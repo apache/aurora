@@ -10,8 +10,8 @@ import com.twitter.aurora.gen.CronCollisionPolicy;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.LimitConstraint;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.gen.ValueConstraint;
 import com.twitter.aurora.scheduler.base.JobKeys;
 
@@ -28,7 +28,7 @@ import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.is
 // TODO(Sathya): Improve test coverage for this class.
 public class ConfigurationManagerTest {
   private static final String THERMOS_CONFIG = "config";
-  private static final TwitterTaskInfo MINIMUM_VIABLE_TASK = new TwitterTaskInfo()
+  private static final TaskConfig MINIMUM_VIABLE_TASK = new TaskConfig()
       .setNumCpus(1.0)
       .setRamMb(64)
       .setDiskMb(64);
@@ -41,7 +41,7 @@ public class ConfigurationManagerTest {
       .setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING)
       .setShardCount(1)
       .setTaskConfig(
-          new TwitterTaskInfo()
+          new TaskConfig()
               .setIsService(false)
               .setHealthCheckIntervalSecs(0)
               .setTaskLinks(ImmutableMap.<String, String>of())

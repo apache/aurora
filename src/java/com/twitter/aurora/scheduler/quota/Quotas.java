@@ -5,7 +5,7 @@ import com.google.common.collect.Iterables;
 
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Tasks;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -42,13 +42,13 @@ public final class Quotas {
    * @param tasks Tasks to count quota from.
    * @return Quota requirement to run {@code tasks}.
    */
-  public static Quota fromTasks(Iterable<TwitterTaskInfo> tasks) {
+  public static Quota fromTasks(Iterable<TaskConfig> tasks) {
     checkNotNull(tasks);
 
     double cpu = 0;
     int ramMb = 0;
     int diskMb = 0;
-    for (TwitterTaskInfo task : Iterables.filter(tasks, Tasks.IS_PRODUCTION)) {
+    for (TaskConfig task : Iterables.filter(tasks, Tasks.IS_PRODUCTION)) {
       cpu += task.getNumCpus();
       ramMb += task.getRamMb();
       diskMb += task.getDiskMb();

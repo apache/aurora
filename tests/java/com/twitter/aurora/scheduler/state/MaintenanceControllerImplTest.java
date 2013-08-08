@@ -15,7 +15,7 @@ import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
@@ -64,7 +64,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
                 .setSlaveHost(host)
                 .setTaskId(taskId)
                 .setTask(
-                    new TwitterTaskInfo()
+                    new TaskConfig()
                         .setJobName("jobName")
                         .setOwner(new Identity().setRole("role").setUser("role"))));
   }

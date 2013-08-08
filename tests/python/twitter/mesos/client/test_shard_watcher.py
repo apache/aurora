@@ -56,7 +56,7 @@ class ShardWatcherTest(unittest.TestCase):
     return query
 
   def create_task(self, shard_id):
-    return ScheduledTask(assignedTask=AssignedTask(task=TwitterTaskInfo(shardId=shard_id)))
+    return ScheduledTask(assignedTask=AssignedTask(task=TaskConfig(shardId=shard_id)))
 
   def expect_get_statuses(self, shard_ids=WATCH_SHARDS, num_calls=EXPECTED_CYCLES):
     response = ScheduleStatusResponse(responseCode=ResponseCode.OK, message='test', tasks=[])

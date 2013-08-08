@@ -18,7 +18,7 @@ import com.twitter.aurora.gen.Constants;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 
 /**
  * Utility class providing convenience functions relating to tasks.
@@ -32,14 +32,14 @@ public final class Tasks {
         }
       };
 
-  public static final Function<AssignedTask, TwitterTaskInfo> ASSIGNED_TO_INFO =
-      new Function<AssignedTask, TwitterTaskInfo>() {
-        @Override public TwitterTaskInfo apply(AssignedTask task) {
+  public static final Function<AssignedTask, TaskConfig> ASSIGNED_TO_INFO =
+      new Function<AssignedTask, TaskConfig>() {
+        @Override public TaskConfig apply(AssignedTask task) {
           return task.getTask();
         }
       };
 
-  public static final Function<ScheduledTask, TwitterTaskInfo> SCHEDULED_TO_INFO =
+  public static final Function<ScheduledTask, TaskConfig> SCHEDULED_TO_INFO =
       Functions.compose(ASSIGNED_TO_INFO, SCHEDULED_TO_ASSIGNED);
 
   public static final Function<AssignedTask, String> ASSIGNED_TO_ID =
@@ -52,9 +52,9 @@ public final class Tasks {
   public static final Function<ScheduledTask, String> SCHEDULED_TO_ID =
       Functions.compose(ASSIGNED_TO_ID, SCHEDULED_TO_ASSIGNED);
 
-  public static final Function<TwitterTaskInfo, Integer> INFO_TO_SHARD_ID =
-      new Function<TwitterTaskInfo, Integer>() {
-        @Override public Integer apply(TwitterTaskInfo task) {
+  public static final Function<TaskConfig, Integer> INFO_TO_SHARD_ID =
+      new Function<TaskConfig, Integer>() {
+        @Override public Integer apply(TaskConfig task) {
           return task.getShardId();
         }
       };
@@ -62,9 +62,9 @@ public final class Tasks {
   public static final Function<ScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
       Functions.compose(INFO_TO_SHARD_ID, SCHEDULED_TO_INFO);
 
-  public static final Function<TwitterTaskInfo, JobKey> INFO_TO_JOB_KEY =
-      new Function<TwitterTaskInfo, JobKey>() {
-        @Override public JobKey apply(TwitterTaskInfo task) {
+  public static final Function<TaskConfig, JobKey> INFO_TO_JOB_KEY =
+      new Function<TaskConfig, JobKey>() {
+        @Override public JobKey apply(TaskConfig task) {
           return JobKeys.from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
         }
       };
@@ -94,9 +94,9 @@ public final class Tasks {
   public static final Set<ScheduleStatus> TERMINAL_STATES =
       EnumSet.copyOf(Constants.TERMINAL_STATES);
 
-  public static final Predicate<TwitterTaskInfo> IS_PRODUCTION =
-      new Predicate<TwitterTaskInfo>() {
-        @Override public boolean apply(TwitterTaskInfo task) {
+  public static final Predicate<TaskConfig> IS_PRODUCTION =
+      new Predicate<TaskConfig>() {
+        @Override public boolean apply(TaskConfig task) {
           return task.isProduction();
         }
       };

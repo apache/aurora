@@ -9,8 +9,8 @@ import org.junit.Test;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
 
@@ -92,7 +92,7 @@ public class MemUpdateStoreTest {
   }
 
   private static JobUpdateConfiguration makeConfig(JobKey jobKey) {
-    TwitterTaskInfo template = new TwitterTaskInfo()
+    TaskConfig template = new TaskConfig()
         .setOwner(new Identity().setRole(jobKey.getRole()).setUser("user-" + jobKey.getName()))
         .setEnvironment(jobKey.getEnvironment())
         .setJobName(jobKey.getName());

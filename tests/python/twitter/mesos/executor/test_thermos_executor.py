@@ -14,7 +14,7 @@ from thrift.TSerialization import serialize
 import mesos_pb2 as mesos_pb
 from gen.twitter.mesos.ttypes import (
   AssignedTask,
-  TwitterTaskInfo)
+  TaskConfig)
 from gen.twitter.thermos.ttypes import TaskState
 
 from twitter.common import log
@@ -120,7 +120,7 @@ class ProxyDriver(object):
 
 
 def make_task(thermos_config, assigned_ports={}, **kw):
-  at = AssignedTask(task=TwitterTaskInfo(thermosConfig=thermos_config.json_dumps(), **kw),
+  at = AssignedTask(task=TaskConfig(thermosConfig=thermos_config.json_dumps(), **kw),
                     assignedPorts=assigned_ports)
   td = mesos_pb.TaskInfo()
   td.task_id.value = thermos_config.task().name().get() + '-001'
@@ -150,12 +150,12 @@ MESOS_JOB = MesosJob(
 
 
 def test_deserialize_thermos_task():
-  assigned_task = AssignedTask(task=TwitterTaskInfo(
+  assigned_task = AssignedTask(task=TaskConfig(
       thermosConfig=MESOS_JOB(task=HELLO_WORLD).json_dumps(),
       shardId=0))
   assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
 
-  assigned_task = AssignedTask(task=TwitterTaskInfo(
+  assigned_task = AssignedTask(task=TaskConfig(
       thermosConfig=HELLO_WORLD_MTI.json_dumps(),
       shardId=0))
   assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
@@ -163,7 +163,7 @@ def test_deserialize_thermos_task():
 
 def test_extract_ensemble():
   def make_assigned_task(thermos_config):
-    return AssignedTask(task=TwitterTaskInfo(thermosConfig=thermos_config.json_dumps(),
+    return AssignedTask(task=TaskConfig(thermosConfig=thermos_config.json_dumps(),
         shardId=0))
 
   assigned_task = make_assigned_task(MESOS_JOB(task=HELLO_WORLD, cluster='unknown'))

@@ -46,9 +46,9 @@ import com.twitter.aurora.gen.ShardConfigRewrite;
 import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.StartMaintenanceResponse;
 import com.twitter.aurora.gen.StartUpdateResponse;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.gen.ValueConstraint;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
@@ -209,7 +209,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setJobName("foo_job");
     ScheduledTask task = new ScheduledTask()
         .setAssignedTask(new AssignedTask()
-            .setTask(new TwitterTaskInfo()
+            .setTask(new TaskConfig()
                 .setOwner(ROLE_IDENTITY)));
 
     expectAuth(ROOT, false);
@@ -231,7 +231,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setJobName("foo_job");
     ScheduledTask task = new ScheduledTask()
         .setAssignedTask(new AssignedTask()
-            .setTask(new TwitterTaskInfo()
+            .setTask(new TaskConfig()
                 .setOwner(ROLE_IDENTITY)));
 
     expectAuth(ROOT, false);
@@ -254,7 +254,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setJobName("foo_job");
     ScheduledTask task = new ScheduledTask()
         .setAssignedTask(new AssignedTask()
-            .setTask(new TwitterTaskInfo()
+            .setTask(new TaskConfig()
                 .setOwner(ROLE_IDENTITY)));
 
     expectAuth(ROOT, false);
@@ -450,7 +450,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    TwitterTaskInfo task = productionTask();
+    TaskConfig task = productionTask();
     task.unsetNumCpus();
     task.unsetRamMb();
     task.unsetDiskMb();
@@ -465,7 +465,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    TwitterTaskInfo task = productionTask().setNumCpus(0.0);
+    TaskConfig task = productionTask().setNumCpus(0.0);
     assertEquals(
         INVALID_REQUEST,
         thrift.createJob(makeJob(task), SESSION).getResponseCode());
@@ -477,7 +477,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    TwitterTaskInfo task = productionTask().setRamMb(-123);
+    TaskConfig task = productionTask().setRamMb(-123);
     assertEquals(
         INVALID_REQUEST,
         thrift.createJob(makeJob(task), SESSION).getResponseCode());
@@ -489,7 +489,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    TwitterTaskInfo task = productionTask().setDiskMb(0);
+    TaskConfig task = productionTask().setDiskMb(0);
     assertEquals(
         INVALID_REQUEST,
         thrift.createJob(makeJob(task), SESSION).getResponseCode());
@@ -497,7 +497,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testCreateJobPopulateDefaults() throws Exception {
-    TwitterTaskInfo task = new TwitterTaskInfo()
+    TaskConfig task = new TaskConfig()
         .setContactEmail("testing@twitter.com")
         .setThermosConfig(new byte[]{1, 2, 3})  // Arbitrary opaque data.
         .setNumCpus(1.0)
@@ -564,8 +564,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testRewriteShardCasMismatch() throws Exception {
-    TwitterTaskInfo storedConfig = productionTask();
-    TwitterTaskInfo modifiedConfig =
+    TaskConfig storedConfig = productionTask();
+    TaskConfig modifiedConfig =
         storedConfig.deepCopy().setThermosConfig("rewritten".getBytes());
     ScheduledTask storedTask =
         new ScheduledTask().setAssignedTask(new AssignedTask().setTask(storedConfig));
@@ -590,8 +590,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testRewriteShard() throws Exception {
-    TwitterTaskInfo storedConfig = productionTask();
-    TwitterTaskInfo modifiedConfig =
+    TaskConfig storedConfig = productionTask();
+    TaskConfig modifiedConfig =
         storedConfig.deepCopy().setThermosConfig("rewritten".getBytes());
     String taskId = "task_id";
     ScheduledTask storedTask = new ScheduledTask().setAssignedTask(
@@ -730,7 +730,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    TwitterTaskInfo task = nonProductionTask();
+    TaskConfig task = nonProductionTask();
     task.addToConstraints(dedicatedConstraint(1));
     assertEquals(
         INVALID_REQUEST,
@@ -743,7 +743,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    TwitterTaskInfo task = nonProductionTask();
+    TaskConfig task = nonProductionTask();
     task.addToConstraints(dedicatedConstraint(ImmutableSet.of("mesos", "test")));
     assertEquals(
         INVALID_REQUEST,
@@ -756,7 +756,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    TwitterTaskInfo task = nonProductionTask();
+    TaskConfig task = nonProductionTask();
     task.addToConstraints(dedicatedConstraint(ImmutableSet.of("mesos")));
     assertEquals(
         INVALID_REQUEST,
@@ -804,7 +804,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testGetJobs() throws Exception {
-    TwitterTaskInfo ownedCronJobTask = nonProductionTask()
+    TaskConfig ownedCronJobTask = nonProductionTask()
         .setJobName(JobKeys.TO_JOB_NAME.apply(JOB_KEY))
         .setOwner(ROLE_IDENTITY)
         .setEnvironment(JobKeys.TO_ENVIRONMENT.apply(JOB_KEY));
@@ -819,7 +819,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setCronSchedule("0 * * * *")
         .setKey(JOB_KEY.deepCopy().setRole("other"))
         .setTaskConfig(ownedCronJobTask.deepCopy().setOwner(otherOwner));
-    TwitterTaskInfo ownedImmediateTaskInfo = defaultTask(false)
+    TaskConfig ownedImmediateTaskInfo = defaultTask(false)
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
     Set<JobConfiguration> ownedCronJobOnly = ImmutableSet.of(ownedCronJob);
@@ -877,7 +877,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setCronSchedule("2 * * * *")
         .setKey(jobKey2)
         .setTaskConfig(nonProductionTask());
-    TwitterTaskInfo immediateTaskConfig = defaultTask(false)
+    TaskConfig immediateTaskConfig = defaultTask(false)
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
     ScheduledTask immediateTask = new ScheduledTask()
@@ -923,11 +923,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return makeJob(nonProductionTask(), 1);
   }
 
-  private JobConfiguration makeJob(TwitterTaskInfo task) {
+  private JobConfiguration makeJob(TaskConfig task) {
     return makeJob(task, 1);
   }
 
-  private JobConfiguration makeJob(TwitterTaskInfo task, int shardCount) {
+  private JobConfiguration makeJob(TaskConfig task, int shardCount) {
     return new JobConfiguration()
         .setName(JOB_NAME)
         .setOwner(ROLE_IDENTITY)
@@ -958,8 +958,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     }
   }
 
-  private static TwitterTaskInfo defaultTask(boolean production) {
-    return new TwitterTaskInfo()
+  private static TaskConfig defaultTask(boolean production) {
+    return new TaskConfig()
         .setOwner(new Identity("role", "user"))
         .setEnvironment(DEFAULT_ENVIRONMENT)
         .setJobName(JOB_NAME)
@@ -971,11 +971,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setProduction(production);
   }
 
-  private static TwitterTaskInfo productionTask() {
+  private static TaskConfig productionTask() {
     return defaultTask(true);
   }
 
-  private static TwitterTaskInfo nonProductionTask() {
+  private static TaskConfig nonProductionTask() {
     return defaultTask(false);
   }
 

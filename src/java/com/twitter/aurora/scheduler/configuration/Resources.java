@@ -23,7 +23,7 @@ import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Type;
 
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Numbers;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
@@ -138,7 +138,7 @@ public class Resources {
    * @param task Task to get resources from.
    * @return The resources required by the task.
    */
-  public static Resources from(TwitterTaskInfo task) {
+  public static Resources from(TaskConfig task) {
     checkNotNull(task);
     return new Resources(
         task.getNumCpus(),

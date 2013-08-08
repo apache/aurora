@@ -15,8 +15,8 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -114,7 +114,7 @@ public class MemTaskStoreTest {
 
   @Test
   public void testUnsafeModifyInPlace() {
-    TwitterTaskInfo updated =
+    TaskConfig updated =
         TASK_A.getAssignedTask().getTask().deepCopy().setThermosConfig("new_config".getBytes());
 
     String taskId = Tasks.id(TASK_A);
@@ -122,7 +122,7 @@ public class MemTaskStoreTest {
 
     store.saveTasks(ImmutableSet.of(TASK_A));
     assertTrue(store.unsafeModifyInPlace(taskId, updated.deepCopy()));
-    TwitterTaskInfo stored =
+    TaskConfig stored =
         Iterables.getOnlyElement(store.fetchTasks(Query.byId(taskId))).getAssignedTask().getTask();
     assertEquals(updated, stored);
 
@@ -239,7 +239,7 @@ public class MemTaskStoreTest {
         .setStatus(ScheduleStatus.PENDING)
         .setAssignedTask(new AssignedTask()
             .setTaskId(id)
-            .setTask(new TwitterTaskInfo()
+            .setTask(new TaskConfig()
                 .setShardId(0)
                 .setJobName(jobName)
                 .setEnvironment(env)

@@ -27,9 +27,9 @@ import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
@@ -374,7 +374,7 @@ public class LogStorageTest extends EasyMockTest {
   public void testUnsafeModifyInPlace() throws Exception {
     final String taskId = "wilma";
     final String taskId2 = "barney";
-    final TwitterTaskInfo updatedConfig =
+    final TaskConfig updatedConfig =
         task(taskId, ScheduleStatus.RUNNING).getAssignedTask().getTask();
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
@@ -532,7 +532,7 @@ public class LogStorageTest extends EasyMockTest {
     final String updateToken = "update-ok";
     final ImmutableSet<TaskUpdateConfiguration> updateConfiguration =
         ImmutableSet.of(
-            new TaskUpdateConfiguration().setNewConfig(new TwitterTaskInfo().setShardId(42)));
+            new TaskUpdateConfiguration().setNewConfig(new TaskConfig().setShardId(42)));
     final JobUpdateConfiguration config =
         new JobUpdateConfiguration(jobKey, updateToken, updateConfiguration);
     final SaveJobUpdate saveOp = new SaveJobUpdate(jobKey, updateToken, updateConfiguration);

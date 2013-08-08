@@ -22,8 +22,8 @@ import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.LimitConstraint;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.gen.ValueConstraint;
 import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.aurora.scheduler.base.Query;
@@ -147,13 +147,13 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         DEFAULT_OFFER.getRam(),
         Amount.of(DEFAULT_DISK, Data.MB), 2);
 
-    TwitterTaskInfo noPortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+    TaskConfig noPortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .setRequestedPorts(ImmutableSet.<String>of());
-    TwitterTaskInfo onePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+    TaskConfig onePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .setRequestedPorts(ImmutableSet.of("one"));
-    TwitterTaskInfo twoPortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+    TaskConfig twoPortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .setRequestedPorts(ImmutableSet.of("one", "two"));
-    TwitterTaskInfo threePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+    TaskConfig threePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .setRequestedPorts(ImmutableSet.of("one", "two", "three"));
 
     Set<Veto> none = ImmutableSet.of();
@@ -418,7 +418,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint jvmConstraint = makeConstraint("jvm", "1.6");
     Constraint zoneConstraint = makeConstraint("zone", "c");
 
-    TwitterTaskInfo task = makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint);
+    TaskConfig task = makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint);
     assertTrue(defaultFilter.filter(DEFAULT_OFFER, HOST_A, task, TASK_ID).isEmpty());
 
     Constraint jvmNegated = jvmConstraint.deepCopy();
@@ -439,7 +439,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertEquals((int) (Veto.MAX_SCORE * 200.0 / DISK.getRange()), DISK.veto(200).getScore());
   }
 
-  private TwitterTaskInfo checkConstraint(
+  private TaskConfig checkConstraint(
       String host,
       String constraintName,
       boolean expected,
@@ -449,7 +449,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return checkConstraint(OWNER_A, JOB_A, host, constraintName, expected, value, vs);
   }
 
-  private TwitterTaskInfo checkConstraint(
+  private TaskConfig checkConstraint(
       Identity owner,
       String jobName,
       String host,
@@ -463,7 +463,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
             ImmutableSet.<String>builder().add(value).addAll(Arrays.asList(vs)).build()));
   }
 
-  private TwitterTaskInfo checkConstraint(
+  private TaskConfig checkConstraint(
       Identity owner,
       String jobName,
       String host,
@@ -472,33 +472,33 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       ValueConstraint value) {
 
     Constraint constraint = new Constraint(constraintName, TaskConstraint.value(value));
-    TwitterTaskInfo task = makeTask(owner, jobName, constraint);
+    TaskConfig task = makeTask(owner, jobName, constraint);
     assertEquals(
         expected,
         defaultFilter.filter(DEFAULT_OFFER, host, task, TASK_ID).isEmpty());
 
     Constraint negated = constraint.deepCopy();
     negated.getConstraint().getValue().setNegated(!value.isNegated());
-    TwitterTaskInfo negatedTask = makeTask(owner, jobName, negated);
+    TaskConfig negatedTask = makeTask(owner, jobName, negated);
     assertEquals(
         !expected,
         defaultFilter.filter(DEFAULT_OFFER, host, negatedTask, TASK_ID).isEmpty());
     return task;
   }
 
-  private void assertNoVetoes(TwitterTaskInfo task) {
+  private void assertNoVetoes(TaskConfig task) {
     assertNoVetoes(task, HOST_A);
   }
 
-  private void assertNoVetoes(TwitterTaskInfo task, String host) {
+  private void assertNoVetoes(TaskConfig task, String host) {
     assertVetoes(task, host);
   }
 
-  private void assertVetoes(TwitterTaskInfo task, Veto... vetos) {
+  private void assertVetoes(TaskConfig task, Veto... vetos) {
     assertVetoes(task, HOST_A, vetos);
   }
 
-  private void assertVetoes(TwitterTaskInfo task, String host, Veto... vetoes) {
+  private void assertVetoes(TaskConfig task, String host, Veto... vetoes) {
     assertEquals(ImmutableSet.copyOf(vetoes),
         defaultFilter.filter(DEFAULT_OFFER, host, task, TASK_ID));
   }
@@ -549,28 +549,28 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return new Constraint(name, TaskConstraint.limit(new LimitConstraint(value)));
   }
 
-  private TwitterTaskInfo makeTask(Identity owner, String jobName, Constraint... constraint) {
+  private TaskConfig makeTask(Identity owner, String jobName, Constraint... constraint) {
     return makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .setOwner(owner)
         .setJobName(jobName)
         .setConstraints(Sets.newHashSet(constraint));
   }
 
-  private TwitterTaskInfo hostLimitTask(Identity owner, String jobName, int maxPerHost) {
+  private TaskConfig hostLimitTask(Identity owner, String jobName, int maxPerHost) {
     return makeTask(owner, jobName, limitConstraint(HOST_ATTRIBUTE, maxPerHost));
   }
 
-  private TwitterTaskInfo hostLimitTask(int maxPerHost) {
+  private TaskConfig hostLimitTask(int maxPerHost) {
     return hostLimitTask(OWNER_A, JOB_A, maxPerHost);
   }
 
-  private TwitterTaskInfo rackLimitTask(Identity owner, String jobName, int maxPerRack) {
+  private TaskConfig rackLimitTask(Identity owner, String jobName, int maxPerRack) {
     return makeTask(owner, jobName, limitConstraint(RACK_ATTRIBUTE, maxPerRack));
   }
 
-  private TwitterTaskInfo makeTask(Identity owner, String jobName, int cpus, long ramMb,
+  private TaskConfig makeTask(Identity owner, String jobName, int cpus, long ramMb,
       long diskMb) {
-    return ConfigurationManager.applyDefaultsIfUnset(new TwitterTaskInfo()
+    return ConfigurationManager.applyDefaultsIfUnset(new TaskConfig()
         .setOwner(owner)
         .setJobName(jobName)
         .setNumCpus(cpus)
@@ -579,11 +579,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .setThermosConfig(new byte[]{0}));
   }
 
-  private TwitterTaskInfo makeTask(int cpus, long ramMb, long diskMb) throws Exception {
+  private TaskConfig makeTask(int cpus, long ramMb, long diskMb) throws Exception {
     return makeTask(OWNER_A, JOB_A, cpus, ramMb, diskMb);
   }
 
-  private TwitterTaskInfo makeTask() throws Exception {
+  private TaskConfig makeTask() throws Exception {
     return makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK);
   }
 }

@@ -21,7 +21,7 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.comm.AdjustRetainedTasks;
 import com.twitter.aurora.scheduler.PulseMonitor;
 import com.twitter.aurora.scheduler.base.Query;
@@ -120,7 +120,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
         .setAssignedTask(new AssignedTask()
             .setTaskId("task-" + taskIdCounter.incrementAndGet())
             .setSlaveHost(HOST)
-            .setTask(new TwitterTaskInfo()
+            .setTask(new TaskConfig()
                 .setJobName(jobName)
                 .setOwner(new Identity().setRole("role").setUser("user"))
                 .setThermosConfig(isThermos ? new byte[] {1, 2, 3} : new byte[] {})));

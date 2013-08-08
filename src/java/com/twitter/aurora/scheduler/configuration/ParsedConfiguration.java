@@ -8,7 +8,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 
 /**
@@ -18,10 +18,10 @@ import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescr
 public final class ParsedConfiguration {
 
   private final JobConfiguration parsed;
-  private final Set<TwitterTaskInfo> tasks;
+  private final Set<TaskConfig> tasks;
 
   /**
-   * Constructs a ParsedConfiguration object and populates the set of {@link TwitterTaskInfo}s for
+   * Constructs a ParsedConfiguration object and populates the set of {@link TaskConfig}s for
    * the provided config.
    *
    * @param parsed A parsed {@link JobConfiguration}.
@@ -29,7 +29,7 @@ public final class ParsedConfiguration {
   @VisibleForTesting
   public ParsedConfiguration(JobConfiguration parsed) {
     this.parsed = parsed;
-    ImmutableSet.Builder<TwitterTaskInfo> builder = ImmutableSet.builder();
+    ImmutableSet.Builder<TaskConfig> builder = ImmutableSet.builder();
     for (int i = 0; i < parsed.getShardCount(); i++) {
       builder.add(parsed.getTaskConfig().deepCopy().setShardId(i));
     }
@@ -54,7 +54,7 @@ public final class ParsedConfiguration {
     return parsed;
   }
 
-  public Set<TwitterTaskInfo> getTaskConfigs() {
+  public Set<TaskConfig> getTaskConfigs() {
     return tasks;
   }
 

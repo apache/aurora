@@ -50,7 +50,7 @@ struct SaveTasks {
 
 struct RewriteTask {
   1: string taskId
-  2: api.TwitterTaskInfo task
+  2: api.TaskConfig task
 }
 
 struct RemoveTasks {

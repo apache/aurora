@@ -10,9 +10,9 @@ import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Quota;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Shards;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -92,7 +92,7 @@ public interface QuotaManager {
     }
 
     private static Quota getUpdateQuota(Collection<TaskUpdateConfiguration> configs,
-        Function<TaskUpdateConfiguration, TwitterTaskInfo> taskExtractor) {
+        Function<TaskUpdateConfiguration, TaskConfig> taskExtractor) {
       return Quotas.fromTasks(Iterables.filter(Iterables.transform(configs, taskExtractor),
           Predicates.notNull()));
     }

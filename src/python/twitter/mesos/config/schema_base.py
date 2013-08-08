@@ -78,7 +78,7 @@ class Announcer(Struct):
   })
 
 
-# The thermosConfig populated inside of TwitterTaskInfo.
+# The thermosConfig populated inside of TaskConfig.
 class MesosTaskInstance(Struct):
   task                       = Required(Task)
   layout                     = AppLayout

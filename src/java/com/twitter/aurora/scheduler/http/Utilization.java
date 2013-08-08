@@ -22,7 +22,7 @@ import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.stats.ResourceCounter;
 import com.twitter.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
@@ -164,8 +164,8 @@ public class Utilization {
   public Response aggregateRoles(@PathParam("metric") final String metric) {
     final MetricType type = getTypeByName(metric);
 
-    Function<TwitterTaskInfo, Display> toKey = new Function<TwitterTaskInfo, Display>() {
-      @Override public Display apply(TwitterTaskInfo task) {
+    Function<TaskConfig, Display> toKey = new Function<TaskConfig, Display>() {
+      @Override public Display apply(TaskConfig task) {
         String role = task.getOwner().getRole();
         return new Display(role, metric + "/" + role);
       }
@@ -190,8 +190,8 @@ public class Utilization {
       @PathParam("role") String role) {
 
     MetricType type = getTypeByName(metric);
-    Function<TwitterTaskInfo, Display> toKey = new Function<TwitterTaskInfo, Display>() {
-      @Override public Display apply(TwitterTaskInfo task) {
+    Function<TaskConfig, Display> toKey = new Function<TaskConfig, Display>() {
+      @Override public Display apply(TaskConfig task) {
         return new Display(task.getJobName(), null);
       }
     };

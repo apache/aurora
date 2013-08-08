@@ -20,7 +20,7 @@ import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -45,7 +45,7 @@ import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 /**
  * A collection of task groups, where a task group is a collection of tasks that are known to be
  * equal in the way they schedule. This is expected to be tasks associated with the same job key,
- * who also have {@code equal()} {@link TwitterTaskInfo} values.
+ * who also have {@code equal()} {@link TaskConfig} values.
  * <p>
  * This is used to prevent redundant work in trying to schedule tasks as well as to provide
  * nearly-equal responsiveness when scheduling across jobs.  In other words, a 1000 shard job cannot
@@ -209,9 +209,9 @@ public class TaskGroups implements EventSubscriber {
   }
 
   static class GroupKey {
-    private final TwitterTaskInfo scrubbedCanonicalTask;
+    private final TaskConfig scrubbedCanonicalTask;
 
-    GroupKey(TwitterTaskInfo task) {
+    GroupKey(TaskConfig task) {
       this.scrubbedCanonicalTask = ConfigurationManager.scrubNonUniqueTaskFields(task);
     }
 

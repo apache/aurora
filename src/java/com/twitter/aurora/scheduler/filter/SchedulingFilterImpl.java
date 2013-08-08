@@ -22,8 +22,8 @@ import com.twitter.aurora.gen.Constraint;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -84,17 +84,17 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   /**
    * A function that may veto a task.
    */
-  private interface FilterRule extends Function<TwitterTaskInfo, Iterable<Veto>> { }
+  private interface FilterRule extends Function<TaskConfig, Iterable<Veto>> { }
 
   /**
    * Convenience class for a rule that will only ever have a single veto.
    */
   private abstract static class SingleVetoRule implements FilterRule {
-    @Override public final Iterable<Veto> apply(TwitterTaskInfo task) {
+    @Override public final Iterable<Veto> apply(TaskConfig task) {
       return doApply(task).asSet();
     }
 
-    abstract Optional<Veto> doApply(TwitterTaskInfo task);
+    abstract Optional<Veto> doApply(TaskConfig task);
   }
 
   // Scaling ranges to use for comparison of vetos.  This has no real bearing besides trying to
@@ -141,26 +141,26 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private Iterable<FilterRule> rulesFromOffer(final Resources available) {
     return ImmutableList.<FilterRule>of(
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
+          @Override public Optional<Veto> doApply(TaskConfig task) {
             return CPU.maybeVeto(
                 available.getNumCpus(),
                 MesosTaskFactoryImpl.getTotalTaskCpus(task.getNumCpus()));
           }
         },
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
+          @Override public Optional<Veto> doApply(TaskConfig task) {
             return RAM.maybeVeto(
                 available.getRam().as(Data.MB),
                 MesosTaskFactoryImpl.getTotalTaskRam(task.getRamMb()).as(Data.MB));
           }
         },
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
+          @Override public Optional<Veto> doApply(TaskConfig task) {
             return DISK.maybeVeto(available.getDisk().as(Data.MB), task.getDiskMb());
           }
         },
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(TwitterTaskInfo task) {
+          @Override public Optional<Veto> doApply(TaskConfig task) {
             return PORTS.maybeVeto(available.getNumPorts(), task.getRequestedPorts().size());
           }
         }
@@ -186,7 +186,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   private FilterRule getConstraintFilter(final String slaveHost) {
     return new FilterRule() {
-      @Override public Iterable<Veto> apply(final TwitterTaskInfo task) {
+      @Override public Iterable<Veto> apply(final TaskConfig task) {
         if (!task.isSetConstraints()) {
           return ImmutableList.of();
         }
@@ -244,7 +244,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         : NO_VETO;
   }
 
-  private Set<Veto> getResourceVetoes(Resources offer, TwitterTaskInfo task) {
+  private Set<Veto> getResourceVetoes(Resources offer, TaskConfig task) {
     ImmutableSet.Builder<Veto> builder = ImmutableSet.builder();
     for (FilterRule rule : rulesFromOffer(offer)) {
       builder.addAll(rule.apply(task));
@@ -264,7 +264,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   }
 
   @Override
-  public Set<Veto> filter(Resources offer, String slaveHost, TwitterTaskInfo task, String taskId) {
+  public Set<Veto> filter(Resources offer, String slaveHost, TaskConfig task, String taskId) {
     if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
       return ImmutableSet.of(DEDICATED_HOST_VETO);
     }

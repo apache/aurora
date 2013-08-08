@@ -14,7 +14,7 @@ import com.google.inject.TypeLiteral;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.Driver.DriverImpl;
 import com.twitter.aurora.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.aurora.scheduler.SchedulerLifecycle.DriverReference;
@@ -49,7 +49,7 @@ public class SchedulerModule extends AbstractModule {
     bind(Scheduler.class).to(MesosSchedulerImpl.class);
     bind(MesosSchedulerImpl.class).in(Singleton.class);
 
-    bind(new TypeLiteral<Function<TwitterTaskInfo, String>>() { }).to(TaskIdGenerator.class);
+    bind(new TypeLiteral<Function<TaskConfig, String>>() { }).to(TaskIdGenerator.class);
 
     bind(new TypeLiteral<Optional<String>>() { }).annotatedWith(GcExecutor.class)
         .toInstance(Optional.fromNullable(GC_EXECUTOR_PATH.get()));

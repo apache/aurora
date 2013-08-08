@@ -7,7 +7,7 @@ import java.util.Set;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.events.PubsubEvent.Vetoed;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
@@ -45,7 +45,7 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   }
 
   @Override
-  public Set<Veto> filter(Resources offer, String slaveHost, TwitterTaskInfo task, String taskId) {
+  public Set<Veto> filter(Resources offer, String slaveHost, TaskConfig task, String taskId) {
     Set<Veto> vetoes = delegate.filter(offer, slaveHost, task, taskId);
     if (!vetoes.isEmpty()) {
       eventSink.execute(new Vetoed(taskId, vetoes));

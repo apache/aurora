@@ -15,9 +15,9 @@ import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
@@ -214,8 +214,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
                 .setTask(createTaskConfig(jobName, cpus, ramMb, diskMb)));
   }
 
-  private TwitterTaskInfo createTaskConfig(String jobName, int cpus, int ramMb, int diskMb) {
-    return new TwitterTaskInfo()
+  private TaskConfig createTaskConfig(String jobName, int cpus, int ramMb, int diskMb) {
+    return new TaskConfig()
         .setOwner(new Identity(ROLE, ROLE))
         .setJobName(jobName)
         .setNumCpus(cpus)

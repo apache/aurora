@@ -24,8 +24,8 @@ import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
@@ -408,7 +408,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     return new AssignedTask()
         .setSlaveHost(SLAVE_HOST)
         .setTaskId(taskId)
-        .setTask(new TwitterTaskInfo()
+        .setTask(new TaskConfig()
             .setOwner(new Identity().setRole("role").setUser("user"))
             .setEnvironment("staging45")
             .setJobName(job)

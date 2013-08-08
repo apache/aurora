@@ -48,7 +48,7 @@ import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.Package;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.DriverFactory;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
@@ -240,7 +240,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
           .setKey(JobKeys.from(owner.getRole(), "test", jobName))
           .setOwner(owner)
           .setShardCount(5)
-          .setTaskConfig(new TwitterTaskInfo()
+          .setTaskConfig(new TaskConfig()
               .setOwner(owner)
               .setJobName(jobName)
               .setEnvironment("test")

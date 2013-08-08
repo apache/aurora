@@ -24,8 +24,8 @@ import org.apache.commons.lang.StringUtils;
 
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.storage.TaskStore;
@@ -182,7 +182,7 @@ class MemTaskStore implements TaskStore.Mutable {
 
   @Timed("mem_storage_unsafe_modify_in_place")
   @Override
-  public boolean unsafeModifyInPlace(String taskId, TwitterTaskInfo taskConfiguration) {
+  public boolean unsafeModifyInPlace(String taskId, TaskConfig taskConfiguration) {
     MorePreconditions.checkNotBlank(taskId);
     checkNotNull(taskConfiguration);
 
@@ -190,7 +190,7 @@ class MemTaskStore implements TaskStore.Mutable {
     if (stored == null) {
       return false;
     } else {
-      stored.getAssignedTask().setTask(Util.<TwitterTaskInfo>deepCopier().apply(taskConfiguration));
+      stored.getAssignedTask().setTask(Util.<TaskConfig>deepCopier().apply(taskConfiguration));
       return true;
     }
   }
@@ -198,7 +198,7 @@ class MemTaskStore implements TaskStore.Mutable {
   private static Predicate<ScheduledTask> queryFilter(final TaskQuery query) {
     return new Predicate<ScheduledTask>() {
       @Override public boolean apply(ScheduledTask task) {
-        TwitterTaskInfo config = task.getAssignedTask().getTask();
+        TaskConfig config = task.getAssignedTask().getTask();
         if (query.getOwner() != null) {
           if (!StringUtils.isBlank(query.getOwner().getRole())) {
             if (!query.getOwner().getRole().equals(config.getOwner().getRole())) {

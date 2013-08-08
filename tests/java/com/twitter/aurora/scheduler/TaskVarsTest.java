@@ -17,7 +17,7 @@ import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -83,7 +83,7 @@ public class TaskVarsTest extends EasyMockTest {
         .setAssignedTask(new AssignedTask()
             .setTaskId(TASK_ID)
             .setSlaveHost(host)
-            .setTask(new TwitterTaskInfo()
+            .setTask(new TaskConfig()
                 .setJobName(job)
                 .setOwner(new Identity(ROLE_A, ROLE_A + "-user"))));
   }

@@ -6,13 +6,13 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.common.util.Clock;
 
 /**
  * A function that generates universally-unique (not guaranteed, but highly confident) task IDs.
  */
-class TaskIdGenerator implements Function<TwitterTaskInfo, String> {
+class TaskIdGenerator implements Function<TaskConfig, String> {
 
   private final Clock clock;
 
@@ -22,7 +22,7 @@ class TaskIdGenerator implements Function<TwitterTaskInfo, String> {
   }
 
   @Override
-  public String apply(TwitterTaskInfo task) {
+  public String apply(TaskConfig task) {
     String sep = "-";
     return new StringBuilder()
         .append(clock.nowMillis())               // Allows chronological sorting.

@@ -20,7 +20,7 @@ import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.state.CronJobManager;
@@ -86,7 +86,7 @@ public class SchedulerzHome extends JerseyTemplateServlet {
         // TODO(William Farner): Render this page without an expensive query.
         Set<ScheduledTask> tasks =
             Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped());
-        for (TwitterTaskInfo task : Iterables.transform(tasks, Tasks.SCHEDULED_TO_INFO)) {
+        for (TaskConfig task : Iterables.transform(tasks, Tasks.SCHEDULED_TO_INFO)) {
           owners.getUnchecked(task.getOwner().getRole()).accumulate(task);
         }
 
@@ -110,7 +110,7 @@ public class SchedulerzHome extends JerseyTemplateServlet {
     private Set<String> jobs = Sets.newHashSet();
     private Set<String> cronJobs = Sets.newHashSet();
 
-    private void accumulate(TwitterTaskInfo task) {
+    private void accumulate(TaskConfig task) {
       jobs.add(task.getJobName());
     }
 

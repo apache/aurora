@@ -31,7 +31,7 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.quota.QuotaManager;
@@ -109,7 +109,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         for (ScheduledTask task
             : Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(role))) {
 
-          TwitterTaskInfo config = task.getAssignedTask().getTask();
+          TaskConfig config = task.getAssignedTask().getTask();
           Job job =
               jobs.getUnchecked(JobKeys.from(role, config.getEnvironment(), config.getJobName()));
 
@@ -196,7 +196,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
     Set<String> packages = Sets.newHashSet();
 
     // Insert all packages for all tasks in the set to eliminate duplicates
-    TwitterTaskInfo task = job.getTaskConfig();
+    TaskConfig task = job.getTaskConfig();
     if (task.getPackagesSize() > 0) {
       packages.addAll(Lists.newArrayList(
           Iterables.transform(task.getPackages(), TransformationUtils.PACKAGE_TOSTRING)));

@@ -19,7 +19,7 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -92,7 +92,7 @@ public class MemStorageTest extends TearDownTestCase {
     return new ScheduledTask().setAssignedTask(
         new AssignedTask()
             .setTaskId(taskId)
-            .setTask(new TwitterTaskInfo()
+            .setTask(new TaskConfig()
                 .setOwner(new Identity().setRole("owner-" + taskId))
                 .setJobName("job-" + taskId)
                 .setEnvironment("env-" + taskId)));

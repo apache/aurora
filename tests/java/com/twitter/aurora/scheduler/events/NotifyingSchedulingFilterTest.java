@@ -7,7 +7,7 @@ import com.google.common.collect.ImmutableSet;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.events.PubsubEvent.Vetoed;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
@@ -20,7 +20,7 @@ import static org.junit.Assert.assertEquals;
 
 public class NotifyingSchedulingFilterTest extends EasyMockTest {
 
-  private static final TwitterTaskInfo TASK = new TwitterTaskInfo()
+  private static final TaskConfig TASK = new TaskConfig()
       .setNumCpus(1)
       .setRamMb(1024)
       .setDiskMb(1024);

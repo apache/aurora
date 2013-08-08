@@ -16,8 +16,8 @@ import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
@@ -278,8 +278,8 @@ public class CronJobManagerTest extends EasyMockTest {
         .setShardCount(1);
   }
 
-  private static TwitterTaskInfo defaultTask() {
-    return new TwitterTaskInfo()
+  private static TaskConfig defaultTask() {
+    return new TaskConfig()
         .setContactEmail("testing@twitter.com")
         .setThermosConfig("data".getBytes())
         .setNumCpus(1)

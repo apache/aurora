@@ -17,7 +17,7 @@ import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
@@ -37,7 +37,7 @@ public class ResourceCounter {
     this.storage = Preconditions.checkNotNull(storage);
   }
 
-  private Iterable<TwitterTaskInfo> getTasks(Query.Builder query) throws StorageException {
+  private Iterable<TaskConfig> getTasks(Query.Builder query) throws StorageException {
     return Iterables.transform(
         Storage.Util.consistentFetchTasks(storage, query),
         Tasks.SCHEDULED_TO_INFO);
@@ -56,7 +56,7 @@ public class ResourceCounter {
         new GlobalMetric(MetricType.QUOTA_CONSUMED),
         new GlobalMetric(MetricType.FREE_POOL_CONSUMED));
 
-    for (TwitterTaskInfo task : getTasks(Query.unscoped().active())) {
+    for (TaskConfig task : getTasks(Query.unscoped().active())) {
       for (GlobalMetric count : counts) {
         count.accumulate(task);
       }
@@ -94,8 +94,8 @@ public class ResourceCounter {
    */
   public <K> Map<K, Metric> computeAggregates(
       Query.Builder query,
-      Predicate<TwitterTaskInfo> filter,
-      Function<TwitterTaskInfo, K> keyFunction) throws StorageException {
+      Predicate<TaskConfig> filter,
+      Function<TaskConfig, K> keyFunction) throws StorageException {
 
     LoadingCache<K, Metric> metrics = CacheBuilder.newBuilder()
         .build(new CacheLoader<K, Metric>() {
@@ -103,33 +103,33 @@ public class ResourceCounter {
             return new Metric();
           }
         });
-    for (TwitterTaskInfo task : Iterables.filter(getTasks(query), filter)) {
+    for (TaskConfig task : Iterables.filter(getTasks(query), filter)) {
       metrics.getUnchecked(keyFunction.apply(task)).accumulate(task);
     }
     return metrics.asMap();
   }
 
   public enum MetricType {
-    TOTAL_CONSUMED(Predicates.<TwitterTaskInfo>alwaysTrue()),
-    DEDICATED_CONSUMED(new Predicate<TwitterTaskInfo>() {
-      @Override public boolean apply(@Nullable TwitterTaskInfo task) {
+    TOTAL_CONSUMED(Predicates.<TaskConfig>alwaysTrue()),
+    DEDICATED_CONSUMED(new Predicate<TaskConfig>() {
+      @Override public boolean apply(@Nullable TaskConfig task) {
         return ConfigurationManager.isDedicated(task);
       }
     }),
-    QUOTA_CONSUMED(new Predicate<TwitterTaskInfo>() {
-      @Override public boolean apply(TwitterTaskInfo task) {
+    QUOTA_CONSUMED(new Predicate<TaskConfig>() {
+      @Override public boolean apply(TaskConfig task) {
         return task.isProduction();
       }
     }),
-    FREE_POOL_CONSUMED(new Predicate<TwitterTaskInfo>() {
-      @Override public boolean apply(TwitterTaskInfo task) {
+    FREE_POOL_CONSUMED(new Predicate<TaskConfig>() {
+      @Override public boolean apply(TaskConfig task) {
         return !ConfigurationManager.isDedicated(task) && !task.isProduction();
       }
     });
 
-    public final Predicate<TwitterTaskInfo> filter;
+    public final Predicate<TaskConfig> filter;
 
-    MetricType(Predicate<TwitterTaskInfo> filter) {
+    MetricType(Predicate<TaskConfig> filter) {
       this.filter = filter;
     }
   }
@@ -142,7 +142,7 @@ public class ResourceCounter {
     }
 
     @Override
-    protected void accumulate(TwitterTaskInfo task) {
+    protected void accumulate(TaskConfig task) {
       if (type.filter.apply(task)) {
         super.accumulate(task);
       }
@@ -166,7 +166,7 @@ public class ResourceCounter {
       this.diskMb = copy.diskMb;
     }
 
-    protected void accumulate(TwitterTaskInfo task) {
+    protected void accumulate(TaskConfig task) {
       cpu += task.numCpus;
       ramMb += task.ramMb;
       diskMb += task.diskMb;

@@ -14,7 +14,7 @@ import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.storage.QuotaConfiguration;
 import com.twitter.aurora.gen.storage.SchedulerMetadata;
 import com.twitter.aurora.gen.storage.Snapshot;
@@ -149,7 +149,7 @@ public class RecoveryTest extends EasyMockTest {
     return new ScheduledTask().setAssignedTask(
         new AssignedTask()
             .setTaskId(taskId)
-            .setTask(new TwitterTaskInfo()
+            .setTask(new TaskConfig()
                 .setJobName("job-" + taskId)
                 .setEnvironment("test")
                 .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))));

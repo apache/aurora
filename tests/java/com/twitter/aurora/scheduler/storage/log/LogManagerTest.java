@@ -28,7 +28,7 @@ import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.storage.Frame;
 import com.twitter.aurora.gen.storage.FrameChunk;
 import com.twitter.aurora.gen.storage.FrameHeader;
@@ -494,7 +494,7 @@ public class LogManagerTest extends EasyMockTest {
         .setTasks(ImmutableSet.of(
             new ScheduledTask().setStatus(ScheduleStatus.RUNNING)
                 .setAssignedTask(new AssignedTask().setTaskId("task_id")
-                    .setTask(new TwitterTaskInfo().setJobName("job_name")))));
+                    .setTask(new TaskConfig().setJobName("job_name")))));
   }
 
   private SaveTasks createSaveTasks(String... taskIds) {

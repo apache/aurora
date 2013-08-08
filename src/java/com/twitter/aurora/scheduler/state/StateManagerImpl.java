@@ -38,9 +38,9 @@ import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.ShardUpdateResult;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.base.JobKeys;
@@ -90,7 +90,7 @@ public class StateManagerImpl implements StateManager {
     return storage;
   }
 
-  private final Function<TwitterTaskInfo, String> taskIdGenerator;
+  private final Function<TaskConfig, String> taskIdGenerator;
 
   // TODO(William Farner): Eliminate this and update all callers to use Storage directly.
   interface ReadOnlyStorage {
@@ -120,9 +120,9 @@ public class StateManagerImpl implements StateManager {
       }
     };
 
-  private final Function<TwitterTaskInfo, ScheduledTask> taskCreator =
-      new Function<TwitterTaskInfo, ScheduledTask>() {
-        @Override public ScheduledTask apply(TwitterTaskInfo task) {
+  private final Function<TaskConfig, ScheduledTask> taskCreator =
+      new Function<TaskConfig, ScheduledTask>() {
+        @Override public ScheduledTask apply(TaskConfig task) {
           AssignedTask assigned =
               new AssignedTask().setTaskId(taskIdGenerator.apply(task)).setTask(task);
           return new ScheduledTask()
@@ -154,7 +154,7 @@ public class StateManagerImpl implements StateManager {
       final Storage storage,
       final Clock clock,
       Driver driver,
-      Function<TwitterTaskInfo, String> taskIdGenerator,
+      Function<TaskConfig, String> taskIdGenerator,
       Closure<PubsubEvent> taskEventSink) {
 
     checkNotNull(storage);
@@ -181,7 +181,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   @Override
-  public void insertPendingTasks(final Set<TwitterTaskInfo> tasks) {
+  public void insertPendingTasks(final Set<TaskConfig> tasks) {
     checkNotNull(tasks);
 
     // Done outside the write transaction to minimize the work done inside a transaction.
@@ -219,7 +219,7 @@ public class StateManagerImpl implements StateManager {
    *     is already in progress.
    * @return A unique string identifying the update.
    */
-  String registerUpdate(final JobKey jobKey, final Set<TwitterTaskInfo> updatedTasks)
+  String registerUpdate(final JobKey jobKey, final Set<TaskConfig> updatedTasks)
       throws UpdateException {
 
     checkNotNull(jobKey);
@@ -229,7 +229,7 @@ public class StateManagerImpl implements StateManager {
       @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
         assertNotUpdatingOrRollingBack(jobKey, storeProvider.getTaskStore());
 
-        Set<TwitterTaskInfo> existingTasks = ImmutableSet.copyOf(Iterables.transform(
+        Set<TaskConfig> existingTasks = ImmutableSet.copyOf(Iterables.transform(
             storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()),
             Tasks.SCHEDULED_TO_INFO));
 
@@ -242,9 +242,9 @@ public class StateManagerImpl implements StateManager {
           throw new UpdateException("Update already in progress for " + jobKey);
         }
 
-        Map<Integer, TwitterTaskInfo> oldShards = Maps.uniqueIndex(existingTasks,
+        Map<Integer, TaskConfig> oldShards = Maps.uniqueIndex(existingTasks,
             Tasks.INFO_TO_SHARD_ID);
-        Map<Integer, TwitterTaskInfo> newShards = Maps.uniqueIndex(updatedTasks,
+        Map<Integer, TaskConfig> newShards = Maps.uniqueIndex(updatedTasks,
             Tasks.INFO_TO_SHARD_ID);
 
         ImmutableSet.Builder<TaskUpdateConfiguration> shardConfigBuilder = ImmutableSet.builder();
@@ -320,7 +320,7 @@ public class StateManagerImpl implements StateManager {
 
         if (EnumSet.of(UpdateResult.SUCCESS, UpdateResult.FAILED).contains(result)) {
           // Kill any shards that were removed during the update or rollback.
-          Function<TaskUpdateConfiguration, TwitterTaskInfo> removedSelector =
+          Function<TaskUpdateConfiguration, TaskConfig> removedSelector =
               (result == UpdateResult.SUCCESS) ? GET_NEW_CONFIG : GET_ORIGINAL_CONFIG;
           for (Integer shard : fetchRemovedShards(jobConfig.get(), removedSelector)) {
             changeState(
@@ -339,7 +339,7 @@ public class StateManagerImpl implements StateManager {
   private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD_ID =
       new Function<TaskUpdateConfiguration, Integer>() {
         @Override public Integer apply(TaskUpdateConfiguration config) {
-          TwitterTaskInfo task = (config.getOldConfig() != null)
+          TaskConfig task = (config.getOldConfig() != null)
               ? config.getOldConfig()
               : config.getNewConfig();
           return task.getShardId();
@@ -348,7 +348,7 @@ public class StateManagerImpl implements StateManager {
 
   private Set<Integer> fetchRemovedShards(
       JobUpdateConfiguration jobConfig,
-      Function<TaskUpdateConfiguration, TwitterTaskInfo> configSelector) {
+      Function<TaskUpdateConfiguration, TaskConfig> configSelector) {
 
     return FluentIterable.from(jobConfig.getConfigs())
         .filter(Predicates.compose(Predicates.isNull(), configSelector))
@@ -417,11 +417,11 @@ public class StateManagerImpl implements StateManager {
     }
   };
 
-  private Set<Integer> getChangedShards(Set<ScheduledTask> tasks, Set<TwitterTaskInfo> compareTo) {
-    Set<TwitterTaskInfo> existingTasks = FluentIterable.from(tasks)
+  private Set<Integer> getChangedShards(Set<ScheduledTask> tasks, Set<TaskConfig> compareTo) {
+    Set<TaskConfig> existingTasks = FluentIterable.from(tasks)
         .transform(Tasks.SCHEDULED_TO_INFO)
         .toSet();
-    Set<TwitterTaskInfo> changedTasks = Sets.difference(compareTo, existingTasks);
+    Set<TaskConfig> changedTasks = Sets.difference(compareTo, existingTasks);
     return FluentIterable.from(changedTasks)
         .transform(Tasks.INFO_TO_SHARD_ID)
         .toSet();
@@ -434,7 +434,7 @@ public class StateManagerImpl implements StateManager {
       final String updateToken,
       boolean updating) throws UpdateException {
 
-    final Function<TaskUpdateConfiguration, TwitterTaskInfo> configSelector = updating
+    final Function<TaskUpdateConfiguration, TaskConfig> configSelector = updating
         ? GET_NEW_CONFIG
         : GET_ORIGINAL_CONFIG;
     final ScheduleStatus modifyingState;
@@ -475,7 +475,7 @@ public class StateManagerImpl implements StateManager {
                 ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_SHARD_ID)));
 
             if (!newShardIds.isEmpty()) {
-              Set<TwitterTaskInfo> newTasks = fetchTaskUpdateConfigs(
+              Set<TaskConfig> newTasks = fetchTaskUpdateConfigs(
                   updateConfig.get(),
                   newShardIds,
                   configSelector);
@@ -493,7 +493,7 @@ public class StateManagerImpl implements StateManager {
 
             Set<Integer> updateShardIds = Sets.difference(shards, newShardIds);
             if (!updateShardIds.isEmpty()) {
-              Set<TwitterTaskInfo> targetConfigs = fetchTaskUpdateConfigs(
+              Set<TaskConfig> targetConfigs = fetchTaskUpdateConfigs(
                   updateConfig.get(),
                   updateShardIds,
                   configSelector);
@@ -562,10 +562,10 @@ public class StateManagerImpl implements StateManager {
    * @param shards Shards within a job to fetch.
    * @return The task information of the shard.
    */
-  private Set<TwitterTaskInfo> fetchTaskUpdateConfigs(
+  private Set<TaskConfig> fetchTaskUpdateConfigs(
       JobUpdateConfiguration config,
       final Set<Integer> shards,
-      final Function<TaskUpdateConfiguration, TwitterTaskInfo> configSelector) {
+      final Function<TaskUpdateConfiguration, TaskConfig> configSelector) {
 
     checkNotNull(config);
     checkNotBlank(shards);
@@ -716,7 +716,7 @@ public class StateManagerImpl implements StateManager {
             taskStore.saveTasks(ImmutableSet.of(task));
 
             createStateMachine(task).updateState(PENDING, Optional.of("Rescheduled"));
-            TwitterTaskInfo taskInfo = task.getAssignedTask().getTask();
+            TaskConfig taskInfo = task.getAssignedTask().getTask();
             sideEffectWork.addTaskEvent(
                 new PubsubEvent.TaskRescheduled(
                     taskInfo.getOwner().getRole(),
@@ -780,7 +780,7 @@ public class StateManagerImpl implements StateManager {
 
     TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
 
-    TwitterTaskInfo oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
+    TaskConfig oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
         Iterables.getOnlyElement(taskStore.fetchTasks(Query.byId(taskId))));
 
     Optional<TaskUpdateConfiguration> optional = fetchShardUpdateConfig(
@@ -799,7 +799,7 @@ public class StateManagerImpl implements StateManager {
     }
 
     TaskUpdateConfiguration updateConfig = optional.get();
-    TwitterTaskInfo newConfig =
+    TaskConfig newConfig =
         rollingBack ? updateConfig.getOldConfig() : updateConfig.getNewConfig();
     if (newConfig == null) {
       // The updated configuration removed the shard, nothing to reschedule.

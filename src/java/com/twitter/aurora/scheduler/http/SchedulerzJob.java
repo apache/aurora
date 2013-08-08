@@ -40,9 +40,9 @@ import com.twitter.aurora.gen.Constants;
 import com.twitter.aurora.gen.Constraint;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -119,7 +119,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
   private static String expandText(String value, AssignedTask task) {
     String expanded = value;
-    TwitterTaskInfo config = task.getTask();
+    TaskConfig config = task.getTask();
 
     expanded = expanded.replaceAll(SHARD_ID_REGEXP, String.valueOf(config.getShardId()));
     expanded = expanded.replaceAll(TASK_ID_REGEXP, task.getTaskId());
@@ -239,9 +239,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         }
       };
 
-  private static final Function<TwitterTaskInfo, SchedulingDetails> CONFIG_TO_DETAILS =
-      new Function<TwitterTaskInfo, SchedulingDetails>() {
-        @Override public SchedulingDetails apply(TwitterTaskInfo task) {
+  private static final Function<TaskConfig, SchedulingDetails> CONFIG_TO_DETAILS =
+      new Function<TaskConfig, SchedulingDetails>() {
+        @Override public SchedulingDetails apply(TaskConfig task) {
           String resources = Joiner.on(", ").join(
               "cpu: " + task.getNumCpus(),
               "ram: " + scaleMb(task.getRamMb()),
@@ -306,9 +306,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
 
   private static Map<String, SchedulingDetails> buildSchedulingTable(
-      Iterable<TwitterTaskInfo> tasks) {
+      Iterable<TaskConfig> tasks) {
 
-    Map<Integer, TwitterTaskInfo> byShard = Maps.uniqueIndex(tasks, Tasks.INFO_TO_SHARD_ID);
+    Map<Integer, TaskConfig> byShard = Maps.uniqueIndex(tasks, Tasks.INFO_TO_SHARD_ID);
     Map<Integer, SchedulingDetails> detailsByShard =
         Maps.transformValues(byShard, CONFIG_TO_DETAILS);
     Multimap<SchedulingDetails, Integer> shardsByDetails = Multimaps.invertFrom(

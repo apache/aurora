@@ -16,8 +16,8 @@ import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.common.base.Closure;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -157,7 +157,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public boolean unsafeModifyInPlace(String taskId, TwitterTaskInfo taskConfiguration) {
+  public boolean unsafeModifyInPlace(String taskId, TaskConfig taskConfiguration) {
     return taskStore.unsafeModifyInPlace(taskId, taskConfiguration);
   }
 

@@ -8,8 +8,8 @@ import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.ScheduleStatus;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 
 /**
  * Thin interface for the state manager.
@@ -53,7 +53,7 @@ public interface StateManager {
    *
    * @param tasks Tasks to insert.
    */
-  void insertPendingTasks(Set<TwitterTaskInfo> tasks);
+  void insertPendingTasks(Set<TaskConfig> tasks);
 
   /**
    * Deletes records of tasks from the task store.

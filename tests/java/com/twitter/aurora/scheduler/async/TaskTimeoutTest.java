@@ -17,9 +17,9 @@ import org.junit.Test;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -173,7 +173,7 @@ public class TaskTimeoutTest extends EasyMockTest {
         .setTaskEvents(ImmutableList.of(new TaskEvent(stateEnteredMs, status)))
         .setAssignedTask(new AssignedTask()
             .setTaskId(taskId)
-            .setTask(new TwitterTaskInfo()));
+            .setTask(new TaskConfig()));
   }
 
   @Test

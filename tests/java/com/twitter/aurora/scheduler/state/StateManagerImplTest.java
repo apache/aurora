@@ -28,7 +28,7 @@ import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.ShardUpdateResult;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.base.JobKeys;
@@ -72,7 +72,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final JobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
 
   private Driver driver;
-  private Function<TwitterTaskInfo, String> taskIdGenerator;
+  private Function<TaskConfig, String> taskIdGenerator;
   private Closure<PubsubEvent> eventSink;
   private StateManagerImpl stateManager;
   private final FakeClock clock = new FakeClock();
@@ -80,7 +80,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Before
   public void setUp() throws Exception {
-    taskIdGenerator = createMock(new Clazz<Function<TwitterTaskInfo, String>>() { });
+    taskIdGenerator = createMock(new Clazz<Function<TaskConfig, String>>() { });
     driver = createMock(Driver.class);
     eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
     // TODO(William Farner): Use a mocked storage.
@@ -157,7 +157,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testKillPendingTask() {
-    TwitterTaskInfo task = makeTask(JIM, MY_JOB, 0);
+    TaskConfig task = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
     expect(taskIdGenerator.apply(task)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
@@ -172,7 +172,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testLostKillingTask() {
-    TwitterTaskInfo task = makeTask(JIM, MY_JOB, 0);
+    TaskConfig task = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
     expect(taskIdGenerator.apply(task)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING);
@@ -192,7 +192,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testUpdate() throws Exception {
-    TwitterTaskInfo taskInfo = makeTask(JIM, MY_JOB, 0);
+    TaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
     expect(taskIdGenerator.apply(taskInfo)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
@@ -222,12 +222,12 @@ public class StateManagerImplTest extends EasyMockTest {
     // Otherwise, the schedule would lose the persisted update configuration, and fail
     // to reschedule tasks.
 
-    TwitterTaskInfo taskInfo = makeTask(JIM, MY_JOB, 0);
+    TaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String id = "a";
     expect(taskIdGenerator.apply(taskInfo)).andReturn("a");
     expectStateTransitions(id, INIT, PENDING, ASSIGNED, UPDATING, FINISHED);
 
-    TwitterTaskInfo updated = taskInfo.deepCopy().setNumCpus(1000);
+    TaskConfig updated = taskInfo.deepCopy().setNumCpus(1000);
     String updatedId = "a-updated";
     expect(taskIdGenerator.apply(updated)).andReturn(updatedId);
     expectStateTransitions(updatedId, INIT, PENDING, ASSIGNED, ROLLBACK, FINISHED);
@@ -276,11 +276,11 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testUpdatingToRollback() throws Exception {
-    TwitterTaskInfo taskInfo = makeTask(JIM, MY_JOB, 0);
+    TaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String id = "a";
     expect(taskIdGenerator.apply(taskInfo)).andReturn(id);
     expectStateTransitions(id, INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, ROLLBACK);
-    TwitterTaskInfo updated = taskInfo.deepCopy().setNumCpus(1000);
+    TaskConfig updated = taskInfo.deepCopy().setNumCpus(1000);
     driver.killTask(EasyMock.<String>anyObject());
     expectLastCall().times(2);
     control.replay();
@@ -301,12 +301,12 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testRollbackToUpdating() throws Exception {
-    TwitterTaskInfo taskInfo = makeTask(JIM, MY_JOB, 0);
+    TaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String id = "a";
     expect(taskIdGenerator.apply(taskInfo)).andReturn(id);
     expectStateTransitions(id, INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, KILLED);
 
-    TwitterTaskInfo newConfig = taskInfo.deepCopy().setNumCpus(1000);
+    TaskConfig newConfig = taskInfo.deepCopy().setNumCpus(1000);
     String newTaskId = "a-rescheduled";
     expect(taskIdGenerator.apply(newConfig)).andReturn(newTaskId);
     expectStateTransitions(
@@ -336,7 +336,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testRollback() throws Exception {
-    TwitterTaskInfo taskInfo = makeTaskWithPorts(JIM, MY_JOB, 0, "foo");
+    TaskConfig taskInfo = makeTaskWithPorts(JIM, MY_JOB, 0, "foo");
     String taskId = "a";
     expect(taskIdGenerator.apply(taskInfo)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, FINISHED);
@@ -387,7 +387,7 @@ public class StateManagerImplTest extends EasyMockTest {
   @Test
   public void testNestedEvents() {
     String id = "a";
-    TwitterTaskInfo task = makeTask(JIM, MY_JOB, 0);
+    TaskConfig task = makeTask(JIM, MY_JOB, 0);
     expect(taskIdGenerator.apply(task)).andReturn(id);
 
     // Trigger an event that produces a side-effect and a PubSub event .
@@ -409,7 +409,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testDeleteTask() {
-    TwitterTaskInfo task = makeTask(JIM, MY_JOB, 0);
+    TaskConfig task = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
     expect(taskIdGenerator.apply(task)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
@@ -443,7 +443,7 @@ public class StateManagerImplTest extends EasyMockTest {
     }
   }
 
-  private void insertTasks(TwitterTaskInfo... tasks) {
+  private void insertTasks(TaskConfig... tasks) {
     stateManager.insertPendingTasks(ImmutableSet.copyOf(tasks));
   }
 
@@ -451,8 +451,8 @@ public class StateManagerImplTest extends EasyMockTest {
     return stateManager.changeState(Query.byId(taskId), status);
   }
 
-  private static TwitterTaskInfo makeTask(Identity owner, String job, int shard) {
-    return new TwitterTaskInfo()
+  private static TaskConfig makeTask(Identity owner, String job, int shard) {
+    return new TaskConfig()
         .setOwner(owner)
         .setEnvironment(DEFAULT_ENVIRONMENT)
         .setJobName(job)
@@ -460,13 +460,13 @@ public class StateManagerImplTest extends EasyMockTest {
         .setRequestedPorts(ImmutableSet.<String>of());
   }
 
-  private static TwitterTaskInfo makeTaskWithPorts(
+  private static TaskConfig makeTaskWithPorts(
       Identity owner,
       String job,
       int shard,
       String... requestedPorts) {
 
-    TwitterTaskInfo task = makeTask(owner, job, shard);
+    TaskConfig task = makeTask(owner, job, shard);
     task.setRequestedPorts(ImmutableSet.<String>builder().add(requestedPorts).build());
     return task;
   }

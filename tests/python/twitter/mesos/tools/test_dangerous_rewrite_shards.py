@@ -19,7 +19,7 @@ from gen.twitter.mesos.ttypes import (
     RewriteConfigsRequest,
     ShardConfigRewrite,
     ShardKey,
-    TwitterTaskInfo)
+    TaskConfig)
 
 from mox import Mox
 
@@ -30,11 +30,11 @@ SHARD_KEY = ShardKey(shardId=5, jobKey=JOB_KEY)
 
 
 def make_config(task_blob):
-  return TwitterTaskInfo(owner=IDENTITY,
-                         environment=JOB_KEY.environment,
-                         jobName=JOB_KEY.name,
-                         shardId=SHARD_KEY.shardId,
-                         thermosConfig=task_blob)
+  return TaskConfig(owner=IDENTITY,
+                    environment=JOB_KEY.environment,
+                    jobName=JOB_KEY.name,
+                    shardId=SHARD_KEY.shardId,
+                    thermosConfig=task_blob)
 
 
 def make_task(task_blob, task_id='task_id'):

@@ -29,8 +29,8 @@ import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
@@ -586,7 +586,7 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_log_unsafe_modify_in_place")
   @Override
-  public boolean unsafeModifyInPlace(final String taskId, final TwitterTaskInfo taskConfiguration) {
+  public boolean unsafeModifyInPlace(final String taskId, final TaskConfig taskConfiguration) {
     return write(new MutateWork.Quiet<Boolean>() {
       @Override public Boolean apply(MutableStoreProvider storeProvider) {
         boolean mutated = LogStorage.super.unsafeModifyInPlace(taskId, taskConfiguration);

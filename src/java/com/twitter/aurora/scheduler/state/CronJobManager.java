@@ -35,7 +35,7 @@ import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
@@ -322,7 +322,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
         JobKeys.toPath(job), new Date(), job.getCronCollisionPolicy()));
     cronJobsTriggered.incrementAndGet();
 
-    ImmutableSet.Builder<TwitterTaskInfo> builder = ImmutableSet.builder();
+    ImmutableSet.Builder<TaskConfig> builder = ImmutableSet.builder();
 
     final Query.Builder activeQuery = Query.jobScoped(job.getKey()).active();
 
@@ -368,7 +368,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
             int shardOffset = Ordering.natural().max(existingTasks.keySet()) + 1;
             LOG.info("Adjusting shard IDs of " + JobKeys.toPath(job) + " by " + shardOffset
                 + " for overlapping cron run.");
-            for (TwitterTaskInfo task : config.getTaskConfigs()) {
+            for (TaskConfig task : config.getTaskConfigs()) {
               builder.add(task.deepCopy().setShardId(task.getShardId() + shardOffset));
             }
           }
@@ -379,7 +379,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
       }
     }
 
-    Set<TwitterTaskInfo> newTasks = builder.build();
+    Set<TaskConfig> newTasks = builder.build();
     if (!newTasks.isEmpty()) {
       stateManager.insertPendingTasks(newTasks);
     }

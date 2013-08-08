@@ -13,7 +13,7 @@ import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
 import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.common.quantity.Data;
@@ -25,7 +25,7 @@ public class MesosTaskFactoryImplTest {
   private static final String EXECUTOR_PATH = "/twitter/fake/executor.sh";
   private static final AssignedTask TASK = new AssignedTask()
       .setTaskId("task-id")
-      .setTask(new TwitterTaskInfo()
+      .setTask(new TaskConfig()
           .setOwner(new Identity("role", "user"))
           .setEnvironment("environment")
           .setJobName("job-name")

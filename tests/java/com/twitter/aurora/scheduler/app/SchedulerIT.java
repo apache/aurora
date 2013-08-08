@@ -46,8 +46,8 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.SaveFrameworkId;
@@ -268,7 +268,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         .setTaskEvents(ImmutableList.of(new TaskEvent(100, status)))
         .setAssignedTask(new AssignedTask()
             .setTaskId(id)
-            .setTask(new TwitterTaskInfo()
+            .setTask(new TaskConfig()
                 .setJobName("job-" + id)
                 .setEnvironment("test")
                 .setOwner(new Identity("role-" + id, "user-" + id))));

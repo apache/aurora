@@ -98,7 +98,7 @@ struct ShardKey {
 }
 
 // Description of the tasks contained within a job.
-struct TwitterTaskInfo {
+struct TaskConfig {
  17: Identity owner                          // contains the role component of JobKey
  26: string environment                      // contains the environment component of JobKey
   3: string jobName                          // contains the name component of JobKey
@@ -149,7 +149,7 @@ struct JobConfiguration {
                                              // with this crontab-syntax schedule.
   5: CronCollisionPolicy cronCollisionPolicy // Collision policy to use when handling overlapping
                                              // cron runs.  Default is KILL_EXISTING.
-  6: TwitterTaskInfo taskConfig              // Task configuration for this job.
+  6: TaskConfig taskConfig              // Task configuration for this job.
   8: i32 shardCount                          // The number of shards in the job.  Generated
                                              // shard IDs for tasks will be in the range
                                              // [0, shardCount).
@@ -167,7 +167,7 @@ struct CreateJobResponse {
 struct PopulateJobResponse {
   1: ResponseCode responseCode
   2: string message
-  3: set<TwitterTaskInfo> populated
+  3: set<TaskConfig> populated
 }
 
 // Response message to a request to start a cron job.
@@ -326,7 +326,7 @@ struct AssignedTask {
                            // This will not be populated for a PENDING task.
   3: string slaveHost      // The hostname of the machine that this task has been assigned to.
                            // This will not be populated for a PENDING task.
-  4: TwitterTaskInfo task  // Information about how to run this task.
+  4: TaskConfig task       // Information about how to run this task.
   5: map<string, i32> assignedPorts  // Ports reserved on the machine while this task is running.
 }
 
@@ -344,10 +344,10 @@ struct ScheduledTask {
 
 // Configuration for an update to a single shard in a job.
 struct TaskUpdateConfiguration {
-  1: TwitterTaskInfo oldConfig  // Task configuration before the update, may be null
-                                // if the job is adding shards.
-  2: TwitterTaskInfo newConfig  // Task configuration after the update, may be null
-                                // if the job is removing shards.
+  1: TaskConfig oldConfig  // Task configuration before the update, may be null
+                           // if the job is adding shards.
+  2: TaskConfig newConfig  // Task configuration after the update, may be null
+                           // if the job is removing shards.
 }
 
 // Configuration for an update to an entire job.
@@ -539,8 +539,8 @@ struct SnapshotResponse {
 
 struct ShardConfigRewrite {
   1: ShardKey shardKey              // Key for the task to rewrite.
-  2: TwitterTaskInfo oldTask        // The original configuration.
-  3: TwitterTaskInfo rewrittenTask  // The rewritten configuration.
+  2: TaskConfig oldTask             // The original configuration.
+  3: TaskConfig rewrittenTask       // The rewritten configuration.
 }
 
 struct JobConfigRewrite {

@@ -66,7 +66,7 @@ class TestRestarter(MoxTestBase):
     for i in shardids:
       tasks.append(ScheduledTask(
           status=ScheduleStatus.RUNNING,
-          assignedTask=AssignedTask(task=TwitterTaskInfo(shardId=i))
+          assignedTask=AssignedTask(task=TaskConfig(shardId=i))
       ))
     response = ScheduleStatusResponse(responseCode=ResponseCode.OK, message='test', tasks=tasks)
 

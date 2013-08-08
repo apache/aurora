@@ -24,7 +24,7 @@ import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
@@ -183,7 +183,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     return new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTaskId(taskId)
-            .setTask(new TwitterTaskInfo()
+            .setTask(new TaskConfig()
                 .setJobName("job-" + taskId)
                 .setShardId(0)
                 .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))

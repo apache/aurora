@@ -14,8 +14,8 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
@@ -276,7 +276,7 @@ public class PreempterTest extends EasyMockTest {
     return expect(schedulingFilter.filter(
         EasyMock.<Resources>anyObject(),
         EasyMock.<String>anyObject(),
-        EasyMock.<TwitterTaskInfo>anyObject(),
+        EasyMock.<TaskConfig>anyObject(),
         EasyMock.<String>anyObject())).andAnswer(
         new IAnswer<Set<Veto>>() {
           @Override public Set<Veto> answer() {
@@ -302,7 +302,7 @@ public class PreempterTest extends EasyMockTest {
       boolean production) {
     AssignedTask assignedTask = new AssignedTask()
         .setTaskId(taskId)
-        .setTask(new TwitterTaskInfo()
+        .setTask(new TaskConfig()
             .setOwner(new Identity(role, role))
             .setPriority(priority)
             .setProduction(production)

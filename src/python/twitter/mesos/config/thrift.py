@@ -13,8 +13,8 @@ from gen.twitter.mesos.ttypes import (
   JobKey,
   LimitConstraint,
   Package,
+  TaskConfig,
   TaskConstraint,
-  TwitterTaskInfo,
   ValueConstraint,
 )
 
@@ -180,7 +180,7 @@ def convert(job, packages=frozenset(), ports=frozenset()):
   task_raw = job.task()
 
   MB = 1024 * 1024
-  task = TwitterTaskInfo()
+  task = TaskConfig()
 
   def not_empty_or(item, default):
     return default if item is Empty else fully_interpolated(item)

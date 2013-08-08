@@ -21,7 +21,7 @@ import org.apache.mesos.Protos.TaskInfo;
 import com.twitter.aurora.Protobufs;
 import com.twitter.aurora.codec.ThriftBinaryCodec;
 import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.TwitterTaskInfo;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.CommandUtil;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.SchedulerException;
@@ -120,11 +120,11 @@ public interface MesosTaskFactory {
       return String.format("%s.%s.%s", role, environment, jobName);
     }
 
-    public static String getJobSourceName(TwitterTaskInfo task) {
+    public static String getJobSourceName(TaskConfig task) {
       return getJobSourceName(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
     }
 
-    public static String getInstanceSourceName(TwitterTaskInfo task) {
+    public static String getInstanceSourceName(TaskConfig task) {
       return String.format("%s.%s", getJobSourceName(task), task.getShardId());
     }
 
@@ -139,7 +139,7 @@ public interface MesosTaskFactory {
         throw new SchedulerException("Internal error.", e);
       }
 
-      TwitterTaskInfo config = task.getTask();
+      TaskConfig config = task.getTask();
       List<Resource> resources;
       if (task.isSetAssignedPorts()) {
         resources = Resources.from(config)

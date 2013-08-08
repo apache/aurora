@@ -13,8 +13,8 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.state.TaskStateMachine.WorkSink;
 import com.twitter.common.base.Closure;
@@ -394,7 +394,7 @@ public class TaskStateMachineTest extends EasyMockTest {
         .setAssignedTask(
             new AssignedTask()
                 .setTask(
-                    new TwitterTaskInfo()
+                    new TaskConfig()
                         .setOwner(new Identity().setRole("roleA"))
                         .setJobName("jobA")
                         .setIsService(service)));

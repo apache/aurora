@@ -22,9 +22,9 @@ import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.LimitConstraint;
+import com.twitter.aurora.gen.TaskConfig;
+import com.twitter.aurora.gen.TaskConfig._Fields;
 import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.gen.TwitterTaskInfo;
-import com.twitter.aurora.gen.TwitterTaskInfo._Fields;
 import com.twitter.aurora.gen.ValueConstraint;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.common.args.Arg;
@@ -63,7 +63,7 @@ public final class ConfigurationManager {
 
   private static final int MAX_IDENTIFIER_LENGTH = 255;
 
-  private static class DefaultField implements Closure<TwitterTaskInfo> {
+  private static class DefaultField implements Closure<TaskConfig> {
     private final _Fields field;
     private final Object defaultValue;
 
@@ -72,7 +72,7 @@ public final class ConfigurationManager {
       this.defaultValue = defaultValue;
     }
 
-    @Override public void execute(TwitterTaskInfo task) {
+    @Override public void execute(TaskConfig task) {
       if (!task.isSet(field)) {
         task.setFieldValue(field, defaultValue);
       }
@@ -99,7 +99,7 @@ public final class ConfigurationManager {
     }
   }
 
-  private static class RequiredFieldValidator<T> implements Validator<TwitterTaskInfo> {
+  private static class RequiredFieldValidator<T> implements Validator<TaskConfig> {
     private final _Fields field;
     private final Validator<T> validator;
 
@@ -108,7 +108,7 @@ public final class ConfigurationManager {
       this.validator = validator;
     }
 
-    public void validate(TwitterTaskInfo task) throws TaskDescriptionException {
+    public void validate(TaskConfig task) throws TaskDescriptionException {
       if (!task.isSet(field)) {
         throw new TaskDescriptionException("Field " + field.getFieldName() + " is required.");
       }
@@ -118,7 +118,7 @@ public final class ConfigurationManager {
     }
   }
 
-  private static final Iterable<Closure<TwitterTaskInfo>> DEFAULT_FIELD_POPULATORS =
+  private static final Iterable<Closure<TaskConfig>> DEFAULT_FIELD_POPULATORS =
       ImmutableList.of(
           new DefaultField(_Fields.IS_SERVICE, false),
           new DefaultField(_Fields.PRIORITY, 0),
@@ -129,15 +129,15 @@ public final class ConfigurationManager {
           new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()),
           new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()),
           new DefaultField(_Fields.ENVIRONMENT, DEFAULT_ENVIRONMENT),
-          new Closure<TwitterTaskInfo>() {
-            @Override public void execute(TwitterTaskInfo task) {
+          new Closure<TaskConfig>() {
+            @Override public void execute(TaskConfig task) {
               if (!Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT))) {
                 task.addToConstraints(hostLimitConstraint(1));
               }
             }
           },
-          new Closure<TwitterTaskInfo>() {
-            @Override public void execute(TwitterTaskInfo task) {
+          new Closure<TaskConfig>() {
+            @Override public void execute(TaskConfig task) {
               if (!isDedicated(task)
                   && task.isProduction()
                   && task.isIsService()
@@ -194,12 +194,12 @@ public final class ConfigurationManager {
     return taskConstraint.getSetField() == TaskConstraint._Fields.VALUE;
   }
 
-  public static boolean isDedicated(TwitterTaskInfo task) {
+  public static boolean isDedicated(TaskConfig task) {
     return Iterables.any(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE));
   }
 
   @Nullable
-  private static Constraint getDedicatedConstraint(TwitterTaskInfo task) {
+  private static Constraint getDedicatedConstraint(TaskConfig task) {
     return Iterables.find(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE), null);
   }
 
@@ -210,8 +210,8 @@ public final class ConfigurationManager {
    * @param task Task to scrub.
    * @return Scrubbed task.
    */
-  public static TwitterTaskInfo scrubNonUniqueTaskFields(TwitterTaskInfo task) {
-    TwitterTaskInfo copy = task.deepCopy();
+  public static TaskConfig scrubNonUniqueTaskFields(TaskConfig task) {
+    TaskConfig copy = task.deepCopy();
     // Unsetting only changes the isset bit vector.  For equals() comparison, the value must also be
     // canonical.
     copy.setShardId(0);
@@ -258,7 +258,7 @@ public final class ConfigurationManager {
     }
 
     populateFields(copy);
-    TwitterTaskInfo config = copy.getTaskConfig();
+    TaskConfig config = copy.getTaskConfig();
 
     if (REQUIRE_CONTACT_EMAIL.get()
         && (!config.isSetContactEmail()
@@ -299,10 +299,10 @@ public final class ConfigurationManager {
    * @throws TaskDescriptionException If the task is invalid.
    */
   @VisibleForTesting
-  public static TwitterTaskInfo populateFields(JobConfiguration job)
+  public static TaskConfig populateFields(JobConfiguration job)
       throws TaskDescriptionException {
 
-    TwitterTaskInfo config = job.getTaskConfig();
+    TaskConfig config = job.getTaskConfig();
     if (config == null) {
       throw new TaskDescriptionException("Task may not be null.");
     }
@@ -379,8 +379,8 @@ public final class ConfigurationManager {
    * @return A reference to the (modified) {@code task}.
    */
   @VisibleForTesting
-  public static TwitterTaskInfo applyDefaultsIfUnset(TwitterTaskInfo task) {
-    for (Closure<TwitterTaskInfo> populator: DEFAULT_FIELD_POPULATORS) {
+  public static TaskConfig applyDefaultsIfUnset(TaskConfig task) {
+    for (Closure<TaskConfig> populator: DEFAULT_FIELD_POPULATORS) {
       populator.execute(task);
     }
 
@@ -404,7 +404,7 @@ public final class ConfigurationManager {
     }
   }
 
-  private static void maybeFillLinks(TwitterTaskInfo task) {
+  private static void maybeFillLinks(TaskConfig task) {
     if (task.getTaskLinksSize() == 0) {
       ImmutableMap.Builder<String, String> links = ImmutableMap.builder();
       if (task.getRequestedPorts().contains("health")) {
@@ -430,7 +430,7 @@ public final class ConfigurationManager {
       return;
     }
 
-    TwitterTaskInfo template = job.getTaskConfig();
+    TaskConfig template = job.getTaskConfig();
 
     LOG.info("Attempting to synthesize key for job " + job + " using template task " + template);
     JobKey synthesizedJobKey = new JobKey()

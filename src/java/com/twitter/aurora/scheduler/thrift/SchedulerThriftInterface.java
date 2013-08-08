@@ -74,8 +74,8 @@ import com.twitter.aurora.gen.StageRecoveryResponse;
 import com.twitter.aurora.gen.StartCronResponse;
 import com.twitter.aurora.gen.StartMaintenanceResponse;
 import com.twitter.aurora.gen.StartUpdateResponse;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.TwitterTaskInfo;
 import com.twitter.aurora.gen.UnloadRecoveryResponse;
 import com.twitter.aurora.gen.UpdateResponseCode;
 import com.twitter.aurora.gen.UpdateResult;
@@ -142,8 +142,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       Arg.create(Amount.of(30L, Time.SECONDS));
 
   private static final Function<ScheduledTask, String> GET_ROLE = Functions.compose(
-      new Function<TwitterTaskInfo, String>() {
-        @Override public String apply(TwitterTaskInfo task) {
+      new Function<TaskConfig, String>() {
+        @Override public String apply(TaskConfig task) {
           return task.getOwner().getRole();
         }
       },
@@ -822,7 +822,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               } else if (!task.get().getTask().equals(shardRewrite.getOldTask())) {
                 errors.add("CAS compare failed for " + shardKey);
               } else {
-                TwitterTaskInfo newConfiguration =
+                TaskConfig newConfiguration =
                     ConfigurationManager.applyDefaultsIfUnset(shardRewrite.getRewrittenTask());
                 boolean changed = storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(
                     task.get().getTaskId(), newConfiguration);
