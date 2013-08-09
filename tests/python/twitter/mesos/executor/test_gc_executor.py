@@ -429,6 +429,24 @@ def test_gc_killtask_queued():
   assert len(proxy_driver.updates) == 0
 
 
+def test_gc_multiple_launchtasks():
+  TASK2, TASK3 = "task2", "task3"
+  proxy_driver = ProxyDriver()
+  with temporary_dir() as td:
+    executor = build_blocking_gc_executor(td, proxy_driver)
+    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks()))
+    thread_yield()
+    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK2))
+    thread_yield()
+    assert len(executor._gc_task_queue) == 1
+    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK3))
+    thread_yield()
+    assert len(executor._gc_task_queue) == 1
+  assert not proxy_driver.stopped.is_set()
+  assert len(proxy_driver.updates) >= 1
+  assert StatusUpdate(mesos.TASK_FINISHED, TASK2) in proxy_driver.updates
+
+
 def test_gc_shutdown():
   proxy_driver = ProxyDriver()
   with temporary_dir() as td:

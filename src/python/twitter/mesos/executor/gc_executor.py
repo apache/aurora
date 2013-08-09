@@ -448,7 +448,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
       self._dropped_tasks.write(0)
     else:
       self.log('=> Dropping previously queued GC with task_id %s' % prev_task_id)
-      self._dropped_tasks.increment(1)
+      self._dropped_tasks.increment()
       self.log('=> Updating scheduler')
       self.send_update(self._driver, prev_task_id, 'FINISHED',
                        'Garbage collection skipped - GC executor received another task')
