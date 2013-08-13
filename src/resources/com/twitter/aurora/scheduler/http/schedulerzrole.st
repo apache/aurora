@@ -11,6 +11,7 @@
     <script type="text/javascript" src="/js/jquery.dataTables.min.js"></script>
     <script type="text/javascript" src="/js/dataTables.bootstrap.js"></script>
     <script type="text/javascript" src="/js/dataTables.localstorage.js"></script>
+    <script type="text/javascript" src="/js/dataTables.htmlNumberType.js"></script>
   </head>
   <body>
     <div class="container-fluid">
