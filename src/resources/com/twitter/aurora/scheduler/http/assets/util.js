@@ -52,3 +52,14 @@ function printElapsed(newerTimestamp, olderTimestamp) {
   }
   return Math.floor(elapsed / DAY) + " days";
 }
+
+function scaleMb(sizeInMb) {
+  var size = sizeInMb;
+  var SCALE = ["MiB", "GiB", "TiB", "PiB", "EiB"];
+  var unit = 0;
+  while(size >= 1024 && unit < SCALE.length) {
+      size = size / 1024;
+      unit++;
+  }
+  return size.toFixed(2).toString() + " " + SCALE[unit];
+}

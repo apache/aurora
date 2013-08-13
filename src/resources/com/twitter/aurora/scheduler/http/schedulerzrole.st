@@ -44,18 +44,18 @@
             <tbody>
               <tr>
                 <td>CPU
-                <td>$resourcesUsed.numCpus$
-                <td>$resourceQuota.numCpus$
+                <td>$resourcesUsed.numCpus$ cores
+                <td>$resourceQuota.numCpus$ cores
               </tr>
               <tr>
                 <td>RAM
-                <td>$resourcesUsed.ramMb$
-                <td>$resourceQuota.ramMb$
+                <td><script>document.write(scaleMb($resourcesUsed.ramMb$));</script>
+                <td><script>document.write(scaleMb($resourceQuota.ramMb$));</script>
               </tr>
               <tr>
                 <td>Disk
-                <td>$resourcesUsed.diskMb$
-                <td>$resourceQuota.diskMb$
+                <td><script>document.write(scaleMb($resourcesUsed.diskMb$));</script>
+                <td><script>document.write(scaleMb($resourceQuota.diskMb$));</script>
               </tr>
             </tbody>
           </table>
