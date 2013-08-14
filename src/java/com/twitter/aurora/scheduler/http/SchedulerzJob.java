@@ -67,7 +67,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 /**
  * HTTP interface to view information about a job in the aurora scheduler.
  */
-@Path("/scheduler/{role}{environment:(/.*)?}/{job}")
+@Path("/scheduler/{role}/{environment}/{job}")
 public class SchedulerzJob extends JerseyTemplateServlet {
   private static final String STATUS_FILTER_PARAM = "status";
   private static final String ADMIN_VIEW_PARAM = "admin";
@@ -333,18 +333,6 @@ public class SchedulerzJob extends JerseyTemplateServlet {
       @QueryParam(STATUS_FILTER_PARAM) final String filterArg,
       @QueryParam(ADMIN_VIEW_PARAM) final String adminView) {
 
-    if (environment.isEmpty()) {
-      StringBuilder output = new StringBuilder();
-      String url = "/scheduler/" + role + "/" + Constants.DEFAULT_ENVIRONMENT + "/" + job;
-
-      output.append("<html><head>");
-      output.append("<meta http-equiv='refresh' content='3;URL=" + url + "'>");
-      output.append("</head>");
-      output.append("<body>This URL is deprecated, redirecting to " + url + "</body>");
-      output.append("</html>");
-      return Response.ok(output.toString()).build();
-    }
-
     return fillTemplate(new Closure<StringTemplate>() {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
@@ -362,14 +350,13 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           }
         }
 
-        String env = environment.substring(1, environment.length());
         template.setAttribute("role", role);
-        template.setAttribute("environment", env);
+        template.setAttribute("environment", environment);
         template.setAttribute("job", job);
-        template.setAttribute("statsUrl", DisplayUtils.getJobDashboardUrl(role, env, job));
+        template.setAttribute("statsUrl", DisplayUtils.getJobDashboardUrl(role, environment, job));
         boolean hasMore = false;
 
-        Query.Builder builder = Query.jobScoped(JobKeys.from(role, env, job));
+        Query.Builder builder = Query.jobScoped(JobKeys.from(role, environment, job));
 
         Optional<Query.Builder> activeQuery = Optional.absent();
         Optional<Query.Builder> completedQuery = Optional.absent();

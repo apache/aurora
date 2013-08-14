@@ -39,7 +39,8 @@
             <a href="/scheduler/$role$">Role: $role$</a> <span class="divider">></span>
           </li>
           <li>
-            Environment: $environment$ <span class="divider">></span>
+            <a href="/scheduler/$role$/$environment$">Environment: $environment$</a>
+            <span class="divider">></span>
           </li>
           <li class="active">Job: $job$</li>
         </ul>
