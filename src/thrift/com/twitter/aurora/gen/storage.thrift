@@ -1,6 +1,6 @@
 // Copyright 2011 Twitter, Inc.
 namespace java com.twitter.aurora.gen.storage
-namespace py gen.twitter.storage
+namespace py gen.twitter.aurora.storage
 
 include "api.thrift"
 
