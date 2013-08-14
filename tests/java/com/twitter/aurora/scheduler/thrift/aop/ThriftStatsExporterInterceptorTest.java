@@ -14,7 +14,7 @@ import com.twitter.aurora.gen.GetJobsResponse;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 import com.twitter.common.stats.Stats;
-import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertNotNull;

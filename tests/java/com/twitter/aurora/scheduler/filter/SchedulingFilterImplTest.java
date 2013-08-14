@@ -38,7 +38,7 @@ import com.twitter.aurora.scheduler.storage.Storage.Work.Quiet;
 import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
-import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;

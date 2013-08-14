@@ -18,7 +18,7 @@ import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.ScheduleStatusResponse;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
-import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertSame;

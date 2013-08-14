@@ -30,7 +30,7 @@ import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.state.StateManager;
 import com.twitter.aurora.scheduler.storage.Storage.StorageException;
 import com.twitter.common.collections.Pair;
-import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;

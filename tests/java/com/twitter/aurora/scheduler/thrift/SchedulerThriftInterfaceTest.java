@@ -66,7 +66,7 @@ import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.aurora.scheduler.thrift.aop.AopModule;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
-import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
 

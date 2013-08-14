@@ -9,7 +9,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.scheduler.Driver.DriverImpl;
-import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.apache.mesos.Protos.Status.DRIVER_ABORTED;
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;

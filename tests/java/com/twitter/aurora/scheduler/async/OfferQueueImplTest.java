@@ -27,7 +27,7 @@ import com.twitter.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import static org.easymock.EasyMock.expect;

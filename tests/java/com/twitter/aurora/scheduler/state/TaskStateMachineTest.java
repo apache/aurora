@@ -18,7 +18,7 @@ import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.state.TaskStateMachine.WorkSink;
 import com.twitter.common.base.Closure;
-import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
 import static org.easymock.EasyMock.eq;

@@ -67,7 +67,7 @@ import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.StorageBackfill;
 import com.twitter.common.base.Closure;
 import com.twitter.common.collections.Pair;
-import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
 import static org.easymock.EasyMock.eq;

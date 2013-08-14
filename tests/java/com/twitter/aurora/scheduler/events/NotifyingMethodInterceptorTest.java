@@ -15,7 +15,7 @@ import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
 import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.common.base.Closure;
-import com.twitter.common.testing.EasyMockTest;
+import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.junit.Assert.assertEquals;
 
