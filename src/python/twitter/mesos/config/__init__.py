@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+from twitter.mesos.common import AuroraJobKey
 from twitter.thermos.config.loader import PortExtractor, ThermosTaskWrapper
 from twitter.thermos.config.schema import ThermosContext
 
@@ -25,10 +26,12 @@ class AuroraConfig(object):
     return []
 
   @classmethod
-  def pick(cls, env, name, bindings, select_cluster=None, select_env=None):
+  def pick(cls, env, name, bindings, select_cluster=None, select_role=None, select_env=None):
+    # TODO(atollenaere): should take a JobKey when non-jobkey interface is deprecated
+
     job_list = env.get('jobs', [])
     if not job_list:
-      raise ValueError('No jobs specified!')
+      raise ValueError('No job defined in this config!')
 
     def maybe_bind(j):
       return j.bind(*bindings) if bindings else j
@@ -45,21 +48,34 @@ class AuroraConfig(object):
       return select_cluster is None or str(job.cluster()) == select_cluster
     def match_env(job):
       return select_env is None or str(job.environment()) == select_env
+    def match_role(job):
+      return select_role is None or str(job.role()) == select_role
 
     bound_jobs = map(maybe_bind, job_list)
-    matches = [j for j in bound_jobs if match_name(j) and match_cluster(j) and match_env(j)]
+    matches = [j for j in bound_jobs if
+               all([match_cluster(j), match_role(j), match_env(j), match_name(j)])]
 
     if len(matches) == 0:
-      msg = 'Could not find job with name %s' % name
-      if select_cluster:
-        msg = '%s, cluster %s' % (msg, select_cluster)
-      if select_env:
-        msg = '%s, env %s' % (msg, select_env)
+      msg = 'Could not find job %s/%s/%s/%s\n' % (
+          select_cluster or '*', select_role or '*', select_env or '*', name)
+      msg += cls._candidate_jobs_str(bound_jobs)
+
       raise ValueError(msg)
+
     elif len(matches) > 1:
-      raise ValueError('Multiple jobs match, please disambiguate by specifying a cluster or env.')
+      msg = 'Multiple jobs match, please disambiguate by specifying a job key.\n'
+      msg += cls._candidate_jobs_str(bound_jobs)
+      raise ValueError(msg)
     else:
       return matches[0]
+
+  @staticmethod
+  def _candidate_jobs_str(job_list):
+    assert(job_list)
+    job_list = ["  %s" % AuroraJobKey(
+        str(j.cluster()), str(j.role()), str(j.environment()), str(j.name()))
+        for j in job_list]
+    return 'Candidates are:\n' + '\n'.join(job_list)
 
   @classmethod
   def apply_plugins(cls, config, env=None):
@@ -70,17 +86,25 @@ class AuroraConfig(object):
     return config
 
   @classmethod
-  def load(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):
+  def load(
+        cls, filename, name=None, bindings=None,
+        select_cluster=None, select_role=None, select_env=None):
+    # TODO(atollenaere): should take a JobKey when non-jobkey interface is deprecated
     env = AuroraConfigLoader.load(filename)
-    return cls.apply_plugins(cls(cls.pick(env, name, bindings, select_cluster, select_env)), env)
+    return cls.apply_plugins(
+        cls(cls.pick(env, name, bindings, select_cluster, select_role, select_env)), env)
 
   @classmethod
-  def load_json(cls, filename, name=None, bindings=None, select_cluster=None, select_env=None):
+  def load_json(
+        cls, filename, name=None, bindings=None,
+        select_cluster=None, select_role=None, select_env=None):
+    # TODO(atollenaere): should take a JobKey when non-jobkey interface is deprecated
     job = AuroraConfigLoader.load_json(filename)
     return cls.apply_plugins(cls(job.bind(*bindings) if bindings else job))
 
   @classmethod
   def loads_json(cls, string, name=None, bindings=None, select_cluster=None, select_env=None):
+    # TODO(atollenaere): should take a JobKey when non-jobkey interface is deprecated
     job = AuroraConfigLoader.loads_json(string)
     return cls.apply_plugins(cls(job.bind(*bindings) if bindings else job))
 

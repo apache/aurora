@@ -44,6 +44,7 @@ class AuroraDeploymentAPI(object):
         False,
         None,
         select_cluster=job_key.cluster,
+        select_role=job_key.role,
         select_env=job_key.env)
 
     file_content = json.dumps({

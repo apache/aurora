@@ -352,6 +352,7 @@ def get_config(jobname,
                force_local=False,
                bindings=(),
                select_cluster=None,
+               select_role=None,
                select_env=None):
   """Creates and returns a config object contained in the provided file."""
   Recipes.include_module('twitter.mesos.client.recipes')
@@ -361,4 +362,5 @@ def get_config(jobname,
                 jobname,
                 bindings,
                 select_cluster=select_cluster,
+                select_role=select_role,
                 select_env=select_env)

@@ -5,6 +5,7 @@ python_library(
     pants(':schema'),
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/mesos/common'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

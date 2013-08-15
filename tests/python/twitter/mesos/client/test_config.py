@@ -74,6 +74,24 @@ def test_get_config_announces():
       config.get_config('hello_world', fp)
 
 
+def test_get_config_select():
+  with temporary_file() as fp:
+    fp.write(MESOS_CONFIG_BASE % '')
+    fp.flush()
+
+    fp.seek(0)
+    config.get_config(
+        'hello_world', fp, select_env='test',
+        select_role='john_doe', select_cluster='smf1-test')
+
+    fp.seek(0)
+    with pytest.raises(ValueError) as cm:
+      config.get_config(
+          'hello_world', fp, select_env='staging42',
+          select_role='moua', select_cluster='smf1-test')
+    assert 'smf1-test/john_doe/test/hello_world' in str(cm.value.message)
+
+
 def test_include():
   with temporary_dir() as dir:
     hello_mesos_fname = "hello_world.mesos"
