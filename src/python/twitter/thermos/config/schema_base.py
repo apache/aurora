@@ -70,3 +70,6 @@ class Task(Struct):
                                             # > 0 is max concurrent processes.
   finalization_wait = Default(Integer, 30)  # the amount of time in seconds we allocate to run the
                                             # finalization schedule.
+
+  # TODO(jon): remove/replace with proper solution to MESOS-3546
+  user = String
