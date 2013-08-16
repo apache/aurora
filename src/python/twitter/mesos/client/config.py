@@ -11,6 +11,7 @@ import sys
 
 from twitter.common import app, log
 from twitter.mesos.client.base import deprecation_warning, die
+from twitter.mesos.client.binding_helpers import apply_binding_helpers
 from twitter.mesos.client.build import BuildArtifactResolver
 from twitter.mesos.client.jenkins import JenkinsArtifactResolver
 from twitter.mesos.config import AuroraConfig
@@ -317,10 +318,9 @@ def validate_config(config, env=None):
 
 def populate_namespaces(config, env=None, force_local=False):
   """Populate additional bindings in the config, e.g. packer bindings."""
+
   _inject_default_environment(config)
-  _inject_packer_bindings(config, env, force_local)
   _inject_prebuilt_package_bindings(config, env, force_local)
-  _inject_jenkins_bindings(config, env, force_local)
   _warn_on_deprecated_cron_policy(config)
   _warn_on_deprecated_daemon_job(config)
   _warn_on_deprecated_health_check_interval_secs(config)
@@ -341,6 +341,7 @@ def AnnotatedAuroraConfig(force_local):
     @classmethod
     def plugins(cls):
       return (inject_recipes,
+              functools.partial(apply_binding_helpers, force_local=force_local),
               functools.partial(populate_namespaces, force_local=force_local),
               validate_config)
   return _AnnotatedAuroraConfig

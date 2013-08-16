@@ -17,8 +17,9 @@ python_test_suite(name = 'all',
 python_tests(name = 'config',
   sources = ['test_config.py'],
   dependencies = [
-    pants('src/python/twitter/mesos/client:config'),
     pants('3rdparty/python:mox'),
+    pants('src/python/twitter/mesos/client:config'),
+    pants('src/python/twitter/mesos/client:jenkins'),
   ],
 )
 

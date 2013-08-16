@@ -138,6 +138,7 @@ class AuroraConfig(object):
     self.validate_job(job)
     self._job = self.standard_bindings(job)
     self._packages = []
+    self.binding_dicts = {}
 
   def context(self, instance=None):
     from .schema import MesosContext

@@ -1,19 +1,18 @@
-import json
 import os
-import tempfile
 
-from twitter.common.contextutil import temporary_dir, temporary_file, open_zip
+from twitter.common.contextutil import temporary_dir, temporary_file
 from twitter.mesos.client import config
+from twitter.mesos.client.binding_helpers import apply_binding_helpers
 from twitter.mesos.config import AuroraConfig
 from twitter.mesos.config.loader import AuroraConfigLoader
-from twitter.mesos.config.schema import Announcer, Job, Resources, Task, MB
-from twitter.mesos.packer import sd_packer_client
+from twitter.mesos.config.schema import Announcer, Job, MB, PackerObject, Resources, Task
+import twitter.mesos.packer
 import twitter.mesos.packer.packer_client as packer_client
+import twitter.mesos.client.jenkins
 
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT
 
 import mox
-from mox import Mox, IsA
 import pytest
 
 
@@ -62,6 +61,21 @@ jobs = [Job(
 )]
 """
 
+JENKINS_CONFIG = """
+jobs = [Job(
+  name = 'jenkins-test',
+  role = 'some-role',
+  cluster = 'smf1-test',
+  task = Task(
+    name = 'main',
+    processes = [ Process(name='command', 
+        cmdline='{{jenkins[some-jenkins-project][latest].package}}')],
+    resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
+  )
+)]
+"""
+
+
 def test_get_config_announces():
   for good_config in (MESOS_CONFIG_WITH_ANNOUNCE_1, MESOS_CONFIG_WITH_ANNOUNCE_2,
                       MESOS_CONFIG_WITHOUT_ANNOUNCE):
@@ -102,7 +116,8 @@ def test_include():
 
       hello_include_fname_path = os.path.join(dir, "hello_include_fname.mesos")
       with open(hello_include_fname_path, "wb+") as hello_include_fname_fp:
-        hello_include_fname_fp.write(MESOS_CONFIG_WITH_INCLUDE % ("", """'%s'""" % hello_mesos_fname))
+        hello_include_fname_fp.write(MESOS_CONFIG_WITH_INCLUDE %
+            ("", """'%s'""" % hello_mesos_fname))
         hello_include_fname_fp.flush()
 
         config.get_config('hello_world', hello_include_fname_path)
@@ -117,8 +132,8 @@ def test_environment_names():
   GOOD = ('prod', 'devel', 'test', 'staging', 'staging001', 'staging1', 'staging1234')
   base_job = Job(
       name='hello_world', role='john_doe', cluster='smf1-test',
-      task = Task(name='main', processes = [],
-                  resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB)))
+      task=Task(name='main', processes=[],
+                resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
 
   with pytest.raises(ValueError):
     config._validate_environment_name(AuroraConfig(base_job))
@@ -132,8 +147,8 @@ def test_environment_names():
 def test_inject_default_environment():
   base_job = Job(
       name='hello_world', role='john_doe', cluster='smf1-test',
-      task = Task(name='main', processes = [],
-                  resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB)))
+      task=Task(name='main', processes=[],
+                resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
 
   no_env_config = AuroraConfig(base_job)
   config._inject_default_environment(no_env_config)
@@ -147,15 +162,15 @@ def test_inject_default_environment():
 def test_dedicated_portmap():
   base_job = Job(
       name='hello_world', role='john_doe', cluster='smf1-test',
-      task = Task(name='main', processes = [],
-                  resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB)))
+      task=Task(name='main', processes=[],
+                resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
 
   config._validate_announce_configuration(AuroraConfig(base_job))
   config._validate_announce_configuration(
-      AuroraConfig(base_job(constraints = {'dedicated': 'mesos-team'})))
+      AuroraConfig(base_job(constraints={'dedicated': 'mesos-team'})))
   config._validate_announce_configuration(
-      AuroraConfig(base_job(constraints = {'dedicated': 'mesos-team'},
-                               announce = Announcer(portmap={'http': 80}))))
+      AuroraConfig(base_job(constraints={'dedicated': 'mesos-team'},
+                            announce=Announcer(portmap={'http': 80}))))
 
   with pytest.raises(ValueError):
     config._validate_announce_configuration(
@@ -164,7 +179,8 @@ def test_dedicated_portmap():
   with pytest.raises(ValueError):
     config._validate_announce_configuration(
         AuroraConfig(base_job(announce=Announcer(portmap={'http': 80}),
-                                 constraints = {'foo': 'bar'})))
+                              constraints={'foo': 'bar'})))
+
 
 def test_package_filename():
   mocker = mox.Mox()
@@ -195,3 +211,97 @@ def test_package_filename():
     fp.flush()
     cfg = config.get_config('hello_world', fp.name)
     assert 'different_file.zip' == cfg.task(0).processes()[0].cmdline().get()
+
+
+def test_packer_binding_helper():
+  mocker = mox.Mox()
+  mocker.StubOutWithMock(config.sd_packer_client, 'create_packer')
+  mock_client = mocker.CreateMock(packer_client.Packer)
+  config.sd_packer_client.create_packer('smf1-test').AndReturn(mock_client)
+
+  pkg = {
+    'id': 5,
+    'uri': 'hftp://foo/bar/file.zip',
+    'auditLog': [{'user': 'john_doe', 'timestamp': 100, 'state': 'PRESENT'}],
+  }
+  mock_client.get_version('john_doe', 'dummy', 'eleventy').AndReturn(pkg)
+  pkg2 = dict(pkg.items())
+  pkg2['filename'] = 'different_file.zip'
+  mocker.ReplayAll()
+
+  with temporary_file() as fp:
+    fp.write(PACKER_CONFIG)
+    fp.flush()
+    cfg = AuroraConfig.load(fp.name)
+    apply_binding_helpers(cfg, {}, False)
+    dicts = cfg.binding_dicts.copy()
+    # Check that that binding dicts returned by ConfigHelper does
+    # indeed contain the appropriate data. We don't so much care about
+    # exactly what it says - that's checked later. We just want to
+    # make sure that it did save the right data.
+    packer_bindings = dicts['packer']
+    packer_entry = packer_bindings['packer[john_doe][dummy][eleventy]']
+    assert len(packer_entry) == 2
+    assert isinstance(packer_entry[0], dict)
+    assert isinstance(packer_entry[1], PackerObject)
+
+    # Now, check that the binding dictionary works:
+    new_packer_obj = packer_entry[1](package_uri="http://foo/bar.zip", package="bar.zip")
+    new_packer_entry = (packer_entry[0], new_packer_obj)
+    packer_bindings['packer[john_doe][dummy][eleventy]'] = new_packer_entry
+    cfg2 = AuroraConfig.load(fp.name)
+    # Update the binding dicts to use for this config.
+    cfg2.binding_dicts = dicts
+    apply_binding_helpers(cfg2, {}, False)
+    dicts2 = cfg2.binding_dicts
+    assert dicts == dicts2
+    orig_job = cfg._job
+    binding_job = cfg2._job
+    # check that unmodified fields from the binding dict still match
+    # the original
+    assert orig_job.instances() == binding_job.instances()
+    assert orig_job.priority() == binding_job.priority()
+    # check that the original config wasn't affected by changing the binding dict.
+    assert str(orig_job.task().processes()[0].cmdline()) == "file.zip"
+    # check that the config populated by the binding dict got the correct value
+    # from the dict.
+    assert str(binding_job.task().processes()[0].cmdline()) == "bar.zip"
+    mocker.VerifyAll()
+
+
+def test_jenkins_binding_helper():
+  mocker = mox.Mox()
+
+  # Replace the standard packer with a test mock.
+  mocker.StubOutWithMock(config.sd_packer_client, 'create_packer')
+  mock_packer = mocker.CreateMock(packer_client.Packer)
+  config.sd_packer_client.create_packer('smf1-test').AndReturn(mock_packer)
+
+  # The jenkins helper calls the JenkinsArtifactResolver.
+  # We need to capture that call, so we stub out the artifact resolver's resolve method.
+  mocker.StubOutWithMock(twitter.mesos.client.jenkins.JenkinsArtifactResolver, 'resolve')
+  mocker.StubOutWithMock(twitter.mesos.client.jenkins.JenkinsArtifactResolver, '__init__')
+  twitter.mesos.client.jenkins.JenkinsArtifactResolver.__init__(mock_packer, 'some-role')
+  expected_pkg_data = {'auditLog': [{'timestamp': 100, 'state': 'PRESENT', 'user': 'john_doe'}],
+                     'id': 5, 'uri': 'hftp://foo/bar/file.zip'}
+  twitter.mesos.client.jenkins.JenkinsArtifactResolver.resolve(
+      'some-jenkins-project', 'latest').AndReturn(('package', expected_pkg_data))
+  mocker.ReplayAll()
+
+  with temporary_file() as fp:
+    fp.write(JENKINS_CONFIG)
+    fp.flush()
+    cfg = AuroraConfig.load(fp.name)
+    apply_binding_helpers(cfg, {}, False)
+    # Check that that binding dicts returned by ConfigHelper does
+    # indeed contain the appropriate data. We don't so much care about
+    # exactly what it says - that's checked later. We just want to
+    # make sure that it did save the right data.
+    assert 'file.zip' == cfg.task(0).processes()[0].cmdline().get()
+
+    # Check the contents of the binding dict.
+    jenkins_bindings = cfg.binding_dicts['jenkins']
+    jenkins_entry = jenkins_bindings['jenkins[some-jenkins-project][latest]']
+    assert len(jenkins_entry) == 2
+    assert jenkins_entry['data']['uri'] == 'hftp://foo/bar/file.zip'
+  mocker.VerifyAll()

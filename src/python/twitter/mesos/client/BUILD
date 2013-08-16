@@ -77,6 +77,7 @@ python_library(
     pants('3rdparty/python:pystachio'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/mesos/client/binding_helpers'),
     pants('src/python/twitter/mesos/config'),
     pants('src/python/twitter/mesos/packer'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),

@@ -205,6 +205,7 @@ class BaseTest(DingusTestCase(JenkinsArtifactResolver,
           assert artifacts_zip.read(artifact.filename, 'rb') == artifact.contents
     else:
       assert packer_add_args[ARG_FILE].endswith('/' + self.mock_artifacts[0].filename)
+
       with open(packer_add_args[ARG_FILE], 'rb') as fp:
         assert fp.read() == self.mock_artifacts[0].contents
 
