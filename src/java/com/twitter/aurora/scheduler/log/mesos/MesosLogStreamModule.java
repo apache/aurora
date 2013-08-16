@@ -7,9 +7,7 @@ import java.net.InetSocketAddress;
 import java.util.List;
 
 import com.google.common.base.Joiner;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
-import com.google.inject.Binder;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
@@ -25,7 +23,6 @@ import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.inject.Bindings;
-import com.twitter.common.inject.Bindings.KeyFactory;
 import com.twitter.common.inject.Bindings.Rebinder;
 import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.quantity.Amount;
@@ -100,62 +97,21 @@ public class MesosLogStreamModule extends PrivateModule {
   @BindingAnnotation
   private @interface LogBinding { }
 
-  /**
-   * Binds a distributed {@link com.twitter.aurora.scheduler.log.Log} that uses the mesos core
-   * native log implementation.
-   *
-   * @param binder a guice binder to bind the distributed log with
-   * @param zkKeys The keys the ZooKeeper server connection can be retrieved with.
-   */
-  public static void bind(Binder binder, KeyFactory zkKeys) {
-    binder.install(new MesosLogStreamModule(
-        Key.get(com.twitter.aurora.scheduler.log.Log.class),
-        zkKeys,
-        LOG_PATH.get(),
-        ZK_LOG_GROUP_PATH.get()));
-  }
-
-  private final Key<com.twitter.aurora.scheduler.log.Log> logKey;
-  private final File logPath;
-  private final String zkPath;
-  private final KeyFactory zkKeys;
-
-  /**
-   * Creates a module that binds the mesos native log to the given key.
-   *
-   * @param logKey The key to bind the native log implementation to.
-   * @param zkKeys The keys the ZooKeeper server connection can be retrieved with.
-   * @param logPath The path to the native log data directory.
-   * @param zkPath The zookeeper path to use for replica coordination.
-   */
-  public MesosLogStreamModule(
-      Key<com.twitter.aurora.scheduler.log.Log> logKey,
-      KeyFactory zkKeys,
-      File logPath,
-      String zkPath) {
-
-    this.logKey = Preconditions.checkNotNull(logKey);
-    this.zkKeys = Preconditions.checkNotNull(zkKeys);
-    this.logPath = Preconditions.checkNotNull(logPath);
-
-    PathUtils.validatePath(zkPath);
-    this.zkPath = zkPath;
-  }
-
   @Override
   protected void configure() {
     Rebinder rebinder = Bindings.rebinder(binder(), LogBinding.class);
-    rebinder.rebind(zkKeys.create(new TypeLiteral<List<InetSocketAddress>>() { }));
-    rebinder.rebind(zkKeys.create(new TypeLiteral<Amount<Integer, Time>>() { }));
-    rebinder.rebind(zkKeys.create(Credentials.class));
+    rebinder.rebind(Key.get(new TypeLiteral<List<InetSocketAddress>>() { }));
+    rebinder.rebind(Key.get(new TypeLiteral<Amount<Integer, Time>>() { }));
+    rebinder.rebind(Key.get(Credentials.class));
 
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.ReadTimeout.class)
         .toInstance(READ_TIMEOUT.get());
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.WriteTimeout.class)
         .toInstance(WRITE_TIMEOUT.get());
 
-    bind(logKey).to(MesosLog.class).in(Singleton.class);
-    expose(logKey);
+    bind(com.twitter.aurora.scheduler.log.Log.class).to(MesosLog.class);
+    bind(MesosLog.class).in(Singleton.class);
+    expose(com.twitter.aurora.scheduler.log.Log.class);
   }
 
   @Provides
@@ -165,6 +121,7 @@ public class MesosLogStreamModule extends PrivateModule {
       @LogBinding Credentials credentials,
       @LogBinding Amount<Integer, Time> sessionTimeout) {
 
+    File logPath = LOG_PATH.get();
     File parentDir = logPath.getParentFile();
     if (!parentDir.exists() && !parentDir.mkdirs()) {
       addError("Failed to create parent directory to store native log at: %s", parentDir);
@@ -173,14 +130,16 @@ public class MesosLogStreamModule extends PrivateModule {
     String zkConnectString =
         Joiner.on(',').join(Iterables.transform(endpoints, InetSocketAddressHelper.INET_TO_STR));
 
-    return new Log(QUORUM_SIZE.get(),
-                   logPath.getAbsolutePath(),
-                   zkConnectString,
-                   sessionTimeout.getValue(),
-                   sessionTimeout.getUnit().getTimeUnit(),
-                   zkPath,
-                   credentials.scheme(),
-                   credentials.authToken());
+    PathUtils.validatePath(ZK_LOG_GROUP_PATH.get());
+    return new Log(
+        QUORUM_SIZE.get(),
+        logPath.getAbsolutePath(),
+        zkConnectString,
+        sessionTimeout.getValue(),
+        sessionTimeout.getUnit().getTimeUnit(),
+        ZK_LOG_GROUP_PATH.get(),
+        credentials.scheme(),
+        credentials.authToken());
   }
 
   @Provides

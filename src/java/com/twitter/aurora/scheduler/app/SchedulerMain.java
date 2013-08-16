@@ -59,7 +59,6 @@ import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
 import com.twitter.common_internal.zookeeper.TwitterServerSetModule;
 import com.twitter.common_internal.zookeeper.ZooKeeperModule;
-import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
 
 /**
  * Launcher for the aurora scheduler.
@@ -152,21 +151,20 @@ public class SchedulerMain extends AbstractApplication {
       throw new IllegalArgumentException(e);
     }
 
-    KeyFactory zkClientKeyFactory = Bindings.annotatedKeyFactory(ServiceDiscovery.class);
     if (zkHost.isPresent()) {
       modules.add(ZooKeeperModule.builder(ImmutableSet.of(zkHost.get()))
           .withDigestCredentials(schedulerService.getRole(), schedulerService.getRole())
           .withAcl(ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL)
-          .build(zkClientKeyFactory));
+          .build());
     } else {
       modules.add(TwitterServerSetModule
           .authenticatedZooKeeperModule(schedulerService)
           .withFlagOverrides()
-          .build(zkClientKeyFactory));
+          .build());
     }
     modules.add(new TwitterServerSetModule(
         Key.get(ServerSet.class),
-        zkClientKeyFactory,
+        KeyFactory.PLAIN,
         schedulerService));
     modules.add(new BackupModule(backupDir, SnapshotStoreImpl.class));
     // TODO(William Farner): Make all mem store implementation classes package private.
@@ -187,9 +185,7 @@ public class SchedulerMain extends AbstractApplication {
           bind(DriverFactory.class).to(DriverFactoryImpl.class);
           bind(DriverFactoryImpl.class).in(Singleton.class);
           bind(Boolean.class).annotatedWith(ShutdownOnDriverExit.class).toInstance(true);
-
-          MesosLogStreamModule.bind(binder(),
-              Bindings.annotatedKeyFactory(ServiceDiscovery.class));
+          install(new MesosLogStreamModule());
         }
       };
     }

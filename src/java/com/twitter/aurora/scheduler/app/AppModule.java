@@ -42,7 +42,6 @@ import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common_internal.zookeeper.TwitterServerSet;
 import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
-import com.twitter.common_internal.zookeeper.legacy.ServerSetMigrationModule.ServiceDiscovery;
 import com.twitter.thrift.ServiceInstance;
 
 /**
@@ -129,8 +128,8 @@ class AppModule extends AbstractModule {
   SingletonService provideSingletonService(
       Service schedulerService,
       ServerSet serverSet,
-      @ServiceDiscovery ZooKeeperClient client,
-      @ServiceDiscovery List<ACL> acl) {
+      ZooKeeperClient client,
+      List<ACL> acl) {
 
     String path = TwitterServerSet.getPath(schedulerService);
     Candidate candidate = SingletonService.createSingletonCandidate(client, path, acl);
@@ -141,7 +140,7 @@ class AppModule extends AbstractModule {
   @Singleton
   DynamicHostSet<ServiceInstance> provideSchedulerHostSet(
       Service schedulerService,
-      @ServiceDiscovery ZooKeeperClient zkClient) {
+      ZooKeeperClient zkClient) {
 
     // For the leader-redirect servlet.
     return TwitterServerSet.create(zkClient, schedulerService);
