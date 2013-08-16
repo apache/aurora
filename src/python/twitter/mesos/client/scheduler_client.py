@@ -93,7 +93,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
     if cluster.zk is None:
       raise ValueError('Cluster has no associated zookeeper ensemble!')
     zk = TunneledZookeeper.get(cluster.zk, port=port, verbose=verbose)
-    return zk, ServerSet(zk, cluster.scheduler_zk_path)
+    return zk, ServerSet(zk, cluster.scheduler_zk_path, **kw)
 
   def __init__(self, cluster, port=2181, ssl=False, verbose=False):
     SchedulerClient.__init__(self, verbose=verbose, ssl=ssl)
