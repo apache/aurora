@@ -117,12 +117,16 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
         # {{thermos.ports}}, it currently gets bound by the Thermos Runner,
         # so we must leave them unbound.
         #
+        # {{thermos.user}} is a legacy binding which we can safely ignore.
+        #
         # TODO(wickman) These should be rewritten by the mesos client to use
         # %%style%% replacements in order to allow us to better type-check configs
         # client-side.
         if ref == Ref.from_address('thermos.task_id'):
           continue
-        elif Ref.subscope(Ref.from_address('thermos.ports'), ref):
+        if Ref.subscope(Ref.from_address('thermos.ports'), ref):
+          continue
+        if ref == Ref.from_address('thermos.user'):
           continue
         raise ValueError('Unexpected unbound refs: %s' % ' '.join(map(str, refs)))
       return mti
