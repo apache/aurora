@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
@@ -169,12 +170,10 @@ class SchedulerCoreImpl implements SchedulerCore {
     stateManager.changeState(query, status, message);
   }
 
-  private static Optional<JobKey> keyIfStrictlyJobScoped(TaskQuery query) {
-    if (query.getStatusesSize() == 0 && query.getTaskIdsSize() == 0) {
-      return JobKeys.from(query);
-    } else {
-      return Optional.absent();
-    }
+  @VisibleForTesting
+  static boolean isStrictlyJobScoped(TaskQuery query) {
+    Optional<JobKey> jobKey = JobKeys.from(query);
+    return jobKey.isPresent() && Query.byJob(jobKey.get()).equals(query);
   }
 
   @Override
@@ -185,10 +184,10 @@ class SchedulerCoreImpl implements SchedulerCore {
     boolean jobDeleted = false;
     boolean updateFinished = false;
 
-    Optional<JobKey> jobKey = keyIfStrictlyJobScoped(query);
-    if (jobKey.isPresent()) {
+    if (isStrictlyJobScoped(query)) {
       // If this looks like a query for all tasks in a job, instruct the scheduler modules to
       // delete the job.
+      Optional<JobKey> jobKey = JobKeys.from(query);
       for (JobManager manager : jobManagers) {
         if (manager.deleteJob(jobKey.get())) {
           jobDeleted = true;

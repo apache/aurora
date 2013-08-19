@@ -93,6 +93,7 @@ import static com.twitter.aurora.gen.UpdateResult.SUCCESS;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.hostLimitConstraint;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.populateFields;
+import static com.twitter.aurora.scheduler.state.SchedulerCoreImpl.isStrictlyJobScoped;
 
 /**
  * Base integration test for the SchedulerCoreImpl, subclasses should supply a concrete Storage
@@ -961,6 +962,38 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Query.unscoped().byStatus(ASSIGNED), LOST);
     assertEquals(PENDING, getOnlyTask(pendingQuery).getStatus());
     assertTaskCount(3);
+  }
+
+  @Test
+  public void testIsStrictlyJobScoped() throws Exception {
+    control.replay();
+    assertTrue(isStrictlyJobScoped(Query.jobScoped(KEY_A).get()));
+    assertFalse(isStrictlyJobScoped(Query.jobScoped(KEY_A).byId("xyz").get()));
+  }
+
+  @Test
+  public void testKillNotStrictlyJobScoped() throws Exception {
+    // Makes sure that queries that are not strictly job scoped will not remove the job entirely.
+    ParsedConfiguration config = makeCronJob(KEY_A, 10, "1 1 1 1 1");
+    JobConfiguration job = config.getJobConfig();
+    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
+        .andReturn("key");
+    cronScheduler.deschedule("key");
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(config);
+    assertTrue(cron.hasJob(KEY_A));
+    scheduler.startCronJob(KEY_A);
+    assertTaskCount(10);
+
+    scheduler.killTasks(Query.shardScoped(KEY_A, 0).get(), USER_A);
+    assertTaskCount(9);
+    assertTrue(cron.hasJob(KEY_A));
+
+    scheduler.killTasks(Query.jobScoped(KEY_A).get(), USER_A);
+    assertFalse(cron.hasJob(KEY_A));
   }
 
   @Test
