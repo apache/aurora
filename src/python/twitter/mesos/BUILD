@@ -17,16 +17,24 @@ python_library(
 python_binary(
   name = 'mesos_client',
   source = 'bin/mesos_client.py',
-  dependencies = [
+  dependencies = [ pants(':mesos_client_lib'),
     python_requirement('argparse'), # this is a legacy dependency required for macaw deploy_mesos
-    pants(':mesos-lib'),
-    pants('src/python/twitter/mesos/common_internal:app'),
-    pants('src/python/twitter/thermos/base:options')
   ],
   platforms = (
     'linux-x86_64',
     'macosx-10.6-x86_64',
   )
+)  
+
+# Duplicate of mesos_client for testing purposes: you can't run tests against a python_binary.
+python_library(
+  name = 'mesos_client_lib',
+  sources = [ 'bin/mesos_client.py' ],
+  dependencies = [
+    pants(':mesos-lib'),
+    pants('src/python/twitter/mesos/common_internal:app'),
+    pants('src/python/twitter/thermos/base:options')
+  ]
 )
 
 python_binary(

@@ -488,7 +488,8 @@ def runtask(args, options):
       packages=options.packages,
       additional_files=options.filemap)
   api = make_client(cluster_name)
-  qr.run(api)
+  if not qr.run(api):
+    die('Task execution failed')
 
 
 @app.command
@@ -544,7 +545,7 @@ def diff(job_spec, config_file):
     dump_tasks(local_tasks, local)
     with NamedTemporaryFile() as remote:
       dump_tasks(remote_tasks, remote)
-      subprocess.call([diff_program, remote.name, local.name])
+      return subprocess.call([diff_program, remote.name, local.name])
 
 
 @app.command(name='open')
@@ -962,7 +963,7 @@ def trap_packer_error(fn):
     try:
       return fn(args)
     except Packer.Error as e:
-      print('Request failed: %s' % e)
+      die('Request failed: %s' % e)
   return wrap
 
 

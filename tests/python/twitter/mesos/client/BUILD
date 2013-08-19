@@ -6,6 +6,7 @@ python_test_suite(name = 'all',
     pants(':disambiguator'),
     pants(':health_check'),
     pants(':jenkins'),
+    pants(':packercli'),
     pants(':quickrun'),
     pants(':restarter'),
     pants(':scheduler_client'),
@@ -38,6 +39,14 @@ python_tests(name = 'health_check',
     pants('src/python/twitter/mesos:mesos-lib'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('3rdparty/python:mox'),
+  ],
+)
+
+python_tests(name = 'packercli',
+  sources = [ 'test_packer_cli.py' ],
+  dependencies = [
+    pants('3rdparty/python:mox'),
+    pants('src/python/twitter/mesos:mesos_client_lib'),
   ],
 )
 
