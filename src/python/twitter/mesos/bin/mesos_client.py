@@ -350,8 +350,8 @@ def deployment(args, options):
 
 @app.command
 @app.command_option('--runner', dest='runner', default='build',
-    help='The thermos_runner.pex to run the task.  If "build", build one automatically. '
-         'This requires that you be running the spawn from within the root of a science repo.')
+    help='The thermos_runner.pex to run the task. If "build", build one automatically. '
+         'This requires that you be running spawn from within the root of a science repo.')
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(CLUSTER_CONFIG_OPTION)
