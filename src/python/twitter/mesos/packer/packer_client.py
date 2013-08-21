@@ -106,7 +106,7 @@ class Packer(object):
   @staticmethod
   def _ver_url(role, package, version):
     # Quoting the path to support arbitrary version identifiers such as metadata strings.
-    return '%s/%s' % (Packer._pkg_url(role, package), urllib.quote(version))
+    return '%s/%s' % (Packer._pkg_url(role, package), urllib.quote(version, ''))
 
   def compute_checksum(self, local_file):
     # Calculate the checksum, reading 16 MiB chunks.

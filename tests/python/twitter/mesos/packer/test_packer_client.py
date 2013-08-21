@@ -1,4 +1,5 @@
 import hashlib
+import httplib
 import pytest
 import tempfile
 import mox
@@ -109,3 +110,24 @@ def test_add_failure_message_parsing_no_json():
 def test_add_failure_message_parsing_no_entity():
   # Generates a response with no entity and a reason code which should be used as the message
   verify_add_failure_message_processing(413, 'some message', as_reason=True)
+
+
+def test_get_version_id_with_slash():
+  mocker = mox.Mox()
+
+  resp = mocker.CreateMock(httplib.HTTPResponse)
+  resp.status = 200
+  resp.read().AndReturn('{"some":"json"}')
+
+  packer = packer_client.Packer('host', 'port')
+  packer._client = mocker.CreateMock(httplib.HTTPConnection)
+  packer._client.request(
+      'GET', '/package/mickey/mouse/something%2Fversion%2Fwith%2Fslashes',
+      body=None, headers={})
+  packer._client.getresponse().AndReturn(resp)
+
+  mocker.ReplayAll()
+
+  packer.get_version('mickey', 'mouse', 'something/version/with/slashes')
+
+  mocker.VerifyAll()
