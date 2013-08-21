@@ -13,7 +13,6 @@ import com.google.inject.TypeLiteral;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import com.twitter.aurora.scheduler.async.TaskGroups.SchedulingAction;
-import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -119,8 +118,8 @@ public class AsyncModule extends AbstractModule {
     binder().install(new PrivateModule() {
       @Override protected void configure() {
         // TODO(ksweeney): Create a configuration validator module so this can be injected.
-        bind(Integer.class).annotatedWith(PruneThreshold.class)
-            .toInstance(ConfigurationManager.MAX_TASKS_PER_JOB.get() * 2);
+        // TODO(William Farner): Revert this once large task counts is cheap (MESOS-2329).
+        bind(Integer.class).annotatedWith(PruneThreshold.class).toInstance(100);
         bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PruneThreshold.class)
             .toInstance(HISTORY_PRUNE_THRESHOLD.get());
         bind(ScheduledExecutorService.class).toInstance(executor);
