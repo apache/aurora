@@ -1,15 +1,11 @@
 package com.twitter.aurora.scheduler.log.mesos;
 
 import java.io.File;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 import java.net.InetSocketAddress;
 import java.util.List;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
-import com.google.inject.BindingAnnotation;
-import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
@@ -22,15 +18,11 @@ import com.twitter.aurora.codec.ThriftBinaryCodec;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.inject.Bindings;
-import com.twitter.common.inject.Bindings.Rebinder;
 import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
-
-import static java.lang.annotation.ElementType.PARAMETER;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import com.twitter.common_internal.zookeeper.ZooKeeper;
 
 /**
  * Binds a native mesos Log implementation.
@@ -92,18 +84,8 @@ public class MesosLogStreamModule extends PrivateModule {
   private static final Arg<Amount<Long, Time>> WRITE_TIMEOUT =
       Arg.create(Amount.of(3L, Time.SECONDS));
 
-  @Retention(RUNTIME)
-  @Target(PARAMETER)
-  @BindingAnnotation
-  private @interface LogBinding { }
-
   @Override
   protected void configure() {
-    Rebinder rebinder = Bindings.rebinder(binder(), LogBinding.class);
-    rebinder.rebind(Key.get(new TypeLiteral<List<InetSocketAddress>>() { }));
-    rebinder.rebind(Key.get(new TypeLiteral<Amount<Integer, Time>>() { }));
-    rebinder.rebind(Key.get(Credentials.class));
-
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.ReadTimeout.class)
         .toInstance(READ_TIMEOUT.get());
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.WriteTimeout.class)
@@ -117,9 +99,9 @@ public class MesosLogStreamModule extends PrivateModule {
   @Provides
   @Singleton
   Log provideLog(
-      @LogBinding List<InetSocketAddress> endpoints,
-      @LogBinding Credentials credentials,
-      @LogBinding Amount<Integer, Time> sessionTimeout) {
+      @ZooKeeper List<InetSocketAddress> endpoints,
+      Credentials credentials,
+      @ZooKeeper Amount<Integer, Time> sessionTimeout) {
 
     File logPath = LOG_PATH.get();
     File parentDir = logPath.getParentFile();
