@@ -17,6 +17,8 @@ from .file_browser import TaskObserverFileBrowser
 from .json import TaskObserverJSONBindings
 from .templating import HttpTemplate
 
+from bottle import HTTPResponse
+
 class StaticAssets(object):
   """
     Serve the /assets directory.
@@ -44,55 +46,30 @@ class StaticAssets(object):
     # TODO(wickman)  Add static_content to bottle.
     if filename in self._assets:
       mimetype, encoding = mimetypes.guess_type(filename)
-      header = {}
-      if mimetype: header['Content-Type'] = mimetype
-      if encoding: header['Content-Encoding'] = encoding
-      return HttpServer.Response(self._assets[filename], header=header)
+      headers = {}
+      if mimetype: headers['Content-Type'] = mimetype
+      if encoding: headers['Content-Encoding'] = encoding
+      return HTTPResponse(self._assets[filename], header=headers)
     else:
-      return HttpServer.Response(status=404)
-
-BottleObserverMixins = (
-  StaticAssets,
-  TaskObserverFileBrowser,
-  TaskObserverJSONBindings
-)
-
-def _flatten(lists):
-  out = []
-  for item in lists:
-    if isinstance(item, (list, tuple)):
-      out.extend(_flatten(item))
-    else:
-      out.append(item)
-  return out
-
-class ListExpansionMetaclass(type):
-  def __new__(mcls, name, parents, attrs):
-    parents = _flatten(parents)
-    return type(name, tuple(parents), attrs)
+      HttpServer.abort(404, 'Unknown asset: %s' % filename)
 
 
-class BottleObserver(HttpServer, BottleObserverMixins):
+class BottleObserver(HttpServer, StaticAssets, TaskObserverFileBrowser, TaskObserverJSONBindings):
   """
     A bottle wrapper around a Thermos TaskObserver.
   """
 
-  # Because Python doesn't like *list syntax in class declarations.
-  __metaclass__ = ListExpansionMetaclass
-
   def __init__(self, observer):
     self._observer = observer
-    # Can these be auto-grokked?
     StaticAssets.__init__(self)
-    for mixin in BottleObserverMixins:
-      mixin.__init__(self)
+    TaskObserverFileBrowser.__init__(self)
+    TaskObserverJSONBindings.__init__(self)
+    HttpServer.__init__(self)
 
   @HttpServer.route("/")
   @HttpServer.view(HttpTemplate.load('index'))
   def handle_index(self):
-    return dict(
-      hostname = socket.gethostname()
-    )
+    return dict(hostname=socket.gethostname())
 
   @HttpServer.route("/main")
   @HttpServer.route("/main/:type")
@@ -101,17 +78,17 @@ class BottleObserver(HttpServer, BottleObserverMixins):
   @HttpServer.mako_view(HttpTemplate.load('main'))
   def handle_main(self, type=None, offset=None, num=None):
     if type not in (None, 'all', 'finished', 'active'):
-      return HttpServer.Response(status=404)
+      HttpServer.abort(404, 'Invalid task type: %s' % type)
     if offset is not None:
       try:
         offset = int(offset)
-      except:
-        return HttpServer.Response(status=404)
+      except ValueError:
+        HttpServer.abort(404, 'Invalid offset: %s' % offset)
     if num is not None:
       try:
         num = int(num)
-      except:
-        return HttpServer.Response(status=404)
+      except ValueError:
+        HttpServer.abort(404, 'Invalid count: %s' % num)
     return self._observer.main(type, offset, num)
 
   @HttpServer.route("/task/:task_id")
@@ -119,8 +96,8 @@ class BottleObserver(HttpServer, BottleObserverMixins):
   def handle_task(self, task_id):
     task = self.get_task(task_id)
     processes = self._observer.processes([task_id])
-    if not processes[task_id]:
-      return HttpServer.Response(status=404)
+    if not processes.get(task_id, None):
+      HttpServer.abort(404, 'Unknown task_id: %s' % task_id)
     processes = processes[task_id]
     state = self._observer.state(task_id)
 
@@ -159,11 +136,12 @@ class BottleObserver(HttpServer, BottleObserverMixins):
     all_processes = {}
     current_run = self._observer.process(task_id, process_id)
     if not current_run:
-      return HttpServer.Response(status=404)
+      HttpServer.abort(404, 'Invalid task/process combination: %s/%s' % (task_id, process_id))
     process = self._observer.process_from_name(task_id, process_id)
     if process is None:
-      log.error('Could not recover process: %s/%s' % (task_id, process_id))
-      return HttpServer.Response(status=404)
+      msg = 'Could not recover process: %s/%s' % (task_id, process_id)
+      log.error(msg)
+      HttpServer.abort(404, msg)
 
     current_run_number = current_run['process_run']
     all_processes[current_run_number] = current_run

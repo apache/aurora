@@ -179,7 +179,6 @@ class MesosObserverVars(Observable, ExceptionalThread):
                     'connection_losses',        # https://issues.apache.org/jira/browse/MESOS-433
                     'disconnected_announcers',  # Remove
                     'finished_tasks',
-                    'gc_executors',
                     'max_disconnected_time',    # Remove
                     'max_metrics_age',
                     'observer_cpu',
@@ -375,7 +374,7 @@ class MesosObserverVars(Observable, ExceptionalThread):
       if self._gc_executor[1]:
         self._gc_executor[1].stop()
       self.metrics.unregister_observable('gc_executor')
-      gc_vars = GCExecutorVars(proc)
+      gc_vars = GCExecutorVars(proc, eid)
       self.metrics.register_observable('gc_executor', gc_vars)
       self._gc_executor = (eid, gc_vars)
 
