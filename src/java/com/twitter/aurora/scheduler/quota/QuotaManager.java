@@ -11,7 +11,6 @@ import com.google.inject.Inject;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Shards;
@@ -101,7 +100,7 @@ public interface QuotaManager {
     public Quota getConsumption(final String role) {
       checkNotBlank(role);
 
-      final TaskQuery query = Query.roleScoped(role).active().get();
+      final Query.Builder query = Query.roleScoped(role).active();
 
       return storage.consistentRead(
           new Work.Quiet<Quota>() {

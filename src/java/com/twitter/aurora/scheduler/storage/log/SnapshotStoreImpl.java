@@ -56,7 +56,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       ATTRIBUTE_FIELD,
       new SnapshotField() {
         @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
-          snapshot.setTasks(store.getTaskStore().fetchTasks(Query.GET_ALL));
+          snapshot.setTasks(store.getTaskStore().fetchTasks(Query.unscoped()));
         }
 
         @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {

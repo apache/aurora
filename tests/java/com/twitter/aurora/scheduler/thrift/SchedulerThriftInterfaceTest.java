@@ -204,9 +204,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testKillTasksImmediate() throws Exception {
-    TaskQuery query = new TaskQuery()
-        .setOwner(ROLE_IDENTITY)
-        .setJobName("foo_job");
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
     ScheduledTask task = new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTask(new TaskConfig()
@@ -220,15 +218,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    KillResponse response = thrift.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query.get(), SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
   @Test
   public void testKillTasksDelayed() throws Exception {
-    TaskQuery query = new TaskQuery()
-        .setOwner(ROLE_IDENTITY)
-        .setJobName("foo_job");
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
     ScheduledTask task = new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTask(new TaskConfig()
@@ -243,15 +239,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    KillResponse response = thrift.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query.get(), SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
   @Test
   public void testKillTasksAuthFailure() throws Exception {
-    TaskQuery query = new TaskQuery()
-        .setOwner(ROLE_IDENTITY)
-        .setJobName("foo_job");
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
     ScheduledTask task = new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTask(new TaskConfig()
@@ -263,15 +257,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    KillResponse response = thrift.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query.get(), SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
   @Test
   public void testAdminKillTasks() throws Exception {
-    TaskQuery query = new TaskQuery()
-        .setOwner(ROLE_IDENTITY)
-        .setJobName("foo_job");
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
 
     expectAuth(ROOT, true);
     scheduler.killTasks(query, USER);
@@ -279,7 +271,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    KillResponse response = thrift.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query.get(), SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -297,9 +289,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testKillNonExistentTasks() throws Exception {
-    TaskQuery query = new TaskQuery()
-        .setOwner(ROLE_IDENTITY)
-        .setJobName("foo_job");
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY);
 
     expectAuth(ROOT, true);
 
@@ -308,7 +298,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    KillResponse response = thrift.killTasks(query, SESSION);
+    KillResponse response = thrift.killTasks(query.get(), SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
@@ -363,7 +353,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     String taskId = "task_id_foo";
     ScheduleStatus status = ScheduleStatus.FAILED;
 
-    scheduler.setTaskStatus(Query.byId(taskId), status, transitionMessage(SESSION.getUser()));
+    scheduler.setTaskStatus(Query.taskScoped(taskId), status, transitionMessage(SESSION.getUser()));
     expectAuth(ROOT, true);
 
     control.replay();

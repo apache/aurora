@@ -2,8 +2,6 @@ package com.twitter.aurora.scheduler.storage.mem;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.Atomics;
@@ -87,7 +85,7 @@ public class MemTaskStoreTest {
   @Test
   public void testMutate() {
     store.saveTasks(ImmutableSet.of(TASK_A, TASK_B, TASK_C, TASK_D));
-    assertQueryResults(Query.byStatus(ScheduleStatus.RUNNING));
+    assertQueryResults(Query.statusScoped(ScheduleStatus.RUNNING));
 
     store.mutateTasks(Query.byId("a"), new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
@@ -96,7 +94,7 @@ public class MemTaskStoreTest {
     });
 
     assertQueryResults(
-        Query.byStatus(ScheduleStatus.RUNNING),
+        Query.statusScoped(ScheduleStatus.RUNNING),
         TASK_A.deepCopy().setStatus(ScheduleStatus.RUNNING));
 
     store.mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
@@ -122,8 +120,9 @@ public class MemTaskStoreTest {
 
     store.saveTasks(ImmutableSet.of(TASK_A));
     assertTrue(store.unsafeModifyInPlace(taskId, updated.deepCopy()));
+    Query.Builder query = Query.taskScoped(taskId);
     TaskConfig stored =
-        Iterables.getOnlyElement(store.fetchTasks(Query.byId(taskId))).getAssignedTask().getTask();
+        Iterables.getOnlyElement(store.fetchTasks(query)).getAssignedTask().getTask();
     assertEquals(updated, stored);
 
     store.deleteTasks(ImmutableSet.of(taskId));
@@ -158,7 +157,7 @@ public class MemTaskStoreTest {
     assertStoreContents(TASK_A);
 
     // Mutate query result.
-    Iterables.getOnlyElement(store.fetchTasks(Query.GET_ALL)).setStatus(ScheduleStatus.KILLED);
+    Iterables.getOnlyElement(store.fetchTasks(Query.unscoped())).setStatus(ScheduleStatus.KILLED);
     assertStoreContents(TASK_A);
 
     // Capture reference during mutation and mutate later.
@@ -225,10 +224,10 @@ public class MemTaskStoreTest {
   }
 
   private void assertQueryResults(TaskQuery query, ScheduledTask... tasks) {
-    assertQueryResults(Suppliers.ofInstance(query), tasks);
+    assertQueryResults(Query.arbitrary(query), tasks);
   }
 
-  private void assertQueryResults(Supplier<TaskQuery> query, ScheduledTask... tasks) {
+  private void assertQueryResults(Query.Builder query, ScheduledTask... tasks) {
     assertEquals(
         ImmutableSet.<ScheduledTask>builder().add(tasks).build(),
         store.fetchTasks(query));

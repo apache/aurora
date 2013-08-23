@@ -76,7 +76,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
   @Test
   public void testForwardsStatusUpdates() throws Exception {
     expect(
-        stateManager.changeState(Query.byId(TASK_ID_A), RUNNING, Optional.of("fake message")))
+        stateManager.changeState(Query.taskScoped(TASK_ID_A), RUNNING, Optional.of("fake message")))
         .andReturn(1);
 
     control.replay();
@@ -101,7 +101,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
   @Test(expected = StorageException.class)
   public void testFailedStatusUpdate() throws Exception {
     expect(stateManager.changeState(
-        Query.byId(TASK_ID_A),
+        Query.taskScoped(TASK_ID_A),
         RUNNING,
         Optional.of("fake message")))
         .andThrow(new StorageException("Injected error"));
@@ -119,7 +119,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
   @Test
   public void testMemoryLimitTranslationHack() throws Exception {
     expect(stateManager.changeState(
-        Query.byId(TASK_ID_A),
+        Query.taskScoped(TASK_ID_A),
         FAILED,
         Optional.of(UserTaskLauncher.MEMORY_LIMIT_DISPLAY)))
         .andReturn(0);

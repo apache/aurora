@@ -2,12 +2,12 @@ package com.twitter.aurora.scheduler.storage;
 
 import java.util.Set;
 
-import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
+import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.common.base.Closure;
 
 /**
@@ -16,41 +16,21 @@ import com.twitter.common.base.Closure;
 public interface TaskStore {
 
   /**
-   * Fetches a read-only view of tasks matching a query and filters.
-   *
-   * @deprecated Use {@link #fetchTaskIds(Supplier)}.
-   * @param query Query to identify tasks with.
-   * @return A read-only view of matching tasks.
-   */
-  @Deprecated
-  ImmutableSet<ScheduledTask> fetchTasks(TaskQuery query);
-
-  /**
    * Fetches a read-only view of tasks matching a query and filters. Intended for use with a
    * {@link com.twitter.aurora.scheduler.base.Query.Builder}.
    *
-   * @param querySupplier Supplier of the query to identify tasks with.
+   * @param query Builder of the query to identify tasks with.
    * @return A read-only view of matching tasks.
    */
-  ImmutableSet<ScheduledTask> fetchTasks(Supplier<TaskQuery> querySupplier);
+  ImmutableSet<ScheduledTask> fetchTasks(Query.Builder query);
 
   /**
    * Convenience method to execute a query and only retrieve the IDs of the matching tasks.
    *
-   * @deprecated Use {@link #fetchTaskIds(Supplier)}.
-   * @param query Query to identify tasks with.
+   * @param query Builder of the query to identify tasks with.
    * @return IDs of the matching tasks.
    */
-  @Deprecated
-  Set<String> fetchTaskIds(TaskQuery query);
-
-  /**
-   * Convenience method to execute a query and only retrieve the IDs of the matching tasks.
-   *
-   * @param querySupplier Supplier of the query to identify tasks with.
-   * @return IDs of the matching tasks.
-   */
-  Set<String> fetchTaskIds(Supplier<TaskQuery> querySupplier);
+  Set<String> fetchTaskIds(Query.Builder query);
 
   public interface Mutable extends TaskStore {
     /**

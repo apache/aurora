@@ -291,7 +291,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public ScheduleStatusResponse getTasksStatus(TaskQuery query) {
     checkNotNull(query);
 
-    Set<ScheduledTask> tasks = Storage.Util.weaklyConsistentFetchTasks(storage, query);
+    Set<ScheduledTask> tasks =
+        Storage.Util.weaklyConsistentFetchTasks(storage, Query.arbitrary(query));
 
     ScheduleStatusResponse response = new ScheduleStatusResponse();
     if (tasks.isEmpty()) {
@@ -368,7 +369,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private void validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
       throws AuthFailedException {
 
-    Set<ScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, taskQuery);
+    Set<ScheduledTask> tasks =
+        Storage.Util.consistentFetchTasks(storage, Query.arbitrary(taskQuery));
     for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
       sessionValidator.checkAuthenticated(session, role);
     }
@@ -403,14 +405,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     try {
-      schedulerCore.killTasks(query, session.getUser());
+      schedulerCore.killTasks(Query.arbitrary(query), session.getUser());
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
       return response;
     }
 
     BackoffHelper backoff = new BackoffHelper(killTaskInitialBackoff, killTaskMaxBackoff, true);
-    final TaskQuery activeQuery = query.setStatuses(Tasks.ACTIVE_STATES);
+    final Query.Builder activeQuery = Query.arbitrary(query.setStatuses(Tasks.ACTIVE_STATES));
     try {
       backoff.doUntilSuccess(new Supplier<Boolean>() {
         @Override public Boolean get() {
@@ -635,7 +637,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     checkNotNull(session);
 
     schedulerCore.setTaskStatus(
-        Query.byId(taskId), status, transitionMessage(session.getUser()));
+        Query.taskScoped(taskId), status, transitionMessage(session.getUser()));
     return new ForceTaskStateResponse().setResponseCode(OK).setMessage("Transition attempted.");
   }
 
@@ -669,7 +671,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public QueryRecoveryResponse queryRecovery(TaskQuery query, SessionKey session) {
     QueryRecoveryResponse response = new QueryRecoveryResponse().setResponseCode(OK);
     try {
-      response.setTasks(recovery.query(query));
+      response.setTasks(recovery.query(Query.arbitrary(query)));
     } catch (RecoveryException e) {
       response.setResponseCode(ERROR).setMessage(e.getMessage());
       LOG.log(Level.WARNING, "Failed to query recovery: " + e, e);
@@ -682,7 +684,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public DeleteRecoveryTasksResponse deleteRecoveryTasks(TaskQuery query, SessionKey session) {
     DeleteRecoveryTasksResponse response = new DeleteRecoveryTasksResponse().setResponseCode(OK);
     try {
-      recovery.deleteTasks(query);
+      recovery.deleteTasks(Query.arbitrary(query));
     } catch (RecoveryException e) {
       response.setResponseCode(ERROR).setMessage(e.getMessage());
       LOG.log(Level.WARNING, "Failed to delete recovery tasks: " + e, e);

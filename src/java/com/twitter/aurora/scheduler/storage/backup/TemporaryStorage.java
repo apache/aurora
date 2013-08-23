@@ -5,8 +5,8 @@ import java.util.Set;
 import com.google.common.base.Function;
 
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.storage.Snapshot;
+import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.SnapshotStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -26,17 +26,17 @@ interface TemporaryStorage {
    * Deletes all tasks matching a query.  Deleted tasks will not be reflected in the snapshot when
    * {@link #toSnapshot()} is executed.
    *
-   * @param query Query for tasks to delete.
+   * @param query Query builder for tasks to delete.
    */
-  void deleteTasks(TaskQuery query);
+  void deleteTasks(Query.Builder query);
 
   /**
    * Fetches tasks matching a query.
    *
-   * @param query Query for tasks to fetch.
+   * @param query Query builder for tasks to fetch.
    * @return Matching tasks.
    */
-  Set<ScheduledTask> fetchTasks(TaskQuery query);
+  Set<ScheduledTask> fetchTasks(Query.Builder query);
 
   /**
    * Creates a snapshot of the contents of the temporary storage.
@@ -57,7 +57,7 @@ interface TemporaryStorage {
       snapshotStore.applySnapshot(snapshot);
 
       return new TemporaryStorage() {
-        @Override public void deleteTasks(final TaskQuery query) {
+        @Override public void deleteTasks(final Query.Builder query) {
           storage.write(new MutateWork.NoResult.Quiet() {
             @Override protected void execute(MutableStoreProvider storeProvider) {
               storeProvider.getUnsafeTaskStore()
@@ -66,7 +66,7 @@ interface TemporaryStorage {
           });
         }
 
-        @Override public Set<ScheduledTask> fetchTasks(final TaskQuery query) {
+        @Override public Set<ScheduledTask> fetchTasks(final Query.Builder query) {
           return storage.consistentRead(new Work.Quiet<Set<ScheduledTask>>() {
             @Override public Set<ScheduledTask> apply(StoreProvider storeProvider) {
               return storeProvider.getTaskStore().fetchTasks(query);

@@ -96,7 +96,7 @@ public class RecoveryTest extends EasyMockTest {
     assertEquals(ImmutableSet.of(backup1), recovery.listBackups());
 
     recovery.stage(backup1);
-    assertEquals(SNAPSHOT1.getTasks(), recovery.query(Query.GET_ALL));
+    assertEquals(SNAPSHOT1.getTasks(), recovery.query(Query.unscoped()));
     recovery.commit();
     transaction.getValue().apply(storeProvider);
   }
@@ -116,9 +116,9 @@ public class RecoveryTest extends EasyMockTest {
     storageBackup.createSnapshot();
     String backup1 = storageBackup.createBackupName();
     recovery.stage(backup1);
-    assertEquals(SNAPSHOT1.getTasks(), recovery.query(Query.GET_ALL));
-    recovery.deleteTasks(Query.byId(Tasks.id(TASK2)));
-    assertEquals(modified.getTasks(), recovery.query(Query.GET_ALL));
+    assertEquals(SNAPSHOT1.getTasks(), recovery.query(Query.unscoped()));
+    recovery.deleteTasks(Query.taskScoped(Tasks.id(TASK2)));
+    assertEquals(modified.getTasks(), recovery.query(Query.unscoped()));
     recovery.commit();
     transaction.getValue().apply(storeProvider);
   }

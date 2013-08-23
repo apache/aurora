@@ -15,7 +15,6 @@ import javax.annotation.Nullable;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
-import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -93,7 +92,6 @@ import static com.twitter.aurora.gen.UpdateResult.SUCCESS;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.hostLimitConstraint;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.populateFields;
-import static com.twitter.aurora.scheduler.state.SchedulerCoreImpl.isStrictlyJobScoped;
 
 /**
  * Base integration test for the SchedulerCoreImpl, subclasses should supply a concrete Storage
@@ -621,7 +619,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(parsedConfiguration);
     assertTrue(cron.hasJob(KEY_A));
 
-    scheduler.killTasks(Query.jobScoped(KEY_A).get(), OWNER_A.getUser());
+    scheduler.killTasks(Query.jobScoped(KEY_A), OWNER_A.getUser());
     scheduler.createJob(updated);
 
     JobConfiguration stored = Iterables.getOnlyElement(cron.getJobs());
@@ -651,7 +649,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         changeStatus(taskId, status);
       }
 
-      scheduler.killTasks(Query.roleScoped(ROLE_A).get(), OWNER_A.getUser());
+      scheduler.killTasks(Query.roleScoped(ROLE_A), OWNER_A.getUser());
 
       if (!statuses.isEmpty()) {
         // If there was no move out of the PENDING state, the task is deleted outright.
@@ -766,7 +764,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Query.roleScoped(ROLE_A), ASSIGNED);
     changeStatus(Query.roleScoped(ROLE_A), STARTING);
     changeStatus(Query.roleScoped(ROLE_A), RUNNING);
-    scheduler.killTasks(Query.roleScoped(ROLE_A).get(), OWNER_A.getUser());
+    scheduler.killTasks(Query.roleScoped(ROLE_A), OWNER_A.getUser());
     changeStatus(Query.roleScoped(ROLE_A), KILLED);
 
     String taskId = Tasks.id(getOnlyTask(Query.roleScoped(ROLE_A)));
@@ -896,7 +894,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     String taskId = Tasks.id(Iterables.get(tasks, 0));
 
-    scheduler.killTasks(Query.byId(taskId), OWNER_A.getUser());
+    scheduler.killTasks(Query.taskScoped(taskId), OWNER_A.getUser());
     assertTaskCount(0);
   }
 
@@ -912,7 +910,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(taskId, ASSIGNED);
     changeStatus(taskId, STARTING);
     changeStatus(taskId, RUNNING);
-    scheduler.killTasks(Query.byId(taskId), OWNER_A.getUser());
+    scheduler.killTasks(Query.taskScoped(taskId), OWNER_A.getUser());
     assertEquals(KILLING, getTask(taskId).getStatus());
     assertEquals(1, getTasks(Query.roleScoped(ROLE_A)).size());
     changeStatus(taskId, KILLED);
@@ -933,7 +931,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeCronJob(KEY_A, 1, "1 1 1 1 1"));
 
     // This will fail if the cron task could not be found.
-    scheduler.killTasks(Query.byJob(KEY_A), OWNER_A.getUser());
+    scheduler.killTasks(Query.jobScoped(KEY_A), OWNER_A.getUser());
   }
 
   @Test
@@ -966,9 +964,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testIsStrictlyJobScoped() throws Exception {
+    // TODO(Sathya): Remove this after adding a unit test for Query utility class.
     control.replay();
-    assertTrue(isStrictlyJobScoped(Query.jobScoped(KEY_A).get()));
-    assertFalse(isStrictlyJobScoped(Query.jobScoped(KEY_A).byId("xyz").get()));
+    assertTrue(Query.isOnlyJobScoped(Query.jobScoped(KEY_A)));
+    assertFalse(Query.isOnlyJobScoped(Query.jobScoped(KEY_A).byId("xyz")));
   }
 
   @Test
@@ -988,11 +987,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.startCronJob(KEY_A);
     assertTaskCount(10);
 
-    scheduler.killTasks(Query.shardScoped(KEY_A, 0).get(), USER_A);
+    scheduler.killTasks(Query.shardScoped(KEY_A, 0), USER_A);
     assertTaskCount(9);
     assertTrue(cron.hasJob(KEY_A));
 
-    scheduler.killTasks(Query.jobScoped(KEY_A).get(), USER_A);
+    scheduler.killTasks(Query.jobScoped(KEY_A), USER_A);
     assertFalse(cron.hasJob(KEY_A));
   }
 
@@ -1004,7 +1003,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(KEY_A, 10));
     assertTaskCount(10);
 
-    scheduler.killTasks(Query.byJob(KEY_A), OWNER_A.getUser());
+    scheduler.killTasks(Query.jobScoped(KEY_A), OWNER_A.getUser());
     assertTaskCount(0);
   }
 
@@ -1817,7 +1816,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   private void assertTaskCount(int numTasks) {
-    assertEquals(numTasks, Storage.Util.consistentFetchTasks(storage, Query.GET_ALL).size());
+    assertEquals(numTasks, Storage.Util.consistentFetchTasks(storage, Query.unscoped()).size());
   }
 
   private static Identity makeIdentity(String role) {
@@ -1891,27 +1890,27 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return getOnlyTask(Query.taskScoped(taskId));
   }
 
-  private ScheduledTask getOnlyTask(Supplier<TaskQuery> query) {
+  private ScheduledTask getOnlyTask(Query.Builder query) {
     return Iterables.getOnlyElement(Storage.Util.consistentFetchTasks(storage, query));
   }
 
-  private Set<ScheduledTask> getTasks(Supplier<TaskQuery> query) {
+  private Set<ScheduledTask> getTasks(Query.Builder query) {
     return Storage.Util.consistentFetchTasks(storage, query);
   }
 
   private Set<ScheduledTask> getTasksByStatus(ScheduleStatus status) {
-    return Storage.Util.consistentFetchTasks(storage, Query.unscoped().byStatus(status).get());
+    return Storage.Util.consistentFetchTasks(storage, Query.unscoped().byStatus(status));
   }
 
   private Set<ScheduledTask> getTasksOwnedBy(Identity owner) {
     return Storage.Util.consistentFetchTasks(storage, query(owner, null, null));
   }
 
-  private TaskQuery queryJob(Identity owner, String jobName) {
+  private Query.Builder queryJob(Identity owner, String jobName) {
     return query(owner, jobName, null);
   }
 
-  private TaskQuery query(
+  private Query.Builder query(
       @Nullable Identity owner,
       @Nullable String jobName,
       @Nullable Iterable<String> taskIds) {
@@ -1927,18 +1926,18 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       query.setTaskIds(Sets.newHashSet(taskIds));
     }
 
-    return query;
+    return Query.arbitrary(query);
   }
 
   public void changeStatus(
-      Supplier<TaskQuery> query,
+      Query.Builder query,
       ScheduleStatus status,
       Optional<String> message) {
 
-    scheduler.setTaskStatus(query.get(), status, message);
+    scheduler.setTaskStatus(query, status, message);
   }
 
-  public void changeStatus(Supplier<TaskQuery> query, ScheduleStatus status) {
+  public void changeStatus(Query.Builder query, ScheduleStatus status) {
     changeStatus(query, status, Optional.<String>absent());
   }
 

@@ -166,15 +166,11 @@ public final class JobKeys {
    * @param query Query to extract the key from.
    * @return A present if one can be extracted, absent otherwise.
    */
-  public static Optional<JobKey> from(TaskQuery query) {
-    if (Query.isJobScoped(query)
-        && query.isSetOwner()
-        && query.getOwner().isSetRole()
-        && query.isSetEnvironment()
-        && query.isSetJobName()) {
-
+  public static Optional<JobKey> from(Query.Builder query) {
+    if (Query.isJobScoped(query)) {
+      TaskQuery taskQuery = query.get();
       return Optional.of(
-          from(query.getOwner().getRole(), query.getEnvironment(), query.getJobName()));
+          from(taskQuery.getOwner().getRole(), taskQuery.getEnvironment(), taskQuery.getJobName()));
 
     } else {
       return Optional.absent();

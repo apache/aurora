@@ -3,6 +3,7 @@ package com.twitter.aurora.scheduler.base;
 import java.util.EnumSet;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
@@ -18,6 +19,7 @@ import static org.apache.commons.lang.StringUtils.isEmpty;
 
 /**
  * A utility class to construct storage queries.
+ * TODO(Sathya): Add some basic unit tests for isJobScoped and isOnlyJobScoped.
  */
 public final class Query {
   public static final TaskQuery GET_ALL = Query.unscoped().get();
@@ -26,47 +28,40 @@ public final class Query {
     // Utility.
   }
 
-  public static TaskQuery byId(Iterable<String> taskIds) {
-    return taskScoped(taskIds).get();
-  }
-
   public static TaskQuery byId(String taskId, String... taskIds) {
     return taskScoped(taskId, taskIds).get();
-  }
-
-  public static TaskQuery byRole(String roleAccount) {
-    return roleScoped(roleAccount).get();
-  }
-
-  public static TaskQuery byStatus(ScheduleStatus status, ScheduleStatus... statuses) {
-    return unscoped().byStatus(status, statuses).get();
-  }
-
-  public static TaskQuery byStatus(Iterable<ScheduleStatus> statuses) {
-    return unscoped().byStatus(statuses).get();
-  }
-
-  public static TaskQuery bySlave(String slaveHost) {
-    return slaveScoped(slaveHost).get();
-  }
-
-  public static TaskQuery byJob(JobKey jobKey) {
-    return jobScoped(jobKey).get();
   }
 
   /**
    * Checks whether a query is scoped to a specific job.
    * A query scoped to a job specifies a role and job name.
    *
-   * @param query Query to test.
+   * @param taskQuery Query to test.
    * @return {@code true} if the query specifies at least a role and job name,
    *         otherwise {@code false}.
    */
-  public static boolean isJobScoped(TaskQuery query) {
+  public static boolean isJobScoped(Builder taskQuery) {
+    TaskQuery query = taskQuery.get();
     return (query.getOwner() != null)
         && !isEmpty(query.getOwner().getRole())
         && !isEmpty(query.getEnvironment())
         && !isEmpty(query.getJobName());
+  }
+
+  /**
+   * Checks whether a query is strictly scoped to a specific job. A query is strictly job scoped,
+   * iff it has the role, environment and jobName set.
+   *
+   * @param query Query to test.
+   * @return {@code true} if the query is strictly job scoped, otherwise {@code false}.
+   */
+  public static boolean isOnlyJobScoped(Builder query) {
+    Optional<JobKey> jobKey = JobKeys.from(query);
+    return jobKey.isPresent() && Query.jobScoped(jobKey.get()).equals(query);
+  }
+
+  public static Builder arbitrary(TaskQuery query) {
+    return new Builder(query.deepCopy());
   }
 
   public static Builder unscoped() {
@@ -105,6 +100,14 @@ public final class Query {
     return unscoped().bySlave(slaveHost);
   }
 
+  public static Builder statusScoped(ScheduleStatus status, ScheduleStatus... statuses) {
+    return unscoped().byStatus(status, statuses);
+  }
+
+  public static Builder statusScoped(Iterable<ScheduleStatus> statuses) {
+    return unscoped().byStatus(statuses);
+  }
+
   /**
    * A Builder of TaskQueries. Builders are immutable and provide access to a set of convenience
    * methods to return a new builder of another scope. Available scope filters include slave,
@@ -126,7 +129,7 @@ public final class Query {
     }
 
     private Builder(final TaskQuery query) {
-      this.query = query; // It is expected that the caller calls deepCopy.
+      this.query = checkNotNull(query); // It is expected that the caller calls deepCopy.
     }
 
     /**
@@ -226,7 +229,7 @@ public final class Query {
      * conflicts with role and shards scopes.
      *
      * @param jobKey The key of the job to scope the query to.
-     * @return A new Builder scoped to the given role
+     * @return A new Builder scoped to the given jobKey.
      */
     public Builder byJob(JobKey jobKey) {
       JobKeys.assertValid(jobKey);
@@ -238,12 +241,11 @@ public final class Query {
               .setJobName(jobKey.getName()));
     }
 
-
     /**
      * Returns a new builder scoped to the slave uniquely identified by the given slaveHost. A
      * builder can only be scoped to slaves once.
      *
-     * @param slaveHost The hostname of the slave to scope the
+     * @param slaveHost The hostname of the slave to scope the query to.
      * @return A new Builder scoped to the given slave.
      */
     public Builder bySlave(String slaveHost) {

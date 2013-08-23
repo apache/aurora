@@ -70,7 +70,7 @@ class UserTaskLauncher implements TaskLauncher {
       }
 
       stateManager.changeState(
-          Query.byId(status.getTaskId().getValue()),
+          Query.taskScoped(status.getTaskId().getValue()),
           translatedState,
           Optional.fromNullable(message));
     } catch (SchedulerException e) {

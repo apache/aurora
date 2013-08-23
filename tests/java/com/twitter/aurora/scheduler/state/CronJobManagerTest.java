@@ -17,7 +17,6 @@ import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
@@ -114,7 +113,7 @@ public class CronJobManagerTest extends EasyMockTest {
     delayExecutor.execute(capture(delayLaunchCapture));
 
     // The cron manager will then try to initiate the kill.
-    scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
+    scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
 
     // Immediate query and delayed query.
     expectActiveTaskFetch(new ScheduledTask()).times(2);
@@ -143,7 +142,7 @@ public class CronJobManagerTest extends EasyMockTest {
     delayExecutor.execute(capture(delayLaunchCapture));
 
     // The cron manager will then try to initiate the kill.
-    scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
+    scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
 
     // Immediate query and delayed query.
     expectActiveTaskFetch(new ScheduledTask()).times(2);
@@ -155,7 +154,7 @@ public class CronJobManagerTest extends EasyMockTest {
     expectJobFetch();
     expectActiveTaskFetch(new ScheduledTask());
     delayExecutor.execute(capture(delayLaunchCapture));
-    scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
+    scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
     expectActiveTaskFetch(new ScheduledTask()).times(2);
     expectActiveTaskFetch();
 
@@ -187,7 +186,7 @@ public class CronJobManagerTest extends EasyMockTest {
 
     // The cron manager will then try to initiate the kill.
     expectJobFetch().times(2);
-    scheduler.killTasks((TaskQuery) anyObject(), eq(CronJobManager.CRON_USER));
+    scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
     expectLastCall().times(3);
 
     // Immediate queries and delayed query.

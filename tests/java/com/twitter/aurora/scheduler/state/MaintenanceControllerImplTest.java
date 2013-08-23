@@ -79,7 +79,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expectMaintenanceModeChange(HOST_A, DRAINED);
     expectMaintenanceModeChange(HOST_A, NONE);
     expect(stateManager.changeState(
-        Query.slaveScoped(HOST_A).active().get(),
+        Query.slaveScoped(HOST_A).active(),
         ScheduleStatus.RESTARTING,
         MaintenanceControllerImpl.DRAINING_MESSAGE))
         .andReturn(1);

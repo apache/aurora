@@ -121,7 +121,7 @@ class TaskVars implements EventSubscriber {
 
   @Subscribe
   public void storageStarted(StorageStarted event) {
-    for (ScheduledTask task : Storage.Util.consistentFetchTasks(storage, Query.GET_ALL)) {
+    for (ScheduledTask task : Storage.Util.consistentFetchTasks(storage, Query.unscoped())) {
       incrementCount(task.getStatus());
     }
 

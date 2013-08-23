@@ -357,9 +357,8 @@ public class StateManagerImplTest extends EasyMockTest {
     insertTasks(taskInfo);
     stateManager.assignTask(taskId, HOST_A, SlaveID.newBuilder().setValue(HOST_A).build(),
         ImmutableSet.<Integer>of(50));
-    ScheduledTask task =
-        Iterables.getOnlyElement(Storage.Util.consistentFetchTasks(storage, Query
-            .byRole(JIM.getRole())));
+    ScheduledTask task = Iterables.getOnlyElement(
+        Storage.Util.consistentFetchTasks(storage, Query.roleScoped(JIM.getRole())));
     assertEquals(ImmutableMap.of("foo", 50), task.getAssignedTask().getAssignedPorts());
     assignTask(taskId, HOST_A);
     changeState(taskId, STARTING);
@@ -394,7 +393,8 @@ public class StateManagerImplTest extends EasyMockTest {
     eventSink.execute(matchStateChange(id, INIT, PENDING));
     expectLastCall().andAnswer(new IAnswer<Void>() {
       @Override public Void answer() throws Throwable {
-        stateManager.changeState(Query.GET_ALL, ScheduleStatus.ASSIGNED);
+        stateManager.changeState(
+            Query.unscoped(), ScheduleStatus.ASSIGNED, Optional.<String>absent());
         return null;
       }
     });
@@ -448,7 +448,7 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   private int changeState(String taskId, ScheduleStatus status) {
-    return stateManager.changeState(Query.byId(taskId), status);
+    return stateManager.changeState(Query.taskScoped(taskId), status, Optional.<String>absent());
   }
 
   private static TaskConfig makeTask(Identity owner, String job, int shard) {

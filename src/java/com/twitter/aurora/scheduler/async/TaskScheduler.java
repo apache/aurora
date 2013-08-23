@@ -97,7 +97,7 @@ class TaskScheduler implements SchedulingAction {
               // It is in the LOST state and a new task will move to PENDING to replace it.
               // Should the state change fail due to storage issues, that's okay.  The task will
               // time out in the ASSIGNED state and be moved to LOST.
-              stateManager.changeState(pendingTaskQuery.get(), LOST, LAUNCH_FAILED_MSG);
+              stateManager.changeState(pendingTaskQuery, LOST, LAUNCH_FAILED_MSG);
             }
           }
 

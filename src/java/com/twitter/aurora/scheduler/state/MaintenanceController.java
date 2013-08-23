@@ -20,7 +20,6 @@ import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.HostStatus;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
@@ -122,7 +121,7 @@ public interface MaintenanceController {
     private Set<HostStatus> watchDrainingTasks(
         MutableStoreProvider store,
         Set<String> hosts,
-        Closure<TaskQuery> callback) {
+        Closure<Query.Builder> callback) {
 
       Set<String> emptyHosts = Sets.newHashSet();
       for (String host : hosts) {
@@ -133,7 +132,7 @@ public interface MaintenanceController {
           emptyHosts.add(host);
         } else {
           drainingTasksByHost.putAll(host, activeTasks);
-          callback.execute(query.get());
+          callback.execute(query);
         }
       }
 
@@ -144,7 +143,7 @@ public interface MaintenanceController {
     }
 
     private Set<HostStatus> watchDrainingTasks(MutableStoreProvider store, Set<String> hosts) {
-      return watchDrainingTasks(store, hosts, Closures.<TaskQuery>noop());
+      return watchDrainingTasks(store, hosts, Closures.<Query.Builder>noop());
     }
 
     private static final Predicate<HostAttributes> IS_DRAINING = new Predicate<HostAttributes>() {
@@ -213,8 +212,8 @@ public interface MaintenanceController {
     public synchronized Set<HostStatus> drain(final Set<String> hosts) {
       return storage.write(new MutateWork.Quiet<Set<HostStatus>>() {
         @Override public Set<HostStatus> apply(MutableStoreProvider store) {
-          return watchDrainingTasks(store, hosts, new Closure<TaskQuery>() {
-            @Override public void execute(TaskQuery query) {
+          return watchDrainingTasks(store, hosts, new Closure<Query.Builder>() {
+            @Override public void execute(Query.Builder query) {
               stateManager.changeState(query, ScheduleStatus.RESTARTING, DRAINING_MESSAGE);
             }
           });

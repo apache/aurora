@@ -337,7 +337,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
       switch (collisionPolicy) {
         case KILL_EXISTING:
           try {
-            schedulerCore.killTasks(activeQuery.get(), CRON_USER);
+            schedulerCore.killTasks(activeQuery, CRON_USER);
             // Check immediately if the tasks are gone.  This could happen if the existing tasks
             // were pending.
             if (!hasTasks(activeQuery)) {

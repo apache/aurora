@@ -5,7 +5,6 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
@@ -19,7 +18,6 @@ import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.ShardUpdateResult;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
@@ -101,7 +99,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized void tasksDeleted(Set<String> taskIds) {
-    setTaskStatus(Query.byId(taskIds), ScheduleStatus.UNKNOWN, Optional.<String>absent());
+    setTaskStatus(Query.taskScoped(taskIds), ScheduleStatus.UNKNOWN, Optional.<String>absent());
   }
 
   @Override
@@ -160,7 +158,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized void setTaskStatus(
-      TaskQuery query,
+      Query.Builder query,
       final ScheduleStatus status,
       Optional<String> message) {
 
@@ -170,26 +168,20 @@ class SchedulerCoreImpl implements SchedulerCore {
     stateManager.changeState(query, status, message);
   }
 
-  @VisibleForTesting
-  static boolean isStrictlyJobScoped(TaskQuery query) {
-    Optional<JobKey> jobKey = JobKeys.from(query);
-    return jobKey.isPresent() && Query.byJob(jobKey.get()).equals(query);
-  }
-
   @Override
-  public synchronized void killTasks(TaskQuery query, String user) throws ScheduleException {
+  public synchronized void killTasks(Query.Builder query, String user) throws ScheduleException {
     checkNotNull(query);
     LOG.info("Killing tasks matching " + query);
 
     boolean jobDeleted = false;
     boolean updateFinished = false;
 
-    if (isStrictlyJobScoped(query)) {
+    if (Query.isOnlyJobScoped(query)) {
       // If this looks like a query for all tasks in a job, instruct the scheduler modules to
       // delete the job.
-      Optional<JobKey> jobKey = JobKeys.from(query);
+      JobKey jobKey = JobKeys.from(query).get();
       for (JobManager manager : jobManagers) {
-        if (manager.deleteJob(jobKey.get())) {
+        if (manager.deleteJob(jobKey)) {
           jobDeleted = true;
         }
       }
@@ -197,7 +189,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       if (!jobDeleted) {
         try {
           updateFinished = stateManager.finishUpdate(
-              jobKey.get(),
+              jobKey,
               user,
               Optional.<String>absent(),
               UpdateResult.TERMINATE,
@@ -210,11 +202,10 @@ class SchedulerCoreImpl implements SchedulerCore {
     }
 
     // Unless statuses were specifically supplied, only attempt to kill active tasks.
-    if (query.getStatusesSize() == 0) {
-      query.setStatuses(ACTIVE_STATES);
-    }
+    Query.Builder taskQuery = query.get().isSetStatuses() ? query.byStatus(ACTIVE_STATES) : query;
 
-    int tasksAffected = stateManager.changeState(query, KILLING, Optional.of("Killed by " + user));
+    int tasksAffected =
+        stateManager.changeState(taskQuery, KILLING, Optional.of("Killed by " + user));
     if (!jobDeleted && !updateFinished && (tasksAffected == 0)) {
       throw new ScheduleException("No jobs to kill");
     }
@@ -245,7 +236,7 @@ class SchedulerCoreImpl implements SchedulerCore {
         }
         LOG.info("Restarting shards matching " + query);
         stateManager.changeState(
-            Query.byId(Tasks.ids(matchingTasks)),
+            Query.taskScoped(Tasks.ids(matchingTasks)),
             RESTARTING,
             Optional.of("Restarted by " + requestingUser));
       }
@@ -272,9 +263,8 @@ class SchedulerCoreImpl implements SchedulerCore {
     return storage.write(new MutateWork<Optional<String>, ScheduleException>() {
       @Override public Optional<String> apply(MutableStoreProvider storeProvider)
           throws ScheduleException {
-
-        Set<ScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
-            Query.jobScoped(jobKey).active().get());
+        Query.Builder query = Query.jobScoped(jobKey).active();
+        Set<ScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(query);
 
         // Reject if any existing task for the job is in UPDATING/ROLLBACK
         if (Iterables.any(existingTasks, IS_UPDATING)) {
@@ -352,7 +342,7 @@ class SchedulerCoreImpl implements SchedulerCore {
     checkNotNull(preemptingTask);
     // TODO(William Farner): Throw SchedulingException if either task doesn't exist, etc.
 
-    stateManager.changeState(Query.byId(task.getTaskId()), ScheduleStatus.PREEMPTING,
+    stateManager.changeState(Query.taskScoped(task.getTaskId()), ScheduleStatus.PREEMPTING,
         Optional.of("Preempting in favor of " + preemptingTask.getTaskId()));
   }
 }

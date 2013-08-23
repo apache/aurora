@@ -11,7 +11,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
@@ -27,6 +26,7 @@ import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.JobKeys;
+import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.common.args.Arg;
@@ -82,43 +82,27 @@ class MemTaskStore implements TaskStore.Mutable {
 
   @Timed("mem_storage_fetch_tasks")
   @Override
-  public ImmutableSet<ScheduledTask> fetchTasks(TaskQuery query) {
+  public ImmutableSet<ScheduledTask> fetchTasks(Query.Builder query) {
     checkNotNull(query);
 
     long start = System.nanoTime();
-    ImmutableSet<ScheduledTask> result = immutableMatches(query).toSet();
+    ImmutableSet<ScheduledTask> result = immutableMatches(query.get()).toSet();
     long durationNanos = System.nanoTime() - start;
     Level level = (durationNanos >= slowQueryThresholdNanos) ? Level.INFO : Level.FINE;
     if (LOG.isLoggable(level)) {
-      LOG.log(level, "Query took "
-          + Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS) + " ms: " + query);
+      Long time = Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);
+      LOG.log(level, "Query took " + time + " ms: " + query.get());
     }
 
     return result;
   }
 
-  @Override
-  public ImmutableSet<ScheduledTask> fetchTasks(Supplier<TaskQuery> querySupplier) {
-    return fetchTasks(querySupplier.get());
-  }
-
   @Timed("mem_storage_fetch_task_ids")
   @Override
-  public Set<String> fetchTaskIds(TaskQuery query) {
+  public Set<String> fetchTaskIds(Query.Builder query) {
     checkNotNull(query);
 
-    return mutableMatches(query).transform(Tasks.SCHEDULED_TO_ID).toSet();
-  }
-
-  private Multimap<JobKey, String> taskIdsByJobKey(Iterable<ScheduledTask> toIndex) {
-    return Multimaps.transformValues(
-        Multimaps.index(toIndex, Tasks.SCHEDULED_TO_JOB_KEY),
-        Tasks.SCHEDULED_TO_ID);
-  }
-
-  @Override
-  public Set<String> fetchTaskIds(Supplier<TaskQuery> querySupplier) {
-    return fetchTaskIds(querySupplier.get());
+    return mutableMatches(query.get()).transform(Tasks.SCHEDULED_TO_ID).toSet();
   }
 
   @Timed("mem_storage_save_tasks")
@@ -132,6 +116,12 @@ class MemTaskStore implements TaskStore.Mutable {
         FluentIterable.from(newTasks).transform(deepCopy).toSet();
     tasks.putAll(Maps.uniqueIndex(immutable, Tasks.SCHEDULED_TO_ID));
     tasksByJobKey.putAll(taskIdsByJobKey(immutable));
+  }
+
+  private Multimap<JobKey, String> taskIdsByJobKey(Iterable<ScheduledTask> toIndex) {
+    return Multimaps.transformValues(
+        Multimaps.index(toIndex, Tasks.SCHEDULED_TO_JOB_KEY),
+        Tasks.SCHEDULED_TO_ID);
   }
 
   @Timed("mem_storage_delete_all_tasks")
@@ -267,7 +257,7 @@ class MemTaskStore implements TaskStore.Mutable {
   private FluentIterable<ScheduledTask> mutableMatches(TaskQuery query) {
     // Apply the query against the working set.
     Iterable<ScheduledTask> from;
-    Optional<JobKey> jobKey = JobKeys.from(query);
+    Optional<JobKey> jobKey = JobKeys.from(Query.arbitrary(query));
     if (query.isSetTaskIds()) {
       taskQueriesById.incrementAndGet();
       from = fromIdIndex(query.getTaskIds());

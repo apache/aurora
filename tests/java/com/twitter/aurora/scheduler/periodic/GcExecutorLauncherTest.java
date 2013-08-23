@@ -127,6 +127,6 @@ public class GcExecutorLauncherTest extends EasyMockTest {
   }
 
   private void expectGetTasksByHost(String host, ScheduledTask... tasks) {
-    storageUtil.expectTaskFetch(Query.bySlave(host), tasks);
+    storageUtil.expectTaskFetch(Query.slaveScoped(host), tasks);
   }
 }

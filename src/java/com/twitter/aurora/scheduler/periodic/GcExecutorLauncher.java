@@ -86,7 +86,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     }
 
     Set<ScheduledTask> tasksOnHost =
-        Storage.Util.weaklyConsistentFetchTasks(storage, Query.bySlave(offer.getHostname()));
+        Storage.Util.weaklyConsistentFetchTasks(storage, Query.slaveScoped(offer.getHostname()));
     AdjustRetainedTasks message = new AdjustRetainedTasks()
         .setRetainedTasks(Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS));
     byte[] data;

@@ -1,6 +1,5 @@
 package com.twitter.aurora.scheduler.storage.testing;
 
-import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 
 import org.easymock.Capture;
@@ -8,7 +7,7 @@ import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
 
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskQuery;
+import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.JobStore;
 import com.twitter.aurora.scheduler.storage.QuotaStore;
@@ -108,14 +107,7 @@ public class StorageTestUtil {
     expectWriteOperation().anyTimes();
   }
 
-  public IExpectationSetters<?> expectTaskFetch(TaskQuery query, ScheduledTask... result) {
-    return expect(taskStore.fetchTasks(query))
-        .andReturn(ImmutableSet.<ScheduledTask>builder().add(result).build());
-  }
-
-  public IExpectationSetters<?> expectTaskFetch(
-      Supplier<TaskQuery> query, ScheduledTask... result) {
-
+  public IExpectationSetters<?> expectTaskFetch(Query.Builder query, ScheduledTask... result) {
     return expect(taskStore.fetchTasks(query))
         .andReturn(ImmutableSet.<ScheduledTask>builder().add(result).build());
   }

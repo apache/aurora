@@ -16,8 +16,8 @@ import com.google.inject.Inject;
 import com.twitter.aurora.codec.ThriftBinaryCodec;
 import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.storage.Snapshot;
+import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.DistributedSnapshotStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -50,19 +50,19 @@ public interface Recovery {
   /**
    * Queries a staged backup.
    *
-   * @param query Query to perform.
+   * @param query Builder of query to perform.
    * @return Tasks matching the query.
    * @throws RecoveryException If a backup is not staged, or could not be queried.
    */
-  Set<ScheduledTask> query(TaskQuery query) throws RecoveryException;
+  Set<ScheduledTask> query(Query.Builder query) throws RecoveryException;
 
   /**
    * Deletes tasks from a staged backup.
    *
-   * @param query Query selector for tasks to delete.
+   * @param query Query builder for tasks to delete.
    * @throws RecoveryException If a backup is not staged, or tasks could not be deleted.
    */
-  void deleteTasks(TaskQuery query) throws RecoveryException;
+  void deleteTasks(Query.Builder query) throws RecoveryException;
 
   /**
    * Unloads a staged backup.
@@ -147,11 +147,11 @@ public interface Recovery {
       return loaded;
     }
 
-    @Override public Set<ScheduledTask> query(TaskQuery query) throws RecoveryException {
+    @Override public Set<ScheduledTask> query(Query.Builder query) throws RecoveryException {
       return getLoadedRecovery().query(query);
     }
 
-    @Override public void deleteTasks(TaskQuery query) throws RecoveryException {
+    @Override public void deleteTasks(Query.Builder query) throws RecoveryException {
       getLoadedRecovery().delete(query);
     }
 
@@ -183,11 +183,11 @@ public interface Recovery {
         });
       }
 
-      Set<ScheduledTask> query(final TaskQuery query) {
+      Set<ScheduledTask> query(final Query.Builder query) {
         return tempStorage.fetchTasks(query);
       }
 
-      void delete(final TaskQuery query) {
+      void delete(final Query.Builder query) {
         tempStorage.deleteTasks(query);
       }
     }

@@ -21,7 +21,6 @@ import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -185,7 +184,7 @@ class TaskTimeout implements EventSubscriber {
         // timeout is still valid.  Ideally, the future would have already been canceled, but in the
         // event of a state transition race, including transientState prevents an unintended
         // task timeout.
-        TaskQuery query = Query.taskScoped(key.taskId).byStatus(key.status).get();
+        Query.Builder query = Query.taskScoped(key.taskId).byStatus(key.status);
         // Note: This requires LOST transitions trigger Driver.killTask.
         stateManager.changeState(query, ScheduleStatus.LOST, TIMEOUT_MESSAGE);
       } finally {

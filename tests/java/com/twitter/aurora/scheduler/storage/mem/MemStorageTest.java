@@ -115,7 +115,7 @@ public class MemStorageTest extends TearDownTestCase {
       @Override public Void apply(StoreProvider storeProvider) {
         assertEquals(
             ImmutableSet.<String>builder().add(taskIds).build(),
-            storeProvider.getTaskStore().fetchTaskIds(Query.GET_ALL));
+            storeProvider.getTaskStore().fetchTaskIds(Query.unscoped()));
         return null;
       }
     });
@@ -150,7 +150,7 @@ public class MemStorageTest extends TearDownTestCase {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a")));
         ScheduledTask a = Iterables.getOnlyElement(
-            storeProvider.getUnsafeTaskStore().fetchTasks(Query.byId("a")));
+            storeProvider.getUnsafeTaskStore().fetchTasks(Query.taskScoped("a")));
         a.setStatus(ScheduleStatus.RUNNING)
             .setAncestorId("z");
         throw new CustomException();
@@ -161,7 +161,8 @@ public class MemStorageTest extends TearDownTestCase {
       @Override public Void apply(StoreProvider storeProvider) {
         assertEquals(
             makeTask("a"),
-            Iterables.getOnlyElement(storeProvider.getTaskStore().fetchTasks(Query.byId("a"))));
+            Iterables.getOnlyElement(storeProvider.getTaskStore().fetchTasks(
+                Query.taskScoped("a"))));
         return null;
       }
     });

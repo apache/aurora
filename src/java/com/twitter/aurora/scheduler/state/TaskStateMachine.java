@@ -617,7 +617,8 @@ class TaskStateMachine {
    * @param mutation Mutate operation to perform while updating the task.
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
-  public synchronized boolean updateState(final ScheduleStatus status,
+  public synchronized boolean updateState(
+      final ScheduleStatus status,
       Closure<ScheduledTask> mutation,
       final Optional<String> auditMessage) {
 

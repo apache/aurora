@@ -39,7 +39,6 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.ShardUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.Driver;
@@ -324,7 +323,7 @@ public class StateManagerImpl implements StateManager {
               (result == UpdateResult.SUCCESS) ? GET_NEW_CONFIG : GET_ORIGINAL_CONFIG;
           for (Integer shard : fetchRemovedShards(jobConfig.get(), removedSelector)) {
             changeState(
-                Query.shardScoped(jobKey, shard).active().get(),
+                Query.shardScoped(jobKey, shard).active(),
                 KILLING,
                 Optional.of("Removed during update by " + invokingUser));
           }
@@ -356,23 +355,9 @@ public class StateManagerImpl implements StateManager {
         .toSet();
   }
 
-  /**
-   * Performs a simple state change, transitioning all tasks matching a query to the given
-   * state.
-   * No audit message will be applied with the transition.
-   *
-   * @param query Query to perform, the results of which will be modified.
-   * @param newState State to move the resulting tasks into.
-   * @return the number of successful state changes.
-   */
-  @VisibleForTesting
-  int changeState(TaskQuery query, ScheduleStatus newState) {
-    return changeState(query, stateUpdater(newState));
-  }
-
   @Override
   public int changeState(
-      TaskQuery query,
+      Query.Builder query,
       final ScheduleStatus newState,
       final Optional<String> auditMessage) {
 
@@ -395,7 +380,7 @@ public class StateManagerImpl implements StateManager {
     checkNotNull(assignedPorts);
 
     TaskAssignMutation mutation = assignHost(slaveHost, slaveId, assignedPorts);
-    changeState(Query.byId(taskId), mutation);
+    changeState(Query.taskScoped(taskId), mutation);
 
     return mutation.getAssignedTask();
   }
@@ -464,11 +449,8 @@ public class StateManagerImpl implements StateManager {
               throw new UpdateException("Invalid update token for " + jobKey);
             }
 
-            Set<ScheduledTask> tasks =
-                store.getTaskStore().fetchTasks(Query
-                    .shardScoped(jobKey, shards)
-                    .active()
-                    .get());
+            Query.Builder query = Query.shardScoped(jobKey, shards).active();
+            Set<ScheduledTask> tasks = store.getTaskStore().fetchTasks(query);
 
             // Extract any shard IDs that are being added as a part of this stage in the update.
             Set<Integer> newShardIds = Sets.difference(shards,
@@ -510,7 +492,7 @@ public class StateManagerImpl implements StateManager {
                 // TODO(William Farner): The additional query could be avoided here.
                 //                       Consider allowing state changes on tasks by task ID.
                 changeState(
-                    Query.shardScoped(jobKey, changedShards).active().get(),
+                    Query.shardScoped(jobKey, changedShards).active(),
                     modifyingState,
                     Optional.of(auditMessage));
                 putResults(result, ShardUpdateResult.RESTARTING, changedShards);
@@ -589,7 +571,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   private int changeState(
-      final TaskQuery query,
+      final Query.Builder query,
       final Function<TaskStateMachine, Boolean> stateChange) {
 
     return storage.write(storage.new QuietSideEffectWork<Integer>() {
@@ -598,14 +580,6 @@ public class StateManagerImpl implements StateManager {
             storeProvider.getTaskStore().fetchTaskIds(query), stateChange);
       }
     });
-  }
-
-  private static Function<TaskStateMachine, Boolean> stateUpdater(final ScheduleStatus state) {
-    return new Function<TaskStateMachine, Boolean>() {
-      @Override public Boolean apply(TaskStateMachine stateMachine) {
-        return stateMachine.updateState(state);
-      }
-    };
   }
 
   private interface TaskAssignMutation extends Function<TaskStateMachine, Boolean> {
@@ -697,7 +671,7 @@ public class StateManagerImpl implements StateManager {
       } else {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
         String taskId = stateMachine.getTaskId();
-        TaskQuery idQuery = Query.byId(taskId);
+        Query.Builder idQuery = Query.taskScoped(taskId);
 
         switch (work.command) {
           case RESCHEDULE:
@@ -730,7 +704,7 @@ public class StateManagerImpl implements StateManager {
             break;
 
           case UPDATE_STATE:
-            taskStore.mutateTasks(idQuery, new Closure<ScheduledTask>() {
+            taskStore.mutateTasks(idQuery.get(), new Closure<ScheduledTask>() {
               @Override public void execute(ScheduledTask task) {
                 task.setStatus(stateMachine.getState());
                 work.mutation.execute(task);
@@ -747,7 +721,7 @@ public class StateManagerImpl implements StateManager {
             break;
 
           case INCREMENT_FAILURES:
-            taskStore.mutateTasks(idQuery, new Closure<ScheduledTask>() {
+            taskStore.mutateTasks(idQuery.get(), new Closure<ScheduledTask>() {
               @Override public void execute(ScheduledTask task) {
                 task.setFailureCount(task.getFailureCount() + 1);
               }
@@ -766,7 +740,7 @@ public class StateManagerImpl implements StateManager {
     storage.write(storage.new NoResultSideEffectWork() {
       @Override protected void execute(final MutableStoreProvider storeProvider) {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
-        Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.byId(taskIds));
+        Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.taskScoped(taskIds));
         addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(tasks)));
         taskStore.deleteTasks(taskIds);
       }
@@ -781,7 +755,7 @@ public class StateManagerImpl implements StateManager {
     TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
 
     TaskConfig oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
-        Iterables.getOnlyElement(taskStore.fetchTasks(Query.byId(taskId))));
+        Iterables.getOnlyElement(taskStore.fetchTasks(Query.taskScoped(taskId))));
 
     Optional<TaskUpdateConfiguration> optional = fetchShardUpdateConfig(
         storeProvider.getUpdateStore(),
@@ -817,12 +791,10 @@ public class StateManagerImpl implements StateManager {
   private Map<String, TaskStateMachine> getStateMachines(final Set<String> taskIds) {
     return readOnlyStorage.consistentRead(new Work.Quiet<Map<String, TaskStateMachine>>() {
       @Override public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
-        Set<ScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(Query.byId(taskIds));
         Map<String, ScheduledTask> existingTasks = Maps.uniqueIndex(
-            tasks,
+            storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskIds)),
             new Function<ScheduledTask, String>() {
-              @Override
-              public String apply(ScheduledTask input) {
+              @Override public String apply(ScheduledTask input) {
                 return input.getAssignedTask().getTaskId();
               }
             });

@@ -9,7 +9,7 @@ import org.apache.mesos.Protos.SlaveID;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskQuery;
+import com.twitter.aurora.scheduler.base.Query;
 
 /**
  * Thin interface for the state manager.
@@ -21,15 +21,12 @@ public interface StateManager {
    * state and applying the given audit message.
    * TODO(William Farner): Consider removing the return value.
    *
-   * @param query Query to perform, the results of which will be modified.
+   * @param query Builder of the query to perform, the results of which will be modified.
    * @param newState State to move the resulting tasks into.
    * @param auditMessage Audit message to apply along with the state change.
    * @return the number of successful state changes.
    */
-  int changeState(
-      TaskQuery query,
-      ScheduleStatus newState,
-      Optional<String> auditMessage);
+  int changeState(Query.Builder query, ScheduleStatus newState, Optional<String> auditMessage);
 
   /**
    * Assigns a task to a specific slave.

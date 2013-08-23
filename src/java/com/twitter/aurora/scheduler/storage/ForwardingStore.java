@@ -6,7 +6,6 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.HostAttributes;
@@ -18,6 +17,7 @@ import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
+import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.common.base.Closure;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -162,22 +162,12 @@ public class ForwardingStore implements
   }
 
   @Override
-  public ImmutableSet<ScheduledTask> fetchTasks(TaskQuery query) {
-    return taskStore.fetchTasks(query);
-  }
-
-  @Override
-  public ImmutableSet<ScheduledTask> fetchTasks(Supplier<TaskQuery> querySupplier) {
+  public ImmutableSet<ScheduledTask> fetchTasks(Query.Builder querySupplier) {
     return taskStore.fetchTasks(querySupplier);
   }
 
   @Override
-  public Set<String> fetchTaskIds(TaskQuery query) {
-    return taskStore.fetchTaskIds(query);
-  }
-
-  @Override
-  public Set<String> fetchTaskIds(Supplier<TaskQuery> querySupplier) {
+  public Set<String> fetchTaskIds(Query.Builder querySupplier) {
     return taskStore.fetchTaskIds(querySupplier);
   }
 

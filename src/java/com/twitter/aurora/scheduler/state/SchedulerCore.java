@@ -9,8 +9,8 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ShardUpdateResult;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
+import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
@@ -116,20 +116,20 @@ public interface SchedulerCore {
   /**
    * Assigns a new state to tasks.
    *
-   * @param query The query to identify tasks
+   * @param query Builder for a query to identify tasks
    * @param status The new state of the tasks.
    * @param message Additional information about the state transition.
    */
-  void setTaskStatus(TaskQuery query, ScheduleStatus status, Optional<String> message);
+  void setTaskStatus(Query.Builder query, ScheduleStatus status, Optional<String> message);
 
   /**
    * Kills a specific set of tasks.
    *
-   * @param query The query to identify tasks
+   * @param query Builder for a query to identify tasks
    * @param user Name of the user performing the kill.
    * @throws ScheduleException If a problem occurs with the kill request.
    */
-  void killTasks(TaskQuery query, String user) throws ScheduleException;
+  void killTasks(Query.Builder query, String user) throws ScheduleException;
 
   /**
    * Initiates a restart of shards within an active job.

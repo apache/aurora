@@ -19,7 +19,6 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -144,7 +143,7 @@ public class TaskTimeoutTest extends EasyMockTest {
     expectTaskWatch();
     expectCancel();
     Capture<Runnable> killingTimeout = expectTaskWatch();
-    TaskQuery query = Query.taskScoped(TASK_ID).byStatus(KILLING).get();
+    Query.Builder query = Query.taskScoped(TASK_ID).byStatus(KILLING);
     expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(1);
 
     control.replay();
@@ -157,7 +156,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Test
   public void testTimeout() throws Exception {
     Capture<Runnable> assignedTimeout = expectTaskWatch();
-    TaskQuery query = Query.taskScoped(TASK_ID).byStatus(ASSIGNED).get();
+    Query.Builder query = Query.taskScoped(TASK_ID).byStatus(ASSIGNED);
     expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(0);
 
     control.replay();

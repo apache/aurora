@@ -20,7 +20,6 @@ import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -61,10 +60,10 @@ class Preempter implements Runnable {
   @interface PreemptionDelay { }
 
   @VisibleForTesting
-  static final TaskQuery PENDING_QUERY = Query.byStatus(PENDING);
+  static final Query.Builder PENDING_QUERY = Query.statusScoped(PENDING);
 
   @VisibleForTesting
-  static final TaskQuery ACTIVE_NOT_PENDING_QUERY = Query.byStatus(
+  static final Query.Builder ACTIVE_NOT_PENDING_QUERY = Query.statusScoped(
       EnumSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(PENDING))));
 
   private static final Logger LOG = Logger.getLogger(Preempter.class.getName());
@@ -119,13 +118,13 @@ class Preempter implements Runnable {
     this.clock = checkNotNull(clock);
   }
 
-  private List<AssignedTask> fetch(TaskQuery query, Predicate<ScheduledTask> filter) {
+  private List<AssignedTask> fetch(Query.Builder query, Predicate<ScheduledTask> filter) {
     return Lists.newArrayList(Iterables.transform(Iterables.filter(
         Storage.Util.consistentFetchTasks(storage, query), filter),
         SCHEDULED_TO_ASSIGNED));
   }
 
-  private List<AssignedTask> fetch(TaskQuery query) {
+  private List<AssignedTask> fetch(Query.Builder query) {
     return fetch(query, Predicates.<ScheduledTask>alwaysTrue());
   }
 
