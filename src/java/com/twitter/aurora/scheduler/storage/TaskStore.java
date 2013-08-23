@@ -6,7 +6,6 @@ import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.common.base.Closure;
 
@@ -63,7 +62,7 @@ public interface TaskStore {
      * @param mutator The mutate operation.
      * @return Immutable copies of only the tasks that were mutated.
      */
-    ImmutableSet<ScheduledTask> mutateTasks(TaskQuery query, Closure<ScheduledTask> mutator);
+    ImmutableSet<ScheduledTask> mutateTasks(Query.Builder query, Closure<ScheduledTask> mutator);
 
     /**
      * Rewrites a task's configuration in-place.

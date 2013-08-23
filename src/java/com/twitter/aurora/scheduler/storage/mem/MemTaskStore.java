@@ -146,12 +146,15 @@ class MemTaskStore implements TaskStore.Mutable {
 
   @Timed("mem_storage_mutate_tasks")
   @Override
-  public ImmutableSet<ScheduledTask> mutateTasks(TaskQuery query, Closure<ScheduledTask> mutator) {
+  public ImmutableSet<ScheduledTask> mutateTasks(
+      Query.Builder query,
+      Closure<ScheduledTask> mutator) {
+
     checkNotNull(query);
     checkNotNull(mutator);
 
     ImmutableSet.Builder<ScheduledTask> mutated = ImmutableSet.builder();
-    for (ScheduledTask original : immutableMatches(query)) {
+    for (ScheduledTask original : immutableMatches(query.get())) {
       // Copy the object before invoking user code.  This is to support diff checking.
       ScheduledTask mutable = deepCopy.apply(original);
       mutator.execute(mutable);

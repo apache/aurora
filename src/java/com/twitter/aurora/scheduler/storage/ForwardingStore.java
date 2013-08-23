@@ -16,7 +16,6 @@ import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.common.base.Closure;
 
@@ -152,7 +151,10 @@ public class ForwardingStore implements
   }
 
   @Override
-  public ImmutableSet<ScheduledTask> mutateTasks(TaskQuery query, Closure<ScheduledTask> mutator) {
+  public ImmutableSet<ScheduledTask> mutateTasks(
+      Query.Builder query,
+      Closure<ScheduledTask> mutator) {
+
     return taskStore.mutateTasks(query, mutator);
   }
 

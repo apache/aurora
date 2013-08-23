@@ -30,7 +30,6 @@ import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
@@ -564,7 +563,7 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_tasks_mutate")
   @Override
   public ImmutableSet<ScheduledTask> mutateTasks(
-      final TaskQuery query,
+      final Query.Builder query,
       final Closure<ScheduledTask> mutator) {
 
     return write(new MutateWork.Quiet<ImmutableSet<ScheduledTask>>() {

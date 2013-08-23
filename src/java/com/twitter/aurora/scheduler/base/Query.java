@@ -22,14 +22,9 @@ import static org.apache.commons.lang.StringUtils.isEmpty;
  * TODO(Sathya): Add some basic unit tests for isJobScoped and isOnlyJobScoped.
  */
 public final class Query {
-  public static final TaskQuery GET_ALL = Query.unscoped().get();
 
   private Query() {
     // Utility.
-  }
-
-  public static TaskQuery byId(String taskId, String... taskIds) {
-    return taskScoped(taskId, taskIds).get();
   }
 
   /**

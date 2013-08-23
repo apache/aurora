@@ -704,7 +704,7 @@ public class StateManagerImpl implements StateManager {
             break;
 
           case UPDATE_STATE:
-            taskStore.mutateTasks(idQuery.get(), new Closure<ScheduledTask>() {
+            taskStore.mutateTasks(idQuery, new Closure<ScheduledTask>() {
               @Override public void execute(ScheduledTask task) {
                 task.setStatus(stateMachine.getState());
                 work.mutation.execute(task);
@@ -721,7 +721,7 @@ public class StateManagerImpl implements StateManager {
             break;
 
           case INCREMENT_FAILURES:
-            taskStore.mutateTasks(idQuery.get(), new Closure<ScheduledTask>() {
+            taskStore.mutateTasks(idQuery, new Closure<ScheduledTask>() {
               @Override public void execute(ScheduledTask task) {
                 task.setFailureCount(task.getFailureCount() + 1);
               }

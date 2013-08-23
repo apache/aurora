@@ -87,7 +87,7 @@ public class MemTaskStoreTest {
     store.saveTasks(ImmutableSet.of(TASK_A, TASK_B, TASK_C, TASK_D));
     assertQueryResults(Query.statusScoped(ScheduleStatus.RUNNING));
 
-    store.mutateTasks(Query.byId("a"), new Closure<ScheduledTask>() {
+    store.mutateTasks(Query.taskScoped("a"), new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
         task.setStatus(ScheduleStatus.RUNNING);
       }
@@ -97,7 +97,7 @@ public class MemTaskStoreTest {
         Query.statusScoped(ScheduleStatus.RUNNING),
         TASK_A.deepCopy().setStatus(ScheduleStatus.RUNNING));
 
-    store.mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
+    store.mutateTasks(Query.unscoped(), new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
         task.setStatus(ScheduleStatus.ASSIGNED);
       }
@@ -162,7 +162,7 @@ public class MemTaskStoreTest {
 
     // Capture reference during mutation and mutate later.
     final AtomicReference<ScheduledTask> capture = Atomics.newReference();
-    store.mutateTasks(Query.GET_ALL, new Closure<ScheduledTask>() {
+    store.mutateTasks(Query.unscoped(), new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
         task.setStatus(ScheduleStatus.ASSIGNED);
         capture.set(task);
@@ -194,7 +194,7 @@ public class MemTaskStoreTest {
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob, d);
 
-    store.mutateTasks(jimsJob.get(), new Closure<ScheduledTask>() {
+    store.mutateTasks(jimsJob, new Closure<ScheduledTask>() {
       @Override public void execute(ScheduledTask task) {
         task.setStatus(ScheduleStatus.RUNNING);
       }
