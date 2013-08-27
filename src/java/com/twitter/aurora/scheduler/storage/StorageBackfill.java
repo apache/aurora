@@ -4,11 +4,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskEvent;
@@ -19,6 +19,9 @@ import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
+
+import static com.twitter.aurora.scheduler.base.Tasks.SCHEDULED_TO_JOB_KEY;
+import static com.twitter.aurora.scheduler.base.Tasks.SCHEDULED_TO_SHARD_ID;
 
 /**
  * Utility class to contain and perform storage backfill operations.
@@ -61,10 +64,11 @@ public final class StorageBackfill {
 
     if (Tasks.isActive(task.getStatus())) {
       // Perform a sanity check on the number of active shards.
-      Set<String> activeTasksInShard = activeShards(
-          taskStore,
-          Tasks.SCHEDULED_TO_JOB_KEY.apply(task),
-          Tasks.SCHEDULED_TO_SHARD_ID.apply(task));
+      Query.Builder query = Query.shardScoped(
+          SCHEDULED_TO_JOB_KEY.apply(task), SCHEDULED_TO_SHARD_ID.apply(task)).active();
+      Set<String> activeTasksInShard = FluentIterable.from(taskStore.fetchTasks(query))
+          .transform(Tasks.SCHEDULED_TO_ID)
+          .toSet();
 
       if (activeTasksInShard.size() > 1) {
         SHARD_SANITY_CHECK_FAILS.incrementAndGet();
@@ -109,10 +113,5 @@ public final class StorageBackfill {
         // don't.
       }
     });
-  }
-
-  private static Set<String> activeShards(TaskStore taskStore, JobKey jobKey, int shardId) {
-
-    return taskStore.fetchTaskIds(Query.shardScoped(jobKey, shardId).active());
   }
 }

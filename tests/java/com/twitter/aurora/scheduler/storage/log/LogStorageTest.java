@@ -46,6 +46,7 @@ import com.twitter.aurora.gen.storage.Snapshot;
 import com.twitter.aurora.gen.storage.Transaction;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.log.Log;
 import com.twitter.aurora.scheduler.log.Log.Entry;
 import com.twitter.aurora.scheduler.log.Log.Position;
@@ -492,11 +493,13 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testRemoveTasksQuery() throws Exception {
-    final Set<String> taskIds = ImmutableSet.of("42");
+    final ScheduledTask task = task("a", ScheduleStatus.FINISHED);
+    final Set<String> taskIds = Tasks.ids(task);
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
-        expect(storageUtil.taskStore.fetchTaskIds(Query.unscoped())).andReturn(taskIds);
+        expect(storageUtil.taskStore.fetchTasks(Query.unscoped()))
+            .andReturn(ImmutableSet.<ScheduledTask>of(task));
         storageUtil.taskStore.deleteTasks(taskIds);
         streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
             .andReturn(position);

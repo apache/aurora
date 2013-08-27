@@ -97,14 +97,6 @@ class MemTaskStore implements TaskStore.Mutable {
     return result;
   }
 
-  @Timed("mem_storage_fetch_task_ids")
-  @Override
-  public Set<String> fetchTaskIds(Query.Builder query) {
-    checkNotNull(query);
-
-    return mutableMatches(query.get()).transform(Tasks.SCHEDULED_TO_ID).toSet();
-  }
-
   @Timed("mem_storage_save_tasks")
   @Override
   public void saveTasks(Set<ScheduledTask> newTasks) {

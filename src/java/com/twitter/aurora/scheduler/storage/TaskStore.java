@@ -23,14 +23,6 @@ public interface TaskStore {
    */
   ImmutableSet<ScheduledTask> fetchTasks(Query.Builder query);
 
-  /**
-   * Convenience method to execute a query and only retrieve the IDs of the matching tasks.
-   *
-   * @param query Builder of the query to identify tasks with.
-   * @return IDs of the matching tasks.
-   */
-  Set<String> fetchTaskIds(Query.Builder query);
-
   public interface Mutable extends TaskStore {
     /**
      * Saves tasks to the store.  Tasks are copied internally, meaning that the tasks are stored in

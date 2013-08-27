@@ -169,11 +169,6 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Set<String> fetchTaskIds(Query.Builder querySupplier) {
-    return taskStore.fetchTaskIds(querySupplier);
-  }
-
-  @Override
   public void saveJobUpdateConfig(JobUpdateConfiguration updateConfiguration) {
     updateStore.saveJobUpdateConfig(updateConfiguration);
   }

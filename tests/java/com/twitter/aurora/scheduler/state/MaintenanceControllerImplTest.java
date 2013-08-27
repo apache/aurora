@@ -17,7 +17,6 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -75,7 +74,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
     expectMaintenanceModeChange(HOST_A, DRAINING);
-    expectFetchTasksByHost(HOST_A, Tasks.ids(task));
+    expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of(task));
     expectMaintenanceModeChange(HOST_A, DRAINED);
     expectMaintenanceModeChange(HOST_A, NONE);
     expect(stateManager.changeState(
@@ -106,7 +105,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   @Test
   public void testDrainEmptyHost() {
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
-    expectFetchTasksByHost(HOST_A, ImmutableSet.<String>of());
+    expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of());
     expectMaintenanceModeChange(HOST_A, DRAINED);
 
     control.replay();
@@ -141,10 +140,10 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
         .andReturn(ImmutableSet.of(
             new HostAttributes().setHost(HOST_A).setMode(DRAINING),
             new HostAttributes().setHost(HOST_B).setMode(DRAINING)));
-    expectFetchTasksByHost(HOST_B, Tasks.ids());
+    expectFetchTasksByHost(HOST_B, ImmutableSet.<ScheduledTask>of());
     expectMaintenanceModeChange(HOST_B, DRAINED);
     expectMaintenanceModeChange(HOST_A, DRAINING);
-    expectFetchTasksByHost(HOST_A, Tasks.ids(taskA));
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of(taskA));
     expectMaintenanceModeChange(HOST_A, DRAINED);
 
     control.replay();
@@ -166,9 +165,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     assertEquals(NONE, maintenance.getMode("unknown"));
   }
 
-  private void expectFetchTasksByHost(String hostName, Set<String> taskIds) {
-    expect(storageUtil.taskStore.fetchTaskIds(Query.slaveScoped(hostName).active()))
-        .andReturn(taskIds);
+  private void expectFetchTasksByHost(String hostName, ImmutableSet<ScheduledTask> tasks) {
+    expect(storageUtil.taskStore.fetchTasks(Query.slaveScoped(hostName).active())).andReturn(tasks);
   }
 
   private void expectMaintenanceModeChange(String hostName, MaintenanceMode mode) {

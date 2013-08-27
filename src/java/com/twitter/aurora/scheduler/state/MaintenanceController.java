@@ -127,7 +127,9 @@ public interface MaintenanceController {
       for (String host : hosts) {
         // If there are no tasks on the host, immediately transition to DRAINED.
         Query.Builder query = Query.slaveScoped(host).active();
-        Set<String> activeTasks = store.getTaskStore().fetchTaskIds(query);
+        Set<String> activeTasks = FluentIterable.from(store.getTaskStore().fetchTasks(query))
+            .transform(Tasks.SCHEDULED_TO_ID)
+            .toSet();
         if (activeTasks.isEmpty()) {
           emptyHosts.add(host);
         } else {

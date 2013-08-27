@@ -3,10 +3,12 @@ package com.twitter.aurora.scheduler.storage.backup;
 import java.util.Set;
 
 import com.google.common.base.Function;
+import com.google.common.collect.FluentIterable;
 
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.storage.Snapshot;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.storage.SnapshotStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -60,8 +62,10 @@ interface TemporaryStorage {
         @Override public void deleteTasks(final Query.Builder query) {
           storage.write(new MutateWork.NoResult.Quiet() {
             @Override protected void execute(MutableStoreProvider storeProvider) {
-              storeProvider.getUnsafeTaskStore()
-                  .deleteTasks(storeProvider.getTaskStore().fetchTaskIds(query));
+              Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
+                  .transform(Tasks.SCHEDULED_TO_ID)
+                  .toSet();
+              storeProvider.getUnsafeTaskStore().deleteTasks(ids);
             }
           });
         }

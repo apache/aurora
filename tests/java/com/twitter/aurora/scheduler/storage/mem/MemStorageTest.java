@@ -1,11 +1,13 @@
 package com.twitter.aurora.scheduler.storage.mem;
 
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.testing.TearDown;
@@ -21,6 +23,7 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
@@ -113,9 +116,11 @@ public class MemStorageTest extends TearDownTestCase {
   private void expectTasks(final String... taskIds) {
     storage.consistentRead(new Work.Quiet<Void>() {
       @Override public Void apply(StoreProvider storeProvider) {
-        assertEquals(
-            ImmutableSet.<String>builder().add(taskIds).build(),
-            storeProvider.getTaskStore().fetchTaskIds(Query.unscoped()));
+        Query.Builder query = Query.unscoped();
+        Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
+            .transform(Tasks.SCHEDULED_TO_ID)
+            .toSet();
+        assertEquals(ImmutableSet.<String>builder().add(taskIds).build(), ids);
         return null;
       }
     });

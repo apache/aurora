@@ -268,7 +268,7 @@ public class StateManagerImpl implements StateManager {
       throws UpdateException {
 
     Query.Builder query = Query.jobScoped(jobKey).byStatus(UPDATE_IN_PROGRESS);
-    if (!taskStore.fetchTaskIds(query).isEmpty()) {
+    if (!taskStore.fetchTasks(query).isEmpty()) {
       throw new UpdateException("Unable to proceed until UPDATING and ROLLBACK tasks complete.");
     }
   }
@@ -576,8 +576,10 @@ public class StateManagerImpl implements StateManager {
 
     return storage.write(storage.new QuietSideEffectWork<Integer>() {
       @Override public Integer apply(MutableStoreProvider storeProvider) {
-        return changeStateInWriteOperation(
-            storeProvider.getTaskStore().fetchTaskIds(query), stateChange);
+        Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
+            .transform(Tasks.SCHEDULED_TO_ID)
+            .toSet();
+        return changeStateInWriteOperation(ids, stateChange);
       }
     });
   }

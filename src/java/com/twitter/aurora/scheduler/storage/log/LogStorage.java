@@ -16,6 +16,7 @@ import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.inject.BindingAnnotation;
@@ -544,7 +545,11 @@ public class LogStorage extends ForwardingStore
   public void deleteAllTasks() {
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        deleteTasks(storeProvider.getTaskStore().fetchTaskIds(Query.unscoped()));
+        Query.Builder query = Query.unscoped();
+        Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
+            .transform(Tasks.SCHEDULED_TO_ID)
+            .toSet();
+        deleteTasks(ids);
       }
     });
   }

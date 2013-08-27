@@ -129,7 +129,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
-        if (taskStore.fetchTaskIds(Query.taskScoped(Tasks.id(copy))).isEmpty()) {
+        if (taskStore.fetchTasks(Query.taskScoped(Tasks.id(copy))).isEmpty()) {
           taskStore.saveTasks(ImmutableSet.of(copy));
         }
       }
