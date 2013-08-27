@@ -207,4 +207,18 @@ public class TaskVarsTest extends EasyMockTest {
     changeState(a, LOST);
     // Since no attributes are stored for the host, a variable is not exported/updated.
   }
+
+  @Test
+  public void testDeleteBeforeStorageStarted() {
+    expectLoadStorage();
+
+    control.replay();
+
+    vars = new TaskVars(storageUtil.storage, trackedStats);
+    vars.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("jobA", RUNNING, "host1"))));
+    assertEquals(0, globalCounters.get(RUNNING).get());
+
+    vars.storageStarted(new StorageStarted());
+    assertEquals(0, globalCounters.get(RUNNING).get());
+  }
 }

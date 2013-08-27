@@ -37,6 +37,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
 class TaskVars implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(TaskVars.class.getName());
 
+  // Used to ignore pubsub events sent before storage has completely started.  This avoids a
+  // miscount where a StorageStarted consumer is invoked before storageStarted is invoked here,
+  // and pubsub events are fired for tasks that we have not yet counted.  For example, if
+  // tasksDeleted is invoked, we would end up with a negative count.
+  private volatile boolean storageStarted = false;
+
   private final LoadingCache<String, AtomicLong> countersByStatus;
   private final LoadingCache<String, AtomicLong> countersByRack;
 
@@ -94,6 +100,10 @@ class TaskVars implements EventSubscriber {
 
   @Subscribe
   public void taskChangedState(TaskStateChange stateChange) {
+    if (!storageStarted) {
+      return;
+    }
+
     ScheduledTask task = stateChange.getTask();
     if (stateChange.getOldState() != ScheduleStatus.INIT) {
       decrementCount(stateChange.getOldState());
@@ -131,10 +141,15 @@ class TaskVars implements EventSubscriber {
     for (ScheduleStatus status : ScheduleStatus.values()) {
       getCounter(status);
     }
+    storageStarted = true;
   }
 
   @Subscribe
   public void tasksDeleted(final TasksDeleted event) {
+    if (!storageStarted) {
+      return;
+    }
+
     for (ScheduledTask task : event.getTasks()) {
       decrementCount(task.getStatus());
     }
