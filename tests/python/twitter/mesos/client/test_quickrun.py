@@ -3,7 +3,7 @@ import hashlib
 
 from twitter.mesos.client.quickrun import Quickrun
 from twitter.mesos.config.schema import Packer
-from twitter.mesos.packer import sd_packer_client
+from twitter.packer import sd_packer_client
 
 
 import mox

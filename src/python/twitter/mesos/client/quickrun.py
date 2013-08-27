@@ -21,7 +21,7 @@ from twitter.mesos.config.schema import (
     Resources,
     SequentialTask)
 from twitter.mesos.config import AuroraConfig
-from twitter.mesos.packer import sd_packer_client
+from twitter.packer import sd_packer_client
 
 from gen.twitter.mesos.ttypes import ResponseCode, ScheduleStatus
 

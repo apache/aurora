@@ -18,7 +18,7 @@ python_library(
   dependencies = [
     pants(':config'),
     pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/mesos/packer'),
+    pants('src/python/twitter/packer'),
   ]
 )
 
@@ -32,7 +32,7 @@ python_library(
     pants('3rdparty/python:argparse'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/mesos/common:aurora_job_key'),
-    pants('src/python/twitter/mesos/packer'),
+    pants('src/python/twitter/packer'),
   ]
 )
 
@@ -79,7 +79,7 @@ python_library(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/mesos/client/binding_helpers'),
     pants('src/python/twitter/mesos/config'),
-    pants('src/python/twitter/mesos/packer'),
+    pants('src/python/twitter/packer'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
@@ -126,7 +126,7 @@ python_library(
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/mesos/config'),
     pants('src/python/twitter/mesos/common:aurora_job_key'),
-    pants('src/python/twitter/mesos/packer'),
+    pants('src/python/twitter/packer'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

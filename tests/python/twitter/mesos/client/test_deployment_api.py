@@ -6,7 +6,7 @@ from twitter.mesos.client.api import MesosClientAPI
 from twitter.mesos.client.deployment_api import AuroraDeploymentAPI, DeploymentConfig
 from twitter.mesos.common import AuroraJobKey, Cluster
 from twitter.mesos.config import AuroraConfig, AuroraConfigLoader
-from twitter.mesos.packer.packer_client import Packer
+from twitter.packer.packer_client import Packer
 
 from gen.twitter.mesos.AuroraSchedulerManager import Client as scheduler_client
 import gen.twitter.mesos.ttypes as ttypes

@@ -10,7 +10,7 @@ python_library(
   dependencies = [
     pants('src/python/twitter/mesos/common_internal:clusters'),
     pants('src/python/twitter/mesos/client'),
-    pants('src/python/twitter/mesos/packer'),
+    pants('src/python/twitter/packer'),
   ]
 )
 

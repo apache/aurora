@@ -6,8 +6,7 @@ from twitter.mesos.client.binding_helpers import apply_binding_helpers
 from twitter.mesos.config import AuroraConfig
 from twitter.mesos.config.loader import AuroraConfigLoader
 from twitter.mesos.config.schema import Announcer, Job, MB, PackerObject, Resources, Task
-import twitter.mesos.packer
-import twitter.mesos.packer.packer_client as packer_client
+import twitter.packer.packer_client as packer_client
 import twitter.mesos.client.jenkins
 
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT

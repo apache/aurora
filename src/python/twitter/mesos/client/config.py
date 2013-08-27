@@ -17,8 +17,8 @@ from twitter.mesos.client.jenkins import JenkinsArtifactResolver
 from twitter.mesos.config import AuroraConfig
 from twitter.mesos.config.schema import PackerObject
 from twitter.mesos.config.recipes import Recipes
-from twitter.mesos.packer.packer_client import Packer
-from twitter.mesos.packer import sd_packer_client
+from twitter.packer.packer_client import Packer
+from twitter.packer import sd_packer_client
 from twitter.thermos.config.schema_helpers import Tasks
 
 from gen.twitter.mesos.constants import DEFAULT_ENVIRONMENT

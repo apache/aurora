@@ -1,7 +1,7 @@
 import unittest
 
 from twitter.common import app
-from twitter.mesos.packer.packer_client import Packer
+from twitter.packer.packer_client import Packer
 import twitter.mesos.bin.mesos_client as mesos_client
 
 import mox

@@ -7,7 +7,7 @@ python_library(name = 'binding_helpers',
     pants('src/python/twitter/mesos/client:base'),
     pants('src/python/twitter/mesos/client:jenkins'),
     pants('src/python/twitter/mesos/config'),
-    pants('src/python/twitter/mesos/packer'),
+    pants('src/python/twitter/packer'),
   ],
 )
 

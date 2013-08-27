@@ -90,7 +90,7 @@ python_tests(name = 'deployment_api',
   sources = ['test_deployment_api.py'],
   dependencies = [
     pants('src/python/twitter/mesos:mesos-lib'),
-    pants('src/python/twitter/mesos/packer:packer'),
+    pants('src/python/twitter/packer'),
     pants('3rdparty/python:mox'),
   ],
 )

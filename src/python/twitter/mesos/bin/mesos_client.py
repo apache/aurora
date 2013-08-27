@@ -45,8 +45,8 @@ from twitter.mesos.common import (
     Clusters)
 # TODO(wickman) Split mesos_client / mesos_client_internal targets
 from twitter.mesos.common_internal.clusters import TWITTER_CLUSTERS
-from twitter.mesos.packer import sd_packer_client
-from twitter.mesos.packer.packer_client import Packer
+from twitter.packer import sd_packer_client
+from twitter.packer.packer_client import Packer
 from twitter.thermos.base.options import add_binding_to
 
 from gen.twitter.mesos.constants import ACTIVE_STATES

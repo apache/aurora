@@ -4,7 +4,7 @@ from tempfile import NamedTemporaryFile
 from twitter.common import log
 from twitter.mesos.client.config import get_config
 from twitter.mesos.config import AuroraConfig, AuroraConfigLoader
-from twitter.mesos.packer.packer_client import Packer
+from twitter.packer.packer_client import Packer
 
 from gen.twitter.mesos.constants import ACTIVE_STATES
 

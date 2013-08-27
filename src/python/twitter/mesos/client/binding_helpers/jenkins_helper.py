@@ -1,5 +1,5 @@
 from twitter.mesos.client.jenkins import JenkinsArtifactResolver
-from twitter.mesos.packer import sd_packer_client
+from twitter.packer import sd_packer_client
 
 from .packer_helper import generate_packer_struct, validate_package
 from . import BindingHelper

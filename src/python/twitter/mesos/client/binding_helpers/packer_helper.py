@@ -3,8 +3,8 @@ import posixpath
 from twitter.common import app, log
 from twitter.mesos.client.base import die
 from twitter.mesos.config.schema import PackerObject
-from twitter.mesos.packer import sd_packer_client
-from twitter.mesos.packer.packer_client import Packer
+from twitter.packer import sd_packer_client
+from twitter.packer.packer_client import Packer
 
 from . import BindingHelper
 

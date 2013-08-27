@@ -6,7 +6,7 @@ from twitter.mesos.client.api import MesosClientAPI
 from twitter.mesos.client.base import check_and_log_response, handle_open
 from twitter.mesos.client.deployment_api import AuroraDeploymentAPI
 from twitter.mesos.common import AuroraJobKey
-from twitter.mesos.packer import sd_packer_client
+from twitter.packer import sd_packer_client
 
 import argparse
 
