@@ -11,10 +11,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -26,7 +26,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -42,6 +41,8 @@ import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.cron.CronException;
+import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.storage.Storage;
@@ -50,17 +51,12 @@ import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.base.Command;
+import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.base.Supplier;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffHelper;
-
-import it.sauronsoftware.cron4j.InvalidPatternException;
-import it.sauronsoftware.cron4j.Predictor;
-import it.sauronsoftware.cron4j.Scheduler;
-import it.sauronsoftware.cron4j.SchedulingPattern;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -71,68 +67,6 @@ import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
  * A job scheduler that receives jobs that should be run periodically on a cron schedule.
  */
 public class CronJobManager extends JobManager implements EventSubscriber {
-
-  /**
-   * An execution manager that executes work on a cron schedule.
-   */
-  public interface CronScheduler {
-    /**
-     * Schedules a task on a cron schedule.
-     *
-     * @param schedule Cron-style schedule.
-     * @param task Work to run when on the cron schedule.
-     * @return A unique ID to identify the scheduled cron task.
-     */
-    String schedule(String schedule, Runnable task);
-
-    /**
-     * Removes a scheduled cron item.
-     *
-     * @param key Key previously returned from {@link #schedule(String, Runnable)}.
-     */
-    void deschedule(String key);
-
-    /**
-     * Gets the cron schedule associated with a scheduling key.
-     *
-     * @param key Key previously returned from {@link #schedule(String, Runnable)}.
-     * @return The task's cron schedule, if a matching task was found.
-     */
-    Optional<String> getSchedule(String key);
-
-    public static class Cron4jScheduler implements CronScheduler {
-      private final Scheduler scheduler;
-
-      @Inject
-      Cron4jScheduler(ShutdownRegistry shutdownRegistry) {
-        checkNotNull(shutdownRegistry);
-        scheduler = new Scheduler();
-        scheduler.setDaemon(true);
-        scheduler.start();
-        shutdownRegistry.addAction(new Command() {
-          @Override public void execute() {
-            scheduler.stop();
-          }
-        });
-      }
-
-      @Override
-      public String schedule(String schedule, Runnable task) {
-        return scheduler.schedule(schedule, task);
-      }
-
-      @Override
-      public void deschedule(String key) {
-        scheduler.deschedule(key);
-      }
-
-      @Override
-      public Optional<String> getSchedule(String key) {
-        return Optional.fromNullable(scheduler.getSchedulingPattern(key))
-            .transform(Functions.toStringFunction());
-      }
-    }
-  }
 
   public static final String MANAGER_KEY = "CRON";
 
@@ -154,7 +88,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   private final AtomicLong cronJobsTriggered = Stats.exportLong("cron_jobs_triggered");
   private final AtomicLong cronJobLaunchFailures = Stats.exportLong("cron_job_launch_failures");
 
-  // Maps from the unique job identifier to the unique identifier used internally by the cron4j
+  // Maps from the unique job identifier to the unique identifier used internally by the cron
   // scheduler.
   private final Map<JobKey, String> scheduledJobs =
       Collections.synchronizedMap(Maps.<JobKey, String>newHashMap());
@@ -168,15 +102,22 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   private final StateManager stateManager;
   private final Storage storage;
   private final CronScheduler cron;
+  private final ShutdownRegistry shutdownRegistry;
   private final BackoffHelper delayedStartBackoff;
   private final Executor delayedRunExecutor;
 
   @Inject
-  CronJobManager(StateManager stateManager, Storage storage, CronScheduler cron) {
+  CronJobManager(
+      StateManager stateManager,
+      Storage storage,
+      CronScheduler cron,
+      ShutdownRegistry shutdownRegistry) {
+
     this(
         stateManager,
         storage,
         cron,
+        shutdownRegistry,
         Executors.newCachedThreadPool(
             new ThreadFactoryBuilder().setDaemon(true).setNameFormat("CronDelay-%d").build()));
   }
@@ -186,11 +127,13 @@ public class CronJobManager extends JobManager implements EventSubscriber {
       StateManager stateManager,
       Storage storage,
       CronScheduler cron,
+      ShutdownRegistry shutdownRegistry,
       Executor delayedRunExecutor) {
 
     this.stateManager = checkNotNull(stateManager);
     this.storage = checkNotNull(storage);
     this.cron = checkNotNull(cron);
+    this.shutdownRegistry = checkNotNull(shutdownRegistry);
     this.delayedStartBackoff =
         new BackoffHelper(CRON_START_INITIAL_BACKOFF.get(), CRON_START_MAX_BACKOFF.get());
     this.delayedRunExecutor = checkNotNull(delayedRunExecutor);
@@ -216,6 +159,13 @@ public class CronJobManager extends JobManager implements EventSubscriber {
    */
   @Subscribe
   public void storageStarted(StorageStarted storageStarted) {
+    cron.start();
+    shutdownRegistry.addAction(new ExceptionalCommand<CronException>() {
+      @Override public void execute() throws CronException {
+        cron.stop();
+      }
+    });
+
     Iterable<JobConfiguration> crons =
         storage.consistentRead(new Work.Quiet<Iterable<JobConfiguration>>() {
           @Override public Iterable<JobConfiguration> apply(Storage.StoreProvider storeProvider) {
@@ -237,15 +187,6 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   private void logLaunchFailure(JobConfiguration job, Exception e) {
     cronJobLaunchFailures.incrementAndGet();
     LOG.log(Level.SEVERE, "Scheduling failed for recovered job " + job, e);
-  }
-
-  /**
-   * Predicts the next date at which a cron schedule will trigger.
-   *
-   * @param cronSchedule Cron schedule to predict the next time for.
-   */
-  public static Date predictNextRun(String cronSchedule) {
-    return new Predictor(cronSchedule).nextMatchingDate();
   }
 
   /**
@@ -432,7 +373,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
           String.format("Not a valid cronjob, %s has no cron schedule", jobPath));
     }
 
-    if (!validateSchedule(job.getCronSchedule())) {
+    if (!cron.isValidSchedule(job.getCronSchedule())) {
       throw new ScheduleException("Invalid cron schedule: " + job.getCronSchedule());
     }
 
@@ -445,13 +386,9 @@ public class CronJobManager extends JobManager implements EventSubscriber {
           cronTriggered(config);
         }
       });
-    } catch (InvalidPatternException e) {
+    } catch (CronException e) {
       throw new ScheduleException("Failed to schedule cron job: " + e.getMessage(), e);
     }
-  }
-
-  private boolean validateSchedule(String cronSchedule) {
-    return SchedulingPattern.validate(cronSchedule);
   }
 
   @Override

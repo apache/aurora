@@ -22,6 +22,7 @@ import com.google.inject.Module;
 import com.google.inject.Singleton;
 
 import com.twitter.aurora.auth.UnsecureAuthModule;
+import com.twitter.aurora.internal.cron.Cron4jModule;
 import com.twitter.aurora.scheduler.DriverFactory;
 import com.twitter.aurora.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
@@ -134,6 +135,7 @@ public class SchedulerMain extends AbstractApplication {
     ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
         .addAll(getSystemModules())
         .add(new AppModule(clusterName))
+        .add(new Cron4jModule())
         .add(new ThriftModule())
         .add(new ThriftAuthModule())
         .add(serviceBinder)

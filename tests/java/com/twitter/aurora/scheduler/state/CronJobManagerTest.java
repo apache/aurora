@@ -21,8 +21,9 @@ import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
-import com.twitter.aurora.scheduler.state.CronJobManager.CronScheduler;
+import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.easymock.EasyMock.anyObject;
@@ -48,6 +49,7 @@ public class CronJobManagerTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
 
   private CronScheduler cronScheduler;
+  private ShutdownRegistry shutdownRegistry;
   private CronJobManager cron;
   private JobConfiguration job;
   private ParsedConfiguration parsedConfiguration;
@@ -61,19 +63,26 @@ public class CronJobManagerTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     cronScheduler = createMock(CronScheduler.class);
-    cron = new CronJobManager(stateManager, storageUtil.storage, cronScheduler, delayExecutor);
+    shutdownRegistry = createMock(ShutdownRegistry.class);
+    cron = new CronJobManager(
+        stateManager,
+        storageUtil.storage,
+        cronScheduler,
+        shutdownRegistry,
+        delayExecutor);
     cron.schedulerCore = scheduler;
     job = makeJob();
     parsedConfiguration = ParsedConfiguration.fromUnparsed(job);
   }
 
-  private void expectJobAccepted(JobConfiguration savedJob) {
+  private void expectJobAccepted(JobConfiguration savedJob) throws Exception {
     storageUtil.jobStore.saveAcceptedJob(CronJobManager.MANAGER_KEY, savedJob);
+    expect(cronScheduler.isValidSchedule(savedJob.getCronSchedule())).andReturn(true);
     expect(cronScheduler.schedule(eq(savedJob.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
   }
 
-  private void expectJobAccepted() {
+  private void expectJobAccepted() throws Exception {
     expectJobAccepted(parsedConfiguration.getJobConfig());
   }
 

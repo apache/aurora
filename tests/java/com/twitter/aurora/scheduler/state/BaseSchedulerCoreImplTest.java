@@ -55,20 +55,22 @@ import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.quota.QuotaManager;
 import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.aurora.scheduler.quota.Quotas;
-import com.twitter.aurora.scheduler.state.CronJobManager.CronScheduler;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.StorageBackfill;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
+import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -127,6 +129,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private QuotaManager quotaManager;
   private FakeClock clock;
   private Closure<PubsubEvent> eventSink;
+  private ShutdownRegistry shutdownRegistry;
 
   @Before
   public void setUp() throws Exception {
@@ -146,7 +149,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
     eventSink.execute(EasyMock.<PubsubEvent>anyObject());
     cronScheduler = createMock(CronScheduler.class);
+    shutdownRegistry = createMock(ShutdownRegistry.class);
     expectLastCall().anyTimes();
+
+    expect(cronScheduler.schedule(anyObject(String.class), anyObject(Runnable.class)))
+        .andStubReturn("key");
+    expect(cronScheduler.isValidSchedule(anyObject(String.class))).andStubReturn(true);
   }
 
   /**
@@ -180,7 +188,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     stateManager = new StateManagerImpl(storage, clock, driver, taskIdGenerator, eventSink);
     ImmediateJobManager immediateManager = new ImmediateJobManager(stateManager, storage);
     quotaManager = new QuotaManagerImpl(storage);
-    cron = new CronJobManager(stateManager, storage, cronScheduler);
+    cron = new CronJobManager(stateManager, storage, cronScheduler, shutdownRegistry);
     scheduler = new SchedulerCoreImpl(
         storage,
         cron,
@@ -447,8 +455,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void testCreateDuplicateCronJob() throws Exception {
     ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
     JobConfiguration job = parsedConfiguration.getJobConfig();
-    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key");
 
     control.replay();
     buildScheduler();
@@ -467,9 +473,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     // in the PENDING state.
 
     ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
-    JobConfiguration job = parsedConfiguration.getJobConfig();
-    expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
-        .andReturn("key");
+    JobKey jobKey = parsedConfiguration.getJobConfig().getKey();
 
     control.replay();
     buildScheduler();
@@ -477,8 +481,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(parsedConfiguration);
     assertTaskCount(0);
 
-    scheduler.startCronJob(job.getKey());
-    assertEquals(PENDING, getOnlyTask(Query.jobScoped(job.getKey())).getStatus());
+    scheduler.startCronJob(jobKey);
+    assertEquals(PENDING, getOnlyTask(Query.jobScoped(jobKey)).getStatus());
   }
 
   @Test(expected = ScheduleException.class)
@@ -518,6 +522,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
     JobConfiguration job = parsedConfiguration.getJobConfig();
+    expect(cronScheduler.isValidSchedule(job.getCronSchedule())).andReturn(true);
     expect(cronScheduler.schedule(eq(job.getCronSchedule()), EasyMock.<Runnable>anyObject()))
         .andReturn("key");
 

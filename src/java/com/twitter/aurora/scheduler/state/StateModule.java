@@ -6,8 +6,6 @@ import com.google.inject.Singleton;
 import com.twitter.aurora.scheduler.MesosTaskFactory;
 import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.aurora.scheduler.events.PubsubEventModule;
-import com.twitter.aurora.scheduler.state.CronJobManager.CronScheduler;
-import com.twitter.aurora.scheduler.state.CronJobManager.CronScheduler.Cron4jScheduler;
 import com.twitter.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
 import com.twitter.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
 
@@ -23,8 +21,6 @@ public class StateModule extends AbstractModule {
     bind(MesosTaskFactory.class).to(MesosTaskFactoryImpl.class);
 
     bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
-
-    bind(CronScheduler.class).to(Cron4jScheduler.class);
 
     bind(StateManager.class).to(StateManagerImpl.class);
     bind(StateManagerImpl.class).in(Singleton.class);

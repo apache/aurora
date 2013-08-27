@@ -29,12 +29,14 @@ import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 
+import com.twitter.aurora.gen.CronCollisionPolicy;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.cron.CronPredictor;
 import com.twitter.aurora.scheduler.quota.QuotaManager;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
@@ -53,37 +55,32 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 public class SchedulerzRole extends JerseyTemplateServlet {
 
   private final Storage storage;
-  private final CronJobManager cronScheduler;
+  private final CronJobManager cronJobManager;
+  private final CronPredictor cronPredictor;
   private final String clusterName;
   private final QuotaManager quotaManager;
 
-  /**
-   * Creates a new role servlet.
-   *
-   * @param storage Backing store to fetch tasks from.
-   * @param cronScheduler Cron scheduler.
-   * @param clusterName Name of the serving cluster.
-   * @param quotaManager Resource quota manager.
-   */
   @Inject
-  public SchedulerzRole(
+  SchedulerzRole(
       Storage storage,
-      CronJobManager cronScheduler,
+      CronJobManager cronJobManager,
+      CronPredictor cronPredictor,
       @ClusterName String clusterName,
       QuotaManager quotaManager) {
 
     super("schedulerzrole");
     this.storage = checkNotNull(storage);
-    this.cronScheduler = checkNotNull(cronScheduler);
+    this.cronJobManager = checkNotNull(cronJobManager);
+    this.cronPredictor = checkNotNull(cronPredictor);
     this.clusterName = checkNotBlank(clusterName);
     this.quotaManager = checkNotNull(quotaManager);
   }
 
-    /**
-     * Fetches the landing page for a role.
-     *
-     * @return HTTP response.
-     */
+  /**
+   * Fetches the landing page for a role.
+   *
+   * @return HTTP response.
+   */
   @GET
   @Produces(MediaType.TEXT_HTML)
   public Response get(@PathParam("role") final String role) {
@@ -138,7 +135,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
 
   private List<?> fetchCronJobsBy(final String role, final Optional<String> environment) {
     Iterable<JobConfiguration> cronJobs = Iterables.filter(
-        cronScheduler.getJobs(),
+        cronJobManager.getJobs(),
         new Predicate<JobConfiguration>() {
           @Override public boolean apply(JobConfiguration job) {
             if (!environment.isPresent()) {
@@ -153,23 +150,24 @@ public class SchedulerzRole extends JerseyTemplateServlet {
     return Lists.newArrayList(
         Iterables.transform(
             DisplayUtils.JOB_CONFIG_ORDERING.sortedCopy(cronJobs),
-            FORMAT_CRON_JOB));
+            new Function<JobConfiguration, Map<?, ?>>() {
+              @Override public Map<?, ?> apply(JobConfiguration job) {
+                return ImmutableMap.<Object, Object>builder()
+                    .put("name", job.getKey().getName())
+                    .put("environment", job.getKey().getEnvironment())
+                    .put("pendingTaskCount", job.getShardCount())
+                    .put("cronSchedule", job.getCronSchedule())
+                    .put("nextRun", cronPredictor.predictNextRun(job.cronSchedule).getTime())
+                    .put("cronCollisionPolicy", cronCollisionPolicy(job))
+                    .put("packages", getPackages(job))
+                    .build();
+              }
+            }));
   }
 
-  private static final Function<JobConfiguration, Map<?, ?>> FORMAT_CRON_JOB =
-      new Function<JobConfiguration, Map<?, ?>>() {
-        @Override public Map<?, ?> apply(JobConfiguration job) {
-          return ImmutableMap.<Object, Object>builder()
-              .put("name", job.getKey().getName())
-              .put("environment", job.getKey().getEnvironment())
-              .put("pendingTaskCount", job.getShardCount())
-              .put("cronSchedule", job.getCronSchedule())
-              .put("nextRun", CronJobManager.predictNextRun(job.cronSchedule).getTime())
-              .put("cronCollisionPolicy", CronJobManager.orDefault(job.getCronCollisionPolicy()))
-              .put("packages", getPackages(job))
-              .build();
-        }
-      };
+  private static CronCollisionPolicy cronCollisionPolicy(JobConfiguration jobConfiguration) {
+    return CronJobManager.orDefault(jobConfiguration.getCronCollisionPolicy());
+  }
 
   private static String getPackages(JobConfiguration job) {
     Set<String> packages = Sets.newHashSet();

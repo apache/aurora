@@ -14,8 +14,8 @@ import com.twitter.aurora.auth.SessionValidator;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.SessionKey;
+import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.quota.QuotaManager;
-import com.twitter.aurora.scheduler.state.CronJobManager.CronScheduler;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
 import com.twitter.aurora.scheduler.state.StateManager;
@@ -24,6 +24,7 @@ import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.easymock.EasyMock.expectLastCall;
@@ -76,6 +77,7 @@ public class ThriftIT extends EasyMockTest {
             bindMock(MaintenanceController.class);
             bindMock(Recovery.class);
             bindMock(SchedulerCore.class);
+            bindMock(ShutdownRegistry.class);
             bindMock(StateManager.class);
             bindMock(Storage.class);
             bindMock(StorageBackup.class);
