@@ -72,9 +72,12 @@ public class AopModule extends AbstractModule {
   protected void configure() {
     requireBinding(CapabilityValidator.class);
 
+    // TODO(Sathya): Consider adding an interceptor to validate session key.
     // Layer ordering:
     // Log -> CapabilityValidator -> FeatureToggle -> StatsExporter -> SchedulerThriftInterface
 
+    // TODO(Sathya): Consider using provider pattern for constructing interceptors to facilitate
+    // unit testing without the creation of Guice injectors.
     bindThriftDecorator(new LoggingInterceptor());
 
     // Note: it's important that the capability interceptor is only applied to AuroraAdmin.Iface

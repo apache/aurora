@@ -1,6 +1,5 @@
 package com.twitter.aurora.scheduler.local;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -161,7 +160,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
       executor.submit(new Runnable() {
         @Override public void run() {
           try {
-            thrift.setQuota("mesos", new Quota(2.0, 1024, 2048), sessionKey("mesos"));
+            thrift.setQuota("mesos", new Quota(2.0, 1024, 2048), new SessionKey());
           } catch (TException e) {
             throw Throwables.propagate(e);
           }
@@ -251,14 +250,10 @@ public class IsolatedSchedulerModule extends AbstractModule {
               .setThermosConfig("opaque".getBytes()));
     }
 
-    private SessionKey sessionKey(String user) {
-      return new SessionKey(user, System.currentTimeMillis(), ByteBuffer.wrap("fake".getBytes()));
-    }
-
     private void submitJob(JobConfiguration job) {
       CreateJobResponse response;
       try {
-        response = thrift.createJob(job, sessionKey(job.getOwner().getUser()));
+        response = thrift.createJob(job, new SessionKey());
       } catch (TException e) {
         throw Throwables.propagate(e);
       }

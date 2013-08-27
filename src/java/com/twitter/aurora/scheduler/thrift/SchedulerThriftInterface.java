@@ -115,6 +115,7 @@ import com.twitter.common.util.BackoffHelper;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import static com.twitter.aurora.auth.SessionValidator.SessionContext;
 import static com.twitter.aurora.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.aurora.gen.ResponseCode.ERROR;
 import static com.twitter.aurora.gen.ResponseCode.INVALID_REQUEST;
@@ -220,7 +221,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     try {
-      sessionValidator.checkAuthenticated(session, job.getOwner().getRole());
+      sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
     } catch (AuthFailedException e) {
       return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
     }
@@ -267,7 +268,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     StartCronResponse response = new StartCronResponse();
     try {
-      sessionValidator.checkAuthenticated(session, jobKey.getRole());
+      sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
     } catch (AuthFailedException e) {
       response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
       return response;
@@ -304,15 +305,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     return response;
-  }
-
-  private boolean isAdmin(SessionKey session) {
-    try {
-      sessionValidator.checkAuthorized(session, Capability.ROOT);
-      return true;
-    } catch (AuthFailedException e) {
-      return false;
-    }
   }
 
   @Override
@@ -366,13 +358,22 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         .setResponseCode(OK);
   }
 
-  private void validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
+  private SessionContext validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
       throws AuthFailedException {
 
     Set<ScheduledTask> tasks =
         Storage.Util.consistentFetchTasks(storage, Query.arbitrary(taskQuery));
-    for (String role : ImmutableSet.copyOf(Iterables.transform(tasks, GET_ROLE))) {
-      sessionValidator.checkAuthenticated(session, role);
+    Set<String> targetRoles = FluentIterable.from(tasks)
+        .transform(GET_ROLE)
+        .toSet();
+    return sessionValidator.checkAuthenticated(session, targetRoles);
+  }
+
+  private Optional<SessionContext> isAdmin(SessionKey session) {
+    try {
+      return Optional.of(sessionValidator.checkAuthorized(session, Capability.ROOT));
+    } catch (AuthFailedException e) {
+      return Optional.absent();
     }
   }
 
@@ -383,7 +384,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     checkNotNull(query);
     checkNotNull(session);
-    checkNotNull(session.getUser());
 
     KillResponse response = new KillResponse();
 
@@ -393,11 +393,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return response;
     }
 
-    if (isAdmin(session)) {
+    Optional<SessionContext> context = isAdmin(session);
+    if (context.isPresent()) {
       LOG.info("Granting kill query to admin user: " + query);
     } else {
       try {
-        validateSessionKeyForTasks(session, query);
+        context = Optional.of(validateSessionKeyForTasks(session, query));
       } catch (AuthFailedException e) {
         response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
         return response;
@@ -405,7 +406,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     try {
-      schedulerCore.killTasks(Query.arbitrary(query), session.getUser());
+      schedulerCore.killTasks(Query.arbitrary(query), context.get().getIdentity());
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
       return response;
@@ -449,7 +450,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     try {
-      sessionValidator.checkAuthenticated(session, job.getOwner().getRole());
+      sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
     } catch (AuthFailedException e) {
       return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
     }
@@ -486,12 +487,18 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     checkNotBlank(updateToken);
     checkNotNull(session);
 
-    // TODO(ksweeney): Validate session key here
-
     UpdateShardsResponse response = new UpdateShardsResponse();
+    SessionContext context;
+    try {
+      context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
+    } catch (AuthFailedException e) {
+      response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+      return response;
+    }
+
     try {
       response
-          .setShards(schedulerCore.updateShards(jobKey, session.getUser(), shards, updateToken))
+          .setShards(schedulerCore.updateShards(jobKey, context.getIdentity(), shards, updateToken))
           .setResponseCode(UpdateResponseCode.OK)
           .setMessage("Successfully started update of shards: " + shards);
     } catch (ScheduleException e) {
@@ -513,12 +520,19 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     checkNotBlank(updateToken);
     checkNotNull(session);
 
-    // TODO(ksweeney): Validate session key here
-
     RollbackShardsResponse response = new RollbackShardsResponse();
+    SessionContext context;
+    try {
+      context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
+    } catch (AuthFailedException e) {
+      response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+      return response;
+    }
+
     try {
       response
-          .setShards(schedulerCore.rollbackShards(jobKey, session.getUser(), shards, updateToken))
+          .setShards(schedulerCore.rollbackShards(
+              jobKey, context.getIdentity(), shards, updateToken))
           .setResponseCode(UpdateResponseCode.OK)
           .setMessage("Successfully started rollback of shards: " + shards);
     } catch (ScheduleException e) {
@@ -538,13 +552,19 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     JobKeys.assertValid(jobKey);
     checkNotNull(session);
 
-    // TODO(ksweeney): Validate session key here
-
     FinishUpdateResponse response = new FinishUpdateResponse();
+    SessionContext context;
+    try {
+      context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+      return response;
+    }
+
     Optional<String> token = updateResult == UpdateResult.TERMINATE
         ? Optional.<String>absent() : Optional.of(updateToken);
     try {
-      schedulerCore.finishUpdate(jobKey, session.getUser(), token, updateResult);
+      schedulerCore.finishUpdate(jobKey, context.getIdentity(), token, updateResult);
       response.setResponseCode(OK).setMessage("Update successfully finished.");
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
@@ -564,15 +584,16 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     checkNotNull(session);
 
     RestartShardsResponse response = new RestartShardsResponse();
+    SessionContext context;
     try {
-      sessionValidator.checkAuthenticated(session, jobKey.getRole());
+      context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
     } catch (AuthFailedException e) {
       response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
       return response;
     }
 
     try {
-      schedulerCore.restartShards(jobKey, shardIds, session.getUser());
+      schedulerCore.restartShards(jobKey, shardIds, context.getIdentity());
       response.setResponseCode(OK).setMessage("Shards are restarting.");
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
@@ -636,8 +657,18 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     checkNotNull(status);
     checkNotNull(session);
 
+    ForceTaskStateResponse response = new ForceTaskStateResponse();
+    SessionContext context;
+    try {
+      // TODO(Sathya): Remove this after AOP-style session validation passes in a SessionContext.
+      context = sessionValidator.checkAuthorized(session, Capability.ROOT);
+    } catch (AuthFailedException e) {
+      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+      return response;
+    }
+
     schedulerCore.setTaskStatus(
-        Query.taskScoped(taskId), status, transitionMessage(session.getUser()));
+        Query.taskScoped(taskId), status, transitionMessage(context.getIdentity()));
     return new ForceTaskStateResponse().setResponseCode(OK).setMessage("Transition attempted.");
   }
 

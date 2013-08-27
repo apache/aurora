@@ -76,6 +76,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import static com.twitter.aurora.auth.SessionValidator.SessionContext;
 import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
 import static com.twitter.aurora.gen.MaintenanceMode.DRAINING;
 import static com.twitter.aurora.gen.MaintenanceMode.NONE;
@@ -95,12 +96,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final String USER = "foo_user";
   private static final String JOB_NAME = "job_foo";
   private static final Identity ROLE_IDENTITY = new Identity(ROLE, USER);
-  private static final SessionKey SESSION = new SessionKey().setUser(USER);
+  private static final SessionKey SESSION = new SessionKey();
   private static final JobKey JOB_KEY = JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, JOB_NAME);
 
   private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
   private CapabilityValidator userValidator;
+  private SessionContext context;
   private QuotaManager quotaManager;
   private StorageBackup backup;
   private Recovery recovery;
@@ -109,11 +111,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private CronJobManager cronJobManager;
 
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     scheduler = createMock(SchedulerCore.class);
     userValidator = createMock(CapabilityValidator.class);
+    context = createMock(SessionContext.class);
+    setUpValidationExpectations();
     quotaManager = createMock(QuotaManager.class);
     backup = createMock(StorageBackup.class);
     recovery = createMock(Recovery.class);
@@ -137,6 +141,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     };
     Injector injector = Guice.createInjector(testModule, new AopModule());
     thrift = injector.getInstance(AuroraAdmin.Iface.class);
+  }
+
+  private void setUpValidationExpectations() throws Exception {
+    expect(userValidator.toString(SESSION)).andReturn(USER).anyTimes();
+    expect(context.getIdentity()).andReturn(USER).anyTimes();
   }
 
   @Test
@@ -353,8 +362,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     String taskId = "task_id_foo";
     ScheduleStatus status = ScheduleStatus.FAILED;
 
-    scheduler.setTaskStatus(Query.taskScoped(taskId), status, transitionMessage(SESSION.getUser()));
-    expectAuth(ROOT, true);
+    scheduler.setTaskStatus(Query.taskScoped(taskId), status, transitionMessage(USER));
+    // Expect auth is first called by an interceptor and then by SchedulerThriftInterface to extract
+    // the SessionContext.
+    // Note: This will change after AOP-style session validation passes in a SessionContext.
+    expectAuth(ROOT, true).times(2);
 
     control.replay();
 
@@ -929,22 +941,24 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private IExpectationSetters<?> expectAuth(String role, boolean allowed)
       throws AuthFailedException {
 
-    userValidator.checkAuthenticated(SESSION, role);
     if (!allowed) {
-      return expectLastCall().andThrow(new AuthFailedException("Denied!"));
+      return expect(userValidator.checkAuthenticated(SESSION, ImmutableSet.of(role)))
+          .andThrow(new AuthFailedException("Denied!"));
     } else {
-      return expectLastCall();
+      return expect(userValidator.checkAuthenticated(SESSION, ImmutableSet.of(role)))
+          .andReturn(context);
     }
   }
 
   private IExpectationSetters<?> expectAuth(Capability capability, boolean allowed)
       throws AuthFailedException {
 
-    userValidator.checkAuthorized(SESSION, capability);
     if (!allowed) {
-      return expectLastCall().andThrow(new AuthFailedException("Denied!"));
+      return expect(userValidator.checkAuthorized(SESSION, capability))
+          .andThrow(new AuthFailedException("Denied!"));
     } else {
-      return expectLastCall();
+      return expect(userValidator.checkAuthorized(SESSION, capability))
+          .andReturn(context);
     }
   }
 

@@ -1,5 +1,6 @@
 package com.twitter.aurora.auth;
 
+import java.util.Set;
 import java.util.logging.Logger;
 
 import com.google.inject.AbstractModule;
@@ -25,11 +26,20 @@ public class UnsecureAuthModule extends AbstractModule {
     private static final Logger LOG = Logger.getLogger(UnsecureSessionValidator.class.getName());
 
     @Override
-    public void checkAuthenticated(SessionKey sessionKey, String targetRole)
+    public SessionContext checkAuthenticated(SessionKey key, Set<String> targetRoles)
         throws AuthFailedException {
 
-      LOG.warning("Using unsecure session validator for key: " + sessionKey
-          + " role: " + targetRole);
+      LOG.warning("Using unsecure session validator for key: " + key + " roles: " + targetRoles);
+      return new SessionContext() {
+        @Override public String getIdentity() {
+          return "UNSECURE";
+        }
+      };
+    }
+
+    @Override
+    public String toString(SessionKey sessionKey) {
+      return sessionKey.toString();
     }
   }
 }

@@ -31,7 +31,7 @@ class TestSchedulerProxy(scheduler_client.SchedulerProxy):
     return self.create_session('SOME_USER')
   @classmethod
   def create_session(cls, user):
-    return SessionKey(user=user, nonce=42, nonceSig='UNAUTHENTICATED')
+    return SessionKey(mechanism='test', data='test')
 
 
 class TestSchedulerProxyInjection(unittest.TestCase):

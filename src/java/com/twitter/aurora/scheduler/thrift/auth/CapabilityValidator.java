@@ -1,9 +1,11 @@
 package com.twitter.aurora.scheduler.thrift.auth;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 
 import com.twitter.aurora.auth.SessionValidator;
@@ -26,9 +28,11 @@ public interface CapabilityValidator extends SessionValidator {
    *
    * @param sessionKey Key to validate.
    * @param capability User capability to authenticate against.
+   * @return  A {@link SessionContext} object that provides information about the validated session.
    * @throws AuthFailedException If the key cannot be validated as the role.
    */
-  void checkAuthorized(SessionKey sessionKey, Capability capability) throws AuthFailedException;
+  SessionContext checkAuthorized(SessionKey sessionKey, Capability capability)
+      throws AuthFailedException;
 
   /**
    * A capability validator that delegates to a provided {@link SessionValidator}, translating
@@ -45,19 +49,24 @@ public interface CapabilityValidator extends SessionValidator {
     }
 
     @Override
-    public void checkAuthorized(SessionKey sessionKey, Capability capability)
+    public SessionContext checkAuthorized(SessionKey sessionKey, Capability capability)
         throws AuthFailedException {
 
-      checkAuthenticated(
+      return checkAuthenticated(
           sessionKey,
-          Optional.of(mapping.get(capability)).or(mapping.get(Capability.ROOT)));
+          ImmutableSet.of(Optional.of(mapping.get(capability)).or(mapping.get(Capability.ROOT))));
     }
 
     @Override
-    public void checkAuthenticated(SessionKey sessionKey, String targetRole)
+    public SessionContext checkAuthenticated(SessionKey sessionKey, Set<String> targetRoles)
         throws AuthFailedException {
 
-      sessionValidator.checkAuthenticated(sessionKey, targetRole);
+      return sessionValidator.checkAuthenticated(sessionKey, targetRoles);
+    }
+
+    @Override
+    public String toString(SessionKey sessionKey) {
+      return sessionValidator.toString(sessionKey);
     }
   }
 }

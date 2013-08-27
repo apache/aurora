@@ -57,19 +57,20 @@ class UserCapabilityInterceptor implements MethodInterceptor {
 
     List<Capability> whitelist = whitelistBuilder.build();
     LOG.fine("Operation " + method.getName() + " may be performed by: " + whitelist);
-    Optional<SessionKey> key = FluentIterable.from(Arrays.asList(invocation.getArguments()))
+    Optional<SessionKey> sessionKey = FluentIterable.from(Arrays.asList(invocation.getArguments()))
         .firstMatch(Predicates.instanceOf(SessionKey.class)).transform(CAST);
-    if (!key.isPresent()) {
+    if (!sessionKey.isPresent()) {
       LOG.severe("Interceptor should only be applied to methods accepting a SessionKey, but "
           + method + " does not.");
       return invocation.proceed();
     }
 
+    String key = capabilityValidator.toString(sessionKey.get());
     for (Capability user : whitelist) {
-      LOG.fine("Attempting to validate " + key.get().getUser() + " as " + user);
+      LOG.fine("Attempting to validate " + key + " against " + user);
       try {
-        capabilityValidator.checkAuthorized(key.get(), user);
-        LOG.info("Permitting " + key.get().getUser() + " to act as "
+         capabilityValidator.checkAuthorized(sessionKey.get(), user);
+        LOG.info("Permitting " + key + " to act as "
             + user + " and perform action " + method.getName());
         return invocation.proceed();
       } catch (AuthFailedException e) {
@@ -81,7 +82,7 @@ class UserCapabilityInterceptor implements MethodInterceptor {
     return Interceptors.properlyTypedResponse(
         method,
         ResponseCode.AUTH_FAILED,
-        "Your user '" + key.get().getUser()
+        "Session identified by '" + key
             + "' does not have the required capability to perform this action: " + whitelist);
   }
 }

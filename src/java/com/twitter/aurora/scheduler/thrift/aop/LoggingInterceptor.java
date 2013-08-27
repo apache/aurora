@@ -9,6 +9,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.inject.Inject;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
@@ -16,6 +17,7 @@ import org.aopalliance.intercept.MethodInvocation;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.SessionKey;
+import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
 
 import static com.twitter.aurora.scheduler.thrift.aop.Interceptors.properlyTypedResponse;
 
@@ -27,8 +29,10 @@ class LoggingInterceptor implements MethodInterceptor {
 
   private static final Logger LOG = Logger.getLogger(LoggingInterceptor.class.getName());
 
+  @Inject private CapabilityValidator validator;
+
   // TODO(wfarner): Scrub updateToken when it is identifiable by type.
-  private static final Map<Class<?>, Function<Object, String>> PRINT_FUNCTIONS =
+  private final Map<Class<?>, Function<Object, String>> printFunctions =
       ImmutableMap.<Class<?>, Function<Object, String>>of(
           JobConfiguration.class,
           new Function<Object, String>() {
@@ -44,7 +48,7 @@ class LoggingInterceptor implements MethodInterceptor {
           new Function<Object, String>() {
             @Override public String apply(Object input) {
               SessionKey key = (SessionKey) input;
-              return "SessionKey(user:" + key.getUser() + ")";
+              return validator.toString(key);
             }
           }
       );
@@ -56,7 +60,7 @@ class LoggingInterceptor implements MethodInterceptor {
       if (arg == null) {
         argStrings.add("null");
       } else {
-        Function<Object, String> printFunction = PRINT_FUNCTIONS.get(arg.getClass());
+        Function<Object, String> printFunction = printFunctions.get(arg.getClass());
         argStrings.add((printFunction == null) ? arg.toString() : printFunction.apply(arg));
       }
     }

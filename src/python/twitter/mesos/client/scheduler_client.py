@@ -27,6 +27,7 @@ class SchedulerClientTrait(Cluster.Trait):
   scheduler_uri  = String
   force_notunnel = Default(Integer, 0)
   proxy_url      = String
+  auth_mechanism = Default(String, 'UNAUTHENTICATED')
 
 
 class SchedulerClient(object):
@@ -199,7 +200,7 @@ class SchedulerProxy(object):
 
   def session_key(self):
     try:
-      return self._session_key_factory()
+      return self._session_key_factory(self.cluster.auth_mechanism)
     except SessionKeyError as e:
       raise self.AuthenticationError('Unable to create session key %s' % e)
 

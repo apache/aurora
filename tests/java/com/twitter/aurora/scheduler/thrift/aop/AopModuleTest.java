@@ -25,12 +25,17 @@ import static org.junit.Assert.assertSame;
 
 public class AopModuleTest extends EasyMockTest {
 
+  private static final SessionKey SESSION_KEY = new SessionKey();
+
   private CapabilityValidator capabilityValidator;
   private Iface mockThrift;
 
   @Before
-  public void setUp() {
+  public void setUp() throws Exception {
     capabilityValidator = createMock(CapabilityValidator.class);
+    expect(capabilityValidator.toString(SESSION_KEY))
+        .andReturn("user")
+        .anyTimes();
     mockThrift = createMock(Iface.class);
   }
 
@@ -80,13 +85,12 @@ public class AopModuleTest extends EasyMockTest {
 
   private void assertCreateAllowed(Map<String, Boolean> toggledMethods) throws Exception {
     JobConfiguration job = new JobConfiguration();
-    SessionKey session = new SessionKey();
     CreateJobResponse response = new CreateJobResponse();
-    expect(mockThrift.createJob(job, session)).andReturn(response);
+    expect(mockThrift.createJob(job, SESSION_KEY)).andReturn(response);
 
     control.replay();
 
     Iface thrift = getIface(toggledMethods);
-    assertSame(response, thrift.createJob(job, session));
+    assertSame(response, thrift.createJob(job, SESSION_KEY));
   }
 }

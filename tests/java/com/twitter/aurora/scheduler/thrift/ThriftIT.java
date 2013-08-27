@@ -1,6 +1,8 @@
 package com.twitter.aurora.scheduler.thrift;
 
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.AbstractModule;
@@ -30,6 +32,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 
+import static com.twitter.aurora.auth.SessionValidator.SessionContext;
 import static com.twitter.aurora.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.aurora.gen.ResponseCode.OK;
 
@@ -45,19 +48,30 @@ public class ThriftIT extends EasyMockTest {
 
   private AuroraAdmin.Iface thrift;
   private QuotaManager quotaManager;
+  private SessionContext context;
 
-  private static final SessionValidator VALIDATOR = new SessionValidator() {
-    @Override public void checkAuthenticated(SessionKey sessionKey, String targetRole)
-        throws AuthFailedException {
+  private final SessionValidator validator = new SessionValidator() {
+    @Override public SessionContext checkAuthenticated(
+        SessionKey sessionKey,
+        Set<String> targetRoles) throws AuthFailedException {
 
-      if (!targetRole.equals(sessionKey.getUser())) {
-        throw new AuthFailedException("Injected");
+      for (String role : targetRoles) {
+        if (!Arrays.equals(role.getBytes(), sessionKey.getData())) {
+          throw new AuthFailedException("Injected");
+        }
       }
+
+      return context;
+    }
+
+    @Override public String toString(SessionKey sessionKey) {
+      return "test";
     }
   };
 
   @Before
   public void setUp() {
+    context = createMock(SessionContext.class);
     createThrift(CAPABILITIES);
   }
 
@@ -83,21 +97,17 @@ public class ThriftIT extends EasyMockTest {
             bindMock(StorageBackup.class);
             bindMock(ThriftConfiguration.class);
             quotaManager = bindMock(QuotaManager.class);
-            bind(SessionValidator.class).toInstance(VALIDATOR);
+            bind(SessionValidator.class).toInstance(validator);
           }
         }
     );
     thrift = injector.getInstance(AuroraAdmin.Iface.class);
   }
 
-  private static SessionKey key(String user) {
-    return new SessionKey().setUser(user);
-  }
-
   private void setQuota(String user, boolean allowed) throws Exception {
     assertEquals(
         allowed ? OK : AUTH_FAILED,
-        thrift.setQuota(USER, QUOTA, key(user)).getResponseCode());
+        thrift.setQuota(USER, QUOTA, new SessionKey().setData(user.getBytes())).getResponseCode());
   }
 
   @Test
