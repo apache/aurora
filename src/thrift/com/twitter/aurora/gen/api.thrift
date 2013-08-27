@@ -1,6 +1,6 @@
 // Copyright 2010 Twitter, Inc.
 namespace java com.twitter.aurora.gen
-namespace py gen.twitter.mesos
+namespace py gen.twitter.aurora
 
 // Thrift interface definition for the aurora scheduler.
 

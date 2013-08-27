@@ -1,6 +1,6 @@
 // Copyright 2010 Twitter, Inc.
 namespace java com.twitter.aurora.gen.comm
-namespace py gen.twitter.mesos.comm
+namespace py gen.twitter.aurora.comm
 
 include "api.thrift"
 

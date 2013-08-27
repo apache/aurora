@@ -1,7 +1,7 @@
 // Copyright 2013 Twitter, Inc.
 
 namespace java com.twitter.aurora.gen.test
-namespace py gen.twitter.mesos.test
+namespace py gen.twitter.aurora.test
 
 // Test data for Thrift interface definition for the Twitter Mesos Scheduler.
 
