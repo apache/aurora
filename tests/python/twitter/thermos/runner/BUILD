@@ -18,6 +18,7 @@ python_test_suite(name = 'medium',
     pants(':test_failing_runner'),
     pants(':test_failure_limit'),
     pants(':test_finalization'),
+    pants(':test_helper'),
     pants(':test_runner_integration'),
  ]
 )
@@ -46,6 +47,11 @@ python_tests(name = 'test_angry',
   timeout = Amount(5, Time.MINUTES)
 )
 
+python_tests(name = 'test_ephemerals',
+  sources = ['test_ephemerals.py'],
+  dependencies = [pants(':runner_baselibs')]
+)
+
 python_tests(name = 'test_failing_runner',
   sources = ['test_failing_runner.py'],
   dependencies = [pants(':runner_baselibs')]
@@ -56,14 +62,18 @@ python_tests(name = 'test_finalization',
   dependencies = [pants(':runner_baselibs')]
 )
 
-python_tests(name = 'test_ephemerals',
-  sources = ['test_ephemerals.py'],
-  dependencies = [pants(':runner_baselibs')]
-)
-
 python_tests(name = 'test_failure_limit',
   sources = ['test_failure_limit.py'],
   dependencies = [pants(':runner_baselibs')]
+)
+
+python_tests(name = 'test_helper',
+  sources = ['test_helper.py'],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:psutil'),
+    pants('src/python/twitter/thermos/runner:helper'),
+  ]
 )
 
 python_tests(name = 'test_process',

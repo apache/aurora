@@ -77,19 +77,27 @@ class TaskRunnerHelper(object):
     return None
 
   @classmethod
-  def this_is_really_our_pid(cls, process_handle, current_user, start_time):
+  def this_is_really_our_pid(cls, process, current_user, start_time):
     """
       A heuristic to make sure that this is likely the pid that we own/forked.  Necessary
       because of pid-space wrapping.  We don't want to go and kill processes we don't own,
       especially if the killer is running as root.
+
+      process: psutil.Process representing the process to check
+      current_user: user expected to own the process
+      start_time: time at which it's expected the process has started
+
+      Raises:
+        psutil.NoSuchProcess - if the Process supplied no longer exists
     """
-    if process_handle.username != current_user:
+    if process.username != current_user:
       log.info("Expected pid %s to be ours but the pid user is %s and we're %s" % (
-        process_handle.pid, process_handle.username, current_user))
+        process.pid, process.username, current_user))
       return False
 
-    estimated_start_time = process_handle.create_time
-    if abs(start_time - estimated_start_time) >= cls.MAX_START_TIME_DRIFT.as_(Time.SECONDS):
+    if abs(start_time - process.create_time) >= cls.MAX_START_TIME_DRIFT.as_(Time.SECONDS):
+      log.info("Expected pid %s start time to be %s but it's %s" % (
+        process.pid, start_time, process.create_time))
       return False
 
     return True
@@ -97,7 +105,7 @@ class TaskRunnerHelper(object):
   @classmethod
   def scan_process(cls, state, process_name):
     """
-      Given a process_name, return the following:
+      Given a RunnerState and a process_name, return the following:
         (coordinator pid, process pid, process tree)
         (int or None, int or None, set)
 
@@ -110,31 +118,30 @@ class TaskRunnerHelper(object):
     if process_run.coordinator_pid:
       try:
         coordinator_process = psutil.Process(process_run.coordinator_pid)
-      except psutil.NoSuchProcess:
-        pass
-      else:
         if cls.this_is_really_our_pid(coordinator_process, process_owner, process_run.fork_time):
           coordinator_pid = process_run.coordinator_pid
-      finally:
-        if coordinator_pid is None:
-          log.info('  Coordinator %s [pid: %s] completed.' % (process_run.process,
-              process_run.coordinator_pid))
+      except psutil.NoSuchProcess:
+        log.info('  Coordinator %s [pid: %s] completed.' % (process_run.process,
+            process_run.coordinator_pid))
+      except psutil.Error as err:
+        log.warning('  Error gathering information on pid %s: %s' % (process_run.coordinator_pid,
+            err))
 
     if process_run.pid:
       try:
         process = psutil.Process(process_run.pid)
-      except psutil.NoSuchProcess:
-        pass
-      else:
         if cls.this_is_really_our_pid(process, process_owner, process_run.start_time):
           pid = process.pid
+      except psutil.NoSuchProcess:
+        log.info('  Process %s [pid: %s] completed.' % (process_run.process, process_run.pid))
+      except psutil.Error as err:
+        log.warning('  Error gathering information on pid %s: %s' % (process_run.pid, err))
+      else:
+        if pid:
           try:
             tree = set(proc.pid for proc in process.get_children(recursive=True))
           except psutil.Error:
             log.warning('  Error gathering information on children of pid %s' % pid)
-      finally:
-        if pid is None:
-          log.info('  Process %s [pid: %s] completed.' % (process_run.process, process_run.pid))
 
     return (coordinator_pid, pid, tree)
 
