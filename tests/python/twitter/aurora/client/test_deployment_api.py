@@ -31,7 +31,7 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
       [{u'timestamp': 1374779340660,
         u'state': u'PRESENT',
         u'user': u'johndoe'}],
-      METADATA)
+      METADATA, True)
   PACKER_DEPLOYMENT_CONFIG = {
       u'id': 1, u'md5sum': u'5be07da9642fb3ec5bc0df0c1290dada',
       u'uri': u'hftp://shortened', u'filename': u'job_description_eFA3CX',
@@ -105,11 +105,15 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
         env=self.JOB_KEY.env,
         name='nope'
     )
-    self.assertRaises(ValueError, self.deployment_api.create, job_key, self.config_file, self.MESSAGE)
+    self.assertRaises(
+        ValueError, self.deployment_api.create, job_key, self.config_file, self.MESSAGE)
 
   def test_log(self):
     self.mock_packer.list_versions(
         self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndReturn([self.PACKER_DEPLOYMENT_CONFIG])
+    self.mock_packer.get_version(
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, 'latest').AndReturn(
+            self.PACKER_DEPLOYMENT_CONFIG)
     self.mox.ReplayAll()
 
     assert self.deployment_api.log(self.JOB_KEY)[0].__dict__ == self.DEPLOYMENT_CONFIG.__dict__
@@ -133,13 +137,14 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
 
   def mock_packer_release(self):
     config_pkg = self.CONFIG_PACKAGE_NAME
-    latest_version = 1234
     self.mock_packer.get_version(
-        self.JOB_KEY.role, config_pkg, 'latest').AndReturn({'id': latest_version})
-    self.mock_fetch(config_pkg, str(latest_version), json.dumps(
+        self.JOB_KEY.role, config_pkg, 'latest').AndReturn(self.PACKER_DEPLOYMENT_CONFIG)
+    self.mock_packer.get_version(
+        self.JOB_KEY.role, config_pkg, 'latest').AndReturn(self.PACKER_DEPLOYMENT_CONFIG)
+    self.mock_fetch(config_pkg, 'latest', json.dumps(
         {'loadables': AuroraConfigLoader(self.config_file.name).loadables,
           'job': self.config.raw().json_dumps()}))
-    self.mock_packer.set_live(self.JOB_KEY.role, config_pkg, str(latest_version))
+    self.mock_packer.set_live(self.JOB_KEY.role, config_pkg, str(self.DEPLOYMENT_CONFIG.version_id))
 
   def test_release_new_job(self):
     self.mock_packer_release()
@@ -169,20 +174,27 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
     assert self.deployment_api.release(self.JOB_KEY, 15, self.PROXY_HOST) == update_response
 
   def test_reset(self):
+    PACKER_CONTENT = json.dumps(
+        {'job': self.config.raw().json_dumps(),
+         'loadables': self.CONFIG_CONTENT})
+
     def write_file(_, _2, _3, _4, f):
-      f.write(self.CONFIG_CONTENT)
+      f.write(PACKER_CONTENT)
 
     def is_config_file(filename):
       with open(filename, 'r') as f:
-        assert f.read() == self.CONFIG_CONTENT
+        assert f.read() == PACKER_CONTENT
       return True
 
-    reset_version = '15'
+    reset_version = str(self.DEPLOYMENT_CONFIG.version_id)
     self.mock_packer.get_version(
         self.JOB_KEY.role,
         self.CONFIG_PACKAGE_NAME,
-        reset_version).AndReturn(
-            self.PACKER_DEPLOYMENT_CONFIG)
+        'latest').AndReturn(self.PACKER_DEPLOYMENT_CONFIG)
+    self.mock_packer.get_version(
+        self.JOB_KEY.role,
+        self.CONFIG_PACKAGE_NAME,
+        reset_version).AndReturn(self.PACKER_DEPLOYMENT_CONFIG)
     self.mock_packer.fetch(
         self.JOB_KEY.role,
         self.CONFIG_PACKAGE_NAME,
@@ -201,7 +213,7 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
   def test_reset_no_deployment(self):
     reset_version = '15'
     self.mock_packer.get_version(
-        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, reset_version).AndRaise(
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, 'latest').AndRaise(
             Packer.Error('Requested package or version not found'))
     self.mock_packer.list_versions(
         self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndRaise(
@@ -218,10 +230,13 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
   def test_reset_version_does_not_exist(self):
     reset_version = '15'
     self.mock_packer.get_version(
-        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, reset_version).AndRaise(
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, 'latest').AndReturn(
+            self.PACKER_DEPLOYMENT_CONFIG)
+    self.mock_packer.get_version(
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, '15').AndRaise(
             Packer.Error('Requested package or version not found'))
     self.mock_packer.list_versions(
-        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME)
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndReturn([self.PACKER_DEPLOYMENT_CONFIG])
     self.mox.ReplayAll()
 
     self.assertRaises(

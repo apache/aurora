@@ -31,14 +31,12 @@ class TestDeploymentCLI(mox.MoxTestBase):
        {u'timestamp': DEPLOYMENT_CONFIG_RELEASE_TIMESTAMP,
         u'state': u'LIVE',
         u'user': u'jane'}],
-      json.dumps({"message": "testing\nmessages"}))
+      json.dumps({"message": "testing\nmessages"}), True)
   RAW_CONFIG = """config
 content
 """
   SCHEDULED_JOB = json.dumps({})
-  DEPLOYMENT_CONFIG_CONTENT = json.dumps(
-      {"loadables": {"myfile.mesos": RAW_CONFIG}, "job": SCHEDULED_JOB})
-
+  DEPLOYMENT_CONFIG_CONTENT = {"loadables": {"myfile.mesos": RAW_CONFIG}, "job": SCHEDULED_JOB}
 
   def setUp(self):
     super(TestDeploymentCLI, self).setUp()
@@ -129,13 +127,14 @@ content
   LONG_LOG = """Version: 1 (md5: 5be07da9642fb3ec5bc0df0c1290dada) (Currently released)
 Created by: johndoe
 Date created: %s
+Status: RELEASED
 Released by: jane
 Date released: %s
 
     testing
     messages
-""" % (str(datetime.fromtimestamp(DEPLOYMENT_CONFIG_CREATE_TIMESTAMP / 1000)),
-       str(datetime.fromtimestamp(DEPLOYMENT_CONFIG_RELEASE_TIMESTAMP / 1000)))
+""" % (datetime.fromtimestamp(DEPLOYMENT_CONFIG_CREATE_TIMESTAMP / 1000).isoformat(' '),
+       datetime.fromtimestamp(DEPLOYMENT_CONFIG_RELEASE_TIMESTAMP / 1000).isoformat(' '))
 
   def test_format_full(self):
     expected = self.LONG_LOG + """
@@ -146,12 +145,14 @@ Scheduled job:
 Raw file: myfile.mesos
 %s""" % (self.SCHEDULED_JOB, self.RAW_CONFIG)
 
-    assert DeploymentConfigFormat.full_str(self.DEPLOYMENT_CONFIG, self.DEPLOYMENT_CONFIG_CONTENT) == expected
+    assert DeploymentConfigFormat.full_str(
+        self.DEPLOYMENT_CONFIG, self.DEPLOYMENT_CONFIG_CONTENT) == expected
 
   def test_format_long(self):
     assert DeploymentConfigFormat.long_str(self.DEPLOYMENT_CONFIG) == self.LONG_LOG
 
   def test_format_one_line(self):
-    log = "1 - testing (%s) <johndoe> (RELEASED)" % str(
-        datetime.fromtimestamp(self.DEPLOYMENT_CONFIG_CREATE_TIMESTAMP / 1000))
+    log = "1 %s johndoe RELEASED testing" % datetime.fromtimestamp(
+        self.DEPLOYMENT_CONFIG_CREATE_TIMESTAMP / 1000).isoformat(' ')
+
     assert DeploymentConfigFormat.one_line_str(self.DEPLOYMENT_CONFIG) == log

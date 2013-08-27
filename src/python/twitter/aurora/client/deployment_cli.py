@@ -158,7 +158,7 @@ class AuroraDeploymentCLI(object):
     version_id = args.version_id
     proxy_host = app.get_options().tunnel_host
 
-    (config, content) = self._deployment_api.show(job_key, version_id, proxy_host)
+    config, content = self._deployment_api.show(job_key, version_id, proxy_host)
     print(DeploymentConfigFormat.full_str(config, content))
 
 class DeploymentConfigFormat(object):
@@ -169,14 +169,13 @@ class DeploymentConfigFormat(object):
     """Full representation of a deployment, with job content in JSON and raw pystachio template used
     to create the job"""
 
-    parsed = json.loads(content)
     desc = []
     desc.append(cls.long_str(config))
     desc.append('Scheduled job:')
     desc.append('--')
-    desc.append(json.dumps(json.loads(parsed.get('job')), indent=2))
+    desc.append(json.dumps(json.loads(content.get('job')), indent=2))
     desc.append('--')
-    files = parsed.get('loadables')
+    files = content.get('loadables')
     for fname, content in files.items():
       desc.append('Raw file: %s' % fname)
       desc.append(content)
@@ -191,34 +190,38 @@ class DeploymentConfigFormat(object):
     desc.append("Version: %s (md5: %s)%s" % (config.version_id, config.md5, released))
     desc.append("Created by: %s" % config.creation()['user'])
     desc.append("Date created: %s" % cls._timestamp_to_str(config.creation()['timestamp']))
+    desc.append("Status: %s" % cls._status(config))
     for release in config.releases():
       desc.append("Released by: %s" % release['user'])
       desc.append("Date released: %s" % cls._timestamp_to_str(release['timestamp']))
     desc.append("")
-    desc.append(cls._indent_lines(cls._message(config), 4))
+    desc.append(cls._indent_lines(config.message, 4))
     return '\n'.join(desc) + '\n'
 
   @classmethod
   def one_line_str(cls, config):
     """One line representation of a deployment"""
 
-    desc = []
-    desc.append("%s" % config.version_id)
-    desc.append("- %s" % cls._message(config).splitlines()[0])
-    desc.append("(%s)" % cls._timestamp_to_str(config.creation()['timestamp']))
-    desc.append("<%s>" % config.auditlog[0]['user'])
-    if config.released():
-      desc.append('(RELEASED)')
-    return ' '.join(desc)
-
-  @classmethod
-  def _message(cls, config):
-    return config.message if config.message else cls._EMPTY_MESSAGE
-
-  @classmethod
-  def _timestamp_to_str(cls, timestamp):
-    return str(datetime.fromtimestamp(timestamp / 1000))
+    return "{id} {date} {user} {status} {message}".format(
+        id=config.version_id,
+        date=cls._timestamp_to_str(config.creation()['timestamp']),
+        user=config.creation()['user'],
+        status=cls._status(config),
+        message=config.message.splitlines()[0] if config.message else config.message)
 
   @classmethod
   def _indent_lines(cls, s, n_spaces):
     return '\n'.join(n_spaces * ' ' + i for i in s.splitlines())
+
+  @classmethod
+  def _status(cls, config):
+    if config.released():
+      return 'RELEASED'
+    elif config.latest:
+      return 'PENDING'
+    else:
+      return 'ARCHIVED'
+
+  @classmethod
+  def _timestamp_to_str(cls, timestamp):
+    return datetime.fromtimestamp(timestamp / 1000).isoformat(' ')
