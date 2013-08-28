@@ -75,6 +75,7 @@
         <div class="row-fluid" style="margin-bottom: 20px;">
           <table id="jobs-table" class="table table-bordered table-striped table-condensed table-hover">
             <thead>
+              <th>Job Type
               <th>Environment
               <th>Job
               <th>Pending Tasks
@@ -86,11 +87,14 @@
               $jobs:{ job |
               <tr>
                 <td>
+                  <span class="jobType">$job.type$</span>
+                <td>
                   <a href="/scheduler/$role$/$job.environment$">$job.environment$</a>
-                  <span class="environment"></span>
                 <td>
                   <a href="/scheduler/$role$/$job.environment$/$job.name$">$job.name$</a>
-                  <span class="job-status pull-right label"></span>
+                  <span class="job-status pull-right badge"></span>
+                  <span class="production-badge pull-right badge"></span>
+                  <input type="hidden" class="production" value="$job.production$" />
                 <td>
                   <a href="/scheduler/$role$/$job.environment$/$job.name$?status=pending">$job.pendingTaskCount$</a>
                   <input type="hidden" class="pending-tasks" value="$job.pendingTaskCount$" />
@@ -152,18 +156,24 @@
     <script type="text/javascript">
       jQuery(function(){
         jQuery('#jobs-table').dataTable({
-          'bStateSave': true,
+          'iDisplayLength': 25,
+          'aLengthMenu': [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+          'bStateSave': false,
           'aoColumns': [
+            {'bSearchable': true},
             {'bSearchable': false},
             {'bSearchable': true},
             {'bSearchable': false, 'sType': 'num-html'},
             {'bSearchable': false, 'sType': 'num-html'},
             {'bSearchable': false, 'sType': 'num-html'},
             {'bSearchable': false, 'sType': 'num-html'}
-          ]
+          ],
+          'fnDrawCallback': drawBadges
         });
         jQuery('#cron-jobs-table').dataTable({
-          'bStateSave': true,
+          'iDisplayLength': 25,
+          'aLengthMenu': [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+          'bStateSave': false,
           'aoColumns': [
             {'bSearchable': false},
             {'bSearchable': true},
@@ -201,9 +211,15 @@
           buttonText.html('Show Production Resources');
         });
 
-        // Update job health
-        jQuery('#jobs-table>tbody').find('tr').each(function(){
-          var tr = jQuery(this);
+        function drawBadges() {
+          jQuery('#jobs-table>tbody').find('tr').each(function(){
+            var tr = jQuery(this);
+            displayHealthBadge(tr);
+            displayProductionBadge(tr);
+          });
+        }
+
+        function displayHealthBadge(tr) {
           var activeTasks = Number(tr.find('.active-tasks').val());
           var recentlyFailedTasks = Number(tr.find('.recently-failed-tasks').val());
           var pendingTasks = Number(tr.find('.pending-tasks').val());
@@ -223,7 +239,20 @@
           }
 
           jobStatus.tooltip();
-        });
+        }
+
+        function displayProductionBadge(tr) {
+          var productionBadgeElem = tr.find('.production-badge');
+          var production = tr.find('.production').val();
+          if (production == "true") {
+            productionBadgeElem.addClass('badge-important').html('P');
+            productionBadgeElem.attr('title', 'This is a production job. This job gets higher priority over a non-production job.');
+          } else {
+            productionBadgeElem.hide();
+          }
+
+          productionBadgeElem.tooltip();
+        }
       });
     </script>
   </body>

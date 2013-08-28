@@ -1,5 +1,6 @@
 package com.twitter.aurora.scheduler.http;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -18,12 +19,12 @@ import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
@@ -36,6 +37,7 @@ import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.cron.CronPredictor;
 import com.twitter.aurora.scheduler.quota.QuotaManager;
 import com.twitter.aurora.scheduler.state.CronJobManager;
@@ -96,8 +98,8 @@ public class SchedulerzRole extends JerseyTemplateServlet {
           return;
         }
 
-        List<Job> jobs = fetchJobsBy(role.get(), environment);
-        List<?> cronJobs = fetchCronJobsBy(role.get(), environment);
+        Map<JobKey, Map<?, ?>> cronJobs = fetchCronJobsBy(role.get(), environment);
+        List<Job> jobs = fetchJobsBy(role.get(), environment, cronJobs);
         if (jobs.isEmpty() && cronJobs.isEmpty()) {
           String msg = "No jobs found for role " + role.get()
               + (environment.isPresent() ? (" and environment " + environment.get()) : "");
@@ -108,7 +110,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         template.setAttribute("role", role.get());
         template.setAttribute("environment", environment.orNull());
         template.setAttribute("jobs", jobs);
-        template.setAttribute("cronJobs", cronJobs);
+        template.setAttribute("cronJobs", cronJobs.values());
         template.setAttribute("resourcesUsed", quotaManager.getConsumption(role.get()));
         template.setAttribute("resourceQuota", quotaManager.getQuota(role.get()));
       }
@@ -133,36 +135,39 @@ public class SchedulerzRole extends JerseyTemplateServlet {
     return processRequest(Optional.of(role), env);
   }
 
-  private List<?> fetchCronJobsBy(final String role, final Optional<String> environment) {
-    Iterable<JobConfiguration> cronJobs = Iterables.filter(
-        cronJobManager.getJobs(),
-        new Predicate<JobConfiguration>() {
-          @Override public boolean apply(JobConfiguration job) {
-            if (!environment.isPresent()) {
-              return job.getOwner().getRole().equals(role);
-            } else {
-              return job.getOwner().getRole().equals(role)
-                  && job.getKey().getEnvironment().equals(environment.get());
-            }
+  private Map<JobKey, Map<?, ?>> fetchCronJobsBy(
+      final String role,
+      final Optional<String> environment) {
+
+    Predicate<JobConfiguration> byRoleEnv = new Predicate<JobConfiguration>() {
+      @Override public boolean apply(JobConfiguration job) {
+        boolean roleMatch = job.getOwner().getRole().equals(role);
+        boolean envMatch =  environment.isPresent()
+            ? job.getKey().getEnvironment().equals(environment.get())
+            : true;
+        return roleMatch && envMatch;
+      }
+    };
+
+    Iterable<JobConfiguration> jobs = FluentIterable
+        .from(cronJobManager.getJobs())
+        .filter(byRoleEnv);
+
+    return Maps.transformValues(Maps.uniqueIndex(jobs, JobKeys.FROM_CONFIG),
+        new Function<JobConfiguration, Map<?, ?>>() {
+          @Override public Map<?, ?> apply(JobConfiguration job) {
+            return ImmutableMap.<Object, Object>builder()
+                .put("jobKey", job.getKey())
+                .put("name", job.getKey().getName())
+                .put("environment", job.getKey().getEnvironment())
+                .put("pendingTaskCount", job.getShardCount())
+                .put("cronSchedule", job.getCronSchedule())
+                .put("nextRun", cronPredictor.predictNextRun(job.cronSchedule).getTime())
+                .put("cronCollisionPolicy", cronCollisionPolicy(job))
+                .put("packages", getPackages(job))
+                .build();
           }
         });
-
-    return Lists.newArrayList(
-        Iterables.transform(
-            DisplayUtils.JOB_CONFIG_ORDERING.sortedCopy(cronJobs),
-            new Function<JobConfiguration, Map<?, ?>>() {
-              @Override public Map<?, ?> apply(JobConfiguration job) {
-                return ImmutableMap.<Object, Object>builder()
-                    .put("name", job.getKey().getName())
-                    .put("environment", job.getKey().getEnvironment())
-                    .put("pendingTaskCount", job.getShardCount())
-                    .put("cronSchedule", job.getCronSchedule())
-                    .put("nextRun", cronPredictor.predictNextRun(job.cronSchedule).getTime())
-                    .put("cronCollisionPolicy", cronCollisionPolicy(job))
-                    .put("packages", getPackages(job))
-                    .build();
-              }
-            }));
   }
 
   private static CronCollisionPolicy cronCollisionPolicy(JobConfiguration jobConfiguration) {
@@ -181,66 +186,90 @@ public class SchedulerzRole extends JerseyTemplateServlet {
     return Joiner.on(',').join(packages);
   }
 
-  private List<Job> fetchJobsBy(final String role, final Optional<String> environment) {
-    LoadingCache<JobKey, Job> jobs = CacheBuilder.newBuilder().build(
-        new CacheLoader<JobKey, Job>() {
-          @Override public Job load(JobKey key) {
+  private List<Job> fetchJobsBy(
+      final String role,
+      final Optional<String> environment,
+      final Map<JobKey, Map<?, ?>> cronJobs) {
+
+    final Function<Map.Entry<JobKey, Collection<ScheduledTask>>, Job> toJob =
+        new Function<Map.Entry<JobKey, Collection<ScheduledTask>>, Job>() {
+          @Override public Job apply(Map.Entry<JobKey, Collection<ScheduledTask>> tasksByJobKey) {
+            JobKey jobKey = tasksByJobKey.getKey();
+            Collection<ScheduledTask> tasks = tasksByJobKey.getValue();
+
             Job job = new Job();
-            job.environment = key.getEnvironment();
-            job.name = key.getName();
+            job.environment = jobKey.getEnvironment();
+            job.name = jobKey.getName();
+
+            TaskConfig config = Iterables.get(tasks, 0).getAssignedTask().getTask();
+            job.production = config.isProduction();
+
+            // TODO(Suman Karumuri): Add a source/job type to TaskConfig and replace logic below
+            if (config.isIsService()) {
+              job.type = JobType.SERVICE;
+            } else if (cronJobs.containsKey(jobKey)) {
+              job.type = JobType.CRON;
+            } else {
+              job.type = JobType.ADHOC;
+            }
+
+            for (ScheduledTask task : tasks) {
+              switch (task.getStatus()) {
+                case INIT:
+                case PENDING:
+                  job.pendingTaskCount++;
+                  break;
+
+                case ASSIGNED:
+                case STARTING:
+                case RESTARTING:
+                case UPDATING:
+                case RUNNING:
+                case KILLING:
+                case PREEMPTING:
+                case ROLLBACK:
+                  job.activeTaskCount++;
+                  break;
+
+                case KILLED:
+                case FINISHED:
+                  job.finishedTaskCount++;
+                  break;
+
+                case LOST:
+                case FAILED:
+                case UNKNOWN:
+                  job.failedTaskCount++;
+                  Date now = new Date();
+                  long elapsedMillis = now.getTime()
+                      - Iterables.getLast(task.getTaskEvents()).getTimestamp();
+
+                  if (Amount.of(elapsedMillis, Time.MILLISECONDS).as(Time.HOURS) < 6) {
+                    job.recentlyFailedTaskCount++;
+                  }
+                  break;
+
+                default:
+                  throw new IllegalArgumentException("Unsupported status: " + task.getStatus());
+              }
+            }
+
             return job;
           }
-        });
+        };
 
     Query.Builder query = environment.isPresent()
         ? Query.envScoped(role, environment.get())
         : Query.roleScoped(role);
 
-    for (ScheduledTask task : Storage.Util.weaklyConsistentFetchTasks(storage, query)) {
-      TaskConfig config = task.getAssignedTask().getTask();
-      Job job = jobs.getUnchecked(JobKeys.from(role, config.getEnvironment(), config.getJobName()));
+    Multimap<JobKey, ScheduledTask> tasks =
+        Tasks.byJobKey(Storage.Util.weaklyConsistentFetchTasks(storage, query));
 
-      switch (task.getStatus()) {
-        case INIT:
-        case PENDING:
-          job.pendingTaskCount++;
-          break;
+    Iterable<Job> jobs = FluentIterable
+        .from(tasks.asMap().entrySet())
+        .transform(toJob);
 
-        case ASSIGNED:
-        case STARTING:
-        case RESTARTING:
-        case UPDATING:
-        case RUNNING:
-        case KILLING:
-        case PREEMPTING:
-        case ROLLBACK:
-          job.activeTaskCount++;
-          break;
-
-        case KILLED:
-        case FINISHED:
-          job.finishedTaskCount++;
-          break;
-
-        case LOST:
-        case FAILED:
-        case UNKNOWN:
-          job.failedTaskCount++;
-          Date now = new Date();
-          long elapsedMillis = now.getTime()
-              - Iterables.getLast(task.getTaskEvents()).getTimestamp();
-
-          if (Amount.of(elapsedMillis, Time.MILLISECONDS).as(Time.HOURS) < 6) {
-            job.recentlyFailedTaskCount++;
-          }
-          break;
-
-        default:
-          throw new IllegalArgumentException("Unsupported status: " + task.getStatus());
-      }
-    }
-
-    return DisplayUtils.JOB_ORDERING.sortedCopy(jobs.asMap().values());
+    return DisplayUtils.JOB_ORDERING.sortedCopy(jobs);
   }
 
   /**
@@ -254,6 +283,8 @@ public class SchedulerzRole extends JerseyTemplateServlet {
     private int finishedTaskCount = 0;
     private int failedTaskCount = 0;
     private int recentlyFailedTaskCount = 0;
+    private boolean production = false;
+    private JobType type;
 
     public String getName() {
       return name;
@@ -281,6 +312,28 @@ public class SchedulerzRole extends JerseyTemplateServlet {
 
     public int getRecentlyFailedTaskCount() {
       return recentlyFailedTaskCount;
+    }
+
+    public boolean getProduction() {
+      return production;
+    }
+
+    public String getType() {
+      return type.toString();
+    }
+  }
+
+  static enum JobType {
+    ADHOC("adhoc"), CRON("cron"), SERVICE("service");
+
+    private String jobType;
+
+    private JobType(String jobType) {
+      this.jobType = jobType;
+    }
+
+    public String toString() {
+      return jobType;
     }
   }
 }

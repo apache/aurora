@@ -25,7 +25,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
@@ -321,9 +320,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     Query.Builder scope = ownerRole.isPresent()
         ? Query.roleScoped(ownerRole.get())
         : Query.unscoped();
-    Multimap<JobKey, ScheduledTask> tasks =  Multimaps.index(
-        Storage.Util.weaklyConsistentFetchTasks(storage, scope.active()),
-        Tasks.SCHEDULED_TO_JOB_KEY);
+    Multimap<JobKey, ScheduledTask> tasks =
+        Tasks.byJobKey(Storage.Util.weaklyConsistentFetchTasks(storage, scope.active()));
 
     jobs.putAll(Maps.transformEntries(tasks.asMap(),
         new Maps.EntryTransformer<JobKey, Collection<ScheduledTask>, JobConfiguration>() {

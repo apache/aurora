@@ -11,6 +11,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 
 import com.twitter.aurora.gen.AssignedTask;
@@ -118,6 +120,15 @@ public final class Tasks {
 
   private Tasks() {
     // Utility class.
+  }
+
+  /**
+   * A utility method that returns a multi-map of tasks keyed by JobKey.
+   * @param tasks A list of tasks to be keyed by map
+   * @return A multi-map of tasks keyed by job key.
+   */
+  public static Multimap<JobKey, ScheduledTask> byJobKey(Iterable<ScheduledTask> tasks) {
+    return Multimaps.index(tasks, Tasks.SCHEDULED_TO_JOB_KEY);
   }
 
   public static boolean isActive(ScheduleStatus status) {
