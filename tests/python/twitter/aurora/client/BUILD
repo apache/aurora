@@ -46,7 +46,7 @@ python_tests(name = 'packercli',
   sources = [ 'test_packer_cli.py' ],
   dependencies = [
     pants('3rdparty/python:mox'),
-    pants('src/python/twitter/aurora:mesos_client_lib'),
+    pants('src/python/twitter/aurora:aurora_client_lib'),
   ],
 )
 

@@ -2,7 +2,7 @@ import unittest
 
 from twitter.common import app
 
-import twitter.aurora.bin.mesos_client as mesos_client
+import twitter.aurora.bin.aurora_client as aurora_client
 from twitter.packer.packer_client import Packer
 
 import mox
@@ -28,7 +28,7 @@ class TestPackerCLI(unittest.TestCase):
     if this works for package_list, it should also work for all of the other
     commands that use trap_packer_error.
     """
-    self.mox.StubOutWithMock(mesos_client, '_get_packer')
+    self.mox.StubOutWithMock(aurora_client, '_get_packer')
     self.mox.StubOutWithMock(app, 'get_options')
     moxOptions = self.mox.CreateMockAnything()
     app.get_options().AndReturn(moxOptions)
@@ -37,7 +37,7 @@ class TestPackerCLI(unittest.TestCase):
 
     mockPacker = self.mox.CreateMock(Packer)
     mockPacker.list_packages('mchucarroll').AndRaise(SystemExit("Request failed."))
-    mesos_client._get_packer(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn(mockPacker)
+    aurora_client._get_packer(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn(mockPacker)
     self.mox.ReplayAll()
     with pytest.raises(SystemExit):
-      mesos_client.package_list(['mchucarroll'])
+      aurora_client.package_list(['mchucarroll'])
