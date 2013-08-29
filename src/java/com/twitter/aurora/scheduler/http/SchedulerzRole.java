@@ -19,6 +19,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -33,6 +34,7 @@ import org.antlr.stringtemplate.StringTemplate;
 import com.twitter.aurora.gen.CronCollisionPolicy;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
+import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
@@ -40,6 +42,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.cron.CronPredictor;
 import com.twitter.aurora.scheduler.quota.QuotaManager;
+import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.common.base.Closure;
@@ -111,10 +114,23 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         template.setAttribute("environment", environment.orNull());
         template.setAttribute("jobs", jobs);
         template.setAttribute("cronJobs", cronJobs.values());
-        template.setAttribute("resourcesUsed", quotaManager.getConsumption(role.get()));
+
+        // TODO(Suman Karumuri): In future compute consumption for role and environment.
+        template.setAttribute("prodResourcesUsed", quotaManager.getConsumption(role.get()));
+        template.setAttribute("nonProdResourcesUsed", getNonProdConsumption(role.get()));
         template.setAttribute("resourceQuota", quotaManager.getQuota(role.get()));
       }
     });
+  }
+
+  private Quota getNonProdConsumption(String role) {
+    FluentIterable<TaskConfig> tasks =
+        FluentIterable
+        .from(Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(role)))
+        .transform(Tasks.SCHEDULED_TO_INFO)
+        .filter(Predicates.not(Tasks.IS_PRODUCTION));
+
+    return Quotas.fromTasks(tasks);
   }
 
   /**

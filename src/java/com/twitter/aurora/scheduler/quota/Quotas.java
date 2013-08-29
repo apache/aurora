@@ -29,26 +29,38 @@ public final class Quotas {
    */
   public static Quota fromJob(JobConfiguration job) {
     checkNotNull(job);
-    Quota quota = fromTasks(ImmutableSet.of(job.getTaskConfig()));
+    Quota quota = fromProductionTasks(ImmutableSet.of(job.getTaskConfig()));
     quota.setNumCpus(quota.getNumCpus() * job.getShardCount());
     quota.setRamMb(quota.getRamMb() * job.getShardCount());
     quota.setDiskMb(quota.getDiskMb() * job.getShardCount());
     return quota;
   }
 
+  // TODO(Suman Karumuri): Refactor this function in to a new class.
+  // TODO(Suman Karumuri): Rename Quota to something more meaningful (ex: ResourceAggregate)
   /**
-   * Determines the amount of quota required for tasks.
+   * Determines the amount of quota required for production tasks among {@code tasks}.
+   *
+   * @param tasks Tasks to count quota from.
+   * @return Quota requirement to run {@code tasks}.
+   */
+  public static Quota fromProductionTasks(Iterable<TaskConfig> tasks) {
+    checkNotNull(tasks);
+
+    return fromTasks(Iterables.filter(tasks, Tasks.IS_PRODUCTION));
+  }
+
+  /**
+   * Determines the amount of quota required for the given tasks.
    *
    * @param tasks Tasks to count quota from.
    * @return Quota requirement to run {@code tasks}.
    */
   public static Quota fromTasks(Iterable<TaskConfig> tasks) {
-    checkNotNull(tasks);
-
     double cpu = 0;
     int ramMb = 0;
     int diskMb = 0;
-    for (TaskConfig task : Iterables.filter(tasks, Tasks.IS_PRODUCTION)) {
+    for (TaskConfig task : tasks) {
       cpu += task.getNumCpus();
       ramMb += task.getRamMb();
       diskMb += task.getDiskMb();

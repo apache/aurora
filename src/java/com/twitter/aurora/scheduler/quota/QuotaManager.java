@@ -5,6 +5,7 @@ import java.util.Collection;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
@@ -92,8 +93,12 @@ public interface QuotaManager {
 
     private static Quota getUpdateQuota(Collection<TaskUpdateConfiguration> configs,
         Function<TaskUpdateConfiguration, TaskConfig> taskExtractor) {
-      return Quotas.fromTasks(Iterables.filter(Iterables.transform(configs, taskExtractor),
-          Predicates.notNull()));
+      FluentIterable<TaskConfig> tasks =
+          FluentIterable
+          .from(configs)
+          .transform(taskExtractor)
+          .filter(Predicates.notNull());
+      return Quotas.fromProductionTasks(tasks);
     }
 
     @Override
@@ -105,7 +110,7 @@ public interface QuotaManager {
       return storage.consistentRead(
           new Work.Quiet<Quota>() {
             @Override public Quota apply(StoreProvider storeProvider) {
-              Quota quota = Quotas.fromTasks(Iterables.transform(
+              Quota quota = Quotas.fromProductionTasks(Iterables.transform(
                   storeProvider.getTaskStore().fetchTasks(query), Tasks.SCHEDULED_TO_INFO));
 
               for (JobUpdateConfiguration updateConfig

@@ -41,30 +41,34 @@
         $else$
           <div class="row-fluid" style="margin-bottom: 20px;">
             <button id="prod-resources-toggle-btn" class="btn">
-              <i class="icon-plus" style="margin-right: 3px;"></i><span class="btn-text">Show Production Resources</span>
+              <i class="icon-plus" style="margin-right: 3px;"></i><span class="btn-text">Show Resource Consumption</span>
             </button>
-            <div id="prod-resources" class="collapse" style="width: 400px; margin-top: 10px;">
+            <div id="prod-resources" class="collapse" style="width: 600px; margin-top: 10px;">
               <table class="table table-striped table-condensed table-hover">
                 <thead>
                   <th>Resource
-                  <th>Used
-                  <th>Quota
+                  <th><span class="label" title="Resources used by production jobs(counted against quota)">Production consumption</span>
+                  <th><span class="label" title="Quota allocated in production">Quota</span>
+                  <th><span class="label" title="Resources used by non-production jobs (not counted against your quota)">Non-Production consumption</span>
                 </thead>
                 <tbody>
                   <tr>
                     <td>CPU
-                    <td>$resourcesUsed.numCpus$ cores
+                    <td>$prodResourcesUsed.numCpus$ cores
                     <td>$resourceQuota.numCpus$ cores
+                    <td>$nonProdResourcesUsed.numCpus$ cores
                   </tr>
                   <tr>
                     <td>RAM
-                    <td><script>document.write(scaleMb($resourcesUsed.ramMb$));</script>
+                    <td><script>document.write(scaleMb($prodResourcesUsed.ramMb$));</script>
                     <td><script>document.write(scaleMb($resourceQuota.ramMb$));</script>
+                    <td><script>document.write(scaleMb($nonProdResourcesUsed.ramMb$));</script>
                   </tr>
                   <tr>
                     <td>Disk
-                    <td><script>document.write(scaleMb($resourcesUsed.diskMb$));</script>
+                    <td><script>document.write(scaleMb($prodResourcesUsed.diskMb$));</script>
                     <td><script>document.write(scaleMb($resourceQuota.diskMb$));</script>
+                    <td><script>document.write(scaleMb($nonProdResourcesUsed.diskMb$));</script>
                   </tr>
                 </tbody>
               </table>
@@ -199,7 +203,7 @@
           var buttonText = parent.find('.btn-text');
 
           icon.addClass('icon-minus').removeClass('icon-plus');
-          buttonText.html('Hide Production Resources');
+          buttonText.html('Hide Resource Consumption');
         });
 
         jQuery('#prod-resources').on('hide', function(){
@@ -208,7 +212,7 @@
           var buttonText = parent.find('.btn-text');
 
           icon.addClass('icon-plus').removeClass('icon-minus');
-          buttonText.html('Show Production Resources');
+          buttonText.html('Show Resource Consumption');
         });
 
         function drawBadges() {

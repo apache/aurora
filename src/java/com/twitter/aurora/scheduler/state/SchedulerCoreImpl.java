@@ -273,8 +273,8 @@ class SchedulerCoreImpl implements SchedulerCore {
         }
 
         if (!existingTasks.isEmpty()) {
-          Quota currentJobQuota =
-              Quotas.fromTasks(Iterables.transform(existingTasks, Tasks.SCHEDULED_TO_INFO));
+          Quota currentJobQuota = Quotas.fromProductionTasks(
+                  Iterables.transform(existingTasks, Tasks.SCHEDULED_TO_INFO));
           Quota newJobQuota = Quotas.fromJob(job);
           Quota additionalQuota = Quotas.subtract(newJobQuota, currentJobQuota);
           ensureHasAdditionalQuota(job.getOwner().getRole(), additionalQuota);
