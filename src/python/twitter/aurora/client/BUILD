@@ -61,6 +61,7 @@ python_library(
   name = 'base',
   sources = ['base.py'],
   dependencies = [
+    pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
