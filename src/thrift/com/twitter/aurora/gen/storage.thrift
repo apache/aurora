@@ -6,20 +6,6 @@ include "api.thrift"
 
 // Thrift object definitions for messages used for mesos storage.
 
-
-// The valid set of keys used in the DbStorage scheduler_state kv store
-enum ConfiguratonKey {
-
-  // The current scheduler framework stored as a thrift encoded string
-  FRAMEWORK_ID = 0,
-
-  // The history of storage migration results stored as an encoded StorageMigrationResults struct
-  MIGRATION_RESULTS = 1,
-
-  // The last locally committed log position stored as a thrift encoded byte array
-  LAST_COMMITTED_LOG_POSITION = 2
-}
-
 // Ops that are direct representations of the data needed to perform local storage mutations.
 struct SaveFrameworkId {
   1: string id
