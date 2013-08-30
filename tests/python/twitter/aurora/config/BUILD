@@ -2,6 +2,7 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':test_base'),
     pants(':test_constraint_parsing'),
+    pants(':test_stats'),
     pants(':test_jvm'),
     pants(':test_loader'),
     pants(':test_thrift'),
@@ -37,6 +38,13 @@ python_tests(name = 'test_constraint_parsing',
 
 python_tests(name = 'test_jvm',
   sources = ['test_jvm.py'],
+  dependencies = [
+    pants('src/python/twitter/aurora/config'),
+  ]
+)
+
+python_tests(name = 'test_stats',
+  sources = ['test_stats.py'],
   dependencies = [
     pants('src/python/twitter/aurora/config'),
   ]
