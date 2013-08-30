@@ -11,13 +11,10 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nonnegative;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
-import com.google.inject.Key;
 import com.google.inject.Module;
 import com.google.inject.Singleton;
 
@@ -49,17 +46,15 @@ import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.CanRead;
 import com.twitter.common.args.constraints.Exists;
 import com.twitter.common.args.constraints.IsDirectory;
+import com.twitter.common.args.constraints.NotEmpty;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.inject.Bindings;
-import com.twitter.common.inject.Bindings.KeyFactory;
 import com.twitter.common.logging.RootLogConfig;
 import com.twitter.common.zookeeper.Group;
-import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService;
-import com.twitter.common.zookeeper.ZooKeeperUtils;
-import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
-import com.twitter.common_internal.zookeeper.TwitterServerSetModule;
-import com.twitter.common_internal.zookeeper.ZooKeeperModule;
+import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule;
+import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
+import com.twitter.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
 
 /**
  * Launcher for the aurora scheduler.
@@ -75,6 +70,11 @@ public class SchedulerMain extends AbstractApplication {
   @NotNull
   @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
   private static final Arg<String> CLUSTER_NAME = Arg.create();
+
+  @NotNull
+  @NotEmpty
+  @CmdLine(name = "serverset_path", help = "ZooKeeper ServerSet path to register at.")
+  private static final Arg<String> SERVERSET_PATH = Arg.create();
 
   @CanRead
   @NotNull
@@ -114,32 +114,17 @@ public class SchedulerMain extends AbstractApplication {
     );
   }
 
-  @VisibleForTesting
-  static Service createService(String clusterName) {
-    return new Service("mesos", clusterName, "scheduler");
-  }
-
   static Iterable<? extends Module> getModules(
-      final String clusterName,
-      final Optional<InetSocketAddress> zkHost,
-      File backupDir,
-      Module... additionalModules) {
-
-    final Service schedulerService = createService(clusterName);
-    Module serviceBinder = new AbstractModule() {
-      @Override protected void configure() {
-        bind(Service.class).toInstance(schedulerService);
-      }
-    };
+      String clusterName,
+      String serverSetPath,
+      File backupDir) {
 
     ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
         .addAll(getSystemModules())
-        .add(new AppModule(clusterName))
+        .add(new AppModule(clusterName, serverSetPath))
         .add(new Cron4jModule())
         .add(new ThriftModule())
-        .add(new ThriftAuthModule())
-        .add(serviceBinder)
-        .add(additionalModules);
+        .add(new ThriftAuthModule());
 
     Class<? extends AbstractModule> authModule = AUTH_MODULE.get();
     try {
@@ -153,23 +138,7 @@ public class SchedulerMain extends AbstractApplication {
       throw new IllegalArgumentException(e);
     }
 
-    if (zkHost.isPresent()) {
-      modules.add(ZooKeeperModule.builder(ImmutableSet.of(zkHost.get()))
-          .withDigestCredentials(schedulerService.getRole(), schedulerService.getRole())
-          .withAcl(ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL)
-          .build());
-    } else {
-      modules.add(TwitterServerSetModule
-          .authenticatedZooKeeperModule(schedulerService)
-          .withFlagOverrides()
-          .build());
-    }
-    modules.add(new TwitterServerSetModule(
-        Key.get(ServerSet.class),
-        KeyFactory.PLAIN,
-        schedulerService));
     modules.add(new BackupModule(backupDir, SnapshotStoreImpl.class));
-    // TODO(William Farner): Make all mem store implementation classes package private.
     modules.add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)));
     modules.add(new LogStorageModule());
     return modules.build();
@@ -178,6 +147,7 @@ public class SchedulerMain extends AbstractApplication {
   @Override
   public Iterable<? extends Module> getModules() {
     Module additional;
+    final ClientConfig zkClientConfig = FlaggedClientConfig.create();
     if (ISOLATED_SCHEDULER.get()) {
       additional = new IsolatedSchedulerModule();
     } else {
@@ -187,7 +157,7 @@ public class SchedulerMain extends AbstractApplication {
           bind(DriverFactory.class).to(DriverFactoryImpl.class);
           bind(DriverFactoryImpl.class).in(Singleton.class);
           bind(Boolean.class).annotatedWith(ShutdownOnDriverExit.class).toInstance(true);
-          install(new MesosLogStreamModule());
+          install(new MesosLogStreamModule(zkClientConfig));
         }
       };
     }
@@ -208,12 +178,12 @@ public class SchedulerMain extends AbstractApplication {
       }
     };
 
-    return getModules(
-        CLUSTER_NAME.get(),
-        Optional.<InetSocketAddress>absent(),
-        BACKUP_DIR.get(),
-        configModule,
-        additional);
+    return ImmutableList.<Module>builder()
+        .addAll(getModules(CLUSTER_NAME.get(), SERVERSET_PATH.get(), BACKUP_DIR.get()))
+        .add(new ZooKeeperClientModule(zkClientConfig))
+        .add(configModule)
+        .add(additional)
+        .build();
   }
 
   @Override

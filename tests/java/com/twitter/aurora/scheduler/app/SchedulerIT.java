@@ -79,9 +79,11 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import com.twitter.common.zookeeper.ServerSet;
+import com.twitter.common.zookeeper.ServerSetImpl;
 import com.twitter.common.zookeeper.ZooKeeperClient;
+import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule;
+import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import com.twitter.common.zookeeper.testing.BaseZooKeeperTest;
-import com.twitter.common_internal.zookeeper.TwitterServerSet;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
@@ -97,6 +99,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   private static final Logger LOG = Logger.getLogger(SchedulerIT.class.getName());
 
   private static final String CLUSTER_NAME = "integration_test_cluster";
+  private static final String SERVERSET_PATH = "/fake/service/path";
   private static final String FRAMEWORK_ID = "integration_test_framework_id";
 
   private ExecutorService executor = Executors.newCachedThreadPool(
@@ -167,14 +170,18 @@ public class SchedulerIT extends BaseZooKeeperTest {
       }
     };
 
+    ClientConfig zkClientConfig = ClientConfig
+        .create(ImmutableList.of(InetSocketAddress.createUnresolved("localhost", getPort())))
+        .withCredentials(ZooKeeperClient.digestCredentials("mesos", "mesos"));
     injector = Guice.createInjector(
-        SchedulerMain.getModules(
-            CLUSTER_NAME,
-            Optional.of(InetSocketAddress.createUnresolved("localhost", getPort())),
-            backupDir,
-            testModule,
-            new LifecycleModule(),
-            new AppLauncherModule()));
+        ImmutableList.<Module>builder()
+            .addAll(SchedulerMain.getModules(CLUSTER_NAME, SERVERSET_PATH, backupDir))
+            .add(new LifecycleModule())
+            .add(new AppLauncherModule())
+            .add(new ZooKeeperClientModule(zkClientConfig))
+            .add(testModule)
+            .build()
+    );
     lifecycle = injector.getInstance(Lifecycle.class);
   }
 
@@ -209,10 +216,9 @@ public class SchedulerIT extends BaseZooKeeperTest {
     return executor.submit(new Callable<HostAndPort>() {
       @Override public HostAndPort call() throws Exception {
         final AtomicReference<HostAndPort> thriftEndpoint = Atomics.newReference();
-        ServerSet schedulerService =
-            TwitterServerSet.create(zkClient, SchedulerMain.createService(CLUSTER_NAME));
+        ServerSet schedulerService = new ServerSetImpl(zkClient, SERVERSET_PATH);
         final CountDownLatch schedulerReady = new CountDownLatch(1);
-        schedulerService.monitor(new HostChangeMonitor<ServiceInstance>() {
+        schedulerService.watch(new HostChangeMonitor<ServiceInstance>() {
           @Override public void onChange(ImmutableSet<ServiceInstance> hostSet) {
             if (!hostSet.isEmpty()) {
               Endpoint endpoint = Iterables.getOnlyElement(hostSet).getServiceEndpoint();

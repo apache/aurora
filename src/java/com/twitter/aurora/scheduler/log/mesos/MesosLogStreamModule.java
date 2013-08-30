@@ -1,10 +1,9 @@
 package com.twitter.aurora.scheduler.log.mesos;
 
 import java.io.File;
-import java.net.InetSocketAddress;
-import java.util.List;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
@@ -21,18 +20,10 @@ import com.twitter.common.args.CmdLine;
 import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
-import com.twitter.common_internal.zookeeper.ZooKeeper;
+import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 
 /**
  * Binds a native mesos Log implementation.
- *
- * <p>Requires the following bindings:
- * <ul>
- *   <li>{@link Credentials} - zk authentication credentials</li>
- *   <li>{@literal @ZooKeeper} List&lt;InetSocketAddress&gt; - zk cluster addresses</li>
- *   <li>{@literal @ZooKeeper} Amount&lt;Integer, Time&gt; - zk session timeout to use</li>
- * </ul>
  *
  * <p>Exports the following bindings:
  * <ul>
@@ -84,6 +75,12 @@ public class MesosLogStreamModule extends PrivateModule {
   private static final Arg<Amount<Long, Time>> WRITE_TIMEOUT =
       Arg.create(Amount.of(3L, Time.SECONDS));
 
+  private final ClientConfig zkClientConfig;
+
+  public MesosLogStreamModule(ClientConfig zkClientConfig) {
+    this.zkClientConfig = Preconditions.checkNotNull(zkClientConfig);
+  }
+
   @Override
   protected void configure() {
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.ReadTimeout.class)
@@ -98,30 +95,26 @@ public class MesosLogStreamModule extends PrivateModule {
 
   @Provides
   @Singleton
-  Log provideLog(
-      @ZooKeeper List<InetSocketAddress> endpoints,
-      Credentials credentials,
-      @ZooKeeper Amount<Integer, Time> sessionTimeout) {
-
+  Log provideLog() {
     File logPath = LOG_PATH.get();
     File parentDir = logPath.getParentFile();
     if (!parentDir.exists() && !parentDir.mkdirs()) {
       addError("Failed to create parent directory to store native log at: %s", parentDir);
     }
 
-    String zkConnectString =
-        Joiner.on(',').join(Iterables.transform(endpoints, InetSocketAddressHelper.INET_TO_STR));
+    String zkConnectString = Joiner.on(',').join(
+        Iterables.transform(zkClientConfig.servers, InetSocketAddressHelper.INET_TO_STR));
 
     PathUtils.validatePath(ZK_LOG_GROUP_PATH.get());
     return new Log(
         QUORUM_SIZE.get(),
         logPath.getAbsolutePath(),
         zkConnectString,
-        sessionTimeout.getValue(),
-        sessionTimeout.getUnit().getTimeUnit(),
+        zkClientConfig.sessionTimeout.getValue(),
+        zkClientConfig.sessionTimeout.getUnit().getTimeUnit(),
         ZK_LOG_GROUP_PATH.get(),
-        credentials.scheme(),
-        credentials.authToken());
+        zkClientConfig.credentials.scheme(),
+        zkClientConfig.credentials.authToken());
   }
 
   @Provides

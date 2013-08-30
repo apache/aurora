@@ -36,12 +36,11 @@ import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
-import com.twitter.common.zookeeper.Candidate;
 import com.twitter.common.zookeeper.ServerSet;
+import com.twitter.common.zookeeper.ServerSetImpl;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
-import com.twitter.common_internal.zookeeper.TwitterServerSet;
-import com.twitter.common_internal.zookeeper.TwitterServerSet.Service;
+import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.thrift.ServiceInstance;
 
 /**
@@ -51,9 +50,11 @@ class AppModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(AppModule.class.getName());
 
   private final String clusterName;
+  private final String serverSetPath;
 
-  AppModule(String clusterName) {
+  AppModule(String clusterName, String serverSetPath) {
     this.clusterName = clusterName;
+    this.serverSetPath = serverSetPath;
   }
 
   @Override
@@ -123,26 +124,26 @@ class AppModule extends AbstractModule {
     }
   }
 
+  private static final List<ACL> ZOOKEEPER_ACL = ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL;
+
   @Provides
   @Singleton
-  SingletonService provideSingletonService(
-      Service schedulerService,
-      ServerSet serverSet,
-      ZooKeeperClient client,
-      List<ACL> acl) {
-
-    String path = TwitterServerSet.getPath(schedulerService);
-    Candidate candidate = SingletonService.createSingletonCandidate(client, path, acl);
-    return new SingletonService(serverSet, candidate);
+  ServerSet provideServerSet(ZooKeeperClient client) {
+    return new ServerSetImpl(client, ZOOKEEPER_ACL, serverSetPath);
   }
 
   @Provides
   @Singleton
-  DynamicHostSet<ServiceInstance> provideSchedulerHostSet(
-      Service schedulerService,
-      ZooKeeperClient zkClient) {
+  DynamicHostSet<ServiceInstance> provideSchedulerHostSet(ServerSet serverSet) {
+    // Used for a type re-binding of the serverset.
+    return serverSet;
+  }
 
-    // For the leader-redirect servlet.
-    return TwitterServerSet.create(zkClient, schedulerService);
+  @Provides
+  @Singleton
+  SingletonService provideSingletonService(ZooKeeperClient client, ServerSet serverSet) {
+    return new SingletonService(
+        serverSet,
+        SingletonService.createSingletonCandidate(client, serverSetPath, ZOOKEEPER_ACL));
   }
 }
