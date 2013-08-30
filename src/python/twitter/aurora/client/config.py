@@ -11,20 +11,20 @@ import sys
 
 from twitter.common import app, log
 
+from twitter.aurora.client import binding_helpers
 from twitter.aurora.client.base import deprecation_warning, die
-from twitter.aurora.client.binding_helpers import apply_binding_helpers
 from twitter.aurora.client.build import BuildArtifactResolver
 from twitter.aurora.client.jenkins import JenkinsArtifactResolver
 from twitter.aurora.config import AuroraConfig
-from twitter.aurora.config.schema import PackerObject
 from twitter.aurora.config.recipes import Recipes
-from twitter.packer.packer_client import Packer
-from twitter.packer import sd_packer_client
 from twitter.thermos.config.schema_helpers import Tasks
 
 from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
 
 from pystachio import Empty, Ref
+
+
+binding_helpers.register_all()
 
 
 APPAPP_DEPRECATION_WARNING = """
@@ -157,148 +157,6 @@ def _validate_health_check_config(config):
     die(HEALTH_CHECK_INTERVAL_SECS_ERROR)
 
 
-def _generate_packer_struct(metadata, local):
-  uri = metadata['uri']
-  filename = metadata.get('filename', None) or posixpath.basename(uri)
-  packer = PackerObject(
-    tunnel_host=app.get_options().tunnel_host,
-    package=filename,
-    package_uri=uri)
-  packer = packer(copy_command=packer.local_copy_command() if local
-                  else packer.remote_copy_command())
-  return packer
-
-
-def _validate_package(metadata):
-  latest_audit = sorted(metadata['auditLog'], key=lambda a: a['timestamp'])[-1]
-  if latest_audit['state'] == 'DELETED':
-    die('The requested package version has been deleted.')
-  return metadata
-
-
-def _get_package_data(cluster, package):
-  role, name, version = package
-  log.info('Fetching metadata for package %s/%s version %s in %s.' % (
-    role, name, version, cluster))
-  try:
-    # TODO(wickman) MESOS-3006
-    packer = sd_packer_client.create_packer(cluster)
-    return packer.get_version(role, name, version)
-  except Packer.Error as e:
-    die('Failed to fetch package metadata: %s' % e)
-
-
-def _inject_packer_bindings(config, env=None, force_local=False):
-  local = config.cluster() == 'local' or force_local
-
-  def extract_ref(ref):
-    # Ref format: packer[role][pkg][version]
-    # version can be a number, or one of strings 'latest', 'live'
-    components = ref.components()
-    if len(components) < 4:
-      return None
-    if components[0] != Ref.Dereference('packer'):
-      return None
-    if not all(isinstance(action, Ref.Index) for action in components[1:4]):
-      return None
-    role, package_name, version = (action.value for action in components[1:4])
-    return (role, package_name, version)
-
-  _, refs = config.raw().interpolate()
-  packages = filter(None, map(extract_ref, set(refs)))
-  for package in set(packages):
-    ref = Ref.from_address('packer[%s][%s][%s]' % package)
-    package_data = _get_package_data(config.cluster(), package)
-    config.bind({ref: _generate_packer_struct(_validate_package(package_data), local)})
-    config.add_package((package[0], package[1], package_data['id']))
-
-
-def _inject_jenkins_bindings(config, env=None, force_local=False):
-  local = config.cluster() == 'local' or force_local
-
-  cached_packages = {}  # memoize for cases when same ref occurs multiple times
-
-  def get_package_via_jenkins(cluster, role, package):
-    cache_key = (cluster, role, package)
-    if cache_key in cached_packages:
-      return cached_packages[cache_key]
-    packer = sd_packer_client.create_packer(cluster)
-    cached_packages[cache_key] = JenkinsArtifactResolver(packer, role).resolve(*package)
-    return cached_packages[cache_key]
-
-  def extract_ref(ref):
-    # Ref format: jenkins[jenkins_project][jenkins_build_number]
-    # jenkins_build_number can be a numeric string, or the string 'latest'
-    components = ref.components()
-    if len(components) < 3:
-      return None
-    if components[0] != Ref.Dereference('jenkins'):
-      return None
-    if not all(isinstance(action, Ref.Index) for action in components[1:3]):
-      return None
-    jenkins_project, jenkins_build_number = (action.value for action in components[1:3])
-    return (jenkins_project, jenkins_build_number)
-
-  _, refs = config.raw().interpolate()
-  jenkins_packages = filter(None, map(extract_ref, set(refs)))
-  for package in set(jenkins_packages):
-    jenkins_project, jenkins_build_number = package
-    ref = Ref.from_address('jenkins[%s][%s]' % (jenkins_project, jenkins_build_number))
-    package_name, package_data = get_package_via_jenkins(config.cluster(), config.role(), package)
-    config.bind({ref: _generate_packer_struct(_validate_package(package_data), local)})
-    config.add_package((config.role(), package_name, package_data['id']))
-
-
-def _inject_prebuilt_package_bindings(config, env=None, force_local=False):
-  local = config.cluster() == 'local' or force_local
-
-  cached_packages = {}  # memoize for cases when same ref occurs multiple times
-
-  def extract_ref(ref):
-    # Ref format: build[build_profile] where build profile is registered to the job
-    # Example: build[projectA]
-    #   where build = { 'projectA': BuildInfo(...) } is available in the thermos file env
-    components = ref.components()
-    if len(components) < 2:
-      return None
-    if components[0] != Ref.Dereference('build'):
-      return None
-    if not isinstance(components[1], Ref.Index):
-      return None
-    build_spec_name = components[1].value
-    return build_spec_name
-
-  def get_prebuilt_package_data(cluster, role, build_spec_name, build_spec, packer=None):
-    cache_key = (cluster, role, build_spec_name)
-    if cache_key in cached_packages:
-      return cached_packages[cache_key]
-    packer = sd_packer_client.create_packer(cluster)
-    build_artifact_resolver = BuildArtifactResolver(packer, role)
-    cached_packages[cache_key] = build_artifact_resolver.resolve(build_spec_name, build_spec)
-    return cached_packages[cache_key]
-
-  _, refs = config.raw().interpolate()
-  build_spec_names = filter(None, map(extract_ref, set(refs)))
-
-  env = env or {}
-  build_specs = env.get('build', {})
-
-  for build_spec_name in set(build_spec_names):
-    ref = Ref.from_address('build[%s]' % build_spec_name)
-    try:
-      build_spec = dict(build_specs[build_spec_name].get())
-    except KeyError:
-      raise KeyError("build spec '%s' not supplied in the environment" % build_spec_name)
-    package_name, package_data = get_prebuilt_package_data(
-        config.cluster(),
-        config.role(),
-        build_spec_name,
-        build_spec
-    )
-    config.bind({ref: _generate_packer_struct(_validate_package(package_data), local)})
-    config.add_package((config.role(), package_name, package_data['id']))
-
-
 DEFAULT_ENVIRONMENT_WARNING = '''
 Job did not specify environment, auto-populating to "%s".
 '''
@@ -318,10 +176,7 @@ def validate_config(config, env=None):
 
 
 def populate_namespaces(config, env=None, force_local=False):
-  """Populate additional bindings in the config, e.g. packer bindings."""
-
   _inject_default_environment(config)
-  _inject_prebuilt_package_bindings(config, env, force_local)
   _warn_on_deprecated_cron_policy(config)
   _warn_on_deprecated_daemon_job(config)
   _warn_on_deprecated_health_check_interval_secs(config)
@@ -342,7 +197,7 @@ def AnnotatedAuroraConfig(force_local):
     @classmethod
     def plugins(cls):
       return (inject_recipes,
-              functools.partial(apply_binding_helpers, force_local=force_local),
+              functools.partial(binding_helpers.apply_all, force_local=force_local),
               functools.partial(populate_namespaces, force_local=force_local),
               validate_config)
   return _AnnotatedAuroraConfig

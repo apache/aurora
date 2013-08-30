@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+from collections import defaultdict
+
 from twitter.aurora.common import AuroraJobKey
 from twitter.thermos.config.loader import PortExtractor, ThermosTaskWrapper
 from twitter.thermos.config.schema import ThermosContext
@@ -138,7 +140,7 @@ class AuroraConfig(object):
     self.validate_job(job)
     self._job = self.standard_bindings(job)
     self._packages = []
-    self.binding_dicts = {}
+    self.binding_dicts = defaultdict(dict)
 
   def context(self, instance=None):
     from .schema import MesosContext
