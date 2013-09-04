@@ -151,9 +151,9 @@ python_library(
     pants('src/python/twitter/aurora/common:cluster'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/net:ssh'),
-    pants('src/python/twitter/common/zookeeper/serverset'),
-    pants('src/python/twitter/common_internal/location'),
-    pants('src/python/twitter/common_internal/zookeeper:tunneler'),
+    pants('src/python/twitter/common/rpc/transports:tsslsocket'),
+    pants('src/python/twitter/common/zookeeper/serverset:kazoo_serverset'),
+    pants('src/python/twitter/common/zookeeper:kazoo_client'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

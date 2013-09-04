@@ -4,11 +4,10 @@ import threading
 import time
 
 from twitter.common import log
-from twitter.common.net.tunnel import TunnelHelper
 from twitter.common.quantity import Amount, Time
+from twitter.common.rpc.transports.tsslsocket import DelayedHandshakeTSSLSocket
+from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset import ServerSet
-from twitter.common_internal.location import Location
-from twitter.common_internal.zookeeper.tunneler import TunneledZookeeper
 
 from twitter.aurora.common.auth import make_session_key, SessionKeyError
 from twitter.aurora.common.cluster import Cluster
@@ -16,7 +15,7 @@ from twitter.aurora.common.cluster import Cluster
 from gen.twitter.aurora import AuroraAdmin
 
 from thrift.protocol import TBinaryProtocol
-from thrift.transport import TSocket, TSSLSocket, TTransport
+from thrift.transport import TSocket, TTransport
 
 from pystachio import Default, Integer, String
 
@@ -43,7 +42,6 @@ class SchedulerClient(object):
     if not isinstance(cluster, Cluster):
       raise TypeError('"cluster" must be an instance of Cluster, got %s' % type(cluster))
     cluster = cluster.with_trait(SchedulerClientTrait)
-    log.debug('Client location: %s' % ('prod' if Location.is_prod() else 'corp'))
     if cluster.zk:
       return ZookeeperSchedulerClient(cluster, port=cluster.zk_port, ssl=True, **kwargs)
     elif cluster.scheduler_uri.startswith('localhost:'):
@@ -71,7 +69,7 @@ class SchedulerClient(object):
   @staticmethod
   def _connect_scheduler(host, port, with_ssl=False):
     if with_ssl:
-      socket = TSSLSocket.TSSLSocket(host, port, validate=False)
+      socket = DelayedHandshakeTSSLSocket(host, port, delay_handshake=True, validate=False)
     else:
       socket = TSocket.TSocket(host, port)
     transport = TTransport.TBufferedTransport(socket)
@@ -94,7 +92,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
   def get_scheduler_serverset(cls, cluster, port=2181, verbose=False, **kw):
     if cluster.zk is None:
       raise ValueError('Cluster has no associated zookeeper ensemble!')
-    zk = TunneledZookeeper.get(cluster.zk, port=port, verbose=verbose)
+    zk = TwitterKazooClient.make(str('%s:%s' % (cluster.zk, port)), verbose=verbose)
     return zk, ServerSet(zk, cluster.scheduler_zk_path, **kw)
 
   def __init__(self, cluster, port=2181, ssl=False, verbose=False):
@@ -107,26 +105,17 @@ class ZookeeperSchedulerClient(SchedulerClient):
     joined = threading.Event()
     def on_join(elements):
       joined.set()
-    zk, serverset = self.get_scheduler_serverset(self._cluster,
-        port=self._zkport, verbose=self._verbose, on_join=on_join)
+    zk, serverset = self.get_scheduler_serverset(self._cluster, verbose=self._verbose,
+        port=self._zkport, on_join=on_join)
     joined.wait(timeout=self.SERVERSET_TIMEOUT.as_(Time.SECONDS))
     serverset_endpoints = list(serverset)
     if len(serverset_endpoints) == 0:
-      zk.close()
       raise self.CouldNotConnect('No schedulers detected in %s!' % self._cluster.name)
     instance = serverset_endpoints[0]
     self._endpoint = instance.service_endpoint
     self._http = instance.additional_endpoints.get('http')
-    host, port = self._maybe_tunnel(self._cluster, self._endpoint.host, self._endpoint.port)
-    return self._connect_scheduler(host, port, self._ssl)
-
-  @classmethod
-  def _maybe_tunnel(cls, cluster, host, port):
-    # Open a tunnel to the scheduler if necessary
-    if Location.is_corp() and not cluster.force_notunnel:
-      log.info('Creating ssh tunnel for %s' % cluster.name)
-      return TunnelHelper.create_tunnel(host, port)
-    return host, port
+    zk.stop()
+    return self._connect_scheduler(self._endpoint.host, self._endpoint.port, self._ssl)
 
   @property
   def url(self):
