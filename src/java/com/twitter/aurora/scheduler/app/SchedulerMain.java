@@ -5,8 +5,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.util.Arrays;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nonnegative;
@@ -16,8 +14,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.Module;
+import com.google.inject.PrivateModule;
 import com.google.inject.Singleton;
 
+import com.twitter.aurora.auth.SessionValidator;
 import com.twitter.aurora.auth.UnsecureAuthModule;
 import com.twitter.aurora.internal.cron.Cron4jModule;
 import com.twitter.aurora.scheduler.DriverFactory;
@@ -25,6 +25,8 @@ import com.twitter.aurora.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
 import com.twitter.aurora.scheduler.SchedulerLifecycle;
 import com.twitter.aurora.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
+import com.twitter.aurora.scheduler.cron.CronPredictor;
+import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.local.IsolatedSchedulerModule;
 import com.twitter.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.aurora.scheduler.storage.backup.BackupModule;
@@ -98,8 +100,22 @@ public class SchedulerMain extends AbstractApplication {
 
   @CmdLine(name = "auth_module",
       help = "A Guice module to provide auth bindings. NOTE: The default is unsecure.")
-  public static final  Arg<? extends Class<? extends AbstractModule>> AUTH_MODULE =
+  private static final Arg<? extends Class<? extends Module>> AUTH_MODULE =
       Arg.create(UnsecureAuthModule.class);
+
+  private static final Iterable<Class<?>> AUTH_MODULE_CLASSES = ImmutableList.<Class<?>>builder()
+      .add(SessionValidator.class)
+      .build();
+
+  @CmdLine(name = "cron_module",
+      help = "A Guice module to provide cron bindings.")
+  private static final Arg<? extends Class<? extends Module>> CRON_MODULE =
+      Arg.create(Cron4jModule.class);
+
+  private static final Iterable<Class<?>> CRON_MODULE_CLASSES = ImmutableList.<Class<?>>builder()
+      .add(CronPredictor.class)
+      .add(CronScheduler.class)
+      .build();
 
   @Inject private SingletonService schedulerService;
   @Inject private LocalServiceRegistry serviceRegistry;
@@ -107,11 +123,55 @@ public class SchedulerMain extends AbstractApplication {
   @Inject private Optional<RootLogConfig.Configuration> glogConfig;
 
   private static Iterable<? extends Module> getSystemModules() {
-    return Arrays.asList(
-        new HttpModule(),
+    return ImmutableList.of(
         new LogModule(),
+        new HttpModule(),
         new StatsModule()
     );
+  }
+
+  // TODO(ksweeney): Consider factoring this out into a ModuleParser library.
+  private static Module instantiateFlaggedModule(Arg<? extends Class<? extends Module>> moduleArg) {
+    Class<? extends Module> moduleClass = moduleArg.get();
+    try {
+      return moduleClass.newInstance();
+    } catch (InstantiationException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Failed to instantiate module %s. Are you sure it has a no-arg constructor?",
+              moduleClass.getName()),
+          e);
+    } catch (IllegalAccessException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Failed to instantiate module %s. Are you sure it's public?",
+              moduleClass.getName()),
+          e);
+    }
+  }
+
+  // Defensively wrap each module provided on the command-line in a PrivateModule that only
+  // exposes requested classes to ensure that we don't depend on surprise extra bindings across
+  // different implementations.
+  private static Module getFlaggedModule(
+      Arg<? extends Class<? extends Module>> moduleArg,
+      final Iterable<Class<?>> exposedClasses) {
+
+    final Module module = instantiateFlaggedModule(moduleArg);
+    return new PrivateModule() {
+      @Override protected void configure() {
+        install(module);
+        for (Class<?> klass : exposedClasses) {
+          expose(klass);
+        }
+      }
+    };
+  }
+
+  private static Iterable<? extends Module> getFlaggedModules() {
+    return ImmutableList.of(
+        getFlaggedModule(AUTH_MODULE, AUTH_MODULE_CLASSES),
+        getFlaggedModule(CRON_MODULE, CRON_MODULE_CLASSES));
   }
 
   static Iterable<? extends Module> getModules(
@@ -119,29 +179,16 @@ public class SchedulerMain extends AbstractApplication {
       String serverSetPath,
       File backupDir) {
 
-    ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
+    return ImmutableList.<Module>builder()
+        .addAll(getFlaggedModules())
         .addAll(getSystemModules())
         .add(new AppModule(clusterName, serverSetPath))
-        .add(new Cron4jModule())
+        .add(new BackupModule(backupDir, SnapshotStoreImpl.class))
+        .add(new LogStorageModule())
+        .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
         .add(new ThriftModule())
-        .add(new ThriftAuthModule());
-
-    Class<? extends AbstractModule> authModule = AUTH_MODULE.get();
-    try {
-      // If installation fails, no SessionValidator will be bound and app will fail to startup.
-      modules.add(authModule.newInstance());
-    } catch (InstantiationException e) {
-      LOG.log(Level.WARNING, "Failed to instantiate auth module: " + authModule.getName(), e);
-      throw new IllegalArgumentException(e);
-    } catch (IllegalAccessException e) {
-      LOG.log(Level.WARNING, "Failed to instantiate auth module: " + authModule.getName(), e);
-      throw new IllegalArgumentException(e);
-    }
-
-    modules.add(new BackupModule(backupDir, SnapshotStoreImpl.class));
-    modules.add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)));
-    modules.add(new LogStorageModule());
-    return modules.build();
+        .add(new ThriftAuthModule())
+        .build();
   }
 
   @Override
