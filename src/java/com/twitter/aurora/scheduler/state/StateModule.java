@@ -1,6 +1,8 @@
 package com.twitter.aurora.scheduler.state;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
+import com.google.inject.Binder;
 import com.google.inject.Singleton;
 
 import com.twitter.aurora.scheduler.MesosTaskFactory;
@@ -25,12 +27,22 @@ public class StateModule extends AbstractModule {
     bind(StateManager.class).to(StateManagerImpl.class);
     bind(StateManagerImpl.class).in(Singleton.class);
 
-    bind(CronJobManager.class).in(Singleton.class);
-    // TODO(William Farner): Add a test that fails if CronJobManager is not wired for events.
-    PubsubEventModule.bindSubscriber(binder(), CronJobManager.class);
+    bindCronJobManager(binder());
     bind(ImmediateJobManager.class).in(Singleton.class);
 
-    bind(MaintenanceController.class).to(MaintenanceControllerImpl.class);
-    bind(MaintenanceControllerImpl.class).in(Singleton.class);
+    bindMaintenanceController(binder());
+  }
+
+  @VisibleForTesting
+  static void bindCronJobManager(Binder binder) {
+    binder.bind(CronJobManager.class).in(Singleton.class);
+    PubsubEventModule.bindSubscriber(binder, CronJobManager.class);
+  }
+
+  @VisibleForTesting
+  static void bindMaintenanceController(Binder binder) {
+    binder.bind(MaintenanceController.class).to(MaintenanceControllerImpl.class);
+    binder.bind(MaintenanceControllerImpl.class).in(Singleton.class);
+    PubsubEventModule.bindSubscriber(binder, MaintenanceControllerImpl.class);
   }
 }

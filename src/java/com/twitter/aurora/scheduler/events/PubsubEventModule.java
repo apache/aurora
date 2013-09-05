@@ -34,9 +34,13 @@ public final class PubsubEventModule extends AbstractModule {
 
   private static final Logger LOG = Logger.getLogger(PubsubEventModule.class.getName());
 
-  @VisibleForTesting
-  PubsubEventModule() {
+  private PubsubEventModule() {
     // Must be constructed through factory.
+  }
+
+  @VisibleForTesting
+  public static void installForTest(Binder binder) {
+    binder.install(new PubsubEventModule());
   }
 
   @Override

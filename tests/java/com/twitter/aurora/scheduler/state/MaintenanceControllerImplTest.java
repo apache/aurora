@@ -4,6 +4,9 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -20,6 +23,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -43,7 +47,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
-  private MaintenanceControllerImpl maintenance;
+  private MaintenanceController maintenance;
   private Closure<PubsubEvent> eventSink;
 
   @Before
@@ -51,8 +55,18 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
-    eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
-    maintenance = new MaintenanceControllerImpl(storageUtil.storage, stateManager, eventSink);
+
+    Injector injector = Guice.createInjector(
+        new AbstractModule() {
+          @Override protected void configure() {
+            PubsubTestUtil.installPubsub(binder());
+            StateModule.bindMaintenanceController(binder());
+            bind(Storage.class).toInstance(storageUtil.storage);
+            bind(StateManager.class).toInstance(stateManager);
+          }
+        });
+    maintenance = injector.getInstance(MaintenanceController.class);
+    eventSink = PubsubTestUtil.startPubsub(injector);
   }
 
   private static ScheduledTask makeTask(String host, String taskId) {
@@ -87,7 +101,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     assertStatus(HOST_A, SCHEDULED, maintenance.startMaintenance(A));
     assertStatus(HOST_A, DRAINING, maintenance.drain(A));
-    maintenance.taskChangedState(new TaskStateChange(task.setStatus(FINISHED), RUNNING));
+    eventSink.execute(new TaskStateChange(task.setStatus(FINISHED), RUNNING));
     assertStatus(HOST_A, NONE, maintenance.endMaintenance(A));
   }
 
@@ -128,8 +142,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     // Make sure a later transition on the host does not cause any ill effects that could surface
     // from stale internal state.
-    maintenance.taskChangedState(
-        new TaskStateChange(makeTask(HOST_A, "taskA").setStatus(FINISHED), RUNNING));
+    eventSink.execute(new TaskStateChange(makeTask(HOST_A, "taskA").setStatus(FINISHED), RUNNING));
   }
 
   @Test
@@ -148,8 +161,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     control.replay();
 
-    maintenance.storageStarted(new StorageStarted());
-    maintenance.taskChangedState(new TaskStateChange(taskA.setStatus(FINISHED), RUNNING));
+    eventSink.execute(new StorageStarted());
+    eventSink.execute(new TaskStateChange(taskA.setStatus(FINISHED), RUNNING));
   }
 
   @Test

@@ -3,7 +3,11 @@ package com.twitter.aurora.scheduler.state;
 import java.util.concurrent.Executor;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
@@ -22,8 +26,13 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.cron.CronScheduler;
+import com.twitter.aurora.scheduler.events.PubsubEvent;
+import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
+import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.application.ShutdownRegistry;
+import com.twitter.common.base.Closure;
+import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.easymock.EasyMock.anyObject;
@@ -64,6 +73,7 @@ public class CronJobManagerTest extends EasyMockTest {
     storageUtil.expectOperations();
     cronScheduler = createMock(CronScheduler.class);
     shutdownRegistry = createMock(ShutdownRegistry.class);
+
     cron = new CronJobManager(
         stateManager,
         storageUtil.storage,
@@ -93,6 +103,31 @@ public class CronJobManagerTest extends EasyMockTest {
 
   private IExpectationSetters<?> expectActiveTaskFetch(ScheduledTask... activeTasks) {
     return storageUtil.expectTaskFetch(Query.jobScoped(job.getKey()).active(), activeTasks);
+  }
+
+  @Test
+  public void testPubsubWiring() throws Exception {
+    cronScheduler.start();
+    shutdownRegistry.addAction(EasyMock.<ExceptionalCommand>anyObject());
+    expect(storageUtil.jobStore.fetchJobs(CronJobManager.MANAGER_KEY))
+        .andReturn(ImmutableList.<JobConfiguration>of());
+
+    control.replay();
+
+    Injector injector = Guice.createInjector(new AbstractModule() {
+      @Override protected void configure() {
+        bind(StateManager.class).toInstance(stateManager);
+        bind(Storage.class).toInstance(storageUtil.storage);
+        bind(CronScheduler.class).toInstance(cronScheduler);
+        bind(ShutdownRegistry.class).toInstance(shutdownRegistry);
+        bind(SchedulerCore.class).toInstance(scheduler);
+        PubsubTestUtil.installPubsub(binder());
+        StateModule.bindCronJobManager(binder());
+      }
+    });
+    cron = injector.getInstance(CronJobManager.class);
+    Closure<PubsubEvent> eventSink = PubsubTestUtil.startPubsub(injector);
+    eventSink.execute(new StorageStarted());
   }
 
   @Test
