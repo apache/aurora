@@ -7,7 +7,7 @@ from twitter.aurora.client.api import AuroraClientAPI
 from twitter.aurora.client.base import check_and_log_response, handle_open
 from twitter.aurora.client.deployment_api import AuroraDeploymentAPI
 from twitter.aurora.common import AuroraJobKey
-from twitter.packer import sd_packer_client
+from twitter.aurora.common_internal.packer_client import TwitterPacker
 
 import argparse
 
@@ -112,7 +112,7 @@ class AuroraDeploymentCLI(object):
 
     if self._deployment_api is None:
       api = AuroraClientAPI(self._clusters[cluster_name], verbose=verbosity)
-      packer = sd_packer_client.create_packer(cluster_name, verbose=verbosity)
+      packer = TwitterPacker.from_cluster_name(cluster_name, verbose=verbosity)
       self._deployment_api = AuroraDeploymentAPI(api, packer)
       self._scheduler_url = api.scheduler.scheduler().url
 

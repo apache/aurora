@@ -14,7 +14,6 @@ from twitter.common import app, log
 from twitter.aurora.client import binding_helpers
 from twitter.aurora.client.base import deprecation_warning, die
 from twitter.aurora.client.build import BuildArtifactResolver
-from twitter.aurora.client.jenkins import JenkinsArtifactResolver
 from twitter.aurora.config import AuroraConfig
 from twitter.aurora.config.recipes import Recipes
 from twitter.thermos.config.schema_helpers import Tasks

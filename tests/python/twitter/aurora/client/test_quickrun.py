@@ -1,12 +1,13 @@
 import getpass
 import hashlib
 
-from twitter.aurora.client.quickrun import Quickrun
-from twitter.aurora.config.schema import Packer
-from twitter.packer import sd_packer_client
+from twitter.aurora.client import quickrun
+from twitter.aurora.config.schema import Packer as PackerObject
 
 import mox
 import pytest
+
+Quickrun = quickrun.Quickrun
 
 
 class UnpopulatedQuickrun(Quickrun):
@@ -65,14 +66,14 @@ def test_with_packages():
           packages=[('a', 'b', 23)])
   assert len(qr._config.task(0).processes().get()) == 2
   process0 = qr._config.task(0).processes()[0]
-  assert process0.get() == Packer.copy(role='a', name='b', version=23).interpolate()[0].get()
+  assert process0.get() == PackerObject.copy(role='a', name='b', version=23).interpolate()[0].get()
 
 
 def test_get_package_file_none_exists():
   # package doesn't exist
   m = mox.Mox()
-  m.StubOutWithMock(sd_packer_client, 'create_packer')
-  sd_packer_client.create_packer('smf1').AndReturn(MockPacker(
+  m.StubOutWithMock(quickrun.TwitterPacker, 'from_cluster_name')
+  quickrun.TwitterPacker.from_cluster_name('smf1').AndReturn(MockPacker(
         [],
         [],
         {'id': 23}))
@@ -84,8 +85,8 @@ def test_get_package_file_none_exists():
 
   # package exists but no versions match
   m = mox.Mox()
-  m.StubOutWithMock(sd_packer_client, 'create_packer')
-  sd_packer_client.create_packer('smf1').AndReturn(MockPacker(
+  m.StubOutWithMock(quickrun.TwitterPacker, 'from_cluster_name')
+  quickrun.TwitterPacker.from_cluster_name('smf1').AndReturn(MockPacker(
         [MockedMD5Quickrun.PACKAGE_NAME],
         [],
         {'id': 23}))
@@ -98,9 +99,9 @@ def test_get_package_file_none_exists():
 
 def test_get_package_file_cached():
   m = mox.Mox()
-  m.StubOutWithMock(sd_packer_client, 'create_packer')
+  m.StubOutWithMock(quickrun.TwitterPacker, 'from_cluster_name')
   MockedMD5Quickrun.MD5_VALUE = 'herpderp'
-  sd_packer_client.create_packer('smf1').AndReturn(MockPacker(
+  quickrun.TwitterPacker.from_cluster_name('smf1').AndReturn(MockPacker(
         [MockedMD5Quickrun.PACKAGE_NAME],
         [{'md5sum': 'foo', 'id': 15}, {'md5sum': 'herpderp', 'id': 31337}],
         {}))

@@ -32,7 +32,7 @@ python_library(
     pants(':deployment_api'),
     pants('src/python/twitter/aurora/common:aurora_job_key'),
     pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/packer'),
+    pants('src/python/twitter/aurora/common_internal:packer_client'),
   ]
 )
 
@@ -125,9 +125,9 @@ python_library(
     pants(':config'),
     pants(':job_monitor'),
     pants('src/python/twitter/aurora/common:aurora_job_key'),
+    pants('src/python/twitter/aurora/common_internal:packer_client'),
     pants('src/python/twitter/aurora/config'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/packer'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

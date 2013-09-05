@@ -5,7 +5,7 @@ from twitter.common import log
 
 from twitter.aurora.client.config import get_config
 from twitter.aurora.config import AuroraConfig, AuroraConfigLoader
-from twitter.packer.packer_client import Packer
+from twitter.packer import Packer
 
 from gen.twitter.aurora.constants import ACTIVE_STATES
 

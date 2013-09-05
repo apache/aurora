@@ -6,7 +6,8 @@ from twitter.aurora.client.api import AuroraClientAPI
 from twitter.aurora.client.deployment_api import AuroraDeploymentAPI, DeploymentConfig
 from twitter.aurora.common import AuroraJobKey, Cluster
 from twitter.aurora.config import AuroraConfig, AuroraConfigLoader
-from twitter.packer.packer_client import Packer
+from twitter.aurora.common_internal.packer_client import TwitterPacker
+from twitter.packer import Packer
 
 from gen.twitter.aurora.AuroraSchedulerManager import Client as scheduler_client
 import gen.twitter.aurora.ttypes as ttypes
@@ -60,7 +61,7 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
   def setUp(self):
     super(TestAuroraDeploymentAPI, self).setUp()
     self.write_config_file()
-    self.mock_packer = self.mox.CreateMock(Packer)
+    self.mock_packer = self.mox.CreateMock(TwitterPacker)
     self.mock_scheduler = self.mox.CreateMock(scheduler_client)
     self.api = AuroraClientAPI(self.CLUSTER)
     self.api._scheduler = FakeSchedulerProxy(self.CLUSTER, self.mock_scheduler, self.SESSION_KEY)

@@ -42,4 +42,3 @@ python_tests(
     pants('src/python/twitter/aurora/common:http_signaler'),
   ]
 )
-

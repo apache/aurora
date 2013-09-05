@@ -22,7 +22,7 @@ from twitter.aurora.config.schema import (
     Resources,
     SequentialTask)
 from twitter.aurora.config import AuroraConfig
-from twitter.packer import sd_packer_client
+from twitter.aurora.common_internal.packer_client import TwitterPacker
 
 from gen.twitter.aurora.ttypes import ResponseCode, ScheduleStatus
 
@@ -99,7 +99,7 @@ class Quickrun(object):
   @classmethod
   def get_package_file(cls, cluster, role, filename):
     md5 = cls.get_md5(filename)
-    packer = sd_packer_client.create_packer(cluster)
+    packer = TwitterPacker.from_cluster_name(cluster)
     if cls.PACKAGE_NAME in packer.list_packages(role):
       for package in packer.list_versions(role, cls.PACKAGE_NAME):
         if package['md5sum'] == md5:
@@ -109,9 +109,9 @@ class Quickrun(object):
     return (role, cls.PACKAGE_NAME, package['id'])
 
   @classmethod
-  def additional_files_process(cls, cluster, role, filemap):
+  def additional_files_process(cls, cluster_name, role, filemap):
     # filemap is of the form local => remote filename
-    package_role, package_name, package_version = cls.get_package_file(cluster, role,
+    package_role, package_name, package_version = cls.get_package_file(cluster_name, role,
         cls.generate_package_file(filemap))
     return Packer.install(package_name, role=package_role, version=package_version)
 
