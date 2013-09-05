@@ -361,10 +361,15 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     Set<ScheduledTask> tasks =
         Storage.Util.consistentFetchTasks(storage, Query.arbitrary(taskQuery));
-    Set<String> targetRoles = FluentIterable.from(tasks)
-        .transform(GET_ROLE)
-        .toSet();
-    return sessionValidator.checkAuthenticated(session, targetRoles);
+    // Authenticate the session against any affected roles, always including the role for a
+    // role-scoped query.  This papers over the implementation detail that dormant cron jobs are
+    // authenticated this way.
+    ImmutableSet.Builder<String> targetRoles = ImmutableSet.<String>builder()
+        .addAll(FluentIterable.from(tasks).transform(GET_ROLE));
+    if (taskQuery.isSetOwner()) {
+      targetRoles.add(taskQuery.getOwner().getRole());
+    }
+    return sessionValidator.checkAuthenticated(session, targetRoles.build());
   }
 
   private Optional<SessionContext> isAdmin(SessionKey session) {
@@ -410,6 +415,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return response;
     }
 
+    // TODO(William Farner): Move this into the client.
     BackoffHelper backoff = new BackoffHelper(killTaskInitialBackoff, killTaskMaxBackoff, true);
     final Query.Builder activeQuery = Query.arbitrary(query.setStatuses(Tasks.ACTIVE_STATES));
     try {
