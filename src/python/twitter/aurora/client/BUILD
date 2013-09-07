@@ -5,6 +5,7 @@ python_library(
     pants(':restarter'),
     pants(':scheduler_client'),
     pants(':updater'),
+    pants('src/python/twitter/aurora/client/hooks'),
     pants('src/python/twitter/aurora/common'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),

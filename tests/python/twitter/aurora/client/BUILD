@@ -5,6 +5,7 @@ python_test_suite(name = 'all',
     pants(':deployment_cli'),
     pants(':disambiguator'),
     pants(':health_check'),
+    pants(':hooks'),
     pants(':jenkins'),
     pants(':packercli'),
     pants(':quickrun'),
@@ -40,6 +41,12 @@ python_tests(name = 'health_check',
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('3rdparty/python:mox'),
   ],
+)
+
+dependencies(name = 'hooks',
+  dependencies = [
+    pants('tests/python/twitter/aurora/client/hooks:all')
+  ]
 )
 
 python_tests(name = 'packercli',

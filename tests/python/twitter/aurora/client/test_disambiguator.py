@@ -24,6 +24,7 @@ class LiveJobDisambiguatorTest(mox.MoxTestBase):
   ENV = 'test'
   NAME = 'labrat'
   JOB_PATH = 'smf1/mesos/test/labrat'
+  CONFIG_FILE = 'abc.aurora'
 
   def setUp(self):
     super(LiveJobDisambiguatorTest, self).setUp()
@@ -74,9 +75,16 @@ class LiveJobDisambiguatorTest(mox.MoxTestBase):
     assert env == self.ENV
     assert name == self.NAME
 
-  def test_disambiguate_args_or_die_unambiguous(self):
-    expected = (self._api, AuroraJobKey(self.CLUSTER.name, self.ROLE, self.ENV, self.NAME))
+  def test_disambiguate_args_or_die_unambiguous_with_no_config(self):
+    expected = (self._api, AuroraJobKey(self.CLUSTER.name, self.ROLE, self.ENV, self.NAME), None)
     result = LiveJobDisambiguator.disambiguate_args_or_die([self.JOB_PATH], None,
+        client_factory=lambda *_: self._api)
+    assert result == expected
+
+  def test_disambiguate_args_or_die_unambiguous_with_config(self):
+    expected = (self._api,
+        AuroraJobKey(self.CLUSTER.name, self.ROLE, self.ENV, self.NAME), self.CONFIG_FILE)
+    result = LiveJobDisambiguator.disambiguate_args_or_die([self.JOB_PATH, self.CONFIG_FILE], None,
         client_factory=lambda *_: self._api)
     assert result == expected
 

@@ -183,6 +183,10 @@ def populate_namespaces(config, env=None, force_local=False):
   return config
 
 
+def inject_hooks(config, env=None):
+  config.hooks = (env or {}).get('hooks', [])
+
+
 def inject_recipes(config, env=None):
   job = config.raw() % config.context()
   recipes = job.recipes().get() if job.recipes() is not Empty else []
@@ -195,7 +199,8 @@ def AnnotatedAuroraConfig(force_local):
   class _AnnotatedAuroraConfig(AuroraConfig):
     @classmethod
     def plugins(cls):
-      return (inject_recipes,
+      return (inject_hooks,
+              inject_recipes,
               functools.partial(binding_helpers.apply_all, force_local=force_local),
               functools.partial(populate_namespaces, force_local=force_local),
               validate_config)

@@ -123,6 +123,8 @@ class MesosJob(Struct):
 
   layout        = AppLayout      # DEPRECATED in favor of directory sandboxes
 
+  enable_hooks = Default(Boolean, False)  # enable client API hooks; from env python-list 'hooks'
+
 
 Job = MesosJob
 Service = Job(service = True)

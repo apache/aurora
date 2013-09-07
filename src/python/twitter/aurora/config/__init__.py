@@ -141,6 +141,7 @@ class AuroraConfig(object):
     self._job = self.standard_bindings(job)
     self._packages = []
     self.binding_dicts = defaultdict(dict)
+    self.hooks = []
 
   def context(self, instance=None):
     from .schema import MesosContext

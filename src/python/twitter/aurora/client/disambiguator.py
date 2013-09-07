@@ -1,5 +1,3 @@
-import re
-
 from twitter.common import log
 
 from twitter.aurora.common import AuroraJobKey
@@ -12,6 +10,7 @@ class LiveJobDisambiguator(object):
   """
   Disambiguates a job-specification into concrete AuroraJobKeys by querying the scheduler API.
   """
+
   def __init__(self, client, role, env, name):
     if not isinstance(client, AuroraClientAPI):
       raise TypeError("client must be a AuroraClientAPI")
@@ -62,9 +61,9 @@ class LiveJobDisambiguator(object):
   @classmethod
   def disambiguate_args_or_die(cls, args, options, client_factory=AuroraClientAPI):
     """
-    Returns a (AuroraClientAPI, AuroraJobKey) tuple if one can be found given the args, potentially
-    querying the scheduler with the returned client. Calls die() with an appropriate error message
-    otherwise.
+    Returns a (AuroraClientAPI, AuroraJobKey, AuroraConfigFile:str) tuple
+    if one can be found given the args, potentially querying the scheduler with the returned client.
+    Calls die() with an appropriate error message otherwise.
 
     Arguments:
       args: args from app command invocation.
@@ -76,14 +75,16 @@ class LiveJobDisambiguator(object):
     try:
       job_key = AuroraJobKey.from_path(args[0])
       client = client_factory(job_key.cluster)
-      return client, job_key
+      config_file = args[1] if len(args) > 1 else None  # the config for hooks
+      return client, job_key, config_file
     except AuroraJobKey.Error:
       log.warning("Failed to parse job path, falling back to compatibility mode")
       role = args[0] if len(args) > 0 else None
       name = args[1] if len(args) > 1 else None
       env = None
+      config_file = None  # deprecated form does not support hooks functionality
       cluster = options.cluster
       if not cluster:
         die('cluster is required')
       client = client_factory(cluster.name)
-      return client, cls._disambiguate_or_die(client, role, env, name)
+      return client, cls._disambiguate_or_die(client, role, env, name), config_file
