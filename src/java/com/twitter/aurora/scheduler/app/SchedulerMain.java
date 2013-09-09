@@ -19,7 +19,6 @@ import com.google.inject.Singleton;
 
 import com.twitter.aurora.auth.SessionValidator;
 import com.twitter.aurora.auth.UnsecureAuthModule;
-import com.twitter.aurora.internal.cron.Cron4jModule;
 import com.twitter.aurora.scheduler.DriverFactory;
 import com.twitter.aurora.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
@@ -27,6 +26,7 @@ import com.twitter.aurora.scheduler.SchedulerLifecycle;
 import com.twitter.aurora.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
 import com.twitter.aurora.scheduler.cron.CronPredictor;
 import com.twitter.aurora.scheduler.cron.CronScheduler;
+import com.twitter.aurora.scheduler.cron.noop.NoopCronModule;
 import com.twitter.aurora.scheduler.local.IsolatedSchedulerModule;
 import com.twitter.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import com.twitter.aurora.scheduler.storage.backup.BackupModule;
@@ -108,9 +108,9 @@ public class SchedulerMain extends AbstractApplication {
       .build();
 
   @CmdLine(name = "cron_module",
-      help = "A Guice module to provide cron bindings.")
+      help = "A Guice module to provide cron bindings. NOTE: The default is a no-op.")
   private static final Arg<? extends Class<? extends Module>> CRON_MODULE =
-      Arg.create(Cron4jModule.class);
+      Arg.create(NoopCronModule.class);
 
   private static final Iterable<Class<?>> CRON_MODULE_CLASSES = ImmutableList.<Class<?>>builder()
       .add(CronPredictor.class)
