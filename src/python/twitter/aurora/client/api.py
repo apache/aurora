@@ -6,7 +6,7 @@ from twitter.aurora.common.cluster import Cluster
 
 from gen.twitter.aurora.constants import LIVE_STATES
 from gen.twitter.aurora.ttypes import (
-    FinishUpdateResponse,
+    Response,
     Identity,
     Quota,
     ResponseCode,
@@ -107,7 +107,7 @@ invoking cancel_update.
     updater = Updater(config, self._scheduler)
 
     resp = updater.start()
-    update_resp = FinishUpdateResponse()
+    update_resp = Response()
     update_resp.responseCode = resp.responseCode
     update_resp.message = resp.message
 

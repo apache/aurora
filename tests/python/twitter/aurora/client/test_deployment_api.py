@@ -151,7 +151,7 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
     self.mock_packer_release()
     response = ttypes.ScheduleStatusResponse(responseCode=ttypes.ResponseCode.INVALID_REQUEST)
     self.mock_scheduler.getTasksStatus(mox.IgnoreArg()).AndReturn(response)
-    create_response = ttypes.CreateJobResponse(responseCode=ttypes.ResponseCode.OK)
+    create_response = ttypes.Response(responseCode=ttypes.ResponseCode.OK)
     self.mock_scheduler.createJob(self.config.job(), self.SESSION_KEY).AndReturn(create_response)
 
     self.mox.ReplayAll()
@@ -166,7 +166,7 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
     self.mock_scheduler.getTasksStatus(mox.IgnoreArg()).AndReturn(status_response)
 
     self.mox.StubOutWithMock(self.api, "update_job")
-    update_response = ttypes.FinishUpdateResponse(responseCode=ttypes.ResponseCode.OK)
+    update_response = ttypes.Response(responseCode=ttypes.ResponseCode.OK)
     self.api.update_job(
         mox.IgnoreArg(), health_check_interval_seconds=mox.IgnoreArg()).AndReturn(update_response)
 

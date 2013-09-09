@@ -41,11 +41,11 @@ import org.apache.mesos.SchedulerDriver;
 import org.apache.thrift.TException;
 
 import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.CreateJobResponse;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.Package;
 import com.twitter.aurora.gen.Quota;
+import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.DriverFactory;
@@ -263,7 +263,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
     }
 
     private void submitJob(JobConfiguration job) {
-      CreateJobResponse response;
+      Response response;
       try {
         response = thrift.createJob(job, new SessionKey());
       } catch (TException e) {

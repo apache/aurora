@@ -5,41 +5,28 @@ import java.util.Set;
 import org.apache.thrift.TException;
 
 import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.CommitRecoveryResponse;
-import com.twitter.aurora.gen.CreateJobResponse;
-import com.twitter.aurora.gen.DeleteRecoveryTasksResponse;
 import com.twitter.aurora.gen.DrainHostsResponse;
 import com.twitter.aurora.gen.EndMaintenanceResponse;
-import com.twitter.aurora.gen.FinishUpdateResponse;
-import com.twitter.aurora.gen.ForceTaskStateResponse;
 import com.twitter.aurora.gen.GetJobUpdatesResponse;
 import com.twitter.aurora.gen.GetJobsResponse;
 import com.twitter.aurora.gen.GetQuotaResponse;
 import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.KillResponse;
 import com.twitter.aurora.gen.ListBackupsResponse;
 import com.twitter.aurora.gen.MaintenanceStatusResponse;
-import com.twitter.aurora.gen.PerformBackupResponse;
 import com.twitter.aurora.gen.PopulateJobResponse;
 import com.twitter.aurora.gen.QueryRecoveryResponse;
 import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.RestartShardsResponse;
+import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
-import com.twitter.aurora.gen.RewriteConfigsResponse;
 import com.twitter.aurora.gen.RollbackShardsResponse;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduleStatusResponse;
 import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.SetQuotaResponse;
-import com.twitter.aurora.gen.SnapshotResponse;
-import com.twitter.aurora.gen.StageRecoveryResponse;
-import com.twitter.aurora.gen.StartCronResponse;
 import com.twitter.aurora.gen.StartMaintenanceResponse;
 import com.twitter.aurora.gen.StartUpdateResponse;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.UnloadRecoveryResponse;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.gen.UpdateShardsResponse;
 
@@ -58,14 +45,14 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public SetQuotaResponse setQuota(String ownerRole, Quota quota, SessionKey session)
+  public Response setQuota(String ownerRole, Quota quota, SessionKey session)
       throws TException {
 
     return delegate.setQuota(ownerRole, quota, session);
   }
 
   @Override
-  public ForceTaskStateResponse forceTaskState(
+  public Response forceTaskState(
       String taskId,
       ScheduleStatus status,
       SessionKey session) throws TException {
@@ -74,7 +61,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public PerformBackupResponse performBackup(SessionKey session) throws TException {
+  public Response performBackup(SessionKey session) throws TException {
     return delegate.performBackup(session);
   }
 
@@ -84,7 +71,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public StageRecoveryResponse stageRecovery(String backupId, SessionKey session)
+  public Response stageRecovery(String backupId, SessionKey session)
       throws TException {
 
     return delegate.stageRecovery(backupId, session);
@@ -98,24 +85,24 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public DeleteRecoveryTasksResponse deleteRecoveryTasks(TaskQuery query, SessionKey session)
+  public Response deleteRecoveryTasks(TaskQuery query, SessionKey session)
       throws TException {
 
     return delegate.deleteRecoveryTasks(query, session);
   }
 
   @Override
-  public CommitRecoveryResponse commitRecovery(SessionKey session) throws TException {
+  public Response commitRecovery(SessionKey session) throws TException {
     return delegate.commitRecovery(session);
   }
 
   @Override
-  public UnloadRecoveryResponse unloadRecovery(SessionKey session) throws TException {
+  public Response unloadRecovery(SessionKey session) throws TException {
     return delegate.unloadRecovery(session);
   }
 
   @Override
-  public CreateJobResponse createJob(JobConfiguration description, SessionKey session)
+  public Response createJob(JobConfiguration description, SessionKey session)
       throws TException {
 
     return delegate.createJob(description, session);
@@ -127,7 +114,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public StartCronResponse startCronJob(JobKey job, SessionKey session) throws TException {
+  public Response startCronJob(JobKey job, SessionKey session) throws TException {
     return delegate.startCronJob(job, session);
   }
 
@@ -159,7 +146,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public FinishUpdateResponse finishUpdate(
+  public Response finishUpdate(
       JobKey job,
       UpdateResult updateResult,
       String updateToken,
@@ -169,7 +156,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public RestartShardsResponse restartShards(
+  public Response restartShards(
       JobKey job,
       Set<Integer> shardIds,
       SessionKey session) throws TException {
@@ -188,7 +175,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public KillResponse killTasks(TaskQuery query, SessionKey session) throws TException {
+  public Response killTasks(TaskQuery query, SessionKey session) throws TException {
     return delegate.killTasks(query, session);
   }
 
@@ -227,12 +214,12 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public SnapshotResponse snapshot(SessionKey session) throws TException {
+  public Response snapshot(SessionKey session) throws TException {
     return delegate.snapshot(session);
   }
 
   @Override
-  public RewriteConfigsResponse rewriteConfigs(RewriteConfigsRequest request, SessionKey session)
+  public Response rewriteConfigs(RewriteConfigsRequest request, SessionKey session)
       throws TException {
 
     return delegate.rewriteConfigs(request, session);

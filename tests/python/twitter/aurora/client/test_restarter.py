@@ -37,7 +37,7 @@ class TestRestarter(MoxTestBase):
         FakeSchedulerProxy(CLUSTER, self.mock_scheduler, SESSION_KEY), self.mock_shard_watcher)
 
   def mock_restart_shards(self, shards):
-    response = RestartShardsResponse(responseCode=ResponseCode.OK, message='test')
+    response = Response(responseCode=ResponseCode.OK, message='test')
 
     self.mock_scheduler.restartShards(JOB.to_thrift(), shards, SESSION_KEY).AndReturn(response)
     self.mock_shard_watcher.watch(shards).AndReturn([])
@@ -92,7 +92,7 @@ class TestRestarter(MoxTestBase):
     self.restarter.restart(None)
 
   def mock_restart_fails(self):
-    response = RestartShardsResponse(responseCode=ResponseCode.ERROR, message='test error')
+    response = Response(responseCode=ResponseCode.ERROR, message='test error')
 
     self.mock_scheduler.restartShards(JOB.to_thrift(), IgnoreArg(), SESSION_KEY).AndReturn(response)
 
@@ -105,7 +105,7 @@ class TestRestarter(MoxTestBase):
     assert self.restarter.restart(None).responseCode == ResponseCode.ERROR
 
   def mock_restart_watch_fails(self, shards):
-    response = RestartShardsResponse(responseCode=ResponseCode.OK, message='test')
+    response = Response(responseCode=ResponseCode.OK, message='test')
 
     self.mock_scheduler.restartShards(JOB.to_thrift(), shards, SESSION_KEY).AndReturn(response)
     self.mock_shard_watcher.watch(shards).AndReturn(shards)

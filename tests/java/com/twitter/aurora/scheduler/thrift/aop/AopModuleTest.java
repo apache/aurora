@@ -12,8 +12,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AuroraAdmin.Iface;
-import com.twitter.aurora.gen.CreateJobResponse;
 import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
@@ -85,7 +85,7 @@ public class AopModuleTest extends EasyMockTest {
 
   private void assertCreateAllowed(Map<String, Boolean> toggledMethods) throws Exception {
     JobConfiguration job = new JobConfiguration();
-    CreateJobResponse response = new CreateJobResponse();
+    Response response = new Response();
     expect(mockThrift.createJob(job, SESSION_KEY)).andReturn(response);
 
     control.replay();

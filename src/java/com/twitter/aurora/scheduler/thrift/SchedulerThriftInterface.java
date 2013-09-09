@@ -33,14 +33,9 @@ import org.apache.commons.lang.StringUtils;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.CommitRecoveryResponse;
 import com.twitter.aurora.gen.ConfigRewrite;
-import com.twitter.aurora.gen.CreateJobResponse;
-import com.twitter.aurora.gen.DeleteRecoveryTasksResponse;
 import com.twitter.aurora.gen.DrainHostsResponse;
 import com.twitter.aurora.gen.EndMaintenanceResponse;
-import com.twitter.aurora.gen.FinishUpdateResponse;
-import com.twitter.aurora.gen.ForceTaskStateResponse;
 import com.twitter.aurora.gen.GetJobUpdatesResponse;
 import com.twitter.aurora.gen.GetJobsResponse;
 import com.twitter.aurora.gen.GetQuotaResponse;
@@ -49,33 +44,25 @@ import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
-import com.twitter.aurora.gen.KillResponse;
 import com.twitter.aurora.gen.ListBackupsResponse;
 import com.twitter.aurora.gen.MaintenanceStatusResponse;
-import com.twitter.aurora.gen.PerformBackupResponse;
 import com.twitter.aurora.gen.PopulateJobResponse;
 import com.twitter.aurora.gen.QueryRecoveryResponse;
 import com.twitter.aurora.gen.Quota;
+import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.ResponseCode;
-import com.twitter.aurora.gen.RestartShardsResponse;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
-import com.twitter.aurora.gen.RewriteConfigsResponse;
 import com.twitter.aurora.gen.RollbackShardsResponse;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduleStatusResponse;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.SetQuotaResponse;
 import com.twitter.aurora.gen.ShardConfigRewrite;
 import com.twitter.aurora.gen.ShardKey;
-import com.twitter.aurora.gen.SnapshotResponse;
-import com.twitter.aurora.gen.StageRecoveryResponse;
-import com.twitter.aurora.gen.StartCronResponse;
 import com.twitter.aurora.gen.StartMaintenanceResponse;
 import com.twitter.aurora.gen.StartUpdateResponse;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.UnloadRecoveryResponse;
 import com.twitter.aurora.gen.UpdateResponseCode;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.gen.UpdateShardsResponse;
@@ -209,11 +196,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public CreateJobResponse createJob(JobConfiguration job, SessionKey session) {
+  public Response createJob(JobConfiguration job, SessionKey session) {
     checkNotNull(job);
     checkNotNull(session);
 
-    CreateJobResponse response = new CreateJobResponse();
+    Response response = new Response();
     if (!JobKeys.isValid(job.getKey())) {
       return response.setResponseCode(INVALID_REQUEST)
           .setMessage("Invalid job key: " + job.getKey());
@@ -261,11 +248,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public StartCronResponse startCronJob(JobKey jobKey, SessionKey session) {
+  public Response startCronJob(JobKey jobKey, SessionKey session) {
     checkNotNull(session);
     JobKeys.assertValid(jobKey);
 
-    StartCronResponse response = new StartCronResponse();
+    Response response = new Response();
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
     } catch (AuthFailedException e) {
@@ -381,14 +368,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public KillResponse killTasks(final TaskQuery query, SessionKey session) {
+  public Response killTasks(final TaskQuery query, SessionKey session) {
     // TODO(wfarner): Determine whether this is a useful function, or if it should simply be
     //     switched to 'killJob'.
 
     checkNotNull(query);
     checkNotNull(session);
 
-    KillResponse response = new KillResponse();
+    Response response = new Response();
 
     if (query.getJobName() != null && StringUtils.isBlank(query.getJobName())) {
       response.setResponseCode(INVALID_REQUEST).setMessage(
@@ -547,7 +534,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public FinishUpdateResponse finishUpdate(
+  public Response finishUpdate(
       JobKey jobKey,
       UpdateResult updateResult,
       String updateToken,
@@ -556,7 +543,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     JobKeys.assertValid(jobKey);
     checkNotNull(session);
 
-    FinishUpdateResponse response = new FinishUpdateResponse();
+    Response response = new Response();
     SessionContext context;
     try {
       context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
@@ -578,7 +565,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public RestartShardsResponse restartShards(
+  public Response restartShards(
       JobKey jobKey,
       Set<Integer> shardIds,
       SessionKey session) {
@@ -587,7 +574,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     MorePreconditions.checkNotBlank(shardIds);
     checkNotNull(session);
 
-    RestartShardsResponse response = new RestartShardsResponse();
+    Response response = new Response();
     SessionContext context;
     try {
       context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
@@ -642,17 +629,17 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Requires(whitelist = Capability.PROVISIONER)
   @Override
-  public SetQuotaResponse setQuota(String ownerRole, Quota quota, SessionKey session) {
+  public Response setQuota(String ownerRole, Quota quota, SessionKey session) {
     checkNotBlank(ownerRole);
     checkNotNull(quota);
     checkNotNull(session);
 
     quotaManager.setQuota(ownerRole, quota);
-    return new SetQuotaResponse().setResponseCode(OK).setMessage("Quota applied.");
+    return new Response().setResponseCode(OK).setMessage("Quota applied.");
   }
 
   @Override
-  public ForceTaskStateResponse forceTaskState(
+  public Response forceTaskState(
       String taskId,
       ScheduleStatus status,
       SessionKey session) {
@@ -661,7 +648,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     checkNotNull(status);
     checkNotNull(session);
 
-    ForceTaskStateResponse response = new ForceTaskStateResponse();
+    Response response = new Response();
     SessionContext context;
     try {
       // TODO(Sathya): Remove this after AOP-style session validation passes in a SessionContext.
@@ -673,13 +660,13 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     schedulerCore.setTaskStatus(
         Query.taskScoped(taskId), status, transitionMessage(context.getIdentity()));
-    return new ForceTaskStateResponse().setResponseCode(OK).setMessage("Transition attempted.");
+    return new Response().setResponseCode(OK).setMessage("Transition attempted.");
   }
 
   @Override
-  public PerformBackupResponse performBackup(SessionKey session) {
+  public Response performBackup(SessionKey session) {
     backup.backupNow();
-    return new PerformBackupResponse().setResponseCode(OK);
+    return new Response().setResponseCode(OK);
   }
 
   @Override
@@ -690,8 +677,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public StageRecoveryResponse stageRecovery(String backupId, SessionKey session) {
-    StageRecoveryResponse response = new StageRecoveryResponse().setResponseCode(OK);
+  public Response stageRecovery(String backupId, SessionKey session) {
+    Response response = new Response().setResponseCode(OK);
     try {
       recovery.stage(backupId);
     } catch (RecoveryException e) {
@@ -716,8 +703,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public DeleteRecoveryTasksResponse deleteRecoveryTasks(TaskQuery query, SessionKey session) {
-    DeleteRecoveryTasksResponse response = new DeleteRecoveryTasksResponse().setResponseCode(OK);
+  public Response deleteRecoveryTasks(TaskQuery query, SessionKey session) {
+    Response response = new Response().setResponseCode(OK);
     try {
       recovery.deleteTasks(Query.arbitrary(query));
     } catch (RecoveryException e) {
@@ -729,8 +716,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public CommitRecoveryResponse commitRecovery(SessionKey session) {
-    CommitRecoveryResponse response = new CommitRecoveryResponse().setResponseCode(OK);
+  public Response commitRecovery(SessionKey session) {
+    Response response = new Response().setResponseCode(OK);
     try {
       recovery.commit();
     } catch (RecoveryException e) {
@@ -758,14 +745,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public UnloadRecoveryResponse unloadRecovery(SessionKey session) {
+  public Response unloadRecovery(SessionKey session) {
     recovery.unload();
-    return new UnloadRecoveryResponse().setResponseCode(OK);
+    return new Response().setResponseCode(OK);
   }
 
   @Override
-  public SnapshotResponse snapshot(SessionKey session) {
-    SnapshotResponse response = new SnapshotResponse();
+  public Response snapshot(SessionKey session) {
+    Response response = new Response();
     try {
       storage.snapshot();
       return response.setResponseCode(OK).setMessage("Compaction successful.");
@@ -788,16 +775,16 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public RewriteConfigsResponse rewriteConfigs(
+  public Response rewriteConfigs(
       final RewriteConfigsRequest request,
       SessionKey session) {
 
     if (request.getRewriteCommandsSize() == 0) {
-      return new RewriteConfigsResponse(ResponseCode.ERROR, "No rewrite commands provided.");
+      return new Response(ResponseCode.ERROR, "No rewrite commands provided.");
     }
 
-    return storage.write(new MutateWork.Quiet<RewriteConfigsResponse>() {
-      @Override public RewriteConfigsResponse apply(MutableStoreProvider storeProvider) {
+    return storage.write(new MutateWork.Quiet<Response>() {
+      @Override public Response apply(MutableStoreProvider storeProvider) {
         List<String> errors = Lists.newArrayList();
 
         for (ConfigRewrite command : request.getRewriteCommands()) {
@@ -874,7 +861,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           }
         }
 
-        RewriteConfigsResponse resp = new RewriteConfigsResponse();
+        Response resp = new Response();
         if (!errors.isEmpty()) {
           resp.setResponseCode(ResponseCode.WARNING).setMessage(Joiner.on(", ").join(errors));
         } else {

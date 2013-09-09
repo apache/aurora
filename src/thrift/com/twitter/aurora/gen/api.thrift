@@ -12,6 +12,17 @@ enum ResponseCode {
   AUTH_FAILED     = 4
 }
 
+
+union Result {
+  // TODO(zmanji): Move all RPC-specific result types here as apart of MESOS-3434
+}
+
+struct Response {
+  1: ResponseCode responseCode
+  2: string message
+  3: optional Result result
+}
+
 struct Identity {
   1: string role
   2: string user
@@ -163,22 +174,10 @@ struct JobConfiguration {
                                              // environment are used to construct it server-side.
 }
 
-// Response message to a job creation request.
-struct CreateJobResponse {
-  1: ResponseCode responseCode
-  2: string message
-}
-
 struct PopulateJobResponse {
   1: ResponseCode responseCode
   2: string message
   3: set<TaskConfig> populated
-}
-
-// Response message to a request to start a cron job.
-struct StartCronResponse {
-  1: ResponseCode responseCode
-  2: string message
 }
 
 struct StartUpdateResponse {
@@ -214,11 +213,6 @@ struct UpdateShardsResponse {
   3: optional map<i32, ShardUpdateResult> shards
 }
 
-struct RestartShardsResponse {
-  1: ResponseCode responseCode
-  2: string message
-}
-
 enum UpdateResult {
   SUCCESS   = 0,
   FAILED    = 1,
@@ -229,11 +223,6 @@ struct RollbackShardsResponse {
   1: UpdateResponseCode responseCode,
   2: string message
   3: optional map<i32, ShardUpdateResult> shards
-}
-
-struct FinishUpdateResponse {
-  1: ResponseCode responseCode,
-  2: string message
 }
 
 struct GetQuotaResponse {
@@ -374,11 +363,6 @@ struct GetJobsResponse {
   3: set<JobConfiguration> configs
 }
 
-struct KillResponse {
-  1: ResponseCode responseCode
-  2: string message
-}
-
 // Contains a set of restrictions on matching tasks where all restrictions must be met (terms are
 // AND'ed together).
 struct TaskQuery {
@@ -430,7 +414,7 @@ struct EndMaintenanceResponse {
 service AuroraSchedulerManager {
   // Creates a new job.  The request will be denied if a job with the provided
   // name already exists in the cluster.
-  CreateJobResponse createJob(1: JobConfiguration description, 2: SessionKey session)
+  Response createJob(1: JobConfiguration description, 2: SessionKey session)
 
   // Populates fields in a job configuration as though it were about to be run.
   // This can be used to diff a configuration running tasks.
@@ -438,7 +422,7 @@ service AuroraSchedulerManager {
 
   // Starts a cron job immediately.  The request will be denied if the specified job does not
   // exist for the role account, or the job is not a cron job.
-  StartCronResponse startCronJob(4: JobKey job, 3: SessionKey session)
+  Response startCronJob(4: JobKey job, 3: SessionKey session)
 
   // Starts a new update.
   StartUpdateResponse startUpdate(1: JobConfiguration updatedConfig, 2: SessionKey session)
@@ -462,14 +446,14 @@ service AuroraSchedulerManager {
       5: SessionKey session)
 
   // Completes the update process, indicating to the scheduler the result of the update.
-  FinishUpdateResponse finishUpdate(
+  Response finishUpdate(
       6: JobKey job,
       3: UpdateResult updateResult,
       4: string updateToken,
       5: SessionKey session)
 
   // Restarts a batch of shards.
-  RestartShardsResponse restartShards(5: JobKey job, 3: set<i32> shardIds, 4: SessionKey session)
+  Response restartShards(5: JobKey job, 3: set<i32> shardIds, 4: SessionKey session)
 
   // Fetches the status of tasks.
   ScheduleStatusResponse getTasksStatus(1: TaskQuery query)
@@ -479,36 +463,19 @@ service AuroraSchedulerManager {
   GetJobsResponse getJobs(1: string ownerRole)
 
   // Initiates a kill on tasks.
-  KillResponse killTasks(1: TaskQuery query, 2: SessionKey session)
+  Response killTasks(1: TaskQuery query, 2: SessionKey session)
 
   // Fetches the quota allocated for a user.
   GetQuotaResponse getQuota(1: string ownerRole)
 }
 
-struct SetQuotaResponse {
-  1: ResponseCode responseCode
-  2: string message
-}
 
-struct ForceTaskStateResponse {
-  1: ResponseCode responseCode
-  2: string message
-}
 
-struct PerformBackupResponse {
-  1: ResponseCode responseCode
-  2: string message
-}
 
 struct ListBackupsResponse {
   1: ResponseCode responseCode
   2: string message
   3: set<string> backups
-}
-
-struct StageRecoveryResponse {
-  1: ResponseCode responseCode
-  2: string message
 }
 
 struct QueryRecoveryResponse {
@@ -517,30 +484,10 @@ struct QueryRecoveryResponse {
   3: set<ScheduledTask> tasks
 }
 
-struct DeleteRecoveryTasksResponse {
-  1: ResponseCode responseCode
-  2: string message
-}
-
-struct CommitRecoveryResponse {
-  1: ResponseCode responseCode
-  2: string message
-}
-
-struct UnloadRecoveryResponse {
-  1: ResponseCode responseCode
-  2: string message
-}
-
 struct GetJobUpdatesResponse {
   1: ResponseCode responseCode
   2: string message
   3: set<JobUpdateConfiguration> jobUpdates
-}
-
-struct SnapshotResponse {
-  1: ResponseCode responseCode
-  2: string message
 }
 
 struct ShardConfigRewrite {
@@ -563,45 +510,40 @@ struct RewriteConfigsRequest {
   1: list<ConfigRewrite> rewriteCommands
 }
 
-struct RewriteConfigsResponse {
-  1: ResponseCode responseCode
-  2: string message
-}
-
 // It would be great to compose these services rather than extend, but that won't be possible until
 // https://issues.apache.org/jira/browse/THRIFT-66 is resolved.
 service AuroraAdmin extends AuroraSchedulerManager {
   // Assign quota to a user.  This will overwrite any pre-existing quota for the user.
-  SetQuotaResponse setQuota(1: string ownerRole, 2: Quota quota, 3: SessionKey session)
+  Response setQuota(1: string ownerRole, 2: Quota quota, 3: SessionKey session)
 
   // Forces a task into a specific state.  This does not guarantee the task will enter the given
   // state, as the task must still transition within the bounds of the state machine.  However,
   // it attempts to enter that state via the state machine.
-  ForceTaskStateResponse forceTaskState(
+  Response forceTaskState(
       1: string taskId,
       2: ScheduleStatus status,
       3: SessionKey session)
 
   // Immediately writes a storage snapshot to disk.
-  PerformBackupResponse performBackup(1: SessionKey session)
+  Response performBackup(1: SessionKey session)
 
   // Lists backups that are available for recovery.
   ListBackupsResponse listBackups(1: SessionKey session)
 
   // Loads a backup to an in-memory storage.  This must precede all other recovery operations.
-  StageRecoveryResponse stageRecovery(1: string backupId, 2: SessionKey session)
+  Response stageRecovery(1: string backupId, 2: SessionKey session)
 
   // Queries for tasks in a staged recovery.
   QueryRecoveryResponse queryRecovery(1: TaskQuery query, 2: SessionKey session)
 
   // Deletes tasks from a staged recovery.
-  DeleteRecoveryTasksResponse deleteRecoveryTasks(1: TaskQuery query, 2: SessionKey session)
+  Response deleteRecoveryTasks(1: TaskQuery query, 2: SessionKey session)
 
   // Commits a staged recovery, completely replacing the previous storage state.
-  CommitRecoveryResponse commitRecovery(1: SessionKey session)
+  Response commitRecovery(1: SessionKey session)
 
   // Unloads (aborts) a staged recovery.
-  UnloadRecoveryResponse unloadRecovery(1: SessionKey session)
+  Response unloadRecovery(1: SessionKey session)
 
   // Put the given hosts into maintenance mode.
   StartMaintenanceResponse startMaintenance(
@@ -621,14 +563,14 @@ service AuroraAdmin extends AuroraSchedulerManager {
   GetJobUpdatesResponse getJobUpdates(1: SessionKey session)
 
   // Start a storage snapshot and block until it completes.
-  SnapshotResponse snapshot(1: SessionKey session)
+  Response snapshot(1: SessionKey session)
 
   // Forcibly rewrites the stored definition of user configurations.  This is intended to be used
   // in a controlled setting, primarily to migrate pieces of configurations that are opaque to the
   // scheduler (e.g. thermosConfig).
   // The scheduler may do some validation of the rewritten configurations, but it is important
   // that the caller take care to provide valid input and alter only necessary fields.
-  RewriteConfigsResponse rewriteConfigs(
+  Response rewriteConfigs(
       1: RewriteConfigsRequest request,
       2: SessionKey session)
 }

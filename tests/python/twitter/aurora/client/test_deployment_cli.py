@@ -18,7 +18,7 @@ class TestDeploymentCLI(mox.MoxTestBase):
   OPTIONS = Namespace(verbosity='normal')
   CLUSTERS = {'smfd': Cluster(name='smfd')}
   PROXY_HOST = 'nest1.corp.twitter.com'
-  CREATE_RESPONSE = ttypes.CreateJobResponse(responseCode=ttypes.ResponseCode.OK)
+  CREATE_RESPONSE = ttypes.Response(responseCode=ttypes.ResponseCode.OK)
   CHECK_INTERVAL = 1234
 
   DEPLOYMENT_CONFIG_CREATE_TIMESTAMP = 1374779340660

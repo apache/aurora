@@ -81,7 +81,7 @@ class UpdaterTest(unittest.TestCase):
         ).AndReturn(response)
 
   def expect_restart(self, shard_ids):
-    response = RestartShardsResponse(responseCode=ResponseCode.OK, message='test')
+    response = Response(responseCode=ResponseCode.OK, message='test')
     self._scheduler.restartShards(self._job_key, shard_ids, self._session_key).AndReturn(response)
 
   def expect_rollback(self, shard_ids, shard_results=None):
