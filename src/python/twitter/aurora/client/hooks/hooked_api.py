@@ -12,9 +12,11 @@ from . import JoinPoint
 
 class NonHookedAuroraClientAPI(AuroraClientAPI):
   """
-    This wraps the AuroraClientAPI methods and certain methods accept an extra 'config' param
-    that is not passed forward to the API method.
-    This config param contains the configured hooks.
+    This wraps those AuroraClientAPI methods that don't have an AuroraConfig 'config' param
+    to take an optional 'config' param which:
+    * contains the configured hooks (config.hooks)
+    * is dropped before the call is proxied to AuroraClientAPI
+    * is thus available to API methods in subclasses
   """
 
   def cancel_update(self, job_key, config=None):
@@ -36,13 +38,12 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
     Adds a hooking aspect/behaviour to the lifecycle of Mesos Client API methods
     by injecting hooks (instances of twitter.aurora.client.hooks.Hooks)
 
-    * It wraps each API method to have:
-      * a 'pre' hook before execution
-      * a 'post' hook after successful execution
-      * a 'err' hook after unsuccessful execution
-    * It captures the requested hooks available in config.hooks
-    * It allows updating the hooks list using hooks_list_updater
-    * It runs these hooks (pre, post/err) for each API call - this is the aspect
+    * Hooks are available in the 'config' (AuroraConfig) param that each API call receives
+    * Each Hook is run around each API call:
+      * 'pre' hook before the call
+      * 'post' hook if the call succeeds
+      * 'err' hook if the call fails
+    * If the hook itself fails, then it is treated as a WARN rather than an ERROR
   """
 
   class Error(Exception): pass
