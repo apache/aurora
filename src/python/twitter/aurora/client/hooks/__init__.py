@@ -8,10 +8,7 @@ __all__ = [
 ]
 
 
-RawJoinPoint = namedtuple('RawJoinPoint', ['time', 'method'])
-
-
-class JoinPoint(RawJoinPoint):
+class JoinPoint(namedtuple('JoinPoint', ['time', 'method'])):
   """
     A join point is an opportunity for code to be executed
     Here we have restricted it to just a time and a method (and without wildcards)
@@ -22,13 +19,14 @@ class JoinPoint(RawJoinPoint):
 
   TIMES = ('pre', 'post', 'err')
 
-  def __init__(self, *args, **kw):
+  def __new__(cls, *args, **kw):
     try:
-      super(JoinPoint, self).__init__(*args, **kw)
+      jp = super(JoinPoint, cls).__new__(cls, *args, **kw)
     except TypeError:
-      raise self.Invalid('Invalid # of args in %s' % repr(self))
-    if self.time not in self.TIMES:
-      raise self.Invalid('Invalid time in %s' % repr(self))
+      raise cls.Invalid('Invalid # of args in %s' % cls.__name__)
+    if jp.time not in cls.TIMES:
+      raise cls.Invalid('Invalid time in %s' % cls.__name__)
+    return jp
 
   def name(self):
     return '%s_%s' % (self.time, self.method)
