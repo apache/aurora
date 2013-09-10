@@ -126,7 +126,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
   private Quota getNonProdConsumption(String role) {
     FluentIterable<TaskConfig> tasks =
         FluentIterable
-        .from(Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(role)))
+        .from(Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(role).active()))
         .transform(Tasks.SCHEDULED_TO_INFO)
         .filter(Predicates.not(Tasks.IS_PRODUCTION));
 
