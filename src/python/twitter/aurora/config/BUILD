@@ -18,6 +18,7 @@ python_library(
     pants('src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/vert:schema'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/python/twitter/aurora/client/hooks:internal_hooks'),
   ]
 )
 
