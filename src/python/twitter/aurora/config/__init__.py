@@ -203,6 +203,9 @@ class AuroraConfig(object):
   def environment(self):
     return self._job.environment().get()
 
+  def job_key(self):
+    return AuroraJobKey(self.cluster(), self.role(), self.environment(), self.name())
+
   def ports(self):
     """Return the list of ports that need to be allocated by the scheduler."""
 

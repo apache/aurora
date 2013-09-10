@@ -7,7 +7,21 @@ from twitter.aurora.common import AuroraJobKey
 
 from gen.twitter.aurora.ttypes import ResponseCode
 
-from . import JoinPoint
+
+def _partial(function, *args, **kw):
+  """Returns a partial function __name__ inherited from parent function."""
+  partial = functools.partial(function, *args, **kw)
+  return functools.update_wrapper(partial, function)
+
+
+class HookConfig(object):
+  def __init__(self, config, job_key):
+    self.config = config
+    self.job_key = job_key or (config.job_key() if config is not None else None)
+
+  def __iter__(self):
+    yield self.config
+    yield self.job_key
 
 
 class NonHookedAuroraClientAPI(AuroraClientAPI):
@@ -57,72 +71,96 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
           ResponseCode._VALUES_TO_NAMES.get(self.response.responseCode, 'UNKNOWN'),
           self.response.message)
 
+  @classmethod
+  def _meta_hook(cls, hook, hook_method):
+    def callback():
+      if hook_method is None:
+        return True
+      log.debug('Running %s in %s' % (hook_method.__name__, hook.__class__.__name__))
+      hook_result = False
+      try:
+        hook_result = hook_method()
+        if not hook_result:
+          log.debug('%s in %s returned False' % (hook_method.__name__,
+              hook.__class__.__name__))
+      except Exception:
+        log.warn('Error in %s in %s' %
+            (hook_method.__name__, hook.__class__.__name__))
+        log.warn(traceback.format_exc())
+      return hook_result
+    return callback
+
+  @classmethod
+  def _generate_method(cls, hook, config, job_key, event, method, extra_argument=None):
+    method_name, args, kw = method.__name__, method.args, method.keywords
+    kw = kw or {}
+    hook_method = getattr(hook, '%s_%s' % (event, method_name), None)
+    if callable(hook_method):
+      if extra_argument is not None:
+        hook_method = _partial(hook_method, extra_argument)
+      return _partial(hook_method, *args, **kw)
+    else:
+      hook_method = getattr(hook, 'generic_hook', None)
+      if hook_method is None:
+        return None
+      hook_method = _partial(hook_method, HookConfig(config, job_key),
+          event, method_name, extra_argument)
+      return _partial(hook_method, args, kw)
+
+  @classmethod
+  def _yield_hooks(cls, event, config, job_key, api_call, extra_argument=None):
+    hooks = config.hooks if config is not None else ()
+    for hook in hooks:
+      yield cls._meta_hook(hook,
+          cls._generate_method(hook, config, job_key, event, api_call, extra_argument))
+
+  @classmethod
+  def _invoke_hooks(cls, event, config, job_key, api_call, extra_argument=None):
+    return all(hook() for hook in cls._yield_hooks(event, config, job_key, api_call,
+        extra_argument))
+
   def _hooked_call(self, config, job_key, api_call):
-    pre, post, err = [JoinPoint(time, api_call.func.__name__) for time in JoinPoint.TIMES]
-
-    if config and not job_key:
-      job_key = AuroraJobKey(config.cluster(), config.role(),
-          config.environment(), config.name())
-
-    proceed = self._call_all_hooks(pre, api_call, None, config, job_key)
-    if not proceed:
-      raise self.PreHooksStoppedCall('Pre hooks stopped call to %s' % api_call.func.__name__)
+    if not self._invoke_hooks('pre', config, job_key, api_call):
+      raise self.PreHooksStoppedCall('Pre hooks stopped call to %s' % api_call.__name__)
 
     try:
       resp = api_call()
     except Exception as e:
-      self._call_all_hooks(err, api_call, e, config, job_key)
+      self._invoke_hooks('err', config, job_key, api_call, e)
       raise  # propagate since the API method call failed for unknown reasons
 
     if resp.responseCode != ResponseCode.OK:
-      self._call_all_hooks(err, api_call, self.APIError(resp), config, job_key)
+      self._invoke_hooks('err', config, job_key, api_call, self.APIError(resp))
     else:
-      self._call_all_hooks(post, api_call, resp, config, job_key)
+      self._invoke_hooks('post', config, job_key, api_call, resp)
 
     return resp
 
-  def _call_all_hooks(self, join_point, api_call, result_or_err, config, job_key):
-    hooks = config.hooks if config else []
-    for hook in hooks:
-      # TODO(sgeorge): AWESOME-4752: Call hooks in an async manner
-      log.debug('Running %s in %s' % (join_point.name(), hook.__class__.__name__))
-      try:
-        hook_method = getattr(hook, join_point.name())
-        hook_result = hook_method(job_key, result_or_err, api_call.args, api_call.keywords)
-        if not hook_result:
-          log.debug('%s in %s returned False' % (repr(join_point), hook.__class__.__name__))
-          return False
-      except Exception:
-        log.warn('Error in %s in %s' %
-            (join_point.name(), hook.__class__.__name__))
-        log.warn(traceback.format_exc())
-    return True  # None of the pre hooks returned False
-
   def create_job(self, config):
     return self._hooked_call(config, None,
-        functools.partial(super(HookedAuroraClientAPI, self).create_job, config))
+        _partial(super(HookedAuroraClientAPI, self).create_job, config))
 
   def cancel_update(self, job_key, config=None):
     return self._hooked_call(config, job_key,
-        functools.partial(super(HookedAuroraClientAPI, self).cancel_update,
+        _partial(super(HookedAuroraClientAPI, self).cancel_update,
             job_key, config=config))
 
   def kill_job(self, job_key, shards=None, config=None):
     return self._hooked_call(config, job_key,
-        functools.partial(super(HookedAuroraClientAPI, self).kill_job,
+        _partial(super(HookedAuroraClientAPI, self).kill_job,
             job_key, shards=shards, config=config))
 
   def restart(self, job_key, shards, updater_config, health_check_interval_seconds, config=None):
     return self._hooked_call(config, job_key,
-        functools.partial(super(HookedAuroraClientAPI, self).restart,
+        _partial(super(HookedAuroraClientAPI, self).restart,
             job_key, shards, updater_config, health_check_interval_seconds, config=config))
 
   def start_cronjob(self, job_key, config=None):
     return self._hooked_call(config, job_key,
-        functools.partial(super(HookedAuroraClientAPI, self).start_cronjob,
+        _partial(super(HookedAuroraClientAPI, self).start_cronjob,
             job_key, config=config))
 
   def update_job(self, config, health_check_interval_seconds=3, shards=None):
     return self._hooked_call(config, None,
-        functools.partial(super(HookedAuroraClientAPI, self).update_job,
+        _partial(super(HookedAuroraClientAPI, self).update_job,
             config, health_check_interval_seconds=health_check_interval_seconds, shards=shards))
