@@ -2,7 +2,7 @@ from inspect import getargspec
 
 from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI, NonHookedAuroraClientAPI
 from twitter.aurora.client.api import AuroraClientAPI
-from twitter.aurora.common.clusters import Cluster
+from twitter.aurora.common.cluster import Cluster
 
 from mock import Mock
 
@@ -53,3 +53,5 @@ def test_api_methods_params(method_name):
   else:
     assert nonhooked_argspec == hooked_argspec
   assert nonhooked_argspec == nonhooked_argspec
+
+
