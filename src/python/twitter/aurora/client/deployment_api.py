@@ -64,7 +64,7 @@ class AuroraDeploymentAPI(object):
     config_pkg_name = self._config_package_name(job_key)
     try:
       versions = self._packer.list_versions(job_key.role, config_pkg_name)
-    except Packer.Error as e:
+    except Packer.RequestError as e:
       self._handle_packer_error(e, job_key)
 
     latest = self._packer.get_version(job_key.role, self._config_package_name(job_key), 'latest')
@@ -111,7 +111,7 @@ class AuroraDeploymentAPI(object):
       latest = self._packer.get_version(job_key.role, self._config_package_name(job_key), 'latest')
       version = self._packer.get_version(
           job_key.role, self._config_package_name(job_key), version_id)
-    except Packer.Error as e:
+    except Packer.RequestError as e:
       self._handle_packer_error(e, job_key, version_id)
 
     config = DeploymentConfig.from_packer_get(version, version['id'] == latest['id'])
@@ -122,20 +122,14 @@ class AuroraDeploymentAPI(object):
     return config, content
 
   def _handle_packer_error(self, e, job_key, version=None):
-    # TODO(atollenaere): This is a hack around the fact the python packer client does not
-    #                    differentiate between 'no such package' and 'no such version'. We should
-    #                    revisit when implementing packer fetch in the packer client.
-    #                    see AWESOME-4623
-    if 'Requested package or version not found' in str(e):
-      if version is None or version == 'latest':
-        raise self.NoDeploymentError(job_key)
+    if e.status == 404:
       try:
         self._packer.list_versions(job_key.role, self._config_package_name(job_key))
         raise self.NoSuchVersion(job_key, version)
-      except Packer.Error as e:
-        raise self.NoDeploymentError(job_key)
-    else:
-      raise e
+      except Packer.RequestError as e:
+        if e.status == 404:
+          raise self.NoDeploymentError(job_key)
+    raise e
 
 
 class DeploymentConfig(object):

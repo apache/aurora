@@ -25,6 +25,8 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
   JOB_KEY = AuroraJobKey(CLUSTER.name, 'johndoe', 'devel', 'hello_world')
   MESSAGE = "testing\\nmessages"
   METADATA = json.dumps({'message': MESSAGE})
+  PACKER_ERROR_NOTFOUND = Packer.RequestError(
+      404, 'Not found', '{"message"="Requested package or version not found"}')
   PROXY_HOST = 'nest1.corp.twitter.com'
   SESSION_KEY = 'asdf'
   DEPLOYMENT_CONFIG = DeploymentConfig(
@@ -121,8 +123,9 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
 
   def test_log_no_deployment(self):
     self.mock_packer.list_versions(
-        self.JOB_KEY.role,
-        self.CONFIG_PACKAGE_NAME).AndRaise(Packer.Error('Requested package or version not found'))
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndRaise(self.PACKER_ERROR_NOTFOUND)
+    self.mock_packer.list_versions(
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndRaise(self.PACKER_ERROR_NOTFOUND)
     self.mox.ReplayAll()
 
     self.assertRaises(AuroraDeploymentAPI.NoDeploymentError, self.deployment_api.log, self.JOB_KEY)
@@ -214,11 +217,9 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
   def test_reset_no_deployment(self):
     reset_version = '15'
     self.mock_packer.get_version(
-        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, 'latest').AndRaise(
-            Packer.Error('Requested package or version not found'))
-    self.mock_packer.list_versions(
-        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndRaise(
-            Packer.Error('Requested package or version not found'))
+        self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, 'latest').AndRaise(self.PACKER_ERROR_NOTFOUND)
+    self.mock_packer.list_versions(self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndRaise(
+        self.PACKER_ERROR_NOTFOUND)
     self.mox.ReplayAll()
 
     self.assertRaises(
@@ -235,7 +236,7 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
             self.PACKER_DEPLOYMENT_CONFIG)
     self.mock_packer.get_version(
         self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME, '15').AndRaise(
-            Packer.Error('Requested package or version not found'))
+            self.PACKER_ERROR_NOTFOUND)
     self.mock_packer.list_versions(
         self.JOB_KEY.role, self.CONFIG_PACKAGE_NAME).AndReturn([self.PACKER_DEPLOYMENT_CONFIG])
     self.mox.ReplayAll()
