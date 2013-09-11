@@ -29,6 +29,8 @@ class TaskIdGenerator implements Function<TaskConfig, String> {
         .append(sep)
         .append(task.getOwner().getRole())       // Identification and collision prevention.
         .append(sep)
+        .append(task.getEnvironment())
+        .append(sep)
         .append(task.getJobName())
         .append(sep)
         .append(task.getShardId())               // Collision prevention within job.
