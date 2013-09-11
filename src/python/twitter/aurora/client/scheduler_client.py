@@ -21,13 +21,13 @@ from pystachio import Default, Integer, String
 
 
 class SchedulerClientTrait(Cluster.Trait):
-  zk             = String
-  zk_port        = Default(Integer, 2181)
-  scheduler_path = String
-  scheduler_uri  = String
-  force_notunnel = Default(Integer, 0)
-  proxy_url      = String
-  auth_mechanism = Default(String, 'UNAUTHENTICATED')
+  zk                = String
+  zk_port           = Default(Integer, 2181)
+  scheduler_zk_path = String
+  scheduler_uri     = String
+  force_notunnel    = Default(Integer, 0)
+  proxy_url         = String
+  auth_mechanism    = Default(String, 'UNAUTHENTICATED')
 
 
 class SchedulerClient(object):
@@ -36,7 +36,9 @@ class SchedulerClient(object):
 
   class CouldNotConnect(Exception): pass
 
-  # TODO(wickman) Refactor per MESOS-3005
+  # TODO(wickman) Refactor per MESOS-3005 into two separate classes with separate traits:
+  #   ZookeeperClientTrait
+  #   DirectClientTrait
   @classmethod
   def get(cls, cluster, **kwargs):
     if not isinstance(cluster, Cluster):
@@ -44,10 +46,13 @@ class SchedulerClient(object):
     cluster = cluster.with_trait(SchedulerClientTrait)
     if cluster.zk:
       return ZookeeperSchedulerClient(cluster, port=cluster.zk_port, ssl=True, **kwargs)
-    elif cluster.scheduler_uri.startswith('localhost:'):
-      log.info('Attempting to talk to local scheduler.')
-      port = int(cluster.scheduler_uri.split(':')[1])
-      return LocalSchedulerClient(port, ssl=True)
+    elif cluster.scheduler_uri:
+      try:
+        host, port = cluster.scheduler_uri.split(':', 2)
+        port = int(port)
+      except ValueError:
+        raise ValueError('Malformed Cluster scheduler_uri: %s' % cluster.scheduler_uri)
+      return DirectSchedulerClient(host, port, ssl=True)
     else:
       raise ValueError('"cluster" does not specify zk or scheduler_uri')
 
@@ -92,6 +97,9 @@ class ZookeeperSchedulerClient(SchedulerClient):
   def get_scheduler_serverset(cls, cluster, port=2181, verbose=False, **kw):
     if cluster.zk is None:
       raise ValueError('Cluster has no associated zookeeper ensemble!')
+    if cluster.scheduler_zk_path is None:
+      raise ValueError('Cluster has no defined scheduler path, must specify scheduler_zk_path '
+                       'in your cluster config!')
     zk = TwitterKazooClient.make(str('%s:%s' % (cluster.zk, port)), verbose=verbose)
     return zk, ServerSet(zk, cluster.scheduler_zk_path, **kw)
 
@@ -126,10 +134,10 @@ class ZookeeperSchedulerClient(SchedulerClient):
       return 'http://%s:%s' % (self._http.host, self._http.port)
 
 
-class LocalSchedulerClient(SchedulerClient):
-  def __init__(self, port, ssl=False):
+class DirectSchedulerClient(SchedulerClient):
+  def __init__(self, host, port, ssl=False):
     SchedulerClient.__init__(self, verbose=True, ssl=ssl)
-    self._host = 'localhost'
+    self._host = host
     self._port = port
 
   def _connect(self):
@@ -137,7 +145,8 @@ class LocalSchedulerClient(SchedulerClient):
 
   @property
   def url(self):
-    return 'http://localhost:8081'
+    # TODO(wickman) This is broken -- make this tunable in MESOS-3005
+    return 'http://%s:8081' % self._host
 
 
 class SchedulerProxy(object):

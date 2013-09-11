@@ -3,6 +3,7 @@ python_test_suite(
   dependencies = [
     pants(':test_aurora_job_key'),
     pants(':test_cluster'),
+    pants(':test_clusters'),
     pants(':test_cluster_option'),
     pants(':test_http_signaler'),
   ]
@@ -20,6 +21,15 @@ python_tests(
   sources = ['test_cluster.py'],
   dependencies = [
     pants('src/python/twitter/aurora/common:cluster'),
+  ]
+)
+
+python_tests(
+  name = 'test_clusters',
+  sources = ['test_clusters.py'],
+  dependencies = [
+    pants('3rdparty/python:pyyaml'),
+    pants('src/python/twitter/aurora/common:clusters'),
   ]
 )
 
