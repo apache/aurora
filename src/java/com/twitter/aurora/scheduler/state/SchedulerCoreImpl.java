@@ -5,6 +5,8 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
@@ -18,6 +20,7 @@ import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.ShardUpdateResult;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
@@ -65,6 +68,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   private final StateManagerImpl stateManager;
 
   private final QuotaManager quotaManager;
+  private final Function<TaskConfig, String> taskIdGenerator;
 
   /**
    * Creates a new core scheduler.
@@ -81,7 +85,8 @@ class SchedulerCoreImpl implements SchedulerCore {
       CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
       StateManagerImpl stateManager,
-      QuotaManager quotaManager) {
+      QuotaManager quotaManager,
+      Function<TaskConfig, String> taskIdGenerator) {
 
     this.storage = checkNotNull(storage);
 
@@ -91,6 +96,7 @@ class SchedulerCoreImpl implements SchedulerCore {
     this.cronScheduler = cronScheduler;
     this.stateManager = checkNotNull(stateManager);
     this.quotaManager = checkNotNull(quotaManager);
+    this.taskIdGenerator = checkNotNull(taskIdGenerator);
   }
 
   private boolean hasActiveJob(JobConfiguration job) {
@@ -102,6 +108,18 @@ class SchedulerCoreImpl implements SchedulerCore {
     setTaskStatus(Query.taskScoped(taskIds), ScheduleStatus.UNKNOWN, Optional.<String>absent());
   }
 
+  // This number is derived from the maximum file name length limit on most UNIX systems, less
+  // the number of characters we've observed being added by mesos for the executor ID, prefix, and
+  // delimiters.
+  @VisibleForTesting
+  static final int MAX_TASK_ID_LENGTH = 255 - 90;
+
+  private void checkTaskIdLength(TaskConfig taskConfig) throws ScheduleException {
+    if (taskIdGenerator.apply(taskConfig).length() > MAX_TASK_ID_LENGTH) {
+      throw new ScheduleException("Task ID is too long, please shorten your role or job name.");
+    }
+  }
+
   @Override
   public synchronized void createJob(ParsedConfiguration parsedConfiguration)
       throws ScheduleException {
@@ -111,6 +129,8 @@ class SchedulerCoreImpl implements SchedulerCore {
       throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
     }
 
+    // TODO(William Farner); This is a short-term hack to stop the bleeding from MESOS-3788.
+    checkTaskIdLength(Iterables.getFirst(parsedConfiguration.getTaskConfigs(), null));
     ensureHasAdditionalQuota(job.getOwner().getRole(), Quotas.fromJob(job));
 
     boolean accepted = false;

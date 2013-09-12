@@ -15,6 +15,7 @@ import javax.annotation.Nullable;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
+import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -27,7 +28,6 @@ import com.google.common.collect.Sets;
 
 import org.apache.mesos.Protos.SlaveID;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -120,7 +120,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final String SLAVE_HOST_1 = "SlaveHost1";
 
   private Driver driver;
-  private Function<TaskConfig, String> taskIdGenerator;
   private StateManagerImpl stateManager;
   private Storage storage;
   private SchedulerCoreImpl scheduler;
@@ -131,20 +130,17 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private Closure<PubsubEvent> eventSink;
   private ShutdownRegistry shutdownRegistry;
 
+  // TODO(William Farner): Set up explicit expectations for calls to generate task IDs.
+  private final AtomicLong idCounter = new AtomicLong();
+  private Function<TaskConfig, String> taskIdGenerator = new Function<TaskConfig, String>() {
+    @Override public String apply(TaskConfig input) {
+      return "task-" + idCounter.incrementAndGet();
+    }
+  };
+
   @Before
   public void setUp() throws Exception {
     driver = createMock(Driver.class);
-
-    // TODO(William Farner): Set up explicit expectations for calls to generate task IDs.
-    taskIdGenerator = createMock(new Clazz<Function<TaskConfig, String>>() { });
-    final AtomicLong idCounter = new AtomicLong();
-    expect(taskIdGenerator.apply(EasyMock.<TaskConfig>anyObject())).andAnswer(
-        new IAnswer<String>() {
-          @Override public String answer() throws Throwable {
-            return "task-" + idCounter.incrementAndGet();
-          }
-        }).anyTimes();
-
     clock = new FakeClock();
     eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
     eventSink.execute(EasyMock.<PubsubEvent>anyObject());
@@ -194,7 +190,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         cron,
         immediateManager,
         stateManager,
-        quotaManager);
+        quotaManager,
+        taskIdGenerator);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
 
@@ -1803,6 +1800,34 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertEquals(expected.getSecond(), event.getMessage());
       assertEquals(hostname, event.getScheduler());
     }
+  }
+
+  @Test
+  public void testTaskIdLimit() throws Exception {
+    taskIdGenerator = new Function<TaskConfig, String>() {
+      @Override public String apply(TaskConfig input) {
+        return Strings.repeat("a", SchedulerCoreImpl.MAX_TASK_ID_LENGTH);
+      }
+    };
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(KEY_A, 1));
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testRejectLongTaskId() throws Exception {
+    taskIdGenerator = new Function<TaskConfig, String>() {
+      @Override public String apply(TaskConfig input) {
+        return Strings.repeat("a", SchedulerCoreImpl.MAX_TASK_ID_LENGTH + 1);
+      }
+    };
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(KEY_A, 1));
   }
 
   private static String getLocalHost() {
