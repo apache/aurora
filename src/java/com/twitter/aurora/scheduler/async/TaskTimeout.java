@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -42,6 +43,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class TaskTimeout implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(TaskTimeout.class.getName());
+
+  private final AtomicLong timedOutTasks = Stats.exportLong("timed_out_tasks");
 
   @VisibleForTesting
   static final Optional<String> TIMEOUT_MESSAGE = Optional.of("Task timed out");
@@ -174,6 +177,7 @@ class TaskTimeout implements EventSubscriber {
         }
 
         LOG.info("Timeout reached for task " + key);
+        timedOutTasks.incrementAndGet();
         // This query acts as a CAS by including the state that we expect the task to be in if the
         // timeout is still valid.  Ideally, the future would have already been canceled, but in the
         // event of a state transition race, including transientState prevents an unintended
