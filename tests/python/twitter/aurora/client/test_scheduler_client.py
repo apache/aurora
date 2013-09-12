@@ -5,7 +5,7 @@ import twitter.aurora.client.scheduler_client as scheduler_client
 
 import gen.twitter.aurora.AuroraAdmin as AuroraAdmin
 import gen.twitter.aurora.AuroraSchedulerManager as AuroraSchedulerManager
-from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
+from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT, CURRENT_API_VERSION
 from gen.twitter.aurora.ttypes import *
 
 from mox import IgnoreArg, IsA, Mox
@@ -29,6 +29,7 @@ class TestSchedulerProxy(scheduler_client.SchedulerProxy):
   """In testing we shouldn't use the real SSHAgentAuthenticator."""
   def session_key(self):
     return self.create_session('SOME_USER')
+
   @classmethod
   def create_session(cls, user):
     return SessionKey(mechanism='test', data='test')
@@ -47,6 +48,8 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     scheduler_client.SchedulerClient.get(IgnoreArg(), verbose=IgnoreArg()).AndReturn(
         self.mock_scheduler_client)
     self.mock_scheduler_client.get_thrift_client().AndReturn(self.mock_thrift_client)
+
+    self.mock_thrift_client.getVersion().AndReturn(CURRENT_API_VERSION)
 
   def tearDown(self):
     self.mox.UnsetStubs()
@@ -167,6 +170,14 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.mox.ReplayAll()
 
     self.make_scheduler_proxy().endMaintenance(Hosts())
+
+  def test_getVersion(self):
+    self.mock_thrift_client.getVersion()
+
+    self.mox.ReplayAll()
+
+    self.make_scheduler_proxy().getVersion()
+
 
 class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
   def test_setQuota(self):

@@ -12,15 +12,22 @@ enum ResponseCode {
   AUTH_FAILED     = 4
 }
 
+struct APIVersion {
+  1: required i32 major
+}
+
+// Scheduler Thrift API Version. Increment this when breaking backwards compatibility.
+const APIVersion CURRENT_API_VERSION = {'major': 0}
 
 union Result {
-  // TODO(zmanji): Move all RPC-specific result types here as apart of MESOS-3434
+  // TODO(zmanji): Move all RPC-specific result types here as apart of MESOS-3751
 }
 
 struct Response {
   1: ResponseCode responseCode
   2: string message
   3: optional Result result
+  // TODO(zmanji): Add version field per MESOS-3752
 }
 
 struct Identity {
@@ -467,9 +474,10 @@ service AuroraSchedulerManager {
 
   // Fetches the quota allocated for a user.
   GetQuotaResponse getQuota(1: string ownerRole)
+
+  // Returns the current version of the API implementation
+  APIVersion getVersion()
 }
-
-
 
 
 struct ListBackupsResponse {

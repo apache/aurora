@@ -1,5 +1,4 @@
 import functools
-import getpass
 import threading
 import time
 
@@ -13,6 +12,7 @@ from twitter.aurora.common.auth import make_session_key, SessionKeyError
 from twitter.aurora.common.cluster import Cluster
 
 from gen.twitter.aurora import AuroraAdmin
+from gen.twitter.aurora.constants import CURRENT_API_VERSION
 
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
@@ -162,12 +162,14 @@ class SchedulerProxy(object):
     'populateJobConfig',
     'getTasksStatus',
     'getJobs',
-    'getQuota'
+    'getQuota',
+    'getVersion',
   ])
 
   class Error(Exception): pass
   class TimeoutError(Error): pass
   class AuthenticationError(Error): pass
+  class APIVersionError(Error): pass
 
   def __init__(self, cluster, verbose=False, session_key_factory=make_session_key):
     """A callable session_key_factory should be provided for authentication"""
@@ -220,6 +222,11 @@ class SchedulerProxy(object):
         log.warning('Could not connect to scheduler: %s' % e)
     if not self._client:
       raise self.TimeoutError('Timed out trying to connect to scheduler at %s' % self.cluster.name)
+
+    server_version = self._client.getVersion()
+    if server_version != CURRENT_API_VERSION:
+      raise self.APIVersionError("Client Version: %s, Server Version: %s" %
+                                 (CURRENT_API_VERSION, server_version))
 
   def __getattr__(self, method_name):
     # If the method does not exist, getattr will return AttributeError for us.

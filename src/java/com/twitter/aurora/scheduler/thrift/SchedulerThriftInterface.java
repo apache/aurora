@@ -31,6 +31,7 @@ import com.google.inject.Inject;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
+import com.twitter.aurora.gen.APIVersion;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
@@ -102,6 +103,7 @@ import com.twitter.common.util.BackoffHelper;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static com.twitter.aurora.auth.SessionValidator.SessionContext;
+import static com.twitter.aurora.gen.Constants.CURRENT_API_VERSION;
 import static com.twitter.aurora.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.aurora.gen.ResponseCode.ERROR;
 import static com.twitter.aurora.gen.ResponseCode.INVALID_REQUEST;
@@ -870,6 +872,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         return resp;
       }
     });
+  }
+
+  @Override
+  public APIVersion getVersion() {
+    return CURRENT_API_VERSION;
   }
 
   @VisibleForTesting
