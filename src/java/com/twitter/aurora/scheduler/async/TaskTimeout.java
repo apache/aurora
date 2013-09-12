@@ -112,11 +112,7 @@ class TaskTimeout implements EventSubscriber {
     exportStats();
   }
 
-  private void registerTimeout(TimeoutKey key, long timestampMillis) {
-    long timeElapsed = Math.max(0, clock.nowMillis() - timestampMillis);
-    long timeoutRemaining = Math.max(0, timeoutMillis - timeElapsed);
-
-    LOG.fine("Timing out task " + key.taskId + " in " + timeoutRemaining + " ms.");
+  private void registerTimeout(TimeoutKey key) {
     // This is an obvious check-then-act, but:
     //   - there isn't much of a better option, given that we have to get the Future before
     //     inserting into the map
@@ -127,9 +123,9 @@ class TaskTimeout implements EventSubscriber {
     if (!futures.containsKey(key)) {
       Future<?> timeoutHandler = executor.schedule(
           new TimedOutTaskHandler(key),
-          timeoutRemaining,
+          timeoutMillis,
           TimeUnit.MILLISECONDS);
-      futures.put(key, new Context(timestampMillis, timeoutHandler));
+      futures.put(key, new Context(clock.nowMillis(), timeoutHandler));
     }
   }
 
@@ -151,16 +147,14 @@ class TaskTimeout implements EventSubscriber {
     }
 
     if (isTransient(newState)) {
-      registerTimeout(new TimeoutKey(taskId, change.getNewState()), clock.nowMillis());
+      registerTimeout(new TimeoutKey(taskId, change.getNewState()));
     }
   }
 
   @Subscribe
   public void storageStarted(StorageStarted event) {
     for (ScheduledTask task : Storage.Util.consistentFetchTasks(storage, TRANSIENT_QUERY)) {
-      registerTimeout(
-          new TimeoutKey(Tasks.id(task), task.getStatus()),
-          Iterables.getLast(task.getTaskEvents()).getTimestamp());
+      registerTimeout(new TimeoutKey(Tasks.id(task), task.getStatus()));
     }
   }
 

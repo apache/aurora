@@ -184,8 +184,8 @@ public class TaskTimeoutTest extends EasyMockTest {
         makeTask("b", KILLING, TIMEOUT_MS),
         makeTask("c", PREEMPTING, TIMEOUT_MS * 3) /* In the future */
     );
-    expectTaskWatch(0);
-    expectTaskWatch(0);
+    expectTaskWatch(TIMEOUT_MS);
+    expectTaskWatch(TIMEOUT_MS);
     expectTaskWatch(TIMEOUT_MS);
     expectCancel().times(3);
 
