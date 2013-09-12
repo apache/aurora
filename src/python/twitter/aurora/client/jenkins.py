@@ -14,7 +14,6 @@ __all__ = [
 ]
 
 
-# TODO(wickman): This option is global i.e. not tailored to relevant sub-commands
 app.add_option(
     '--jenkins_url',
     dest='jenkins_url',

@@ -39,15 +39,7 @@ class AppLayout(Struct):
 class PackerObject(Struct):
   package = String
   package_uri = String
-
-  # 'copy_command' is bound to the command in the context
   copy_command = String
-
-  tunnel_host = Default(String, 'nest2.corp.twitter.com')
-  local_copy_command = Default(String,
-      'ssh {{tunnel_host}} hadoop fs -cat {{package_uri}} > {{package}}')
-  remote_copy_command = Default(String,
-      'hadoop fs -copyToLocal {{package_uri}} {{package}}')
 
 
 class UpdateConfig(Struct):

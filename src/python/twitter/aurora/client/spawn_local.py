@@ -148,8 +148,8 @@ def spawn_local(runner, jobname, config_file, json=False, open_browser=False,
   """
     Spawn a local run of a task.
   """
-  config = get_config(jobname, config_file, json, force_local=True,
-      bindings=bindings, select_cluster=cluster, select_env=env)
+  config = get_config(jobname, config_file, json, bindings=bindings,
+      select_cluster=cluster, select_env=env)
 
   checkpoint_root = os.path.expanduser(os.path.join('~', '.thermos'))
   _, port = spawn_observer(checkpoint_root)

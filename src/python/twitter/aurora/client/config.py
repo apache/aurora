@@ -13,7 +13,6 @@ from twitter.common import app, log
 
 from twitter.aurora.client import binding_helpers
 from twitter.aurora.client.base import deprecation_warning, die
-from twitter.aurora.client.build import BuildArtifactResolver
 from twitter.aurora.config import AuroraConfig
 from twitter.aurora.config.recipes import Recipes
 from twitter.thermos.config.schema_helpers import Tasks
@@ -174,7 +173,7 @@ def validate_config(config, env=None):
   _validate_environment_name(config)
 
 
-def populate_namespaces(config, env=None, force_local=False):
+def populate_namespaces(config, env=None):
   _inject_default_environment(config)
   _warn_on_deprecated_cron_policy(config)
   _warn_on_deprecated_daemon_job(config)
@@ -195,30 +194,26 @@ def inject_recipes(config, env=None):
   config.update_job(job(task=Tasks.concat(*tasks)))
 
 
-def AnnotatedAuroraConfig(force_local):
-  class _AnnotatedAuroraConfig(AuroraConfig):
-    @classmethod
-    def plugins(cls):
-      return (inject_hooks,
-              inject_recipes,
-              functools.partial(binding_helpers.apply_all, force_local=force_local),
-              functools.partial(populate_namespaces, force_local=force_local),
-              validate_config)
-  return _AnnotatedAuroraConfig
+class AnnotatedAuroraConfig(AuroraConfig):
+  @classmethod
+  def plugins(cls):
+    return (inject_hooks,
+            inject_recipes,
+            functools.partial(binding_helpers.apply_all),
+            functools.partial(populate_namespaces),
+            validate_config)
 
 
 def get_config(jobname,
                config_file,
                json=False,
-               force_local=False,
                bindings=(),
                select_cluster=None,
                select_role=None,
                select_env=None):
   """Creates and returns a config object contained in the provided file."""
   Recipes.include_module('twitter.aurora.client.recipes')
-  AuroraConfig = AnnotatedAuroraConfig(force_local)
-  loader = AuroraConfig.load_json if json else AuroraConfig.load
+  loader = AnnotatedAuroraConfig.load_json if json else AnnotatedAuroraConfig.load
   return loader(config_file,
                 jobname,
                 bindings,

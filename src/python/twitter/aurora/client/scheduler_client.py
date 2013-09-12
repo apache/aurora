@@ -25,7 +25,6 @@ class SchedulerClientTrait(Cluster.Trait):
   zk_port           = Default(Integer, 2181)
   scheduler_zk_path = String
   scheduler_uri     = String
-  force_notunnel    = Default(Integer, 0)
   proxy_url         = String
   auth_mechanism    = Default(String, 'UNAUTHENTICATED')
 

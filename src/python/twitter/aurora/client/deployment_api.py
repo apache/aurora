@@ -42,7 +42,6 @@ class AuroraDeploymentAPI(object):
         job_key.name,
         config_filename,
         False,
-        False,
         None,
         select_cluster=job_key.cluster,
         select_role=job_key.role,

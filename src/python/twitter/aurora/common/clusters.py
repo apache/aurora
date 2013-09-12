@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 from collections import Mapping, namedtuple
+from contextlib import contextmanager
 import itertools
 import json
 import os
@@ -35,6 +36,7 @@ Parser = namedtuple('Parser', 'loader exception')
 class Clusters(Mapping):
   class Error(Exception): pass
   class ClusterExists(Error): pass
+  class ClusterNotFound(KeyError, Error): pass
   class UnknownFormatError(Error): pass
   class ParseError(Error): pass
 
@@ -89,6 +91,15 @@ class Clusters(Mapping):
     cluster.check_trait(NameTrait)
     self._clusters[cluster.name] = cluster
 
+  @contextmanager
+  def patch(self, cluster_list):
+    """Patch this Clusters instance with a new list of clusters in a
+       contextmanager.  Intended for testing purposes."""
+    old_clusters = self._clusters.copy()
+    self.replace(cluster_list)
+    yield self
+    self._clusters = old_clusters
+
   def __iter__(self):
     return iter(self._clusters)
 
@@ -96,7 +107,11 @@ class Clusters(Mapping):
     return len(self._clusters)
 
   def __getitem__(self, name):
-    return self._clusters[name]
+    try:
+      return self._clusters[name]
+    except KeyError:
+      raise self.ClusterNotFound('Unknown cluster %s, valid clusters: %s' % (
+          name, ', '.join(self._clusters.keys())))
 
 
 
