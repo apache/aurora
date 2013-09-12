@@ -80,6 +80,12 @@ class UpdaterTest(unittest.TestCase):
     self._scheduler.updateShards(self._job_key, shard_ids, self._update_token, self._session_key
         ).AndReturn(response)
 
+  def expect_invalid_update(self):
+    response = UpdateShardsResponse(responseCode=UpdateResponseCode.INVALID_REQUEST)
+    self._scheduler.updateShards(self._job_key, mox.IgnoreArg(), mox.IgnoreArg(), self._session_key
+        ).AndReturn(response)
+
+
   def expect_restart(self, shard_ids):
     response = Response(responseCode=ResponseCode.OK, message='test')
     self._scheduler.restartShards(self._job_key, shard_ids, self._session_key).AndReturn(response)
@@ -212,6 +218,18 @@ class UpdaterTest(unittest.TestCase):
     self.expect_watch_shards([6])
     self.replay_mocks()
     self.assert_update_result([0])
+    self.verify_mocks()
+
+  def test_invalid_response(self):
+    """A response code other than success is returned by a scheduler RPC."""
+    update_config = self.UPDATE_CONFIG.copy()
+    self.init_updater(update_config)
+    self.expect_invalid_update()
+
+    self.replay_mocks()
+    with pytest.raises(Updater.Error):
+      self.assert_update_result([0])
+
     self.verify_mocks()
 
   def test_invalid_batch_size(self):

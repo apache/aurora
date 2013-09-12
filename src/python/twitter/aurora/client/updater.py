@@ -15,10 +15,6 @@ from .shard_watcher import ShardWatcher
 from .scheduler_client import SchedulerProxy
 
 
-def debug_if(condition):
-  return log.DEBUG if condition else log.ERROR
-
-
 class Updater(object):
   """Update the shards of a job in batches."""
 
@@ -133,7 +129,8 @@ class Updater(object):
 
       failed_shards = self._shard_watcher.watch(shards_to_watch) if shards_to_watch else set()
 
-      log.log(debug_if(not failed_shards), 'Failed shards: %s' % failed_shards)
+      if failed_shards:
+        log.error('Failed shards: %s' % failed_shards)
       remaining_shards += [ShardState(shard_id, is_updated=True) for shard_id in failed_shards]
       remaining_shards.sort(key=lambda tup: tup.shard_id)
       failure_threshold.update_failure_counts(failed_shards)
@@ -159,9 +156,7 @@ class Updater(object):
       shards_to_rollback = list(set(shards_to_rollback) - set(batch_shards))
 
       resp = self._scheduler.rollbackShards(self._job_key, batch_shards, self._update_token)
-      log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
-        'Response from scheduler: %s (message: %s)'
-          % (UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+      self._check_and_log_update_response(resp)
       shards_to_watch = self._get_shards_to_watch(resp.shards, batch_shards)
       failed_shards += self._shard_watcher.watch(shards_to_watch)
 
@@ -178,9 +173,7 @@ class Updater(object):
     """
     log.info('Updating shards: %s' % shard_ids)
     resp = self._scheduler.updateShards(self._job_key, shard_ids, self._update_token)
-    log.log(debug_if(resp.responseCode == UpdateResponseCode.OK),
-        'Response from scheduler: %s (message: %s)' % (
-          UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+    self._check_and_log_update_response(resp)
     return resp.shards
 
   def _restart_shards(self, shard_ids):
@@ -191,6 +184,27 @@ class Updater(object):
     """
     log.info('Restarting shards: %s' % shard_ids)
     resp = self._scheduler.restartShards(self._job_key, shard_ids)
-    log.log(debug_if(resp.responseCode == ResponseCode.OK),
-        'Response from scheduler: %s (message: %s)' % (
-          ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+    self._check_and_log_response(resp)
+
+  @classmethod
+  def _handle_unexpected_response(cls, name, message):
+    e = cls.Error('Unexpected response from scheduler: %s (message: %s)' % (name, message))
+    log.error(e)
+    log.error('Aborting update without rollback!!!')
+    raise e
+
+  @classmethod
+  def _check_and_log_response(cls, resp):
+    name, message = ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message
+    if resp.responseCode == ResponseCode.OK:
+      log.debug('Response from scheduler: %s (message: %s)' % (name, message))
+    else:
+      cls._handle_unexpected_response(name, message)
+
+  @classmethod
+  def _check_and_log_update_response(cls, resp):
+    name, message = UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message
+    if resp.responseCode == UpdateResponseCode.OK:
+      log.debug('Response from scheduler: %s (message: %s)' % (name, message))
+    else:
+      cls._handle_unexpected_response(name, message)
