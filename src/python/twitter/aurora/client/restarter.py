@@ -38,7 +38,9 @@ class Restarter(object):
       if status.responseCode != ResponseCode.OK:
         return status
 
-      shards = sorted(task.assignedTask.task.shardId for task in status.tasks)
+      tasks = status.result.scheduleStatusResult.tasks
+
+      shards = sorted(task.assignedTask.task.shardId for task in tasks)
       if not shards:
         log.info("No shards specified, and no active shards found in job %s" % self._job_key)
         log.info("Nothing to do.")

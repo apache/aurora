@@ -47,21 +47,22 @@ import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.ListBackupsResponse;
 import com.twitter.aurora.gen.MaintenanceStatusResponse;
-import com.twitter.aurora.gen.PopulateJobResponse;
+import com.twitter.aurora.gen.PopulateJobResult;
 import com.twitter.aurora.gen.QueryRecoveryResponse;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.ResponseCode;
+import com.twitter.aurora.gen.Result;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
 import com.twitter.aurora.gen.RollbackShardsResponse;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduleStatusResponse;
+import com.twitter.aurora.gen.ScheduleStatusResult;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.ShardConfigRewrite;
 import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.StartMaintenanceResponse;
-import com.twitter.aurora.gen.StartUpdateResponse;
+import com.twitter.aurora.gen.StartUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResponseCode;
@@ -232,14 +233,17 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public PopulateJobResponse populateJobConfig(JobConfiguration description) {
+  public Response populateJobConfig(JobConfiguration description) {
     checkNotNull(description);
 
     // TODO(ksweeney): check valid JobKey in description after deprecating non-environment version.
 
-    PopulateJobResponse response = new PopulateJobResponse();
+    Response response = new Response();
+
     try {
-      response.setPopulated(ParsedConfiguration.fromUnparsed(description).getTaskConfigs())
+      PopulateJobResult result = new PopulateJobResult()
+          .setPopulated(ParsedConfiguration.fromUnparsed(description).getTaskConfigs());
+      response.setResult(Result.populateJobResult(result))
           .setResponseCode(OK)
           .setMessage("Tasks populated");
     } catch (TaskDescriptionException e) {
@@ -277,19 +281,23 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   // TODO(William Farner): Provide status information about cron jobs here.
   @Override
-  public ScheduleStatusResponse getTasksStatus(TaskQuery query) {
+  public Response getTasksStatus(TaskQuery query) {
     checkNotNull(query);
 
     Set<ScheduledTask> tasks =
         Storage.Util.weaklyConsistentFetchTasks(storage, Query.arbitrary(query));
 
-    ScheduleStatusResponse response = new ScheduleStatusResponse();
+    Response response = new Response();
+
     if (tasks.isEmpty()) {
       response.setResponseCode(INVALID_REQUEST)
           .setMessage("No tasks found for query: " + query);
     } else {
       response.setResponseCode(OK)
-          .setTasks(ImmutableList.copyOf(tasks));
+          .setResult(Result.scheduleStatusResult(
+              new ScheduleStatusResult().setTasks(ImmutableList.copyOf(tasks))
+              )
+          );
     }
 
     return response;
@@ -432,11 +440,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public StartUpdateResponse startUpdate(JobConfiguration job, SessionKey session) {
+  public Response startUpdate(JobConfiguration job, SessionKey session) {
     checkNotNull(job);
     checkNotNull(session);
 
-    StartUpdateResponse response = new StartUpdateResponse();
+    Response response = new Response();
+
     if (!JobKeys.isValid(job.getKey())) {
       return response.setResponseCode(INVALID_REQUEST)
           .setMessage("Invalid job key: " + job.getKey());
@@ -451,10 +460,15 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     try {
       Optional<String> token =
           schedulerCore.initiateJobUpdate(ParsedConfiguration.fromUnparsed(job));
-      response.setResponseCode(OK);
-      response.setRollingUpdateRequired(token.isPresent());
+
+      StartUpdateResult result = new StartUpdateResult()
+          .setRollingUpdateRequired(token.isPresent());
+
+      response.setResult(Result.startUpdateResult(result))
+        .setResponseCode(OK);
+
       if (token.isPresent()) {
-        response.setUpdateToken(token.get());
+        result.setUpdateToken(token.get());
         response.setMessage("Update successfully started.");
       } else {
         response.setMessage("Job successfully updated.");

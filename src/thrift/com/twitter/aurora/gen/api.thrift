@@ -17,18 +17,7 @@ struct APIVersion {
 }
 
 // Scheduler Thrift API Version. Increment this when breaking backwards compatibility.
-const APIVersion CURRENT_API_VERSION = {'major': 0}
-
-union Result {
-  // TODO(zmanji): Move all RPC-specific result types here as apart of MESOS-3751
-}
-
-struct Response {
-  1: ResponseCode responseCode
-  2: string message
-  3: optional Result result
-  // TODO(zmanji): Add version field per MESOS-3752
-}
+const APIVersion CURRENT_API_VERSION = {'major': 1}
 
 struct Identity {
   1: string role
@@ -181,25 +170,20 @@ struct JobConfiguration {
                                              // environment are used to construct it server-side.
 }
 
-struct PopulateJobResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<TaskConfig> populated
+struct PopulateJobResult {
+  1: set<TaskConfig> populated
 }
 
-struct StartUpdateResponse {
-  1: ResponseCode responseCode
-  2: string message
-
+struct StartUpdateResult {
   // A unique token to identify the update session.  Must be provided for any subsequent calls to
   // update-related functions.
-  3: optional string updateToken
+  1: optional string updateToken
 
   // If false, indicates that the update was complete and no additional calls are required for this
   // update.
   // If true, the update is staged and may proceed with subsequent calls to updateShards,
   // rollbackShards, and finishUpdate.
-  4: bool rollingUpdateRequired
+  2: bool rollingUpdateRequired
 }
 
 enum UpdateResponseCode {
@@ -358,10 +342,8 @@ struct JobUpdateConfiguration {
   4: set<TaskUpdateConfiguration> configs
 }
 
-struct ScheduleStatusResponse {
-  1: ResponseCode responseCode
-  2: string message
-  5: list<ScheduledTask> tasks
+struct ScheduleStatusResult {
+  1: list<ScheduledTask> tasks
 }
 
 struct GetJobsResponse {
@@ -391,28 +373,18 @@ struct Hosts {
   1: set<string> hostNames
 }
 
-struct StartMaintenanceResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<HostStatus> statuses
+union Result {
+  // TODO(zmanji): Move all RPC-specific result types here as apart of MESOS-3751
+  1: PopulateJobResult populateJobResult
+  2: StartUpdateResult startUpdateResult
+  3: ScheduleStatusResult scheduleStatusResult
 }
 
-struct DrainHostsResponse {
+struct Response {
   1: ResponseCode responseCode
   2: string message
-  3: set<HostStatus> statuses
-}
-
-struct MaintenanceStatusResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<HostStatus> statuses
-}
-
-struct EndMaintenanceResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<HostStatus> statuses
+  3: optional Result result
+  // TODO(zmanji): Add version field per MESOS-3752-
 }
 
 // Due to assumptions in the client all authenticated RPCs must have a SessionKey as their
@@ -425,14 +397,14 @@ service AuroraSchedulerManager {
 
   // Populates fields in a job configuration as though it were about to be run.
   // This can be used to diff a configuration running tasks.
-  PopulateJobResponse populateJobConfig(1: JobConfiguration description)
+  Response populateJobConfig(1: JobConfiguration description)
 
   // Starts a cron job immediately.  The request will be denied if the specified job does not
   // exist for the role account, or the job is not a cron job.
   Response startCronJob(4: JobKey job, 3: SessionKey session)
 
   // Starts a new update.
-  StartUpdateResponse startUpdate(1: JobConfiguration updatedConfig, 2: SessionKey session)
+  Response startUpdate(1: JobConfiguration updatedConfig, 2: SessionKey session)
 
   // Sends a request to update the set of shards specified.
   // A call to startUpdate must be successfully completed before a call can be made to updateShards.
@@ -463,7 +435,7 @@ service AuroraSchedulerManager {
   Response restartShards(5: JobKey job, 3: set<i32> shardIds, 4: SessionKey session)
 
   // Fetches the status of tasks.
-  ScheduleStatusResponse getTasksStatus(1: TaskQuery query)
+  Response getTasksStatus(1: TaskQuery query)
 
   // Fetches the status of jobs.
   // ownerRole is optional, in which case all jobs are returned.
@@ -479,6 +451,29 @@ service AuroraSchedulerManager {
   APIVersion getVersion()
 }
 
+struct StartMaintenanceResponse {
+  1: ResponseCode responseCode
+  2: string message
+  3: set<HostStatus> statuses
+}
+
+struct DrainHostsResponse {
+  1: ResponseCode responseCode
+  2: string message
+  3: set<HostStatus> statuses
+}
+
+struct MaintenanceStatusResponse {
+  1: ResponseCode responseCode
+  2: string message
+  3: set<HostStatus> statuses
+}
+
+struct EndMaintenanceResponse {
+  1: ResponseCode responseCode
+  2: string message
+  3: set<HostStatus> statuses
+}
 
 struct ListBackupsResponse {
   1: ResponseCode responseCode

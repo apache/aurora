@@ -8,6 +8,7 @@ from twitter.aurora.config import AuroraConfig, AuroraConfigLoader
 from twitter.packer import Packer
 
 from gen.twitter.aurora.constants import ACTIVE_STATES
+from gen.twitter.aurora.ttypes import ResponseCode
 
 
 class AuroraDeploymentAPI(object):
@@ -71,7 +72,12 @@ class AuroraDeploymentAPI(object):
 
   def _is_running(self, job_key):
     resp = self._api.check_status(job_key)
-    return resp.tasks and any(task.status in ACTIVE_STATES for task in resp.tasks)
+
+    if resp.responseCode != ResponseCode.OK:
+      return False
+
+    tasks = resp.result.scheduleStatusResult.tasks
+    return tasks and any(task.status in ACTIVE_STATES for task in tasks)
 
   def release(self, job_key, health_check_interval_seconds, proxy_host):
     config, content = self._fetch_full_config(job_key, 'latest', proxy_host)

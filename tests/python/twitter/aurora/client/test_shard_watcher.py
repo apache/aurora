@@ -8,7 +8,6 @@ from gen.twitter.aurora.ttypes import *
 from gen.twitter.aurora.AuroraSchedulerManager import Client as scheduler_client
 
 import mox
-import pytest
 
 
 class FakeClock(object):
@@ -59,8 +58,11 @@ class ShardWatcherTest(unittest.TestCase):
     return ScheduledTask(assignedTask=AssignedTask(task=TaskConfig(shardId=shard_id)))
 
   def expect_get_statuses(self, shard_ids=WATCH_SHARDS, num_calls=EXPECTED_CYCLES):
-    response = ScheduleStatusResponse(responseCode=ResponseCode.OK, message='test', tasks=[])
-    response.tasks += [self.create_task(shard_id) for shard_id in shard_ids]
+    tasks = [self.create_task(shard_id) for shard_id in shard_ids]
+    response = Response(responseCode=ResponseCode.OK, message='test')
+    response.result = Result()
+    response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
+
     query = self.get_tasks_status_query(shard_ids)
     for x in range(int(num_calls)):
       self._scheduler.getTasksStatus(query).AndReturn(response)

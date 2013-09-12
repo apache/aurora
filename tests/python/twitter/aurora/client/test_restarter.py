@@ -68,7 +68,9 @@ class TestRestarter(MoxTestBase):
           status=ScheduleStatus.RUNNING,
           assignedTask=AssignedTask(task=TaskConfig(shardId=i))
       ))
-    response = ScheduleStatusResponse(responseCode=ResponseCode.OK, message='test', tasks=tasks)
+    response = Response(responseCode=ResponseCode.OK, message='test')
+    response.result = Result()
+    response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
 
     self.mock_scheduler.getTasksStatus(IgnoreArg()).AndReturn(response)
 
@@ -81,7 +83,7 @@ class TestRestarter(MoxTestBase):
     self.restarter.restart(None)
 
   def mock_status_no_active_task(self):
-    response = ScheduleStatusResponse(responseCode=ResponseCode.INVALID_REQUEST, message='test', tasks=None)
+    response = Response(responseCode=ResponseCode.INVALID_REQUEST, message='test')
     self.mock_scheduler.getTasksStatus(IgnoreArg()).AndReturn(response)
 
   def test_restart_no_shard_active(self):

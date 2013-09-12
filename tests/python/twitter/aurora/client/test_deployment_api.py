@@ -152,7 +152,7 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
 
   def test_release_new_job(self):
     self.mock_packer_release()
-    response = ttypes.ScheduleStatusResponse(responseCode=ttypes.ResponseCode.INVALID_REQUEST)
+    response = ttypes.Response(responseCode=ttypes.ResponseCode.INVALID_REQUEST)
     self.mock_scheduler.getTasksStatus(mox.IgnoreArg()).AndReturn(response)
     create_response = ttypes.Response(responseCode=ttypes.ResponseCode.OK)
     self.mock_scheduler.createJob(self.config.job(), self.SESSION_KEY).AndReturn(create_response)
@@ -163,10 +163,13 @@ class TestAuroraDeploymentAPI(mox.MoxTestBase):
 
   def test_release_existing_job(self):
     self.mock_packer_release()
-    status_response = ttypes.ScheduleStatusResponse(
-        responseCode=ttypes.ResponseCode.OK,
-        tasks=[ttypes.ScheduledTask(status=ttypes.ScheduleStatus.RUNNING)])
-    self.mock_scheduler.getTasksStatus(mox.IgnoreArg()).AndReturn(status_response)
+    response = ttypes.Response(responseCode=ttypes.ResponseCode.OK)
+    response.result = ttypes.Result()
+    response.result.scheduleStatusResult = ttypes.ScheduleStatusResult(
+        tasks=[ttypes.ScheduledTask(status=ttypes.ScheduleStatus.RUNNING)]
+    )
+
+    self.mock_scheduler.getTasksStatus(mox.IgnoreArg()).AndReturn(response)
 
     self.mox.StubOutWithMock(self.api, "update_job")
     update_response = ttypes.Response(responseCode=ttypes.ResponseCode.OK)

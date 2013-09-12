@@ -14,8 +14,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AuroraAdmin;
+import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.ResponseCode;
-import com.twitter.aurora.gen.ScheduleStatusResponse;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -49,7 +49,7 @@ public class FeatureToggleInterceptorTest extends EasyMockTest {
   @Test
   public void testPredicatePass() throws Exception {
     TaskQuery query = new TaskQuery();
-    ScheduleStatusResponse response = new ScheduleStatusResponse()
+    Response response = new Response()
         .setResponseCode(ResponseCode.OK);
 
     expect(predicate.apply(EasyMock.<Method>anyObject())).andReturn(true);

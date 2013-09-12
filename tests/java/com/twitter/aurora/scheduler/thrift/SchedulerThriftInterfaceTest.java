@@ -41,7 +41,7 @@ import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.ShardConfigRewrite;
 import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.StartMaintenanceResponse;
-import com.twitter.aurora.gen.StartUpdateResponse;
+import com.twitter.aurora.gen.StartUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.gen.TaskQuery;
@@ -392,10 +392,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(Optional.of(token));
 
     control.replay();
-    StartUpdateResponse resp = thrift.startUpdate(job, SESSION);
-    assertEquals(token, resp.getUpdateToken());
+    Response resp = thrift.startUpdate(job, SESSION);
+    StartUpdateResult result = resp.getResult().getStartUpdateResult();
     assertEquals(OK, resp.getResponseCode());
-    assertTrue(resp.isRollingUpdateRequired());
+    assertEquals(token, result.getUpdateToken());
+    assertTrue(result.isRollingUpdateRequired());
   }
 
   @Test
@@ -407,9 +408,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(Optional.<String>absent());
 
     control.replay();
-    StartUpdateResponse resp = thrift.startUpdate(job, SESSION);
+    Response resp = thrift.startUpdate(job, SESSION);
+    StartUpdateResult result = resp.getResult().getStartUpdateResult();
     assertEquals(OK, resp.getResponseCode());
-    assertFalse(resp.isRollingUpdateRequired());
+    assertFalse(result.isRollingUpdateRequired());
   }
 
   @Test

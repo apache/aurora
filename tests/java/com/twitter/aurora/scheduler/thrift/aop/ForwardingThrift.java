@@ -16,17 +16,14 @@ import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ListBackupsResponse;
 import com.twitter.aurora.gen.MaintenanceStatusResponse;
-import com.twitter.aurora.gen.PopulateJobResponse;
 import com.twitter.aurora.gen.QueryRecoveryResponse;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
 import com.twitter.aurora.gen.RollbackShardsResponse;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduleStatusResponse;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.StartMaintenanceResponse;
-import com.twitter.aurora.gen.StartUpdateResponse;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.gen.UpdateShardsResponse;
@@ -110,7 +107,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public PopulateJobResponse populateJobConfig(JobConfiguration description) throws TException {
+  public Response populateJobConfig(JobConfiguration description) throws TException {
     return delegate.populateJobConfig(description);
   }
 
@@ -120,7 +117,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public StartUpdateResponse startUpdate(JobConfiguration updatedConfig, SessionKey session)
+  public Response startUpdate(JobConfiguration updatedConfig, SessionKey session)
       throws TException {
 
     return delegate.startUpdate(updatedConfig, session);
@@ -166,7 +163,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public ScheduleStatusResponse getTasksStatus(TaskQuery query) throws TException {
+  public Response getTasksStatus(TaskQuery query) throws TException {
     return delegate.getTasksStatus(query);
   }
 

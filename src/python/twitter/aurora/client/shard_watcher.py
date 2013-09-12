@@ -119,7 +119,11 @@ class ShardWatcher(object):
     query.statuses = set([ScheduleStatus.RUNNING])
     query.shardIds = shard_ids
     resp = self._scheduler.getTasksStatus(query)
-    resp.tasks = resp.tasks or []
+
+    tasks = []
+    if resp.responseCode == ResponseCode.OK:
+      tasks = resp.result.scheduleStatusResult.tasks
+
     log.debug('Response from scheduler: %s (message: %s)'
         % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-    return resp.tasks
+    return tasks
