@@ -63,7 +63,9 @@ class GitBuilder(CommandLineBuilder):
 
   def validate_repo(self, require_origin_master=False):
     if self._repo.is_dirty():
-      raise self.Error('Can not run the build from a dirty repository!')
+      raise self.Error('Can not run the build from a dirty repository! Commit or stash your changes'
+                       ' to proceed, or remove gitsha from BuildSpec in aurora config to build'
+                       ' current source.')
     sha = self.resolved_gitsha
     if require_origin_master:
       for commit in self._repo.iter_commits(rev='origin/master'):
