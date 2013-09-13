@@ -1,13 +1,14 @@
 import copy
 import unittest
 
-from twitter.aurora.client.updater import Updater
-from twitter.aurora.client.shard_watcher import ShardWatcher
+from twitter.aurora.client.api.shard_watcher import ShardWatcher
+from twitter.aurora.client.api.updater import Updater
 
 from gen.twitter.aurora.ttypes import *
 from gen.twitter.aurora.AuroraSchedulerManager import Client as scheduler_client
 
-from .helper import FakeSchedulerProxy
+# test space
+from twitter.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
 
 import mox
 import pytest

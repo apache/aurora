@@ -19,7 +19,6 @@ python_tests(name = 'test_base',
 python_tests(name = 'test_loader',
   sources = ['test_loader.py'],
   dependencies = [
-    pants('src/python/twitter/aurora/client:recipes'),
     pants('src/python/twitter/aurora/config'),
     pants('src/python/twitter/common/contextutil'),
   ],

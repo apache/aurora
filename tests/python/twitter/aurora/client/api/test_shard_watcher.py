@@ -1,8 +1,8 @@
 from math import ceil
 import unittest
 
-from twitter.aurora.client.health_check import HealthCheck
-from twitter.aurora.client.shard_watcher import ShardWatcher
+from twitter.aurora.client.api.health_check import HealthCheck
+from twitter.aurora.client.api.shard_watcher import ShardWatcher
 
 from gen.twitter.aurora.ttypes import *
 from gen.twitter.aurora.AuroraSchedulerManager import Client as scheduler_client

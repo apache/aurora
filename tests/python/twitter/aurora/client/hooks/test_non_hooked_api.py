@@ -1,7 +1,7 @@
 import functools
 import unittest
 
-from twitter.aurora.common import AuroraJobKey
+from twitter.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.aurora.client.hooks.hooked_api import NonHookedAuroraClientAPI
 
 

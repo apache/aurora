@@ -2,9 +2,14 @@ from datetime import datetime
 import json
 import tempfile
 
-from twitter.aurora.common import AuroraJobKey, Cluster
-from twitter.aurora.client.deployment_api import AuroraDeploymentAPI, DeploymentConfig
-from twitter.aurora.client.deployment_cli import AuroraDeploymentCLI, DeploymentConfigFormat
+from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from twitter.aurora.common.cluster import Cluster
+from twitter.aurora.client.api_internal.deployment_api import (
+    AuroraDeploymentAPI,
+    DeploymentConfig)
+from twitter.aurora.client.api_internal.deployment_cli import (
+    AuroraDeploymentCLI,
+    DeploymentConfigFormat)
 
 import gen.twitter.aurora.ttypes as ttypes
 

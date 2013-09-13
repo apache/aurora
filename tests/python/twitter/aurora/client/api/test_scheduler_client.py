@@ -1,7 +1,7 @@
 import inspect
 import unittest
 
-import twitter.aurora.client.scheduler_client as scheduler_client
+import twitter.aurora.client.api.scheduler_client as scheduler_client
 
 import gen.twitter.aurora.AuroraAdmin as AuroraAdmin
 import gen.twitter.aurora.AuroraSchedulerManager as AuroraSchedulerManager

@@ -2,7 +2,6 @@ import os
 
 from twitter.common.contextutil import temporary_dir, temporary_file
 
-import twitter.aurora.client.jenkins
 from twitter.aurora.client import config
 from twitter.aurora.config import AuroraConfig
 from twitter.aurora.config.loader import AuroraConfigLoader

@@ -1,7 +1,7 @@
 import unittest
 
 from twitter.aurora.common.http_signaler import HttpSignaler
-from twitter.aurora.client.health_check import (
+from twitter.aurora.client.api.health_check import (
   ChainedHealthCheck,
   HealthCheck,
   HealthStatus,

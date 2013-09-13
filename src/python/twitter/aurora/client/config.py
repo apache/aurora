@@ -14,7 +14,6 @@ from twitter.common import app, log
 from twitter.aurora.client import binding_helpers
 from twitter.aurora.client.base import deprecation_warning, die
 from twitter.aurora.config import AuroraConfig
-from twitter.aurora.config.recipes import Recipes
 from twitter.thermos.config.schema_helpers import Tasks
 
 from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
@@ -186,19 +185,10 @@ def inject_hooks(config, env=None):
   config.hooks = (env or {}).get('hooks', [])
 
 
-def inject_recipes(config, env=None):
-  job = config.raw() % config.context()
-  recipes = job.recipes().get() if job.recipes() is not Empty else []
-  tasks = [Recipes.get(recipe) for recipe in recipes]
-  tasks.append(job.task())
-  config.update_job(job(task=Tasks.concat(*tasks)))
-
-
 class AnnotatedAuroraConfig(AuroraConfig):
   @classmethod
   def plugins(cls):
     return (inject_hooks,
-            inject_recipes,
             functools.partial(binding_helpers.apply_all),
             functools.partial(populate_namespaces),
             validate_config)
@@ -212,7 +202,6 @@ def get_config(jobname,
                select_role=None,
                select_env=None):
   """Creates and returns a config object contained in the provided file."""
-  Recipes.include_module('twitter.aurora.client.recipes')
   loader = AnnotatedAuroraConfig.load_json if json else AnnotatedAuroraConfig.load
   return loader(config_file,
                 jobname,

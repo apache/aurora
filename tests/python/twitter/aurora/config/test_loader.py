@@ -36,15 +36,6 @@ def test_enoent():
     AuroraConfigLoader.load(nonexistent_file)
 
 
-def test_module_loading():
-  env = AuroraConfigLoader.load('twitter/aurora/client/recipes/python.aurora_recipe')
-  assert 'recipes' in env
-  with pytest.raises(AuroraConfigLoader.NotFound):
-    AuroraConfigLoader.load('twitter/aurora/client/recipes/does_not_exist.aurora_recipe')
-  with pytest.raises(AuroraConfigLoader.NotFound):
-    AuroraConfigLoader.load('twitter/aurora/client')
-
-
 def test_bad_config():
   with temporary_file() as fp:
     fp.write(BAD_MESOS_CONFIG)

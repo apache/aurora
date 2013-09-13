@@ -1,8 +1,9 @@
 import functools
 
 from twitter.aurora.client.api import AuroraClientAPI
-from twitter.aurora.client.disambiguator import LiveJobDisambiguator
-from twitter.aurora.common import AuroraJobKey, Cluster
+from twitter.aurora.client.api.disambiguator import LiveJobDisambiguator
+from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from twitter.aurora.common.cluster import Cluster
 
 from gen.twitter.aurora.constants import ResponseCode
 from gen.twitter.aurora.ttypes import (
