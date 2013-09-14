@@ -63,6 +63,21 @@ HELLO_WORLD = Job(
 jobs = [HELLO_WORLD]
 """
 
+MESOS_CONFIG_CANARY = """
+RESOURCES = Resources(cpu = 1.0, ram = 256*MB, disk = 128*MB)
+HELLO_WORLD = Job(
+  name = 'hello_world',
+  role = 'john_doe',
+  cluster = 'smf1-test',
+  task = Task(
+    name = 'main',
+    resources = RESOURCES,
+    processes = [JVMProcess(arguments = ' -version', resources = RESOURCES, jvm = Canary(java_home = '/usr/lib/jvm/java-1.6.0', collector = 'latency', heap = '228', new_gen = '114', perm_gen = '32', code_cache = '24', cpu_cores = '1', gc_log = 'gctest.log', extra_jvm_flags = '-XX:+PrintFlagsFinal', canary_package_version='live' ))],
+  )
+)
+jobs = [HELLO_WORLD]
+"""
+
 def test_default_jvm_config():
   with temporary_file() as fp:
     fp.write(MESOS_CONFIG_DEFAULT)
@@ -93,6 +108,15 @@ def test_simple_jvm_config():
 def test_simple_jvm_config_java6():
   with temporary_file() as fp:
     fp.write(MESOS_CONFIG_JAVA6)
+    fp.flush()
+    proxy_config1 = AuroraConfig.load(fp.name)
+    assert proxy_config1.name() == 'hello_world'
+    assert proxy_config1.role() == 'john_doe'
+    assert proxy_config1.cluster() == 'smf1-test'
+
+def test_simple_jvm_config_canary():
+  with temporary_file() as fp:
+    fp.write(MESOS_CONFIG_CANARY)
     fp.flush()
     proxy_config1 = AuroraConfig.load(fp.name)
     assert proxy_config1.name() == 'hello_world'
