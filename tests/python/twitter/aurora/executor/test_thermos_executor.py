@@ -36,6 +36,7 @@ from twitter.thermos.runner.runner import TaskRunner
 
 from gen.twitter.aurora.ttypes import (
   AssignedTask,
+  ExecutorConfig,
   TaskConfig)
 from gen.twitter.thermos.ttypes import TaskState
 
@@ -152,7 +153,8 @@ MESOS_JOB = MesosJob(
 )
 
 
-def test_deserialize_thermos_task():
+def test_deserialize_thermos_task_old():
+  """TODO(maximk): decomission this test once migration to thermosConfigData is done."""
   assigned_task = AssignedTask(task=TaskConfig(
       thermosConfig=MESOS_JOB(task=HELLO_WORLD).json_dumps(),
       shardId=0))
@@ -163,6 +165,20 @@ def test_deserialize_thermos_task():
       shardId=0))
   assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
 
+def test_deserialize_thermos_task():
+  assigned_task = AssignedTask(task=TaskConfig(
+    executorConfig=ExecutorConfig(
+      name='thermos',
+      data=MESOS_JOB(task=HELLO_WORLD).json_dumps()),
+    shardId=0))
+  assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
+
+  assigned_task = AssignedTask(task=TaskConfig(
+    executorConfig=ExecutorConfig(
+      name='thermos',
+      data=HELLO_WORLD_MTI.json_dumps()),
+    shardId=0))
+  assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
 
 def test_extract_ensemble():
   def make_assigned_task(thermos_config):

@@ -258,3 +258,10 @@ def convert(job, packages=frozenset(), ports=frozenset()):
     cronCollisionPolicy=cron_policy,
     taskConfig=task,
     shardCount=fully_interpolated(job.instances()))
+
+def resolve_thermos_config(task):
+  """TODO(maximk): Delete this method when migration to executorConfig is done"""
+  if task.executorConfig is None:
+    return task.thermosConfig
+
+  return task.executorConfig.data

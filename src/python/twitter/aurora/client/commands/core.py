@@ -36,6 +36,7 @@ from twitter.aurora.client.options import (
     SHARDS_OPTION,
     WAIT_UNTIL_OPTION)
 from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from twitter.aurora.config.thrift import resolve_thermos_config
 
 from gen.twitter.aurora.constants import ACTIVE_STATES
 from gen.twitter.aurora.ttypes import ScheduleStatus
@@ -135,7 +136,7 @@ def diff(job_spec, config_file):
   def pretty_print_task(task):
     # The raw configuration is not interesting - we only care about what gets parsed.
     task.configuration = None
-    task.thermosConfig = json.loads(task.thermosConfig)
+    task.thermosConfig = json.loads(resolve_thermos_config(task))
     return pp.pformat(vars(task))
 
   def pretty_print_tasks(tasks):

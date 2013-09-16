@@ -15,7 +15,7 @@ from twitter.aurora.common_internal.clusters import TWITTER_CLUSTERS, TwitterClu
 from twitter.aurora.common.http_signaler import HttpSignaler
 from twitter.aurora.config import PortResolver
 from twitter.aurora.config.schema import MesosJob, MesosTaskInstance
-from twitter.aurora.config.thrift import task_instance_from_job
+from twitter.aurora.config.thrift import task_instance_from_job, resolve_thermos_config
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
 
@@ -97,7 +97,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
   @staticmethod
   def deserialize_thermos_task(assigned_task):
     """Deserialize MesosTaskInstance from a AssignedTask thrift."""
-    thermos_task = assigned_task.task.thermosConfig
+    thermos_task = resolve_thermos_config(assigned_task.task)
     if not thermos_task:
       raise ValueError('Task did not have a thermosConfig!')
     try:
@@ -134,7 +134,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
 
   @classmethod
   def extract_ensemble(cls, assigned_task, default=TwitterCluster.DEFAULT_ENSEMBLE):
-    thermos_task = assigned_task.task.thermosConfig
+    thermos_task = resolve_thermos_config(assigned_task.task)
     if 'instance' in json.loads(thermos_task):
       # Received MesosTaskInstance
       return default

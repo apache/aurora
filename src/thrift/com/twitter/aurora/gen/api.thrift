@@ -109,6 +109,11 @@ struct ShardKey {
   2: i32 shardId    // Unique shard ID for the active task in a job.
 }
 
+struct ExecutorConfig {
+  1: string name    // Name identifying the Executor.
+  2: string data    // Executor configuration data.
+}
+
 // Description of the tasks contained within a job.
 struct TaskConfig {
  17: Identity owner                          // contains the role component of JobKey
@@ -127,7 +132,8 @@ struct TaskConfig {
                                              // for a job that has N instances.
  18: optional bool production                // Whether this is a production task, which can preempt
                                              // non-production tasks.
- 19: binary thermosConfig
+ 19: optional binary thermosConfig           // TODO(maximk): Deprecate once fully converted to
+                                             // executorConfig
  20: set<Constraint> constraints
  21: set<string> requestedPorts              // a list of named ports this task requests
  22: optional map<string, string> taskLinks  // Custom links to include when displaying this task
@@ -138,7 +144,7 @@ struct TaskConfig {
  23: optional string contactEmail
  24: optional set<Package> packages          // Used only to display package information in the
                                              // scheduler UI.
-
+ 25: optional ExecutorConfig executorConfig  // Executor configuration
 }
 
 // Defines the policy for launching a new cron job when one is already running.
