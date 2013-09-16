@@ -48,10 +48,6 @@ python_library(
   sources = ['options.py'],
   dependencies = [
     pants('src/python/twitter/aurora/common:aurora_job_key'),
-    pants('src/python/twitter/aurora/common:cluster_option'),
     pants('src/python/twitter/thermos/base:options'),
-
-    # TODO(wickman) MESOS-3801
-    pants('src/python/twitter/aurora/common_internal:clusters'),
   ]
 )

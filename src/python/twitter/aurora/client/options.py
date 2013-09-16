@@ -1,10 +1,6 @@
 import optparse
 
 from twitter.aurora.common.aurora_job_key import AuroraJobKey
-from twitter.aurora.common.cluster_option import ClusterOption
-# TODO(wickman) MESOS-3801
-from twitter.aurora.common_internal.clusters import TWITTER_CLUSTERS
-
 from twitter.thermos.base.options import add_binding_to
 
 
@@ -122,16 +118,20 @@ JSON_OPTION = optparse.Option(
     help='If specified, configuration is read in JSON format.')
 
 
-CLUSTER_CONFIG_OPTION = ClusterOption(
+CLUSTER_CONFIG_OPTION = optparse.Option(
   '--cluster',
-  clusters=TWITTER_CLUSTERS,
+  dest='cluster',
+  default=None,
+  type='string',
   help='Cluster to match when selecting a job from a configuration. Optional if only one job '
        'matching the given job name exists in the config.')
 
 
-CLUSTER_INVOKE_OPTION = ClusterOption(
+CLUSTER_INVOKE_OPTION = optparse.Option(
   '--cluster',
-  clusters=TWITTER_CLUSTERS,
+  dest='cluster',
+  default=None,
+  type='string',
   help='Cluster to invoke this command against. Deprecated in favor of the CLUSTER/ROLE/ENV/NAME '
        'syntax.')
 

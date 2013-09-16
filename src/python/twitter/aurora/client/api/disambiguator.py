@@ -85,5 +85,5 @@ class LiveJobDisambiguator(object):
       cluster = options.cluster
       if not cluster:
         die('cluster is required')
-      client = client_factory(cluster.name)
+      client = client_factory(cluster)
       return client, cls._disambiguate_or_die(client, role, env, name), config_file

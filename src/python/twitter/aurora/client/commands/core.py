@@ -50,7 +50,7 @@ def get_job_config(job_spec, config_file, options):
     jobname = job_key.name
   except AuroraJobKey.Error:
     deprecation_warning('Please refer to your job in CLUSTER/ROLE/ENV/NAME format.')
-    select_cluster = options.cluster.name if options.cluster else None
+    select_cluster = options.cluster if options.cluster else None
     select_env = options.env
     select_role = None
     jobname = job_spec
