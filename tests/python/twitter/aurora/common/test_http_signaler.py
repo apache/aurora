@@ -1,10 +1,11 @@
-import mox
 from socket import timeout as SocketTimeout
 import unittest
 
 from twitter.common.lang import Compatibility
 
 from twitter.aurora.common.http_signaler import HttpSignaler
+
+import mox
 
 if Compatibility.PY3:
   import urllib.request as urllib_request

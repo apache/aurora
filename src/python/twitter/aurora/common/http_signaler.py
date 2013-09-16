@@ -4,9 +4,6 @@ import sys
 
 from twitter.common import log
 from twitter.common.lang import Compatibility
-from twitter.common.net.socks import urllib_opener as socks_opener
-from twitter.common.net.tunnel import TunnelHelper
-from twitter.common_internal.location import Location
 
 if Compatibility.PY3:
   from http.client import HTTPException
@@ -17,26 +14,14 @@ else:
   import urllib2 as urllib_request
   from urllib2 import URLError, HTTPError
 
-import socks
-
 
 class HttpSignaler(object):
   """Simple HTTP endpoint wrapper to check health or trigger quitquitquit/abortabortabort"""
   TIMEOUT_SECS = 1.0
   FAILURE_REASON_LENGTH = 10
-  _PROXY = None
 
   class Error(Exception): pass
   class QueryError(Error): pass
-
-  @classmethod
-  def maybe_setup_proxy(cls, hostname):
-    if Location.is_prod():
-      return
-    if Location.is_prod(hostname) and not cls._PROXY:
-      log.info('Setting up SOCKS proxy for http health checks.')
-      proxy_host, proxy_port = TunnelHelper.create_proxy()
-      cls._PROXY = socks_opener(proxy_host, proxy_port)
 
   def __init__(self, port, host='localhost', timeout_secs=TIMEOUT_SECS):
     self._host = host
@@ -48,18 +33,17 @@ class HttpSignaler(object):
 
   @property
   def opener(self):
-    return self._PROXY.open if self._PROXY else urllib_request.urlopen
+    return urllib_request.urlopen
 
   def query(self, endpoint, data=None):
     """Request an HTTP endpoint with a GET request (or POST if data is not None)"""
-    self.maybe_setup_proxy(self._host)
     url = self.url(endpoint)
     log.debug("%s: %s %s" % (self.__class__.__name__, 'GET' if data is None else 'POST', url))
     try:
       with contextlib.closing(
           self.opener(url, data, timeout=self._timeout_secs)) as fp:
         return fp.read()
-    except (URLError, HTTPError, HTTPException, SocketTimeout, socks.GeneralProxyError) as e:
+    except (URLError, HTTPError, HTTPException, SocketTimeout) as e:
       # the type of an HTTPException is typically more useful than its contents (since for example
       # BadStatusLines are often empty). likewise with socket.timeout.
       err = e.__class__.__name__ if isinstance(e, (HTTPException, SocketTimeout)) else e

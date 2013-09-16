@@ -50,11 +50,5 @@ python_library(
   dependencies = [
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/net'),
-    pants('src/python/twitter/common/net:socks'),
-
-    # TODO(wickman) MESOS-3763 -- This should be removed as SOCKS
-    # monkeypatching is now taking place.
-    pants('src/python/twitter/common_internal/location'),
   ]
 )
