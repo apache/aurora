@@ -39,9 +39,9 @@ class JobMonitor(object):
     except TTransport.TTransportException as e:
       print('Failed to query slaves from scheduler: %s' % e)
       return
-    if res is None or res.tasks is None:
+    if res is None or res.result is None:
       return
-    for task in res.tasks:
+    for task in res.result.scheduleStatusResult.tasks:
       if task.assignedTask.taskId not in self._initial_tasks:
         yield task
 
