@@ -1,9 +1,10 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':config'),
-    pants(':packercli'),
     pants('tests/python/twitter/aurora/client/api:all'),
     pants('tests/python/twitter/aurora/client/api_internal:all'),
+    pants('tests/python/twitter/aurora/client/commands:all'),
+    pants('tests/python/twitter/aurora/client/commands_internal:all'),
     pants('tests/python/twitter/aurora/client/hooks:all'),
   ],
 )
@@ -13,14 +14,6 @@ python_tests(name = 'config',
   dependencies = [
     pants('3rdparty/python:mox'),
     pants('src/python/twitter/aurora/client:config'),
-  ],
-)
-
-python_tests(name = 'packercli',
-  sources = [ 'test_packer_cli.py' ],
-  dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('src/python/twitter/aurora:aurora_client_lib'),
   ],
 )
 

@@ -29,3 +29,29 @@ python_library(
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
+
+python_library(
+  name = 'factory',
+  sources = ['factory.py'],
+  dependencies = [
+    pants(':base'),
+    pants('src/python/twitter/aurora/client/hooks'),
+    pants('src/python/twitter/aurora/common:cluster'),
+    pants('src/python/twitter/aurora/common:clusters'),
+    pants('src/python/twitter/common/app'),
+  ]
+)
+
+
+python_library(
+  name = 'options',
+  sources = ['options.py'],
+  dependencies = [
+    pants('src/python/twitter/aurora/common:aurora_job_key'),
+    pants('src/python/twitter/aurora/common:cluster_option'),
+    pants('src/python/twitter/thermos/base:options'),
+
+    # TODO(wickman) MESOS-3801
+    pants('src/python/twitter/aurora/common_internal:clusters'),
+  ]
+)

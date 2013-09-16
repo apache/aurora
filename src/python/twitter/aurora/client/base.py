@@ -1,3 +1,4 @@
+from collections import defaultdict
 import functools
 import sys
 from urlparse import urljoin
@@ -89,3 +90,49 @@ def handle_open(scheduler_url, role, env, job):
     if app.get_options().open_browser:
       import webbrowser
       webbrowser.open_new_tab(url)
+
+
+def make_commands_str(command_aliases):
+  """Format a string representation of a number of command aliases."""
+  commands = command_aliases[:]
+  commands.sort()
+  if len(commands) == 1:
+    return str(commands[0])
+  elif len(commands) == 2:
+    return '%s (or %s)' % (str(commands[0]), str(commands[1]))
+  else:
+    return '%s (or any of: %s)' % (str(commands[0]), ' '.join(map(str, commands[1:])))
+
+
+# TODO(wickman) This likely belongs in twitter.common.app (or split out as
+# part of a possible twitter.common.cli)
+def generate_full_usage():
+  """Generate verbose application usage from all registered
+     twitter.common.app commands and return as a string."""
+  docs_to_commands = defaultdict(list)
+  for (command, doc) in app.get_commands_and_docstrings():
+    docs_to_commands[doc].append(command)
+  def make_docstring(item):
+    (doc_text, commands) = item
+    def format_line(line):
+      return '    %s\n' % line.lstrip()
+    stripped = ''.join(map(format_line, doc_text.splitlines()))
+    return '%s\n%s' % (make_commands_str(commands), stripped)
+  usage = sorted(map(make_docstring, docs_to_commands.items()))
+  return 'Available commands:\n\n' + '\n'.join(usage)
+
+
+def generate_terse_usage():
+  """Generate minimal application usage from all registered
+     twitter.common.app commands and return as a string."""
+  docs_to_commands = defaultdict(list)
+  for (command, doc) in app.get_commands_and_docstrings():
+    docs_to_commands[doc].append(command)
+  usage = '\n    '.join(sorted(map(make_commands_str, docs_to_commands.values())))
+  return """
+Available commands:
+    %s
+
+For more help on an individual command:
+    %s help <command>
+""" % (usage, app.name())

@@ -15,9 +15,7 @@ python_library(
   sources = globs('*.py') - ['__init__.py', 'thrift.py'],
   dependencies = [
     pants('3rdparty/python:pystachio'),
-    pants('src/python/twitter/aurora/client/hooks/internal:all'),
     pants('src/python/twitter/thermos/config:schema'),
-    pants('src/python/twitter/vert:schema'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
