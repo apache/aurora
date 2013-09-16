@@ -56,4 +56,15 @@ public interface SessionValidator {
       super(msg, cause);
     }
   }
+
+  /**
+   * Thrown when authentication failed due to transient nature.
+   * <p>
+   * Used to determine if the action is retryable.
+   */
+  public static class TransientAuthFailedException extends AuthFailedException {
+    public TransientAuthFailedException(String msg, Throwable cause) {
+      super(msg, cause);
+    }
+  }
 }
