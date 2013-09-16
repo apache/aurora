@@ -123,7 +123,6 @@ public final class ConfigurationManager {
           new DefaultField(_Fields.IS_SERVICE, false),
           new DefaultField(_Fields.PRIORITY, 0),
           new DefaultField(_Fields.PRODUCTION, false),
-          new DefaultField(_Fields.HEALTH_CHECK_INTERVAL_SECS, 30),
           new DefaultField(_Fields.MAX_TASK_FAILURES, 1),
           new DefaultField(_Fields.TASK_LINKS, Maps.<String, String>newHashMap()),
           new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()),

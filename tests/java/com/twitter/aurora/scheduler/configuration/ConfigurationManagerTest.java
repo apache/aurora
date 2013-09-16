@@ -43,7 +43,6 @@ public class ConfigurationManagerTest {
       .setTaskConfig(
           new TaskConfig()
               .setIsService(false)
-              .setHealthCheckIntervalSecs(0)
               .setTaskLinks(ImmutableMap.<String, String>of())
               .setThermosConfig(THERMOS_CONFIG.getBytes())
               .setEnvironment(DEFAULT_ENVIRONMENT)

@@ -119,7 +119,6 @@ struct TaskConfig {
   9: i64 ramMb
  10: i64 diskMb
  11: i32 priority
- 12: i32 healthCheckIntervalSecs
  13: i32 maxTaskFailures
  14: i32 shardId                             // TODO(Sathya): Deprecate. Push to AssignedTask.
                                              // The shard ID for this task.

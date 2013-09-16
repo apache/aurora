@@ -193,8 +193,6 @@ def convert(job, packages=frozenset(), ports=frozenset()):
   task.isService = select_service_bit(job)
   task.maxTaskFailures = fully_interpolated(job.max_task_failures())
   task.priority = fully_interpolated(job.priority())
-  if job.has_health_check_interval_secs():
-    task.healthCheckIntervalSecs = fully_interpolated(job.health_check_interval_secs())
   task.contactEmail = not_empty_or(job.contact(), None)
 
   # Add package tuples to a task, to display in the scheduler UI.

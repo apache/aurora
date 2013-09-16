@@ -512,7 +512,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     JobConfiguration parsed = job.deepCopy();
     parsed.getTaskConfig()
-        .setHealthCheckIntervalSecs(30)
         .setShardId(0)
         .setNumCpus(1.0)
         .setPriority(0)
