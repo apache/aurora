@@ -11,7 +11,10 @@ from twitter.aurora.client.commands import (
     run,
     ssh,
 )
+from twitter.aurora.client.options import add_verbosity_options
+
 app.register_commands_from(core, run, ssh)
+add_verbosity_options()
 
 
 def main():
