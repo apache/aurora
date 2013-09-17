@@ -1,6 +1,7 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':disambiguator'),
+    pants(':job_monitor'),
     pants(':restarter'),
     pants(':scheduler_client'),
     pants(':shard_watcher'),
@@ -15,6 +16,17 @@ python_tests(
     pants('3rdparty/python:mox'),
     pants('src/python/twitter/aurora/client/api:disambiguator'),
     pants('src/python/twitter/common/app'),
+  ],
+)
+
+python_tests(name = 'job_monitor',
+  sources = ['test_job_monitor.py'],
+  dependencies = [
+    pants('3rdparty/python:mox'),
+    pants('src/python/twitter/aurora/client/api:api'),
+    pants('src/python/twitter/aurora/client/api:job_monitor'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('tests/python/twitter/aurora/client:fake_scheduler_proxy'),
   ],
 )
 
@@ -56,4 +68,3 @@ python_tests(name = 'updater',
     pants('tests/python/twitter/aurora/client:fake_scheduler_proxy'),
   ]
 )
-
