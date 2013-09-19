@@ -8,9 +8,12 @@ import json
 import os
 import pprint
 import subprocess
+import sys
 from tempfile import NamedTemporaryFile
 
 from twitter.common import app, log
+from twitter.common.python.pex import PexInfo
+from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 
 from twitter.aurora.client.base import (
     check_and_log_response,
@@ -38,7 +41,7 @@ from twitter.aurora.client.options import (
 from twitter.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.aurora.config.thrift import resolve_thermos_config
 
-from gen.twitter.aurora.constants import ACTIVE_STATES
+from gen.twitter.aurora.constants import ACTIVE_STATES, CURRENT_API_VERSION
 from gen.twitter.aurora.ttypes import ScheduleStatus
 
 
@@ -71,6 +74,19 @@ def get_job_config(job_spec, config_file, options):
       select_cluster=select_cluster,
       select_role=select_role,
       select_env=select_env)
+
+
+@app.command
+def version(args):
+  try:
+    pexpath = sys.argv[0]
+    pex_info = PexInfo.from_pex(PythonDirectoryWrapper.get(pexpath))
+    print("Aurora client build info:")
+    print("\tsha: %s" % pex_info.build_properties['sha'])
+    print("\tdate: %s" % pex_info.build_properties['date'])
+  except (IOError, PythonDirectoryWrapper.Error):
+    print("Aurora client build info not available")
+  print("Aurora API version: %s" % CURRENT_API_VERSION)
 
 
 @app.command
