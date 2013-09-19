@@ -4,12 +4,13 @@ import pytest
 
 from twitter.common.contextutil import temporary_dir
 
-from twitter.aurora.config.schema import (
+from twitter.aurora.config.schema.base import (
   Task,
   Resources,
   AppLayout,
   AppPackage,
-  MesosTaskInstance)
+  MesosTaskInstance,
+)
 from twitter.aurora.executor.sandbox_manager import DirectorySandbox
 
 

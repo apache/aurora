@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from collections import defaultdict
 
 from twitter.aurora.common import AuroraJobKey
+from twitter.aurora.config.schema.base import MesosContext
 from twitter.thermos.config.loader import PortExtractor, ThermosTaskWrapper
 from twitter.thermos.config.schema import ThermosContext
 
@@ -144,7 +145,6 @@ class AuroraConfig(object):
     self.hooks = []
 
   def context(self, instance=None):
-    from .schema import MesosContext
     context = dict(instance=instance)
     # Filter unspecified values
     return Environment(mesos=MesosContext(dict((k, v) for k, v in context.items() if v)))

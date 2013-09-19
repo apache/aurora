@@ -2,11 +2,12 @@ import getpass
 import re
 
 from twitter.aurora.config import AuroraConfig
-from twitter.aurora.config.schema import Job, SimpleTask
+from twitter.aurora.config.schema.base import Job, SimpleTask
 from twitter.aurora.config.thrift import (
     convert as convert_pystachio_to_thrift,
     InvalidConfig,
-    task_instance_from_job)
+    task_instance_from_job,
+)
 from twitter.thermos.config.schema import (
     Process,
     Resources,

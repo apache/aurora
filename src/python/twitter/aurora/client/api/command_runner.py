@@ -5,7 +5,7 @@ import subprocess
 from twitter.common import log
 
 from twitter.aurora.client.api import AuroraClientAPI
-from twitter.aurora.config.schema import MesosContext
+from twitter.aurora.config.schema.base import MesosContext
 from twitter.aurora.config.thrift import resolve_thermos_config
 from twitter.aurora.common.cluster import Cluster
 from twitter.thermos.config.schema import ThermosContext

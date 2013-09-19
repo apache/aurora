@@ -1,8 +1,12 @@
 import getpass
 import re
 
+from twitter.aurora.config.schema.base import (
+  HealthCheckConfig,
+  MesosContext,
+  MesosTaskInstance,
+)
 from twitter.common.lang import Compatibility
-
 from twitter.thermos.config.loader import ThermosTaskValidator
 
 from gen.twitter.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
@@ -19,18 +23,13 @@ from gen.twitter.aurora.ttypes import (
   ValueConstraint,
 )
 
-from .schema import (
-  HealthCheckConfig,
-  MesosContext,
-  MesosTaskInstance,
-)
-
 from pystachio import Empty, Ref
 
 __all__ = (
   'InvalidConfig',
   'convert'
 )
+
 
 class InvalidConfig(ValueError):
   pass

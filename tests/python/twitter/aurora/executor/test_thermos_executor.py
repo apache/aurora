@@ -18,14 +18,15 @@ from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
 
 from twitter.aurora.common_internal.clusters import TwitterCluster, TWITTER_CLUSTERS
-from twitter.aurora.config.schema import (
+from twitter.aurora.config.schema.base import (
     HealthCheckConfig,
     MB,
     MesosJob,
     MesosTaskInstance,
     Task,
     Process,
-    Resources)
+    Resources,
+)
 from twitter.aurora.executor.thermos_executor import ThermosExecutor, ThermosExecutorTimer
 from twitter.aurora.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.aurora.executor.sandbox_manager import DirectorySandbox

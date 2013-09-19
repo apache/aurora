@@ -1,5 +1,6 @@
 from twitter.thermos.config.schema import *
 
+
 def Stats(port = 'http', library = 'metrics', version = 'live'):
   config = {
     # This copies the agent distribution package from packer into the sandbox directory

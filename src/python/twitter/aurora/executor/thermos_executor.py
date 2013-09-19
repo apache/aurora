@@ -14,7 +14,7 @@ from twitter.common.quantity import Amount, Time
 from twitter.aurora.common_internal.clusters import TWITTER_CLUSTERS, TwitterCluster
 from twitter.aurora.common.http_signaler import HttpSignaler
 from twitter.aurora.config import PortResolver
-from twitter.aurora.config.schema import MesosJob, MesosTaskInstance
+from twitter.aurora.config.schema.base import MesosJob, MesosTaskInstance
 from twitter.aurora.config.thrift import task_instance_from_job, resolve_thermos_config
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
