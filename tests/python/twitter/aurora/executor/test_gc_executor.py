@@ -1,4 +1,5 @@
 from collections import namedtuple
+import functools
 from itertools import product
 import os
 import shutil
@@ -117,6 +118,18 @@ class FakeClock(object):
     self.slept += amount
 
 
+class FakeExecutorDetector(object):
+  class ExecutorScanf(object):
+    def __init__(self, task_id):
+      self.executor_id = 'thermos-' + task_id
+      self.run = 'some_run_number'
+
+  def __init__(self, *task_ids):
+    self.__scanfs = [self.ExecutorScanf(task_id) for task_id in task_ids]
+
+  def __iter__(self):
+    return iter(self.__scanfs)
+
 
 class ThinTestThermosGCExecutor(ThermosGCExecutor):
   POLL_WAIT = Amount(1, Time.MICROSECONDS)
@@ -126,7 +139,8 @@ class ThinTestThermosGCExecutor(ThermosGCExecutor):
     self._kills = set()
     self._losses = set()
     self._gcs = set()
-    ThermosGCExecutor.__init__(self, checkpoint_root, clock=self._clock)
+    ThermosGCExecutor.__init__(self, checkpoint_root, clock=self._clock,
+        executor_detector=lambda: list)
 
   @property
   def gcs(self):
@@ -502,18 +516,13 @@ class TestRealGC(unittest.TestCase):
       def __init__(self, root): pass
       def erase_logs(self, task_id): pass
       def erase_metadata(self, task_id): pass
-    class FakeExecutorDetector(object):
-      class ExecutorScanf(object):
-        executor_id = 'thermos-' + task_id
-        run = 'some_run_number'
-      def find(self, root):
-        return [self.ExecutorScanf()]
     class FastThermosGCExecutor(ThermosGCExecutor):
       POLL_WAIT = Amount(1, Time.MICROSECONDS)
+    detector = functools.partial(FakeExecutorDetector, task_id) if retain else FakeExecutorDetector
     executor = FastThermosGCExecutor(
         checkpoint_root=root,
         task_killer=FakeTaskKiller,
-        executor_detector=FakeExecutorDetector if retain else ExecutorDetector,
+        executor_detector=detector,
         task_garbage_collector=FakeTaskGarbageCollector,
         clock=self.clock)
     return executor.garbage_collect()

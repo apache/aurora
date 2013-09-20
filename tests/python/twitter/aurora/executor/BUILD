@@ -8,6 +8,7 @@ python_test_suite(name = 'all',
     pants(':status_manager'),
     pants(':thermos_executor'),
     pants(':executor_builds'),
+    pants(':executor_detector'),
     pants(':executor_vars'),
   ]
 )
@@ -31,6 +32,15 @@ python_tests(name = 'resource_manager',
   dependencies = [
     pants('src/python/twitter/aurora/config:schema'),
     pants('src/python/twitter/aurora/executor:resource_manager')
+  ]
+)
+
+python_tests(name = 'executor_detector',
+  sources = [ 'test_executor_detector.py' ],
+  dependencies = [
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/aurora/executor:executor_detector')
   ]
 )
 

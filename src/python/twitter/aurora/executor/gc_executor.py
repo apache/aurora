@@ -64,7 +64,6 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
 
   def __init__(self,
                checkpoint_root,
-               mesos_root=None,
                verbose=True,
                task_killer=TaskKiller,
                executor_detector=ExecutorDetector,
@@ -83,7 +82,6 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
     self._slave_id = None # cache the slave ID provided by the slave
     self._task_id = None  # the task_id currently being executed by the ThermosGCExecutor, if any
     self._start_time = None # the start time of a task currently being executed, if any
-    self._mesos_root = mesos_root or TwitterCluster.DEFAULT_MESOS_ROOT
     self._detector = executor_detector()
     self._collector = task_garbage_collector(root=checkpoint_root)
     self._clock = clock
@@ -366,7 +364,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
   def linked_executors(self):
     """Generator yielding the executor sandboxes detected on the system."""
     thermos_executor_prefix = 'thermos-'
-    for executor in self._detector.find(root=self._mesos_root):
+    for executor in self._detector:
       # It's possible for just the 'latest' symlink to be present but no run directories.
       # This indicates that the task has been fully garbage collected.
       if executor.executor_id.startswith(thermos_executor_prefix) and executor.run != 'latest':

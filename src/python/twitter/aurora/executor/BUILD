@@ -28,7 +28,6 @@ python_library(
   name = 'executor_detector',
   sources = ['executor_detector.py'],
   dependencies = [
-    pants('src/python/twitter/aurora/common_internal:clusters'),
     pants('src/python/twitter/common/string'),
   ]
 )
