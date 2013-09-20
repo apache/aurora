@@ -50,39 +50,38 @@ import com.twitter.aurora.gen.APIVersion;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
-import com.twitter.aurora.gen.DrainHostsResponse;
-import com.twitter.aurora.gen.EndMaintenanceResponse;
-import com.twitter.aurora.gen.GetJobUpdatesResponse;
-import com.twitter.aurora.gen.GetJobsResponse;
-import com.twitter.aurora.gen.GetQuotaResponse;
+import com.twitter.aurora.gen.DrainHostsResult;
+import com.twitter.aurora.gen.EndMaintenanceResult;
+import com.twitter.aurora.gen.GetJobUpdatesResult;
+import com.twitter.aurora.gen.GetJobsResult;
+import com.twitter.aurora.gen.GetQuotaResult;
 import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
-import com.twitter.aurora.gen.ListBackupsResponse;
-import com.twitter.aurora.gen.MaintenanceStatusResponse;
+import com.twitter.aurora.gen.ListBackupsResult;
+import com.twitter.aurora.gen.MaintenanceStatusResult;
 import com.twitter.aurora.gen.PopulateJobResult;
-import com.twitter.aurora.gen.QueryRecoveryResponse;
+import com.twitter.aurora.gen.QueryRecoveryResult;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.Result;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
-import com.twitter.aurora.gen.RollbackShardsResponse;
+import com.twitter.aurora.gen.RollbackShardsResult;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduleStatusResult;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.ShardConfigRewrite;
 import com.twitter.aurora.gen.ShardKey;
-import com.twitter.aurora.gen.StartMaintenanceResponse;
+import com.twitter.aurora.gen.StartMaintenanceResult;
 import com.twitter.aurora.gen.StartUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.UpdateResponseCode;
 import com.twitter.aurora.gen.UpdateResult;
-import com.twitter.aurora.gen.UpdateShardsResponse;
+import com.twitter.aurora.gen.UpdateShardsResult;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
@@ -311,7 +310,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       response.setResponseCode(OK)
           .setResult(Result.scheduleStatusResult(
               new ScheduleStatusResult().setTasks(ImmutableList.copyOf(tasks))
-              )
+          )
           );
     }
 
@@ -319,7 +318,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public GetJobsResponse getJobs(@Nullable String maybeNullRole) {
+  public Response getJobs(@Nullable String maybeNullRole) {
     Optional<String> ownerRole = Optional.fromNullable(maybeNullRole);
 
 
@@ -363,9 +362,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         FluentIterable.from(cronJobManager.getJobs()).filter(configFilter),
         JobKeys.FROM_CONFIG));
 
-    return new GetJobsResponse()
-        .setConfigs(ImmutableSet.copyOf(jobs.values()))
-        .setResponseCode(OK);
+    return new Response()
+        .setResponseCode(OK)
+        .setResult(Result.getJobsResult(new GetJobsResult()
+            .setConfigs(ImmutableSet.copyOf(jobs.values()))));
   }
 
   private SessionContext validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
@@ -498,7 +498,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public UpdateShardsResponse updateShards(
+  public Response updateShards(
       JobKey jobKey,
       Set<Integer> shards,
       String updateToken,
@@ -509,29 +509,31 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     checkNotBlank(updateToken);
     checkNotNull(session);
 
-    UpdateShardsResponse response = new UpdateShardsResponse();
+    Response response = new Response();
     SessionContext context;
     try {
       context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
     } catch (AuthFailedException e) {
-      response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
       return response;
     }
 
     try {
       response
+          .setResponseCode(OK)
+          .setMessage("Successfully started update of shards: " + shards)
+          .setResult(Result.updateShardsResult(new UpdateShardsResult()
           .setShards(schedulerCore.updateShards(jobKey, context.getIdentity(), shards, updateToken))
-          .setResponseCode(UpdateResponseCode.OK)
-          .setMessage("Successfully started update of shards: " + shards);
+      ));
     } catch (ScheduleException e) {
-      response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
 
     return response;
   }
 
   @Override
-  public RollbackShardsResponse rollbackShards(
+  public Response rollbackShards(
       JobKey jobKey,
       Set<Integer> shards,
       String updateToken,
@@ -542,23 +544,23 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     checkNotBlank(updateToken);
     checkNotNull(session);
 
-    RollbackShardsResponse response = new RollbackShardsResponse();
+    Response response = new Response();
     SessionContext context;
     try {
       context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
     } catch (AuthFailedException e) {
-      response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
       return response;
     }
 
     try {
-      response
+      response.setResult(Result.rollbackShardsResult(new RollbackShardsResult()
           .setShards(schedulerCore.rollbackShards(
-              jobKey, context.getIdentity(), shards, updateToken))
-          .setResponseCode(UpdateResponseCode.OK)
+              jobKey, context.getIdentity(), shards, updateToken))))
+          .setResponseCode(OK)
           .setMessage("Successfully started rollback of shards: " + shards);
     } catch (ScheduleException e) {
-      response.setResponseCode(UpdateResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
 
     return response;
@@ -625,37 +627,44 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public GetQuotaResponse getQuota(String ownerRole) {
+  public Response getQuota(String ownerRole) {
     checkNotBlank(ownerRole);
-    return new GetQuotaResponse().setQuota(quotaManager.getQuota(ownerRole));
+    return new Response()
+        .setResponseCode(OK)
+        .setResult(Result.getQuotaResult(new GetQuotaResult()
+            .setQuota(quotaManager.getQuota(ownerRole))));
   }
 
   @Override
-  public StartMaintenanceResponse startMaintenance(Hosts hosts, SessionKey session) {
-    return new StartMaintenanceResponse()
-        .setStatuses(maintenance.startMaintenance(hosts.getHostNames()))
-        .setResponseCode(OK);
+  public Response startMaintenance(Hosts hosts, SessionKey session) {
+      return new Response()
+          .setResponseCode(OK)
+          .setResult(Result.startMaintenanceResult(new StartMaintenanceResult()
+              .setStatuses(maintenance.startMaintenance(hosts.getHostNames()))));
   }
 
   @Override
-  public DrainHostsResponse drainHosts(Hosts hosts, SessionKey session) {
-    return new DrainHostsResponse()
-        .setStatuses(maintenance.drain(hosts.getHostNames()))
-        .setResponseCode(OK);
+  public Response drainHosts(Hosts hosts, SessionKey session) {
+    return new Response()
+        .setResponseCode(OK)
+        .setResult(Result.drainHostsResult(new DrainHostsResult()
+            .setStatuses(maintenance.drain(hosts.getHostNames()))));
   }
 
   @Override
-  public MaintenanceStatusResponse maintenanceStatus(Hosts hosts, SessionKey session) {
-    return new MaintenanceStatusResponse()
-        .setStatuses(maintenance.getStatus(hosts.getHostNames()))
-        .setResponseCode(OK);
+  public Response maintenanceStatus(Hosts hosts, SessionKey session) {
+    return new Response()
+        .setResponseCode(OK)
+        .setResult(Result.maintenanceStatusResult(new MaintenanceStatusResult()
+            .setStatuses(maintenance.getStatus(hosts.getHostNames()))));
   }
 
   @Override
-  public EndMaintenanceResponse endMaintenance(Hosts hosts, SessionKey session) {
-    return new EndMaintenanceResponse()
-        .setStatuses(maintenance.endMaintenance(hosts.getHostNames()))
-        .setResponseCode(OK);
+  public Response endMaintenance(Hosts hosts, SessionKey session) {
+      return new Response()
+          .setResponseCode(OK)
+          .setResult(Result.endMaintenanceResult(new EndMaintenanceResult()
+            .setStatuses(maintenance.endMaintenance(hosts.getHostNames()))));
   }
 
   @Requires(whitelist = Capability.PROVISIONER)
@@ -701,10 +710,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public ListBackupsResponse listBackups(SessionKey session) {
-    return new ListBackupsResponse()
-        .setBackups(recovery.listBackups())
-        .setResponseCode(OK);
+  public Response listBackups(SessionKey session) {
+    return new Response()
+        .setResponseCode(OK)
+        .setResult(Result.listBackupsResult(new ListBackupsResult()
+            .setBackups(recovery.listBackups())));
   }
 
   @Override
@@ -721,10 +731,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public QueryRecoveryResponse queryRecovery(TaskQuery query, SessionKey session) {
-    QueryRecoveryResponse response = new QueryRecoveryResponse().setResponseCode(OK);
+  public Response queryRecovery(TaskQuery query, SessionKey session) {
+    Response response = new Response();
     try {
-      response.setTasks(recovery.query(Query.arbitrary(query)));
+      response.setResponseCode(OK)
+          .setResult(Result.queryRecoveryResult(new QueryRecoveryResult()
+          .setTasks(recovery.query(Query.arbitrary(query)))));
     } catch (RecoveryException e) {
       response.setResponseCode(ERROR).setMessage(e.getMessage());
       LOG.log(Level.WARNING, "Failed to query recovery: " + e, e);
@@ -759,18 +771,19 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public GetJobUpdatesResponse getJobUpdates(SessionKey session) {
-    return storage.weaklyConsistentRead(new Work.Quiet<GetJobUpdatesResponse>() {
-      @Override public GetJobUpdatesResponse apply(StoreProvider storeProvider) {
-        GetJobUpdatesResponse response = new GetJobUpdatesResponse().setResponseCode(OK);
-        response.setJobUpdates(Sets.<JobUpdateConfiguration>newHashSet());
+  public Response getJobUpdates(SessionKey session) {
+    return storage.weaklyConsistentRead(new Work.Quiet<Response>() {
+      @Override public Response apply(StoreProvider storeProvider) {
+        GetJobUpdatesResult result = new GetJobUpdatesResult()
+            .setJobUpdates(Sets.<JobUpdateConfiguration>newHashSet());
         UpdateStore store = storeProvider.getUpdateStore();
         for (String role : store.fetchUpdatingRoles()) {
           for (JobUpdateConfiguration config : store.fetchUpdateConfigs(role)) {
-            response.addToJobUpdates(config);
+            result.addToJobUpdates(config);
           }
         }
-        return response;
+        return new Response().setResponseCode(OK)
+            .setResult(Result.getJobUpdatesResult(result));
       }
     });
   }

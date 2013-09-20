@@ -7,7 +7,9 @@ from twitter.aurora.common.cluster import Cluster
 
 from gen.twitter.aurora.constants import ResponseCode
 from gen.twitter.aurora.ttypes import (
-   GetJobsResponse,
+   Response,
+   Result,
+   GetJobsResult,
    JobConfiguration,
    JobKey,
 )
@@ -39,11 +41,12 @@ class LiveJobDisambiguatorTest(mox.MoxTestBase):
     assert not LiveJobDisambiguator(self._api, self.ROLE, self.ENV, self.NAME).ambiguous
 
   def _expect_get_jobs(self, *envs):
-    self._api.get_jobs(self.ROLE).AndReturn(GetJobsResponse(
+    self._api.get_jobs(self.ROLE).AndReturn(Response(
       responseCode=ResponseCode.OK,
       message='Mock OK',
-      configs=set(JobConfiguration(key=JobKey(role=self.ROLE, environment=env, name=self.NAME))
-        for env in envs)))
+      result = Result(getJobsResult=GetJobsResult(
+        configs=set(JobConfiguration(key=JobKey(role=self.ROLE, environment=env, name=self.NAME))
+        for env in envs)))))
 
   def _try_disambiguate_ambiguous(self):
     return LiveJobDisambiguator._disambiguate_or_die(self._api, self.ROLE, None, self.NAME)

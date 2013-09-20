@@ -29,7 +29,7 @@ struct APIVersion {
 }
 
 // Scheduler Thrift API Version. Increment this when breaking backwards compatibility.
-const APIVersion CURRENT_API_VERSION = {'major': 1}
+const APIVersion CURRENT_API_VERSION = {'major': 2}
 
 struct Identity {
   1: string role
@@ -203,22 +203,14 @@ struct StartUpdateResult {
   2: bool rollingUpdateRequired
 }
 
-enum UpdateResponseCode {
-  OK              = 0,
-  INVALID_REQUEST = 1,
-  INVALID_TOKEN   = 2
-}
-
 enum ShardUpdateResult {
   ADDED      = 0,  // A task for the shard was created.
   RESTARTING = 1,  // The task is beginning an update or rollback and is restarting.
   UNCHANGED  = 2   // The task was unchanged and no action was necessary.
 }
 
-struct UpdateShardsResponse {
-  1: UpdateResponseCode responseCode,
-  2: string message
-  3: optional map<i32, ShardUpdateResult> shards
+struct UpdateShardsResult {
+  1: optional map<i32, ShardUpdateResult> shards
 }
 
 enum UpdateResult {
@@ -227,13 +219,11 @@ enum UpdateResult {
   TERMINATE = 2
 }
 
-struct RollbackShardsResponse {
-  1: UpdateResponseCode responseCode,
-  2: string message
-  3: optional map<i32, ShardUpdateResult> shards
+struct RollbackShardsResult {
+  1: optional map<i32, ShardUpdateResult> shards
 }
 
-struct GetQuotaResponse {
+struct GetQuotaResult {
   1: Quota quota
 }
 
@@ -363,10 +353,8 @@ struct ScheduleStatusResult {
   1: list<ScheduledTask> tasks
 }
 
-struct GetJobsResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<JobConfiguration> configs
+struct GetJobsResult {
+  1: set<JobConfiguration> configs
 }
 
 // Contains a set of restrictions on matching tasks where all restrictions must be met (terms are
@@ -390,11 +378,50 @@ struct Hosts {
   1: set<string> hostNames
 }
 
+struct ListBackupsResult {
+  1: set<string> backups
+}
+
+struct StartMaintenanceResult {
+  1: set<HostStatus> statuses
+}
+
+struct DrainHostsResult {
+  1: set<HostStatus> statuses
+}
+
+struct QueryRecoveryResult {
+  1: set<ScheduledTask> tasks
+}
+
+struct MaintenanceStatusResult {
+  1: set<HostStatus> statuses
+}
+
+struct EndMaintenanceResult {
+  1: set<HostStatus> statuses
+}
+
+struct GetJobUpdatesResult {
+  1: set<JobUpdateConfiguration> jobUpdates
+}
+
 union Result {
   // TODO(zmanji): Move all RPC-specific result types here as apart of MESOS-3751
   1: PopulateJobResult populateJobResult
   2: StartUpdateResult startUpdateResult
   3: ScheduleStatusResult scheduleStatusResult
+  4: GetJobsResult getJobsResult
+  5: GetQuotaResult getQuotaResult
+  6: ListBackupsResult listBackupsResult
+  7: StartMaintenanceResult startMaintenanceResult
+  8: DrainHostsResult drainHostsResult
+  9: QueryRecoveryResult queryRecoveryResult
+  10: MaintenanceStatusResult maintenanceStatusResult
+  11: EndMaintenanceResult endMaintenanceResult
+  12: GetJobUpdatesResult getJobUpdatesResult
+  13: UpdateShardsResult updateShardsResult
+  14: RollbackShardsResult rollbackShardsResult
 }
 
 struct Response {
@@ -426,7 +453,7 @@ service AuroraSchedulerManager {
   // Sends a request to update the set of shards specified.
   // A call to startUpdate must be successfully completed before a call can be made to updateShards.
   // The updateToken must be the one received from startUpdate.
-  UpdateShardsResponse updateShards(
+  Response updateShards(
       6: JobKey job,
       3: set<i32> shardIds,
       4: string updateToken,
@@ -435,7 +462,7 @@ service AuroraSchedulerManager {
   // Sends a request to rollback the shards that failed to update.
   // Update must be a failure before a call can be made to rollbackShards.
   // The updateToken must be the one received from startUpdate.
-  RollbackShardsResponse rollbackShards(
+  Response rollbackShards(
       6: JobKey job,
       3: set<i32> shardIds,
       4: string updateToken,
@@ -456,58 +483,16 @@ service AuroraSchedulerManager {
 
   // Fetches the status of jobs.
   // ownerRole is optional, in which case all jobs are returned.
-  GetJobsResponse getJobs(1: string ownerRole)
+  Response getJobs(1: string ownerRole)
 
   // Initiates a kill on tasks.
   Response killTasks(1: TaskQuery query, 2: SessionKey session)
 
   // Fetches the quota allocated for a user.
-  GetQuotaResponse getQuota(1: string ownerRole)
+  Response getQuota(1: string ownerRole)
 
   // Returns the current version of the API implementation
   APIVersion getVersion()
-}
-
-struct StartMaintenanceResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<HostStatus> statuses
-}
-
-struct DrainHostsResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<HostStatus> statuses
-}
-
-struct MaintenanceStatusResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<HostStatus> statuses
-}
-
-struct EndMaintenanceResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<HostStatus> statuses
-}
-
-struct ListBackupsResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<string> backups
-}
-
-struct QueryRecoveryResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<ScheduledTask> tasks
-}
-
-struct GetJobUpdatesResponse {
-  1: ResponseCode responseCode
-  2: string message
-  3: set<JobUpdateConfiguration> jobUpdates
 }
 
 struct ShardConfigRewrite {
@@ -548,13 +533,13 @@ service AuroraAdmin extends AuroraSchedulerManager {
   Response performBackup(1: SessionKey session)
 
   // Lists backups that are available for recovery.
-  ListBackupsResponse listBackups(1: SessionKey session)
+  Response listBackups(1: SessionKey session)
 
   // Loads a backup to an in-memory storage.  This must precede all other recovery operations.
   Response stageRecovery(1: string backupId, 2: SessionKey session)
 
   // Queries for tasks in a staged recovery.
-  QueryRecoveryResponse queryRecovery(1: TaskQuery query, 2: SessionKey session)
+  Response queryRecovery(1: TaskQuery query, 2: SessionKey session)
 
   // Deletes tasks from a staged recovery.
   Response deleteRecoveryTasks(1: TaskQuery query, 2: SessionKey session)
@@ -566,21 +551,19 @@ service AuroraAdmin extends AuroraSchedulerManager {
   Response unloadRecovery(1: SessionKey session)
 
   // Put the given hosts into maintenance mode.
-  StartMaintenanceResponse startMaintenance(
-      1: Hosts hosts,
-      2: SessionKey session)
+  Response startMaintenance(1: Hosts hosts, 2: SessionKey session)
 
   // Ask scheduler to begin moving tasks scheduled on given hosts.
-  DrainHostsResponse drainHosts(1: Hosts hosts, 2: SessionKey session)
+  Response drainHosts(1: Hosts hosts, 2: SessionKey session)
 
   // Retrieve the current maintenance states for a group of hosts.
-  MaintenanceStatusResponse maintenanceStatus(1: Hosts hosts, 2: SessionKey session)
+  Response maintenanceStatus(1: Hosts hosts, 2: SessionKey session)
 
   // Set the given hosts back into serving mode.
-  EndMaintenanceResponse endMaintenance(1: Hosts hosts, 2: SessionKey session)
+  Response endMaintenance(1: Hosts hosts, 2: SessionKey session)
 
   // Retrieves all in-flight user job updates.
-  GetJobUpdatesResponse getJobUpdates(1: SessionKey session)
+  Response getJobUpdates(1: SessionKey session)
 
   // Start a storage snapshot and block until it completes.
   Response snapshot(1: SessionKey session)
@@ -590,7 +573,5 @@ service AuroraAdmin extends AuroraSchedulerManager {
   // scheduler (e.g. thermosConfig).
   // The scheduler may do some validation of the rewritten configurations, but it is important
   // that the caller take care to provide valid input and alter only necessary fields.
-  Response rewriteConfigs(
-      1: RewriteConfigsRequest request,
-      2: SessionKey session)
+  Response rewriteConfigs(1: RewriteConfigsRequest request, 2: SessionKey session)
 }

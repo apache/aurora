@@ -36,8 +36,8 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
 import com.twitter.aurora.gen.Constraint;
-import com.twitter.aurora.gen.DrainHostsResponse;
-import com.twitter.aurora.gen.EndMaintenanceResponse;
+import com.twitter.aurora.gen.DrainHostsResult;
+import com.twitter.aurora.gen.EndMaintenanceResult;
 import com.twitter.aurora.gen.HostStatus;
 import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.Identity;
@@ -45,17 +45,18 @@ import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.LimitConstraint;
-import com.twitter.aurora.gen.MaintenanceStatusResponse;
+import com.twitter.aurora.gen.MaintenanceStatusResult;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.ResponseCode;
+import com.twitter.aurora.gen.Result;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.ShardConfigRewrite;
 import com.twitter.aurora.gen.ShardKey;
-import com.twitter.aurora.gen.StartMaintenanceResponse;
+import com.twitter.aurora.gen.StartMaintenanceResult;
 import com.twitter.aurora.gen.StartUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
@@ -796,22 +797,29 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Hosts hosts = new Hosts(hostnames);
 
     assertEquals(
-        new MaintenanceStatusResponse().setResponseCode(OK).setStatuses(none),
+        new Response().setResponseCode(OK).setResult(
+            Result.maintenanceStatusResult(new MaintenanceStatusResult().setStatuses(none))),
         thrift.maintenanceStatus(hosts, SESSION));
     assertEquals(
-        new StartMaintenanceResponse().setResponseCode(OK).setStatuses(scheduled),
-        thrift.startMaintenance(hosts, SESSION));
+        new Response().setResponseCode(OK).setResult(
+            Result.startMaintenanceResult(new StartMaintenanceResult().setStatuses(scheduled))),
+        thrift.startMaintenance(hosts, SESSION)
+    );
     assertEquals(
-        new DrainHostsResponse().setResponseCode(OK).setStatuses(draining),
+        new Response().setResponseCode(OK).setResult(
+            Result.drainHostsResult(new DrainHostsResult().setStatuses(draining))),
         thrift.drainHosts(hosts, SESSION));
     assertEquals(
-        new MaintenanceStatusResponse().setResponseCode(OK).setStatuses(draining),
+        new Response().setResponseCode(OK).setResult(
+            Result.maintenanceStatusResult(new MaintenanceStatusResult().setStatuses(draining))),
         thrift.maintenanceStatus(hosts, SESSION));
     assertEquals(
-        new MaintenanceStatusResponse().setResponseCode(OK).setStatuses(drained),
+        new Response().setResponseCode(OK).setResult(
+            Result.maintenanceStatusResult(new MaintenanceStatusResult().setStatuses(drained))),
         thrift.maintenanceStatus(hosts, SESSION));
     assertEquals(
-        new EndMaintenanceResponse().setResponseCode(OK).setStatuses(none),
+        new Response().setResponseCode(OK).setResult(
+            Result.endMaintenanceResult(new EndMaintenanceResult().setStatuses(none))),
         thrift.endMaintenance(hosts, SESSION));
   }
 
@@ -866,17 +874,22 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE).getConfigs()));
+    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE)
+        .getResult().getGetJobsResult().getConfigs()));
 
-    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE).getConfigs()));
+    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE)
+        .getResult().getGetJobsResult().getConfigs()));
 
-    Set<JobConfiguration> queryResult3 = thrift.getJobs(ROLE).getConfigs();
+    Set<JobConfiguration> queryResult3 =
+        thrift.getJobs(ROLE).getResult().getGetJobsResult().getConfigs();
     assertEquals(ownedImmediateJob, Iterables.getOnlyElement(queryResult3));
     assertEquals(ownedImmediateTaskInfo, Iterables.getOnlyElement(queryResult3).getTaskConfig());
 
-    assertTrue(thrift.getJobs(ROLE).getConfigs().isEmpty());
+    assertTrue(thrift.getJobs(ROLE)
+        .getResult().getGetJobsResult().getConfigs().isEmpty());
 
-    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE).getConfigs()));
+    assertEquals(ownedCronJob, Iterables.getOnlyElement(thrift.getJobs(ROLE)
+        .getResult().getGetJobsResult().getConfigs()));
   }
 
   @Test
@@ -910,7 +923,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Set<JobConfiguration> allJobs =
         ImmutableSet.<JobConfiguration>builder().addAll(crons).add(immediateJob).build();
-    assertEquals(allJobs, thrift.getJobs(null).getConfigs());
+    assertEquals(allJobs, thrift.getJobs(null).getResult().getGetJobsResult().getConfigs());
   }
 
   @Test

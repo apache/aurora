@@ -21,27 +21,16 @@ import org.apache.thrift.TException;
 
 import com.twitter.aurora.gen.APIVersion;
 import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.DrainHostsResponse;
-import com.twitter.aurora.gen.EndMaintenanceResponse;
-import com.twitter.aurora.gen.GetJobUpdatesResponse;
-import com.twitter.aurora.gen.GetJobsResponse;
-import com.twitter.aurora.gen.GetQuotaResponse;
 import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.ListBackupsResponse;
-import com.twitter.aurora.gen.MaintenanceStatusResponse;
-import com.twitter.aurora.gen.QueryRecoveryResponse;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
-import com.twitter.aurora.gen.RollbackShardsResponse;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.StartMaintenanceResponse;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
-import com.twitter.aurora.gen.UpdateShardsResponse;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -79,7 +68,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public ListBackupsResponse listBackups(SessionKey session) throws TException {
+  public Response listBackups(SessionKey session) throws TException {
     return delegate.listBackups(session);
   }
 
@@ -91,7 +80,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public QueryRecoveryResponse queryRecovery(TaskQuery query, SessionKey session)
+  public Response queryRecovery(TaskQuery query, SessionKey session)
       throws TException {
 
     return delegate.queryRecovery(query, session);
@@ -139,7 +128,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public UpdateShardsResponse updateShards(
+  public Response updateShards(
       JobKey job,
       Set<Integer> shardIds,
       String updateToken,
@@ -149,7 +138,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public RollbackShardsResponse rollbackShards(
+  public Response rollbackShards(
       JobKey job,
       Set<Integer> shardIds,
       String updateToken,
@@ -183,7 +172,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public GetJobsResponse getJobs(String ownerRole) throws TException {
+  public Response getJobs(String ownerRole) throws TException {
     return delegate.getJobs(ownerRole);
   }
 
@@ -193,36 +182,36 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public GetQuotaResponse getQuota(String ownerRole) throws TException {
+  public Response getQuota(String ownerRole) throws TException {
     return delegate.getQuota(ownerRole);
   }
 
   @Override
-  public StartMaintenanceResponse startMaintenance(Hosts hosts, SessionKey session)
+  public Response startMaintenance(Hosts hosts, SessionKey session)
       throws TException {
 
     return delegate.startMaintenance(hosts, session);
   }
 
   @Override
-  public DrainHostsResponse drainHosts(Hosts hosts, SessionKey session) throws TException {
+  public Response drainHosts(Hosts hosts, SessionKey session) throws TException {
     return delegate.drainHosts(hosts, session);
   }
 
   @Override
-  public MaintenanceStatusResponse maintenanceStatus(Hosts hosts, SessionKey session)
+  public Response maintenanceStatus(Hosts hosts, SessionKey session)
       throws TException {
 
     return delegate.maintenanceStatus(hosts, session);
   }
 
   @Override
-  public EndMaintenanceResponse endMaintenance(Hosts hosts, SessionKey session) throws TException {
+  public Response endMaintenance(Hosts hosts, SessionKey session) throws TException {
     return delegate.endMaintenance(hosts, session);
   }
 
   @Override
-  public GetJobUpdatesResponse getJobUpdates(SessionKey session) throws TException {
+  public Response getJobUpdates(SessionKey session) throws TException {
     return delegate.getJobUpdates(session);
   }
 

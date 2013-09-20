@@ -76,13 +76,14 @@ class UpdaterTest(unittest.TestCase):
     self._updater._update_token = self._update_token
 
   def expect_update(self, shard_ids, shard_results=None):
-    response = UpdateShardsResponse(responseCode=UpdateResponseCode.OK, message='test')
-    response.shards = shard_results
+    response = Response(responseCode=ResponseCode.OK, message='test')
+    result = UpdateShardsResult(shards=shard_results)
+    response.result = Result(updateShardsResult=result)
     self._scheduler.updateShards(self._job_key, shard_ids, self._update_token, self._session_key
         ).AndReturn(response)
 
   def expect_invalid_update(self):
-    response = UpdateShardsResponse(responseCode=UpdateResponseCode.INVALID_REQUEST)
+    response = Response(responseCode=ResponseCode.INVALID_REQUEST)
     self._scheduler.updateShards(self._job_key, mox.IgnoreArg(), mox.IgnoreArg(), self._session_key
         ).AndReturn(response)
 
@@ -92,8 +93,9 @@ class UpdaterTest(unittest.TestCase):
     self._scheduler.restartShards(self._job_key, shard_ids, self._session_key).AndReturn(response)
 
   def expect_rollback(self, shard_ids, shard_results=None):
-    response = RollbackShardsResponse(responseCode=UpdateResponseCode.OK, message='test')
-    response.shards = shard_results
+    response = Response(responseCode=ResponseCode.OK, message='test')
+    result = RollbackShardsResult(shards=shard_results)
+    response.result = Result(rollbackShardsResult=result)
     self._scheduler.rollbackShards(self._job_key, shard_ids, self._update_token, self._session_key
         ).AndReturn(response)
 

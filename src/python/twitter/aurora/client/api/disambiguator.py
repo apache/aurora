@@ -31,7 +31,7 @@ class LiveJobDisambiguator(object):
     resp = self._client.get_jobs(self._role)
     check_and_log_response(resp)
     return set(AuroraJobKey(self._client.cluster.name, j.key.role, j.key.environment, j.key.name)
-        for j in resp.configs if j.key.name == self._name)
+        for j in resp.result.getJobsResult.configs if j.key.name == self._name)
 
   @classmethod
   def _disambiguate_or_die(cls, client, role, env, name):

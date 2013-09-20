@@ -2,12 +2,10 @@ import collections
 
 from twitter.common import log
 
-from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.aurora.ttypes import (
   JobKey,
   ResponseCode,
   ShardUpdateResult,
-  UpdateResponseCode,
   UpdateResult,
 )
 from .updater_util import FailureThreshold, UpdaterConfig
@@ -157,7 +155,8 @@ class Updater(object):
 
       resp = self._scheduler.rollbackShards(self._job_key, batch_shards, self._update_token)
       self._check_and_log_update_response(resp)
-      shards_to_watch = self._get_shards_to_watch(resp.shards, batch_shards)
+      shards = resp.result.rollbackShardsResult.shards
+      shards_to_watch = self._get_shards_to_watch(shards, batch_shards)
       failed_shards += self._shard_watcher.watch(shards_to_watch)
 
     if failed_shards:
@@ -174,7 +173,7 @@ class Updater(object):
     log.info('Updating shards: %s' % shard_ids)
     resp = self._scheduler.updateShards(self._job_key, shard_ids, self._update_token)
     self._check_and_log_update_response(resp)
-    return resp.shards
+    return resp.result.updateShardsResult.shards
 
   def _restart_shards(self, shard_ids):
     """Instructs the scheduler to restart shards.
@@ -203,8 +202,8 @@ class Updater(object):
 
   @classmethod
   def _check_and_log_update_response(cls, resp):
-    name, message = UpdateResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message
-    if resp.responseCode == UpdateResponseCode.OK:
+    name, message = ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message
+    if resp.responseCode == ResponseCode.OK:
       log.debug('Response from scheduler: %s (message: %s)' % (name, message))
     else:
       cls._handle_unexpected_response(name, message)

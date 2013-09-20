@@ -25,8 +25,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.GetJobsResponse;
+import com.twitter.aurora.gen.GetJobsResult;
 import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.gen.Response;
+import com.twitter.aurora.gen.Result;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -63,14 +65,14 @@ public class ThriftStatsExporterInterceptorTest extends EasyMockTest {
 
   @Test
   public void testIncrementStat() throws Exception {
-    GetJobsResponse getJobsResponse = new GetJobsResponse()
-        .setConfigs(ImmutableSet.<JobConfiguration>of())
-        .setResponseCode(OK);
+    Response response = new Response().setResponseCode(OK)
+        .setResult(Result.getJobsResult(new GetJobsResult()
+        .setConfigs(ImmutableSet.<JobConfiguration>of())));
 
-    expect(realThrift.getJobs(ROLE)).andReturn(getJobsResponse);
+    expect(realThrift.getJobs(ROLE)).andReturn(response);
     control.replay();
 
-    assertSame(getJobsResponse, decoratedThrift.getJobs(ROLE));
+    assertSame(response, decoratedThrift.getJobs(ROLE));
     assertNotNull(Stats.getVariable("scheduler_thrift_getJobs_events"));
     assertNotNull(Stats.getVariable("scheduler_thrift_getJobs_events_per_sec"));
     assertNotNull(Stats.getVariable("scheduler_thrift_getJobs_nanos_per_event"));
