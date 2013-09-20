@@ -63,6 +63,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
 import com.twitter.aurora.scheduler.metadata.NearestFit;
+import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.common.base.Closure;
 
@@ -202,6 +203,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
   private final Storage storage;
   private final String clusterName;
   private final NearestFit nearestFit;
+  private final CronJobManager cronJobManager;
 
   /**
    * Creates a new job servlet.
@@ -212,6 +214,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
   @Inject
   public SchedulerzJob(
       Storage storage,
+      CronJobManager cronJobManager,
       @ClusterName String clusterName,
       NearestFit nearestFit) {
 
@@ -219,6 +222,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
     this.storage = checkNotNull(storage);
     this.clusterName = checkNotBlank(clusterName);
     this.nearestFit = checkNotNull(nearestFit);
+    this.cronJobManager = checkNotNull(cronJobManager);
   }
 
   private static <T> Iterable<T> offsetAndLimit(Iterable<T> iterable, int offset) {
@@ -352,6 +356,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
         template.setAttribute(ADMIN_VIEW_PARAM, adminView != null);
+
+        boolean isCron = cronJobManager.hasJob(JobKeys.from(role, environment, job));
+        template.setAttribute("is_cron", isCron);
 
         ScheduleStatus statusFilter = null;
         if (filterArg != null) {

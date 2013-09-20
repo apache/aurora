@@ -47,8 +47,11 @@
       </div>
 
       $if(admin)$
-        (<a href="/structdump/cron/$role$/$environment$/$job$">dump</a>)
+        $if(is_cron)$
+          (<a href="/structdump/cron/$role$/$environment$/$job$">dump</a>)
+        $endif$
       $endif$
+
 
       $if(schedulingDetails)$
         <div class="row-fluid" style="margin-bottom: 20px;">
