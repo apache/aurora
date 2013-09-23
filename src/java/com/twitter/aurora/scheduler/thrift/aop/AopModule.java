@@ -40,9 +40,9 @@ import com.google.inject.matcher.Matchers;
 import org.aopalliance.intercept.MethodInterceptor;
 
 import com.twitter.aurora.GuiceUtils;
+import com.twitter.aurora.auth.CapabilityValidator;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.AuroraSchedulerManager;
-import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;

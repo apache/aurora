@@ -31,6 +31,8 @@ import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.aurora.auth.CapabilityValidator;
+import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.AuroraAdmin;
@@ -76,8 +78,6 @@ import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.aurora.scheduler.thrift.aop.AopModule;
-import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
-import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
@@ -88,6 +88,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import static com.twitter.aurora.auth.CapabilityValidator.Capability.ROOT;
 import static com.twitter.aurora.auth.SessionValidator.SessionContext;
 import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
 import static com.twitter.aurora.gen.MaintenanceMode.DRAINING;
@@ -101,7 +102,6 @@ import static com.twitter.aurora.gen.ResponseCode.WARNING;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.MAX_TASKS_PER_JOB;
 import static com.twitter.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
-import static com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability.ROOT;
 
 // TODO(ksweeney): Get role from JobKey instead of Identity everywhere in here.
 public class SchedulerThriftInterfaceTest extends EasyMockTest {

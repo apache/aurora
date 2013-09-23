@@ -28,26 +28,53 @@ import com.twitter.aurora.gen.SessionKey;
  * to {@link SessionValidator}.
  */
 public class UnsecureAuthModule extends AbstractModule {
-
+  private static final String UNSECURE = "UNSECURE";
   private static final Logger LOG = Logger.getLogger(UnsecureAuthModule.class.getName());
 
   @Override
   protected void configure() {
     LOG.info("Using default (UNSECURE!!!) authentication module.");
     bind(SessionValidator.class).to(UnsecureSessionValidator.class);
+    bind(CapabilityValidator.class).to(UnsecureCapabilityValidator.class);
   }
 
   static class UnsecureSessionValidator implements SessionValidator {
-    private static final Logger LOG = Logger.getLogger(UnsecureSessionValidator.class.getName());
+    @Override
+    public SessionContext checkAuthenticated(SessionKey key, Set<String> targetRoles)
+        throws AuthFailedException {
+
+      return new SessionContext() {
+        @Override public String getIdentity() {
+          return UNSECURE;
+        }
+      };
+    }
+
+    @Override
+    public String toString(SessionKey sessionKey) {
+      return sessionKey.toString();
+    }
+  }
+
+  static class UnsecureCapabilityValidator implements CapabilityValidator {
+    @Override
+    public SessionContext checkAuthorized(SessionKey key, Capability capability)
+        throws AuthFailedException {
+
+      return new SessionContext() {
+        @Override public String getIdentity() {
+          return UNSECURE;
+        }
+      };
+    }
 
     @Override
     public SessionContext checkAuthenticated(SessionKey key, Set<String> targetRoles)
         throws AuthFailedException {
 
-      LOG.warning("Using unsecure session validator for key: " + key + " roles: " + targetRoles);
       return new SessionContext() {
         @Override public String getIdentity() {
-          return "UNSECURE";
+          return UNSECURE;
         }
       };
     }

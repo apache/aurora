@@ -32,6 +32,7 @@ import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 import com.google.inject.Singleton;
 
+import com.twitter.aurora.auth.CapabilityValidator;
 import com.twitter.aurora.auth.SessionValidator;
 import com.twitter.aurora.auth.UnsecureAuthModule;
 import com.twitter.aurora.scheduler.DriverFactory;
@@ -120,6 +121,7 @@ public class SchedulerMain extends AbstractApplication {
 
   private static final Iterable<Class<?>> AUTH_MODULE_CLASSES = ImmutableList.<Class<?>>builder()
       .add(SessionValidator.class)
+      .add(CapabilityValidator.class)
       .build();
 
   @CmdLine(name = "cron_module",

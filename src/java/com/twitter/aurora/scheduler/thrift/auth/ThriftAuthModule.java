@@ -21,12 +21,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.AbstractModule;
-import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
+import com.twitter.aurora.auth.CapabilityValidator;
+import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator;
-import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
-import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.CapabilityValidatorImpl;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotEmpty;
@@ -64,7 +63,6 @@ public class ThriftAuthModule extends AbstractModule {
     bind(new TypeLiteral<Map<Capability, String>>() { }).toInstance(capabilities);
 
     requireBinding(SessionValidator.class);
-    bind(CapabilityValidator.class).to(CapabilityValidatorImpl.class);
-    bind(CapabilityValidatorImpl.class).in(Singleton.class);
+    requireBinding(CapabilityValidator.class);
   }
 }

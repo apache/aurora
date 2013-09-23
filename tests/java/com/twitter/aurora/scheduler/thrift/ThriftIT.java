@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -27,6 +28,8 @@ import com.google.inject.Injector;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.aurora.auth.CapabilityValidator;
+import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.Quota;
@@ -39,7 +42,6 @@ import com.twitter.aurora.scheduler.state.StateManager;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
-import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -84,6 +86,34 @@ public class ThriftIT extends EasyMockTest {
     }
   };
 
+  private class CapabilityValidatorFake implements CapabilityValidator {
+    private final SessionValidator validator;
+
+    CapabilityValidatorFake(SessionValidator validator) {
+      this.validator = validator;
+    }
+
+    @Override public SessionContext checkAuthorized(SessionKey sessionKey, Capability capability)
+        throws AuthFailedException {
+
+      return validator.checkAuthenticated(
+          sessionKey,
+          ImmutableSet.of(CAPABILITIES.get(capability)));
+    }
+
+    @Override public SessionContext checkAuthenticated(
+        SessionKey sessionKey,
+        Set<String> targetRoles)
+        throws AuthFailedException {
+
+      return validator.checkAuthenticated(sessionKey, targetRoles);
+    }
+
+    @Override public String toString(SessionKey sessionKey) {
+      return validator.toString(sessionKey);
+    }
+  };
+
   @Before
   public void setUp() {
     context = createMock(SessionContext.class);
@@ -113,6 +143,7 @@ public class ThriftIT extends EasyMockTest {
             bindMock(ThriftConfiguration.class);
             quotaManager = bindMock(QuotaManager.class);
             bind(SessionValidator.class).toInstance(validator);
+            bind(CapabilityValidator.class).toInstance(new CapabilityValidatorFake(validator));
           }
         }
     );

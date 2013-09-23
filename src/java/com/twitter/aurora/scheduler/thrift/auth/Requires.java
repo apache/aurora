@@ -18,7 +18,7 @@ package com.twitter.aurora.scheduler.thrift.auth;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
+import com.twitter.aurora.auth.CapabilityValidator.Capability;
 
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;

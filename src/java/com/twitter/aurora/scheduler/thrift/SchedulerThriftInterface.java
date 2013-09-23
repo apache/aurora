@@ -45,6 +45,8 @@ import com.google.inject.Inject;
 
 import org.apache.commons.lang.StringUtils;
 
+import com.twitter.aurora.auth.CapabilityValidator;
+import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.APIVersion;
 import com.twitter.aurora.gen.AssignedTask;
@@ -103,8 +105,6 @@ import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
-import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator;
-import com.twitter.aurora.scheduler.thrift.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 import com.twitter.aurora.scheduler.thrift.auth.Requires;
 import com.twitter.common.args.Arg;
