@@ -72,9 +72,7 @@ import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescr
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
-import com.twitter.aurora.scheduler.quota.QuotaManager;
-import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
-import com.twitter.aurora.scheduler.quota.Quotas;
+import com.twitter.aurora.scheduler.state.JobFilter.JobFilterResult;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
@@ -123,8 +121,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final String JOB_A = "Test_Job_A";
   private static final JobKey KEY_A = JobKeys.from(ROLE_A, ENV_A, JOB_A);
   private static final int ONE_GB = 1024;
-  private static final Quota DEFAULT_TASK_QUOTA = new Quota(1.0, ONE_GB, ONE_GB);
-  private static final int DEFAULT_TASKS_IN_QUOTA = 10;
 
   private static final String ROLE_B = "Test_Role_B";
   private static final String USER_B = "Test_User_B";
@@ -140,10 +136,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private SchedulerCoreImpl scheduler;
   private CronScheduler cronScheduler;
   private CronJobManager cron;
-  private QuotaManager quotaManager;
   private FakeClock clock;
   private Closure<PubsubEvent> eventSink;
   private ShutdownRegistry shutdownRegistry;
+  private QuotaFilter quotaFilter;
 
   // TODO(William Farner): Set up explicit expectations for calls to generate task IDs.
   private final AtomicLong idCounter = new AtomicLong();
@@ -161,11 +157,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     eventSink.execute(EasyMock.<PubsubEvent>anyObject());
     cronScheduler = createMock(CronScheduler.class);
     shutdownRegistry = createMock(ShutdownRegistry.class);
+    quotaFilter = createMock(QuotaFilter.class);
     expectLastCall().anyTimes();
 
     expect(cronScheduler.schedule(anyObject(String.class), anyObject(Runnable.class)))
         .andStubReturn("key");
     expect(cronScheduler.isValidSchedule(anyObject(String.class))).andStubReturn(true);
+
+    expect(quotaFilter.filter(anyObject(JobConfiguration.class))).andStubReturn(
+        JobFilter.JobFilterResult.pass());
   }
 
   /**
@@ -188,6 +188,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setDiskMb(quota.getDiskMb() * factor);
   }
 
+  // TODO(ksweeney): Use Guice to instantiate everything here.
   private void buildScheduler(Storage newStorage) throws Exception {
     this.storage = newStorage;
     storage.write(new MutateWork.NoResult.Quiet() {
@@ -198,47 +199,16 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     stateManager = new StateManagerImpl(storage, clock, driver, taskIdGenerator, eventSink);
     ImmediateJobManager immediateManager = new ImmediateJobManager(stateManager, storage);
-    quotaManager = new QuotaManagerImpl(storage);
     cron = new CronJobManager(stateManager, storage, cronScheduler, shutdownRegistry);
     scheduler = new SchedulerCoreImpl(
         storage,
         cron,
         immediateManager,
         stateManager,
-        quotaManager,
-        taskIdGenerator);
+        taskIdGenerator,
+        quotaFilter);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
-
-    // Apply a default quota for users so we don't have to give quota for every test.
-    quotaManager.setQuota(ROLE_A, scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
-    quotaManager.setQuota(OWNER_B.getRole(), scale(DEFAULT_TASK_QUOTA, DEFAULT_TASKS_IN_QUOTA));
-  }
-
-  @Test(expected = ScheduleException.class)
-  public void testCreateJobNoQuota() throws Exception {
-    control.replay();
-    buildScheduler();
-
-    quotaManager.setQuota(ROLE_A, Quotas.NO_QUOTA);
-    scheduler.createJob(makeJob(KEY_A, 1));
-  }
-
-  @Test
-  public void testCreateNonproductionJobNoQuota() throws Exception {
-    control.replay();
-    buildScheduler();
-
-    TaskConfig task = nonProductionTask();
-    scheduler.createJob(makeJob(KEY_A, task, 100));
-    assertEquals(100, getTasks(Query.roleScoped(ROLE_A)).size());
-  }
-
-  @Test(expected = ScheduleException.class)
-  public void testCreateJobExceedsQuota() throws Exception {
-    control.replay();
-    buildScheduler();
-    scheduler.createJob(makeJob(KEY_A, DEFAULT_TASKS_IN_QUOTA + 1));
   }
 
   @Test
@@ -324,7 +294,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setTaskLinks(ImmutableMap.<String, String>of());
 
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
             new ScheduledTask()
                 .setStatus(PENDING)
@@ -1636,27 +1607,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     };
   }
 
-  @Test(expected = ScheduleException.class)
-  public void testIncreaseShardsExceedsQuota() throws Exception {
-    int numTasks = DEFAULT_TASKS_IN_QUOTA;
-    int additionalTasks = 1;
-
-    control.replay();
-    buildScheduler();
-
-    ParsedConfiguration job = makeJob(KEY_A, productionTask().deepCopy(), numTasks);
-    for (TaskConfig config : job.getTaskConfigs()) {
-      config.setRequestedPorts(OLD_PORTS);
-    }
-    scheduler.createJob(job);
-
-    ParsedConfiguration updatedJob =
-        makeJob(KEY_A, productionTask().deepCopy(), numTasks + additionalTasks);
-    for (TaskConfig config : updatedJob.getTaskConfigs()) {
-      config.setRequestedPorts(NEW_PORTS);
-    }
-    scheduler.initiateJobUpdate(updatedJob);
-  }
 
   @Test
   public void testDecreaseShardsRollback() throws Exception {
@@ -1842,6 +1792,28 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     buildScheduler();
 
     scheduler.createJob(makeJob(KEY_A, 1));
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testFilterFailRejectsCreate() throws Exception {
+    ParsedConfiguration job = makeJob(KEY_A, 1);
+    expect(quotaFilter.filter(job.getJobConfig())).andReturn(JobFilterResult.fail("failed"));
+
+    control.replay();
+
+    buildScheduler();
+    scheduler.createJob(job);
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testFilterFailRejectsUpdate() throws Exception {
+    ParsedConfiguration job = makeJob(KEY_A, 1);
+    expect(quotaFilter.filter(job.getJobConfig())).andReturn(JobFilterResult.fail("failed"));
+
+    control.replay();
+
+    buildScheduler();
+    scheduler.initiateJobUpdate(job);
   }
 
   private static String getLocalHost() {

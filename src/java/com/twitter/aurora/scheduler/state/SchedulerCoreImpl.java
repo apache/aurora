@@ -31,7 +31,6 @@ import com.google.inject.Inject;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.ShardUpdateResult;
@@ -43,8 +42,6 @@ import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
-import com.twitter.aurora.scheduler.quota.QuotaManager;
-import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.state.StateManagerImpl.UpdateException;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -82,8 +79,8 @@ class SchedulerCoreImpl implements SchedulerCore {
   // State manager handles persistence of task modifications and state transitions.
   private final StateManagerImpl stateManager;
 
-  private final QuotaManager quotaManager;
   private final Function<TaskConfig, String> taskIdGenerator;
+  private final JobFilter jobFilter;
 
   /**
    * Creates a new core scheduler.
@@ -92,7 +89,7 @@ class SchedulerCoreImpl implements SchedulerCore {
    * @param cronScheduler Cron scheduler.
    * @param immediateScheduler Immediate scheduler.
    * @param stateManager Persistent state manager.
-   * @param quotaManager Quota tracker.
+   * @param jobFilter Job filter.
    */
   @Inject
   public SchedulerCoreImpl(
@@ -100,8 +97,8 @@ class SchedulerCoreImpl implements SchedulerCore {
       CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
       StateManagerImpl stateManager,
-      QuotaManager quotaManager,
-      Function<TaskConfig, String> taskIdGenerator) {
+      Function<TaskConfig, String> taskIdGenerator,
+      JobFilter jobFilter) {
 
     this.storage = checkNotNull(storage);
 
@@ -110,8 +107,8 @@ class SchedulerCoreImpl implements SchedulerCore {
     this.jobManagers = ImmutableList.of(cronScheduler, immediateScheduler);
     this.cronScheduler = cronScheduler;
     this.stateManager = checkNotNull(stateManager);
-    this.quotaManager = checkNotNull(quotaManager);
     this.taskIdGenerator = checkNotNull(taskIdGenerator);
+    this.jobFilter = checkNotNull(jobFilter);
   }
 
   private boolean hasActiveJob(JobConfiguration job) {
@@ -146,7 +143,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
     // TODO(William Farner); This is a short-term hack to stop the bleeding from MESOS-3788.
     checkTaskIdLength(Iterables.getFirst(parsedConfiguration.getTaskConfigs(), null));
-    ensureHasAdditionalQuota(job.getOwner().getRole(), Quotas.fromJob(job));
+    checkFilterPasses(job);
 
     boolean accepted = false;
     for (final JobManager manager : jobManagers) {
@@ -278,12 +275,6 @@ class SchedulerCoreImpl implements SchedulerCore {
     });
   }
 
-  private void ensureHasAdditionalQuota(String role, Quota quota) throws ScheduleException {
-    if (!quotaManager.hasRemaining(role, quota)) {
-      throw new ScheduleException("Insufficient resource quota.");
-    }
-  }
-
   @Override
   public synchronized Optional<String> initiateJobUpdate(
       final ParsedConfiguration parsedConfiguration) throws ScheduleException {
@@ -307,13 +298,7 @@ class SchedulerCoreImpl implements SchedulerCore {
               + JobKeys.toPath(job));
         }
 
-        if (!existingTasks.isEmpty()) {
-          Quota currentJobQuota = Quotas.fromProductionTasks(
-                  Iterables.transform(existingTasks, Tasks.SCHEDULED_TO_INFO));
-          Quota newJobQuota = Quotas.fromJob(job);
-          Quota additionalQuota = Quotas.subtract(newJobQuota, currentJobQuota);
-          ensureHasAdditionalQuota(job.getOwner().getRole(), additionalQuota);
-        }
+        checkFilterPasses(job);
 
         try {
           return Optional.of(
@@ -379,5 +364,13 @@ class SchedulerCoreImpl implements SchedulerCore {
 
     stateManager.changeState(Query.taskScoped(task.getTaskId()), ScheduleStatus.PREEMPTING,
         Optional.of("Preempting in favor of " + preemptingTask.getTaskId()));
+  }
+
+  private void checkFilterPasses(JobConfiguration job) throws ScheduleException {
+    JobFilter.JobFilterResult result = jobFilter.filter(job);
+    if (!result.isPass()) {
+      throw new ScheduleException(
+          "Job was rejected (Reason: " + result.getReason() + ")");
+    }
   }
 }
