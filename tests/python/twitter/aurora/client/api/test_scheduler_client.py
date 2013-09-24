@@ -49,7 +49,10 @@ class TestSchedulerProxyInjection(unittest.TestCase):
         self.mock_scheduler_client)
     self.mock_scheduler_client.get_thrift_client().AndReturn(self.mock_thrift_client)
 
-    self.mock_thrift_client.getVersion().AndReturn(CURRENT_API_VERSION)
+    version_resp = Response(responseCode=ResponseCode.OK)
+    version_resp.result = Result(getVersionResult = CURRENT_API_VERSION)
+
+    self.mock_thrift_client.getVersion().AndReturn(version_resp)
 
   def tearDown(self):
     self.mox.UnsetStubs()

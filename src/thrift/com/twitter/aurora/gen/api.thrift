@@ -29,7 +29,7 @@ struct APIVersion {
 }
 
 // Scheduler Thrift API Version. Increment this when breaking backwards compatibility.
-const APIVersion CURRENT_API_VERSION = {'major': 2}
+const APIVersion CURRENT_API_VERSION = {'major': 3}
 
 struct Identity {
   1: string role
@@ -422,6 +422,7 @@ union Result {
   12: GetJobUpdatesResult getJobUpdatesResult
   13: UpdateShardsResult updateShardsResult
   14: RollbackShardsResult rollbackShardsResult
+  15: APIVersion getVersionResult
 }
 
 struct Response {
@@ -492,7 +493,7 @@ service AuroraSchedulerManager {
   Response getQuota(1: string ownerRole)
 
   // Returns the current version of the API implementation
-  APIVersion getVersion()
+  Response getVersion()
 }
 
 struct ShardConfigRewrite {

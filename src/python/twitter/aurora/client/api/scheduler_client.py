@@ -222,7 +222,7 @@ class SchedulerProxy(object):
     if not self._client:
       raise self.TimeoutError('Timed out trying to connect to scheduler at %s' % self.cluster.name)
 
-    server_version = self._client.getVersion()
+    server_version = self._client.getVersion().result.getVersionResult
     if server_version != CURRENT_API_VERSION:
       raise self.APIVersionError("Client Version: %s, Server Version: %s" %
                                  (CURRENT_API_VERSION, server_version))

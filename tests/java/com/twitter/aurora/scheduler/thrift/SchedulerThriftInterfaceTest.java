@@ -965,6 +965,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(OK, thrift.killTasks(query.get(), SESSION).getResponseCode());
   }
 
+  @Test
+  public void testGetVersion() throws Exception {
+    control.replay();
+
+    Response response = thrift.getVersion();
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
   private JobConfiguration makeJob() {
     return makeJob(nonProductionTask(), 1);
   }

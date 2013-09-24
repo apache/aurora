@@ -48,7 +48,6 @@ import org.apache.commons.lang.StringUtils;
 import com.twitter.aurora.auth.CapabilityValidator;
 import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
-import com.twitter.aurora.gen.APIVersion;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
@@ -917,8 +916,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public APIVersion getVersion() {
-    return CURRENT_API_VERSION;
+  public Response getVersion() {
+    return new Response()
+        .setResponseCode(OK)
+        .setResult(Result.getVersionResult(CURRENT_API_VERSION));
   }
 
   @VisibleForTesting

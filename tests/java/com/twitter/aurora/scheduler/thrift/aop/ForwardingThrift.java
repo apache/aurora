@@ -19,7 +19,6 @@ import java.util.Set;
 
 import org.apache.thrift.TException;
 
-import com.twitter.aurora.gen.APIVersion;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.JobConfiguration;
@@ -228,7 +227,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public APIVersion getVersion() throws TException {
+  public Response getVersion() throws TException {
     return delegate.getVersion();
   }
 }
