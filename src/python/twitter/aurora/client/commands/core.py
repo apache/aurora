@@ -142,11 +142,11 @@ def diff(job_spec, config_file):
   resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
   if not resp.responseCode:
     die('Request failed, server responded with "%s"' % resp.message)
-  remote_tasks = [t.assignedTask.task for t in resp.tasks]
+  remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
   resp = api.populate_job_config(config)
   if not resp.responseCode:
     die('Request failed, server responded with "%s"' % resp.message)
-  local_tasks = resp.populated
+  local_tasks = resp.result.populateJobResult.populated
 
   pp = pprint.PrettyPrinter(indent=2)
   def pretty_print_task(task):
@@ -360,11 +360,12 @@ def status(args, options):
   resp = api.check_status(job_key)
   check_and_log_response(resp)
 
-  if resp.tasks:
-    active_tasks = filter(is_active, resp.tasks)
+  tasks = resp.result.scheduleStatusResult.tasks
+  if tasks:
+    active_tasks = filter(is_active, tasks)
     log.info('Active Tasks (%s)' % len(active_tasks))
     print_tasks(active_tasks)
-    inactive_tasks = filter(lambda x: not is_active(x), resp.tasks)
+    inactive_tasks = filter(lambda x: not is_active(x), tasks)
     log.info('Inactive Tasks (%s)' % len(inactive_tasks))
     print_tasks(inactive_tasks)
   else:

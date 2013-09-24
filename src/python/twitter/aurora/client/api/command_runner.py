@@ -105,7 +105,7 @@ class DistributedCommandRunner(object):
       if not resp.responseCode:
         log.error('Failed to query job: %s' % job)
         continue
-      for task in resp.tasks:
+      for task in resp.result.scheduleStatusResult.tasks:
         yield task
 
   def process_arguments(self, command, **kw):

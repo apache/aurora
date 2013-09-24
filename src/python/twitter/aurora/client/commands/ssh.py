@@ -39,14 +39,15 @@ def ssh(args, options):
   resp = api.query(api.build_query(role, name, set([int(shard)]), env=env))
   check_and_log_response(resp)
 
+  first_task = resp.result.scheduleStatusResult.tasks[0]
   remote_cmd = 'bash' if not args else ' '.join(args)
-  command = DistributedCommandRunner.substitute(remote_cmd, resp.tasks[0],
+  command = DistributedCommandRunner.substitute(remote_cmd, first_task,
       api.cluster, executor_sandbox=options.executor_sandbox)
 
   ssh_command = ['ssh', '-t']
 
-  role = resp.tasks[0].assignedTask.task.owner.role
-  slave_host = resp.tasks[0].assignedTask.slaveHost
+  role = first_task.assignedTask.task.owner.role
+  slave_host = first_task.assignedTask.slaveHost
 
   for tunnel in options.tunnels:
     try:
@@ -54,10 +55,10 @@ def ssh(args, options):
       port = int(port)
     except ValueError:
       die('Could not parse tunnel: %s.  Must be of form PORT:NAME' % tunnel)
-    if name not in resp.tasks[0].assignedTask.assignedPorts:
-      die('Task %s has no port named %s' % (resp.tasks[0].assignedTask.taskId, name))
+    if name not in first_task.assignedTask.assignedPorts:
+      die('Task %s has no port named %s' % (first_task.assignedTask.taskId, name))
     ssh_command += [
-        '-L', '%d:%s:%d' % (port, slave_host, resp.tasks[0].assignedTask.assignedPorts[name])]
+        '-L', '%d:%s:%d' % (port, slave_host, first_task.assignedTask.assignedPorts[name])]
 
   ssh_command += ['%s@%s' % (options.ssh_user or role, slave_host), command]
   return subprocess.call(ssh_command)
