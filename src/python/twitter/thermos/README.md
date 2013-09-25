@@ -1,9 +1,13 @@
+** This document is deprecated and no longer updated. **
+
 # Thermos manual #
 
 [TOC]
 
 
 ## tl;dr ##
+
+** You noticed the deprecation notice, right? **
 
 ### What is Thermos? ###
 
