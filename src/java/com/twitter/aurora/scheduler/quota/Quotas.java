@@ -29,11 +29,19 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Convenience class for normalizing resource measures between tasks and offers.
  */
 public final class Quotas {
-
-  public static final Quota NO_QUOTA = new Quota(0, 0, 0);
+  private static final Quota NO_QUOTA = new Quota(0, 0, 0);
 
   private Quotas() {
     // Utility class.
+  }
+
+  /**
+   * Returns a quota with all resource vectors zeroed.
+   *
+   * @return A quota with all resource vectors zeroed.
+   */
+  public static Quota noQuota() {
+    return NO_QUOTA.deepCopy();
   }
 
   /**

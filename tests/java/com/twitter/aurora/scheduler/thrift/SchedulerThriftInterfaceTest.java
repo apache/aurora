@@ -69,7 +69,6 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
-import com.twitter.aurora.scheduler.quota.QuotaManager;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
@@ -117,7 +116,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private SchedulerCore scheduler;
   private CapabilityValidator userValidator;
   private SessionContext context;
-  private QuotaManager quotaManager;
   private StorageBackup backup;
   private Recovery recovery;
   private MaintenanceController maintenance;
@@ -132,7 +130,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     userValidator = createMock(CapabilityValidator.class);
     context = createMock(SessionContext.class);
     setUpValidationExpectations();
-    quotaManager = createMock(QuotaManager.class);
     backup = createMock(StorageBackup.class);
     recovery = createMock(Recovery.class);
     maintenance = createMock(MaintenanceController.class);
@@ -145,7 +142,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(Storage.class).toInstance(storageUtil.storage);
         bind(SchedulerCore.class).toInstance(scheduler);
         bind(CapabilityValidator.class).toInstance(userValidator);
-        bind(QuotaManager.class).toInstance(quotaManager);
         bind(StorageBackup.class).toInstance(backup);
         bind(Recovery.class).toInstance(recovery);
         bind(MaintenanceController.class).toInstance(maintenance);
@@ -332,7 +328,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setDiskMb(100)
         .setRamMb(200);
     expectAuth(ROOT, true);
-    quotaManager.setQuota(ROLE, quota);
+    storageUtil.quotaStore.saveQuota(ROLE, quota);
 
     control.replay();
 
@@ -348,7 +344,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setRamMb(200);
     expectAuth(ROOT, false);
     expectAuth(Capability.PROVISIONER, true);
-    quotaManager.setQuota(ROLE, quota);
+    storageUtil.quotaStore.saveQuota(ROLE, quota);
 
     control.replay();
 

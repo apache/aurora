@@ -44,7 +44,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class QuotaManagerImplTest extends EasyMockTest {
-
   private static final String ROLE = "foo";
   private static final Query.Builder ACTIVE_QUERY = Query.roleScoped(ROLE).active();
 
@@ -61,13 +60,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testGetEmptyQuota() {
     storageUtil.expectOperations();
     noActiveUpdates();
-    expect(storageUtil.quotaStore.fetchQuota(ROLE)).andReturn(Optional.<Quota>absent());
-    returnNoTasks().atLeastOnce();
+    returnNoTasks();
 
     control.replay();
 
-    assertEquals(Quotas.NO_QUOTA, quotaManager.getQuota(ROLE));
-    assertEquals(Quotas.NO_QUOTA, quotaManager.getConsumption(ROLE));
+    assertEquals(Quotas.noQuota(), quotaManager.getConsumption(ROLE));
   }
 
   @Test
@@ -79,7 +76,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(quotaManager.hasRemaining(ROLE, Quotas.NO_QUOTA));
+    assertTrue(quotaManager.hasRemaining(ROLE, Quotas.noQuota()));
   }
 
   @Test
@@ -92,18 +89,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
     control.replay();
 
     assertFalse(quotaManager.hasRemaining(ROLE, new Quota(1, 1, 1)));
-  }
-
-  @Test
-  public void testSetQuota() {
-    Quota quota = new Quota(1, 2, 3);
-
-    storageUtil.expectOperations();
-    storageUtil.quotaStore.saveQuota(ROLE, quota);
-
-    control.replay();
-
-    quotaManager.setQuota(ROLE, quota);
   }
 
   @Test

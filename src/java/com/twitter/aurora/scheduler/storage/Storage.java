@@ -20,9 +20,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.BindingAnnotation;
 
+import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.SchedulerException;
@@ -299,6 +301,22 @@ public interface Storage {
       return storage.weaklyConsistentRead(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
         @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(query);
+        }
+      });
+    }
+
+    /**
+     * Fetch quota for {@code role} from {@code storage} in a consistent read operation.
+     *
+     * @param storage Storage instance to fetch quota from.
+     * @param role Role to fetch quota for.
+     * @return Quota returned from the fetch operation.
+     * @see QuotaStore#fetchQuota(String)
+     */
+    public static Optional<Quota> consistentFetchQuota(Storage storage, final String role) {
+      return storage.consistentRead(new Work.Quiet<Optional<Quota>>() {
+        @Override public Optional<Quota> apply(StoreProvider storeProvider) {
+          return storeProvider.getQuotaStore().fetchQuota(role);
         }
       });
     }

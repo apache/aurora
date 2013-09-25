@@ -133,14 +133,17 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         // TODO(Suman Karumuri): In future compute consumption for role and environment.
         template.setAttribute("prodResourcesUsed", quotaManager.getConsumption(role.get()));
         template.setAttribute("nonProdResourcesUsed", getNonProdConsumption(role.get()));
-        template.setAttribute("resourceQuota", quotaManager.getQuota(role.get()));
+        template.setAttribute("resourceQuota", getQuota(role.get()));
       }
     });
   }
 
+  private Quota getQuota(final String role) {
+    return Storage.Util.consistentFetchQuota(storage, role).or(Quotas.noQuota());
+  }
+
   private Quota getNonProdConsumption(String role) {
-    FluentIterable<TaskConfig> tasks =
-        FluentIterable
+    FluentIterable<TaskConfig> tasks = FluentIterable
         .from(Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(role).active()))
         .transform(Tasks.SCHEDULED_TO_INFO)
         .filter(Predicates.not(Tasks.IS_PRODUCTION));

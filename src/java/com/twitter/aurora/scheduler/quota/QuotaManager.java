@@ -18,7 +18,6 @@ package com.twitter.aurora.scheduler.quota;
 import java.util.Collection;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
@@ -32,10 +31,9 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Shards;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.Storage.Work.Quiet;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -45,15 +43,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  * Allows access to resource quotas, and tracks quota consumption.
  */
 public interface QuotaManager {
-
-  /**
-   * Fetches the quota associated with a role.
-   *
-   * @param role Role to fetch quotas for.
-   * @return Resource quota associated with {@code role}.
-   */
-  Quota getQuota(String role);
-
   /**
    * Fetches the current resource usage for the role.
    *
@@ -61,14 +50,6 @@ public interface QuotaManager {
    * @return Resource quota used by {@code role}.
    */
   Quota getConsumption(String role);
-
-  /**
-   * Assigns quota to a user, overwriting any previously-assigned quota.
-   *
-   * @param role Role to assign quota for.
-   * @param quota Quota to allocate for the role.
-   */
-  void setQuota(String role, Quota quota);
 
   /**
    * Tests whether the role has at least the specified amount of quota available.
@@ -90,20 +71,6 @@ public interface QuotaManager {
     @Inject
     public QuotaManagerImpl(Storage storage) {
       this.storage = checkNotNull(storage);
-    }
-
-    @Override
-    public Quota getQuota(final String role) {
-      checkNotBlank(role);
-
-      Optional<Quota> quota = storage.consistentRead(new Work.Quiet<Optional<Quota>>() {
-        @Override public Optional<Quota> apply(StoreProvider storeProvider) {
-          return storeProvider.getQuotaStore().fetchQuota(role);
-        }
-      });
-
-      // If this user doesn't have a quota record, return non-null empty quota.
-      return quota.or(noQuota());
     }
 
     private static Quota getUpdateQuota(Collection<TaskUpdateConfiguration> configs,
@@ -136,7 +103,7 @@ public interface QuotaManager {
                     getUpdateQuota(updateConfig.getConfigs(), Shards.GET_NEW_CONFIG),
                     getUpdateQuota(updateConfig.getConfigs(), Shards.GET_ORIGINAL_CONFIG)
                 );
-                if (Quotas.greaterThan(additionalQuota, Quotas.NO_QUOTA)) {
+                if (Quotas.greaterThan(additionalQuota, Quotas.noQuota())) {
                   quota = Quotas.add(quota, additionalQuota);
                 }
               }
@@ -147,27 +114,16 @@ public interface QuotaManager {
     }
 
     @Override
-    public void setQuota(final String role, final Quota quota) {
+    public boolean hasRemaining(final String role, final Quota quota) {
       checkNotBlank(role);
       checkNotNull(quota);
 
-      storage.write(new MutateWork.NoResult.Quiet() {
-        @Override public void execute(MutableStoreProvider storeProvider) {
-          storeProvider.getQuotaStore().saveQuota(role, quota);
+      return storage.consistentRead(new Quiet<Boolean>() {
+        @Override public Boolean apply(StoreProvider storeProvider) {
+          Quota reserved = storeProvider.getQuotaStore().fetchQuota(role).or(Quotas.noQuota());
+          return Quotas.geq(reserved, Quotas.add(getConsumption(role), quota));
         }
       });
-    }
-
-    @Override
-    public synchronized boolean hasRemaining(String role, Quota quota) {
-      checkNotBlank(role);
-      checkNotNull(quota);
-
-      return Quotas.geq(getQuota(role), Quotas.add(getConsumption(role), quota));
-    }
-
-    private static Quota noQuota() {
-      return Quotas.NO_QUOTA.deepCopy();
     }
   }
 }

@@ -90,7 +90,7 @@ import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
-import com.twitter.aurora.scheduler.quota.QuotaManager;
+import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
@@ -155,7 +155,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final Storage storage;
   private final SchedulerCore schedulerCore;
   private final CapabilityValidator sessionValidator;
-  private final QuotaManager quotaManager;
   private final StorageBackup backup;
   private final Recovery recovery;
   private final MaintenanceController maintenance;
@@ -168,7 +167,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       Storage storage,
       SchedulerCore schedulerCore,
       CapabilityValidator sessionValidator,
-      QuotaManager quotaManager,
       StorageBackup backup,
       Recovery recovery,
       CronJobManager cronJobManager,
@@ -177,7 +175,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this(storage,
         schedulerCore,
         sessionValidator,
-        quotaManager,
         backup,
         recovery,
         maintenance,
@@ -191,7 +188,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       Storage storage,
       SchedulerCore schedulerCore,
       CapabilityValidator sessionValidator,
-      QuotaManager quotaManager,
       StorageBackup backup,
       Recovery recovery,
       MaintenanceController maintenance,
@@ -202,7 +198,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.storage = checkNotNull(storage);
     this.schedulerCore = checkNotNull(schedulerCore);
     this.sessionValidator = checkNotNull(sessionValidator);
-    this.quotaManager = checkNotNull(quotaManager);
     this.backup = checkNotNull(backup);
     this.recovery = checkNotNull(recovery);
     this.maintenance = checkNotNull(maintenance);
@@ -626,12 +621,19 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response getQuota(String ownerRole) {
+  public Response getQuota(final String ownerRole) {
     checkNotBlank(ownerRole);
+
+    Quota quota = storage.consistentRead(new Work.Quiet<Quota>() {
+      @Override public Quota apply(StoreProvider storeProvider) {
+        return storeProvider.getQuotaStore().fetchQuota(ownerRole).or(Quotas.noQuota());
+      }
+    });
+
     return new Response()
         .setResponseCode(OK)
         .setResult(Result.getQuotaResult(new GetQuotaResult()
-            .setQuota(quotaManager.getQuota(ownerRole))));
+            .setQuota(quota)));
   }
 
   @Override
@@ -668,12 +670,19 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Requires(whitelist = Capability.PROVISIONER)
   @Override
-  public Response setQuota(String ownerRole, Quota quota, SessionKey session) {
+  public Response setQuota(final String ownerRole, final Quota quota, SessionKey session) {
     checkNotBlank(ownerRole);
     checkNotNull(quota);
     checkNotNull(session);
 
-    quotaManager.setQuota(ownerRole, quota);
+    // TODO(Kevin Sweeney): Input validation for Quota.
+
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getQuotaStore().saveQuota(ownerRole, quota);
+      }
+    });
+
     return new Response().setResponseCode(OK).setMessage("Quota applied.");
   }
 
