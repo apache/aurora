@@ -50,7 +50,7 @@ class TaskRunnerWrapper(object):
     self._ports = mesos_ports
     self._runner_pex = runner_pex
     if not os.path.exists(self._runner_pex):
-      raise self.TaskError('Specified runner pex does not exist!')
+      raise self.TaskError('Specified runner pex:%s does not exist!' % self._runner_pex)
     self._sandbox = sandbox
     if not isinstance(self._sandbox, SandboxBase):
       raise ValueError('sandbox must be derived from SandboxBase!')
@@ -239,11 +239,11 @@ class ProductionTaskRunner(TaskRunnerWrapper):
 
 class AngrybirdTaskRunner(TaskRunnerWrapper):
   def __init__(self, task_id, mesos_task, role, mesos_ports, **kwargs):
-    angrybird_home = os.environ['ANGRYBIRD_HOME']
-    angrybird_logdir = os.environ['ANGRYBIRD_THERMOS']
-    sandbox_root = os.path.join(angrybird_logdir, 'thermos', 'lib')
-    checkpoint_root = os.path.join(angrybird_logdir, 'thermos', 'run')
-    runner_pex = os.path.join(angrybird_home, 'science', 'dist', self.PEX_NAME)
+    thermos_home = os.environ['ANGRYBIRD_THERMOS_HOME']
+    thermos_logdir = os.environ['ANGRYBIRD_THERMOS_LOG_DIR']
+    sandbox_root = os.path.join(thermos_logdir, 'thermos', 'lib')
+    checkpoint_root = os.path.join(thermos_logdir, 'thermos', 'run')
+    runner_pex = os.path.join(thermos_home, 'science', 'dist', self.PEX_NAME)
     sandbox = DirectorySandbox(os.path.join(sandbox_root, task_id))
     super(AngrybirdTaskRunner, self).__init__(
         task_id,

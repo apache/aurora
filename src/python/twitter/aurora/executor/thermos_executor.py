@@ -40,7 +40,7 @@ from thrift.Thrift import TException
 from thrift.TSerialization import deserialize as thrift_deserialize
 
 
-if 'ANGRYBIRD_THERMOS' in os.environ:
+if 'ANGRYBIRD_THERMOS_LOG_DIR' in os.environ:
   RUNNER_CLASS = AngrybirdTaskRunner
 else:
   RUNNER_CLASS = ProductionTaskRunner

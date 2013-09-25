@@ -26,8 +26,8 @@ app.configure(debug=True)
 LogOptions.set_simple(True)
 LogOptions.set_disk_log_level('DEBUG')
 
-if 'ANGRYBIRD_THERMOS' in os.environ:
-  LogOptions.set_log_dir(os.path.join(os.environ['ANGRYBIRD_THERMOS'], 'thermos/log'))
+if 'ANGRYBIRD_THERMOS_LOG_DIR' in os.environ:
+  LogOptions.set_log_dir(os.path.join(os.environ['ANGRYBIRD_THERMOS_LOG_DIR'], 'thermos/log'))
 else:
   # locate logs locally in executor sandbox
   LogOptions.set_log_dir(ExecutorDetector.LOG_PATH)
