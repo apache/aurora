@@ -45,6 +45,9 @@ import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.cron.noop.NoopCronModule;
 import com.twitter.aurora.scheduler.local.IsolatedSchedulerModule;
 import com.twitter.aurora.scheduler.log.mesos.MesosLogStreamModule;
+import com.twitter.aurora.scheduler.quota.QuotaManager;
+import com.twitter.aurora.scheduler.quota.QuotaModule;
+import com.twitter.aurora.scheduler.state.JobFilter;
 import com.twitter.aurora.scheduler.storage.backup.BackupModule;
 import com.twitter.aurora.scheduler.storage.log.LogStorage;
 import com.twitter.aurora.scheduler.storage.log.LogStorageModule;
@@ -134,6 +137,16 @@ public class SchedulerMain extends AbstractApplication {
       .add(CronScheduler.class)
       .build();
 
+  @CmdLine(name = "quota_module",
+      help = "A Guice module to provide quota subsystem bindings.")
+  private static final Arg<? extends Class<? extends Module>> QUOTA_MODULE =
+      Arg.create(QuotaModule.class);
+
+  private static final Iterable<Class<?>> QUOTA_MODULE_CLASSES = ImmutableList.<Class<?>>builder()
+      .add(QuotaManager.class)
+      .add(JobFilter.class)
+      .build();
+
   @Inject private SingletonService schedulerService;
   @Inject private LocalServiceRegistry serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
@@ -188,7 +201,8 @@ public class SchedulerMain extends AbstractApplication {
   private static Iterable<? extends Module> getFlaggedModules() {
     return ImmutableList.of(
         getFlaggedModule(AUTH_MODULE, AUTH_MODULE_CLASSES),
-        getFlaggedModule(CRON_MODULE, CRON_MODULE_CLASSES));
+        getFlaggedModule(CRON_MODULE, CRON_MODULE_CLASSES),
+        getFlaggedModule(QUOTA_MODULE, QUOTA_MODULE_CLASSES));
   }
 
   static Iterable<? extends Module> getModules(

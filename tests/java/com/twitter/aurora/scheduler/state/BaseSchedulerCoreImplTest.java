@@ -124,7 +124,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private static final String ROLE_B = "Test_Role_B";
   private static final String USER_B = "Test_User_B";
-  private static final Identity OWNER_B = new Identity(ROLE_B, USER_B);
   private static final JobKey KEY_B = JobKeys.from(ROLE_B, ENV_A, JOB_A);
 
   private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("SlaveId").build();
@@ -139,7 +138,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private FakeClock clock;
   private Closure<PubsubEvent> eventSink;
   private ShutdownRegistry shutdownRegistry;
-  private QuotaFilter quotaFilter;
+  private JobFilter jobFilter;
 
   // TODO(William Farner): Set up explicit expectations for calls to generate task IDs.
   private final AtomicLong idCounter = new AtomicLong();
@@ -157,14 +156,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     eventSink.execute(EasyMock.<PubsubEvent>anyObject());
     cronScheduler = createMock(CronScheduler.class);
     shutdownRegistry = createMock(ShutdownRegistry.class);
-    quotaFilter = createMock(QuotaFilter.class);
+    jobFilter = createMock(JobFilter.class);
     expectLastCall().anyTimes();
 
     expect(cronScheduler.schedule(anyObject(String.class), anyObject(Runnable.class)))
         .andStubReturn("key");
     expect(cronScheduler.isValidSchedule(anyObject(String.class))).andStubReturn(true);
 
-    expect(quotaFilter.filter(anyObject(JobConfiguration.class))).andStubReturn(
+    expect(jobFilter.filter(anyObject(JobConfiguration.class))).andStubReturn(
         JobFilter.JobFilterResult.pass());
   }
 
@@ -206,7 +205,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         immediateManager,
         stateManager,
         taskIdGenerator,
-        quotaFilter);
+        jobFilter);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
   }
@@ -436,7 +435,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testCreateDuplicateCronJob() throws Exception {
     ParsedConfiguration parsedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
-    JobConfiguration job = parsedConfiguration.getJobConfig();
 
     control.replay();
     buildScheduler();
@@ -1797,7 +1795,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testFilterFailRejectsCreate() throws Exception {
     ParsedConfiguration job = makeJob(KEY_A, 1);
-    expect(quotaFilter.filter(job.getJobConfig())).andReturn(JobFilterResult.fail("failed"));
+    expect(jobFilter.filter(job.getJobConfig())).andReturn(JobFilterResult.fail("failed"));
 
     control.replay();
 
@@ -1808,7 +1806,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testFilterFailRejectsUpdate() throws Exception {
     ParsedConfiguration job = makeJob(KEY_A, 1);
-    expect(quotaFilter.filter(job.getJobConfig())).andReturn(JobFilterResult.fail("failed"));
+    expect(jobFilter.filter(job.getJobConfig())).andReturn(JobFilterResult.fail("failed"));
 
     control.replay();
 

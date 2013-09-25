@@ -1,4 +1,4 @@
-package com.twitter.aurora.scheduler.state;
+package com.twitter.aurora.scheduler.quota;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -11,7 +11,6 @@ import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.quota.QuotaManager;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.testing.easymock.EasyMockTest;
 

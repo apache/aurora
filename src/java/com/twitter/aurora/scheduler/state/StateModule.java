@@ -46,9 +46,6 @@ public class StateModule extends AbstractModule {
     bind(ImmediateJobManager.class).in(Singleton.class);
 
     bindMaintenanceController(binder());
-
-    bind(JobFilter.class).to(QuotaFilter.class);
-    bind(QuotaFilter.class).in(Singleton.class);
   }
 
   @VisibleForTesting

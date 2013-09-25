@@ -16,8 +16,10 @@
 package com.twitter.aurora.scheduler.quota;
 
 import com.google.inject.AbstractModule;
+import com.google.inject.Singleton;
 
 import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
+import com.twitter.aurora.scheduler.state.JobFilter;
 import com.twitter.aurora.scheduler.storage.Storage;
 
 /**
@@ -28,6 +30,11 @@ public class QuotaModule extends AbstractModule {
   @Override
   protected void configure() {
     requireBinding(Storage.class);
+
     bind(QuotaManager.class).to(QuotaManagerImpl.class);
+    bind(QuotaManagerImpl.class).in(Singleton.class);
+
+    bind(JobFilter.class).to(QuotaFilter.class);
+    bind(QuotaFilter.class).in(Singleton.class);
   }
 }
