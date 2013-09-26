@@ -27,6 +27,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.Inject;
@@ -120,7 +121,11 @@ public interface MaintenanceController {
     private final Storage storage;
     private final StateManager stateManager;
     private final Closure<PubsubEvent> eventSink;
-    private final Multimap<String, String> drainingTasksByHost = HashMultimap.create();
+    // Access on views, or non-atomic operations on this map must synchronize on the map itself.
+    // Please be careful to avoid securing any external locks when locking on this data structure,
+    // however.
+    private final Multimap<String, String> drainingTasksByHost =
+        Multimaps.synchronizedMultimap(HashMultimap.<String, String>create());
 
     @Inject
     public MaintenanceControllerImpl(
@@ -176,7 +181,7 @@ public interface MaintenanceController {
      * @param started Event.
      */
     @Subscribe
-    public synchronized void storageStarted(StorageStarted started) {
+    public void storageStarted(StorageStarted started) {
       storage.write(new MutateWork.NoResult.Quiet() {
         @Override protected void execute(MutableStoreProvider storeProvider) {
           Set<String> drainingHosts =
@@ -195,20 +200,23 @@ public interface MaintenanceController {
      * @param change Event
      */
     @Subscribe
-    public synchronized void taskChangedState(TaskStateChange change) {
+    public void taskChangedState(final TaskStateChange change) {
       if (Tasks.isTerminated(change.getNewState())) {
         final String host = change.getTask().getAssignedTask().getSlaveHost();
-
-        // If the task _was_ associated with a draining host, and it was the last task on the host.
-        if (drainingTasksByHost.remove(host, change.getTaskId())
-            && !drainingTasksByHost.containsKey(host)) {
-
-          storage.write(new MutateWork.NoResult.Quiet() {
-            @Override public void execute(MutableStoreProvider store) {
+        storage.write(new MutateWork.NoResult.Quiet() {
+          @Override public void execute(MutableStoreProvider store) {
+            // If the task _was_ associated with a draining host, and it was the last task on the
+            // host.
+            boolean drained;
+            synchronized (drainingTasksByHost) {
+              drained = drainingTasksByHost.remove(host, change.getTaskId())
+                  && !drainingTasksByHost.containsKey(host);
+            }
+            if (drained) {
               setMaintenanceMode(store, ImmutableSet.of(host), DRAINED);
             }
-          });
-        }
+          }
+        });
       }
     }
 
@@ -226,7 +234,7 @@ public interface MaintenanceController {
         Optional.of("Draining machine for maintenance.");
 
     @Override
-    public synchronized Set<HostStatus> drain(final Set<String> hosts) {
+    public Set<HostStatus> drain(final Set<String> hosts) {
       return storage.write(new MutateWork.Quiet<Set<HostStatus>>() {
         @Override public Set<HostStatus> apply(MutableStoreProvider store) {
           return watchDrainingTasks(store, hosts, new Closure<Query.Builder>() {
@@ -285,10 +293,12 @@ public interface MaintenanceController {
     }
 
     @Override
-    public synchronized Set<HostStatus> endMaintenance(final Set<String> hosts) {
+    public Set<HostStatus> endMaintenance(final Set<String> hosts) {
       return storage.write(new MutateWork.Quiet<Set<HostStatus>>() {
         @Override public Set<HostStatus> apply(MutableStoreProvider storeProvider) {
-          drainingTasksByHost.keys().removeAll(hosts);
+          synchronized (drainingTasksByHost) {
+            drainingTasksByHost.keys().removeAll(hosts);
+          }
           return setMaintenanceMode(storeProvider, hosts, MaintenanceMode.NONE);
         }
       });
@@ -296,7 +306,9 @@ public interface MaintenanceController {
 
     @Override
     public Multimap<String, String> getDrainingTasks() {
-      return ImmutableMultimap.copyOf(drainingTasksByHost);
+      synchronized (drainingTasksByHost) {
+        return ImmutableMultimap.copyOf(drainingTasksByHost);
+      }
     }
 
     private Set<HostStatus> setMaintenanceMode(
