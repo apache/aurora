@@ -1,15 +1,15 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':discovery_manager'),
+    pants(':executor_builds'),
+    pants(':executor_detector'),
+    pants(':executor_vars'),
     pants(':gc_executor'),
-    pants(':health_checker'),
     pants(':resource_manager'),
     pants(':sandbox_manager'),
     pants(':status_manager'),
     pants(':thermos_executor'),
-    pants(':executor_builds'),
-    pants(':executor_detector'),
-    pants(':executor_vars'),
+    pants('tests/python/twitter/aurora/executor/common:all'),
   ]
 )
 
@@ -18,9 +18,10 @@ python_tests(name = 'gc_executor',
   dependencies = [
     pants('3rdparty/python:mock'),
     pants('3rdparty/python:mox'),
-    pants('src/python/twitter/aurora/executor:gc_executor_lib'),
+    pants('src/python/twitter/aurora/executor:gc_executor'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/thermos/runner'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
   ],
@@ -66,15 +67,6 @@ python_tests(name = 'discovery_manager',
   ]
 )
 
-python_tests(name = 'health_checker',
-  sources = [ 'test_health_checker.py' ],
-  dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('src/python/twitter/aurora/executor:health_checker'),
-    pants('src/python/twitter/common/testing'),
-  ]
-)
-
 python_tests(name = 'status_manager',
   sources = [ 'test_status_manager.py' ],
   dependencies = [
@@ -90,7 +82,7 @@ python_tests(name = 'thermos_executor',
   timeout = Amount(5, Time.MINUTES),
   dependencies = [
     pants('src/python/twitter/aurora/config:schema'),
-    pants('src/python/twitter/aurora/executor:thermos_executor_lib'),
+    pants('src/python/twitter/aurora/executor:thermos_executor'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/quantity'),

@@ -25,25 +25,17 @@ from gen.twitter.aurora.ttypes import AssignedTask
 from .discovery_manager import DiscoveryManager
 from .executor_base import ThermosExecutorBase
 from .executor_detector import ExecutorDetector
-from .health_checker import HealthCheckerThread
+from .common.health_checker import HealthCheckerThread
 from .kill_manager import KillManager
 from .resource_checkpoints import ResourceCheckpointer
 from .resource_manager import ResourceManager
+from .task_runner_wrapper import TaskRunnerWrapper
 from .status_manager import StatusManager
-from .task_runner_wrapper import (
-    AngrybirdTaskRunner,
-    ProductionTaskRunner)
 
 import mesos_pb2 as mesos_pb
 from pystachio import Ref
 from thrift.Thrift import TException
 from thrift.TSerialization import deserialize as thrift_deserialize
-
-
-if 'ANGRYBIRD_THERMOS_LOG_DIR' in os.environ:
-  RUNNER_CLASS = AngrybirdTaskRunner
-else:
-  RUNNER_CLASS = ProductionTaskRunner
 
 
 def default_exit_action():
@@ -70,8 +62,10 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
   STOP_WAIT = Amount(5, Time.SECONDS)
   RUNNER_INITIALIZATION_TIMEOUT = Amount(10, Time.MINUTES)
 
-  def __init__(self, runner_class=RUNNER_CLASS, manager_class=StatusManager):
+  def __init__(self, runner_class, manager_class=StatusManager):
     ThermosExecutorBase.__init__(self)
+    if not issubclass(runner_class, TaskRunnerWrapper):
+      raise TypeError('runner_class must be a subclass of TaskRunnerWrapper.')
     self._runner = None
     self._task_id = None
     self._manager = None

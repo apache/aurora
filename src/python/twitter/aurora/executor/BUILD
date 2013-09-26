@@ -46,28 +46,10 @@ python_library(
 )
 
 python_library(
-  name = 'health_interface',
-  sources = ['health_interface.py'],
-  dependencies = [
-    pants('src/python/twitter/aurora:mesos-core'),
-    pants('src/python/twitter/common/metrics'),
-  ]
-)
-
-python_library(
-  name = 'health_checker',
-  sources = ['health_checker.py'],
-  dependencies = [
-    pants(':health_interface'),
-    pants('src/python/twitter/common/exceptions')
-  ]
-)
-
-python_library(
   name = 'kill_manager',
   sources = ['kill_manager.py'],
   dependencies = [
-    pants(':health_interface'),
+    pants('src/python/twitter/aurora/executor/common:health_interface'),
   ]
 )
 
@@ -75,7 +57,7 @@ python_library(
   name = 'discovery_manager',
   sources = ['discovery_manager.py'],
   dependencies = [
-    pants(':health_interface'),
+    pants('src/python/twitter/aurora/executor/common:health_interface'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/common/quantity'),
@@ -88,7 +70,7 @@ python_library(
   name = 'resource_manager',
   sources = ['resource_manager.py'],
   dependencies = [
-    pants(':health_interface'),
+    pants('src/python/twitter/aurora/executor/common:health_interface'),
     pants(':resource_checkpoints'),
     pants('3rdparty/python:psutil'),
     pants('src/python/twitter/common/dirutil'),
@@ -117,7 +99,7 @@ python_library(
 python_library(
   name = 'health_interfaces',
   dependencies = [
-    pants(':health_checker'),
+    pants('src/python/twitter/aurora/executor/common:health_checker'),
     pants(':kill_manager'),
     pants(':resource_manager'),
     pants(':discovery_manager'),
@@ -154,9 +136,12 @@ python_library(
 )
 
 python_library(
-  name = 'thermos_executor_lib',
+  name = 'thermos_executor',
   sources = ['thermos_executor.py'],
   dependencies = [
+    pants('3rdparty/python:pystachio'),
+    pants(':executor_detector'),
+    pants(':kill_manager'),
     pants(':resource_manager'),
     pants(':status_manager'),
     pants(':task_runner_wrapper'),
@@ -165,22 +150,13 @@ python_library(
     pants('src/python/twitter/aurora/common_internal:clusters'),
     pants('src/python/twitter/aurora/config'),
     pants('src/python/twitter/aurora/config:schema'),
+    pants('src/python/twitter/aurora:mesos-core'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
-  ]
-)
-
-python_binary(
-  name = 'thermos_executor',
-  source = 'thermos_executor_main.py',
-  ignore_errors = True,
-  always_write_cache = True,
-  dependencies = [
-    pants(':executor_vars'),
-    pants(':thermos_executor_lib')
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -199,8 +175,8 @@ python_binary(
 )
 
 python_library(
-  name = 'gc_executor_lib',
-  sources = ['gc_executor.py', 'gc_executor_main.py'],
+  name = 'gc_executor',
+  sources = ['gc_executor.py'],
   dependencies = [
     pants('3rdparty/python:psutil'),
     pants(':executor_detector'),
@@ -208,24 +184,18 @@ python_library(
     pants(':thermos_executor_base'),
     pants('src/python/twitter/aurora/common_internal:clusters'),
     pants('src/python/twitter/aurora/config:schema'),
+    pants('src/python/twitter/common/collections'),
     pants('src/python/twitter/common/concurrent'),
+    pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/process'),
+    pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/common/quantity'),
+    pants('src/python/twitter/thermos/base:ckpt'),
+    pants('src/python/twitter/thermos/base:path'),
     pants('src/python/twitter/thermos/monitoring:detector'),
     pants('src/python/twitter/thermos/monitoring:garbage'),
-    pants('src/python/twitter/thermos/runner'),
+    pants('src/python/twitter/thermos/runner:helper'),
     pants('src/python/twitter/thermos/runner:inspector'),
-  ]
-)
-
-python_binary(
-  name = 'gc_executor',
-  entry_point = 'twitter.aurora.executor.gc_executor_main',
-  ignore_errors = True,
-  dependencies = [
-    pants(':executor_vars'),
-    pants(':gc_executor_lib'),
-    pants('src/python/twitter/common/app'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

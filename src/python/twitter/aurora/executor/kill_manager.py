@@ -1,6 +1,6 @@
 import threading
 
-from .health_interface import FailureReason, HealthInterface
+from .common.health_interface import FailureReason, HealthInterface
 
 import mesos_pb2 as mesos_pb
 

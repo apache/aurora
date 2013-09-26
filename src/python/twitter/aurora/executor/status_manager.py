@@ -38,6 +38,11 @@ class StatusManager(ExceptionalThread):
     super(StatusManager, self).__init__()
     self.daemon = True
 
+  def _start_health_checkers(self):
+    for checker in self._health_checkers:
+      log.debug("Starting checker: %s" % checker.__class__.__name__)
+      checker.start()
+
   def _stop_health_checkers(self):
     if self._unhealthy_event.is_set():
       return
@@ -47,9 +52,7 @@ class StatusManager(ExceptionalThread):
       checker.stop()
 
   def run(self):
-    for checker in self._health_checkers:
-      log.debug("Starting checker: %s" % checker.__class__.__name__)
-      checker.start()
+    self._start_health_checkers()
 
     failure_reason = None
 

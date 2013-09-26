@@ -71,6 +71,13 @@ class TestThermosExecutorTimer(ThermosExecutorTimer):
   EXECUTOR_TIMEOUT = Amount(100, Time.MILLISECONDS)
 
 
+def alternate_root_task_runner(base_class, checkpoint_root):
+  class AlternateRunner(base_class):
+    def __init__(self, *args, **kw):
+      super(AlternateRunner, self).__init__(*args, checkpoint_root=checkpoint_root, **kw)
+  return AlternateRunner
+
+
 class TestTaskRunner(TaskRunnerWrapper):
   def __init__(self, task_id, mesos_task, role, mesos_ports, **kwargs):
     runner_pex = os.path.join('dist', 'thermos_runner.pex')
@@ -200,7 +207,7 @@ def test_extract_ensemble():
 
 def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False,
                 executor_timer_class=TestThermosExecutorTimer):
-  runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
+  runner_class = alternate_root_task_runner(TestTaskRunner, checkpoint_root)
   manager_class = TestStatusManager if fast_status else StatusManager
   te = FastThermosExecutor(runner_class=runner_class, manager_class=manager_class)
   executor_timer_class(te, proxy_driver).start()
@@ -286,7 +293,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as tempdir:
-      runner_class = functools.partial(TestTaskRunner, checkpoint_root=tempdir)
+      runner_class = alternate_root_task_runner(TestTaskRunner, tempdir)
       te = ThermosExecutor(runner_class=runner_class)
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
       while te._runner.is_alive():
@@ -311,7 +318,7 @@ class TestThermosExecutor(object):
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as tempdir:
-      runner_class = functools.partial(TestTaskRunner, checkpoint_root=tempdir)
+      runner_class = alternate_root_task_runner(TestTaskRunner, tempdir)
       te = ThermosExecutor(runner_class=runner_class)
       te.launchTask(proxy_driver, make_task(MESOS_JOB(task=HELLO_WORLD), shardId=0))
       while te._runner.is_alive():
@@ -497,8 +504,7 @@ class TestThermosExecutor(object):
 def test_waiting_executor():
   proxy_driver = ProxyDriver()
   with temporary_dir() as checkpoint_root:
-    runner_class = functools.partial(TestTaskRunner, checkpoint_root=checkpoint_root)
-    te = ThermosExecutor(runner_class=runner_class)
+    te = ThermosExecutor(runner_class=alternate_root_task_runner(TestTaskRunner, checkpoint_root))
     TestThermosExecutorTimer(te, proxy_driver).start()
     proxy_driver._stop_event.wait(timeout=1.0)
     assert proxy_driver._stop_event.is_set()

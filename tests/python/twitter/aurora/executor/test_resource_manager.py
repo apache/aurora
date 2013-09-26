@@ -1,7 +1,7 @@
 import random
 
 from twitter.aurora.config.schema.base import Resources as _Resources
-from twitter.aurora.executor.health_interface import FailureReason
+from twitter.aurora.executor.common.health_interface import FailureReason
 from twitter.aurora.executor.resource_manager import ResourceEnforcer
 from twitter.thermos.base.path import TaskPath
 

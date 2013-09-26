@@ -7,7 +7,7 @@ from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.serverset import Endpoint
 from twitter.common_internal.zookeeper.twitter_service_kazoo import KazooTwitterService
 
-from .health_interface import HealthInterface
+from .common.health_interface import HealthInterface
 
 
 class DiscoveryManager(HealthInterface):

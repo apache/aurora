@@ -3,7 +3,7 @@ import unittest
 
 from twitter.common.testing.clock import ThreadedClock
 
-from twitter.aurora.executor.health_checker import HealthCheckerThread
+from twitter.aurora.executor.common.health_checker import HealthCheckerThread
 
 import mox
 

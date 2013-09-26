@@ -12,7 +12,7 @@ from twitter.thermos.monitoring.resource import TaskResourceMonitor
 
 from gen.twitter.aurora.comm.ttypes import TaskResourceSample
 
-from .health_interface import (
+from .common.health_interface import (
     FailureReason,
     HealthInterface)
 

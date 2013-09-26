@@ -87,8 +87,6 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
     self._clock = clock
     self._task_killer = task_killer
     self._checkpoint_root = checkpoint_root
-    if 'ANGRYBIRD_THERMOS_LOG_DIR' in os.environ:
-      self._checkpoint_root = os.path.join(os.environ['ANGRYBIRD_THERMOS_LOG_DIR'], 'thermos', 'run')
     self._dropped_tasks = AtomicGauge('dropped_tasks')
     self.metrics.register(self._dropped_tasks)
 

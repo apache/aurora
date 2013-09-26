@@ -19,7 +19,7 @@ from twitter.thermos.config.loader import ThermosTaskWrapper
 
 from gen.twitter.thermos.ttypes import TaskState
 
-from .sandbox_manager import AppAppSandbox, DirectorySandbox, SandboxBase
+from .sandbox_manager import SandboxBase
 
 
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
@@ -200,56 +200,3 @@ class TaskRunnerWrapper(object):
         log.error('Could not instantiate runner!')
     except TaskRunner.Error as e:
       log.error('Could not quitquitquit runner: %s' % e)
-
-
-class ProductionTaskRunner(TaskRunnerWrapper):
-  @classmethod
-  def dump_runner(cls, directory):
-    import pkg_resources
-    import twitter.aurora.executor.resources
-    runner_pex = os.path.join(directory, cls.PEX_NAME)
-    with open(runner_pex, 'w') as fp:
-      fp.write(pkg_resources.resource_stream(twitter.aurora.executor.resources.__name__,
-        cls.PEX_NAME).read())
-    return runner_pex
-
-  def __init__(self, task_id, mesos_task, role, mesos_ports, **kwargs):
-    artifact_dir = os.path.realpath('.')
-    runner_pex = self.dump_runner(artifact_dir)
-    if 'META_THERMOS_ROOT' in os.environ:
-      kwargs['checkpoint_root'] = os.path.join(os.environ['META_THERMOS_ROOT'],
-          'checkpoints')
-    if mesos_task.has_layout():
-      sandbox = AppAppSandbox(task_id)
-      enable_chroot = True
-    else:
-      sandbox = DirectorySandbox(os.path.join(artifact_dir, 'sandbox'))
-      enable_chroot = False
-    super(ProductionTaskRunner, self).__init__(
-        task_id,
-        mesos_task,
-        role,
-        mesos_ports,
-        runner_pex,
-        sandbox,
-        artifact_dir=artifact_dir,
-        **kwargs)
-    self._enable_chroot = enable_chroot
-
-
-class AngrybirdTaskRunner(TaskRunnerWrapper):
-  def __init__(self, task_id, mesos_task, role, mesos_ports, **kwargs):
-    thermos_home = os.environ['ANGRYBIRD_THERMOS_HOME']
-    thermos_logdir = os.environ['ANGRYBIRD_THERMOS_LOG_DIR']
-    sandbox_root = os.path.join(thermos_logdir, 'thermos', 'lib')
-    checkpoint_root = os.path.join(thermos_logdir, 'thermos', 'run')
-    runner_pex = os.path.join(thermos_home, 'science', 'dist', self.PEX_NAME)
-    sandbox = DirectorySandbox(os.path.join(sandbox_root, task_id))
-    super(AngrybirdTaskRunner, self).__init__(
-        task_id,
-        mesos_task,
-        role,
-        mesos_ports,
-        runner_pex,
-        sandbox,
-        checkpoint_root=checkpoint_root)

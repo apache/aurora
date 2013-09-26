@@ -2,6 +2,7 @@ import threading
 import time
 
 from twitter.common.exceptions import ExceptionalThread
+
 from .health_interface import HealthInterface, FailureReason
 
 
@@ -18,7 +19,6 @@ class HealthCheckerThread(HealthInterface, ExceptionalThread):
                initial_interval_secs=None,
                max_consecutive_failures=0,
                clock=time):
-
     self._checker = health_checker
     self._interval = interval_secs
     if initial_interval_secs is not None:

@@ -12,7 +12,7 @@ from twitter.common.testing.clock import ThreadedClock
 
 from twitter.aurora.common.http_signaler import HttpSignaler
 from twitter.aurora.executor.status_manager import StatusManager
-from twitter.aurora.executor.health_checker import HealthCheckerThread
+from twitter.aurora.executor.common.health_checker import HealthCheckerThread
 
 from gen.twitter.thermos.ttypes import TaskState
 
