@@ -134,5 +134,5 @@ Available commands:
     %s
 
 For more help on an individual command:
-    %s help <command>
+    %s <command> --help
 """ % (usage, app.name())
