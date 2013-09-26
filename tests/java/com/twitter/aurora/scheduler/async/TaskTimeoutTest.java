@@ -172,13 +172,28 @@ public class TaskTimeoutTest extends EasyMockTest {
   public void testTimeout() throws Exception {
     Capture<Runnable> assignedTimeout = expectTaskWatch();
     Query.Builder query = Query.taskScoped(TASK_ID).byStatus(ASSIGNED);
-    expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(0);
+    expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(1);
 
     control.replay();
 
     changeState(INIT, PENDING);
     changeState(PENDING, ASSIGNED);
     assignedTimeout.getValue().run();
+    checkStat(TaskTimeout.TIMED_OUT_TASKS_COUNTER, 1);
+  }
+
+  @Test
+  public void testTaskDeleted() throws Exception {
+    Capture<Runnable> assignedTimeout = expectTaskWatch();
+    Query.Builder query = Query.taskScoped(TASK_ID).byStatus(UPDATING);
+    expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(0);
+
+    control.replay();
+
+    changeState(INIT, PENDING);
+    changeState(PENDING, UPDATING);
+    assignedTimeout.getValue().run();
+    checkStat(TaskTimeout.TIMED_OUT_TASKS_COUNTER, 0);
   }
 
   private static ScheduledTask makeTask(String taskId, ScheduleStatus status, long stateEnteredMs) {
@@ -227,7 +242,11 @@ public class TaskTimeoutTest extends EasyMockTest {
   }
 
   private void checkOutstandingTimer(ScheduleStatus status, long expectedValue) {
-    long value = (Long) Stats.getVariable(TaskTimeout.waitingTimeStatName(status)).read();
+    checkStat(TaskTimeout.waitingTimeStatName(status), expectedValue);
+  }
+
+  private void checkStat(String name, long expectedValue) {
+    long value = (Long) Stats.getVariable(name).read();
     assertEquals(expectedValue, value);
   }
 

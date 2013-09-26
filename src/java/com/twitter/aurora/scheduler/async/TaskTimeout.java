@@ -55,11 +55,16 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Observes task transitions and identifies tasks that are 'stuck' in a transient state.  Stuck
  * tasks will be transitioned to the LOST state.
+ * <p>
+ * TODO(William Farner): Convert this test to use StatsProvider.
  */
 class TaskTimeout implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(TaskTimeout.class.getName());
 
-  private final AtomicLong timedOutTasks = Stats.exportLong("timed_out_tasks");
+  @VisibleForTesting
+  static final String TIMED_OUT_TASKS_COUNTER = "timed_out_tasks";
+
+  private final AtomicLong timedOutTasks = Stats.exportLong(TIMED_OUT_TASKS_COUNTER);
 
   @VisibleForTesting
   static final Optional<String> TIMEOUT_MESSAGE = Optional.of("Task timed out");
@@ -192,14 +197,17 @@ class TaskTimeout implements EventSubscriber {
         }
 
         LOG.info("Timeout reached for task " + key);
-        timedOutTasks.incrementAndGet();
         // This query acts as a CAS by including the state that we expect the task to be in if the
         // timeout is still valid.  Ideally, the future would have already been canceled, but in the
         // event of a state transition race, including transientState prevents an unintended
         // task timeout.
         Query.Builder query = Query.taskScoped(key.taskId).byStatus(key.status);
         // Note: This requires LOST transitions trigger Driver.killTask.
-        stateManager.changeState(query, ScheduleStatus.LOST, TIMEOUT_MESSAGE);
+        if (stateManager.changeState(query, ScheduleStatus.LOST, TIMEOUT_MESSAGE) > 0) {
+          timedOutTasks.incrementAndGet();
+        } else {
+          LOG.warning("Task " + key + " does not exist, or was not in the expected state.");
+        }
       } finally {
         futures.remove(key);
       }
