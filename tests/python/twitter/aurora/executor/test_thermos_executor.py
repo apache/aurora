@@ -4,6 +4,7 @@ import functools
 import getpass
 import json
 import os
+import pytest
 import signal
 import subprocess
 import tempfile
@@ -411,6 +412,8 @@ class TestThermosExecutor(object):
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
 
+  # Flaky test, c.f. https://jira.twitter.biz/browse/MESOS-3832
+  @pytest.mark.skipif("True")
   def test_task_health_ok(self):
     proxy_driver = ProxyDriver()
     with SignalServer(HealthyHandler) as port:
