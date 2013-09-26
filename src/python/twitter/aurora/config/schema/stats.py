@@ -4,7 +4,7 @@ from twitter.thermos.config.schema import *
 def Stats(port = 'http', library = 'metrics', version = 'live'):
   config = {
     # This copies the agent distribution package from packer into the sandbox directory
-    'unpack': '{{packer[{{role}}][absorber][' + version + '].copy_command}}',
+    'unpack': '{{packer[observe][absorber][' + version + '].copy_command}}',
     'configure': 'chmod +x absorber',
     'portname': port,
     'library': library
