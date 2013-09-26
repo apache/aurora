@@ -48,6 +48,7 @@ python_library(
   name = 'http_signaler',
   sources = ['http_signaler.py'],
   dependencies = [
+    pants('3rdparty/python:socksipy-branch'),  # TODO(wickman) MESOS-3710
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
   ]

@@ -14,6 +14,10 @@ else:
   import urllib2 as urllib_request
   from urllib2 import URLError, HTTPError
 
+# TODO(wickman) This is an abstraction leak -- this should be fixed upstream by
+# MESOS-3710
+import socks
+
 
 class HttpSignaler(object):
   """Simple HTTP endpoint wrapper to check health or trigger quitquitquit/abortabortabort"""
@@ -43,7 +47,7 @@ class HttpSignaler(object):
       with contextlib.closing(
           self.opener(url, data, timeout=self._timeout_secs)) as fp:
         return fp.read()
-    except (URLError, HTTPError, HTTPException, SocketTimeout) as e:
+    except (URLError, HTTPError, HTTPException, SocketTimeout, socks.GeneralProxyError) as e:
       # the type of an HTTPException is typically more useful than its contents (since for example
       # BadStatusLines are often empty). likewise with socket.timeout.
       err = e.__class__.__name__ if isinstance(e, (HTTPException, SocketTimeout)) else e
