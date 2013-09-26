@@ -28,9 +28,9 @@ class MesosMaintenance(object):
       clock.sleep(self.START_MAINTENANCE_DELAY.as_(Time.SECONDS))
       resp = self._client.maintenance_status(Hosts(not_ready_hosts))
       #TODO(jsmith): Workaround until scheduler responds with unknown slaves in MESOS-3454
-      if not resp.statuses:
+      if not resp.result.maintenanceStatusResult.statuses:
         not_ready_hosts = None
-      for host_status in resp.statuses:
+      for host_status in resp.result.maintenanceStatusResult.statuses:
         if host_status.mode != MaintenanceMode.DRAINED:
           log.warning('%s is currently in status %s' %
               (host_status.host, MaintenanceMode._VALUES_TO_NAMES[host_status.mode]))
@@ -40,7 +40,7 @@ class MesosMaintenance(object):
   def _complete_maintenance(self, drained_hosts):
     check_and_log_response(self._client.end_maintenance(drained_hosts))
     resp = self._client.maintenance_status(drained_hosts)
-    for host_status in resp.statuses:
+    for host_status in resp.result.maintenanceStatusResult.statuses:
       if host_status.mode != MaintenanceMode.NONE:
         log.warning('%s is DRAINING or in DRAINED' % host_status.host)
 
@@ -71,6 +71,6 @@ class MesosMaintenance(object):
     resp = self._client.maintenance_status(Hosts(set(hosts)))
     check_and_log_response(resp)
     statuses = []
-    for host_status in resp.statuses:
+    for host_status in resp.result.maintenanceStatusResult.statuses:
       statuses.append((host_status.host, MaintenanceMode._VALUES_TO_NAMES[host_status.mode]))
     return statuses
