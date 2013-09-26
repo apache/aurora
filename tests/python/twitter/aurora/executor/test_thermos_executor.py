@@ -28,9 +28,10 @@ from twitter.aurora.config.schema.base import (
     Process,
     Resources,
 )
-from twitter.aurora.executor.thermos_executor import ThermosExecutor, ThermosExecutorTimer
+from twitter.aurora.executor.common.executor_timeout import ExecutorTimeout
+from twitter.aurora.executor.thermos_executor import ThermosExecutor
 from twitter.aurora.executor.task_runner_wrapper import TaskRunnerWrapper
-from twitter.aurora.executor.sandbox_manager import DirectorySandbox
+from twitter.aurora.executor.common.sandbox import DirectorySandbox
 from twitter.aurora.executor.status_manager import StatusManager
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
@@ -67,8 +68,11 @@ class FastThermosExecutor(ThermosExecutor):
   STOP_WAIT = Amount(0, Time.SECONDS)
 
 
-class TestThermosExecutorTimer(ThermosExecutorTimer):
-  EXECUTOR_TIMEOUT = Amount(100, Time.MILLISECONDS)
+def alternate_root_task_runner(base_class, checkpoint_root):
+  class AlternateRunner(base_class):
+    def __init__(self, *args, **kw):
+      super(AlternateRunner, self).__init__(*args, checkpoint_root=checkpoint_root, **kw)
+  return AlternateRunner
 
 
 def alternate_root_task_runner(base_class, checkpoint_root):
@@ -205,12 +209,11 @@ def test_extract_ensemble():
   assert ThermosExecutor.extract_ensemble(assigned_task) == TwitterCluster.DEFAULT_ENSEMBLE
 
 
-def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False,
-                executor_timer_class=TestThermosExecutorTimer):
+def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False):
   runner_class = alternate_root_task_runner(TestTaskRunner, checkpoint_root)
   manager_class = TestStatusManager if fast_status else StatusManager
   te = FastThermosExecutor(runner_class=runner_class, manager_class=manager_class)
-  executor_timer_class(te, proxy_driver).start()
+  ExecutorTimeout(te.launched, proxy_driver, timeout=Amount(100, Time.MILLISECONDS)).start()
   task_description = make_task(task, assigned_ports=ports, shardId=0)
   te.launchTask(proxy_driver, task_description)
 
@@ -505,7 +508,6 @@ def test_waiting_executor():
   proxy_driver = ProxyDriver()
   with temporary_dir() as checkpoint_root:
     te = ThermosExecutor(runner_class=alternate_root_task_runner(TestTaskRunner, checkpoint_root))
-    TestThermosExecutorTimer(te, proxy_driver).start()
+    ExecutorTimeout(te.launched, proxy_driver, timeout=Amount(100, Time.MILLISECONDS)).start()
     proxy_driver._stop_event.wait(timeout=1.0)
     assert proxy_driver._stop_event.is_set()
-

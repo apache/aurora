@@ -22,40 +22,20 @@ from twitter.thermos.monitoring.monitor import TaskMonitor
 from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
 from gen.twitter.aurora.ttypes import AssignedTask
 
-from .discovery_manager import DiscoveryManager
+from .common.health_checker import HealthCheckerThread
+from .common.kill_manager import KillManager
+from .common_internal.discovery_manager import DiscoveryManager
+from .common_internal.resource_checkpoints import ResourceCheckpointer
+from .common_internal.resource_manager import ResourceManager
 from .executor_base import ThermosExecutorBase
 from .executor_detector import ExecutorDetector
-from .common.health_checker import HealthCheckerThread
-from .kill_manager import KillManager
-from .resource_checkpoints import ResourceCheckpointer
-from .resource_manager import ResourceManager
-from .task_runner_wrapper import TaskRunnerWrapper
 from .status_manager import StatusManager
+from .task_runner_wrapper import TaskRunnerWrapper
 
 import mesos_pb2 as mesos_pb
 from pystachio import Ref
-from thrift.Thrift import TException
 from thrift.TSerialization import deserialize as thrift_deserialize
-
-
-def default_exit_action():
-  sys.exit(0)
-
-
-class ThermosExecutorTimer(ExceptionalThread):
-  EXECUTOR_TIMEOUT = Amount(10, Time.SECONDS)
-
-  def __init__(self, executor, driver):
-    self._executor = executor
-    self._driver = driver
-    super(ThermosExecutorTimer, self).__init__()
-    self.daemon = True
-
-  def run(self):
-    self._executor.launched.wait(self.EXECUTOR_TIMEOUT.as_(Time.SECONDS))
-    if not self._executor.launched.is_set():
-      self._executor.log('Executor timing out on lack of launchTask.')
-      self._driver.stop()
+from thrift.Thrift import TException
 
 
 class ThermosExecutor(Observable, ThermosExecutorBase):

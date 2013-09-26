@@ -6,20 +6,15 @@ slaves utilising the Thermos executor.
 
 """
 
-from functools import wraps
 import os
-import pwd
 import threading
 import time
 
 from twitter.common.collections import OrderedDict
-from twitter.common.concurrent import defer
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import Observable
 from twitter.common.metrics.gauge import AtomicGauge
-from twitter.common.quantity import Amount, Time, Data
-
-from twitter.aurora.common_internal.clusters import TwitterCluster
+from twitter.common.quantity import Amount, Time
 from twitter.thermos.base.ckpt import CheckpointDispatcher
 from twitter.thermos.base.path import TaskPath
 from twitter.thermos.runner.inspector import CheckpointInspector
@@ -33,14 +28,14 @@ from gen.twitter.aurora.comm.ttypes import (
     SchedulerMessage)
 from gen.twitter.aurora.ttypes import ScheduleStatus
 
-from .sandbox_manager import AppAppSandbox, DirectorySandbox, SandboxBase
+from .common.sandbox import DirectorySandbox, SandboxInterface
+from .common_internal.appapp_sandbox import AppAppSandbox
 from .executor_base import ThermosExecutorBase
 from .executor_detector import ExecutorDetector
 
+import psutil
 from thrift.TSerialization import deserialize as thrift_deserialize
 from thrift.TSerialization import serialize as thrift_serialize
-
-import psutil
 
 
 class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
@@ -318,7 +313,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
       self.log('Destroying AppAppSandbox for %s' % task_id)
       try:
         appapp_sandbox.destroy()
-      except SandboxBase.DeletionError as err:
+      except SandboxInterface.DeletionError as err:
         self.log('Error destroying AppAppSandbox: %s' % err)
     else:
       header_sandbox = self.get_sandbox(task_id)

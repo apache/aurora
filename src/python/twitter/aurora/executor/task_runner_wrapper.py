@@ -17,9 +17,9 @@ from twitter.thermos.runner import TaskRunner
 from twitter.thermos.monitoring.monitor import TaskMonitor
 from twitter.thermos.config.loader import ThermosTaskWrapper
 
-from gen.twitter.thermos.ttypes import TaskState
+from .common.sandbox import SandboxInterface
 
-from .sandbox_manager import SandboxBase
+from gen.twitter.thermos.ttypes import TaskState
 
 
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
@@ -52,8 +52,8 @@ class TaskRunnerWrapper(object):
     if not os.path.exists(self._runner_pex):
       raise self.TaskError('Specified runner pex:%s does not exist!' % self._runner_pex)
     self._sandbox = sandbox
-    if not isinstance(self._sandbox, SandboxBase):
-      raise ValueError('sandbox must be derived from SandboxBase!')
+    if not isinstance(self._sandbox, SandboxInterface):
+      raise ValueError('sandbox must be derived from SandboxInterface!')
     self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
     self._enable_chroot = False
     self._role = role

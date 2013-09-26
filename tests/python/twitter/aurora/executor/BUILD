@@ -1,15 +1,13 @@
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':discovery_manager'),
     pants(':executor_builds'),
     pants(':executor_detector'),
     pants(':executor_vars'),
     pants(':gc_executor'),
-    pants(':resource_manager'),
-    pants(':sandbox_manager'),
     pants(':status_manager'),
     pants(':thermos_executor'),
     pants('tests/python/twitter/aurora/executor/common:all'),
+    pants('tests/python/twitter/aurora/executor/common_internal:all'),
   ]
 )
 
@@ -19,7 +17,10 @@ python_tests(name = 'gc_executor',
     pants('3rdparty/python:mock'),
     pants('3rdparty/python:mox'),
     pants('src/python/twitter/aurora/executor:gc_executor'),
+    # TODO(wickman) This should go away?
+    pants('src/python/twitter/aurora/executor/common_internal:appapp_sandbox'),
     pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/thermos/runner'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
@@ -28,13 +29,6 @@ python_tests(name = 'gc_executor',
   coverage = 'twitter.mesos.executor.gc_executor'
 )
 
-python_tests(name = 'resource_manager',
-  sources = [ 'test_resource_manager.py' ],
-  dependencies = [
-    pants('src/python/twitter/aurora/config:schema'),
-    pants('src/python/twitter/aurora/executor:resource_manager')
-  ]
-)
 
 python_tests(name = 'executor_detector',
   sources = [ 'test_executor_detector.py' ],
@@ -42,28 +36,6 @@ python_tests(name = 'executor_detector',
     pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/aurora/executor:executor_detector')
-  ]
-)
-
-python_tests(name = 'sandbox_manager',
-  sources = ['test_sandbox_manager.py'],
-  dependencies = [
-    pants('src/python/twitter/aurora/config:schema'),
-    pants('src/python/twitter/aurora/executor:sandbox_manager'),
-    pants('src/python/twitter/common/contextutil'),
-  ],
-)
-
-python_tests(name = 'discovery_manager',
-  sources = ['test_discovery_manager.py'],
-  timeout = Amount(5, Time.MINUTES),
-  dependencies = [
-    pants('src/python/twitter/aurora/config:schema'),
-    pants('src/python/twitter/aurora/executor:discovery_manager'),
-    pants('src/python/twitter/common/net:ssh'),
-    pants('src/python/twitter/common/zookeeper/serverset'),
-    pants('src/python/twitter/common/zookeeper:testing'),
-    pants('src/python/twitter/common_internal/zookeeper:twitter_serverset_base')
   ]
 )
 
@@ -82,6 +54,7 @@ python_tests(name = 'thermos_executor',
   timeout = Amount(5, Time.MINUTES),
   dependencies = [
     pants('src/python/twitter/aurora/config:schema'),
+    pants('src/python/twitter/aurora/executor/common:executor_timeout'),
     pants('src/python/twitter/aurora/executor:thermos_executor'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/exceptions'),

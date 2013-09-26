@@ -7,14 +7,13 @@ import threading
 import time
 import unittest
 
+from twitter.aurora.executor.common_internal.appapp_sandbox import AppAppSandbox
+from twitter.aurora.executor.executor_detector import ExecutorDetector
+from twitter.aurora.executor.gc_executor import ThermosGCExecutor
 from twitter.common.concurrent import deadline, Timeout
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
-
-from twitter.aurora.executor.executor_detector import ExecutorDetector
-from twitter.aurora.executor.gc_executor import ThermosGCExecutor
-from twitter.aurora.executor.sandbox_manager import AppAppSandbox
 from twitter.thermos.config.schema import SimpleTask
 from twitter.thermos.runner import TaskRunner
 

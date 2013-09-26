@@ -139,6 +139,8 @@ class StatusManager(ExceptionalThread):
         log.error("Unknown task state = %r!" % last_state)
         finish_state = mesos_pb.TASK_FAILED
 
+    # TODO(wickman) This should be using ExecutorBase.send_status -- or the
+    # sending of status should be decoupled from the status_manager.
     update = mesos_pb.TaskStatus()
     update.task_id.value = self._task_id
     update.state = failure_reason.status if failure_reason is not None else finish_state
