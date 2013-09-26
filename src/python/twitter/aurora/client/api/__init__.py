@@ -115,7 +115,7 @@ invoking cancel_update.
       log.info("Error starting update: %s" % resp.message)
       log.warning(self.UPDATE_FAILURE_WARNING)
       return update_resp
-    elif not resp.rollingUpdateRequired:
+    elif not resp.result.startUpdateResult.rollingUpdateRequired:
       log.info('Update successful: %s' % resp.message)
       return update_resp
 

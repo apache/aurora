@@ -40,8 +40,8 @@ class Updater(object):
        UpdateInProgressError exception is thrown if an update is already in progress.
     """
     resp = self._scheduler.startUpdate(self._config.job())
-    if resp.responseCode == ResponseCode.OK and resp.rollingUpdateRequired:
-      self._update_token = resp.updateToken
+    if resp.responseCode == ResponseCode.OK and resp.result.startUpdateResult.rollingUpdateRequired:
+      self._update_token = resp.result.startUpdateResult.updateToken
     return resp
 
   def finish(self, rollback=False):
