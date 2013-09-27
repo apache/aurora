@@ -75,9 +75,13 @@ def get_job_config(job_spec, config_file, options):
       select_role=select_role,
       select_env=select_env)
 
+@app.command
+def help(args):
+  app.help()
 
 @app.command
 def version(args):
+  """usage: version"""
   try:
     pexpath = sys.argv[0]
     pex_info = PexInfo.from_pex(PythonDirectoryWrapper.get(pexpath))
