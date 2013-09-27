@@ -832,7 +832,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       SessionKey session) {
 
     if (request.getRewriteCommandsSize() == 0) {
-      return new Response(ResponseCode.ERROR, "No rewrite commands provided.");
+      return new Response()
+        .setResponseCode(ResponseCode.ERROR)
+        .setMessage("No rewrite commands provided.");
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {

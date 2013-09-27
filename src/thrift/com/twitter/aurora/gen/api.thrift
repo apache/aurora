@@ -407,7 +407,6 @@ struct GetJobUpdatesResult {
 }
 
 union Result {
-  // TODO(zmanji): Move all RPC-specific result types here as apart of MESOS-3751
   1: PopulateJobResult populateJobResult
   2: StartUpdateResult startUpdateResult
   3: ScheduleStatusResult scheduleStatusResult
@@ -428,8 +427,8 @@ union Result {
 struct Response {
   1: ResponseCode responseCode
   2: string message
+  4: APIVersion version
   3: optional Result result
-  // TODO(zmanji): Add version field per MESOS-3752-
 }
 
 // Due to assumptions in the client all authenticated RPCs must have a SessionKey as their
