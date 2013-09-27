@@ -109,7 +109,7 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
 
   @classmethod
   def _yield_hooks(cls, event, config, job_key, api_call, extra_argument=None):
-    hooks = config.hooks if config is not None else ()
+    hooks = config.hooks if config and config.raw().enable_hooks().get() else ()
     for hook in hooks:
       yield cls._meta_hook(hook,
           cls._generate_method(hook, config, job_key, event, api_call, extra_argument))
