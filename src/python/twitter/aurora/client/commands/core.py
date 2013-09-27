@@ -502,7 +502,7 @@ def get_quota(role):
   """
   options = app.get_options()
   resp = make_client(options.cluster).get_quota(role)
-  quota = resp.quota
+  quota = resp.result.getQuotaResult.quota
 
   quota_fields = [
     ('CPU', quota.numCpus),
