@@ -27,6 +27,8 @@ import com.google.common.collect.Maps;
 
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
+import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
 
@@ -37,10 +39,12 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class MemUpdateStore implements UpdateStore.Mutable {
 
-  private static final Function<JobUpdateConfiguration, JobUpdateConfiguration> DEEP_COPY =
+  private static final Function<JobUpdateConfiguration, JobUpdateConfiguration> DEEP_COPY_CONFIG =
       Util.deepCopier();
+  private static final Function<Lock, Lock> DEEP_COPY_LOCK = Util.deepCopier();
 
   private final Map<JobKey, JobUpdateConfiguration> configs = Maps.newConcurrentMap();
+  private final Map<LockKey, Lock> locks = Maps.newConcurrentMap();
 
   private JobKey key(JobKey jobKey) {
     return JobKeys.assertValid(jobKey).deepCopy();
@@ -54,7 +58,7 @@ class MemUpdateStore implements UpdateStore.Mutable {
 
   @Override
   public void saveJobUpdateConfig(JobUpdateConfiguration config) {
-    configs.put(key(config), DEEP_COPY.apply(config));
+    configs.put(key(config), DEEP_COPY_CONFIG.apply(config));
   }
 
   @Override
@@ -68,16 +72,31 @@ class MemUpdateStore implements UpdateStore.Mutable {
   }
 
   @Override
+  public void saveLock(Lock lock) {
+    locks.put(lock.getKey(), DEEP_COPY_LOCK.apply(lock));
+  }
+
+  @Override
+  public void removeLock(LockKey lockKey) {
+    locks.remove(lockKey);
+  }
+
+  @Override
+  public void deleteLocks() {
+    locks.clear();
+  }
+
+  @Override
   public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(JobKey jobKey) {
     return Optional.fromNullable(configs.get(key(jobKey)))
-        .transform(DEEP_COPY);
+        .transform(DEEP_COPY_CONFIG);
   }
 
   @Override
   public Set<JobUpdateConfiguration> fetchUpdateConfigs(String role) {
     return FluentIterable.from(configs.values())
         .filter(hasRole(role))
-        .transform(DEEP_COPY)
+        .transform(DEEP_COPY_CONFIG)
         .toSet();
   }
 
@@ -86,6 +105,18 @@ class MemUpdateStore implements UpdateStore.Mutable {
     return FluentIterable.from(configs.values())
         .transform(GET_ROLE)
         .toSet();
+  }
+
+  @Override
+  public Set<Lock> fetchLocks() {
+    return FluentIterable.from(locks.values())
+        .transform(DEEP_COPY_LOCK)
+        .toSet();
+  }
+
+  @Override
+  public Optional<Lock> fetchLock(LockKey lockKey) {
+    return Optional.fromNullable(locks.get(lockKey)).transform(DEEP_COPY_LOCK);
   }
 
   private static final Function<JobUpdateConfiguration, String> GET_ROLE =

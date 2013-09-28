@@ -21,6 +21,8 @@ import com.google.common.base.Optional;
 
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
+import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.gen.LockKey;
 
 /**
  * Stores all update configurations for on-going updates.
@@ -51,6 +53,21 @@ public interface UpdateStore {
    */
   Set<String> fetchUpdatingRoles();
 
+  /**
+   * Fetches all locks available in the store.
+   *
+   * @return All locks in the store.
+   */
+  Set<Lock> fetchLocks();
+
+  /**
+   * Fetches a lock by its key.
+   *
+   * @param lockKey Key of the lock to fetch.
+   * @return Optional lock.
+   */
+  Optional<Lock> fetchLock(LockKey lockKey);
+
   public interface Mutable extends UpdateStore {
 
     /**
@@ -71,5 +88,24 @@ public interface UpdateStore {
      * Deletes all update configurations.
      */
     void deleteShardUpdateConfigs();
+
+    /**
+     * Saves a new lock or overwrites the existing one with same LockKey.
+     *
+     * @param lock Lock to save.
+     */
+    void saveLock(Lock lock);
+
+    /**
+     * Removes the lock from the store.
+     *
+     * @param lockKey Key of the lock to remove.
+     */
+    void removeLock(LockKey lockKey);
+
+    /**
+     * Deletes all locks from the store.
+     */
+    void deleteLocks();
   }
 }

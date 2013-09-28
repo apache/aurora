@@ -39,6 +39,8 @@ import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
+import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -48,6 +50,7 @@ import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
 import com.twitter.aurora.gen.storage.RemoveJobUpdate;
+import com.twitter.aurora.gen.storage.RemoveLock;
 import com.twitter.aurora.gen.storage.RemoveQuota;
 import com.twitter.aurora.gen.storage.RemoveTasks;
 import com.twitter.aurora.gen.storage.RewriteTask;
@@ -55,6 +58,7 @@ import com.twitter.aurora.gen.storage.SaveAcceptedJob;
 import com.twitter.aurora.gen.storage.SaveFrameworkId;
 import com.twitter.aurora.gen.storage.SaveHostAttributes;
 import com.twitter.aurora.gen.storage.SaveJobUpdate;
+import com.twitter.aurora.gen.storage.SaveLock;
 import com.twitter.aurora.gen.storage.SaveQuota;
 import com.twitter.aurora.gen.storage.SaveTasks;
 import com.twitter.aurora.gen.storage.Snapshot;
@@ -614,6 +618,44 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override protected void performMutations() {
         logStorage.removeQuota(role);
+      }
+    }.run();
+  }
+
+  @Test
+  public void testSaveLock() throws Exception {
+    final Lock lock = new Lock(
+        LockKey.job(JobKeys.from("testRole", "testEnv", "testJob")),
+        "testLockId",
+        "testUser",
+        12345L);
+    new MutationFixture() {
+      @Override protected void setupExpectations() throws Exception {
+        storageUtil.expectOperations();
+        storageUtil.updateStore.saveLock(lock);
+        streamMatcher.expectTransaction(Op.saveLock(new SaveLock(lock)))
+            .andReturn(position);
+      }
+
+      @Override protected void performMutations() {
+        logStorage.saveLock(lock);
+      }
+    }.run();
+  }
+
+  @Test
+  public void testRemoveLock() throws Exception {
+    final LockKey lockKey = LockKey.job(JobKeys.from("testRole", "testEnv", "testJob"));
+    new MutationFixture() {
+      @Override protected void setupExpectations() throws Exception {
+        storageUtil.expectOperations();
+        storageUtil.updateStore.removeLock(lockKey);
+        streamMatcher.expectTransaction(Op.removeLock(new RemoveLock(lockKey)))
+            .andReturn(position);
+      }
+
+      @Override protected void performMutations() {
+        logStorage.removeLock(lockKey);
       }
     }.run();
   }

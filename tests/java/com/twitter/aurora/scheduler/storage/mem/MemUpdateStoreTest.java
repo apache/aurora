@@ -24,12 +24,15 @@ import org.junit.Test;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
+import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
 public class MemUpdateStoreTest {
@@ -39,7 +42,6 @@ public class MemUpdateStoreTest {
 
   private static final JobKey KEY_A = CONFIG_A.getJobKey();
   private static final JobKey KEY_B = CONFIG_B.getJobKey();
-  private static final JobKey KEY_C = CONFIG_C.getJobKey();
 
   private UpdateStore.Mutable store;
 
@@ -96,6 +98,44 @@ public class MemUpdateStoreTest {
     store.removeShardUpdateConfigs(staging.getJobKey());
     assertNull(store.fetchJobUpdateConfig(staging.getJobKey()).orNull());
     assertEquals(prod, store.fetchJobUpdateConfig(prod.getJobKey()).orNull());
+  }
+
+  @Test
+  public void testLocks() {
+    final String role = "testRole";
+    final String env = "testEnv";
+    final String job1 = "testJob1";
+    final String job2 = "testJob2";
+    Lock lock1 = new Lock(
+        LockKey.job(JobKeys.from(role, env, job1)),
+        "lock1",
+        "testUser",
+        12345L);
+    Lock lock2 = new Lock(
+        LockKey.job(JobKeys.from(role, env, job2)),
+        "lock2",
+        "testUser",
+        12345L);
+    lock2.setMessage("Test message");
+
+    store.saveLock(lock1);
+    store.saveLock(lock2);
+
+    assertEquals(Optional.of(lock1),
+        store.fetchLock(LockKey.job(JobKeys.from(role, env, job1))));
+    assertEquals(Optional.of(lock2),
+        store.fetchLock(LockKey.job(JobKeys.from(role, env, job2))));
+    assertEquals(ImmutableSet.of(lock1, lock2), store.fetchLocks());
+
+    store.removeLock(LockKey.job(JobKeys.from(role, env, job1)));
+    assertEquals(Optional.<Lock>absent(),
+        store.fetchLock(LockKey.job(JobKeys.from(role, env, job1))));
+
+    assertEquals(Optional.of(lock2),
+        store.fetchLock(LockKey.job(JobKeys.from(role, env, job2))));
+    assertNotNull(store.fetchLock(LockKey.job(JobKeys.from(role, env, job2)))
+        .get().getMessage());
+    assertEquals(ImmutableSet.of(lock2), store.fetchLocks());
   }
 
   private static JobKey makeKey(String id) {

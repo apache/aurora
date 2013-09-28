@@ -115,6 +115,20 @@ struct JobKey {
   3: string name        // Name, for example "labrat"
 }
 
+// A unique lock key.
+union LockKey {
+  1: JobKey job
+}
+
+// A generic lock struct to facilitate context specific resource/operation serialization.
+struct Lock {
+  1: LockKey key                // ID of the lock - unique per storage
+  2: string token               // UUID - facilitating soft lock authorization
+  3: string user                // Lock owner
+  4: i64 timestampMs            // Lock creation timestamp in milliseconds
+  5: optional string message    // Optional message to record with the lock
+}
+
 // A unique identifier for the active task within a job.
 struct ShardKey {
   1: JobKey jobKey  // Key identifying the job.

@@ -42,6 +42,8 @@ import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
+import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -50,6 +52,7 @@ import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
 import com.twitter.aurora.gen.storage.RemoveJobUpdate;
+import com.twitter.aurora.gen.storage.RemoveLock;
 import com.twitter.aurora.gen.storage.RemoveQuota;
 import com.twitter.aurora.gen.storage.RemoveTasks;
 import com.twitter.aurora.gen.storage.RewriteTask;
@@ -57,6 +60,7 @@ import com.twitter.aurora.gen.storage.SaveAcceptedJob;
 import com.twitter.aurora.gen.storage.SaveFrameworkId;
 import com.twitter.aurora.gen.storage.SaveHostAttributes;
 import com.twitter.aurora.gen.storage.SaveJobUpdate;
+import com.twitter.aurora.gen.storage.SaveLock;
 import com.twitter.aurora.gen.storage.SaveQuota;
 import com.twitter.aurora.gen.storage.SaveTasks;
 import com.twitter.aurora.gen.storage.Snapshot;
@@ -419,6 +423,14 @@ public class LogStorage extends ForwardingStore
         saveHostAttributes(op.getSaveHostAttributes().hostAttributes);
         break;
 
+      case SAVE_LOCK:
+        saveLock(op.getSaveLock().getLock());
+        break;
+
+      case REMOVE_LOCK:
+        removeLock(op.getRemoveLock().getLockKey());
+        break;
+
       default:
         throw new IllegalStateException("Unknown transaction op: " + op);
     }
@@ -680,6 +692,28 @@ public class LogStorage extends ForwardingStore
         if (!saved.equals(updated)) {
           log(Op.saveHostAttributes(new SaveHostAttributes(updated.get())));
         }
+      }
+    });
+  }
+
+  @Timed("scheduler_lock_save")
+  @Override
+  public void saveLock(final Lock lock) {
+    write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider unused) {
+        log(Op.saveLock(new SaveLock(lock)));
+        LogStorage.super.saveLock(lock);
+      }
+    });
+  }
+
+  @Timed("scheduler_lock_remove")
+  @Override
+  public void removeLock(final LockKey lockKey) {
+    write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider unused) {
+        log(Op.removeLock(new RemoveLock(lockKey)));
+        LogStorage.super.removeLock(lockKey);
       }
     });
   }

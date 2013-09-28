@@ -27,6 +27,8 @@ import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
+import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
@@ -72,6 +74,11 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     JobUpdateConfiguration update = new JobUpdateConfiguration(
         JobKeys.from("role", "env", "job"), "token", ImmutableSet.<TaskUpdateConfiguration>of());
     String frameworkId = "framework_id";
+    Lock lock = new Lock(
+        LockKey.job(JobKeys.from("testRole", "testEnv", "testJob")),
+        "lockId",
+        "testUser",
+        12345L);
 
     storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);
@@ -84,6 +91,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     expect(storageUtil.updateStore.fetchUpdatingRoles()).andReturn(ImmutableSet.of("role"));
     expect(storageUtil.updateStore.fetchUpdateConfigs("role")).andReturn(ImmutableSet.of(update));
     expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(frameworkId);
+    expect(storageUtil.updateStore.fetchLocks()).andReturn(ImmutableSet.of(lock));
 
     expectDataWipe();
     storageUtil.taskStore.saveTasks(tasks);
@@ -92,6 +100,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     storageUtil.jobStore.saveAcceptedJob(job.getJobManagerId(), job.getJobConfiguration());
     storageUtil.updateStore.saveJobUpdateConfig(update);
     storageUtil.schedulerStore.saveFrameworkId(frameworkId);
+    storageUtil.updateStore.saveLock(lock);
 
     control.replay();
 
@@ -102,7 +111,9 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setHostAttributes(ImmutableSet.of(attribute))
         .setJobs(ImmutableSet.of(job))
         .setUpdateConfigurations(ImmutableSet.of(update))
-        .setSchedulerMetadata(new SchedulerMetadata(frameworkId));
+        .setSchedulerMetadata(new SchedulerMetadata(frameworkId))
+        .setLocks(ImmutableSet.of(lock));
+
     assertEquals(expected, snapshotStore.createSnapshot());
 
     snapshotStore.applySnapshot(expected);
@@ -114,5 +125,6 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     storageUtil.attributeStore.deleteHostAttributes();
     storageUtil.jobStore.deleteJobs();
     storageUtil.updateStore.deleteShardUpdateConfigs();
+    storageUtil.updateStore.deleteLocks();
   }
 }

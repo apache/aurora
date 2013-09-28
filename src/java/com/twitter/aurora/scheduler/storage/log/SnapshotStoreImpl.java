@@ -25,6 +25,7 @@ import com.google.inject.Inject;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
+import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.storage.QuotaConfiguration;
 import com.twitter.aurora.gen.storage.SchedulerMetadata;
@@ -156,6 +157,21 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
           if (snapshot.isSetQuotaConfigurations()) {
             for (QuotaConfiguration quota : snapshot.getQuotaConfigurations()) {
               store.getQuotaStore().saveQuota(quota.getRole(), quota.getQuota());
+            }
+          }
+        }
+      },
+      new SnapshotField() {
+        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+          snapshot.setLocks(ImmutableSet.copyOf(store.getUpdateStore().fetchLocks()));
+        }
+
+        @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          store.getUpdateStore().deleteLocks();
+
+          if (snapshot.isSetLocks()) {
+            for (Lock lock : snapshot.getLocks()) {
+              store.getUpdateStore().saveLock(lock);
             }
           }
         }

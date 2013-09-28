@@ -27,6 +27,8 @@ import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
+import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -201,6 +203,31 @@ public class ForwardingStore implements
   @Override
   public Set<String> fetchUpdatingRoles() {
     return updateStore.fetchUpdatingRoles();
+  }
+
+  @Override
+  public Set<Lock> fetchLocks() {
+    return updateStore.fetchLocks();
+  }
+
+  @Override
+  public Optional<Lock> fetchLock(LockKey lockKey) {
+    return updateStore.fetchLock(lockKey);
+  }
+
+  @Override
+  public void saveLock(Lock lock) {
+    updateStore.saveLock(lock);
+  }
+
+  @Override
+  public void removeLock(LockKey lockKey) {
+    updateStore.removeLock(lockKey);
+  }
+
+  @Override
+  public void deleteLocks() {
+    updateStore.deleteLocks();
   }
 
   @Override

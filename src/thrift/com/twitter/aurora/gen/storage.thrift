@@ -38,6 +38,14 @@ struct RemoveJobUpdate {
   3: api.JobKey jobKey
 }
 
+struct SaveLock {
+  1: api.Lock lock
+}
+
+struct RemoveLock {
+  1: api.LockKey lockKey
+}
+
 struct RemoveJob {
   2: api.JobKey jobKey
 }
@@ -80,6 +88,8 @@ union Op {
   9: RemoveQuota removeQuota
   10: SaveHostAttributes saveHostAttributes
   11: RewriteTask rewriteTask
+  12: SaveLock saveLock
+  13: RemoveLock removeLock
 }
 
 // Represents a series of local storage mutations that should be applied in a single atomic
@@ -115,6 +125,7 @@ struct Snapshot {
   6: SchedulerMetadata schedulerMetadata
   7: set<api.JobUpdateConfiguration> updateConfigurations
   8: set<QuotaConfiguration> quotaConfigurations
+  9: set<api.Lock> locks
 }
 
 // A message header that calls out the number of expected FrameChunks to follow to form a complete

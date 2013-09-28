@@ -28,6 +28,7 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
+import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.storage.QuotaConfiguration;
@@ -103,7 +104,7 @@ public class RecoveryTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(ImmutableSet.of(), recovery.listBackups());
+    assertEquals(ImmutableSet.<String>of(), recovery.listBackups());
 
     clock.advance(INTERVAL);
     storageBackup.createSnapshot();
@@ -157,7 +158,8 @@ public class RecoveryTest extends EasyMockTest {
         .setSchedulerMetadata(new SchedulerMetadata("frameworkId"))
         .setUpdateConfigurations(ImmutableSet.<JobUpdateConfiguration>of())
         .setQuotaConfigurations(ImmutableSet.<QuotaConfiguration>of())
-        .setTasks(ImmutableSet.<ScheduledTask>builder().add(tasks).build());
+        .setTasks(ImmutableSet.<ScheduledTask>builder().add(tasks).build())
+        .setLocks(ImmutableSet.<Lock>of());
   }
 
   private static ScheduledTask makeTask(String taskId) {
