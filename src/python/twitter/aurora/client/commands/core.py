@@ -341,6 +341,52 @@ def start_cron(args, options):
 
 
 @app.command
+@app.command_option(
+    '--pretty',
+    dest='pretty',
+    default=False,
+    action='store_true',
+    help='Show job information in prettyprinted format')
+@app.command_option(
+    '--show-cron',
+    '-c',
+    dest='show_cron_schedule',
+    default=False,
+    action='store_true',
+    help='Show cron schedule for jobs')
+@requires.exactly('cluster/role')
+def list_jobs(cluster_and_role):
+  """usage: show_cron_schedule cluster/role/env/job"""
+  def show_job_simple(job):
+    if options.show_cron_schedule:
+      print(('{0}/{1.key.role}/{1.key.environment}/{1.key.name}' +
+          '\t\'{1.cronSchedule}\'\t{1.cronCollisionPolicy}').format(cluster, job))
+    else:
+      print('{0}/{1.key.role}/{1.key.environment}/{1.key.name}'.format(cluster, job))
+
+  def show_job_pretty(job):
+    print("Job %s/%s/%s/%s:" % 
+        (cluster, job.key.role, job.key.environment, job.key.name))
+    print('\tcron schedule: %s' % job.cronSchedule)
+    print('\tcron policy:   %s' % job.cronCollisionPolicy)
+
+  options = app.get_options()
+  if options.show_cron_schedule and options.pretty:
+    print_fn = show_job_pretty
+  else:
+    print_fn = show_job_simple
+  # Take the cluster_and_role parameter, and split it into its two components.  
+  if cluster_and_role.count('/') != 1:
+    die('list_jobs parameter must be in cluster/role format')
+  (cluster,role) = cluster_and_role.split('/')
+  api = make_client(cluster)
+  resp = api.get_jobs(role)
+  check_and_log_response(resp)
+  for job in resp.result.getJobsResult.configs:
+    print_fn(job)
+
+
+@app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(SHARDS_OPTION)
