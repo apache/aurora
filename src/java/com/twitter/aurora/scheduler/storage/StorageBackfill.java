@@ -62,16 +62,6 @@ public final class StorageBackfill {
     }
   }
 
-  private static void guaranteeTaskHasEvents(ScheduledTask task, Clock clock) {
-    TaskEvent latestEvent = task.isSetTaskEvents()
-        ? Iterables.getLast(task.getTaskEvents(), null) : null;
-    if ((latestEvent == null) || (latestEvent.getStatus() != task.getStatus())) {
-      LOG.severe("Task " + Tasks.id(task) + " has no event for current status.");
-      task.addToTaskEvents(new TaskEvent(clock.nowMillis(), task.getStatus())
-          .setMessage("Synthesized missing event."));
-    }
-  }
-
   private static void guaranteeShardUniqueness(
       ScheduledTask task,
       TaskStore taskStore,
@@ -122,7 +112,6 @@ public final class StorageBackfill {
     storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new Closure<ScheduledTask>() {
       @Override public void execute(final ScheduledTask task) {
         ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
-        guaranteeTaskHasEvents(task, clock);
         guaranteeShardUniqueness(task, storeProvider.getUnsafeTaskStore(), clock);
         // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they
         // don't.

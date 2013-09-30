@@ -298,6 +298,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
             new ScheduledTask()
                 .setStatus(PENDING)
+                .setTaskEvents(ImmutableList.of(new TaskEvent(100, ScheduleStatus.PENDING)))
                 .setAssignedTask(
                     new AssignedTask()
                         .setTaskId(storedTaskId)
@@ -306,9 +307,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     });
 
     buildScheduler(storage);
-
-    // Check that the missing event was synthesized.
-    assertEquals(PENDING, Iterables.getLast(getTask(storedTaskId).getTaskEvents()).getStatus());
 
     assignTask(storedTaskId, SLAVE_ID, SLAVE_HOST_1);
 
