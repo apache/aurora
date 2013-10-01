@@ -387,10 +387,12 @@ def test_gc_withheld_and_executor_missing():
 
 def build_blocking_gc_executor(td, proxy_driver):
   class LongGCThinTestThermosGCExecutor(ThinTestThermosGCExecutor):
-    def _run_gc(self, task, retain_tasks):
+    def _run_gc(self, task, retain_tasks, retain_start):
       # just block until we shutdown
+      self._start_time = retain_start
       self._task_id = task.task_id.value
       self._stop_event.wait()
+      self._start_time = None
       self._task_id = None
   executor = LongGCThinTestThermosGCExecutor(td)
   executor.registered(proxy_driver, None, None, None)

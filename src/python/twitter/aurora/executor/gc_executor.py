@@ -363,7 +363,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
       if executor.executor_id.startswith(thermos_executor_prefix) and executor.run != 'latest':
         yield executor.executor_id[len(thermos_executor_prefix):]
 
-  def _run_gc(self, task, retain_tasks):
+  def _run_gc(self, task, retain_tasks, retain_start):
     """
       Reconcile the set of tasks to retain (provided by the scheduler) with the current state of
       executors on this system. Garbage collect tasks/executors as appropriate.
@@ -377,6 +377,9 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
         task: TaskInfo provided by the slave
         retain_tasks: mapping of task_id => ScheduleStatus, describing what the scheduler thinks is
                       running on this system
+        retain_start: the time at which the retain_tasks message is effective -- this means that
+                      tasks started after the retain_tasks message is effective are skipped
+                      until future GC runs.
     """
     task_id = task.task_id.value
     if self._task_id is not None:
@@ -384,7 +387,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
                          % (task_id, self._task_id))
     self._task_id = task_id
     self.log('Launching garbage collection [task_id=%s]' % task_id)
-    self._start_time = self._clock.time()
+    self._start_time = retain_start
     local_gc, remote_gc, _ = self.reconcile_states(self._driver, retain_tasks)
     deleted_tasks = set(retain_tasks).intersection(self.garbage_collect(local_gc)) | remote_gc
     if deleted_tasks:
@@ -402,8 +405,8 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
     """
     while not self._stop_event.is_set():
       try:
-        _, (task, retain_tasks) = self._gc_task_queue.popitem(0)
-        self._run_gc(task, retain_tasks)
+        _, (task, retain_tasks, retain_start) = self._gc_task_queue.popitem(0)
+        self._run_gc(task, retain_tasks, retain_start)
       except KeyError: # no enqueued GC tasks
         pass
       if self._driver is not None:
@@ -412,7 +415,6 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
     # shutdown called
     if self._driver is not None:
       self._driver.stop()
-
 
   """ Mesos Executor API methods follow """
 
@@ -445,7 +447,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
       self.send_update(self._driver, prev_task_id, 'FINISHED',
                        'Garbage collection skipped - GC executor received another task')
     self.log('=> Adding %s to GC queue' % task_id)
-    self._gc_task_queue[task_id] = (task, art.retainedTasks)
+    self._gc_task_queue[task_id] = (task, art.retainedTasks, self._clock.time())
 
   def killTask(self, driver, task_id):
     """Remove the specified task from the queue, if it's not yet run. Otherwise, no-op."""
