@@ -116,8 +116,9 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
 
   @classmethod
   def _invoke_hooks(cls, event, config, job_key, api_call, extra_argument=None):
-    return all(hook() for hook in cls._yield_hooks(event, config, job_key, api_call,
-        extra_argument))
+    hooks_passed = [hook() for hook in cls._yield_hooks(event, config, job_key, api_call,
+        extra_argument)]
+    return all(hooks_passed)
 
   def _hooked_call(self, config, job_key, api_call):
     if not self._invoke_hooks('pre', config, job_key, api_call):
