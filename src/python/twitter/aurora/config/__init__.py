@@ -59,10 +59,14 @@ class AuroraConfig(object):
                all([match_cluster(j), match_role(j), match_env(j), match_name(j)])]
 
     if len(matches) == 0:
-      msg = 'Could not find job %s/%s/%s/%s\n' % (
-          select_cluster or '*', select_role or '*', select_env or '*', name)
+      msg = "Could not find job %s/%s/%s/%s\n" % (
+        select_cluster or '*', select_role or '*', select_env or '*', name)
+      for j in bound_jobs:
+        if j.environment() is Empty:
+          msg += "Job %s/%s/%s/%s in configuration file doesn't specify an environment\n" % (
+            j.cluster(), j.role(), '{MISSING}', j.name()
+          )
       msg += cls._candidate_jobs_str(bound_jobs)
-
       raise ValueError(msg)
 
     elif len(matches) > 1:
@@ -75,8 +79,10 @@ class AuroraConfig(object):
   @staticmethod
   def _candidate_jobs_str(job_list):
     assert(job_list)
-    job_list = ["  %s" % AuroraJobKey(
-        str(j.cluster()), str(j.role()), str(j.environment()), str(j.name()))
+    job_list = ["  %s/%s/%s/%s" % (
+        j.cluster(), j.role(),
+        j.environment() if j.environment() is not Empty else "{MISSING}",
+        j.name())
         for j in job_list]
     return 'Candidates are:\n' + '\n'.join(job_list)
 

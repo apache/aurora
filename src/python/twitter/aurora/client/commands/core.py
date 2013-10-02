@@ -157,13 +157,16 @@ def create(job_spec, config_file):
   Creates a job based on a configuration file.
   """
   options = app.get_options()
-  config = get_job_config(job_spec, config_file, options)
+  try:
+    config = get_job_config(job_spec, config_file, options)
+  except ValueError as v:
+    print("Error: %s" % v)
+    sys.exit(1)
   api = make_client(config.cluster())
   monitor = JobMonitor(api, config.role(), config.environment(), config.name())
   resp = api.create_job(config)
   check_and_log_response(resp)
   handle_open(api.scheduler.scheduler().url, config.role(), config.environment(), config.name())
-
   if options.wait_until == 'RUNNING':
     monitor.wait_until(monitor.running_or_finished)
   elif options.wait_until == 'FINISHED':
