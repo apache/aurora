@@ -30,6 +30,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
@@ -596,7 +597,7 @@ public class LogStorage extends ForwardingStore
   @Override
   public ImmutableSet<ScheduledTask> mutateTasks(
       final Query.Builder query,
-      final Closure<ScheduledTask> mutator) {
+      final Function<ScheduledTask, ScheduledTask> mutator) {
 
     return write(new MutateWork.Quiet<ImmutableSet<ScheduledTask>>() {
       @Override public ImmutableSet<ScheduledTask> apply(MutableStoreProvider unused) {

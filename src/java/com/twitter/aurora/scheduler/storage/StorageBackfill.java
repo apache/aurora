@@ -31,7 +31,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import com.twitter.common.base.Closure;
+import com.twitter.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 
@@ -109,12 +109,13 @@ public final class StorageBackfill {
     backfillJobDefaults(storeProvider.getJobStore());
 
     LOG.info("Performing shard uniqueness sanity check.");
-    storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new Closure<ScheduledTask>() {
-      @Override public void execute(final ScheduledTask task) {
+    storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {
+      @Override public ScheduledTask apply(final ScheduledTask task) {
         ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
         guaranteeShardUniqueness(task, storeProvider.getUnsafeTaskStore(), clock);
         // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they
         // don't.
+        return task;
       }
     });
   }

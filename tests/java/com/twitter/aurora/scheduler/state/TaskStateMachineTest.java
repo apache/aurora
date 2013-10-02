@@ -17,6 +17,7 @@ package com.twitter.aurora.scheduler.state;
 
 import java.util.Set;
 
+import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 
 import org.easymock.EasyMock;
@@ -32,7 +33,6 @@ import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.state.TaskStateMachine.WorkSink;
-import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -400,7 +400,10 @@ public class TaskStateMachineTest extends EasyMockTest {
   }
 
   private IExpectationSetters<Void> expectWork(WorkCommand work, TaskStateMachine machine) {
-    workSink.addWork(eq(work), eq(machine), EasyMock.<Closure<ScheduledTask>>anyObject());
+    workSink.addWork(
+        eq(work),
+        eq(machine),
+        EasyMock.<Function<ScheduledTask, ScheduledTask>>anyObject());
     return expectLastCall();
   }
 

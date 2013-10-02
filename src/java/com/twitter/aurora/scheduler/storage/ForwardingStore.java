@@ -20,6 +20,7 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
@@ -34,7 +35,6 @@ import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.common.base.Closure;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -170,7 +170,7 @@ public class ForwardingStore implements
   @Override
   public ImmutableSet<ScheduledTask> mutateTasks(
       Query.Builder query,
-      Closure<ScheduledTask> mutator) {
+      Function<ScheduledTask, ScheduledTask> mutator) {
 
     return taskStore.mutateTasks(query, mutator);
   }

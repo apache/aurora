@@ -23,6 +23,8 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
@@ -103,18 +105,21 @@ class TaskStateMachine {
    */
   private static class State {
     private final ScheduleStatus state;
-    private final Closure<ScheduledTask> mutation;
+    private final Function<ScheduledTask, ScheduledTask> mutation;
 
-    State(ScheduleStatus state, @Nullable Closure<ScheduledTask> mutation) {
+    State(ScheduleStatus state, Function<ScheduledTask, ScheduledTask> mutation) {
       this.state = state;
       this.mutation = mutation;
     }
 
     static State create(ScheduleStatus status) {
-      return create(status, null);
+      return create(status, Functions.<ScheduledTask>identity());
     }
 
-    static State create(ScheduleStatus status, @Nullable Closure<ScheduledTask> mutation) {
+    static State create(
+        ScheduleStatus status,
+        Function<ScheduledTask, ScheduledTask> mutation) {
+
       return new State(status, mutation);
     }
 
@@ -148,7 +153,7 @@ class TaskStateMachine {
       return state;
     }
 
-    private Closure<ScheduledTask> getMutation() {
+    private Function<ScheduledTask, ScheduledTask> getMutation() {
       return mutation;
     }
   }
@@ -165,7 +170,10 @@ class TaskStateMachine {
      * @param stateMachine The state machine that the work is associated with.
      * @param mutation Mutate operation to perform along with the state transition.
      */
-    void addWork(WorkCommand work, TaskStateMachine stateMachine, Closure<ScheduledTask> mutation);
+    void addWork(
+        WorkCommand work,
+        TaskStateMachine stateMachine,
+        Function<ScheduledTask, ScheduledTask> mutation);
   }
 
   /**
@@ -579,37 +587,37 @@ class TaskStateMachine {
   }
 
   private void addWork(WorkCommand work) {
-    addWork(work, Closures.<ScheduledTask>noop());
+    addWork(work, Functions.<ScheduledTask>identity());
   }
 
-  private void addWork(WorkCommand work, Closure<ScheduledTask> mutation) {
+  private void addWork(WorkCommand work, Function<ScheduledTask, ScheduledTask> mutation) {
     LOG.info("Adding work command " + work + " for " + this);
     workSink.addWork(work, TaskStateMachine.this, mutation);
   }
 
   /**
-   * Same as {@link #updateState(ScheduleStatus, Closure)}, but uses a noop mutation.
+   * Same as {@link #updateState(ScheduleStatus, Function)}, but uses a noop mutation.
    *
    * @param status Status to apply to the task.
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
   public synchronized boolean updateState(ScheduleStatus status) {
-    return updateState(status, Closures.<ScheduledTask>noop());
+    return updateState(status, Functions.<ScheduledTask>identity());
   }
 
   /**
-   * Same as {@link #updateState(ScheduleStatus, Closure, Optional)}, but uses a noop mutation.
+   * Same as {@link #updateState(ScheduleStatus, Function, Optional)}, but uses a noop mutation.
    *
    * @param status Status to apply to the task.
    * @param auditMessage The (optional) audit message to associate with the transition.
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
   public synchronized boolean updateState(ScheduleStatus status, Optional<String> auditMessage) {
-    return updateState(status, Closures.<ScheduledTask>noop(), auditMessage);
+    return updateState(status, Functions.<ScheduledTask>identity(), auditMessage);
   }
 
   /**
-   * Same as {@link #updateState(ScheduleStatus, Closure, Optional)}, but omits the audit message.
+   * Same as {@link #updateState(ScheduleStatus, Function, Optional)}, but omits the audit message.
    *
    * @param status Status to apply to the task.
    * @param mutation Mutate operation to perform while updating the task.
@@ -617,7 +625,7 @@ class TaskStateMachine {
    */
   public synchronized boolean updateState(
       ScheduleStatus status,
-      Closure<ScheduledTask> mutation) {
+      Function<ScheduledTask, ScheduledTask> mutation) {
 
     return updateState(status, mutation, Optional.<String>absent());
   }
@@ -634,7 +642,7 @@ class TaskStateMachine {
    */
   public synchronized boolean updateState(
       final ScheduleStatus status,
-      Closure<ScheduledTask> mutation,
+      Function<ScheduledTask, ScheduledTask> mutation,
       final Optional<String> auditMessage) {
 
     checkNotNull(status);
@@ -647,15 +655,15 @@ class TaskStateMachine {
      * a different way to suppress noop transitions.
      */
     if (stateMachine.getState().getState() != status) {
-      @SuppressWarnings("unchecked")
-      Closure<ScheduledTask> operation = Closures.combine(mutation,
-          new Closure<ScheduledTask>() {
-            @Override public void execute(ScheduledTask task) {
+      Function<ScheduledTask, ScheduledTask> operation = Functions.compose(mutation,
+          new Function<ScheduledTask, ScheduledTask>() {
+            @Override public ScheduledTask apply(ScheduledTask task) {
               task.addToTaskEvents(new TaskEvent()
                   .setTimestamp(clock.nowMillis())
                   .setStatus(status)
                   .setMessage(auditMessage.orNull())
                   .setScheduler(LOCAL_HOST_SUPPLIER.get()));
+              return task;
             }
           });
       return stateMachine.transition(State.create(status, operation));

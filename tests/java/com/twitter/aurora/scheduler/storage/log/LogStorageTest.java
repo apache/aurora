@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -78,8 +80,6 @@ import com.twitter.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import com.twitter.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.base.Closure;
-import com.twitter.common.base.Closures;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
@@ -375,7 +375,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testMutateTasks() throws Exception {
     final Query.Builder query = Query.taskScoped("fred");
-    final Closure<ScheduledTask> mutation = Closures.noop();
+    final Function<ScheduledTask, ScheduledTask> mutation = Functions.identity();
     final ImmutableSet<ScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.STARTING));
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
@@ -415,7 +415,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testNestedTransactions() throws Exception {
     final Query.Builder query = Query.taskScoped("fred");
-    final Closure<ScheduledTask> mutation = Closures.noop();
+    final Function<ScheduledTask, ScheduledTask> mutation = Functions.identity();
     final ImmutableSet<ScheduledTask> mutated =
         ImmutableSet.of(task("a", ScheduleStatus.STARTING));
     final ImmutableSet<String> tasksToRemove = ImmutableSet.of("b");
@@ -451,7 +451,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveAndMutateTasks() throws Exception {
     final Query.Builder query = Query.taskScoped("fred");
-    final Closure<ScheduledTask> mutation = Closures.noop();
+    final Function<ScheduledTask, ScheduledTask> mutation = Functions.identity();
     final Set<ScheduledTask> saved = ImmutableSet.of(task("a", ScheduleStatus.INIT));
     final ImmutableSet<ScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.PENDING));
 
@@ -481,7 +481,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveAndMutateTasksNoCoalesceUniqueIds() throws Exception {
     final Query.Builder query = Query.taskScoped("fred");
-    final Closure<ScheduledTask> mutation = Closures.noop();
+    final Function<ScheduledTask, ScheduledTask> mutation = Functions.identity();
     final Set<ScheduledTask> saved = ImmutableSet.of(task("b", ScheduleStatus.INIT));
     final ImmutableSet<ScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.PENDING));
 

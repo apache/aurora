@@ -17,12 +17,12 @@ package com.twitter.aurora.scheduler.storage;
 
 import java.util.Set;
 
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.common.base.Closure;
 
 /**
  * Stores all tasks configured with the scheduler.
@@ -39,6 +39,13 @@ public interface TaskStore {
   ImmutableSet<ScheduledTask> fetchTasks(Query.Builder query);
 
   public interface Mutable extends TaskStore {
+
+    /**
+     * A convenience interface to allow callers to more concisely implement a task mutation.
+     */
+    public interface TaskMutation extends Function<ScheduledTask, ScheduledTask> {
+    }
+
     /**
      * Saves tasks to the store.  Tasks are copied internally, meaning that the tasks are stored in
      * the state they were in when the method is called, and further object modifications will not
@@ -69,7 +76,9 @@ public interface TaskStore {
      * @param mutator The mutate operation.
      * @return Immutable copies of only the tasks that were mutated.
      */
-    ImmutableSet<ScheduledTask> mutateTasks(Query.Builder query, Closure<ScheduledTask> mutator);
+    ImmutableSet<ScheduledTask> mutateTasks(
+        Query.Builder query,
+        Function<ScheduledTask, ScheduledTask> mutator);
 
     /**
      * Rewrites a task's configuration in-place.

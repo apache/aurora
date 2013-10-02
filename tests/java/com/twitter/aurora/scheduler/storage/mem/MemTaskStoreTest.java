@@ -33,7 +33,7 @@ import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
-import com.twitter.common.base.Closure;
+import com.twitter.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -102,9 +102,9 @@ public class MemTaskStoreTest {
     store.saveTasks(ImmutableSet.of(TASK_A, TASK_B, TASK_C, TASK_D));
     assertQueryResults(Query.statusScoped(ScheduleStatus.RUNNING));
 
-    store.mutateTasks(Query.taskScoped("a"), new Closure<ScheduledTask>() {
-      @Override public void execute(ScheduledTask task) {
-        task.setStatus(ScheduleStatus.RUNNING);
+    store.mutateTasks(Query.taskScoped("a"), new TaskMutation() {
+      @Override public ScheduledTask apply(ScheduledTask task) {
+        return task.setStatus(ScheduleStatus.RUNNING);
       }
     });
 
@@ -112,9 +112,9 @@ public class MemTaskStoreTest {
         Query.statusScoped(ScheduleStatus.RUNNING),
         TASK_A.deepCopy().setStatus(ScheduleStatus.RUNNING));
 
-    store.mutateTasks(Query.unscoped(), new Closure<ScheduledTask>() {
-      @Override public void execute(ScheduledTask task) {
-        task.setStatus(ScheduleStatus.ASSIGNED);
+    store.mutateTasks(Query.unscoped(), new TaskMutation() {
+      @Override public ScheduledTask apply(ScheduledTask task) {
+        return task.setStatus(ScheduleStatus.ASSIGNED);
       }
     });
 
@@ -177,10 +177,11 @@ public class MemTaskStoreTest {
 
     // Capture reference during mutation and mutate later.
     final AtomicReference<ScheduledTask> capture = Atomics.newReference();
-    store.mutateTasks(Query.unscoped(), new Closure<ScheduledTask>() {
-      @Override public void execute(ScheduledTask task) {
+    store.mutateTasks(Query.unscoped(), new TaskMutation() {
+      @Override public ScheduledTask apply(ScheduledTask task) {
         task.setStatus(ScheduleStatus.ASSIGNED);
         capture.set(task);
+        return task;
       }
     });
     capture.get().setStatus(ScheduleStatus.LOST);
@@ -197,7 +198,6 @@ public class MemTaskStoreTest {
     final Query.Builder jimsJob = Query.jobScoped(JobKeys.from("jim", "test", "job"));
     final Query.Builder jimsJob2 = Query.jobScoped(JobKeys.from("jim", "test", "job2"));
     final Query.Builder joesJob = Query.jobScoped(JobKeys.from("joe", "test", "job"));
-    final Query.Builder jimsProdJob = Query.jobScoped(JobKeys.from("jim", "prod", "job"));
 
     store.saveTasks(ImmutableSet.of(a, b, c, d, e));
     assertQueryResults(jimsJob, a, b);
@@ -209,9 +209,9 @@ public class MemTaskStoreTest {
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob, d);
 
-    store.mutateTasks(jimsJob, new Closure<ScheduledTask>() {
-      @Override public void execute(ScheduledTask task) {
-        task.setStatus(ScheduleStatus.RUNNING);
+    store.mutateTasks(jimsJob, new TaskMutation() {
+      @Override public ScheduledTask apply(ScheduledTask task) {
+        return task.setStatus(ScheduleStatus.RUNNING);
       }
     });
     // Change 'a' locally to make subsequent equality checks pass.
@@ -232,6 +232,29 @@ public class MemTaskStoreTest {
     assertQueryResults(jimsJob, a, b);
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob);
+  }
+
+  @Test
+  public void testIgnoresMutationInput() {
+    final ScheduledTask a = makeTask("a", "jim", "test", "job");
+    final Query.Builder jimsJob = Query.jobScoped(JobKeys.from("jim", "test", "job"));
+
+    final String bogusTaskId = "bogusTaskId";
+
+    store.saveTasks(ImmutableSet.of(a));
+    store.mutateTasks(jimsJob, new TaskMutation() {
+      @Override public ScheduledTask apply(ScheduledTask task) {
+        // Modify the supplied task and returned task differently, and make sure that only the
+        // returned value is honored.
+        ScheduledTask copy = task.deepCopy();
+        task.getAssignedTask().setTaskId(bogusTaskId);
+        task.setStatus(ScheduleStatus.FAILED);
+        return copy.setStatus(ScheduleStatus.FINISHED);
+      }
+    });
+
+    assertQueryResults(Query.taskScoped(bogusTaskId));
+    assertQueryResults(jimsJob, a.deepCopy().setStatus(ScheduleStatus.FINISHED));
   }
 
   private void assertStoreContents(ScheduledTask... tasks) {

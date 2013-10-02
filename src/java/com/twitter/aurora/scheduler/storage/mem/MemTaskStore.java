@@ -46,7 +46,6 @@ import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
@@ -155,7 +154,7 @@ class MemTaskStore implements TaskStore.Mutable {
   @Override
   public ImmutableSet<ScheduledTask> mutateTasks(
       Query.Builder query,
-      Closure<ScheduledTask> mutator) {
+      Function<ScheduledTask, ScheduledTask> mutator) {
 
     checkNotNull(query);
     checkNotNull(mutator);
@@ -163,16 +162,16 @@ class MemTaskStore implements TaskStore.Mutable {
     ImmutableSet.Builder<ScheduledTask> mutated = ImmutableSet.builder();
     for (ScheduledTask original : immutableMatches(query.get())) {
       // Copy the object before invoking user code.  This is to support diff checking.
-      ScheduledTask mutable = deepCopy.apply(original);
-      mutator.execute(mutable);
-      if (!original.equals(mutable)) {
-        Preconditions.checkState(Tasks.id(original).equals(Tasks.id(mutable)),
-            "A tasks ID may not be mutated.");
+      ScheduledTask maybeMutated = mutator.apply(deepCopy.apply(original));
+      if (!original.equals(maybeMutated)) {
+        Preconditions.checkState(
+            Tasks.id(original).equals(Tasks.id(maybeMutated)),
+            "A task's ID may not be mutated.");
 
         // A diff is present - detach the mutable object from the closure's code to render
         // further mutation impossible.
-        ScheduledTask updated = deepCopy.apply(mutable);
-        tasks.put(Tasks.id(mutable), updated);
+        ScheduledTask updated = deepCopy.apply(maybeMutated);
+        tasks.put(Tasks.id(maybeMutated), updated);
         mutated.add(deepCopy.apply(updated));
       }
     }

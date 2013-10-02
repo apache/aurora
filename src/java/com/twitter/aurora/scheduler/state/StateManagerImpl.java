@@ -68,6 +68,7 @@ import com.twitter.aurora.scheduler.storage.Storage.StorageException;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.TaskStore;
+import com.twitter.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
@@ -128,8 +129,11 @@ public class StateManagerImpl implements StateManager {
 
   // Adapt the work queue into a sink.
   private final TaskStateMachine.WorkSink workSink = new TaskStateMachine.WorkSink() {
-      @Override public void addWork(WorkCommand work, TaskStateMachine stateMachine,
-          Closure<ScheduledTask> mutation) {
+      @Override public void addWork(
+          WorkCommand work,
+          TaskStateMachine stateMachine,
+          Function<ScheduledTask, ScheduledTask> mutation) {
+
         workQueue.add(new WorkEntry(work, stateMachine, mutation));
       }
     };
@@ -154,9 +158,13 @@ public class StateManagerImpl implements StateManager {
   private static class WorkEntry {
     private final WorkCommand command;
     private final TaskStateMachine stateMachine;
-    private final Closure<ScheduledTask> mutation;
+    private final Function<ScheduledTask, ScheduledTask> mutation;
 
-    WorkEntry(WorkCommand command, TaskStateMachine stateMachine, Closure<ScheduledTask> mutation) {
+    WorkEntry(
+        WorkCommand command,
+        TaskStateMachine stateMachine,
+        Function<ScheduledTask, ScheduledTask> mutation) {
+
       this.command = command;
       this.stateMachine = stateMachine;
       this.mutation = mutation;
@@ -633,13 +641,14 @@ public class StateManagerImpl implements StateManager {
       final SlaveID slaveId,
       final Set<Integer> assignedPorts) {
 
-    final Closure<ScheduledTask> mutation = new Closure<ScheduledTask>() {
-      @Override public void execute(ScheduledTask task) {
+    final TaskMutation mutation = new TaskMutation() {
+      @Override public ScheduledTask apply(ScheduledTask task) {
         AssignedTask assigned = task.getAssignedTask();
         assigned.setAssignedPorts(
             getNameMappedPorts(assigned.getTask().getRequestedPorts(), assignedPorts));
         assigned.setSlaveHost(slaveHost)
             .setSlaveId(slaveId.getValue());
+        return task;
       }
     };
 
@@ -650,12 +659,13 @@ public class StateManagerImpl implements StateManager {
       }
 
       @Override public Boolean apply(final TaskStateMachine stateMachine) {
-        Closure<ScheduledTask> wrapper = new Closure<ScheduledTask>() {
-          @Override public void execute(ScheduledTask task) {
-            mutation.execute(task);
+        TaskMutation wrapper = new TaskMutation() {
+          @Override public ScheduledTask apply(ScheduledTask task) {
+            ScheduledTask mutated = mutation.apply(task);
             Preconditions.checkState(
                 assignedTask.compareAndSet(null, task.getAssignedTask()),
                 "More than one result was found for an identity query.");
+            return mutated;
           }
         };
         return stateMachine.updateState(ScheduleStatus.ASSIGNED, wrapper);
@@ -721,10 +731,9 @@ public class StateManagerImpl implements StateManager {
             break;
 
           case UPDATE_STATE:
-            taskStore.mutateTasks(idQuery, new Closure<ScheduledTask>() {
-              @Override public void execute(ScheduledTask task) {
-                task.setStatus(stateMachine.getState());
-                work.mutation.execute(task);
+            taskStore.mutateTasks(idQuery, new TaskMutation() {
+              @Override public ScheduledTask apply(ScheduledTask task) {
+                return work.mutation.apply(task.setStatus(stateMachine.getState()));
               }
             });
             sideEffectWork.addTaskEvent(
@@ -738,9 +747,9 @@ public class StateManagerImpl implements StateManager {
             break;
 
           case INCREMENT_FAILURES:
-            taskStore.mutateTasks(idQuery, new Closure<ScheduledTask>() {
-              @Override public void execute(ScheduledTask task) {
-                task.setFailureCount(task.getFailureCount() + 1);
+            taskStore.mutateTasks(idQuery, new TaskMutation() {
+              @Override public ScheduledTask apply(ScheduledTask task) {
+                return task.setFailureCount(task.getFailureCount() + 1);
               }
             });
             break;
