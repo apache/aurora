@@ -857,8 +857,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               }
               if (!existingJob.getKey().equals(rewrittenJob.getKey())) {
                 errors.add("Disallowing rewrite attempting to change job key.");
-              } else if (!existingJob.getName().equals(rewrittenJob.getName())) {
-                errors.add("Disallowing rewrite attempting to change job name.");
               } else if (!existingJob.getOwner().equals(rewrittenJob.getOwner())) {
                 errors.add("Disallowing rewrite attempting to change job owner.");
               } else {

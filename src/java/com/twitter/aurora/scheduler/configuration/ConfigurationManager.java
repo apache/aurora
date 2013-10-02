@@ -15,7 +15,6 @@
  */
 package com.twitter.aurora.scheduler.configuration;
 
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
@@ -35,7 +34,6 @@ import org.apache.commons.lang.StringUtils;
 import com.twitter.aurora.gen.Constraint;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.LimitConstraint;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConfig._Fields;
@@ -71,8 +69,6 @@ public final class ConfigurationManager {
   @CmdLine(name = "require_contact_email",
       help = "If true, reject jobs that do not specify a contact email address.")
   public static final Arg<Boolean> REQUIRE_CONTACT_EMAIL = Arg.create(true);
-
-  private static final Logger LOG = Logger.getLogger(ConfigurationManager.class.getName());
 
   private static final Pattern GOOD_IDENTIFIER = Pattern.compile(GOOD_IDENTIFIER_PATTERN_JVM);
 
@@ -267,8 +263,23 @@ public final class ConfigurationManager {
 
     assertOwnerValidity(job.getOwner());
 
-    if (!isGoodIdentifier(copy.getName())) {
-      throw new TaskDescriptionException("Job name contains illegal characters: " + copy.getName());
+    if (!JobKeys.isValid(job.getKey())) {
+      throw new TaskDescriptionException("Job key " + job.getKey() + " is invalid.");
+    }
+    if (!job.getKey().getRole().equals(job.getOwner().getRole())) {
+      throw new TaskDescriptionException("Role in job key must match job owner.");
+    }
+    if (!isGoodIdentifier(job.getKey().getRole())) {
+      throw new TaskDescriptionException(
+          "Job role contains illegal characters: " + job.getKey().getRole());
+    }
+    if (!isGoodIdentifier(job.getKey().getEnvironment())) {
+      throw new TaskDescriptionException(
+          "Job environment contains illegal characters: " + job.getKey().getEnvironment());
+    }
+    if (!isGoodIdentifier(job.getKey().getName())) {
+      throw new TaskDescriptionException(
+          "Job name contains illegal characters: " + job.getKey().getName());
     }
 
     populateFields(copy);
@@ -300,8 +311,6 @@ public final class ConfigurationManager {
       }
     }
 
-    maybeFillJobKey(job);
-
     return copy;
   }
 
@@ -328,7 +337,7 @@ public final class ConfigurationManager {
     maybeFillLinks(config);
 
     config.setOwner(job.getOwner());
-    config.setJobName(job.getName());
+    config.setJobName(job.getKey().getName());
 
     // TODO(ksweeney): Remove the check for job.isSetKey when it's no longer optional.
     if (StringUtils.isBlank(config.getEnvironment()) && job.isSetKey()) {
@@ -408,14 +417,7 @@ public final class ConfigurationManager {
    */
   @VisibleForTesting
   public static void applyDefaultsIfUnset(JobConfiguration job) {
-   ConfigurationManager.applyDefaultsIfUnset(job.getTaskConfig());
-
-   try {
-      // TODO(Bill Farner): Get rid of this since we should be out of backfill phase.
-      maybeFillJobKey(job);
-    } catch (TaskDescriptionException e) {
-      LOG.warning("Failed to fill job key in " + job + " due to " + e);
-    }
+    ConfigurationManager.applyDefaultsIfUnset(job.getTaskConfig());
   }
 
   private static void maybeFillLinks(TaskConfig task) {
@@ -429,36 +431,6 @@ public final class ConfigurationManager {
       }
       task.setTaskLinks(links.build());
     }
-  }
-
-  /**
-    * Fill in a missing job key from task fields.
-    *
-    * TODO(ksweeney): Make this private and call it in populateFields.
-    *
-    * @param job The job to mutate.
-    * @throws TaskDescriptionException If job has no tasks.
-    */
-  public static void maybeFillJobKey(JobConfiguration job) throws TaskDescriptionException {
-    if (JobKeys.isValid(job.getKey())) {
-      return;
-    }
-
-    TaskConfig template = job.getTaskConfig();
-
-    LOG.info("Attempting to synthesize key for job " + job + " using template task " + template);
-    JobKey synthesizedJobKey = new JobKey()
-        .setRole(job.getOwner().getRole())
-        .setEnvironment(template.getEnvironment())
-        .setName(job.getName());
-
-    if (!JobKeys.isValid(synthesizedJobKey)) {
-      throw new TaskDescriptionException(String.format(
-          "Could not make valid key from template %s: synthesized key %s is invalid",
-          template, synthesizedJobKey));
-    }
-
-    job.setKey(synthesizedJobKey);
   }
 
   /**

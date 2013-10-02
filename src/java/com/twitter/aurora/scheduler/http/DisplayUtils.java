@@ -18,7 +18,6 @@ package com.twitter.aurora.scheduler.http;
 import com.google.common.base.Function;
 import com.google.common.collect.Ordering;
 
-import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.aurora.scheduler.http.SchedulerzHome.Role;
 import com.twitter.aurora.scheduler.http.SchedulerzRole.Job;
@@ -47,13 +46,6 @@ public final class DisplayUtils {
   static final Ordering<Job> JOB_ORDERING = Ordering.natural().onResultOf(
       new Function<Job, String>() {
         @Override public String apply(Job job) {
-          return job.getName();
-        }
-      });
-
-  static final Ordering<JobConfiguration> JOB_CONFIG_ORDERING = Ordering.natural().onResultOf(
-      new Function<JobConfiguration, String>() {
-        @Override public String apply(JobConfiguration job) {
           return job.getName();
         }
       });

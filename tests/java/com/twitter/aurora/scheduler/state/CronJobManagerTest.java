@@ -328,7 +328,6 @@ public class CronJobManagerTest extends EasyMockTest {
 
   private JobConfiguration makeJob() {
     return new JobConfiguration()
-        .setName(JOB_NAME)
         .setOwner(new Identity(OWNER, OWNER))
         .setKey(JobKeys.from(OWNER, ENVIRONMENT, JOB_NAME))
         .setCronSchedule("1 1 1 1 1")

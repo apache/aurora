@@ -321,7 +321,8 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testSaveAcceptedJob() throws Exception {
-    final JobConfiguration jobConfig = new JobConfiguration().setName("jake");
+    final JobConfiguration jobConfig =
+        new JobConfiguration().setKey(new JobKey("owner", "env", "jake"));
     final String managerId = "CRON";
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {

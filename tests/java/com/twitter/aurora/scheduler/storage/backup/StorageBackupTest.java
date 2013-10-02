@@ -31,6 +31,7 @@ import com.twitter.aurora.codec.ThriftBinaryCodec;
 import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.storage.QuotaConfiguration;
@@ -169,8 +170,10 @@ public class StorageBackupTest extends EasyMockTest {
         new HostAttributes(
             "hostA",
             ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))))));
-    snapshot.setJobs(
-        ImmutableSet.of(new StoredJob("jobManager", new JobConfiguration().setName("jobA"))));
+    snapshot.setJobs(ImmutableSet.of(
+        new StoredJob(
+            "jobManager",
+            new JobConfiguration().setKey(new JobKey("owner", "env", "jobA")))));
     snapshot.setQuotaConfigurations(
         ImmutableSet.of(new QuotaConfiguration("roleA", new Quota(10, 1024, 1024))));
     snapshot.setSchedulerMetadata(new SchedulerMetadata("frameworkId"));

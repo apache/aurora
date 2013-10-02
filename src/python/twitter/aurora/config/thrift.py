@@ -248,9 +248,7 @@ def convert(job, packages=frozenset(), ports=frozenset()):
   # TODO(Sathya): Re-evaluate this since the scheduler does not need to know about an update config.
   task.thermosConfig = filter_aliased_fields(underlying).json_dumps()
 
-  # TODO(ksweeney): Remove jobName once it has been deprecated.
   return JobConfiguration(
-    name=fully_interpolated(job.name()),
     key=key,
     owner=owner,
     cronSchedule=cron_schedule,

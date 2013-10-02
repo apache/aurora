@@ -28,8 +28,6 @@ import com.twitter.aurora.gen.TaskQuery;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
-import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
-
 /**
  * Utility class providing convenience functions relating to JobKeys.
  */
@@ -79,12 +77,6 @@ public final class JobKeys {
   public static final Function<JobConfiguration, String> CONFIG_TO_ROLE =
       Functions.compose(TO_ROLE, FROM_CONFIG_NO_COPY);
 
-  public static final Function<JobConfiguration, String> CONFIG_TO_ENVIRONMENT =
-      Functions.compose(TO_ENVIRONMENT, FROM_CONFIG_NO_COPY);
-
-  public static final Function<JobConfiguration, String> CONFIG_TO_JOB_NAME =
-      Functions.compose(TO_JOB_NAME, FROM_CONFIG_NO_COPY);
-
   /**
    * Check that a jobKey struct is valid.
    *
@@ -109,28 +101,6 @@ public final class JobKeys {
     checkArgument(isValid(jobKey));
 
     return jobKey;
-  }
-
-  /**
-   * Attempt to create a JobKey from Nullable Thrift parameters. Uses jobKey if it's present,
-   * then uses role, name, and a default environment if they're present, otherwise throws.
-   *
-   * @param jobKey The jobKey that appeared in the Thrift call.
-   * @param role The role that appeared in the Thrift call.
-   * @param name The job name that appeared in the Thrift call.
-   * @return A valid JobKey if one can be synthesized.
-   * @throws IllegalArgumentException if no valid JobKey could be synthesized.
-   */
-  public static JobKey fromRequestParameters(
-      @Nullable JobKey jobKey,
-      @Nullable String role,
-      @Nullable String name) {
-
-    if (isValid(jobKey)) {
-      return jobKey.deepCopy();
-    } else {
-      return from(role, DEFAULT_ENVIRONMENT, name);
-    }
   }
 
   /**

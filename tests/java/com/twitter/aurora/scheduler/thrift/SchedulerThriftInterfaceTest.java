@@ -720,10 +720,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    JobConfiguration job = new JobConfiguration()
-        .setKey(JOB_KEY)
-        .setOwner(ROLE_IDENTITY)
-        .setName(JOB_NAME);
+    JobConfiguration job = new JobConfiguration().setKey(JOB_KEY).setOwner(ROLE_IDENTITY);
     assertEquals(
         INVALID_REQUEST,
         thrift.createJob(job, SESSION).getResponseCode());
@@ -971,7 +968,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private JobConfiguration makeJob(TaskConfig task, int shardCount) {
     return new JobConfiguration()
-        .setName(JOB_NAME)
         .setOwner(ROLE_IDENTITY)
         .setShardCount(shardCount)
         .setTaskConfig(task)

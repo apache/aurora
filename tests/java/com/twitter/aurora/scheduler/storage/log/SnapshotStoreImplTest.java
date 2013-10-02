@@ -26,6 +26,7 @@ import org.junit.Test;
 import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
@@ -70,7 +71,9 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         ImmutableSet.of(new QuotaConfiguration("steve", Quotas.noQuota()));
     HostAttributes attribute = new HostAttributes("host",
         ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))));
-    StoredJob job = new StoredJob("jobManager", new JobConfiguration().setName("name"));
+    StoredJob job = new StoredJob(
+        "jobManager",
+        new JobConfiguration().setKey(new JobKey("owner", "env", "name")));
     JobUpdateConfiguration update = new JobUpdateConfiguration(
         JobKeys.from("role", "env", "job"), "token", ImmutableSet.<TaskUpdateConfiguration>of());
     String frameworkId = "framework_id";

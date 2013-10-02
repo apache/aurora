@@ -47,7 +47,6 @@ def test_simple_config():
   job = convert_pystachio_to_thrift(HELLO_WORLD)
   assert job.shardCount == 1
   tti = job.taskConfig
-  assert job.name == 'hello_world'
   assert job.key == JobKey(
     role=HELLO_WORLD.role().get(),
     environment=HELLO_WORLD.environment().get(),

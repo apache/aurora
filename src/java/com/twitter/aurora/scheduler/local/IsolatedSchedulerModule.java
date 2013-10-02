@@ -262,7 +262,6 @@ public class IsolatedSchedulerModule extends AbstractModule {
 
     private JobConfiguration createJob(String jobName, Identity owner) {
       return new JobConfiguration()
-          .setName(jobName)
           .setKey(JobKeys.from(owner.getRole(), "test", jobName))
           .setOwner(owner)
           .setShardCount(5)

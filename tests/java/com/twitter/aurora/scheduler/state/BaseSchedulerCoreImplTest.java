@@ -52,7 +52,6 @@ import com.twitter.aurora.gen.CronCollisionPolicy;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.ShardUpdateResult;
@@ -178,13 +177,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   private void buildScheduler() throws Exception {
     buildScheduler(createStorage());
-  }
-
-  private static Quota scale(Quota quota, int factor) {
-    return new Quota()
-        .setNumCpus(quota.getNumCpus() * factor)
-        .setRamMb(quota.getRamMb() * factor)
-        .setDiskMb(quota.getDiskMb() * factor);
   }
 
   // TODO(ksweeney): Use Guice to instantiate everything here.
@@ -1867,7 +1859,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       int numTasks) throws TaskDescriptionException  {
 
     JobConfiguration job = new JobConfiguration()
-        .setName(jobKey.getName())
         .setOwner(makeIdentity(jobKey))
         .setKey(jobKey)
         .setShardCount(numTasks)

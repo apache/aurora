@@ -130,7 +130,7 @@ public class SchedulerzHome extends JerseyTemplateServlet {
     }
 
     private void accumulate(JobConfiguration job) {
-      cronJobs.add(job.getName());
+      cronJobs.add(job.getKey().getName());
     }
 
     public String getRole() {

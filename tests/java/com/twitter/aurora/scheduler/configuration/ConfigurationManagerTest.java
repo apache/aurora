@@ -24,11 +24,11 @@ import com.twitter.aurora.gen.Constraint;
 import com.twitter.aurora.gen.CronCollisionPolicy;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.LimitConstraint;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.gen.ValueConstraint;
-import com.twitter.aurora.scheduler.base.JobKeys;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -43,15 +43,11 @@ import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.is
 // TODO(Sathya): Improve test coverage for this class.
 public class ConfigurationManagerTest {
   private static final String THERMOS_CONFIG = "config";
-  private static final TaskConfig MINIMUM_VIABLE_TASK = new TaskConfig()
-      .setNumCpus(1.0)
-      .setRamMb(64)
-      .setDiskMb(64);
 
   // This job caused a crash when loaded in MESOS-3062
   // TODO(ksweeney): Create a test fixtures resource file and move this to it.
   private static final JobConfiguration UNSANITIZED_JOB_CONFIGURATION = new JobConfiguration()
-      .setName("email_stats")
+      .setKey(new JobKey("owner-role", DEFAULT_ENVIRONMENT, "email_stats"))
       .setCronSchedule("0 2 * * *")
       .setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING)
       .setShardCount(1)
@@ -84,7 +80,6 @@ public class ConfigurationManagerTest {
                           .setName("host")
                           .setConstraint(TaskConstraint.limit(new LimitConstraint()
                               .setLimit(1))))))
-      .setKey(null)
       .setOwner(new Identity()
           .setRole("owner-role")
           .setUser("owner-user"));
@@ -98,17 +93,6 @@ public class ConfigurationManagerTest {
     for (String identifier : INVALID_IDENTIFIERS) {
       assertFalse(isGoodIdentifier(identifier));
     }
-  }
-
-  @Test
-  public void testApplyDefaultsIfUnsetHomogeneous() {
-    JobConfiguration unclean = new JobConfiguration()
-        .setName("jobname")
-        .setOwner(new Identity().setRole("role"))
-        .setTaskConfig(MINIMUM_VIABLE_TASK.deepCopy());
-    ConfigurationManager.applyDefaultsIfUnset(unclean);
-    assertEquals(DEFAULT_ENVIRONMENT, unclean.getKey().getEnvironment());
-    assertEquals(DEFAULT_ENVIRONMENT, unclean.getTaskConfig().getEnvironment());
   }
 
   @Test
@@ -138,16 +122,5 @@ public class ConfigurationManagerTest {
     } catch (ConfigurationManager.TaskDescriptionException e) {
       // expected
     }
-  }
-
-  @Test
-  public void testFillsJobKeyFromConfig() throws Exception {
-    JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy();
-    copy.unsetKey();
-    copy.setShardCount(1);
-    ConfigurationManager.validateAndPopulate(copy);
-    assertEquals(
-        JobKeys.from(copy.getOwner().getRole(), DEFAULT_ENVIRONMENT, copy.getName()),
-        copy.getKey());
   }
 }

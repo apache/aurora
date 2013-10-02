@@ -142,6 +142,7 @@ struct ExecutorConfig {
 
 // Description of the tasks contained within a job.
 struct TaskConfig {
+                                             // TODO(William Farner): Store a JobKey instead.
  17: Identity owner                          // contains the role component of JobKey
  26: string environment                      // contains the environment component of JobKey
   3: string jobName                          // contains the name component of JobKey
@@ -185,20 +186,20 @@ enum CronCollisionPolicy {
 // heterogeneous.  One task will be scheduled for each task description.
 // The tuple (name, environment, owner.role) must be unique.
 struct JobConfiguration {
-  1: optional string name                    // Name for this job, must be unique for an owner.
-                                             // DEPRECATED, use key
+  9: JobKey key                              // Key for this job. If not specified
+                                             // name, owner.role, and a reasonable default
+                                             // environment are used to construct it server-side.
+                                             // TODO(William Farner): Deprecate Identity and
+                                             // use JobKey instead (MESOS-4006).
   7: Identity owner                          // Owner of this job.
   4: string cronSchedule                     // If present, the job will be handled as a cron job
                                              // with this crontab-syntax schedule.
   5: CronCollisionPolicy cronCollisionPolicy // Collision policy to use when handling overlapping
                                              // cron runs.  Default is KILL_EXISTING.
-  6: TaskConfig taskConfig              // Task configuration for this job.
+  6: TaskConfig taskConfig                   // Task configuration for this job.
   8: i32 shardCount                          // The number of shards in the job.  Generated
                                              // shard IDs for tasks will be in the range
                                              // [0, shardCount).
-  9: optional JobKey key                     // Key for this job. If not specified
-                                             // name, owner.role, and a reasonable default
-                                             // environment are used to construct it server-side.
 }
 
 struct PopulateJobResult {
