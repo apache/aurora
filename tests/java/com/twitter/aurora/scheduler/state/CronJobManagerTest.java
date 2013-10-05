@@ -31,6 +31,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
@@ -338,7 +339,7 @@ public class CronJobManagerTest extends EasyMockTest {
   private static TaskConfig defaultTask() {
     return new TaskConfig()
         .setContactEmail("testing@twitter.com")
-        .setThermosConfig("data".getBytes())
+        .setExecutorConfig(new ExecutorConfig("aurora", "data"))
         .setNumCpus(1)
         .setRamMb(1024)
         .setDiskMb(1024)

@@ -56,6 +56,7 @@ import org.apache.mesos.SchedulerDriver;
 import org.apache.thrift.TException;
 
 import com.twitter.aurora.gen.AuroraAdmin;
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.Package;
@@ -273,7 +274,9 @@ public class IsolatedSchedulerModule extends AbstractModule {
               .setDiskMb(1024)
               .setRamMb(1024)
               .setPackages(ImmutableSet.of(new Package(owner.getRole(), "package", 15)))
-              .setThermosConfig("opaque".getBytes()));
+              // TODO(maximk): Dump thermosConfig during the MESOS-2635 cleanup stage
+              .setThermosConfig("opaque".getBytes())
+              .setExecutorConfig(new ExecutorConfig("aurora", "opaque")));
     }
 
     private void submitJob(JobConfiguration job) {

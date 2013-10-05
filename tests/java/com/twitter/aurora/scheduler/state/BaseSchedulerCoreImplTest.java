@@ -49,6 +49,7 @@ import org.junit.Test;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Constraint;
 import com.twitter.aurora.gen.CronCollisionPolicy;
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
@@ -279,7 +280,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setRamMb(ONE_GB)
         .setDiskMb(500)
         .setShardId(0)
-        .setThermosConfig(new byte[] {})
+        .setExecutorConfig(new ExecutorConfig("aurora", "config"))
         .setRequestedPorts(ImmutableSet.<String>of())
         .setConstraints(ImmutableSet.<Constraint>of())
         .setTaskLinks(ImmutableMap.<String, String>of());
@@ -306,7 +307,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     TaskConfig expected = new TaskConfig(storedTask)
         .setProduction(false)
         .setMaxTaskFailures(1)
-        .setThermosConfig(new byte[] {})
+        .setExecutorConfig(new ExecutorConfig("aurora", "config"))
         .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1)));
 
     assertEquals(expected, getTask(storedTaskId).getAssignedTask().getTask());
@@ -1875,7 +1876,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setRamMb(1024)
         .setDiskMb(1024)
         .setProduction(production)
-        .setThermosConfig("thermos".getBytes())
+        .setExecutorConfig(new ExecutorConfig("aurora", "thermos"))
         // Avoid per-host scheduling constraints.
         .setConstraints(Sets.newHashSet(hostLimitConstraint(100)))
         .setContactEmail("testing@twitter.com");

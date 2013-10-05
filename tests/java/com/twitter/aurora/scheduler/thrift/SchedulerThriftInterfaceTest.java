@@ -38,6 +38,7 @@ import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
 import com.twitter.aurora.gen.Constraint;
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.HostStatus;
 import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.Identity;
@@ -505,7 +506,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testCreateJobPopulateDefaults() throws Exception {
     TaskConfig task = new TaskConfig()
         .setContactEmail("testing@twitter.com")
-        .setThermosConfig(new byte[]{1, 2, 3})  // Arbitrary opaque data.
+        .setExecutorConfig(new ExecutorConfig("aurora", "config"))  // Arbitrary opaque data.
         .setNumCpus(1.0)
         .setRamMb(1024)
         .setDiskMb(1024)
@@ -571,7 +572,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteShardCasMismatch() throws Exception {
     TaskConfig storedConfig = productionTask();
     TaskConfig modifiedConfig =
-        storedConfig.deepCopy().setThermosConfig("rewritten".getBytes());
+        storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
     ScheduledTask storedTask =
         new ScheduledTask().setAssignedTask(new AssignedTask().setTask(storedConfig));
     ShardKey shardKey = new ShardKey(
@@ -597,7 +598,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteShard() throws Exception {
     TaskConfig storedConfig = productionTask();
     TaskConfig modifiedConfig =
-        storedConfig.deepCopy().setThermosConfig("rewritten".getBytes());
+        storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
     String taskId = "task_id";
     ScheduledTask storedTask = new ScheduledTask().setAssignedTask(
         new AssignedTask()
@@ -629,7 +630,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteJobCasMismatch() throws Exception {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setThermosConfig("rewritten".getBytes());
+    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
     String manager = "manager_key";
     expectAuth(ROOT, true);
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
@@ -647,7 +648,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteJobNotFound() throws Exception {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setThermosConfig("rewritten".getBytes());
+    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
     String manager = "manager_key";
     expectAuth(ROOT, true);
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
@@ -665,7 +666,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteJobMultipleMatches() throws Exception {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setThermosConfig("rewritten".getBytes());
+    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
     String manager = "manager_key";
     expectAuth(ROOT, true);
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
@@ -683,7 +684,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testRewriteJob() throws Exception {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
-    newJob.getTaskConfig().setThermosConfig("rewritten".getBytes());
+    newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
     String manager = "manager_key";
     expectAuth(ROOT, true);
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
@@ -1010,7 +1011,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setEnvironment(DEFAULT_ENVIRONMENT)
         .setJobName(JOB_NAME)
         .setContactEmail("testing@twitter.com")
-        .setThermosConfig("data".getBytes())
+        .setExecutorConfig(new ExecutorConfig("aurora", "data"))
         .setNumCpus(1)
         .setRamMb(1024)
         .setDiskMb(1024)

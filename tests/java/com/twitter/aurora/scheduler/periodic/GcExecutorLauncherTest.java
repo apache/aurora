@@ -33,6 +33,7 @@ import org.junit.Test;
 
 import com.twitter.aurora.codec.ThriftBinaryCodec;
 import com.twitter.aurora.gen.AssignedTask;
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -138,7 +139,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
             .setTask(new TaskConfig()
                 .setJobName(jobName)
                 .setOwner(new Identity().setRole("role").setUser("user"))
-                .setThermosConfig(isThermos ? new byte[] {1, 2, 3} : new byte[] {})));
+                .setExecutorConfig(isThermos ? new ExecutorConfig("aurora", "config") : null)));
   }
 
   private void expectGetTasksByHost(String host, ScheduledTask... tasks) {

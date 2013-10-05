@@ -30,6 +30,7 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
 import com.twitter.aurora.auth.CapabilityValidator;
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.SessionKey;
@@ -53,8 +54,11 @@ class LoggingInterceptor implements MethodInterceptor {
           new Function<Object, String>() {
             @Override public String apply(Object input) {
               JobConfiguration configuration = ((JobConfiguration) input).deepCopy();
+              // TODO(maximk): Remove thermosConfig during the MESOS-2635 cleanup stage
               if (configuration.isSetTaskConfig()) {
                 configuration.getTaskConfig().setThermosConfig("BLANKED".getBytes());
+                configuration.getTaskConfig().setExecutorConfig(
+                    new ExecutorConfig("BLANKED", "BLANKED"));
               }
               return configuration.toString();
             }

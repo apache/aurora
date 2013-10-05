@@ -35,6 +35,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
@@ -427,6 +428,6 @@ public class HistoryPrunerTest extends EasyMockTest {
             .setOwner(new Identity().setRole("role").setUser("user"))
             .setEnvironment("staging45")
             .setJobName(job)
-            .setThermosConfig(new byte[]{1, 2, 3}));
+            .setExecutorConfig(new ExecutorConfig("aurora", "config")));
   }
 }

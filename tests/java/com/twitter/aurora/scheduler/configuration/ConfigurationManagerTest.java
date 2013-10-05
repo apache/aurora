@@ -22,6 +22,7 @@ import org.junit.Test;
 
 import com.twitter.aurora.gen.Constraint;
 import com.twitter.aurora.gen.CronCollisionPolicy;
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
@@ -42,8 +43,6 @@ import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.is
 
 // TODO(Sathya): Improve test coverage for this class.
 public class ConfigurationManagerTest {
-  private static final String THERMOS_CONFIG = "config";
-
   // This job caused a crash when loaded in MESOS-3062
   // TODO(ksweeney): Create a test fixtures resource file and move this to it.
   private static final JobConfiguration UNSANITIZED_JOB_CONFIGURATION = new JobConfiguration()
@@ -55,7 +54,7 @@ public class ConfigurationManagerTest {
           new TaskConfig()
               .setIsService(false)
               .setTaskLinks(ImmutableMap.<String, String>of())
-              .setThermosConfig(THERMOS_CONFIG.getBytes())
+              .setExecutorConfig(new ExecutorConfig("aurora", "config"))
               .setEnvironment(DEFAULT_ENVIRONMENT)
               .setRequestedPorts(ImmutableSet.<String>of())
               .setJobName(null)

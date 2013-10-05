@@ -25,6 +25,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -127,8 +128,11 @@ public class MemTaskStoreTest {
 
   @Test
   public void testUnsafeModifyInPlace() {
-    TaskConfig updated =
-        TASK_A.getAssignedTask().getTask().deepCopy().setThermosConfig("new_config".getBytes());
+    TaskConfig updated = TASK_A
+        .getAssignedTask()
+        .getTask()
+        .deepCopy()
+        .setExecutorConfig(new ExecutorConfig("aurora", "new_config"));
 
     String taskId = Tasks.id(TASK_A);
     assertFalse(store.unsafeModifyInPlace(taskId, updated.deepCopy()));

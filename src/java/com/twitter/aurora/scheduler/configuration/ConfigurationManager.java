@@ -350,7 +350,8 @@ public final class ConfigurationManager {
           "A service task may not be run on a cron schedule: " + config);
     }
 
-    if (!config.isSetThermosConfig()) {
+    // TODO(maximk): Remove thermosConfig during the MESOS-2635 cleanup stage
+    if (!config.isSetThermosConfig() && !config.isSetExecutorConfig()) {
       throw new TaskDescriptionException("Configuration may not be null");
     }
 

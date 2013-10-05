@@ -32,6 +32,7 @@ import org.junit.Test;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.Constraint;
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.LimitConstraint;
@@ -591,7 +592,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .setNumCpus(cpus)
         .setRamMb(ramMb)
         .setDiskMb(diskMb)
-        .setThermosConfig(new byte[]{0}));
+        .setExecutorConfig(new ExecutorConfig("aurora", "config")));
   }
 
   private TaskConfig makeTask(int cpus, long ramMb, long diskMb) throws Exception {

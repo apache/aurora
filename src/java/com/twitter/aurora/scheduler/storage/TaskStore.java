@@ -85,7 +85,7 @@ public interface TaskStore {
      * <p>
      * <b>WARNING</b>: this is a dangerous operation, and should not be used without exercising
      * great care.  This feature should be used as a last-ditch effort to rewrite things that
-     * the scheduler otherwise can't (e.g. {@link TaskConfig#thermosConfig}) rewrite in a
+     * the scheduler otherwise can't (e.g. {@link TaskConfig#executorConfig}) rewrite in a
      * controlled/tested backfill operation.
      *
      * @param taskId ID of the task to alter.
