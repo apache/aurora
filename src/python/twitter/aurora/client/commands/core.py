@@ -10,6 +10,7 @@ import os
 import pprint
 import subprocess
 import sys
+import time
 from tempfile import NamedTemporaryFile
 
 from twitter.common import app, log
@@ -482,6 +483,12 @@ def status(args, options):
 @app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
 @app.command_option(HEALTH_CHECK_INTERVAL_SECONDS_OPTION)
+@app.command_option(
+    '--force',
+    dest='force',
+    default=False,
+    action='store_true',
+    help='Turn off warning message that the update looks large enough to be disruptive.')
 @requires.exactly('cluster/role/env/job', 'config')
 def update(job_spec, config_file):
   """usage: update cluster/role/env/job config
@@ -500,9 +507,30 @@ def update(job_spec, config_file):
   You may want to consider using the 'diff' subcommand before updating,
   to preview what changes will take effect.
   """
+  def warn_if_dangerous_change(api, job_spec, config):
+    # Get the current job status, so that we can check if there's anything
+    # dangerous about this update.
+    job_key = AuroraJobKey(config.cluster(), config.role(), config.environment(), config.name())
+    resp = api.query(api.build_query(config.role(), config.name(),
+        statuses=ACTIVE_STATES, env=config.environment()))
+    if not resp.responseCode:
+      die('Could not get job status from server for comparison: %s' % resp.message)
+    remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
+    resp = api.populate_job_config(config)
+    if not resp.responseCode:
+      die('Server could not populate job config for comparison: %s' % resp.message)
+    local_task_count = len(resp.result.populateJobResult.populated)
+    remote_task_count = len(remote_tasks)
+    if (local_task_count >= 4 * remote_task_count or local_task_count <= 4 * remote_task_count
+        or local_task_count == 0):
+      print('Warning: this update is a large change. Press ^c within 5 seconds to abort')
+      time.sleep(5)
+
   options = app.get_options()
   config = get_job_config(job_spec, config_file, options)
   api = make_client(config.cluster())
+  if not options.force:
+    warn_if_dangerous_change(api, job_spec, config)
   resp = api.update_job(config, options.health_check_interval_seconds, options.shards)
   check_and_log_response(resp)
 
