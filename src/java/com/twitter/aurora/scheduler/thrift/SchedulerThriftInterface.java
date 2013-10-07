@@ -46,6 +46,7 @@ import com.google.inject.Inject;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.aurora.auth.CapabilityValidator;
+import com.twitter.aurora.auth.CapabilityValidator.AuditCheck;
 import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.AssignedTask;
@@ -380,7 +381,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   private Optional<SessionContext> isAdmin(SessionKey session) {
     try {
-      return Optional.of(sessionValidator.checkAuthorized(session, Capability.ROOT));
+      return Optional.of(
+          sessionValidator.checkAuthorized(session, Capability.ROOT, AuditCheck.REQUIRED));
     } catch (AuthFailedException e) {
       return Optional.absent();
     }
@@ -700,7 +702,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     SessionContext context;
     try {
       // TODO(Sathya): Remove this after AOP-style session validation passes in a SessionContext.
-      context = sessionValidator.checkAuthorized(session, Capability.ROOT);
+      context = sessionValidator.checkAuthorized(session, Capability.ROOT, AuditCheck.REQUIRED);
     } catch (AuthFailedException e) {
       response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
       return response;

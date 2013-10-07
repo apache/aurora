@@ -32,6 +32,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.auth.CapabilityValidator;
+import com.twitter.aurora.auth.CapabilityValidator.AuditCheck;
 import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.AssignedTask;
@@ -77,6 +78,8 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
 
+import static org.easymock.EasyMock.anyObject;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -997,11 +1000,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
       throws AuthFailedException {
 
     if (!allowed) {
-      return expect(userValidator.checkAuthorized(SESSION, capability))
-          .andThrow(new AuthFailedException("Denied!"));
+      return expect(userValidator.checkAuthorized(
+          eq(SESSION),
+          eq(capability),
+          anyObject(AuditCheck.class))).andThrow(new AuthFailedException("Denied!"));
     } else {
-      return expect(userValidator.checkAuthorized(SESSION, capability))
-          .andReturn(context);
+      return expect(userValidator.checkAuthorized(
+          eq(SESSION),
+          eq(capability),
+          anyObject(AuditCheck.class))).andReturn(context);
     }
   }
 

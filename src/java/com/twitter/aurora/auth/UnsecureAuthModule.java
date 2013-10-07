@@ -58,7 +58,7 @@ public class UnsecureAuthModule extends AbstractModule {
 
   static class UnsecureCapabilityValidator implements CapabilityValidator {
     @Override
-    public SessionContext checkAuthorized(SessionKey key, Capability capability)
+    public SessionContext checkAuthorized(SessionKey key, Capability capability, AuditCheck check)
         throws AuthFailedException {
 
       return new SessionContext() {

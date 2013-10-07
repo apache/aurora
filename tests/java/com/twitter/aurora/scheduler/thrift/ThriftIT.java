@@ -93,7 +93,10 @@ public class ThriftIT extends EasyMockTest {
       this.validator = validator;
     }
 
-    @Override public SessionContext checkAuthorized(SessionKey sessionKey, Capability capability)
+    @Override public SessionContext checkAuthorized(
+        SessionKey sessionKey,
+        Capability capability,
+        AuditCheck check)
         throws AuthFailedException {
 
       return validator.checkAuthenticated(
@@ -112,7 +115,7 @@ public class ThriftIT extends EasyMockTest {
     @Override public String toString(SessionKey sessionKey) {
       return validator.toString(sessionKey);
     }
-  };
+  }
 
   @Before
   public void setUp() {

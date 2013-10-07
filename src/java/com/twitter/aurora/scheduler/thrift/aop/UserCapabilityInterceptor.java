@@ -32,6 +32,7 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
 import com.twitter.aurora.auth.CapabilityValidator;
+import com.twitter.aurora.auth.CapabilityValidator.AuditCheck;
 import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.ResponseCode;
@@ -84,7 +85,8 @@ class UserCapabilityInterceptor implements MethodInterceptor {
     for (Capability user : whitelist) {
       LOG.fine("Attempting to validate " + key + " against " + user);
       try {
-         capabilityValidator.checkAuthorized(sessionKey.get(), user);
+        capabilityValidator.checkAuthorized(sessionKey.get(), user, AuditCheck.NONE);
+
         LOG.info("Permitting " + key + " to act as "
             + user + " and perform action " + method.getName());
         return invocation.proceed();

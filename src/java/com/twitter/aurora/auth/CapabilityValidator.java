@@ -30,14 +30,31 @@ public interface CapabilityValidator extends SessionValidator {
   }
 
   /**
+   * Audit check to perform for a given action.
+   */
+  enum AuditCheck {
+    /**
+     * Default. No audit checks will be performed.
+     */
+    NONE,
+
+    /**
+     * A check will be performed to verify if a given action has
+     * all necessary data to generate a valid audit trail.
+     */
+    REQUIRED
+  }
+
+  /**
    * Checks whether a session key is authenticated, and has the specified capability.
    *
    * @param sessionKey Key to validate.
    * @param capability User capability to authenticate against.
+   * @param check Auditing data presence check required.
    * @return  A {@link SessionContext} object that provides information about the validated session.
    * @throws AuthFailedException If the key cannot be validated as the role or lacks
    * the requested capability.
    */
-  SessionContext checkAuthorized(SessionKey sessionKey, Capability capability)
+  SessionContext checkAuthorized(SessionKey sessionKey, Capability capability, AuditCheck check)
       throws AuthFailedException;
 }
