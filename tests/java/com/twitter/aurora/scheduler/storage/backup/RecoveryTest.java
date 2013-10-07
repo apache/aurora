@@ -58,6 +58,8 @@ import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
+import static com.twitter.aurora.gen.Constants.CURRENT_API_VERSION;
+
 public class RecoveryTest extends EasyMockTest {
 
   private static final Amount<Long, Time> INTERVAL = Amount.of(1L, Time.HOURS);
@@ -155,7 +157,7 @@ public class RecoveryTest extends EasyMockTest {
     return new Snapshot()
         .setHostAttributes(ImmutableSet.<HostAttributes>of())
         .setJobs(ImmutableSet.<StoredJob>of())
-        .setSchedulerMetadata(new SchedulerMetadata("frameworkId"))
+        .setSchedulerMetadata(new SchedulerMetadata().setVersion(CURRENT_API_VERSION))
         .setUpdateConfigurations(ImmutableSet.<JobUpdateConfiguration>of())
         .setQuotaConfigurations(ImmutableSet.<QuotaConfiguration>of())
         .setTasks(ImmutableSet.<ScheduledTask>builder().add(tasks).build())

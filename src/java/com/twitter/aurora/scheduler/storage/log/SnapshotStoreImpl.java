@@ -17,6 +17,7 @@ package com.twitter.aurora.scheduler.storage.log;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Properties;
 import java.util.logging.Logger;
 
 import com.google.common.collect.ImmutableSet;
@@ -40,9 +41,12 @@ import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Volatile;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.util.BuildInfo;
 import com.twitter.common.util.Clock;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
+import static com.twitter.aurora.gen.Constants.CURRENT_API_VERSION;
 
 /**
  * Snapshot store implementation that delegates to underlying snapshot stores by
@@ -107,8 +111,17 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       },
       new SnapshotField() {
         @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+          Properties props = new BuildInfo().getProperties();
+
           snapshot.setSchedulerMetadata(
-              new SchedulerMetadata(store.getSchedulerStore().fetchFrameworkId()));
+                new SchedulerMetadata()
+                  .setFrameworkId(store.getSchedulerStore().fetchFrameworkId())
+                  .setRevision(props.getProperty(BuildInfo.Key.GIT_REVISION.value))
+                  .setTag(props.getProperty(BuildInfo.Key.GIT_TAG.value))
+                  .setTimestamp(props.getProperty(BuildInfo.Key.TIMESTAMP.value))
+                  .setUser(props.getProperty(BuildInfo.Key.USER.value))
+                  .setMachine(props.getProperty(BuildInfo.Key.MACHINE.value))
+                  .setVersion(CURRENT_API_VERSION));
         }
 
         @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {

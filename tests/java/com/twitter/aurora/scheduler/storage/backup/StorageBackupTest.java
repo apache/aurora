@@ -176,7 +176,7 @@ public class StorageBackupTest extends EasyMockTest {
             new JobConfiguration().setKey(new JobKey("owner", "env", "jobA")))));
     snapshot.setQuotaConfigurations(
         ImmutableSet.of(new QuotaConfiguration("roleA", new Quota(10, 1024, 1024))));
-    snapshot.setSchedulerMetadata(new SchedulerMetadata("frameworkId"));
+    snapshot.setSchedulerMetadata(new SchedulerMetadata().setFrameworkId("frameworkId"));
     snapshot.setTasks(ImmutableSet.of(new ScheduledTask()));
     return snapshot;
   }

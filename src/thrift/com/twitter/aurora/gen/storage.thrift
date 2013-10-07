@@ -105,6 +105,17 @@ struct StoredJob {
 
 struct SchedulerMetadata {
   1: string frameworkId
+  // The SHA of the repo.
+  2: string revision
+  // The tag of the repo.
+  3: string tag
+  // The timestamp of the build.
+  4: string timestamp
+  // The user who built the scheduler
+  5: string user
+  // The machine that built the scheduler
+  6: string machine
+  7: api.APIVersion version
 }
 
 struct QuotaConfiguration {

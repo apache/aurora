@@ -48,6 +48,8 @@ import com.twitter.common.util.testing.FakeClock;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
+import static com.twitter.aurora.gen.Constants.CURRENT_API_VERSION;
+
 public class SnapshotStoreImplTest extends EasyMockTest {
 
   private static final long NOW = 10335463456L;
@@ -82,6 +84,10 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         "lockId",
         "testUser",
         12345L);
+    SchedulerMetadata metadata = new SchedulerMetadata()
+        .setFrameworkId(frameworkId)
+        .setVersion(CURRENT_API_VERSION);
+
 
     storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);
@@ -114,7 +120,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setHostAttributes(ImmutableSet.of(attribute))
         .setJobs(ImmutableSet.of(job))
         .setUpdateConfigurations(ImmutableSet.of(update))
-        .setSchedulerMetadata(new SchedulerMetadata(frameworkId))
+        .setSchedulerMetadata(metadata)
         .setLocks(ImmutableSet.of(lock));
 
     assertEquals(expected, snapshotStore.createSnapshot());
