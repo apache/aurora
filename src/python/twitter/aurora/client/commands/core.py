@@ -287,7 +287,7 @@ def inspect(job_spec, config_file):
   print('Job level information')
   print('  name:       %s' % job.name())
   print('  role:       %s' % job.role())
-  print('  contact:    %s' % job.role())
+  print('  contact:    %s' % job.contact())
   print('  cluster:    %s' % job.cluster())
   print('  instances:  %s' % job.instances())
   if job.has_cron_schedule():
