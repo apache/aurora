@@ -19,13 +19,16 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
+import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -98,6 +101,19 @@ public final class StorageBackfill {
     }
   }
 
+  private static void convertToExecutorConfig(ScheduledTask task) {
+    // TODO(maximk): remove this as part of MESOS-2635 cleanup
+    if (task.getAssignedTask().getTask().isSetThermosConfig()) {
+      TaskConfig taskConfig = task.getAssignedTask().getTask();
+      taskConfig.setExecutorConfig(
+          new ExecutorConfig(
+              "AuroraExecutor",
+              new String(taskConfig.getThermosConfig(), Charsets.UTF_8)));
+
+      taskConfig.unsetThermosConfig();
+    }
+  }
+
   /**
    * Backfills the storage to make it match any assumptions that may have changed since
    * the structs were first written.
@@ -113,6 +129,7 @@ public final class StorageBackfill {
       @Override public ScheduledTask apply(final ScheduledTask task) {
         ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
         guaranteeShardUniqueness(task, storeProvider.getUnsafeTaskStore(), clock);
+        convertToExecutorConfig(task);
         // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they
         // don't.
         return task;

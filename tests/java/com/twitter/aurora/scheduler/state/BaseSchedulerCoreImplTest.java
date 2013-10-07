@@ -280,7 +280,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setRamMb(ONE_GB)
         .setDiskMb(500)
         .setShardId(0)
-        .setExecutorConfig(new ExecutorConfig("aurora", "config"))
+        .setThermosConfig("thermosConfig".getBytes())
         .setRequestedPorts(ImmutableSet.<String>of())
         .setConstraints(ImmutableSet.<Constraint>of())
         .setTaskLinks(ImmutableMap.<String, String>of());
@@ -307,8 +307,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     TaskConfig expected = new TaskConfig(storedTask)
         .setProduction(false)
         .setMaxTaskFailures(1)
-        .setExecutorConfig(new ExecutorConfig("aurora", "config"))
+        .setExecutorConfig(new ExecutorConfig("AuroraExecutor", "thermosConfig"))
         .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1)));
+    expected.unsetThermosConfig();
 
     assertEquals(expected, getTask(storedTaskId).getAssignedTask().getTask());
 
