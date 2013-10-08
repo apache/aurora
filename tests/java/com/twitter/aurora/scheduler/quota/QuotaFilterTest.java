@@ -11,6 +11,7 @@ import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -83,9 +84,9 @@ public class QuotaFilterTest extends EasyMockTest {
 
     storageTestUtil.expectOperations();
     storageTestUtil.expectTaskFetch(QUERY,
-        new ScheduledTask().setAssignedTask(
+        IScheduledTask.build(new ScheduledTask().setAssignedTask(
             new AssignedTask().setTask(
-                job.getTaskConfig().deepCopy())));
+                job.getTaskConfig().deepCopy()))));
 
     expect(quotaManager.hasRemaining(ROLE, new Quota(0, 0, 0))).andReturn(true);
 
@@ -102,12 +103,13 @@ public class QuotaFilterTest extends EasyMockTest {
     JobConfiguration job = JOB.deepCopy().setShardCount(numTasks + additionalTasks);
     job.getTaskConfig().setProduction(true);
 
-    ScheduledTask[] scheduledTasks = new ScheduledTask[numTasks];
+    IScheduledTask[] scheduledTasks = new IScheduledTask[numTasks];
     for (int i = 0; i < numTasks; i++) {
-      scheduledTasks[i] = new ScheduledTask().setAssignedTask(
+      ScheduledTask builder = new ScheduledTask().setAssignedTask(
           new AssignedTask().setTask(
               job.getTaskConfig().deepCopy()));
-      scheduledTasks[i].getAssignedTask().getTask().setShardId(i);
+      builder.getAssignedTask().getTask().setShardId(i);
+      scheduledTasks[i] = IScheduledTask.build(builder);
     }
 
     storageTestUtil.expectOperations();

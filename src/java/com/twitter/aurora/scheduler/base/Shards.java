@@ -19,8 +19,8 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Utility class for dealing with individual shards of a job.
@@ -31,11 +31,12 @@ public final class Shards {
    * Gets the original task configuration for a shard update.  Result may be null if the update
    * adds the shard.
    */
-  public static final Function<TaskUpdateConfiguration, TaskConfig> GET_ORIGINAL_CONFIG =
-      new Function<TaskUpdateConfiguration, TaskConfig>() {
+  public static final Function<TaskUpdateConfiguration, ITaskConfig> GET_ORIGINAL_CONFIG =
+      new Function<TaskUpdateConfiguration, ITaskConfig>() {
         @Nullable
-        @Override public TaskConfig apply(TaskUpdateConfiguration updateConfig) {
-          return updateConfig.getOldConfig();
+        @Override public ITaskConfig apply(TaskUpdateConfiguration updateConfig) {
+          return updateConfig.isSetOldConfig()
+              ? ITaskConfig.build(updateConfig.getOldConfig()) : null;
         }
       };
 
@@ -43,11 +44,12 @@ public final class Shards {
    * Gets the updated task configuration for a shard update.  Result may be null if the update
    * removes the shard.
    */
-  public static final Function<TaskUpdateConfiguration, TaskConfig> GET_NEW_CONFIG =
-      new Function<TaskUpdateConfiguration, TaskConfig>() {
+  public static final Function<TaskUpdateConfiguration, ITaskConfig> GET_NEW_CONFIG =
+      new Function<TaskUpdateConfiguration, ITaskConfig>() {
         @Nullable
-        @Override public TaskConfig apply(TaskUpdateConfiguration updateConfig) {
-          return updateConfig.getNewConfig();
+        @Override public ITaskConfig apply(TaskUpdateConfiguration updateConfig) {
+          return updateConfig.isSetNewConfig()
+              ? ITaskConfig.build(updateConfig.getNewConfig()) : null;
         }
       };
 

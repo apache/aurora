@@ -38,8 +38,11 @@ import com.twitter.aurora.gen.LimitConstraint;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConfig._Fields;
 import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.gen.ValueConstraint;
 import com.twitter.aurora.scheduler.base.JobKeys;
+import com.twitter.aurora.scheduler.storage.entities.IConstraint;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConstraint;
+import com.twitter.aurora.scheduler.storage.entities.IValueConstraint;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.Positive;
@@ -148,7 +151,7 @@ public final class ConfigurationManager {
           },
           new Closure<TaskConfig>() {
             @Override public void execute(TaskConfig task) {
-              if (!isDedicated(task)
+              if (!isDedicated(ITaskConfig.build(task))
                   && task.isProduction()
                   && task.isIsService()
                   && !Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT))) {
@@ -196,20 +199,20 @@ public final class ConfigurationManager {
     }
   }
 
-  private static String getRole(ValueConstraint constraint) {
+  private static String getRole(IValueConstraint constraint) {
     return Iterables.getOnlyElement(constraint.getValues()).split("/")[0];
   }
 
-  private static boolean isValueConstraint(TaskConstraint taskConstraint) {
+  private static boolean isValueConstraint(ITaskConstraint taskConstraint) {
     return taskConstraint.getSetField() == TaskConstraint._Fields.VALUE;
   }
 
-  public static boolean isDedicated(TaskConfig task) {
+  public static boolean isDedicated(ITaskConfig task) {
     return Iterables.any(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE));
   }
 
   @Nullable
-  private static Constraint getDedicatedConstraint(TaskConfig task) {
+  private static IConstraint getDedicatedConstraint(ITaskConfig task) {
     return Iterables.find(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE), null);
   }
 
@@ -220,13 +223,13 @@ public final class ConfigurationManager {
    * @param task Task to scrub.
    * @return Scrubbed task.
    */
-  public static TaskConfig scrubNonUniqueTaskFields(TaskConfig task) {
-    TaskConfig copy = task.deepCopy();
+  public static ITaskConfig scrubNonUniqueTaskFields(ITaskConfig task) {
+    TaskConfig copy = task.newBuilder();
     // Unsetting only changes the isset bit vector.  For equals() comparison, the value must also be
     // canonical.
     copy.setShardId(0);
     copy.unsetShardId();
-    return copy;
+    return ITaskConfig.build(copy);
   }
 
   /**
@@ -292,13 +295,13 @@ public final class ConfigurationManager {
           "A valid twitter.com contact email address is required.");
     }
 
-    Constraint constraint = getDedicatedConstraint(config);
+    IConstraint constraint = getDedicatedConstraint(ITaskConfig.build(config));
     if (constraint != null) {
       if (!isValueConstraint(constraint.getConstraint())) {
         throw new TaskDescriptionException("A dedicated constraint must be of value type.");
       }
 
-      ValueConstraint valueConstraint = constraint.getConstraint().getValue();
+      IValueConstraint valueConstraint = constraint.getConstraint().getValue();
 
       if (!(valueConstraint.getValues().size() == 1)) {
         throw new TaskDescriptionException("A dedicated constraint must have exactly one value");
@@ -369,9 +372,9 @@ public final class ConfigurationManager {
    * @param name The name of the constraint.
    * @return A filter that matches the constraint.
    */
-  public static Predicate<Constraint> getConstraintByName(final String name) {
-    return new Predicate<Constraint>() {
-      @Override public boolean apply(Constraint constraint) {
+  public static Predicate<IConstraint> getConstraintByName(final String name) {
+    return new Predicate<IConstraint>() {
+      @Override public boolean apply(IConstraint constraint) {
         return constraint.getName().equals(name);
       }
     };

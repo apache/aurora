@@ -20,8 +20,8 @@ import java.util.Set;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.configuration.Resources;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Determines whether a proposed scheduling assignment should be allowed.
@@ -112,5 +112,5 @@ public interface SchedulingFilter {
    * @return A set of vetoes indicating reasons the task cannot be scheduled.  If the task may be
    *    scheduled, the set will be empty.
    */
-  Set<Veto> filter(Resources offer, String slaveHost, TaskConfig task, String taskId);
+  Set<Veto> filter(Resources offer, String slaveHost, ITaskConfig task, String taskId);
 }

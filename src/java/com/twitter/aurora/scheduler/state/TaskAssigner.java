@@ -24,13 +24,13 @@ import com.google.inject.Inject;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskInfo;
 
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.MesosTaskFactory;
-import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -47,7 +47,7 @@ public interface TaskAssigner {
    * @param task The task to match against and optionally assign.
    * @return Instructions for launching the task if matching and assignment were successful.
    */
-  Optional<TaskInfo> maybeAssign(Offer offer, ScheduledTask task);
+  Optional<TaskInfo> maybeAssign(Offer offer, IScheduledTask task);
 
   class TaskAssignerImpl implements TaskAssigner {
     private static final Logger LOG = Logger.getLogger(TaskAssignerImpl.class.getName());
@@ -67,19 +67,22 @@ public interface TaskAssigner {
       this.taskFactory = checkNotNull(taskFactory);
     }
 
-    private TaskInfo assign(Offer offer, ScheduledTask task) {
+    private TaskInfo assign(Offer offer, IScheduledTask task) {
       String host = offer.getHostname();
       Set<Integer> selectedPorts =
-          Resources.getPorts(offer, task.getAssignedTask().getTask().getRequestedPortsSize());
-      task.setAssignedTask(
-          stateManager.assignTask(Tasks.id(task), host, offer.getSlaveId(), selectedPorts));
+          Resources.getPorts(offer, task.getAssignedTask().getTask().getRequestedPorts().size());
+      IAssignedTask assigned = stateManager.assignTask(
+          Tasks.id(task),
+          host,
+          offer.getSlaveId(),
+          selectedPorts);
       LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
-          host, offer.getSlaveId(), JobKeys.toPath(Tasks.SCHEDULED_TO_JOB_KEY.apply(task))));
-      return taskFactory.createFrom(task.getAssignedTask(), offer.getSlaveId());
+          host, offer.getSlaveId(), Tasks.id(task)));
+      return taskFactory.createFrom(assigned, offer.getSlaveId());
     }
 
     @Override
-    public Optional<TaskInfo> maybeAssign(Offer offer, ScheduledTask task) {
+    public Optional<TaskInfo> maybeAssign(Offer offer, IScheduledTask task) {
       Set<Veto> vetoes = filter.filter(
           Resources.from(offer),
           offer.getHostname(),

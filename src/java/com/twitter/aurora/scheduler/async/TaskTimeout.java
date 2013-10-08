@@ -36,7 +36,6 @@ import com.google.common.eventbus.Subscribe;
 import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -44,6 +43,7 @@ import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.state.StateManager;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
@@ -176,7 +176,7 @@ class TaskTimeout implements EventSubscriber {
 
   @Subscribe
   public void storageStarted(StorageStarted event) {
-    for (ScheduledTask task : Storage.Util.consistentFetchTasks(storage, TRANSIENT_QUERY)) {
+    for (IScheduledTask task : Storage.Util.consistentFetchTasks(storage, TRANSIENT_QUERY)) {
       registerTimeout(new TimeoutKey(Tasks.id(task), task.getStatus()));
     }
   }

@@ -31,6 +31,7 @@ import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
 import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.common.quantity.Data;
 
 import static org.junit.Assert.assertEquals;
@@ -38,7 +39,7 @@ import static org.junit.Assert.assertEquals;
 public class MesosTaskFactoryImplTest {
 
   private static final String EXECUTOR_PATH = "/twitter/fake/executor.sh";
-  private static final AssignedTask TASK = new AssignedTask()
+  private static final IAssignedTask TASK = IAssignedTask.build(new AssignedTask()
       .setTaskId("task-id")
       .setTask(new TaskConfig()
           .setOwner(new Identity("role", "user"))
@@ -47,7 +48,7 @@ public class MesosTaskFactoryImplTest {
           .setShardId(2)
           .setDiskMb(10)
           .setRamMb(100)
-          .setNumCpus(5));
+          .setNumCpus(5)));
   private static final SlaveID SLAVE = SlaveID.newBuilder().setValue("slave-id").build();
 
   private MesosTaskFactory taskFactory;

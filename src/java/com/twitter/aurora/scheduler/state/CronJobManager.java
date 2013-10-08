@@ -48,8 +48,6 @@ import com.twitter.aurora.gen.CronCollisionPolicy;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
@@ -63,6 +61,8 @@ import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -244,7 +244,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
             ParsedConfiguration config = pendingRuns.remove(jobKey);
             checkNotNull(config, "Failed to fetch job for delayed run of " + jobKey);
             LOG.info("Launching " + config.getTaskConfigs().size() + " tasks.");
-            stateManager.insertPendingTasks(config.getTaskConfigs());
+            stateManager.insertPendingTasks(FluentIterable.from(config.getTaskConfigs()).toSet());
             return true;
           } else {
             LOG.info("Not yet safe to run cron " + jobKey);
@@ -278,11 +278,11 @@ public class CronJobManager extends JobManager implements EventSubscriber {
         JobKeys.toPath(job), new Date(), job.getCronCollisionPolicy()));
     cronJobsTriggered.incrementAndGet();
 
-    ImmutableSet.Builder<TaskConfig> builder = ImmutableSet.builder();
+    ImmutableSet.Builder<ITaskConfig> builder = ImmutableSet.builder();
 
     final Query.Builder activeQuery = Query.jobScoped(job.getKey()).active();
 
-    Set<ScheduledTask> activeTasks = Storage.Util.consistentFetchTasks(storage, activeQuery);
+    Set<IScheduledTask> activeTasks = Storage.Util.consistentFetchTasks(storage, activeQuery);
 
     if (activeTasks.isEmpty()) {
       builder.addAll(config.getTaskConfigs());
@@ -310,7 +310,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
           break;
 
         case RUN_OVERLAP:
-          Map<Integer, ScheduledTask> byShard =
+          Map<Integer, IScheduledTask> byShard =
               Maps.uniqueIndex(activeTasks, Tasks.SCHEDULED_TO_SHARD_ID);
           Map<Integer, ScheduleStatus> existingTasks =
               Maps.transformValues(byShard, Tasks.GET_STATUS);
@@ -324,8 +324,9 @@ public class CronJobManager extends JobManager implements EventSubscriber {
             int shardOffset = Ordering.natural().max(existingTasks.keySet()) + 1;
             LOG.info("Adjusting shard IDs of " + JobKeys.toPath(job) + " by " + shardOffset
                 + " for overlapping cron run.");
-            for (TaskConfig task : config.getTaskConfigs()) {
-              builder.add(task.deepCopy().setShardId(task.getShardId() + shardOffset));
+            for (ITaskConfig task : config.getTaskConfigs()) {
+              builder.add(
+                  ITaskConfig.build(task.newBuilder().setShardId(task.getShardId() + shardOffset)));
             }
           }
           break;
@@ -335,7 +336,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
       }
     }
 
-    Set<TaskConfig> newTasks = builder.build();
+    Set<ITaskConfig> newTasks = builder.build();
     if (!newTasks.isEmpty()) {
       stateManager.insertPendingTasks(newTasks);
     }

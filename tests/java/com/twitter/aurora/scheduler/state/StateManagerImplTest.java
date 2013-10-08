@@ -37,11 +37,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.ShardUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.UpdateResult;
@@ -53,6 +51,9 @@ import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.mem.MemStorage;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -87,7 +88,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final JobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
 
   private Driver driver;
-  private Function<TaskConfig, String> taskIdGenerator;
+  private Function<ITaskConfig, String> taskIdGenerator;
   private Closure<PubsubEvent> eventSink;
   private StateManagerImpl stateManager;
   private final FakeClock clock = new FakeClock();
@@ -95,7 +96,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Before
   public void setUp() throws Exception {
-    taskIdGenerator = createMock(new Clazz<Function<TaskConfig, String>>() { });
+    taskIdGenerator = createMock(new Clazz<Function<ITaskConfig, String>>() { });
     driver = createMock(Driver.class);
     eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
     // TODO(William Farner): Use a mocked storage.
@@ -172,7 +173,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testKillPendingTask() {
-    TaskConfig task = makeTask(JIM, MY_JOB, 0);
+    ITaskConfig task = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
     expect(taskIdGenerator.apply(task)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
@@ -187,7 +188,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testLostKillingTask() {
-    TaskConfig task = makeTask(JIM, MY_JOB, 0);
+    ITaskConfig task = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
     expect(taskIdGenerator.apply(task)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING);
@@ -207,7 +208,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testUpdate() throws Exception {
-    TaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
+    ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
     expect(taskIdGenerator.apply(taskInfo)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
@@ -237,12 +238,12 @@ public class StateManagerImplTest extends EasyMockTest {
     // Otherwise, the schedule would lose the persisted update configuration, and fail
     // to reschedule tasks.
 
-    TaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
+    ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String id = "a";
     expect(taskIdGenerator.apply(taskInfo)).andReturn("a");
     expectStateTransitions(id, INIT, PENDING, ASSIGNED, UPDATING, FINISHED);
 
-    TaskConfig updated = taskInfo.deepCopy().setNumCpus(1000);
+    ITaskConfig updated = ITaskConfig.build(taskInfo.newBuilder().setNumCpus(1000));
     String updatedId = "a-updated";
     expect(taskIdGenerator.apply(updated)).andReturn(updatedId);
     expectStateTransitions(updatedId, INIT, PENDING, ASSIGNED, ROLLBACK, FINISHED);
@@ -291,11 +292,11 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testUpdatingToRollback() throws Exception {
-    TaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
+    ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String id = "a";
     expect(taskIdGenerator.apply(taskInfo)).andReturn(id);
     expectStateTransitions(id, INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, ROLLBACK);
-    TaskConfig updated = taskInfo.deepCopy().setNumCpus(1000);
+    ITaskConfig updated = ITaskConfig.build(taskInfo.newBuilder().setNumCpus(1000));
     driver.killTask(EasyMock.<String>anyObject());
     expectLastCall().times(2);
     control.replay();
@@ -316,12 +317,12 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testRollbackToUpdating() throws Exception {
-    TaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
+    ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String id = "a";
     expect(taskIdGenerator.apply(taskInfo)).andReturn(id);
     expectStateTransitions(id, INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, KILLED);
 
-    TaskConfig newConfig = taskInfo.deepCopy().setNumCpus(1000);
+    ITaskConfig newConfig = ITaskConfig.build(taskInfo.newBuilder().setNumCpus(1000));
     String newTaskId = "a-rescheduled";
     expect(taskIdGenerator.apply(newConfig)).andReturn(newTaskId);
     expectStateTransitions(
@@ -351,7 +352,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testRollback() throws Exception {
-    TaskConfig taskInfo = makeTaskWithPorts(JIM, MY_JOB, 0, "foo");
+    ITaskConfig taskInfo = makeTaskWithPorts(JIM, MY_JOB, 0, "foo");
     String taskId = "a";
     expect(taskIdGenerator.apply(taskInfo)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, FINISHED);
@@ -372,7 +373,7 @@ public class StateManagerImplTest extends EasyMockTest {
     insertTasks(taskInfo);
     stateManager.assignTask(taskId, HOST_A, SlaveID.newBuilder().setValue(HOST_A).build(),
         ImmutableSet.<Integer>of(50));
-    ScheduledTask task = Iterables.getOnlyElement(
+    IScheduledTask task = Iterables.getOnlyElement(
         Storage.Util.consistentFetchTasks(storage, Query.roleScoped(JIM.getRole())));
     assertEquals(ImmutableMap.of("foo", 50), task.getAssignedTask().getAssignedPorts());
     assignTask(taskId, HOST_A);
@@ -383,7 +384,7 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(taskId, UPDATING);
     changeState(taskId, FINISHED);
 
-    AssignedTask updated = stateManager.assignTask(newTaskId, HOST_A,
+    IAssignedTask updated = stateManager.assignTask(newTaskId, HOST_A,
         SlaveID.newBuilder().setValue(HOST_A).build(),
         ImmutableSet.<Integer>of(51));
 
@@ -392,7 +393,7 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(newTaskId, ROLLBACK);
     changeState(newTaskId, FINISHED);
 
-    AssignedTask rolledBack = stateManager.assignTask(rolledBackId, HOST_A,
+    IAssignedTask rolledBack = stateManager.assignTask(rolledBackId, HOST_A,
         SlaveID.newBuilder().setValue(HOST_A).build(),
         ImmutableSet.<Integer>of(52));
     assertEquals(ImmutableMap.of("foo", 52), rolledBack.getAssignedPorts());
@@ -401,7 +402,7 @@ public class StateManagerImplTest extends EasyMockTest {
   @Test
   public void testNestedEvents() {
     String id = "a";
-    TaskConfig task = makeTask(JIM, MY_JOB, 0);
+    ITaskConfig task = makeTask(JIM, MY_JOB, 0);
     expect(taskIdGenerator.apply(task)).andReturn(id);
 
     // Trigger an event that produces a side-effect and a PubSub event .
@@ -424,7 +425,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testDeleteTask() {
-    TaskConfig task = makeTask(JIM, MY_JOB, 0);
+    ITaskConfig task = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
     expect(taskIdGenerator.apply(task)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
@@ -458,7 +459,7 @@ public class StateManagerImplTest extends EasyMockTest {
     }
   }
 
-  private void insertTasks(TaskConfig... tasks) {
+  private void insertTasks(ITaskConfig... tasks) {
     stateManager.insertPendingTasks(ImmutableSet.copyOf(tasks));
   }
 
@@ -466,24 +467,23 @@ public class StateManagerImplTest extends EasyMockTest {
     return stateManager.changeState(Query.taskScoped(taskId), status, Optional.<String>absent());
   }
 
-  private static TaskConfig makeTask(Identity owner, String job, int shard) {
-    return new TaskConfig()
+  private static ITaskConfig makeTask(Identity owner, String job, int shard) {
+    return ITaskConfig.build(new TaskConfig()
         .setOwner(owner)
         .setEnvironment(DEFAULT_ENVIRONMENT)
         .setJobName(job)
         .setShardId(shard)
-        .setRequestedPorts(ImmutableSet.<String>of());
+        .setRequestedPorts(ImmutableSet.<String>of()));
   }
 
-  private static TaskConfig makeTaskWithPorts(
+  private static ITaskConfig makeTaskWithPorts(
       Identity owner,
       String job,
       int shard,
       String... requestedPorts) {
 
-    TaskConfig task = makeTask(owner, job, shard);
-    task.setRequestedPorts(ImmutableSet.<String>builder().add(requestedPorts).build());
-    return task;
+    return ITaskConfig.build(makeTask(owner, job, shard).newBuilder()
+        .setRequestedPorts(ImmutableSet.<String>builder().add(requestedPorts).build()));
   }
 
   private void assignTask(String taskId, String host) {

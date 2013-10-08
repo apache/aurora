@@ -45,6 +45,8 @@ import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
@@ -66,6 +68,7 @@ public class CronJobManagerTest extends EasyMockTest {
   private static final String OWNER = "owner";
   private static final String ENVIRONMENT = "staging11";
   private static final String JOB_NAME = "jobName";
+  private static final IScheduledTask TASK = IScheduledTask.build(new ScheduledTask());
 
   private SchedulerCore scheduler;
   private StateManagerImpl stateManager;
@@ -117,7 +120,7 @@ public class CronJobManagerTest extends EasyMockTest {
         .andReturn(Optional.of(parsedConfiguration.getJobConfig()));
   }
 
-  private IExpectationSetters<?> expectActiveTaskFetch(ScheduledTask... activeTasks) {
+  private IExpectationSetters<?> expectActiveTaskFetch(IScheduledTask... activeTasks) {
     return storageUtil.expectTaskFetch(Query.jobScoped(job.getKey()).active(), activeTasks);
   }
 
@@ -167,7 +170,7 @@ public class CronJobManagerTest extends EasyMockTest {
     expectJobFetch();
 
     // Query to test if live tasks exist for the job.
-    expectActiveTaskFetch(new ScheduledTask());
+    expectActiveTaskFetch(TASK);
 
     // Live tasks exist, so the cron manager must delay the cron launch.
     delayExecutor.execute(capture(delayLaunchCapture));
@@ -176,7 +179,7 @@ public class CronJobManagerTest extends EasyMockTest {
     scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
 
     // Immediate query and delayed query.
-    expectActiveTaskFetch(new ScheduledTask()).times(2);
+    expectActiveTaskFetch(TASK).times(2);
 
     // Simulate the live task disappearing.
     expectActiveTaskFetch();
@@ -196,7 +199,7 @@ public class CronJobManagerTest extends EasyMockTest {
     expectJobFetch();
 
     // Query to test if live tasks exist for the job.
-    expectActiveTaskFetch(new ScheduledTask());
+    expectActiveTaskFetch(TASK);
 
     // Live tasks exist, so the cron manager must delay the cron launch.
     delayExecutor.execute(capture(delayLaunchCapture));
@@ -205,17 +208,17 @@ public class CronJobManagerTest extends EasyMockTest {
     scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
 
     // Immediate query and delayed query.
-    expectActiveTaskFetch(new ScheduledTask()).times(2);
+    expectActiveTaskFetch(TASK).times(2);
 
     // Simulate the live task disappearing.
     expectActiveTaskFetch();
 
     // Round two.
     expectJobFetch();
-    expectActiveTaskFetch(new ScheduledTask());
+    expectActiveTaskFetch(TASK);
     delayExecutor.execute(capture(delayLaunchCapture));
     scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
-    expectActiveTaskFetch(new ScheduledTask()).times(2);
+    expectActiveTaskFetch(TASK).times(2);
     expectActiveTaskFetch();
 
     stateManager.insertPendingTasks(parsedConfiguration.getTaskConfigs());
@@ -239,7 +242,7 @@ public class CronJobManagerTest extends EasyMockTest {
     expectJobFetch();
 
     // Query to test if live tasks exist for the job.
-    expectActiveTaskFetch(new ScheduledTask()).times(3);
+    expectActiveTaskFetch(TASK).times(3);
 
     // Live tasks exist, so the cron manager must delay the cron launch.
     delayExecutor.execute(capture(delayLaunchCapture));
@@ -250,7 +253,7 @@ public class CronJobManagerTest extends EasyMockTest {
     expectLastCall().times(3);
 
     // Immediate queries and delayed query.
-    expectActiveTaskFetch(new ScheduledTask()).times(4);
+    expectActiveTaskFetch(TASK).times(4);
 
     // Simulate the live task disappearing.
     expectActiveTaskFetch();
@@ -285,17 +288,17 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testRunOverlapNoShardCollision() throws Exception {
-    ScheduledTask scheduledTask = new ScheduledTask()
+    IScheduledTask scheduledTask = IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.RUNNING)
-        .setAssignedTask(new AssignedTask().setTask(defaultTask()));
+        .setAssignedTask(new AssignedTask().setTask(defaultTask())));
     parsedConfiguration =
         ParsedConfiguration.fromUnparsed(job.deepCopy().setCronCollisionPolicy(RUN_OVERLAP));
     expectJobAccepted();
     expectJobFetch();
     expectActiveTaskFetch(scheduledTask);
 
-    stateManager.insertPendingTasks(ImmutableSet.of(
-        parsedConfiguration.getJobConfig().getTaskConfig().deepCopy().setShardId(1)));
+    stateManager.insertPendingTasks(ImmutableSet.of(ITaskConfig.build(
+        parsedConfiguration.getJobConfig().getTaskConfig().deepCopy().setShardId(1))));
 
     control.replay();
 

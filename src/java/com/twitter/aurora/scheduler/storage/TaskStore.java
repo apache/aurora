@@ -20,9 +20,9 @@ import java.util.Set;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
 
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Stores all tasks configured with the scheduler.
@@ -36,14 +36,14 @@ public interface TaskStore {
    * @param query Builder of the query to identify tasks with.
    * @return A read-only view of matching tasks.
    */
-  ImmutableSet<ScheduledTask> fetchTasks(Query.Builder query);
+  ImmutableSet<IScheduledTask> fetchTasks(Query.Builder query);
 
   public interface Mutable extends TaskStore {
 
     /**
      * A convenience interface to allow callers to more concisely implement a task mutation.
      */
-    public interface TaskMutation extends Function<ScheduledTask, ScheduledTask> {
+    public interface TaskMutation extends Function<IScheduledTask, IScheduledTask> {
     }
 
     /**
@@ -54,7 +54,7 @@ public interface TaskStore {
      *
      * @param tasks Tasks to add.
      */
-    void saveTasks(Set<ScheduledTask> tasks);
+    void saveTasks(Set<IScheduledTask> tasks);
 
     /**
      * Removes all tasks from the store.
@@ -76,23 +76,24 @@ public interface TaskStore {
      * @param mutator The mutate operation.
      * @return Immutable copies of only the tasks that were mutated.
      */
-    ImmutableSet<ScheduledTask> mutateTasks(
+    ImmutableSet<IScheduledTask> mutateTasks(
         Query.Builder query,
-        Function<ScheduledTask, ScheduledTask> mutator);
+        Function<IScheduledTask, IScheduledTask> mutator);
 
     /**
      * Rewrites a task's configuration in-place.
      * <p>
      * <b>WARNING</b>: this is a dangerous operation, and should not be used without exercising
      * great care.  This feature should be used as a last-ditch effort to rewrite things that
-     * the scheduler otherwise can't (e.g. {@link TaskConfig#executorConfig}) rewrite in a
+     * the scheduler otherwise can't (e.g. {@link ITaskConfig#executorConfig}) rewrite in a
      * controlled/tested backfill operation.
      *
      * @param taskId ID of the task to alter.
-     * @param taskConfiguration Configuration object to swap with the existing task's configuration.
+     * @param taskConfiguration Configuration object to swap with the existing task's
+     *                          configuration.
      * @return {@code true} if the modification took effect, or {@code false} if the task does not
      *         exist in the store.
      */
-    boolean unsafeModifyInPlace(String taskId, TaskConfig taskConfiguration);
+    boolean unsafeModifyInPlace(String taskId, ITaskConfig taskConfiguration);
   }
 }

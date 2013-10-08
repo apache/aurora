@@ -52,6 +52,8 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work.Quiet;
 import com.twitter.aurora.scheduler.storage.TaskStore;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -163,14 +165,18 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         DEFAULT_OFFER.getRam(),
         Amount.of(DEFAULT_DISK, Data.MB), 2);
 
-    TaskConfig noPortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
-        .setRequestedPorts(ImmutableSet.<String>of());
-    TaskConfig onePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
-        .setRequestedPorts(ImmutableSet.of("one"));
-    TaskConfig twoPortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
-        .setRequestedPorts(ImmutableSet.of("one", "two"));
-    TaskConfig threePortTask = makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
-        .setRequestedPorts(ImmutableSet.of("one", "two", "three"));
+    ITaskConfig noPortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+        .newBuilder()
+        .setRequestedPorts(ImmutableSet.<String>of()));
+    ITaskConfig onePortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+        .newBuilder()
+        .setRequestedPorts(ImmutableSet.of("one")));
+    ITaskConfig twoPortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+        .newBuilder()
+        .setRequestedPorts(ImmutableSet.of("one", "two")));
+    ITaskConfig threePortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+        .newBuilder()
+        .setRequestedPorts(ImmutableSet.of("one", "two", "three")));
 
     Set<Veto> none = ImmutableSet.of();
     assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, noPortTask, TASK_ID));
@@ -434,7 +440,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint jvmConstraint = makeConstraint("jvm", "1.6");
     Constraint zoneConstraint = makeConstraint("zone", "c");
 
-    TaskConfig task = makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint);
+    ITaskConfig task = makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint);
     assertTrue(defaultFilter.filter(DEFAULT_OFFER, HOST_A, task, TASK_ID).isEmpty());
 
     Constraint jvmNegated = jvmConstraint.deepCopy();
@@ -455,7 +461,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertEquals((int) (Veto.MAX_SCORE * 200.0 / DISK.getRange()), DISK.veto(200).getScore());
   }
 
-  private TaskConfig checkConstraint(
+  private ITaskConfig checkConstraint(
       String host,
       String constraintName,
       boolean expected,
@@ -465,7 +471,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return checkConstraint(OWNER_A, JOB_A, host, constraintName, expected, value, vs);
   }
 
-  private TaskConfig checkConstraint(
+  private ITaskConfig checkConstraint(
       Identity owner,
       String jobName,
       String host,
@@ -479,7 +485,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
             ImmutableSet.<String>builder().add(value).addAll(Arrays.asList(vs)).build()));
   }
 
-  private TaskConfig checkConstraint(
+  private ITaskConfig checkConstraint(
       Identity owner,
       String jobName,
       String host,
@@ -488,33 +494,33 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       ValueConstraint value) {
 
     Constraint constraint = new Constraint(constraintName, TaskConstraint.value(value));
-    TaskConfig task = makeTask(owner, jobName, constraint);
+    ITaskConfig task = makeTask(owner, jobName, constraint);
     assertEquals(
         expected,
         defaultFilter.filter(DEFAULT_OFFER, host, task, TASK_ID).isEmpty());
 
     Constraint negated = constraint.deepCopy();
     negated.getConstraint().getValue().setNegated(!value.isNegated());
-    TaskConfig negatedTask = makeTask(owner, jobName, negated);
+    ITaskConfig negatedTask = makeTask(owner, jobName, negated);
     assertEquals(
         !expected,
         defaultFilter.filter(DEFAULT_OFFER, host, negatedTask, TASK_ID).isEmpty());
     return task;
   }
 
-  private void assertNoVetoes(TaskConfig task) {
+  private void assertNoVetoes(ITaskConfig task) {
     assertNoVetoes(task, HOST_A);
   }
 
-  private void assertNoVetoes(TaskConfig task, String host) {
+  private void assertNoVetoes(ITaskConfig task, String host) {
     assertVetoes(task, host);
   }
 
-  private void assertVetoes(TaskConfig task, Veto... vetos) {
+  private void assertVetoes(ITaskConfig task, Veto... vetos) {
     assertVetoes(task, HOST_A, vetos);
   }
 
-  private void assertVetoes(TaskConfig task, String host, Veto... vetoes) {
+  private void assertVetoes(ITaskConfig task, String host, Veto... vetoes) {
     assertEquals(ImmutableSet.copyOf(vetoes),
         defaultFilter.filter(DEFAULT_OFFER, host, task, TASK_ID));
   }
@@ -529,7 +535,9 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         TaskConstraint.value(new ValueConstraint(false, ImmutableSet.copyOf(values))));
   }
 
-  private IExpectationSetters<ImmutableSet<ScheduledTask>> expectGetTasks(ScheduledTask... tasks) {
+  private IExpectationSetters<ImmutableSet<IScheduledTask>> expectGetTasks(
+      IScheduledTask... tasks) {
+
     return expect(taskStore.fetchTasks((Query.Builder) anyObject()))
         .andReturn(ImmutableSet.copyOf(tasks));
   }
@@ -553,53 +561,60 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return expect(attributeStore.getHostAttributes(host)).andReturn(Optional.of(hostAttributes));
   }
 
-  private ScheduledTask makeScheduledTask(Identity owner, String jobName, String host) {
-    return new ScheduledTask().setAssignedTask(
+  private IScheduledTask makeScheduledTask(Identity owner, String jobName, String host) {
+    return IScheduledTask.build(new ScheduledTask().setAssignedTask(
         new AssignedTask()
             .setSlaveHost(host)
             .setTaskId("Task-" + taskIdCounter.incrementAndGet())
-            .setTask(hostLimitTask(owner, jobName, 1 /* Max per host not used here. */)));
+            .setTask(hostLimitTask(owner, jobName, 1 /* Max per host not used here. */)
+                .newBuilder())));
   }
 
   private Constraint limitConstraint(String name, int value) {
     return new Constraint(name, TaskConstraint.limit(new LimitConstraint(value)));
   }
 
-  private TaskConfig makeTask(Identity owner, String jobName, Constraint... constraint) {
-    return makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+  private ITaskConfig makeTask(Identity owner, String jobName, Constraint... constraint) {
+    return ITaskConfig.build(makeTask(OWNER_A, JOB_A, DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
+        .newBuilder()
         .setOwner(owner)
         .setJobName(jobName)
-        .setConstraints(Sets.newHashSet(constraint));
+        .setConstraints(Sets.newHashSet(constraint)));
   }
 
-  private TaskConfig hostLimitTask(Identity owner, String jobName, int maxPerHost) {
+  private ITaskConfig hostLimitTask(Identity owner, String jobName, int maxPerHost) {
     return makeTask(owner, jobName, limitConstraint(HOST_ATTRIBUTE, maxPerHost));
   }
 
-  private TaskConfig hostLimitTask(int maxPerHost) {
+  private ITaskConfig hostLimitTask(int maxPerHost) {
     return hostLimitTask(OWNER_A, JOB_A, maxPerHost);
   }
 
-  private TaskConfig rackLimitTask(Identity owner, String jobName, int maxPerRack) {
+  private ITaskConfig rackLimitTask(Identity owner, String jobName, int maxPerRack) {
     return makeTask(owner, jobName, limitConstraint(RACK_ATTRIBUTE, maxPerRack));
   }
 
-  private TaskConfig makeTask(Identity owner, String jobName, int cpus, long ramMb,
+  private ITaskConfig makeTask(
+      Identity owner,
+      String jobName,
+      int cpus,
+      long ramMb,
       long diskMb) {
-    return ConfigurationManager.applyDefaultsIfUnset(new TaskConfig()
+
+    return ITaskConfig.build(ConfigurationManager.applyDefaultsIfUnset(new TaskConfig()
         .setOwner(owner)
         .setJobName(jobName)
         .setNumCpus(cpus)
         .setRamMb(ramMb)
         .setDiskMb(diskMb)
-        .setExecutorConfig(new ExecutorConfig("aurora", "config")));
+        .setExecutorConfig(new ExecutorConfig("aurora", "config"))));
   }
 
-  private TaskConfig makeTask(int cpus, long ramMb, long diskMb) throws Exception {
+  private ITaskConfig makeTask(int cpus, long ramMb, long diskMb) throws Exception {
     return makeTask(OWNER_A, JOB_A, cpus, ramMb, diskMb);
   }
 
-  private TaskConfig makeTask() throws Exception {
+  private ITaskConfig makeTask() throws Exception {
     return makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK);
   }
 }

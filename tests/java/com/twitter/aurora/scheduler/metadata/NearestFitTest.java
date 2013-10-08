@@ -29,6 +29,7 @@ import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.Vetoed;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeTicker;
@@ -86,8 +87,9 @@ public class NearestFitTest {
     assertNearest();
   }
 
-  private ScheduledTask makeTask() {
-    return new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(TASK));
+  private IScheduledTask makeTask() {
+    return IScheduledTask.build(
+        new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(TASK)));
   }
 
   @Test
@@ -103,9 +105,9 @@ public class NearestFitTest {
   public void testStateChanged() {
     vetoed(ALMOST);
     assertNearest(ALMOST);
-    ScheduledTask task = new ScheduledTask()
+    IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.ASSIGNED)
-        .setAssignedTask(new AssignedTask().setTaskId(TASK));
+        .setAssignedTask(new AssignedTask().setTaskId(TASK)));
     nearest.stateChanged(new TaskStateChange(task, ScheduleStatus.PENDING));
     assertNearest();
   }

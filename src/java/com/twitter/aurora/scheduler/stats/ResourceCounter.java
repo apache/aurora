@@ -19,8 +19,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -32,7 +30,6 @@ import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
@@ -40,6 +37,7 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StorageException;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Computes aggregate metrics about resource allocation and consumption in the scheduler.
@@ -52,7 +50,7 @@ public class ResourceCounter {
     this.storage = Preconditions.checkNotNull(storage);
   }
 
-  private Iterable<TaskConfig> getTasks(Query.Builder query) throws StorageException {
+  private Iterable<ITaskConfig> getTasks(Query.Builder query) throws StorageException {
     return Iterables.transform(
         Storage.Util.consistentFetchTasks(storage, query),
         Tasks.SCHEDULED_TO_INFO);
@@ -71,7 +69,7 @@ public class ResourceCounter {
         new GlobalMetric(MetricType.QUOTA_CONSUMED),
         new GlobalMetric(MetricType.FREE_POOL_CONSUMED));
 
-    for (TaskConfig task : getTasks(Query.unscoped().active())) {
+    for (ITaskConfig task : getTasks(Query.unscoped().active())) {
       for (GlobalMetric count : counts) {
         count.accumulate(task);
       }
@@ -109,8 +107,8 @@ public class ResourceCounter {
    */
   public <K> Map<K, Metric> computeAggregates(
       Query.Builder query,
-      Predicate<TaskConfig> filter,
-      Function<TaskConfig, K> keyFunction) throws StorageException {
+      Predicate<ITaskConfig> filter,
+      Function<ITaskConfig, K> keyFunction) throws StorageException {
 
     LoadingCache<K, Metric> metrics = CacheBuilder.newBuilder()
         .build(new CacheLoader<K, Metric>() {
@@ -118,33 +116,33 @@ public class ResourceCounter {
             return new Metric();
           }
         });
-    for (TaskConfig task : Iterables.filter(getTasks(query), filter)) {
+    for (ITaskConfig task : Iterables.filter(getTasks(query), filter)) {
       metrics.getUnchecked(keyFunction.apply(task)).accumulate(task);
     }
     return metrics.asMap();
   }
 
   public enum MetricType {
-    TOTAL_CONSUMED(Predicates.<TaskConfig>alwaysTrue()),
-    DEDICATED_CONSUMED(new Predicate<TaskConfig>() {
-      @Override public boolean apply(@Nullable TaskConfig task) {
+    TOTAL_CONSUMED(Predicates.<ITaskConfig>alwaysTrue()),
+    DEDICATED_CONSUMED(new Predicate<ITaskConfig>() {
+      @Override public boolean apply(ITaskConfig task) {
         return ConfigurationManager.isDedicated(task);
       }
     }),
-    QUOTA_CONSUMED(new Predicate<TaskConfig>() {
-      @Override public boolean apply(TaskConfig task) {
+    QUOTA_CONSUMED(new Predicate<ITaskConfig>() {
+      @Override public boolean apply(ITaskConfig task) {
         return task.isProduction();
       }
     }),
-    FREE_POOL_CONSUMED(new Predicate<TaskConfig>() {
-      @Override public boolean apply(TaskConfig task) {
+    FREE_POOL_CONSUMED(new Predicate<ITaskConfig>() {
+      @Override public boolean apply(ITaskConfig task) {
         return !ConfigurationManager.isDedicated(task) && !task.isProduction();
       }
     });
 
-    public final Predicate<TaskConfig> filter;
+    public final Predicate<ITaskConfig> filter;
 
-    MetricType(Predicate<TaskConfig> filter) {
+    MetricType(Predicate<ITaskConfig> filter) {
       this.filter = filter;
     }
   }
@@ -157,7 +155,7 @@ public class ResourceCounter {
     }
 
     @Override
-    protected void accumulate(TaskConfig task) {
+    protected void accumulate(ITaskConfig task) {
       if (type.filter.apply(task)) {
         super.accumulate(task);
       }
@@ -181,10 +179,10 @@ public class ResourceCounter {
       this.diskMb = copy.diskMb;
     }
 
-    protected void accumulate(TaskConfig task) {
-      cpu += task.numCpus;
-      ramMb += task.ramMb;
-      diskMb += task.diskMb;
+    protected void accumulate(ITaskConfig task) {
+      cpu += task.getNumCpus();
+      ramMb += task.getRamMb();
+      diskMb += task.getDiskMb();
     }
 
     protected void accumulate(Quota quota) {

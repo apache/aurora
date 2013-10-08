@@ -48,10 +48,7 @@ import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.aurora.gen.CronCollisionPolicy;
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -60,6 +57,9 @@ import com.twitter.aurora.scheduler.quota.QuotaManager;
 import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -116,7 +116,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
           return;
         }
 
-        Map<JobKey, Map<?, ?>> cronJobs = fetchCronJobsBy(role.get(), environment);
+        Map<IJobKey, Map<?, ?>> cronJobs = fetchCronJobsBy(role.get(), environment);
         List<Job> jobs = fetchJobsBy(role.get(), environment, cronJobs);
         if (jobs.isEmpty() && cronJobs.isEmpty()) {
           String msg = "No jobs found for role " + role.get()
@@ -143,7 +143,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
   }
 
   private Quota getNonProdConsumption(String role) {
-    FluentIterable<TaskConfig> tasks = FluentIterable
+    FluentIterable<ITaskConfig> tasks = FluentIterable
         .from(Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(role).active()))
         .transform(Tasks.SCHEDULED_TO_INFO)
         .filter(Predicates.not(Tasks.IS_PRODUCTION));
@@ -163,22 +163,21 @@ public class SchedulerzRole extends JerseyTemplateServlet {
 
     Optional<String> env = Optional.of(environment);
     if (env.isPresent() && env.get().isEmpty()) {
-      env = Optional.<String>absent();
+      env = Optional.absent();
     }
 
     return processRequest(Optional.of(role), env);
   }
 
-  private Map<JobKey, Map<?, ?>> fetchCronJobsBy(
+  private Map<IJobKey, Map<?, ?>> fetchCronJobsBy(
       final String role,
       final Optional<String> environment) {
 
     Predicate<JobConfiguration> byRoleEnv = new Predicate<JobConfiguration>() {
       @Override public boolean apply(JobConfiguration job) {
         boolean roleMatch = job.getOwner().getRole().equals(role);
-        boolean envMatch =  environment.isPresent()
-            ? job.getKey().getEnvironment().equals(environment.get())
-            : true;
+        boolean envMatch = !environment.isPresent()
+            || job.getKey().getEnvironment().equals(environment.get());
         return roleMatch && envMatch;
       }
     };
@@ -212,8 +211,8 @@ public class SchedulerzRole extends JerseyTemplateServlet {
     Set<String> packages = Sets.newHashSet();
 
     // Insert all packages for all tasks in the set to eliminate duplicates
-    TaskConfig task = job.getTaskConfig();
-    if (task.getPackagesSize() > 0) {
+    ITaskConfig task = ITaskConfig.build(job.getTaskConfig());
+    if (!task.getPackages().isEmpty()) {
       packages.addAll(Lists.newArrayList(
           Iterables.transform(task.getPackages(), TransformationUtils.PACKAGE_TOSTRING)));
     }
@@ -223,19 +222,19 @@ public class SchedulerzRole extends JerseyTemplateServlet {
   private List<Job> fetchJobsBy(
       final String role,
       final Optional<String> environment,
-      final Map<JobKey, Map<?, ?>> cronJobs) {
+      final Map<IJobKey, Map<?, ?>> cronJobs) {
 
-    final Function<Map.Entry<JobKey, Collection<ScheduledTask>>, Job> toJob =
-        new Function<Map.Entry<JobKey, Collection<ScheduledTask>>, Job>() {
-          @Override public Job apply(Map.Entry<JobKey, Collection<ScheduledTask>> tasksByJobKey) {
-            JobKey jobKey = tasksByJobKey.getKey();
-            Collection<ScheduledTask> tasks = tasksByJobKey.getValue();
+    final Function<Map.Entry<IJobKey, Collection<IScheduledTask>>, Job> toJob =
+        new Function<Map.Entry<IJobKey, Collection<IScheduledTask>>, Job>() {
+          @Override public Job apply(Map.Entry<IJobKey, Collection<IScheduledTask>> tasksByJobKey) {
+            IJobKey jobKey = tasksByJobKey.getKey();
+            Collection<IScheduledTask> tasks = tasksByJobKey.getValue();
 
             Job job = new Job();
             job.environment = jobKey.getEnvironment();
             job.name = jobKey.getName();
 
-            TaskConfig config = Iterables.get(tasks, 0).getAssignedTask().getTask();
+            ITaskConfig config = Iterables.get(tasks, 0).getAssignedTask().getTask();
             job.production = config.isProduction();
 
             // TODO(Suman Karumuri): Add a source/job type to TaskConfig and replace logic below
@@ -247,7 +246,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
               job.type = JobType.ADHOC;
             }
 
-            for (ScheduledTask task : tasks) {
+            for (IScheduledTask task : tasks) {
               switch (task.getStatus()) {
                 case INIT:
                 case PENDING:
@@ -296,7 +295,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         ? Query.envScoped(role, environment.get())
         : Query.roleScoped(role);
 
-    Multimap<JobKey, ScheduledTask> tasks =
+    Multimap<IJobKey, IScheduledTask> tasks =
         Tasks.byJobKey(Storage.Util.weaklyConsistentFetchTasks(storage, query));
 
     Iterable<Job> jobs = FluentIterable

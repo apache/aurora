@@ -35,6 +35,7 @@ import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -93,8 +94,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testUseAllQuota() {
-    ScheduledTask task1 = createTask("foo", "id1", 1, 1, 1);
-    ScheduledTask task2 = createTask("foo", "id2", 1, 1, 1);
+    IScheduledTask task1 = createTask("foo", "id1", 1, 1, 1);
+    IScheduledTask task2 = createTask("foo", "id2", 1, 1, 1);
 
     storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2)).anyTimes();
@@ -147,8 +148,9 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testNonproductionUnaccounted() {
-    ScheduledTask task = createTask("foo", "id1", 3, 3, 3);
-    task.getAssignedTask().getTask().setProduction(false);
+    ScheduledTask builder = createTask("foo", "id1", 3, 3, 3).newBuilder();
+    builder.getAssignedTask().getTask().setProduction(false);
+    IScheduledTask task = IScheduledTask.build(builder);
 
     storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2));
@@ -162,8 +164,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testUpdating() {
-    ScheduledTask task = createTask("bar", "id1", 1, 1, 1);
-    ScheduledTask updatingTask = createTask("foo", "id1", 1, 1, 1);
+    IScheduledTask task = createTask("bar", "id1", 1, 1, 1);
+    IScheduledTask updatingTask = createTask("foo", "id1", 1, 1, 1);
 
     storageUtil.expectOperations();
     applyQuota(new Quota(4, 4, 4)).anyTimes();
@@ -175,7 +177,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
             JobKeys.from(ROLE, "env", "foo"),
             "token",
             ImmutableSet.of(new TaskUpdateConfiguration(
-                updatingTask.getAssignedTask().getTask(),
+                updatingTask.getAssignedTask().getTask().newBuilder(),
                 createTaskConfig("foo", 2, 2, 2)))))).anyTimes();
 
     control.replay();
@@ -184,7 +186,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     assertFalse(quotaManager.hasRemaining(ROLE, new Quota(2, 2, 2)));
   }
 
-  private IExpectationSetters<?> returnTasks(ScheduledTask... tasks) {
+  private IExpectationSetters<?> returnTasks(IScheduledTask... tasks) {
     return storageUtil.expectTaskFetch(ACTIVE_QUERY, tasks);
   }
 
@@ -204,13 +206,19 @@ public class QuotaManagerImplTest extends EasyMockTest {
     return expect(storageUtil.quotaStore.fetchQuota(ROLE)).andReturn(Optional.of(quota));
   }
 
-  private ScheduledTask createTask(String jobName, String taskId, int cpus, int ramMb, int diskMb) {
-    return new ScheduledTask()
+  private IScheduledTask createTask(
+      String jobName,
+      String taskId,
+      int cpus,
+      int ramMb,
+      int diskMb) {
+
+    return IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.RUNNING)
         .setAssignedTask(
             new AssignedTask()
                 .setTaskId(taskId)
-                .setTask(createTaskConfig(jobName, cpus, ramMb, diskMb)));
+                .setTask(createTaskConfig(jobName, cpus, ramMb, diskMb))));
   }
 
   private TaskConfig createTaskConfig(String jobName, int cpus, int ramMb, int diskMb) {

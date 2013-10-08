@@ -47,6 +47,7 @@ import com.twitter.aurora.scheduler.storage.backup.Recovery.RecoveryImpl;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import com.twitter.aurora.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.base.Command;
 import com.twitter.common.io.FileUtils;
 import com.twitter.common.quantity.Amount;
@@ -114,7 +115,9 @@ public class RecoveryTest extends EasyMockTest {
     assertEquals(ImmutableSet.of(backup1), recovery.listBackups());
 
     recovery.stage(backup1);
-    assertEquals(SNAPSHOT1.getTasks(), recovery.query(Query.unscoped()));
+    assertEquals(
+        IScheduledTask.setFromBuilders(SNAPSHOT1.getTasks()),
+        recovery.query(Query.unscoped()));
     recovery.commit();
     transaction.getValue().apply(storeProvider);
   }
@@ -134,9 +137,13 @@ public class RecoveryTest extends EasyMockTest {
     storageBackup.createSnapshot();
     String backup1 = storageBackup.createBackupName();
     recovery.stage(backup1);
-    assertEquals(SNAPSHOT1.getTasks(), recovery.query(Query.unscoped()));
+    assertEquals(
+        IScheduledTask.setFromBuilders(SNAPSHOT1.getTasks()),
+        recovery.query(Query.unscoped()));
     recovery.deleteTasks(Query.taskScoped(Tasks.id(TASK2)));
-    assertEquals(modified.getTasks(), recovery.query(Query.unscoped()));
+    assertEquals(
+        IScheduledTask.setFromBuilders(modified.getTasks()),
+        recovery.query(Query.unscoped()));
     recovery.commit();
     transaction.getValue().apply(storeProvider);
   }

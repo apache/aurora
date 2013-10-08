@@ -32,9 +32,9 @@ import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -153,7 +153,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void saveTasks(Set<ScheduledTask> tasks) throws IllegalStateException {
+  public void saveTasks(Set<IScheduledTask> tasks) throws IllegalStateException {
     taskStore.saveTasks(tasks);
   }
 
@@ -168,20 +168,20 @@ public class ForwardingStore implements
   }
 
   @Override
-  public ImmutableSet<ScheduledTask> mutateTasks(
+  public ImmutableSet<IScheduledTask> mutateTasks(
       Query.Builder query,
-      Function<ScheduledTask, ScheduledTask> mutator) {
+      Function<IScheduledTask, IScheduledTask> mutator) {
 
     return taskStore.mutateTasks(query, mutator);
   }
 
   @Override
-  public boolean unsafeModifyInPlace(String taskId, TaskConfig taskConfiguration) {
+  public boolean unsafeModifyInPlace(String taskId, ITaskConfig taskConfiguration) {
     return taskStore.unsafeModifyInPlace(taskId, taskConfiguration);
   }
 
   @Override
-  public ImmutableSet<ScheduledTask> fetchTasks(Query.Builder querySupplier) {
+  public ImmutableSet<IScheduledTask> fetchTasks(Query.Builder querySupplier) {
     return taskStore.fetchTasks(querySupplier);
   }
 

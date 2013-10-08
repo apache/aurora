@@ -58,6 +58,7 @@ import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.StorageException;
 import com.twitter.aurora.scheduler.storage.TaskStore;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.mem.MemStorage;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -135,11 +136,11 @@ public class TaskSchedulerTest extends EasyMockTest {
   }
 
   private void changeState(
-      ScheduledTask task,
+      IScheduledTask task,
       ScheduleStatus oldState,
       ScheduleStatus newState) {
 
-    final ScheduledTask copy = task.deepCopy().setStatus(newState);
+    final IScheduledTask copy = IScheduledTask.build(task.newBuilder().setStatus(newState));
     // Insert the task if it doesn't already exist.
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
@@ -194,20 +195,20 @@ public class TaskSchedulerTest extends EasyMockTest {
     timeoutCapture.getValue().run();
   }
 
-  private ScheduledTask makeTask(String taskId) {
-    return new ScheduledTask()
+  private IScheduledTask makeTask(String taskId) {
+    return IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTaskId(taskId)
             .setTask(new TaskConfig()
                 .setJobName("job-" + taskId)
                 .setShardId(0)
                 .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))
-                .setEnvironment("env-" + taskId)));
+                .setEnvironment("env-" + taskId))));
   }
 
 
-  private ScheduledTask makeTask(String taskId, ScheduleStatus status) {
-    return makeTask(taskId).setStatus(status);
+  private IScheduledTask makeTask(String taskId, ScheduleStatus status) {
+    return IScheduledTask.build(makeTask(taskId).newBuilder().setStatus(status));
   }
 
   @Test
@@ -216,7 +217,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    final ScheduledTask c = makeTask("c", RUNNING);
+    final IScheduledTask c = makeTask("c", RUNNING);
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider store) {
         store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
@@ -244,7 +245,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectAnyMaintenanceCalls();
     expectOfferDeclineIn(10);
 
-    ScheduledTask task = makeTask("a", PENDING);
+    IScheduledTask task = makeTask("a", PENDING);
     TaskInfo mesosTask = makeTaskInfo(task);
 
     Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
@@ -271,7 +272,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testDriverNotReady() {
-    ScheduledTask task = makeTask("a", PENDING);
+    IScheduledTask task = makeTask("a", PENDING);
     TaskInfo mesosTask = TaskInfo.newBuilder()
         .setName(Tasks.id(task))
         .setTaskId(TaskID.newBuilder().setValue(Tasks.id(task)))
@@ -299,7 +300,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testStorageException() {
-    ScheduledTask task = makeTask("a", PENDING);
+    IScheduledTask task = makeTask("a", PENDING);
     TaskInfo mesosTask = TaskInfo.newBuilder()
         .setName(Tasks.id(task))
         .setTaskId(TaskID.newBuilder().setValue(Tasks.id(task)))
@@ -326,7 +327,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testExpiration() {
-    ScheduledTask task = makeTask("a", PENDING);
+    IScheduledTask task = makeTask("a", PENDING);
 
     Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
     Capture<Runnable> offerExpirationCapture = expectOfferDeclineIn(10);
@@ -377,13 +378,13 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectOffer();
     expect(maintenance.getMode("HOST_A")).andReturn(MaintenanceMode.NONE);
 
-    ScheduledTask taskA = makeTask("A", PENDING);
+    IScheduledTask taskA = makeTask("A", PENDING);
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
     expect(assigner.maybeAssign(OFFER_A, taskA)).andReturn(Optional.of(mesosTaskA));
     driver.launchTask(OFFER_A.getId(), mesosTaskA);
     Capture<Runnable> captureA = expectTaskBackoff(10);
 
-    ScheduledTask taskB = makeTask("B", PENDING);
+    IScheduledTask taskB = makeTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
     expect(assigner.maybeAssign(OFFER_B, taskB)).andReturn(Optional.of(mesosTaskB));
     driver.launchTask(OFFER_B.getId(), mesosTaskB);
@@ -412,13 +413,13 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectOffer();
     expect(maintenance.getMode("HOST_C")).andReturn(MaintenanceMode.DRAINED);
 
-    ScheduledTask taskA = makeTask("A", PENDING);
+    IScheduledTask taskA = makeTask("A", PENDING);
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
     expect(assigner.maybeAssign(OFFER_B, taskA)).andReturn(Optional.of(mesosTaskA));
     driver.launchTask(OFFER_B.getId(), mesosTaskA);
     Capture<Runnable> captureA = expectTaskBackoff(10);
 
-    ScheduledTask taskB = makeTask("B", PENDING);
+    IScheduledTask taskB = makeTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
     expect(assigner.maybeAssign(OFFER_C, taskB)).andReturn(Optional.of(mesosTaskB));
     driver.launchTask(OFFER_C.getId(), mesosTaskB);
@@ -443,9 +444,9 @@ public class TaskSchedulerTest extends EasyMockTest {
     captureB.getValue().run();
   }
 
-  private Capture<ScheduledTask> expectTaskScheduled(ScheduledTask task) {
+  private Capture<IScheduledTask> expectTaskScheduled(IScheduledTask task) {
     TaskInfo mesosTask = makeTaskInfo(task);
-    Capture<ScheduledTask> taskScheduled = createCapture();
+    Capture<IScheduledTask> taskScheduled = createCapture();
     expect(assigner.maybeAssign(EasyMock.<Offer>anyObject(), capture(taskScheduled)))
         .andReturn(Optional.of(mesosTask));
     driver.launchTask(EasyMock.<OfferID>anyObject(), EasyMock.eq(mesosTask));
@@ -459,17 +460,19 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     expectAnyMaintenanceCalls();
 
-    ScheduledTask jobA0 = makeTask("a0", PENDING);
+    IScheduledTask jobA0 = makeTask("a0", PENDING);
 
-    ScheduledTask jobA1 = jobA0.deepCopy();
-    jobA1.getAssignedTask().setTaskId("a1");
-    jobA1.getAssignedTask().getTask().setShardId(1);
+    ScheduledTask jobA1Builder = jobA0.newBuilder();
+    jobA1Builder.getAssignedTask().setTaskId("a1");
+    jobA1Builder.getAssignedTask().getTask().setShardId(1);
+    IScheduledTask jobA1 = IScheduledTask.build(jobA1Builder);
 
-    ScheduledTask jobA2 = jobA0.deepCopy();
-    jobA2.getAssignedTask().setTaskId("a2");
-    jobA2.getAssignedTask().getTask().setShardId(2);
+    ScheduledTask jobA2Builder = jobA0.newBuilder();
+    jobA2Builder.getAssignedTask().setTaskId("a2");
+    jobA2Builder.getAssignedTask().getTask().setShardId(2);
+    IScheduledTask jobA2 = IScheduledTask.build(jobA2Builder);
 
-    ScheduledTask jobB0 = makeTask("b0", PENDING);
+    IScheduledTask jobB0 = makeTask("b0", PENDING);
 
     expectOfferDeclineIn(10);
     expectOfferDeclineIn(10);
@@ -479,8 +482,8 @@ public class TaskSchedulerTest extends EasyMockTest {
     Capture<Runnable> timeoutA = expectTaskBackoff(10);
     Capture<Runnable> timeoutB = expectTaskBackoff(10);
 
-    Capture<ScheduledTask> firstScheduled = expectTaskScheduled(jobA0);
-    Capture<ScheduledTask> secondScheduled = expectTaskScheduled(jobB0);
+    Capture<IScheduledTask> firstScheduled = expectTaskScheduled(jobA0);
+    Capture<IScheduledTask> secondScheduled = expectTaskScheduled(jobB0);
 
     // Expect another watch of the task group for job A.
     expectTaskBackoff(10);
@@ -507,7 +510,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectAnyMaintenanceCalls();
     expectOfferDeclineIn(10);
 
-    final ScheduledTask task = makeTask("a", PENDING);
+    final IScheduledTask task = makeTask("a", PENDING);
 
     Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.<TaskInfo>absent());
@@ -530,7 +533,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     timeoutCapture.getValue().run();
   }
 
-  private TaskInfo makeTaskInfo(ScheduledTask task) {
+  private TaskInfo makeTaskInfo(IScheduledTask task) {
     return TaskInfo.newBuilder()
         .setName(Tasks.id(task))
         .setTaskId(TaskID.newBuilder().setValue(Tasks.id(task)))

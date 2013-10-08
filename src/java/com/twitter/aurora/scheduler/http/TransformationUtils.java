@@ -22,16 +22,16 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Range;
 
-import com.twitter.aurora.gen.Package;
 import com.twitter.aurora.scheduler.base.Numbers;
+import com.twitter.aurora.scheduler.storage.entities.IPackage;
 
 /**
  * Utility class to hold common object to string transformation helper functions.
  */
 final class TransformationUtils {
-  public static final Function<Package, String> PACKAGE_TOSTRING =
-      new Function<Package, String>() {
-        @Override public String apply(Package pkg) {
+  public static final Function<IPackage, String> PACKAGE_TOSTRING =
+      new Function<IPackage, String>() {
+        @Override public String apply(IPackage pkg) {
           return pkg.getRole() + "/" + pkg.getName() + " v" + pkg.getVersion();
         }
       };

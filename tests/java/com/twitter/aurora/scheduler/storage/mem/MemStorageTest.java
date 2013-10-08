@@ -34,7 +34,6 @@ import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
@@ -44,6 +43,7 @@ import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
@@ -106,14 +106,14 @@ public class MemStorageTest extends TearDownTestCase {
     assertEquals("slowResult", future.get());
   }
 
-  private ScheduledTask makeTask(String taskId) {
-    return new ScheduledTask().setAssignedTask(
+  private IScheduledTask makeTask(String taskId) {
+    return IScheduledTask.build(new ScheduledTask().setAssignedTask(
         new AssignedTask()
             .setTaskId(taskId)
             .setTask(new TaskConfig()
                 .setOwner(new Identity().setRole("owner-" + taskId))
                 .setJobName("job-" + taskId)
-                .setEnvironment("env-" + taskId)));
+                .setEnvironment("env-" + taskId))));
   }
 
   private class CustomException extends RuntimeException {
@@ -169,10 +169,6 @@ public class MemStorageTest extends TearDownTestCase {
     expectWriteFail(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(makeTask("a")));
-        ScheduledTask a = Iterables.getOnlyElement(
-            storeProvider.getUnsafeTaskStore().fetchTasks(Query.taskScoped("a")));
-        a.setStatus(ScheduleStatus.RUNNING)
-            .setAncestorId("z");
         throw new CustomException();
       }
     });

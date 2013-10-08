@@ -72,6 +72,8 @@ import com.twitter.aurora.scheduler.state.SchedulerCore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.aurora.scheduler.thrift.aop.AopModule;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -223,10 +225,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testKillTasksImmediate() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-    ScheduledTask task = new ScheduledTask()
+    IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTask(new TaskConfig()
-                .setOwner(ROLE_IDENTITY)));
+                .setOwner(ROLE_IDENTITY))));
 
     expectAuth(ROOT, false);
     expectAuth(ROLE, true);
@@ -243,10 +245,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testKillTasksDelayed() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-    ScheduledTask task = new ScheduledTask()
+    IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTask(new TaskConfig()
-                .setOwner(ROLE_IDENTITY)));
+                .setOwner(ROLE_IDENTITY))));
 
     expectAuth(ROOT, false);
     expectAuth(ROLE, true);
@@ -264,10 +266,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testKillTasksAuthFailure() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-    ScheduledTask task = new ScheduledTask()
+    IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTask(new TaskConfig()
-                .setOwner(ROLE_IDENTITY)));
+                .setOwner(ROLE_IDENTITY))));
 
     expectAuth(ROOT, false);
     expectAuth(ROLE, false);
@@ -576,8 +578,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TaskConfig storedConfig = productionTask();
     TaskConfig modifiedConfig =
         storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
-    ScheduledTask storedTask =
-        new ScheduledTask().setAssignedTask(new AssignedTask().setTask(storedConfig));
+    IScheduledTask storedTask = IScheduledTask.build(
+        new ScheduledTask().setAssignedTask(new AssignedTask().setTask(storedConfig)));
     ShardKey shardKey = new ShardKey(
         JobKeys.from(
             storedConfig.getOwner().getRole(),
@@ -600,13 +602,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testRewriteShard() throws Exception {
     TaskConfig storedConfig = productionTask();
-    TaskConfig modifiedConfig =
-        storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
+    ITaskConfig modifiedConfig = ITaskConfig.build(
+        storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig("aurora", "rewritten")));
     String taskId = "task_id";
-    ScheduledTask storedTask = new ScheduledTask().setAssignedTask(
+    IScheduledTask storedTask = IScheduledTask.build(new ScheduledTask().setAssignedTask(
         new AssignedTask()
             .setTaskId(taskId)
-            .setTask(storedConfig));
+            .setTask(storedConfig)));
     ShardKey shardKey = new ShardKey(
         JobKeys.from(
             storedConfig.getOwner().getRole(),
@@ -619,13 +621,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         Query.shardScoped(shardKey.getJobKey(), shardKey.getShardId()).active(), storedTask);
     expect(storageUtil.taskStore.unsafeModifyInPlace(
         taskId,
-        ConfigurationManager.applyDefaultsIfUnset(modifiedConfig))).andReturn(true);
+        ITaskConfig.build(ConfigurationManager.applyDefaultsIfUnset(modifiedConfig.newBuilder()))))
+        .andReturn(true);
 
     control.replay();
 
     RewriteConfigsRequest request = new RewriteConfigsRequest(
         ImmutableList.of(ConfigRewrite.shardRewrite(
-            new ShardConfigRewrite(shardKey, storedConfig, modifiedConfig))));
+            new ShardConfigRewrite(shardKey, storedConfig, modifiedConfig.newBuilder()))));
     assertEquals(OK, thrift.rewriteConfigs(request, SESSION).getResponseCode());
   }
 
@@ -821,8 +824,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration ownedCronJob = makeJob()
         .setCronSchedule("0 * * * *")
         .setTaskConfig(ownedCronJobTask);
-    ScheduledTask ownedCronJobScheduledTask = new ScheduledTask()
-        .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask));
+    IScheduledTask ownedCronJobScheduledTask = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask)));
     Identity otherOwner = new Identity("other", "other");
     JobConfiguration unownedCronJob = makeJob()
         .setOwner(otherOwner)
@@ -835,9 +838,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Set<JobConfiguration> ownedCronJobOnly = ImmutableSet.of(ownedCronJob);
     Set<JobConfiguration> unownedCronJobOnly = ImmutableSet.of(unownedCronJob);
     Set<JobConfiguration> bothCronJobs = ImmutableSet.of(ownedCronJob, unownedCronJob);
-    ScheduledTask ownedImmediateTask = new ScheduledTask()
+    IScheduledTask ownedImmediateTask = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(
-            new AssignedTask().setTask(ownedImmediateTaskInfo));
+            new AssignedTask().setTask(ownedImmediateTaskInfo)));
     JobConfiguration ownedImmediateJob = new JobConfiguration()
         .setKey(JOB_KEY.deepCopy().setName("immediate"))
         .setOwner(ROLE_IDENTITY)
@@ -895,9 +898,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TaskConfig immediateTaskConfig = defaultTask(false)
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
-    ScheduledTask immediateTask = new ScheduledTask()
+    IScheduledTask immediateTask = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(
-            new AssignedTask().setTask(immediateTaskConfig));
+            new AssignedTask().setTask(immediateTaskConfig)));
     JobConfiguration immediateJob = new JobConfiguration()
         .setKey(JOB_KEY.deepCopy().setName("immediate"))
         .setOwner(ROLE_IDENTITY)
@@ -940,10 +943,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ImmutableSet.of("foo", ROLE), true);
 
     Query.Builder query = Query.roleScoped("foo");
-    ScheduledTask task = new ScheduledTask()
+    IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTask(new TaskConfig()
-                .setOwner(ROLE_IDENTITY)));
+                .setOwner(ROLE_IDENTITY))));
 
     storageUtil.expectTaskFetch(query, task);
     scheduler.killTasks(query, USER);

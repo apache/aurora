@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 
 import static org.junit.Assert.assertEquals;
 
@@ -40,6 +41,6 @@ public class MnameTest {
   }
 
   private Optional<Integer> getRedirectPort(Map<String, Integer> ports) {
-    return Mname.getRedirectPort(new AssignedTask().setAssignedPorts(ports));
+    return Mname.getRedirectPort(IAssignedTask.build(new AssignedTask().setAssignedPorts(ports)));
   }
 }

@@ -17,6 +17,7 @@ package com.twitter.aurora.scheduler.state;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
@@ -29,7 +30,6 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
@@ -77,6 +77,12 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.StorageBackfill;
+import com.twitter.aurora.scheduler.storage.TaskStore;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IIdentity;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
+import com.twitter.aurora.scheduler.storage.entities.ITaskEvent;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.collections.Pair;
@@ -142,8 +148,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   // TODO(William Farner): Set up explicit expectations for calls to generate task IDs.
   private final AtomicLong idCounter = new AtomicLong();
-  private Function<TaskConfig, String> taskIdGenerator = new Function<TaskConfig, String>() {
-    @Override public String apply(TaskConfig input) {
+  private Function<ITaskConfig, String> taskIdGenerator = new Function<ITaskConfig, String>() {
+    @Override public String apply(ITaskConfig input) {
       return "task-" + idCounter.incrementAndGet();
     }
   };
@@ -214,15 +220,16 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(job);
     assertTaskCount(numTasks);
 
-    Set<ScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, Query.jobScoped(KEY_A));
+    Set<IScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, Query.jobScoped(KEY_A));
     assertEquals(numTasks, tasks.size());
-    for (ScheduledTask state : tasks) {
+    for (IScheduledTask state : tasks) {
       assertEquals(PENDING, state.getStatus());
       assertTrue(state.getAssignedTask().isSetTaskId());
       assertFalse(state.getAssignedTask().isSetSlaveId());
       // Need to clear shard ID since that was assigned when the job is scheduled.
-      state.getAssignedTask().getTask().setShardId(0);
-      assertEquals(populateFields(job.getJobConfig()), state.getAssignedTask().getTask());
+      TaskConfig configBuilder = state.getAssignedTask().getTask().newBuilder()
+          .setShardId(0);
+      assertEquals(populateFields(job.getJobConfig()), configBuilder);
     }
   }
 
@@ -289,13 +296,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       @Override
       protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
-            new ScheduledTask()
-                .setStatus(PENDING)
-                .setTaskEvents(ImmutableList.of(new TaskEvent(100, ScheduleStatus.PENDING)))
-                .setAssignedTask(
-                    new AssignedTask()
-                        .setTaskId(storedTaskId)
-                        .setTask(storedTask))));
+            IScheduledTask.build(
+              new ScheduledTask()
+                  .setStatus(PENDING)
+                  .setTaskEvents(ImmutableList.of(new TaskEvent(100, ScheduleStatus.PENDING)))
+                  .setAssignedTask(
+                      new AssignedTask()
+                          .setTaskId(storedTaskId)
+                          .setTask(storedTask)))));
       }
     });
 
@@ -304,15 +312,14 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assignTask(storedTaskId, SLAVE_ID, SLAVE_HOST_1);
 
     // Since task fields are backfilled with defaults, additional flags should be filled.
-    TaskConfig expected = new TaskConfig(storedTask)
+    ITaskConfig expected = ITaskConfig.build(new TaskConfig(storedTask)
         .setProduction(false)
         .setMaxTaskFailures(1)
         .setExecutorConfig(new ExecutorConfig("AuroraExecutor", "thermosConfig"))
-        .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1)));
-    expected.unsetThermosConfig();
+        .setThermosConfig((ByteBuffer) null)
+        .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1))));
 
     assertEquals(expected, getTask(storedTaskId).getAssignedTask().getTask());
-
     assertEquals(ASSIGNED, getTask(storedTaskId).getStatus());
   }
 
@@ -333,16 +340,16 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     final AtomicInteger taskId = new AtomicInteger();
 
     ParsedConfiguration job = makeJob(KEY_A, 10);
-    final Set<ScheduledTask> badTasks = ImmutableSet.copyOf(Iterables
+    final Set<IScheduledTask> badTasks = ImmutableSet.copyOf(Iterables
         .transform(job.getTaskConfigs(),
-            new Function<TaskConfig, ScheduledTask>() {
-              @Override public ScheduledTask apply(TaskConfig task) {
-                return new ScheduledTask()
+            new Function<ITaskConfig, IScheduledTask>() {
+              @Override public IScheduledTask apply(ITaskConfig task) {
+                return IScheduledTask.build(new ScheduledTask()
                     .setStatus(RUNNING)
                     .setAssignedTask(
                         new AssignedTask()
                             .setTaskId("task-" + taskId.incrementAndGet())
-                            .setTask(task.setShardId(0)));
+                            .setTask(task.newBuilder().setShardId(0))));
               }
             }));
 
@@ -408,8 +415,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    for (ScheduledTask task : getTasks(Query.unscoped())) {
-      assertEquals(OWNER_A, task.getAssignedTask().getTask().getOwner());
+    for (IScheduledTask task : getTasks(Query.unscoped())) {
+      assertEquals(IIdentity.build(OWNER_A), task.getAssignedTask().getTask().getOwner());
     }
   }
 
@@ -660,9 +667,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     // Service tasks will move back into PENDING state after finishing.
     changeStatus(Query.roleScoped(ROLE_A), FINISHED);
-    Set<ScheduledTask> newTasks = getTasksByStatus(PENDING);
+    Set<IScheduledTask> newTasks = getTasksByStatus(PENDING);
     assertEquals(5, newTasks.size());
-    for (ScheduledTask state : newTasks) {
+    for (IScheduledTask state : newTasks) {
       assertEquals(
           getTask(state.getAncestorId()).getAssignedTask().getTask().getShardId(),
           state.getAssignedTask().getTask().getShardId());
@@ -698,7 +705,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       changeStatus(taskId, FAILED);
 
       assertTaskCount(i + 1);
-      ScheduledTask rescheduled = getOnlyTask(Query.unscoped().byStatus(PENDING));
+      IScheduledTask rescheduled = getOnlyTask(Query.unscoped().byStatus(PENDING));
       assertEquals(i, rescheduled.getFailureCount());
     }
 
@@ -725,7 +732,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     // All tasks will move back into PENDING state after getting KILLED.
     changeStatus(Query.roleScoped(ROLE_A), KILLED);
-    Set<ScheduledTask> newTasks = getTasksByStatus(PENDING);
+    Set<IScheduledTask> newTasks = getTasksByStatus(PENDING);
     assertEquals(10, newTasks.size());
     assertEquals(10, getTasksByStatus(KILLED).size());
   }
@@ -775,7 +782,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
       if (i != maxFailures) {
         assertTaskCount(i + 1);
-        ScheduledTask rescheduled = getOnlyTask(Query.unscoped().byStatus(PENDING));
+        IScheduledTask rescheduled = getOnlyTask(Query.unscoped().byStatus(PENDING));
         assertEquals(i, rescheduled.getFailureCount());
       } else {
         assertTaskCount(maxFailures);
@@ -866,7 +873,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(KEY_A, 1));
     assertTaskCount(1);
 
-    Set<ScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, Query.jobScoped(KEY_A));
+    Set<IScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, Query.jobScoped(KEY_A));
     assertEquals(1, tasks.size());
 
     String taskId = Tasks.id(Iterables.get(tasks, 0));
@@ -923,7 +930,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(KEY_A, task, 1));
     assertTaskCount(1);
 
-    Set<ScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, Query.jobScoped(KEY_A));
+    Set<IScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, Query.jobScoped(KEY_A));
     assertEquals(1, tasks.size());
 
     changeStatus(Query.unscoped().byStatus(PENDING), ASSIGNED);
@@ -998,7 +1005,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.killTasks(queryJob(OWNER_A, JOB_A + "2"), OWNER_A.getUser());
     assertTaskCount(5);
 
-    for (ScheduledTask state : Storage.Util.consistentFetchTasks(storage, Query.unscoped())) {
+    for (IScheduledTask state : Storage.Util.consistentFetchTasks(storage, Query.unscoped())) {
       assertEquals(JOB_A, Tasks.getJob(state));
     }
   }
@@ -1030,7 +1037,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertEquals(LOST, getOnlyTask(Query.taskScoped(taskId1)).getStatus());
     assertTrue(getTasks(Query.taskScoped(taskId2)).isEmpty());
 
-    ScheduledTask rescheduled = Iterables.getOnlyElement(getTasksByStatus(PENDING));
+    IScheduledTask rescheduled = Iterables.getOnlyElement(getTasksByStatus(PENDING));
     assertEquals(taskId1, rescheduled.getAncestorId());
   }
 
@@ -1148,16 +1155,16 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   private void verifyUpdate(
-      Set<ScheduledTask> tasks,
+      Set<IScheduledTask> tasks,
       ParsedConfiguration job,
-      Closure<ScheduledTask> updatedTaskChecker) {
+      Closure<IScheduledTask> updatedTaskChecker) {
 
-    Map<Integer, ScheduledTask> fetchedShards =
+    Map<Integer, IScheduledTask> fetchedShards =
         Maps.uniqueIndex(tasks, Tasks.SCHEDULED_TO_SHARD_ID);
-    Map<Integer, TaskConfig> originalConfigsByShard =
+    Map<Integer, ITaskConfig> originalConfigsByShard =
         Maps.uniqueIndex(job.getTaskConfigs(), Tasks.INFO_TO_SHARD_ID);
     assertEquals(originalConfigsByShard.keySet(), fetchedShards.keySet());
-    for (ScheduledTask task : tasks) {
+    for (IScheduledTask task : tasks) {
       updatedTaskChecker.execute(task);
     }
   }
@@ -1171,17 +1178,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       control.replay();
       buildScheduler();
 
-      ParsedConfiguration job = makeJob(KEY_A, productionTask().deepCopy(), numTasks);
-      for (TaskConfig config : job.getTaskConfigs()) {
-        config.setRequestedPorts(OLD_PORTS);
-      }
+      ParsedConfiguration job =
+          makeJob(KEY_A, productionTask().setRequestedPorts(OLD_PORTS), numTasks);
       scheduler.createJob(job);
 
       ParsedConfiguration updatedJob =
-          makeJob(KEY_A, productionTask().deepCopy(), numTasks + additionalTasks);
-      for (TaskConfig config : updatedJob.getTaskConfigs()) {
-        config.setRequestedPorts(NEW_PORTS);
-      }
+          makeJob(KEY_A, productionTask().setRequestedPorts(NEW_PORTS), numTasks + additionalTasks);
       Optional<String> updateToken = scheduler.initiateJobUpdate(updatedJob);
 
       Set<Integer> jobShards = FluentIterable.from(updatedJob.getTaskConfigs())
@@ -1196,8 +1198,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
       scheduler.finishUpdate(KEY_A, USER_A, updateToken, result);
       postUpdate();
-      Set<ScheduledTask> tasks =
-          getTasks(Query.jobScoped(KEY_A).active());
+      Set<IScheduledTask> tasks = getTasks(Query.jobScoped(KEY_A).active());
       verify(tasks, job, updatedJob);
       scheduler.initiateJobUpdate(job);
     }
@@ -1214,7 +1215,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     }
 
     abstract void verify(
-        Set<ScheduledTask> tasks,
+        Set<IScheduledTask> tasks,
         ParsedConfiguration oldJob,
         ParsedConfiguration updatedJob);
   }
@@ -1247,7 +1248,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       }
 
       @Override void verify(
-          Set<ScheduledTask> tasks,
+          Set<IScheduledTask> tasks,
           ParsedConfiguration oldJob,
           ParsedConfiguration updatedJob) {
 
@@ -1266,7 +1267,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     Set<String> ports = ImmutableSet.of("foo");
     TaskConfig task = productionTask().deepCopy().setRequestedPorts(ports);
     scheduler.createJob(makeJob(KEY_A, task, 3));
-    List<String> taskIds = Ordering.natural().sortedCopy(Tasks.ids(getTasksOwnedBy(OWNER_A)));
+    final List<String> taskIds = Ordering.natural().sortedCopy(Tasks.ids(getTasksOwnedBy(OWNER_A)));
 
     Set<Integer> port = ImmutableSet.of(80);
     assignTask(taskIds.get(0), SLAVE_ID, SLAVE_HOST_1, port);
@@ -1276,12 +1277,22 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(Query.roleScoped(ROLE_A), RUNNING);
 
     ParsedConfiguration updatedJob = makeJob(KEY_A, task, 10);
-    Set<String> differentPorts = ImmutableSet.of("different");
+    final Set<String> differentPorts = ImmutableSet.of("different");
     // Change the requested ports on shard 1 to ensure that it (and only it) gets restarted as a
     // part of the update.
-    Iterables.getOnlyElement(Iterables.filter(updatedJob.getTaskConfigs(),
-        Predicates.compose(Predicates.equalTo(1), Tasks.INFO_TO_SHARD_ID)))
-        .setRequestedPorts(differentPorts);
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
+        String id = taskIds.get(0);
+        TaskConfig builder = Iterables.getOnlyElement(taskStore.fetchTasks(Query.taskScoped(id)))
+            .getAssignedTask()
+            .getTask()
+            .newBuilder();
+        taskStore.unsafeModifyInPlace(
+            taskIds.get(0),
+            ITaskConfig.build(builder.setRequestedPorts(differentPorts)));
+      }
+    });
 
     Optional<String> updateToken = scheduler.initiateJobUpdate(updatedJob);
 
@@ -1345,12 +1356,12 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       }
 
       @Override void verify(
-          Set<ScheduledTask> tasks,
+          Set<IScheduledTask> tasks,
           ParsedConfiguration oldJob,
           ParsedConfiguration updatedJob) {
 
-        verifyUpdate(tasks, oldJob, new Closure<ScheduledTask>() {
-          @Override public void execute(ScheduledTask state) {
+        verifyUpdate(tasks, oldJob, new Closure<IScheduledTask>() {
+          @Override public void execute(IScheduledTask state) {
             assertEquals(OLD_PORTS, Tasks.SCHEDULED_TO_INFO.apply(state).getRequestedPorts());
           }
         });
@@ -1408,15 +1419,15 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.finishUpdate(KEY_A, USER_A, updateToken, UpdateResult.FAILED);
   }
 
-  private static Closure<ScheduledTask> verifyPorts(final Set<String> requestedPorts) {
-    return new Closure<ScheduledTask>() {
-      @Override public void execute(ScheduledTask task) {
+  private static Closure<IScheduledTask> verifyPorts(final Set<String> requestedPorts) {
+    return new Closure<IScheduledTask>() {
+      @Override public void execute(IScheduledTask task) {
         assertEquals(requestedPorts, Tasks.SCHEDULED_TO_INFO.apply(task).getRequestedPorts());
       }
     };
   }
-  private static final Closure<ScheduledTask> VERIFY_OLD_TASK = verifyPorts(OLD_PORTS);
-  private static final Closure<ScheduledTask> VERIFY_NEW_TASK = verifyPorts(NEW_PORTS);
+  private static final Closure<IScheduledTask> VERIFY_OLD_TASK = verifyPorts(OLD_PORTS);
+  private static final Closure<IScheduledTask> VERIFY_NEW_TASK = verifyPorts(NEW_PORTS);
 
   @Test
   public void testInvalidTransition() throws Exception {
@@ -1445,7 +1456,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       }
 
       @Override void verify(
-          Set<ScheduledTask> tasks,
+          Set<IScheduledTask> tasks,
           ParsedConfiguration oldJob,
           ParsedConfiguration updatedJob) {
 
@@ -1470,7 +1481,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       }
 
       @Override void verify(
-          Set<ScheduledTask> tasks,
+          Set<IScheduledTask> tasks,
           ParsedConfiguration oldJob,
           ParsedConfiguration updatedJob) {
 
@@ -1507,7 +1518,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       }
 
       @Override void verify(
-          Set<ScheduledTask> tasks,
+          Set<IScheduledTask> tasks,
           ParsedConfiguration oldJob,
           ParsedConfiguration updatedJob) {
 
@@ -1541,7 +1552,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       }
 
       @Override void verify(
-          Set<ScheduledTask> tasks,
+          Set<IScheduledTask> tasks,
           ParsedConfiguration oldJob,
           ParsedConfiguration updatedJob) {
 
@@ -1588,7 +1599,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       }
 
       @Override void verify(
-          Set<ScheduledTask> tasks,
+          Set<IScheduledTask> tasks,
           ParsedConfiguration oldJob,
           ParsedConfiguration updatedJob) {
 
@@ -1632,7 +1643,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       }
 
       @Override void verify(
-          Set<ScheduledTask> tasks,
+          Set<IScheduledTask> tasks,
           ParsedConfiguration oldJob,
           ParsedConfiguration updatedJob) {
 
@@ -1693,7 +1704,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     assignTask(taskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of(80, 81, 82));
 
-    AssignedTask task = getTask(taskId).getAssignedTask();
+    IAssignedTask task = getTask(taskId).getAssignedTask();
     assertEquals(
         ImmutableSet.of("one", "two", "three"),
         task.getTask().getRequestedPorts());
@@ -1722,7 +1733,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         Query.shardScoped(KEY_A, 0).active()));
     assignTask(newTaskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of(86));
 
-    AssignedTask task = getTask(newTaskId).getAssignedTask();
+    IAssignedTask task = getTask(newTaskId).getAssignedTask();
     assertEquals(ImmutableMap.of("one", 86), task.getAssignedPorts());
   }
 
@@ -1748,7 +1759,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
             .add(Pair.<ScheduleStatus, String>of(FAILED, "bad stuff happened"))
             .build()
         .iterator();
-    for (TaskEvent event : getTask(taskId).getTaskEvents()) {
+    for (ITaskEvent event : getTask(taskId).getTaskEvents()) {
       Pair<ScheduleStatus, String> expected = expectedEvents.next();
       assertEquals(expected.getFirst(), event.getStatus());
       assertEquals(expected.getSecond(), event.getMessage());
@@ -1758,8 +1769,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testTaskIdLimit() throws Exception {
-    taskIdGenerator = new Function<TaskConfig, String>() {
-      @Override public String apply(TaskConfig input) {
+    taskIdGenerator = new Function<ITaskConfig, String>() {
+      @Override public String apply(ITaskConfig input) {
         return Strings.repeat("a", SchedulerCoreImpl.MAX_TASK_ID_LENGTH);
       }
     };
@@ -1772,8 +1783,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = ScheduleException.class)
   public void testRejectLongTaskId() throws Exception {
-    taskIdGenerator = new Function<TaskConfig, String>() {
-      @Override public String apply(TaskConfig input) {
+    taskIdGenerator = new Function<ITaskConfig, String>() {
+      @Override public String apply(ITaskConfig input) {
         return Strings.repeat("a", SchedulerCoreImpl.MAX_TASK_ID_LENGTH + 1);
       }
     };
@@ -1891,23 +1902,23 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     return defaultTask(false);
   }
 
-  private ScheduledTask getTask(String taskId) {
+  private IScheduledTask getTask(String taskId) {
     return getOnlyTask(Query.taskScoped(taskId));
   }
 
-  private ScheduledTask getOnlyTask(Query.Builder query) {
+  private IScheduledTask getOnlyTask(Query.Builder query) {
     return Iterables.getOnlyElement(Storage.Util.consistentFetchTasks(storage, query));
   }
 
-  private Set<ScheduledTask> getTasks(Query.Builder query) {
+  private Set<IScheduledTask> getTasks(Query.Builder query) {
     return Storage.Util.consistentFetchTasks(storage, query);
   }
 
-  private Set<ScheduledTask> getTasksByStatus(ScheduleStatus status) {
+  private Set<IScheduledTask> getTasksByStatus(ScheduleStatus status) {
     return Storage.Util.consistentFetchTasks(storage, Query.unscoped().byStatus(status));
   }
 
-  private Set<ScheduledTask> getTasksOwnedBy(Identity owner) {
+  private Set<IScheduledTask> getTasksOwnedBy(Identity owner) {
     return Storage.Util.consistentFetchTasks(storage, query(owner, null, null));
   }
 

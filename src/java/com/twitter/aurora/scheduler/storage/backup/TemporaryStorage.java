@@ -20,7 +20,6 @@ import java.util.Set;
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.storage.Snapshot;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -30,6 +29,7 @@ import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import com.twitter.aurora.scheduler.storage.mem.MemStorage;
 import com.twitter.common.util.testing.FakeClock;
@@ -53,7 +53,7 @@ interface TemporaryStorage {
    * @param query Query builder for tasks to fetch.
    * @return Matching tasks.
    */
-  Set<ScheduledTask> fetchTasks(Query.Builder query);
+  Set<IScheduledTask> fetchTasks(Query.Builder query);
 
   /**
    * Creates a snapshot of the contents of the temporary storage.
@@ -85,9 +85,9 @@ interface TemporaryStorage {
           });
         }
 
-        @Override public Set<ScheduledTask> fetchTasks(final Query.Builder query) {
-          return storage.consistentRead(new Work.Quiet<Set<ScheduledTask>>() {
-            @Override public Set<ScheduledTask> apply(StoreProvider storeProvider) {
+        @Override public Set<IScheduledTask> fetchTasks(final Query.Builder query) {
+          return storage.consistentRead(new Work.Quiet<Set<IScheduledTask>>() {
+            @Override public Set<IScheduledTask> apply(StoreProvider storeProvider) {
               return storeProvider.getTaskStore().fetchTasks(query);
             }
           });

@@ -37,6 +37,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -75,13 +76,13 @@ public class TaskVarsTest extends EasyMockTest {
     vars.storageStarted(new StorageStarted());
   }
 
-  private void changeState(ScheduledTask task, ScheduleStatus status) {
-    ScheduleStatus oldState = task.getStatus();
-    task.setStatus(status);
-    vars.taskChangedState(new TaskStateChange(task, oldState));
+  private void changeState(IScheduledTask task, ScheduleStatus status) {
+    vars.taskChangedState(new TaskStateChange(
+        IScheduledTask.build(task.newBuilder().setStatus(status)),
+        task.getStatus()));
   }
 
-  private void expectLoadStorage(ScheduledTask... result) {
+  private void expectLoadStorage(IScheduledTask... result) {
     storageUtil.expectOperations();
     storageUtil.expectTaskFetch(Query.unscoped(), result);
     globalCounters = Maps.newHashMap();
@@ -92,18 +93,18 @@ public class TaskVarsTest extends EasyMockTest {
     }
   }
 
-  private ScheduledTask makeTask(String job, ScheduleStatus status, String host) {
-    return new ScheduledTask()
+  private IScheduledTask makeTask(String job, ScheduleStatus status, String host) {
+    return IScheduledTask.build(new ScheduledTask()
         .setStatus(status)
         .setAssignedTask(new AssignedTask()
             .setTaskId(TASK_ID)
             .setSlaveHost(host)
             .setTask(new TaskConfig()
                 .setJobName(job)
-                .setOwner(new Identity(ROLE_A, ROLE_A + "-user"))));
+                .setOwner(new Identity(ROLE_A, ROLE_A + "-user")))));
   }
 
-  private ScheduledTask makeTask(String job, ScheduleStatus status) {
+  private IScheduledTask makeTask(String job, ScheduleStatus status) {
     return makeTask(job, status, "hostA");
   }
 
@@ -138,19 +139,20 @@ public class TaskVarsTest extends EasyMockTest {
     control.replay();
     initialize();
 
-    ScheduledTask taskA = makeTask(JOB_A, INIT);
+    IScheduledTask taskA = makeTask(JOB_A, INIT);
     changeState(taskA, PENDING);
     assertEquals(1, globalCounters.get(PENDING).get());
-    changeState(taskA, ASSIGNED);
+    changeState(IScheduledTask.build(taskA.newBuilder().setStatus(PENDING)), ASSIGNED);
     assertEquals(0, globalCounters.get(PENDING).get());
     assertEquals(1, globalCounters.get(ASSIGNED).get());
-    changeState(taskA, RUNNING);
+    changeState(IScheduledTask.build(taskA.newBuilder().setStatus(ASSIGNED)), RUNNING);
     assertEquals(0, globalCounters.get(ASSIGNED).get());
     assertEquals(1, globalCounters.get(RUNNING).get());
-    changeState(taskA, FINISHED);
+    changeState(IScheduledTask.build(taskA.newBuilder().setStatus(RUNNING)), FINISHED);
     assertEquals(0, globalCounters.get(RUNNING).get());
     assertEquals(1, globalCounters.get(FINISHED).get());
-    vars.tasksDeleted(new TasksDeleted(ImmutableSet.of(taskA)));
+    vars.tasksDeleted(new TasksDeleted(ImmutableSet.of(
+        IScheduledTask.build(taskA.newBuilder().setStatus(FINISHED)))));
     assertAllZero();
   }
 
@@ -195,10 +197,10 @@ public class TaskVarsTest extends EasyMockTest {
     control.replay();
     initialize();
 
-    ScheduledTask a = makeTask("jobA", RUNNING, "host1");
-    ScheduledTask b = makeTask("jobB", RUNNING, "host2");
-    ScheduledTask c = makeTask("jobC", RUNNING, "host3");
-    ScheduledTask d = makeTask("jobD", RUNNING, "host1");
+    IScheduledTask a = makeTask("jobA", RUNNING, "host1");
+    IScheduledTask b = makeTask("jobB", RUNNING, "host2");
+    IScheduledTask c = makeTask("jobC", RUNNING, "host3");
+    IScheduledTask d = makeTask("jobD", RUNNING, "host1");
 
     changeState(a, LOST);
     changeState(b, LOST);
@@ -218,7 +220,7 @@ public class TaskVarsTest extends EasyMockTest {
     control.replay();
     initialize();
 
-    ScheduledTask a = makeTask(JOB_A, RUNNING, "a");
+    IScheduledTask a = makeTask(JOB_A, RUNNING, "a");
     changeState(a, LOST);
     // Since no attributes are stored for the host, a variable is not exported/updated.
   }

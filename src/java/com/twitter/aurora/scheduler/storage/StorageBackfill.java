@@ -35,11 +35,9 @@ import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
-
-import static com.twitter.aurora.scheduler.base.Tasks.SCHEDULED_TO_JOB_KEY;
-import static com.twitter.aurora.scheduler.base.Tasks.SCHEDULED_TO_SHARD_ID;
 
 /**
  * Utility class to contain and perform storage backfill operations.
@@ -67,13 +65,15 @@ public final class StorageBackfill {
 
   private static void guaranteeShardUniqueness(
       ScheduledTask task,
-      TaskStore taskStore,
+      TaskStore.Mutable taskStore,
       Clock clock) {
 
     if (Tasks.isActive(task.getStatus())) {
       // Perform a sanity check on the number of active shards.
       Query.Builder query = Query.shardScoped(
-          SCHEDULED_TO_JOB_KEY.apply(task), SCHEDULED_TO_SHARD_ID.apply(task)).active();
+          Tasks.getJobKey(task.getAssignedTask().getTask()),
+          task.getAssignedTask().getTask().getShardId())
+          .active();
       Set<String> activeTasksInShard = FluentIterable.from(taskStore.fetchTasks(query))
           .transform(Tasks.SCHEDULED_TO_ID)
           .toSet();
@@ -126,13 +126,14 @@ public final class StorageBackfill {
 
     LOG.info("Performing shard uniqueness sanity check.");
     storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {
-      @Override public ScheduledTask apply(final ScheduledTask task) {
-        ConfigurationManager.applyDefaultsIfUnset(task.getAssignedTask().getTask());
-        guaranteeShardUniqueness(task, storeProvider.getUnsafeTaskStore(), clock);
-        convertToExecutorConfig(task);
+      @Override public IScheduledTask apply(final IScheduledTask task) {
+        ScheduledTask builder = task.newBuilder();
+        ConfigurationManager.applyDefaultsIfUnset(builder.getAssignedTask().getTask());
         // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they
         // don't.
-        return task;
+        guaranteeShardUniqueness(builder, storeProvider.getUnsafeTaskStore(), clock);
+        convertToExecutorConfig(builder);
+        return IScheduledTask.build(builder);
       }
     });
   }

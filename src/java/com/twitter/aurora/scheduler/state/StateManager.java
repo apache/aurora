@@ -21,10 +21,10 @@ import com.google.common.base.Optional;
 
 import org.apache.mesos.Protos.SlaveID;
 
-import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Thin interface for the state manager.
@@ -53,7 +53,7 @@ public interface StateManager {
    * @param assignedPorts Ports on the host that are being assigned to the task.
    * @return The updated task record, or {@code null} if the task was not found.
    */
-  AssignedTask assignTask(
+  IAssignedTask assignTask(
       String taskId,
       String slaveHost,
       SlaveID slaveId,
@@ -65,7 +65,7 @@ public interface StateManager {
    *
    * @param tasks Tasks to insert.
    */
-  void insertPendingTasks(Set<TaskConfig> tasks);
+  void insertPendingTasks(Set<ITaskConfig> tasks);
 
   /**
    * Deletes records of tasks from the task store.

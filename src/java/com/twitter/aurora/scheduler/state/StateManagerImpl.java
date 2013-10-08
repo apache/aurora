@@ -70,6 +70,10 @@ import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
@@ -105,7 +109,7 @@ public class StateManagerImpl implements StateManager {
     return storage;
   }
 
-  private final Function<TaskConfig, String> taskIdGenerator;
+  private final Function<ITaskConfig, String> taskIdGenerator;
 
   // TODO(William Farner): Eliminate this and update all callers to use Storage directly.
   interface ReadOnlyStorage {
@@ -132,20 +136,20 @@ public class StateManagerImpl implements StateManager {
       @Override public void addWork(
           WorkCommand work,
           TaskStateMachine stateMachine,
-          Function<ScheduledTask, ScheduledTask> mutation) {
+          Function<IScheduledTask, IScheduledTask> mutation) {
 
         workQueue.add(new WorkEntry(work, stateMachine, mutation));
       }
     };
 
-  private final Function<TaskConfig, ScheduledTask> taskCreator =
-      new Function<TaskConfig, ScheduledTask>() {
-        @Override public ScheduledTask apply(TaskConfig task) {
+  private final Function<ITaskConfig, IScheduledTask> taskCreator =
+      new Function<ITaskConfig, IScheduledTask>() {
+        @Override public IScheduledTask apply(ITaskConfig task) {
           AssignedTask assigned =
-              new AssignedTask().setTaskId(taskIdGenerator.apply(task)).setTask(task);
-          return new ScheduledTask()
+              new AssignedTask().setTaskId(taskIdGenerator.apply(task)).setTask(task.newBuilder());
+          return IScheduledTask.build(new ScheduledTask()
               .setStatus(INIT)
-              .setAssignedTask(assigned);
+              .setAssignedTask(assigned));
         }
       };
 
@@ -158,12 +162,12 @@ public class StateManagerImpl implements StateManager {
   private static class WorkEntry {
     private final WorkCommand command;
     private final TaskStateMachine stateMachine;
-    private final Function<ScheduledTask, ScheduledTask> mutation;
+    private final Function<IScheduledTask, IScheduledTask> mutation;
 
     WorkEntry(
         WorkCommand command,
         TaskStateMachine stateMachine,
-        Function<ScheduledTask, ScheduledTask> mutation) {
+        Function<IScheduledTask, IScheduledTask> mutation) {
 
       this.command = command;
       this.stateMachine = stateMachine;
@@ -176,7 +180,7 @@ public class StateManagerImpl implements StateManager {
       final Storage storage,
       final Clock clock,
       Driver driver,
-      Function<TaskConfig, String> taskIdGenerator,
+      Function<ITaskConfig, String> taskIdGenerator,
       Closure<PubsubEvent> taskEventSink) {
 
     checkNotNull(storage);
@@ -203,17 +207,17 @@ public class StateManagerImpl implements StateManager {
   }
 
   @Override
-  public void insertPendingTasks(final Set<TaskConfig> tasks) {
+  public void insertPendingTasks(final Set<ITaskConfig> tasks) {
     checkNotNull(tasks);
 
     // Done outside the write transaction to minimize the work done inside a transaction.
-    final Set<ScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
+    final Set<IScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
 
     storage.write(storage.new NoResultSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(scheduledTasks);
 
-        for (ScheduledTask task : scheduledTasks) {
+        for (IScheduledTask task : scheduledTasks) {
           createStateMachine(task).updateState(PENDING);
         }
       }
@@ -241,7 +245,7 @@ public class StateManagerImpl implements StateManager {
    *     is already in progress.
    * @return A unique string identifying the update.
    */
-  String registerUpdate(final JobKey jobKey, final Set<TaskConfig> updatedTasks)
+  String registerUpdate(final JobKey jobKey, final Set<ITaskConfig> updatedTasks)
       throws UpdateException {
 
     checkNotNull(jobKey);
@@ -251,7 +255,7 @@ public class StateManagerImpl implements StateManager {
       @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
         assertNotUpdatingOrRollingBack(jobKey, storeProvider.getTaskStore());
 
-        Set<TaskConfig> existingTasks = ImmutableSet.copyOf(Iterables.transform(
+        Set<ITaskConfig> existingTasks = ImmutableSet.copyOf(Iterables.transform(
             storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()),
             Tasks.SCHEDULED_TO_INFO));
 
@@ -264,15 +268,21 @@ public class StateManagerImpl implements StateManager {
           throw new UpdateException("Update already in progress for " + jobKey);
         }
 
-        Map<Integer, TaskConfig> oldShards = Maps.uniqueIndex(existingTasks,
+        Map<Integer, ITaskConfig> oldShards = Maps.uniqueIndex(existingTasks,
             Tasks.INFO_TO_SHARD_ID);
-        Map<Integer, TaskConfig> newShards = Maps.uniqueIndex(updatedTasks,
+        Map<Integer, ITaskConfig> newShards = Maps.uniqueIndex(updatedTasks,
             Tasks.INFO_TO_SHARD_ID);
 
         ImmutableSet.Builder<TaskUpdateConfiguration> shardConfigBuilder = ImmutableSet.builder();
         for (int shard : Sets.union(oldShards.keySet(), newShards.keySet())) {
           shardConfigBuilder.add(
-              new TaskUpdateConfiguration(oldShards.get(shard), newShards.get(shard)));
+              new TaskUpdateConfiguration(
+                  Optional.fromNullable(oldShards.get(shard))
+                      .transform(ITaskConfig.TO_BUILDER)
+                      .orNull(),
+                  Optional.fromNullable(newShards.get(shard))
+                      .transform(ITaskConfig.TO_BUILDER)
+                      .orNull()));
         }
 
         String updateToken = UUID.randomUUID().toString();
@@ -342,7 +352,7 @@ public class StateManagerImpl implements StateManager {
 
         if (EnumSet.of(UpdateResult.SUCCESS, UpdateResult.FAILED).contains(result)) {
           // Kill any shards that were removed during the update or rollback.
-          Function<TaskUpdateConfiguration, TaskConfig> removedSelector =
+          Function<TaskUpdateConfiguration, ITaskConfig> removedSelector =
               (result == UpdateResult.SUCCESS) ? GET_NEW_CONFIG : GET_ORIGINAL_CONFIG;
           for (Integer shard : fetchRemovedShards(jobConfig.get(), removedSelector)) {
             changeState(
@@ -370,7 +380,7 @@ public class StateManagerImpl implements StateManager {
 
   private Set<Integer> fetchRemovedShards(
       JobUpdateConfiguration jobConfig,
-      Function<TaskUpdateConfiguration, TaskConfig> configSelector) {
+      Function<TaskUpdateConfiguration, ITaskConfig> configSelector) {
 
     return FluentIterable.from(jobConfig.getConfigs())
         .filter(Predicates.compose(Predicates.isNull(), configSelector))
@@ -392,7 +402,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   @Override
-  public AssignedTask assignTask(
+  public IAssignedTask assignTask(
       String taskId,
       String slaveHost,
       SlaveID slaveId,
@@ -419,17 +429,17 @@ public class StateManagerImpl implements StateManager {
     }
   }
 
-  private static final Predicate<ScheduledTask> NOT_UPDATING = new Predicate<ScheduledTask>() {
-    @Override public boolean apply(ScheduledTask task) {
+  private static final Predicate<IScheduledTask> NOT_UPDATING = new Predicate<IScheduledTask>() {
+    @Override public boolean apply(IScheduledTask task) {
       return task.getStatus() != UPDATING && task.getStatus() != ROLLBACK;
     }
   };
 
-  private Set<Integer> getChangedShards(Set<ScheduledTask> tasks, Set<TaskConfig> compareTo) {
-    Set<TaskConfig> existingTasks = FluentIterable.from(tasks)
+  private Set<Integer> getChangedShards(Set<IScheduledTask> tasks, Set<ITaskConfig> compareTo) {
+    Set<ITaskConfig> existingTasks = FluentIterable.from(tasks)
         .transform(Tasks.SCHEDULED_TO_INFO)
         .toSet();
-    Set<TaskConfig> changedTasks = Sets.difference(compareTo, existingTasks);
+    Set<ITaskConfig> changedTasks = Sets.difference(compareTo, existingTasks);
     return FluentIterable.from(changedTasks)
         .transform(Tasks.INFO_TO_SHARD_ID)
         .toSet();
@@ -442,7 +452,7 @@ public class StateManagerImpl implements StateManager {
       final String updateToken,
       boolean updating) throws UpdateException {
 
-    final Function<TaskUpdateConfiguration, TaskConfig> configSelector = updating
+    final Function<TaskUpdateConfiguration, ITaskConfig> configSelector = updating
         ? GET_NEW_CONFIG
         : GET_ORIGINAL_CONFIG;
     final ScheduleStatus modifyingState;
@@ -473,14 +483,14 @@ public class StateManagerImpl implements StateManager {
             }
 
             Query.Builder query = Query.shardScoped(jobKey, shards).active();
-            Set<ScheduledTask> tasks = store.getTaskStore().fetchTasks(query);
+            Set<IScheduledTask> tasks = store.getTaskStore().fetchTasks(query);
 
             // Extract any shard IDs that are being added as a part of this stage in the update.
             Set<Integer> newShardIds = Sets.difference(shards,
                 ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_SHARD_ID)));
 
             if (!newShardIds.isEmpty()) {
-              Set<TaskConfig> newTasks = fetchTaskUpdateConfigs(
+              Set<ITaskConfig> newTasks = fetchTaskUpdateConfigs(
                   updateConfig.get(),
                   newShardIds,
                   configSelector);
@@ -498,7 +508,7 @@ public class StateManagerImpl implements StateManager {
 
             Set<Integer> updateShardIds = Sets.difference(shards, newShardIds);
             if (!updateShardIds.isEmpty()) {
-              Set<TaskConfig> targetConfigs = fetchTaskUpdateConfigs(
+              Set<ITaskConfig> targetConfigs = fetchTaskUpdateConfigs(
                   updateConfig.get(),
                   updateShardIds,
                   configSelector);
@@ -506,7 +516,7 @@ public class StateManagerImpl implements StateManager {
               // that these tasks are either rolled back or updated. If not, when a task in UPDATING
               // is later KILLED and a new shard is created with the updated configuration it
               // appears as if the rollback completed successfully.
-              Set<ScheduledTask> notUpdating = FluentIterable.from(tasks)
+              Set<IScheduledTask> notUpdating = FluentIterable.from(tasks)
                   .filter(NOT_UPDATING)
                   .toSet();
               Set<Integer> changedShards = getChangedShards(notUpdating, targetConfigs);
@@ -532,9 +542,10 @@ public class StateManagerImpl implements StateManager {
   }
 
   private Optional<TaskUpdateConfiguration> fetchShardUpdateConfig(
-      UpdateStore updateStore, JobKey jobKey, int shard) {
+      UpdateStore updateStore, IJobKey jobKey, int shard) {
 
-    Optional<JobUpdateConfiguration> optional = updateStore.fetchJobUpdateConfig(jobKey);
+    Optional<JobUpdateConfiguration> optional =
+        updateStore.fetchJobUpdateConfig(jobKey.newBuilder());
     if (optional.isPresent()) {
       Set<TaskUpdateConfiguration> matches =
           fetchShardUpdateConfigs(optional.get(), ImmutableSet.of(shard));
@@ -567,10 +578,10 @@ public class StateManagerImpl implements StateManager {
    * @param shards Shards within a job to fetch.
    * @return The task information of the shard.
    */
-  private Set<TaskConfig> fetchTaskUpdateConfigs(
+  private Set<ITaskConfig> fetchTaskUpdateConfigs(
       JobUpdateConfiguration config,
       final Set<Integer> shards,
-      final Function<TaskUpdateConfiguration, TaskConfig> configSelector) {
+      final Function<TaskUpdateConfiguration, ITaskConfig> configSelector) {
 
     checkNotNull(config);
     checkNotBlank(shards);
@@ -608,7 +619,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   private interface TaskAssignMutation extends Function<TaskStateMachine, Boolean> {
-    AssignedTask getAssignedTask();
+    IAssignedTask getAssignedTask();
   }
 
   private static Map<String, Integer> getNameMappedPorts(
@@ -642,28 +653,29 @@ public class StateManagerImpl implements StateManager {
       final Set<Integer> assignedPorts) {
 
     final TaskMutation mutation = new TaskMutation() {
-      @Override public ScheduledTask apply(ScheduledTask task) {
-        AssignedTask assigned = task.getAssignedTask();
+      @Override public IScheduledTask apply(IScheduledTask task) {
+        ScheduledTask builder = task.newBuilder();
+        AssignedTask assigned = builder.getAssignedTask();
         assigned.setAssignedPorts(
             getNameMappedPorts(assigned.getTask().getRequestedPorts(), assignedPorts));
         assigned.setSlaveHost(slaveHost)
             .setSlaveId(slaveId.getValue());
-        return task;
+        return IScheduledTask.build(builder);
       }
     };
 
     return new TaskAssignMutation() {
-      private AtomicReference<AssignedTask> assignedTask = Atomics.newReference();
-      @Override public AssignedTask getAssignedTask() {
+      private AtomicReference<IAssignedTask> assignedTask = Atomics.newReference();
+      @Override public IAssignedTask getAssignedTask() {
         return assignedTask.get();
       }
 
       @Override public Boolean apply(final TaskStateMachine stateMachine) {
         TaskMutation wrapper = new TaskMutation() {
-          @Override public ScheduledTask apply(ScheduledTask task) {
-            ScheduledTask mutated = mutation.apply(task);
+          @Override public IScheduledTask apply(IScheduledTask task) {
+            IScheduledTask mutated = mutation.apply(task);
             Preconditions.checkState(
-                assignedTask.compareAndSet(null, task.getAssignedTask()),
+                assignedTask.compareAndSet(null, mutated.getAssignedTask()),
                 "More than one result was found for an identity query.");
             return mutated;
           }
@@ -702,22 +714,24 @@ public class StateManagerImpl implements StateManager {
 
         switch (work.command) {
           case RESCHEDULE:
-            ScheduledTask task =
-                Iterables.getOnlyElement(taskStore.fetchTasks(idQuery)).deepCopy();
-            task.getAssignedTask().unsetSlaveId();
-            task.getAssignedTask().unsetSlaveHost();
-            task.getAssignedTask().unsetAssignedPorts();
-            task.unsetTaskEvents();
-            task.setAncestorId(taskId);
-            String newTaskId = taskIdGenerator.apply(task.getAssignedTask().getTask());
-            task.getAssignedTask().setTaskId(newTaskId);
+            ScheduledTask builder =
+                Iterables.getOnlyElement(taskStore.fetchTasks(idQuery)).newBuilder();
+            builder.getAssignedTask().unsetSlaveId();
+            builder.getAssignedTask().unsetSlaveHost();
+            builder.getAssignedTask().unsetAssignedPorts();
+            builder.unsetTaskEvents();
+            builder.setAncestorId(taskId);
+            String newTaskId =
+                taskIdGenerator.apply(ITaskConfig.build(builder.getAssignedTask().getTask()));
+            builder.getAssignedTask().setTaskId(newTaskId);
 
             LOG.info("Task being rescheduled: " + taskId);
 
+            IScheduledTask task = IScheduledTask.build(builder);
             taskStore.saveTasks(ImmutableSet.of(task));
 
             createStateMachine(task).updateState(PENDING, Optional.of("Rescheduled"));
-            TaskConfig taskInfo = task.getAssignedTask().getTask();
+            ITaskConfig taskInfo = task.getAssignedTask().getTask();
             sideEffectWork.addTaskEvent(
                 new PubsubEvent.TaskRescheduled(
                     taskInfo.getOwner().getRole(),
@@ -732,8 +746,9 @@ public class StateManagerImpl implements StateManager {
 
           case UPDATE_STATE:
             taskStore.mutateTasks(idQuery, new TaskMutation() {
-              @Override public ScheduledTask apply(ScheduledTask task) {
-                return work.mutation.apply(task.setStatus(stateMachine.getState()));
+              @Override public IScheduledTask apply(IScheduledTask task) {
+                return work.mutation.apply(
+                    IScheduledTask.build(task.newBuilder().setStatus(stateMachine.getState())));
               }
             });
             sideEffectWork.addTaskEvent(
@@ -748,8 +763,9 @@ public class StateManagerImpl implements StateManager {
 
           case INCREMENT_FAILURES:
             taskStore.mutateTasks(idQuery, new TaskMutation() {
-              @Override public ScheduledTask apply(ScheduledTask task) {
-                return task.setFailureCount(task.getFailureCount() + 1);
+              @Override public IScheduledTask apply(IScheduledTask task) {
+                return IScheduledTask.build(
+                    task.newBuilder().setFailureCount(task.getFailureCount() + 1));
               }
             });
             break;
@@ -766,7 +782,7 @@ public class StateManagerImpl implements StateManager {
     storage.write(storage.new NoResultSideEffectWork() {
       @Override protected void execute(final MutableStoreProvider storeProvider) {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
-        Iterable<ScheduledTask> tasks = taskStore.fetchTasks(Query.taskScoped(taskIds));
+        Iterable<IScheduledTask> tasks = taskStore.fetchTasks(Query.taskScoped(taskIds));
         addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(tasks)));
         taskStore.deleteTasks(taskIds);
       }
@@ -780,7 +796,7 @@ public class StateManagerImpl implements StateManager {
 
     TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
 
-    TaskConfig oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
+    ITaskConfig oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
         Iterables.getOnlyElement(taskStore.fetchTasks(Query.taskScoped(taskId))));
 
     Optional<TaskUpdateConfiguration> optional = fetchShardUpdateConfig(
@@ -793,7 +809,7 @@ public class StateManagerImpl implements StateManager {
 
     if (!optional.isPresent()) {
       LOG.warning("No update configuration found for key "
-          + JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(oldConfig))
+          + JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(oldConfig).newBuilder())
           + " shard " + oldConfig.getShardId() + " : Assuming update has finished.");
       return;
     }
@@ -806,7 +822,9 @@ public class StateManagerImpl implements StateManager {
       return;
     }
 
-    ScheduledTask newTask = taskCreator.apply(newConfig).setAncestorId(taskId);
+    IScheduledTask newTask =
+        IScheduledTask.build(taskCreator.apply(ITaskConfig.build(newConfig)).newBuilder()
+            .setAncestorId(taskId));
     taskStore.saveTasks(ImmutableSet.of(newTask));
     createStateMachine(newTask)
         .updateState(
@@ -817,10 +835,10 @@ public class StateManagerImpl implements StateManager {
   private Map<String, TaskStateMachine> getStateMachines(final Set<String> taskIds) {
     return readOnlyStorage.consistentRead(new Work.Quiet<Map<String, TaskStateMachine>>() {
       @Override public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
-        Map<String, ScheduledTask> existingTasks = Maps.uniqueIndex(
+        Map<String, IScheduledTask> existingTasks = Maps.uniqueIndex(
             storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskIds)),
-            new Function<ScheduledTask, String>() {
-              @Override public String apply(ScheduledTask input) {
+            new Function<IScheduledTask, String>() {
+              @Override public String apply(IScheduledTask input) {
                 return input.getAssignedTask().getTaskId();
               }
             });
@@ -835,7 +853,7 @@ public class StateManagerImpl implements StateManager {
     });
   }
 
-  private TaskStateMachine getStateMachine(String taskId, @Nullable ScheduledTask task) {
+  private TaskStateMachine getStateMachine(String taskId, @Nullable IScheduledTask task) {
     if (task != null) {
       return createStateMachine(task, task.getStatus());
     }
@@ -853,15 +871,15 @@ public class StateManagerImpl implements StateManager {
     return stateMachine;
   }
 
-  private TaskStateMachine createStateMachine(ScheduledTask task) {
+  private TaskStateMachine createStateMachine(IScheduledTask task) {
     return createStateMachine(task, INIT);
   }
 
-  private TaskStateMachine createStateMachine(ScheduledTask task, ScheduleStatus initialState) {
+  private TaskStateMachine createStateMachine(IScheduledTask task, ScheduleStatus initialState) {
     return new TaskStateMachine(
         Tasks.id(task),
         task,
-        taskUpdateChecker(Tasks.SCHEDULED_TO_JOB_KEY.apply(task)),
+        taskUpdateChecker(Tasks.SCHEDULED_TO_JOB_KEY.apply(task).newBuilder()),
         workSink,
         clock,
         initialState);

@@ -75,6 +75,8 @@ import com.twitter.aurora.scheduler.log.Log.Stream;
 import com.twitter.aurora.scheduler.storage.SnapshotStore;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.log.LogStorage.SchedulingService;
 import com.twitter.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import com.twitter.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
@@ -358,12 +360,14 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testSaveTasks() throws Exception {
-    final Set<ScheduledTask> tasks = ImmutableSet.of(task("a", ScheduleStatus.INIT));
+    final Set<IScheduledTask> tasks = ImmutableSet.of(task("a", ScheduleStatus.INIT));
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.taskStore.saveTasks(tasks);
-        streamMatcher.expectTransaction(Op.saveTasks(new SaveTasks(tasks))).andReturn(position);
+        streamMatcher.expectTransaction(
+            Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(tasks))))
+            .andReturn(position);
       }
 
       @Override protected void performMutations() {
@@ -375,13 +379,16 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testMutateTasks() throws Exception {
     final Query.Builder query = Query.taskScoped("fred");
-    final Function<ScheduledTask, ScheduledTask> mutation = Functions.identity();
-    final ImmutableSet<ScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.STARTING));
+    final Function<IScheduledTask, IScheduledTask> mutation = Functions.identity();
+    final ImmutableSet<IScheduledTask> mutated =
+        ImmutableSet.of(task("a", ScheduleStatus.STARTING));
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         expect(storageUtil.taskStore.mutateTasks(query, mutation)).andReturn(mutated);
-        streamMatcher.expectTransaction(Op.saveTasks(new SaveTasks(mutated))).andReturn(null);
+        streamMatcher.expectTransaction(
+            Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))))
+            .andReturn(null);
       }
 
       @Override protected void performMutations() {
@@ -394,14 +401,15 @@ public class LogStorageTest extends EasyMockTest {
   public void testUnsafeModifyInPlace() throws Exception {
     final String taskId = "wilma";
     final String taskId2 = "barney";
-    final TaskConfig updatedConfig =
+    final ITaskConfig updatedConfig =
         task(taskId, ScheduleStatus.RUNNING).getAssignedTask().getTask();
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         expect(storageUtil.taskStore.unsafeModifyInPlace(taskId2, updatedConfig)).andReturn(false);
         expect(storageUtil.taskStore.unsafeModifyInPlace(taskId, updatedConfig)).andReturn(true);
-        streamMatcher.expectTransaction(Op.rewriteTask(new RewriteTask(taskId, updatedConfig)))
+        streamMatcher.expectTransaction(
+            Op.rewriteTask(new RewriteTask(taskId, updatedConfig.newBuilder())))
             .andReturn(position);
       }
 
@@ -415,8 +423,8 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testNestedTransactions() throws Exception {
     final Query.Builder query = Query.taskScoped("fred");
-    final Function<ScheduledTask, ScheduledTask> mutation = Functions.identity();
-    final ImmutableSet<ScheduledTask> mutated =
+    final Function<IScheduledTask, IScheduledTask> mutation = Functions.identity();
+    final ImmutableSet<IScheduledTask> mutated =
         ImmutableSet.of(task("a", ScheduleStatus.STARTING));
     final ImmutableSet<String> tasksToRemove = ImmutableSet.of("b");
 
@@ -428,7 +436,7 @@ public class LogStorageTest extends EasyMockTest {
         storageUtil.taskStore.deleteTasks(tasksToRemove);
 
         streamMatcher.expectTransaction(
-            Op.saveTasks(new SaveTasks(mutated)),
+            Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))),
             Op.removeTasks(new RemoveTasks(tasksToRemove)))
             .andReturn(position);
       }
@@ -451,9 +459,9 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveAndMutateTasks() throws Exception {
     final Query.Builder query = Query.taskScoped("fred");
-    final Function<ScheduledTask, ScheduledTask> mutation = Functions.identity();
-    final Set<ScheduledTask> saved = ImmutableSet.of(task("a", ScheduleStatus.INIT));
-    final ImmutableSet<ScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.PENDING));
+    final Function<IScheduledTask, IScheduledTask> mutation = Functions.identity();
+    final Set<IScheduledTask> saved = ImmutableSet.of(task("a", ScheduleStatus.INIT));
+    final ImmutableSet<IScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.PENDING));
 
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
@@ -464,7 +472,9 @@ public class LogStorageTest extends EasyMockTest {
         expect(storageUtil.taskStore.mutateTasks(query, mutation)).andReturn(mutated);
 
         // Resulting stream operation.
-        streamMatcher.expectTransaction(Op.saveTasks(new SaveTasks(mutated))).andReturn(null);
+        streamMatcher.expectTransaction(Op.saveTasks(
+            new SaveTasks(IScheduledTask.toBuildersSet(mutated))))
+            .andReturn(null);
       }
 
       @Override protected void performMutations() {
@@ -481,9 +491,9 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveAndMutateTasksNoCoalesceUniqueIds() throws Exception {
     final Query.Builder query = Query.taskScoped("fred");
-    final Function<ScheduledTask, ScheduledTask> mutation = Functions.identity();
-    final Set<ScheduledTask> saved = ImmutableSet.of(task("b", ScheduleStatus.INIT));
-    final ImmutableSet<ScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.PENDING));
+    final Function<IScheduledTask, IScheduledTask> mutation = Functions.identity();
+    final Set<IScheduledTask> saved = ImmutableSet.of(task("b", ScheduleStatus.INIT));
+    final ImmutableSet<IScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.PENDING));
 
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
@@ -496,7 +506,10 @@ public class LogStorageTest extends EasyMockTest {
         // Resulting stream operation.
         streamMatcher.expectTransaction(
             Op.saveTasks(new SaveTasks(
-                ImmutableSet.<ScheduledTask>builder().addAll(saved).addAll(mutated).build())))
+                ImmutableSet.<ScheduledTask>builder()
+                    .addAll(IScheduledTask.toBuildersList(saved))
+                    .addAll(IScheduledTask.toBuildersList(mutated))
+                    .build())))
             .andReturn(position);
       }
 
@@ -513,13 +526,12 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testRemoveTasksQuery() throws Exception {
-    final ScheduledTask task = task("a", ScheduleStatus.FINISHED);
+    final IScheduledTask task = task("a", ScheduleStatus.FINISHED);
     final Set<String> taskIds = Tasks.ids(task);
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
-        expect(storageUtil.taskStore.fetchTasks(Query.unscoped()))
-            .andReturn(ImmutableSet.<ScheduledTask>of(task));
+        expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(ImmutableSet.of(task));
         storageUtil.taskStore.deleteTasks(taskIds);
         streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
             .andReturn(position);
@@ -703,10 +715,11 @@ public class LogStorageTest extends EasyMockTest {
     return LogEntry.transaction(new Transaction(ImmutableList.copyOf(ops)));
   }
 
-  private static ScheduledTask task(String id, ScheduleStatus status) {
-    return new ScheduledTask()
+  private static IScheduledTask task(String id, ScheduleStatus status) {
+    return IScheduledTask.build(new ScheduledTask()
         .setStatus(status)
         .setAssignedTask(new AssignedTask()
-            .setTaskId(id));
+            .setTaskId(id)
+            .setTask(new TaskConfig())));
   }
 }

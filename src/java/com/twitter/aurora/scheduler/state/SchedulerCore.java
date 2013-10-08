@@ -20,7 +20,6 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 
-import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ShardUpdateResult;
@@ -29,6 +28,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 
 /**
  * Scheduling core, stores scheduler state and makes decisions about which tasks to schedule when
@@ -164,7 +164,7 @@ public interface SchedulerCore {
    * @param preemptingTask Task we are preempting in favor of.
    * @throws ScheduleException If a problem occurs while trying to perform the preemption.
    */
-  void preemptTask(AssignedTask task, AssignedTask preemptingTask) throws ScheduleException;
+  void preemptTask(IAssignedTask task, IAssignedTask preemptingTask) throws ScheduleException;
 
   /**
    * Indicates to the scheduler that tasks were deleted on the assigned host.

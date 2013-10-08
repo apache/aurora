@@ -39,14 +39,13 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
@@ -198,7 +197,7 @@ public class Mname {
       UriInfo uriInfo,
       Optional<String> forwardRequest) {
 
-    ScheduledTask task = Iterables.getOnlyElement(
+    IScheduledTask task = Iterables.getOnlyElement(
         Storage.Util.consistentFetchTasks(storage,
             Query.shardScoped(JobKeys.from(role, env, job), shardId).active()),
         null);
@@ -210,7 +209,7 @@ public class Mname {
       return respond(NOT_FOUND, "The selected shard is currently in state " + task.getStatus());
     }
 
-    AssignedTask assignedTask = task.getAssignedTask();
+    IAssignedTask assignedTask = task.getAssignedTask();
     Optional<Integer> port = getRedirectPort(assignedTask);
     if (!port.isPresent()) {
       return respond(NOT_FOUND, "The task does not have a registered http port.");
@@ -231,12 +230,16 @@ public class Mname {
   }
 
   @VisibleForTesting
-  static Optional<Integer> getRedirectPort(AssignedTask task) {
+  static Optional<Integer> getRedirectPort(IAssignedTask task) {
     Map<String, Integer> ports = task.isSetAssignedPorts()
         ? task.getAssignedPorts() : ImmutableMap.<String, Integer>of();
-    String httpPortName =
-        Iterables.getFirst(Sets.intersection(ports.keySet(), HTTP_PORT_NAMES), null);
-    return httpPortName == null ? Optional.<Integer>absent() : Optional.of(ports.get(httpPortName));
+    for (String httpPortName : HTTP_PORT_NAMES) {
+      Integer port = ports.get(httpPortName);
+      if (port != null) {
+        return Optional.of(port);
+      }
+    }
+    return Optional.absent();
   }
 
   private Response respond(Status status, String message) {

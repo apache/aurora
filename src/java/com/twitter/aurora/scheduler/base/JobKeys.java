@@ -25,6 +25,7 @@ import com.google.common.base.Strings;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.TaskQuery;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -50,8 +51,8 @@ public final class JobKeys {
         }
       };
 
-  public static final Function<JobConfiguration, JobKey> FROM_CONFIG =
-      Functions.compose(DEEP_COPY, FROM_CONFIG_NO_COPY);
+  public static final Function<JobConfiguration, IJobKey> FROM_CONFIG =
+      Functions.compose(IJobKey.FROM_BUILDER, Functions.compose(DEEP_COPY, FROM_CONFIG_NO_COPY));
 
   public static final Function<JobKey, String> TO_ROLE =
       new Function<JobKey, String>() {

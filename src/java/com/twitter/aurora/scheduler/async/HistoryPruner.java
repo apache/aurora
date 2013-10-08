@@ -39,12 +39,12 @@ import com.google.common.eventbus.Subscribe;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.state.StateManager;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
@@ -68,9 +68,9 @@ import static com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 public class HistoryPruner implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(HistoryPruner.class.getName());
 
-  private static final Ordering<ScheduledTask> LATEST_ACTIVITY = Ordering.natural()
-      .onResultOf(new Function<ScheduledTask, Long>() {
-        @Override public Long apply(ScheduledTask task) {
+  private static final Ordering<IScheduledTask> LATEST_ACTIVITY = Ordering.natural()
+      .onResultOf(new Function<IScheduledTask, Long>() {
+        @Override public Long apply(IScheduledTask task) {
           return Iterables.getLast(task.getTaskEvents()).getTimestamp();
         }
       });
@@ -78,10 +78,10 @@ public class HistoryPruner implements EventSubscriber {
   @VisibleForTesting
   static final Query.Builder INACTIVE_QUERY = Query.unscoped().terminal();
 
-  private final Multimap<JobKey, String> tasksByJob =
-      Multimaps.synchronizedSetMultimap(LinkedHashMultimap.<JobKey, String>create());
+  private final Multimap<IJobKey, String> tasksByJob =
+      Multimaps.synchronizedSetMultimap(LinkedHashMultimap.<IJobKey, String>create());
   @VisibleForTesting
-  Multimap<JobKey, String> getTasksByJob() {
+  Multimap<IJobKey, String> getTasksByJob() {
     return tasksByJob;
   }
 
@@ -142,7 +142,7 @@ public class HistoryPruner implements EventSubscriber {
    */
   @Subscribe
   public void storageStarted(StorageStarted event) {
-    for (ScheduledTask task
+    for (IScheduledTask task
         : LATEST_ACTIVITY.sortedCopy(Storage.Util.consistentFetchTasks(storage, INACTIVE_QUERY))) {
 
       registerInactiveTask(
@@ -164,7 +164,7 @@ public class HistoryPruner implements EventSubscriber {
    */
   @Subscribe
   public void tasksDeleted(final TasksDeleted event) {
-    for (ScheduledTask task : event.getTasks()) {
+    for (IScheduledTask task : event.getTasks()) {
       String id = Tasks.id(task);
       tasksByJob.remove(Tasks.SCHEDULED_TO_JOB_KEY.apply(task), id);
       Future<?> future = taskIdToFuture.remove(id);
@@ -175,7 +175,7 @@ public class HistoryPruner implements EventSubscriber {
   }
 
   private void registerInactiveTask(
-      final JobKey jobKey,
+      final IJobKey jobKey,
       final String taskId,
       long timeRemaining) {
 

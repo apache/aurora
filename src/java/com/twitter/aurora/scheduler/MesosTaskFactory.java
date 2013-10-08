@@ -35,13 +35,13 @@ import org.apache.mesos.Protos.TaskInfo;
 
 import com.twitter.aurora.Protobufs;
 import com.twitter.aurora.codec.ThriftBinaryCodec;
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.CommandUtil;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.SchedulerException;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.Resources;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
@@ -62,7 +62,7 @@ public interface MesosTaskFactory {
    * @return A new task.
    * @throws SchedulerException If the task could not be encoded.
    */
-  TaskInfo createFrom(AssignedTask task, SlaveID slaveId) throws SchedulerException;
+  TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException;
 
   // TODO(wfarner): Reduce visibility of this class and instantiate it in a module only.
   public static class ExecutorConfig {
@@ -135,26 +135,26 @@ public interface MesosTaskFactory {
       return String.format("%s.%s.%s", role, environment, jobName);
     }
 
-    public static String getJobSourceName(TaskConfig task) {
+    public static String getJobSourceName(ITaskConfig task) {
       return getJobSourceName(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
     }
 
-    public static String getInstanceSourceName(TaskConfig task) {
+    public static String getInstanceSourceName(ITaskConfig task) {
       return String.format("%s.%s", getJobSourceName(task), task.getShardId());
     }
 
     @Override
-    public TaskInfo createFrom(AssignedTask task, SlaveID slaveId) throws SchedulerException {
+    public TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException {
       checkNotNull(task);
       byte[] taskInBytes;
       try {
-        taskInBytes = ThriftBinaryCodec.encode(task);
+        taskInBytes = ThriftBinaryCodec.encode(task.newBuilder());
       } catch (ThriftBinaryCodec.CodingException e) {
         LOG.log(Level.SEVERE, "Unable to serialize task.", e);
         throw new SchedulerException("Internal error.", e);
       }
 
-      TaskConfig config = task.getTask();
+      ITaskConfig config = task.getTask();
       List<Resource> resources;
       if (task.isSetAssignedPorts()) {
         resources = Resources.from(config)
@@ -168,7 +168,8 @@ public interface MesosTaskFactory {
             + Iterables.transform(resources, Protobufs.SHORT_TOSTRING));
       }
       TaskInfo.Builder taskBuilder =
-          TaskInfo.newBuilder().setName(JobKeys.toPath(Tasks.ASSIGNED_TO_JOB_KEY.apply(task)))
+          TaskInfo.newBuilder()
+              .setName(JobKeys.toPath(Tasks.ASSIGNED_TO_JOB_KEY.apply(task).newBuilder()))
               .setTaskId(TaskID.newBuilder().setValue(task.getTaskId()))
               .setSlaveId(slaveId)
               .addAllResources(resources)

@@ -34,12 +34,12 @@ import com.google.inject.Inject;
 import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -99,9 +99,9 @@ public class SchedulerzHome extends JerseyTemplateServlet {
             CacheBuilder.newBuilder().build(CacheLoader.from(CREATE_ROLE));
 
         // TODO(William Farner): Render this page without an expensive query.
-        Set<ScheduledTask> tasks =
+        Set<IScheduledTask> tasks =
             Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped());
-        for (TaskConfig task : Iterables.transform(tasks, Tasks.SCHEDULED_TO_INFO)) {
+        for (ITaskConfig task : Iterables.transform(tasks, Tasks.SCHEDULED_TO_INFO)) {
           owners.getUnchecked(task.getOwner().getRole()).accumulate(task);
         }
 
@@ -125,7 +125,7 @@ public class SchedulerzHome extends JerseyTemplateServlet {
     private Set<String> jobs = Sets.newHashSet();
     private Set<String> cronJobs = Sets.newHashSet();
 
-    private void accumulate(TaskConfig task) {
+    private void accumulate(ITaskConfig task) {
       jobs.add(task.getJobName());
     }
 

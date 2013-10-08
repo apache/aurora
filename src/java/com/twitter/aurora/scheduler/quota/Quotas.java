@@ -18,10 +18,10 @@ package com.twitter.aurora.scheduler.quota;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
-import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Tasks;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -50,7 +50,7 @@ public final class Quotas {
    * @param job Job to count quota from.
    * @return Quota requirement to run {@code job}.
    */
-  public static Quota fromJob(JobConfiguration job) {
+  public static Quota fromJob(IJobConfiguration job) {
     checkNotNull(job);
     Quota quota = fromProductionTasks(ImmutableSet.of(job.getTaskConfig()));
     quota.setNumCpus(quota.getNumCpus() * job.getShardCount());
@@ -67,7 +67,7 @@ public final class Quotas {
    * @param tasks Tasks to count quota from.
    * @return Quota requirement to run {@code tasks}.
    */
-  public static Quota fromProductionTasks(Iterable<TaskConfig> tasks) {
+  public static Quota fromProductionTasks(Iterable<ITaskConfig> tasks) {
     checkNotNull(tasks);
 
     return fromTasks(Iterables.filter(tasks, Tasks.IS_PRODUCTION));
@@ -79,11 +79,11 @@ public final class Quotas {
    * @param tasks Tasks to count quota from.
    * @return Quota requirement to run {@code tasks}.
    */
-  public static Quota fromTasks(Iterable<TaskConfig> tasks) {
+  public static Quota fromTasks(Iterable<ITaskConfig> tasks) {
     double cpu = 0;
     int ramMb = 0;
     int diskMb = 0;
-    for (TaskConfig task : tasks) {
+    for (ITaskConfig task : tasks) {
       cpu += task.getNumCpus();
       ramMb += task.getRamMb();
       diskMb += task.getDiskMb();

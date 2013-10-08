@@ -30,74 +30,75 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 
-import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Constants;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Utility class providing convenience functions relating to tasks.
  */
 public final class Tasks {
 
-  public static final Function<ScheduledTask, AssignedTask> SCHEDULED_TO_ASSIGNED =
-      new Function<ScheduledTask, AssignedTask>() {
-        @Override public AssignedTask apply(ScheduledTask task) {
+  public static final Function<IScheduledTask, IAssignedTask> SCHEDULED_TO_ASSIGNED =
+      new Function<IScheduledTask, IAssignedTask>() {
+        @Override public IAssignedTask apply(IScheduledTask task) {
           return task.getAssignedTask();
         }
       };
 
-  public static final Function<AssignedTask, TaskConfig> ASSIGNED_TO_INFO =
-      new Function<AssignedTask, TaskConfig>() {
-        @Override public TaskConfig apply(AssignedTask task) {
+  public static final Function<IAssignedTask, ITaskConfig> ASSIGNED_TO_INFO =
+      new Function<IAssignedTask, ITaskConfig>() {
+        @Override public ITaskConfig apply(IAssignedTask task) {
           return task.getTask();
         }
       };
 
-  public static final Function<ScheduledTask, TaskConfig> SCHEDULED_TO_INFO =
+  public static final Function<IScheduledTask, ITaskConfig> SCHEDULED_TO_INFO =
       Functions.compose(ASSIGNED_TO_INFO, SCHEDULED_TO_ASSIGNED);
 
-  public static final Function<AssignedTask, String> ASSIGNED_TO_ID =
-      new Function<AssignedTask, String>() {
-        @Override public String apply(AssignedTask task) {
+  public static final Function<IAssignedTask, String> ASSIGNED_TO_ID =
+      new Function<IAssignedTask, String>() {
+        @Override public String apply(IAssignedTask task) {
           return task.getTaskId();
         }
       };
 
-  public static final Function<ScheduledTask, String> SCHEDULED_TO_ID =
+  public static final Function<IScheduledTask, String> SCHEDULED_TO_ID =
       Functions.compose(ASSIGNED_TO_ID, SCHEDULED_TO_ASSIGNED);
 
-  public static final Function<TaskConfig, Integer> INFO_TO_SHARD_ID =
-      new Function<TaskConfig, Integer>() {
-        @Override public Integer apply(TaskConfig task) {
+  public static final Function<ITaskConfig, Integer> INFO_TO_SHARD_ID =
+      new Function<ITaskConfig, Integer>() {
+        @Override public Integer apply(ITaskConfig task) {
           return task.getShardId();
         }
       };
 
-  public static final Function<ScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
+  public static final Function<IScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
       Functions.compose(INFO_TO_SHARD_ID, SCHEDULED_TO_INFO);
 
-  public static final Function<TaskConfig, JobKey> INFO_TO_JOB_KEY =
-      new Function<TaskConfig, JobKey>() {
-        @Override public JobKey apply(TaskConfig task) {
-          return JobKeys.from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
+  public static final Function<ITaskConfig, IJobKey> INFO_TO_JOB_KEY =
+      new Function<ITaskConfig, IJobKey>() {
+        @Override public IJobKey apply(ITaskConfig task) {
+          return IJobKey.build(
+              JobKeys.from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName()));
         }
       };
 
-  public static final Function<AssignedTask, JobKey> ASSIGNED_TO_JOB_KEY =
+  public static JobKey getJobKey(TaskConfig task) {
+    return JobKeys.from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
+  }
+
+  public static final Function<IAssignedTask, IJobKey> ASSIGNED_TO_JOB_KEY =
       Functions.compose(INFO_TO_JOB_KEY, ASSIGNED_TO_INFO);
 
-  public static final Function<ScheduledTask, JobKey> SCHEDULED_TO_JOB_KEY =
+  public static final Function<IScheduledTask, IJobKey> SCHEDULED_TO_JOB_KEY =
       Functions.compose(ASSIGNED_TO_JOB_KEY, SCHEDULED_TO_ASSIGNED);
-
-  public static final Function<ScheduledTask, ScheduledTask> DEEP_COPY_SCHEDULED =
-      new Function<ScheduledTask, ScheduledTask>() {
-        @Override public ScheduledTask apply(ScheduledTask task) {
-          return task.deepCopy();
-        }
-      };
 
   /**
    * Different states that an active task may be in.
@@ -111,16 +112,16 @@ public final class Tasks {
   public static final Set<ScheduleStatus> TERMINAL_STATES =
       EnumSet.copyOf(Constants.TERMINAL_STATES);
 
-  public static final Predicate<TaskConfig> IS_PRODUCTION =
-      new Predicate<TaskConfig>() {
-        @Override public boolean apply(TaskConfig task) {
+  public static final Predicate<ITaskConfig> IS_PRODUCTION =
+      new Predicate<ITaskConfig>() {
+        @Override public boolean apply(ITaskConfig task) {
           return task.isProduction();
         }
       };
 
-  public static final Function<ScheduledTask, ScheduleStatus> GET_STATUS =
-      new Function<ScheduledTask, ScheduleStatus>() {
-        @Override public ScheduleStatus apply(ScheduledTask task) {
+  public static final Function<IScheduledTask, ScheduleStatus> GET_STATUS =
+      new Function<IScheduledTask, ScheduleStatus>() {
+        @Override public ScheduleStatus apply(IScheduledTask task) {
           return task.getStatus();
         }
       };
@@ -128,7 +129,7 @@ public final class Tasks {
   /**
    * Order by production flag (true, then false), subsorting by task ID.
    */
-  public static final Ordering<AssignedTask> SCHEDULING_ORDER =
+  public static final Ordering<IAssignedTask> SCHEDULING_ORDER =
       Ordering.explicit(true, false)
           .onResultOf(Functions.compose(Functions.forPredicate(IS_PRODUCTION), ASSIGNED_TO_INFO))
           .compound(Ordering.natural().onResultOf(ASSIGNED_TO_ID));
@@ -138,11 +139,11 @@ public final class Tasks {
   }
 
   /**
-   * A utility method that returns a multi-map of tasks keyed by JobKey.
+   * A utility method that returns a multi-map of tasks keyed by IJobKey.
    * @param tasks A list of tasks to be keyed by map
    * @return A multi-map of tasks keyed by job key.
    */
-  public static Multimap<JobKey, ScheduledTask> byJobKey(Iterable<ScheduledTask> tasks) {
+  public static Multimap<IJobKey, IScheduledTask> byJobKey(Iterable<IScheduledTask> tasks) {
     return Multimaps.index(tasks, Tasks.SCHEDULED_TO_JOB_KEY);
   }
 
@@ -154,27 +155,32 @@ public final class Tasks {
     return TERMINAL_STATES.contains(status);
   }
 
+  public static String id(IScheduledTask task) {
+    return task.getAssignedTask().getTaskId();
+  }
+
+  // TODO(William Farner: Remove this once the code base is switched to IScheduledTask.
   public static String id(ScheduledTask task) {
     return task.getAssignedTask().getTaskId();
   }
 
-  public static Set<String> ids(Iterable<ScheduledTask> tasks) {
+  public static Set<String> ids(Iterable<IScheduledTask> tasks) {
     return ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_ID));
   }
 
-  public static Set<String> ids(ScheduledTask... tasks) {
+  public static Set<String> ids(IScheduledTask... tasks) {
     return ids(ImmutableList.copyOf(tasks));
   }
 
-  public static Map<String, ScheduledTask> mapById(Iterable<ScheduledTask> tasks) {
+  public static Map<String, IScheduledTask> mapById(Iterable<IScheduledTask> tasks) {
     return Maps.uniqueIndex(tasks, SCHEDULED_TO_ID);
   }
 
-  public static String getRole(ScheduledTask task) {
+  public static String getRole(IScheduledTask task) {
     return task.getAssignedTask().getTask().getOwner().getRole();
   }
 
-  public static String getJob(ScheduledTask task) {
+  public static String getJob(IScheduledTask task) {
     return task.getAssignedTask().getTask().getJobName();
   }
 }

@@ -33,8 +33,6 @@ import com.google.common.collect.Sets;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -43,6 +41,8 @@ import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StorageException;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
@@ -83,21 +83,15 @@ class Preempter implements Runnable {
 
   private static final Logger LOG = Logger.getLogger(Preempter.class.getName());
 
-  private static final Predicate<AssignedTask> IS_PRODUCTION = new Predicate<AssignedTask>() {
-    @Override public boolean apply(AssignedTask task) {
-      return task.getTask().isProduction();
-    }
-  };
-
-  private static final Function<AssignedTask, Integer> GET_PRIORITY =
-      new Function<AssignedTask, Integer>() {
-        @Override public Integer apply(AssignedTask task) {
+  private static final Function<IAssignedTask, Integer> GET_PRIORITY =
+      new Function<IAssignedTask, Integer>() {
+        @Override public Integer apply(IAssignedTask task) {
           return task.getTask().getPriority();
         }
       };
 
-  private final Predicate<ScheduledTask> isIdleTask = new Predicate<ScheduledTask>() {
-    @Override public boolean apply(ScheduledTask task) {
+  private final Predicate<IScheduledTask> isIdleTask = new Predicate<IScheduledTask>() {
+    @Override public boolean apply(IScheduledTask task) {
       return (clock.nowMillis() - Iterables.getLast(task.getTaskEvents()).getTimestamp())
           >= preemptionCandidacyDelay.as(Time.MILLISECONDS);
     }
@@ -133,20 +127,20 @@ class Preempter implements Runnable {
     this.clock = checkNotNull(clock);
   }
 
-  private List<AssignedTask> fetch(Query.Builder query, Predicate<ScheduledTask> filter) {
+  private List<IAssignedTask> fetch(Query.Builder query, Predicate<IScheduledTask> filter) {
     return Lists.newArrayList(Iterables.transform(Iterables.filter(
         Storage.Util.consistentFetchTasks(storage, query), filter),
         SCHEDULED_TO_ASSIGNED));
   }
 
-  private List<AssignedTask> fetch(Query.Builder query) {
-    return fetch(query, Predicates.<ScheduledTask>alwaysTrue());
+  private List<IAssignedTask> fetch(Query.Builder query) {
+    return fetch(query, Predicates.<IScheduledTask>alwaysTrue());
   }
 
   @Override
   public void run() {
     // We are only interested in preempting in favor of pending tasks.
-    List<AssignedTask> pendingTasks;
+    List<IAssignedTask> pendingTasks;
     try {
       pendingTasks = fetch(PENDING_QUERY, isIdleTask);
     } catch (StorageException e) {
@@ -159,7 +153,7 @@ class Preempter implements Runnable {
     }
 
     // Only non-pending active tasks may be preempted.
-    List<AssignedTask> activeTasks = fetch(ACTIVE_NOT_PENDING_QUERY);
+    List<IAssignedTask> activeTasks = fetch(ACTIVE_NOT_PENDING_QUERY);
     if (activeTasks.isEmpty()) {
       return;
     }
@@ -170,7 +164,7 @@ class Preempter implements Runnable {
     // Walk through the preemption candidates in reverse scheduling order.
     Collections.sort(activeTasks, Tasks.SCHEDULING_ORDER.reverse());
 
-    for (AssignedTask preemptableTask : activeTasks) {
+    for (IAssignedTask preemptableTask : activeTasks) {
       // TODO(William Farner): This doesn't fully work, since the preemption is based solely on
       // the resources reserved for the task running, and does not account for slack resource on
       // the machine.  For example, a machine has 1 CPU available, and is running a low priority
@@ -178,13 +172,13 @@ class Preempter implements Runnable {
       // still not be scheduled.  This implies that a preempter would need to be in the resource
       // offer flow, or that we should make accepting of resource offers asynchronous, so that we
       // operate scheduling and preemption in an independent loop.
-      Predicate<AssignedTask> preemptionFilter = preemptionFilter(preemptableTask);
+      Predicate<IAssignedTask> preemptionFilter = preemptionFilter(preemptableTask);
 
       Resources slot = Resources.from(preemptableTask.getTask());
       String host = preemptableTask.getSlaveHost();
 
-      AssignedTask preempting = null;
-      for (AssignedTask task : Iterables.filter(pendingTasks, preemptionFilter)) {
+      IAssignedTask preempting = null;
+      for (IAssignedTask task : Iterables.filter(pendingTasks, preemptionFilter)) {
         if (schedulingFilter.filter(slot, host, task.getTask(), task.getTaskId()).isEmpty()) {
           preempting = task;
           break;
@@ -202,6 +196,9 @@ class Preempter implements Runnable {
     }
   }
 
+  private static final Predicate<IAssignedTask> IS_PRODUCTION =
+      Predicates.compose(Tasks.IS_PRODUCTION, Tasks.ASSIGNED_TO_INFO);
+
   /**
    * Creates a static filter that will identify tasks that may preempt the provided task.
    * A task may preempt another task if the following conditions hold true:
@@ -213,12 +210,12 @@ class Preempter implements Runnable {
    * @return A filter that will compare the priorities and resources required by other tasks
    *     with {@code preemptableTask}.
    */
-  private Predicate<AssignedTask> preemptionFilter(AssignedTask preemptableTask) {
-    Predicate<AssignedTask> preemptableIsProduction = preemptableTask.getTask().isProduction()
-        ? Predicates.<AssignedTask>alwaysTrue()
-        : Predicates.<AssignedTask>alwaysFalse();
+  private Predicate<IAssignedTask> preemptionFilter(IAssignedTask preemptableTask) {
+    Predicate<IAssignedTask> preemptableIsProduction = preemptableTask.getTask().isProduction()
+        ? Predicates.<IAssignedTask>alwaysTrue()
+        : Predicates.<IAssignedTask>alwaysFalse();
 
-    Predicate<AssignedTask> priorityFilter =
+    Predicate<IAssignedTask> priorityFilter =
         greaterPriorityFilter(GET_PRIORITY.apply(preemptableTask));
     return Predicates.or(
         Predicates.and(Predicates.not(preemptableIsProduction), IS_PRODUCTION),
@@ -226,15 +223,15 @@ class Preempter implements Runnable {
     );
   }
 
-  private Predicate<AssignedTask> isOwnedBy(final String role) {
-    return new Predicate<AssignedTask>() {
-      @Override public boolean apply(AssignedTask task) {
+  private Predicate<IAssignedTask> isOwnedBy(final String role) {
+    return new Predicate<IAssignedTask>() {
+      @Override public boolean apply(IAssignedTask task) {
         return getRole(task).equals(role);
       }
     };
   }
 
-  private static String getRole(AssignedTask task) {
+  private static String getRole(IAssignedTask task) {
     return task.getTask().getOwner().getRole();
   }
 
@@ -246,7 +243,7 @@ class Preempter implements Runnable {
     };
   }
 
-  private static Predicate<AssignedTask> greaterPriorityFilter(int priority) {
+  private static Predicate<IAssignedTask> greaterPriorityFilter(int priority) {
     return Predicates.compose(greaterThan(priority), GET_PRIORITY);
   }
 }

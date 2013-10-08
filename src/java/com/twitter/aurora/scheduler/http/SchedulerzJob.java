@@ -50,14 +50,8 @@ import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 
-import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Constants;
-import com.twitter.aurora.gen.Constraint;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -65,6 +59,12 @@ import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
 import com.twitter.aurora.scheduler.metadata.NearestFit;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IConstraint;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConstraint;
+import com.twitter.aurora.scheduler.storage.entities.ITaskEvent;
 import com.twitter.common.base.Closure;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -92,7 +92,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
   private static final String OFFSET_PARAM = "o";
   private static final int PAGE_SIZE = 50;
 
-  private static final Ordering<ScheduledTask> SHARD_ID_COMPARATOR =
+  private static final Ordering<IScheduledTask> SHARD_ID_COMPARATOR =
     Ordering.natural().onResultOf(Tasks.SCHEDULED_TO_SHARD_ID);
 
   private static final Map<ScheduleStatus, Set<ScheduleStatus>> FILTER_MAP =
@@ -103,12 +103,12 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         .put(FAILED, EnumSet.of(LOST, FAILED))
       .build();
 
-  private static final Comparator<ScheduledTask> REVERSE_CHRON_COMPARATOR =
-      new Comparator<ScheduledTask>() {
-        @Override public int compare(ScheduledTask taskA, ScheduledTask taskB) {
+  private static final Comparator<IScheduledTask> REVERSE_CHRON_COMPARATOR =
+      new Comparator<IScheduledTask>() {
+        @Override public int compare(IScheduledTask taskA, IScheduledTask taskB) {
           // Sort in reverse chronological order.
-          Iterable<TaskEvent> taskAEvents = taskA.getTaskEvents();
-          Iterable<TaskEvent> taskBEvents = taskB.getTaskEvents();
+          Iterable<ITaskEvent> taskAEvents = taskA.getTaskEvents();
+          Iterable<ITaskEvent> taskBEvents = taskB.getTaskEvents();
 
           boolean taskAHasEvents = taskAEvents != null && !Iterables.isEmpty(taskAEvents);
           boolean taskBHasEvents = taskBEvents != null && !Iterables.isEmpty(taskBEvents);
@@ -133,9 +133,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
   private static final String TASK_ID_REGEXP = "%task_id%";
   private static final String HOST_REGEXP = "%host%";
 
-  private static String expandText(String value, AssignedTask task) {
+  private static String expandText(String value, IAssignedTask task) {
     String expanded = value;
-    TaskConfig config = task.getTask();
+    ITaskConfig config = task.getTask();
 
     expanded = expanded.replaceAll(SHARD_ID_REGEXP, String.valueOf(config.getShardId()));
     expanded = expanded.replaceAll(TASK_ID_REGEXP, task.getTaskId());
@@ -156,10 +156,10 @@ public class SchedulerzJob extends JerseyTemplateServlet {
     return expanded;
   }
 
-  private final Function<ScheduledTask, Map<String, Object>> taskToStringMap =
-      new Function<ScheduledTask, Map<String, Object>>() {
-        @Override public Map<String, Object> apply(ScheduledTask scheduledTask) {
-          final AssignedTask task = scheduledTask.getAssignedTask();
+  private final Function<IScheduledTask, Map<String, Object>> taskToStringMap =
+      new Function<IScheduledTask, Map<String, Object>>() {
+        @Override public Map<String, Object> apply(IScheduledTask scheduledTask) {
+          final IAssignedTask task = scheduledTask.getAssignedTask();
           ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
             .put("taskId", task.getTaskId())
             .put("shardId", task.getTask().getShardId())
@@ -233,11 +233,11 @@ public class SchedulerzJob extends JerseyTemplateServlet {
     return (mb >= 1024) ? ((mb / 1024) + " GiB") : (mb + " MiB");
   }
 
-  private static final Function<Constraint, String> DISPLAY_CONSTRAINT =
-      new Function<Constraint, String>() {
-        @Override public String apply(Constraint constraint) {
+  private static final Function<IConstraint, String> DISPLAY_CONSTRAINT =
+      new Function<IConstraint, String>() {
+        @Override public String apply(IConstraint constraint) {
           StringBuilder sb = new StringBuilder().append(constraint.getName()).append(": ");
-          TaskConstraint taskConstraint = constraint.getConstraint();
+          ITaskConstraint taskConstraint = constraint.getConstraint();
           switch (taskConstraint.getSetField()) {
             case VALUE:
               if (taskConstraint.getValue().isNegated()) {
@@ -258,16 +258,16 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         }
       };
 
-  private static final Function<TaskConfig, SchedulingDetails> CONFIG_TO_DETAILS =
-      new Function<TaskConfig, SchedulingDetails>() {
-        @Override public SchedulingDetails apply(TaskConfig task) {
+  private static final Function<ITaskConfig, SchedulingDetails> CONFIG_TO_DETAILS =
+      new Function<ITaskConfig, SchedulingDetails>() {
+        @Override public SchedulingDetails apply(ITaskConfig task) {
           String resources = Joiner.on(", ").join(
               "cpu: " + task.getNumCpus(),
               "ram: " + scaleMb(task.getRamMb()),
               "disk: " + scaleMb(task.getDiskMb()));
           ImmutableMap.Builder<String, Object> details = ImmutableMap.<String, Object>builder()
               .put("resources", resources);
-          if (task.getConstraintsSize() > 0) {
+          if (!task.getConstraints().isEmpty()) {
             Iterable<String> displayConstraints = FluentIterable.from(task.getConstraints())
                 .transform(DISPLAY_CONSTRAINT)
                 .toSortedList(Ordering.<String>natural());
@@ -279,11 +279,11 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           if (task.isProduction()) {
             details.put("production", "true");
           }
-          if (task.getRequestedPortsSize() > 0) {
+          if (!task.getRequestedPorts().isEmpty()) {
             details.put("ports",
                 Joiner.on(", ").join(ImmutableSortedSet.copyOf(task.getRequestedPorts())));
           }
-          if (task.getPackagesSize() > 0) {
+          if (!task.getPackages().isEmpty()) {
             List<String> packages = Ordering.natural().sortedCopy(
                 Iterables.transform(task.getPackages(), TransformationUtils.PACKAGE_TOSTRING));
             details.put(
@@ -325,9 +325,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
 
   private static Map<String, SchedulingDetails> buildSchedulingTable(
-      Iterable<TaskConfig> tasks) {
+      Iterable<ITaskConfig> tasks) {
 
-    Map<Integer, TaskConfig> byShard = Maps.uniqueIndex(tasks, Tasks.INFO_TO_SHARD_ID);
+    Map<Integer, ITaskConfig> byShard = Maps.uniqueIndex(tasks, Tasks.INFO_TO_SHARD_ID);
     Map<Integer, SchedulingDetails> detailsByShard =
         Maps.transformValues(byShard, CONFIG_TO_DETAILS);
     Multimap<SchedulingDetails, Integer> shardsByDetails = Multimaps.invertFrom(
@@ -395,9 +395,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         }
 
         if (activeQuery.isPresent()) {
-          Set<ScheduledTask> activeTasks =
+          Set<IScheduledTask> activeTasks =
               Storage.Util.weaklyConsistentFetchTasks(storage, activeQuery.get());
-          List<ScheduledTask> liveTasks = SHARD_ID_COMPARATOR.sortedCopy(activeTasks);
+          List<IScheduledTask> liveTasks = SHARD_ID_COMPARATOR.sortedCopy(activeTasks);
           template.setAttribute("activeTasks",
               ImmutableList.copyOf(
                   Iterables.transform(offsetAndLimit(liveTasks, offset), taskToStringMap)));
@@ -406,7 +406,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
               buildSchedulingTable(Iterables.transform(liveTasks, Tasks.SCHEDULED_TO_INFO)));
         }
         if (completedQuery.isPresent()) {
-          List<ScheduledTask> completedTasks = Lists.newArrayList(
+          List<IScheduledTask> completedTasks = Lists.newArrayList(
               Storage.Util.weaklyConsistentFetchTasks(storage, completedQuery.get()));
           Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
           template.setAttribute("completedTasks",

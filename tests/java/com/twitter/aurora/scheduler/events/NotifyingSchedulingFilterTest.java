@@ -27,6 +27,7 @@ import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.events.PubsubEvent.Vetoed;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -35,10 +36,10 @@ import static org.junit.Assert.assertEquals;
 
 public class NotifyingSchedulingFilterTest extends EasyMockTest {
 
-  private static final TaskConfig TASK = new TaskConfig()
+  private static final ITaskConfig TASK = ITaskConfig.build(new TaskConfig()
       .setNumCpus(1)
       .setRamMb(1024)
-      .setDiskMb(1024);
+      .setDiskMb(1024));
   private static final Resources TASK_RESOURCES = Resources.from(TASK);
   private static final String TASK_ID = "taskId";
   private static final String SLAVE = "slaveHost";

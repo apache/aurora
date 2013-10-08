@@ -40,6 +40,7 @@ import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Volatile;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.common.util.Clock;
@@ -76,14 +77,16 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       ATTRIBUTE_FIELD,
       new SnapshotField() {
         @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
-          snapshot.setTasks(store.getTaskStore().fetchTasks(Query.unscoped()));
+          snapshot.setTasks(
+              IScheduledTask.toBuildersSet(store.getTaskStore().fetchTasks(Query.unscoped())));
         }
 
         @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           store.getUnsafeTaskStore().deleteAllTasks();
 
           if (snapshot.isSetTasks()) {
-            store.getUnsafeTaskStore().saveTasks(snapshot.getTasks());
+            store.getUnsafeTaskStore().saveTasks(
+                IScheduledTask.setFromBuilders(snapshot.getTasks()));
           }
         }
       },

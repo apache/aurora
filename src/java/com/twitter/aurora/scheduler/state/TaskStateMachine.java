@@ -36,6 +36,7 @@ import org.apache.commons.lang.builder.HashCodeBuilder;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskEvent;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
 import com.twitter.common.base.Command;
@@ -105,20 +106,20 @@ class TaskStateMachine {
    */
   private static class State {
     private final ScheduleStatus state;
-    private final Function<ScheduledTask, ScheduledTask> mutation;
+    private final Function<IScheduledTask, IScheduledTask> mutation;
 
-    State(ScheduleStatus state, Function<ScheduledTask, ScheduledTask> mutation) {
+    State(ScheduleStatus state, Function<IScheduledTask, IScheduledTask> mutation) {
       this.state = state;
       this.mutation = mutation;
     }
 
     static State create(ScheduleStatus status) {
-      return create(status, Functions.<ScheduledTask>identity());
+      return create(status, Functions.<IScheduledTask>identity());
     }
 
     static State create(
         ScheduleStatus status,
-        Function<ScheduledTask, ScheduledTask> mutation) {
+        Function<IScheduledTask, IScheduledTask> mutation) {
 
       return new State(status, mutation);
     }
@@ -153,7 +154,7 @@ class TaskStateMachine {
       return state;
     }
 
-    private Function<ScheduledTask, ScheduledTask> getMutation() {
+    private Function<IScheduledTask, IScheduledTask> getMutation() {
       return mutation;
     }
   }
@@ -173,7 +174,7 @@ class TaskStateMachine {
     void addWork(
         WorkCommand work,
         TaskStateMachine stateMachine,
-        Function<ScheduledTask, ScheduledTask> mutation);
+        Function<IScheduledTask, IScheduledTask> mutation);
   }
 
   /**
@@ -190,7 +191,7 @@ class TaskStateMachine {
    */
   public TaskStateMachine(
       final String taskId,
-      final ScheduledTask task,
+      final IScheduledTask task,
       final Supplier<Boolean> isJobUpdating,
       final WorkSink workSink,
       final Clock clock,
@@ -587,10 +588,10 @@ class TaskStateMachine {
   }
 
   private void addWork(WorkCommand work) {
-    addWork(work, Functions.<ScheduledTask>identity());
+    addWork(work, Functions.<IScheduledTask>identity());
   }
 
-  private void addWork(WorkCommand work, Function<ScheduledTask, ScheduledTask> mutation) {
+  private void addWork(WorkCommand work, Function<IScheduledTask, IScheduledTask> mutation) {
     LOG.info("Adding work command " + work + " for " + this);
     workSink.addWork(work, TaskStateMachine.this, mutation);
   }
@@ -602,7 +603,7 @@ class TaskStateMachine {
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
   public synchronized boolean updateState(ScheduleStatus status) {
-    return updateState(status, Functions.<ScheduledTask>identity());
+    return updateState(status, Functions.<IScheduledTask>identity());
   }
 
   /**
@@ -613,7 +614,7 @@ class TaskStateMachine {
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
   public synchronized boolean updateState(ScheduleStatus status, Optional<String> auditMessage) {
-    return updateState(status, Functions.<ScheduledTask>identity(), auditMessage);
+    return updateState(status, Functions.<IScheduledTask>identity(), auditMessage);
   }
 
   /**
@@ -625,7 +626,7 @@ class TaskStateMachine {
    */
   public synchronized boolean updateState(
       ScheduleStatus status,
-      Function<ScheduledTask, ScheduledTask> mutation) {
+      Function<IScheduledTask, IScheduledTask> mutation) {
 
     return updateState(status, mutation, Optional.<String>absent());
   }
@@ -642,7 +643,7 @@ class TaskStateMachine {
    */
   public synchronized boolean updateState(
       final ScheduleStatus status,
-      Function<ScheduledTask, ScheduledTask> mutation,
+      Function<IScheduledTask, IScheduledTask> mutation,
       final Optional<String> auditMessage) {
 
     checkNotNull(status);
@@ -655,15 +656,16 @@ class TaskStateMachine {
      * a different way to suppress noop transitions.
      */
     if (stateMachine.getState().getState() != status) {
-      Function<ScheduledTask, ScheduledTask> operation = Functions.compose(mutation,
-          new Function<ScheduledTask, ScheduledTask>() {
-            @Override public ScheduledTask apply(ScheduledTask task) {
-              task.addToTaskEvents(new TaskEvent()
+      Function<IScheduledTask, IScheduledTask> operation = Functions.compose(mutation,
+          new Function<IScheduledTask, IScheduledTask>() {
+            @Override public IScheduledTask apply(IScheduledTask task) {
+              ScheduledTask builder = task.newBuilder();
+              builder.addToTaskEvents(new TaskEvent()
                   .setTimestamp(clock.nowMillis())
                   .setStatus(status)
                   .setMessage(auditMessage.orNull())
                   .setScheduler(LOCAL_HOST_SUPPLIER.get()));
-              return task;
+              return IScheduledTask.build(builder);
             }
           });
       return stateMachine.transition(State.create(status, operation));

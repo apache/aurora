@@ -32,7 +32,6 @@ import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
@@ -42,6 +41,7 @@ import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.stats.StatsProvider;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -119,7 +119,7 @@ class TaskVars implements EventSubscriber {
       return;
     }
 
-    ScheduledTask task = stateChange.getTask();
+    IScheduledTask task = stateChange.getTask();
     if (stateChange.getOldState() != ScheduleStatus.INIT) {
       decrementCount(stateChange.getOldState());
     }
@@ -146,7 +146,7 @@ class TaskVars implements EventSubscriber {
 
   @Subscribe
   public void storageStarted(StorageStarted event) {
-    for (ScheduledTask task : Storage.Util.consistentFetchTasks(storage, Query.unscoped())) {
+    for (IScheduledTask task : Storage.Util.consistentFetchTasks(storage, Query.unscoped())) {
       incrementCount(task.getStatus());
     }
 
@@ -165,7 +165,7 @@ class TaskVars implements EventSubscriber {
       return;
     }
 
-    for (ScheduledTask task : event.getTasks()) {
+    for (IScheduledTask task : event.getTasks()) {
       decrementCount(task.getStatus());
     }
   }

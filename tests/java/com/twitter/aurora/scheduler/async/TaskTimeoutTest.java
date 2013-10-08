@@ -38,6 +38,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.state.StateManager;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -126,9 +127,9 @@ public class TaskTimeoutTest extends EasyMockTest {
   }
 
   private void changeState(String taskId, ScheduleStatus from, ScheduleStatus to) {
-    ScheduledTask task = new ScheduledTask()
+    IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setStatus(to)
-        .setAssignedTask(new AssignedTask().setTaskId(taskId));
+        .setAssignedTask(new AssignedTask().setTaskId(taskId)));
     timeout.recordStateChange(new TaskStateChange(task, from));
   }
 
@@ -196,13 +197,17 @@ public class TaskTimeoutTest extends EasyMockTest {
     checkStat(TaskTimeout.TIMED_OUT_TASKS_COUNTER, 0);
   }
 
-  private static ScheduledTask makeTask(String taskId, ScheduleStatus status, long stateEnteredMs) {
-    return new ScheduledTask()
+  private static IScheduledTask makeTask(
+      String taskId,
+      ScheduleStatus status,
+      long stateEnteredMs) {
+
+    return IScheduledTask.build(new ScheduledTask()
         .setStatus(status)
         .setTaskEvents(ImmutableList.of(new TaskEvent(stateEnteredMs, status)))
         .setAssignedTask(new AssignedTask()
             .setTaskId(taskId)
-            .setTask(new TaskConfig()));
+            .setTask(new TaskConfig())));
   }
 
   @Test

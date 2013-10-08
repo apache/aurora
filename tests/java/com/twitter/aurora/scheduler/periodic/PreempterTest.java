@@ -15,6 +15,7 @@
  */
 package com.twitter.aurora.scheduler.periodic;
 
+import java.util.Arrays;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
@@ -34,6 +35,9 @@ import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -94,11 +98,15 @@ public class PreempterTest extends EasyMockTest {
   }
 
   private void expectGetPendingTasks(ScheduledTask... returnedTasks) {
-    storageUtil.expectTaskFetch(Preempter.PENDING_QUERY, returnedTasks);
+    storageUtil.expectTaskFetch(
+        Preempter.PENDING_QUERY,
+        IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
   }
 
   private void expectGetActiveTasks(ScheduledTask... returnedTasks) {
-    storageUtil.expectTaskFetch(Preempter.ACTIVE_NOT_PENDING_QUERY, returnedTasks);
+    storageUtil.expectTaskFetch(
+        Preempter.ACTIVE_NOT_PENDING_QUERY,
+        IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
   }
 
   @Test
@@ -291,7 +299,7 @@ public class PreempterTest extends EasyMockTest {
     return expect(schedulingFilter.filter(
         EasyMock.<Resources>anyObject(),
         EasyMock.<String>anyObject(),
-        EasyMock.<TaskConfig>anyObject(),
+        EasyMock.<ITaskConfig>anyObject(),
         EasyMock.<String>anyObject())).andAnswer(
         new IAnswer<Set<Veto>>() {
           @Override public Set<Veto> answer() {
@@ -302,7 +310,9 @@ public class PreempterTest extends EasyMockTest {
   }
 
   private void expectPreempted(ScheduledTask preempted, ScheduledTask preempting) throws Exception {
-    scheduler.preemptTask(preempted.getAssignedTask(), preempting.getAssignedTask());
+    scheduler.preemptTask(
+        IAssignedTask.build(preempted.getAssignedTask()),
+        IAssignedTask.build(preempting.getAssignedTask()));
   }
 
   private ScheduledTask makeTask(String role, String job, String taskId, int priority) {

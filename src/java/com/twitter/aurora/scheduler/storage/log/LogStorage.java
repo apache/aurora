@@ -47,8 +47,6 @@ import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
@@ -81,6 +79,8 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.log.LogManager.StreamManager;
 import com.twitter.aurora.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
 import com.twitter.common.application.ShutdownRegistry;
@@ -399,12 +399,12 @@ public class LogStorage extends ForwardingStore
         break;
 
       case SAVE_TASKS:
-        saveTasks(op.getSaveTasks().getTasks());
+        saveTasks(IScheduledTask.setFromBuilders(op.getSaveTasks().getTasks()));
         break;
 
       case REWRITE_TASK:
         RewriteTask rewriteTask = op.getRewriteTask();
-        unsafeModifyInPlace(rewriteTask.getTaskId(), rewriteTask.getTask());
+        unsafeModifyInPlace(rewriteTask.getTaskId(), ITaskConfig.build(rewriteTask.getTask()));
         break;
 
       case REMOVE_TASKS:
@@ -560,10 +560,10 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_log_tasks_save")
   @Override
-  public void saveTasks(final Set<ScheduledTask> newTasks) throws IllegalStateException {
+  public void saveTasks(final Set<IScheduledTask> newTasks) throws IllegalStateException {
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.saveTasks(new SaveTasks(newTasks)));
+        log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(newTasks))));
         LogStorage.super.saveTasks(newTasks);
       }
     });
@@ -595,22 +595,22 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_log_tasks_mutate")
   @Override
-  public ImmutableSet<ScheduledTask> mutateTasks(
+  public ImmutableSet<IScheduledTask> mutateTasks(
       final Query.Builder query,
-      final Function<ScheduledTask, ScheduledTask> mutator) {
+      final Function<IScheduledTask, IScheduledTask> mutator) {
 
-    return write(new MutateWork.Quiet<ImmutableSet<ScheduledTask>>() {
-      @Override public ImmutableSet<ScheduledTask> apply(MutableStoreProvider unused) {
-        ImmutableSet<ScheduledTask> mutated = LogStorage.super.mutateTasks(query, mutator);
+    return write(new MutateWork.Quiet<ImmutableSet<IScheduledTask>>() {
+      @Override public ImmutableSet<IScheduledTask> apply(MutableStoreProvider unused) {
+        ImmutableSet<IScheduledTask> mutated = LogStorage.super.mutateTasks(query, mutator);
 
-        Map<String, ScheduledTask> tasksById = Tasks.mapById(mutated);
+        Map<String, IScheduledTask> tasksById = Tasks.mapById(mutated);
         if (LOG.isLoggable(Level.FINE)) {
           LOG.fine("Storing updated tasks to log: "
               + Maps.transformValues(tasksById, Tasks.GET_STATUS));
         }
 
         // TODO(William Farner): Avoid writing an op when mutated is empty.
-        log(Op.saveTasks(new SaveTasks(mutated)));
+        log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
         return mutated;
       }
     });
@@ -618,12 +618,12 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_log_unsafe_modify_in_place")
   @Override
-  public boolean unsafeModifyInPlace(final String taskId, final TaskConfig taskConfiguration) {
+  public boolean unsafeModifyInPlace(final String taskId, final ITaskConfig taskConfiguration) {
     return write(new MutateWork.Quiet<Boolean>() {
       @Override public Boolean apply(MutableStoreProvider storeProvider) {
         boolean mutated = LogStorage.super.unsafeModifyInPlace(taskId, taskConfiguration);
         if (mutated) {
-          log(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration)));
+          log(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration.newBuilder())));
         }
         return mutated;
       }

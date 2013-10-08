@@ -37,12 +37,12 @@ import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.stats.ResourceCounter;
 import com.twitter.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
 import com.twitter.aurora.scheduler.stats.ResourceCounter.Metric;
 import com.twitter.aurora.scheduler.stats.ResourceCounter.MetricType;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.util.templating.StringTemplateHelper;
@@ -179,8 +179,8 @@ public class Utilization {
   public Response aggregateRoles(@PathParam("metric") final String metric) {
     final MetricType type = getTypeByName(metric);
 
-    Function<TaskConfig, Display> toKey = new Function<TaskConfig, Display>() {
-      @Override public Display apply(TaskConfig task) {
+    Function<ITaskConfig, Display> toKey = new Function<ITaskConfig, Display>() {
+      @Override public Display apply(ITaskConfig task) {
         String role = task.getOwner().getRole();
         return new Display(role, metric + "/" + role);
       }
@@ -205,8 +205,8 @@ public class Utilization {
       @PathParam("role") String role) {
 
     MetricType type = getTypeByName(metric);
-    Function<TaskConfig, Display> toKey = new Function<TaskConfig, Display>() {
-      @Override public Display apply(TaskConfig task) {
+    Function<ITaskConfig, Display> toKey = new Function<ITaskConfig, Display>() {
+      @Override public Display apply(ITaskConfig task) {
         return new Display(task.getJobName(), null);
       }
     };

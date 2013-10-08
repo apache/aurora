@@ -38,7 +38,6 @@ import org.apache.mesos.Protos.TaskStatus;
 import com.twitter.aurora.Protobufs;
 import com.twitter.aurora.codec.ThriftBinaryCodec;
 import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.comm.AdjustRetainedTasks;
 import com.twitter.aurora.scheduler.PulseMonitor;
 import com.twitter.aurora.scheduler.TaskLauncher;
@@ -47,6 +46,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
@@ -100,7 +100,7 @@ public class GcExecutorLauncher implements TaskLauncher {
       return Optional.absent();
     }
 
-    Set<ScheduledTask> tasksOnHost =
+    Set<IScheduledTask> tasksOnHost =
         Storage.Util.weaklyConsistentFetchTasks(storage, Query.slaveScoped(offer.getHostname()));
     AdjustRetainedTasks message = new AdjustRetainedTasks()
         .setRetainedTasks(Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS));

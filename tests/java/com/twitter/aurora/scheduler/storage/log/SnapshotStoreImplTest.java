@@ -41,6 +41,7 @@ import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.storage.SnapshotStore;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
@@ -67,8 +68,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
 
   @Test
   public void testCreateAndRestoreNewSnapshot() {
-    ImmutableSet<ScheduledTask> tasks =
-        ImmutableSet.of(new ScheduledTask().setStatus(ScheduleStatus.PENDING));
+    ImmutableSet<IScheduledTask> tasks = ImmutableSet.of(
+        IScheduledTask.build(new ScheduledTask().setStatus(ScheduleStatus.PENDING)));
     Set<QuotaConfiguration> quotas =
         ImmutableSet.of(new QuotaConfiguration("steve", Quotas.noQuota()));
     HostAttributes attribute = new HostAttributes("host",
@@ -115,7 +116,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
 
     Snapshot expected = new Snapshot()
         .setTimestamp(NOW)
-        .setTasks(tasks)
+        .setTasks(IScheduledTask.toBuildersSet(tasks))
         .setQuotaConfigurations(quotas)
         .setHostAttributes(ImmutableSet.of(attribute))
         .setJobs(ImmutableSet.of(job))

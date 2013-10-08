@@ -33,11 +33,8 @@ import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.Attribute;
-import com.twitter.aurora.gen.Constraint;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.aurora.scheduler.base.Query;
@@ -49,6 +46,9 @@ import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work.Quiet;
+import com.twitter.aurora.scheduler.storage.entities.IConstraint;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
@@ -99,17 +99,17 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   /**
    * A function that may veto a task.
    */
-  private interface FilterRule extends Function<TaskConfig, Iterable<Veto>> { }
+  private interface FilterRule extends Function<ITaskConfig, Iterable<Veto>> { }
 
   /**
    * Convenience class for a rule that will only ever have a single veto.
    */
   private abstract static class SingleVetoRule implements FilterRule {
-    @Override public final Iterable<Veto> apply(TaskConfig task) {
+    @Override public final Iterable<Veto> apply(ITaskConfig task) {
       return doApply(task).asSet();
     }
 
-    abstract Optional<Veto> doApply(TaskConfig task);
+    abstract Optional<Veto> doApply(ITaskConfig task);
   }
 
   // Scaling ranges to use for comparison of vetos.  This has no real bearing besides trying to
@@ -156,39 +156,39 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private Iterable<FilterRule> rulesFromOffer(final Resources available) {
     return ImmutableList.<FilterRule>of(
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(TaskConfig task) {
+          @Override public Optional<Veto> doApply(ITaskConfig task) {
             return CPU.maybeVeto(
                 available.getNumCpus(),
                 MesosTaskFactoryImpl.getTotalTaskCpus(task.getNumCpus()));
           }
         },
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(TaskConfig task) {
+          @Override public Optional<Veto> doApply(ITaskConfig task) {
             return RAM.maybeVeto(
                 available.getRam().as(Data.MB),
                 MesosTaskFactoryImpl.getTotalTaskRam(task.getRamMb()).as(Data.MB));
           }
         },
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(TaskConfig task) {
+          @Override public Optional<Veto> doApply(ITaskConfig task) {
             return DISK.maybeVeto(available.getDisk().as(Data.MB), task.getDiskMb());
           }
         },
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(TaskConfig task) {
+          @Override public Optional<Veto> doApply(ITaskConfig task) {
             return PORTS.maybeVeto(available.getNumPorts(), task.getRequestedPorts().size());
           }
         }
     );
   }
 
-  private static boolean isValueConstraint(Constraint constraint) {
-    return constraint.getConstraint().isSet(TaskConstraint._Fields.VALUE);
+  private static boolean isValueConstraint(IConstraint constraint) {
+    return constraint.getConstraint().getSetField() == TaskConstraint._Fields.VALUE;
   }
 
-  private static final Ordering<Constraint> VALUES_FIRST = Ordering.from(
-      new Comparator<Constraint>() {
-        @Override public int compare(Constraint a, Constraint b) {
+  private static final Ordering<IConstraint> VALUES_FIRST = Ordering.from(
+      new Comparator<IConstraint>() {
+        @Override public int compare(IConstraint a, IConstraint b) {
           if (a.getConstraint().getSetField() == b.getConstraint().getSetField()) {
             return 0;
           }
@@ -201,7 +201,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   private FilterRule getConstraintFilter(final String slaveHost) {
     return new FilterRule() {
-      @Override public Iterable<Veto> apply(final TaskConfig task) {
+      @Override public Iterable<Veto> apply(final ITaskConfig task) {
         if (!task.isSetConstraints()) {
           return ImmutableList.of();
         }
@@ -218,11 +218,11 @@ public class SchedulingFilterImpl implements SchedulingFilter {
               }
             };
 
-            Supplier<Collection<ScheduledTask>> activeTasksSupplier =
-                Suppliers.memoize(new Supplier<Collection<ScheduledTask>>() {
-                  @Override public Collection<ScheduledTask> get() {
+            Supplier<Collection<IScheduledTask>> activeTasksSupplier =
+                Suppliers.memoize(new Supplier<Collection<IScheduledTask>>() {
+                  @Override public Collection<IScheduledTask> get() {
                     return storeProvider.getTaskStore().fetchTasks(
-                        Query.jobScoped(Tasks.INFO_TO_JOB_KEY.apply(task))
+                        Query.jobScoped(Tasks.INFO_TO_JOB_KEY.apply(task).newBuilder())
                             .byStatus(ACTIVE_NOT_PENDING_STATES));
                   }
                 });
@@ -233,7 +233,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
                 attributeLoader,
                 attributeLoader.apply(slaveHost));
             ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
-            for (Constraint constraint : VALUES_FIRST.sortedCopy(task.getConstraints())) {
+            for (IConstraint constraint : VALUES_FIRST.sortedCopy(task.getConstraints())) {
               Optional<Veto> veto = constraintFilter.apply(constraint);
               if (veto.isPresent()) {
                 vetoes.add(veto.get());
@@ -259,7 +259,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         : NO_VETO;
   }
 
-  private Set<Veto> getResourceVetoes(Resources offer, TaskConfig task) {
+  private Set<Veto> getResourceVetoes(Resources offer, ITaskConfig task) {
     ImmutableSet.Builder<Veto> builder = ImmutableSet.builder();
     for (FilterRule rule : rulesFromOffer(offer)) {
       builder.addAll(rule.apply(task));
@@ -279,7 +279,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   }
 
   @Override
-  public Set<Veto> filter(Resources offer, String slaveHost, TaskConfig task, String taskId) {
+  public Set<Veto> filter(Resources offer, String slaveHost, ITaskConfig task, String taskId) {
     if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
       return ImmutableSet.of(DEDICATED_HOST_VETO);
     }

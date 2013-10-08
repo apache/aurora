@@ -33,6 +33,7 @@ import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.state.TaskStateMachine.WorkSink;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -80,10 +81,10 @@ public class TaskStateMachineTest extends EasyMockTest {
     stateMachine = makeStateMachine("test", makeTask(false));
   }
 
-  private TaskStateMachine makeStateMachine(String taskId, ScheduledTask task) {
+  private TaskStateMachine makeStateMachine(String taskId, ScheduledTask builder) {
     return new TaskStateMachine(
         taskId,
-        task,
+        IScheduledTask.build(builder),
         isJobUpdating,
         workSink,
         clock,
@@ -286,8 +287,8 @@ public class TaskStateMachineTest extends EasyMockTest {
     expectWork(INCREMENT_FAILURES);
 
     ScheduledTask rescheduled = task.deepCopy();
-    TaskStateMachine rescheduledMachine = makeStateMachine("test2", rescheduled);
     rescheduled.setFailureCount(9);
+    TaskStateMachine rescheduledMachine = makeStateMachine("test2", rescheduled);
     expectWork(UPDATE_STATE, rescheduledMachine).times(5);
     expectWork(INCREMENT_FAILURES, rescheduledMachine);
 
@@ -403,7 +404,7 @@ public class TaskStateMachineTest extends EasyMockTest {
     workSink.addWork(
         eq(work),
         eq(machine),
-        EasyMock.<Function<ScheduledTask, ScheduledTask>>anyObject());
+        EasyMock.<Function<IScheduledTask, IScheduledTask>>anyObject());
     return expectLastCall();
   }
 

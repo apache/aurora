@@ -35,7 +35,6 @@ import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
@@ -83,8 +82,8 @@ public class StructDump extends JerseyTemplateServlet {
         // Deep copy the struct to sidestep any subclass trickery inside the storage system.
         return Optional.fromNullable(Iterables.getOnlyElement(
                 storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskId)),
-                null))
-            .transform(Tasks.DEEP_COPY_SCHEDULED);
+                null)
+            .newBuilder());
       }
     });
   }

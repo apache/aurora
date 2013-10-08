@@ -24,11 +24,11 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import com.twitter.aurora.gen.Attribute;
-import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.ValueConstraint;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.IValueConstraint;
 
 /**
  * Utility class that matches attributes to constraints.
@@ -53,7 +53,7 @@ final class AttributeFilter {
    * @param constraint Constraint to match.
    * @return {@code true} if the attribute satisfies the constraint, {@code false} otherwise.
    */
-  static boolean matches(Set<Attribute> attributes, ValueConstraint constraint) {
+  static boolean matches(Set<Attribute> attributes, IValueConstraint constraint) {
     Set<String> allAttributes =
         ImmutableSet.copyOf(Iterables.concat(Iterables.transform(attributes, GET_VALUES)));
     boolean match = Iterables.any(constraint.getValues(), Predicates.in(allAttributes));
@@ -71,16 +71,16 @@ final class AttributeFilter {
    * @return {@code true} if the limit constraint is satisfied, {@code false} otherwise.
    */
   static boolean matches(final Set<Attribute> attributes,
-      final JobKey jobKey,
+      final IJobKey jobKey,
       int limit,
-      Iterable<ScheduledTask> activeTasks,
+      Iterable<IScheduledTask> activeTasks,
       final AttributeLoader attributeFetcher) {
 
-    Predicate<ScheduledTask> sameJob =
+    Predicate<IScheduledTask> sameJob =
         Predicates.compose(Predicates.equalTo(jobKey), Tasks.SCHEDULED_TO_JOB_KEY);
 
-    Predicate<ScheduledTask> hasAttribute = new Predicate<ScheduledTask>() {
-      @Override public boolean apply(ScheduledTask task) {
+    Predicate<IScheduledTask> hasAttribute = new Predicate<IScheduledTask>() {
+      @Override public boolean apply(IScheduledTask task) {
         Iterable<Attribute> hostAttributes =
             attributeFetcher.apply(task.getAssignedTask().getSlaveHost());
         return Iterables.any(hostAttributes, Predicates.in(attributes));

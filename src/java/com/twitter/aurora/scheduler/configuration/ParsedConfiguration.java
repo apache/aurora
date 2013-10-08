@@ -23,8 +23,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Wrapper for a configuration that has been fully-parsed and populated with defaults.
@@ -33,10 +33,10 @@ import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescr
 public final class ParsedConfiguration {
 
   private final JobConfiguration parsed;
-  private final Set<TaskConfig> tasks;
+  private final Set<ITaskConfig> tasks;
 
   /**
-   * Constructs a ParsedConfiguration object and populates the set of {@link TaskConfig}s for
+   * Constructs a ParsedConfiguration object and populates the set of {@link ITaskConfig}s for
    * the provided config.
    *
    * @param parsed A parsed {@link JobConfiguration}.
@@ -44,9 +44,9 @@ public final class ParsedConfiguration {
   @VisibleForTesting
   public ParsedConfiguration(JobConfiguration parsed) {
     this.parsed = parsed;
-    ImmutableSet.Builder<TaskConfig> builder = ImmutableSet.builder();
+    ImmutableSet.Builder<ITaskConfig> builder = ImmutableSet.builder();
     for (int i = 0; i < parsed.getShardCount(); i++) {
-      builder.add(parsed.getTaskConfig().deepCopy().setShardId(i));
+      builder.add(ITaskConfig.build(parsed.getTaskConfig().deepCopy().setShardId(i)));
     }
     this.tasks = builder.build();
   }
@@ -69,7 +69,7 @@ public final class ParsedConfiguration {
     return parsed;
   }
 
-  public Set<TaskConfig> getTaskConfigs() {
+  public Set<ITaskConfig> getTaskConfigs() {
     return tasks;
   }
 

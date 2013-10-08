@@ -25,9 +25,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.BindingAnnotation;
 
 import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.SchedulerException;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 
 /**
  * Manages scheduler storage operations providing an interface to perform atomic changes.
@@ -274,12 +274,12 @@ public interface Storage {
      * @param query Builder of the query to perform.
      * @return Tasks returned from the query.
      */
-    public static ImmutableSet<ScheduledTask> consistentFetchTasks(
+    public static ImmutableSet<IScheduledTask> consistentFetchTasks(
         Storage storage,
         final Query.Builder query) {
 
-      return storage.consistentRead(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
-        @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
+      return storage.consistentRead(new Work.Quiet<ImmutableSet<IScheduledTask>>() {
+        @Override public ImmutableSet<IScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(query);
         }
       });
@@ -294,12 +294,12 @@ public interface Storage {
      * @param query Builder of the query to perform.
      * @return Tasks returned from the query.
      */
-    public static ImmutableSet<ScheduledTask> weaklyConsistentFetchTasks(
+    public static ImmutableSet<IScheduledTask> weaklyConsistentFetchTasks(
         Storage storage,
         final Query.Builder query) {
 
-      return storage.weaklyConsistentRead(new Work.Quiet<ImmutableSet<ScheduledTask>>() {
-        @Override public ImmutableSet<ScheduledTask> apply(StoreProvider storeProvider) {
+      return storage.weaklyConsistentRead(new Work.Quiet<ImmutableSet<IScheduledTask>>() {
+        @Override public ImmutableSet<IScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(query);
         }
       });

@@ -42,6 +42,7 @@ import com.twitter.aurora.gen.comm.AdjustRetainedTasks;
 import com.twitter.aurora.scheduler.PulseMonitor;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -84,9 +85,9 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
   @Test
   public void testPruning() throws ThriftBinaryCodec.CodingException {
-    ScheduledTask thermosPrunedTask = makeTask(JOB_A, true, FAILED);
-    ScheduledTask thermosTask = makeTask(JOB_A, true, FAILED);
-    ScheduledTask nonThermosTask = makeTask(JOB_A, false, FAILED);
+    IScheduledTask thermosPrunedTask = makeTask(JOB_A, true, FAILED);
+    IScheduledTask thermosTask = makeTask(JOB_A, true, FAILED);
+    IScheduledTask nonThermosTask = makeTask(JOB_A, false, FAILED);
 
     // Service first createTask - no hosts ready for GC.
     expect(hostMonitor.isAlive(HOST)).andReturn(true);
@@ -122,16 +123,16 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     assertEquals(executor1, taskInfo.get().getExecutor());
   }
 
-  private static void assertRetainedTasks(TaskInfo taskInfo, ScheduledTask... tasks)
+  private static void assertRetainedTasks(TaskInfo taskInfo, IScheduledTask... tasks)
       throws ThriftBinaryCodec.CodingException {
     AdjustRetainedTasks message = ThriftBinaryCodec.decode(
         AdjustRetainedTasks.class, taskInfo.getData().toByteArray());
-    Map<String, ScheduledTask> byId = Tasks.mapById(ImmutableSet.copyOf(tasks));
+    Map<String, IScheduledTask> byId = Tasks.mapById(ImmutableSet.copyOf(tasks));
     assertEquals(Maps.transformValues(byId, Tasks.GET_STATUS), message.getRetainedTasks());
   }
 
-  private ScheduledTask makeTask(String jobName, boolean isThermos, ScheduleStatus status) {
-    return new ScheduledTask()
+  private IScheduledTask makeTask(String jobName, boolean isThermos, ScheduleStatus status) {
+    return IScheduledTask.build(new ScheduledTask()
         .setStatus(status)
         .setAssignedTask(new AssignedTask()
             .setTaskId("task-" + taskIdCounter.incrementAndGet())
@@ -139,10 +140,10 @@ public class GcExecutorLauncherTest extends EasyMockTest {
             .setTask(new TaskConfig()
                 .setJobName(jobName)
                 .setOwner(new Identity().setRole("role").setUser("user"))
-                .setExecutorConfig(isThermos ? new ExecutorConfig("aurora", "config") : null)));
+                .setExecutorConfig(isThermos ? new ExecutorConfig("aurora", "config") : null))));
   }
 
-  private void expectGetTasksByHost(String host, ScheduledTask... tasks) {
+  private void expectGetTasksByHost(String host, IScheduledTask... tasks) {
     storageUtil.expectTaskFetch(Query.slaveScoped(host), tasks);
   }
 }

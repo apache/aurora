@@ -33,9 +33,6 @@ import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -45,6 +42,9 @@ import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
@@ -60,7 +60,7 @@ import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 /**
  * A collection of task groups, where a task group is a collection of tasks that are known to be
  * equal in the way they schedule. This is expected to be tasks associated with the same job key,
- * who also have {@code equal()} {@link TaskConfig} values.
+ * who also have {@code equal()} {@link ITaskConfig} values.
  * <p>
  * This is used to prevent redundant work in trying to schedule tasks as well as to provide
  * nearly-equal responsiveness when scheduling across jobs.  In other words, a 1000 shard job cannot
@@ -166,7 +166,7 @@ public class TaskGroups implements EventSubscriber {
     return executor;
   }
 
-  private synchronized void add(AssignedTask task) {
+  private synchronized void add(IAssignedTask task) {
     groups.getUnchecked(new GroupKey(task.getTask())).push(task.getTaskId());
   }
 
@@ -197,7 +197,7 @@ public class TaskGroups implements EventSubscriber {
    */
   @Subscribe
   public void storageStarted(StorageStarted event) {
-    for (ScheduledTask task
+    for (IScheduledTask task
         : Storage.Util.consistentFetchTasks(storage, Query.unscoped().byStatus(PENDING))) {
 
       add(task.getAssignedTask());
@@ -211,7 +211,8 @@ public class TaskGroups implements EventSubscriber {
    */
   @Subscribe
   public synchronized void tasksDeleted(TasksDeleted deleted) {
-    for (AssignedTask task : Iterables.transform(deleted.getTasks(), Tasks.SCHEDULED_TO_ASSIGNED)) {
+    for (IAssignedTask task
+        : Iterables.transform(deleted.getTasks(), Tasks.SCHEDULED_TO_ASSIGNED)) {
       TaskGroup group = groups.getIfPresent(new GroupKey(task.getTask()));
       if (group != null) {
         group.remove(task.getTaskId());
@@ -224,9 +225,9 @@ public class TaskGroups implements EventSubscriber {
   }
 
   static class GroupKey {
-    private final TaskConfig scrubbedCanonicalTask;
+    private final ITaskConfig scrubbedCanonicalTask;
 
-    GroupKey(TaskConfig task) {
+    GroupKey(ITaskConfig task) {
       this.scrubbedCanonicalTask = ConfigurationManager.scrubNonUniqueTaskFields(task);
     }
 
@@ -246,7 +247,7 @@ public class TaskGroups implements EventSubscriber {
 
     @Override
     public String toString() {
-      return JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(scrubbedCanonicalTask));
+      return JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(scrubbedCanonicalTask).newBuilder());
     }
   }
 

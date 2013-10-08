@@ -39,6 +39,7 @@ import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -116,7 +117,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     assertStatus(HOST_A, SCHEDULED, maintenance.startMaintenance(A));
     assertStatus(HOST_A, DRAINING, maintenance.drain(A));
-    eventSink.execute(new TaskStateChange(task.setStatus(FINISHED), RUNNING));
+    eventSink.execute(new TaskStateChange(IScheduledTask.build(task.setStatus(FINISHED)), RUNNING));
     assertStatus(HOST_A, NONE, maintenance.endMaintenance(A));
   }
 
@@ -157,7 +158,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     // Make sure a later transition on the host does not cause any ill effects that could surface
     // from stale internal state.
-    eventSink.execute(new TaskStateChange(makeTask(HOST_A, "taskA").setStatus(FINISHED), RUNNING));
+    eventSink.execute(new TaskStateChange(
+        IScheduledTask.build(makeTask(HOST_A, "taskA").setStatus(FINISHED)), RUNNING));
   }
 
   @Test
@@ -177,7 +179,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     control.replay();
 
     eventSink.execute(new StorageStarted());
-    eventSink.execute(new TaskStateChange(taskA.setStatus(FINISHED), RUNNING));
+    eventSink.execute(
+        new TaskStateChange(IScheduledTask.build(taskA.setStatus(FINISHED)), RUNNING));
   }
 
   @Test
@@ -194,7 +197,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   }
 
   private void expectFetchTasksByHost(String hostName, ImmutableSet<ScheduledTask> tasks) {
-    expect(storageUtil.taskStore.fetchTasks(Query.slaveScoped(hostName).active())).andReturn(tasks);
+    expect(storageUtil.taskStore.fetchTasks(Query.slaveScoped(hostName).active()))
+        .andReturn(IScheduledTask.setFromBuilders(tasks));
   }
 
   private void expectMaintenanceModeChange(String hostName, MaintenanceMode mode) {

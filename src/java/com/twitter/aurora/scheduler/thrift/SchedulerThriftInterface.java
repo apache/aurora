@@ -33,7 +33,6 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -49,7 +48,6 @@ import com.twitter.aurora.auth.CapabilityValidator;
 import com.twitter.aurora.auth.CapabilityValidator.AuditCheck;
 import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
-import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
 import com.twitter.aurora.gen.DrainHostsResult;
@@ -80,7 +78,6 @@ import com.twitter.aurora.gen.ShardConfigRewrite;
 import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.StartMaintenanceResult;
 import com.twitter.aurora.gen.StartUpdateResult;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.gen.UpdateShardsResult;
@@ -105,6 +102,10 @@ import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 import com.twitter.aurora.scheduler.thrift.auth.Requires;
 import com.twitter.common.args.Arg;
@@ -145,9 +146,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private static final Arg<Amount<Long, Time>> KILL_TASK_MAX_BACKOFF =
       Arg.create(Amount.of(30L, Time.SECONDS));
 
-  private static final Function<ScheduledTask, String> GET_ROLE = Functions.compose(
-      new Function<TaskConfig, String>() {
-        @Override public String apply(TaskConfig task) {
+  private static final Function<IScheduledTask, String> GET_ROLE = Functions.compose(
+      new Function<ITaskConfig, String>() {
+        @Override public String apply(ITaskConfig task) {
           return task.getOwner().getRole();
         }
       },
@@ -251,7 +252,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     try {
       PopulateJobResult result = new PopulateJobResult()
-          .setPopulated(ParsedConfiguration.fromUnparsed(description).getTaskConfigs());
+          .setPopulated(ITaskConfig.toBuildersSet(
+              ParsedConfiguration.fromUnparsed(description).getTaskConfigs()));
       response.setResult(Result.populateJobResult(result))
           .setResponseCode(OK)
           .setMessage("Tasks populated");
@@ -293,7 +295,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response getTasksStatus(TaskQuery query) {
     checkNotNull(query);
 
-    Set<ScheduledTask> tasks =
+    Set<IScheduledTask> tasks =
         Storage.Util.weaklyConsistentFetchTasks(storage, Query.arbitrary(query));
 
     Response response = new Response();
@@ -304,9 +306,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     } else {
       response.setResponseCode(OK)
           .setResult(Result.scheduleStatusResult(
-              new ScheduleStatusResult().setTasks(ImmutableList.copyOf(tasks))
-          )
-          );
+              new ScheduleStatusResult().setTasks(IScheduledTask.toBuildersList(tasks))));
     }
 
     return response;
@@ -318,7 +318,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
 
     // Ensure we only return one JobConfiguration for each JobKey.
-    Map<JobKey, JobConfiguration> jobs = Maps.newHashMap();
+    Map<IJobKey, JobConfiguration> jobs = Maps.newHashMap();
 
     // Query the task store, find immediate jobs, and synthesize a JobConfiguration for them.
     // This is necessary because the ImmediateJobManager doesn't store jobs directly and
@@ -326,21 +326,21 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     Query.Builder scope = ownerRole.isPresent()
         ? Query.roleScoped(ownerRole.get())
         : Query.unscoped();
-    Multimap<JobKey, ScheduledTask> tasks =
+    Multimap<IJobKey, IScheduledTask> tasks =
         Tasks.byJobKey(Storage.Util.weaklyConsistentFetchTasks(storage, scope.active()));
 
     jobs.putAll(Maps.transformEntries(tasks.asMap(),
-        new Maps.EntryTransformer<JobKey, Collection<ScheduledTask>, JobConfiguration>() {
+        new Maps.EntryTransformer<IJobKey, Collection<IScheduledTask>, JobConfiguration>() {
           @Override
-          public JobConfiguration transformEntry(JobKey jobKey, Collection<ScheduledTask> tasks) {
+          public JobConfiguration transformEntry(IJobKey jobKey, Collection<IScheduledTask> tasks) {
 
             // Pick an arbitrary task for each immediate job. The chosen task might not be the most
             // recent if the job is in the middle of an update or some shards have been selectively
             // created.
-            ScheduledTask firstTask = tasks.iterator().next();
+            ScheduledTask firstTask = tasks.iterator().next().newBuilder();
             firstTask.getAssignedTask().getTask().unsetShardId();
             return new JobConfiguration()
-                .setKey(jobKey)
+                .setKey(jobKey.newBuilder())
                 .setOwner(firstTask.getAssignedTask().getTask().getOwner())
                 .setTaskConfig(firstTask.getAssignedTask().getTask())
                 .setShardCount(tasks.size());
@@ -366,7 +366,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private SessionContext validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
       throws AuthFailedException {
 
-    Set<ScheduledTask> tasks =
+    Set<IScheduledTask> tasks =
         Storage.Util.consistentFetchTasks(storage, Query.arbitrary(taskQuery));
     // Authenticate the session against any affected roles, always including the role for a
     // role-scoped query.  This papers over the implementation detail that dormant cron jobs are
@@ -429,7 +429,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     try {
       backoff.doUntilSuccess(new Supplier<Boolean>() {
         @Override public Boolean get() {
-          Set<ScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, activeQuery);
+          Set<IScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, activeQuery);
           if (tasks.isEmpty()) {
             LOG.info("Tasks all killed, done waiting.");
             return true;
@@ -746,7 +746,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     try {
       response.setResponseCode(OK)
           .setResult(Result.queryRecoveryResult(new QueryRecoveryResult()
-          .setTasks(recovery.query(Query.arbitrary(query)))));
+          .setTasks(IScheduledTask.toBuildersSet(recovery.query(Query.arbitrary(query))))));
     } catch (RecoveryException e) {
       response.setResponseCode(ERROR).setMessage(e.getMessage());
       LOG.log(Level.WARNING, "Failed to query recovery: " + e, e);
@@ -890,18 +890,18 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             case SHARD_REWRITE:
               ShardConfigRewrite shardRewrite = command.getShardRewrite();
               ShardKey shardKey = shardRewrite.getShardKey();
-              Iterable<ScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
+              Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
                   Query.shardScoped(shardKey.getJobKey(), shardKey.getShardId()).active());
-              Optional<AssignedTask> task =
+              Optional<IAssignedTask> task =
                   Optional.fromNullable(Iterables.getOnlyElement(tasks, null))
                       .transform(Tasks.SCHEDULED_TO_ASSIGNED);
               if (!task.isPresent()) {
                 errors.add("No active task found for " + shardKey);
-              } else if (!task.get().getTask().equals(shardRewrite.getOldTask())) {
+              } else if (!task.get().getTask().newBuilder().equals(shardRewrite.getOldTask())) {
                 errors.add("CAS compare failed for " + shardKey);
               } else {
-                TaskConfig newConfiguration =
-                    ConfigurationManager.applyDefaultsIfUnset(shardRewrite.getRewrittenTask());
+                ITaskConfig newConfiguration = ITaskConfig.build(
+                    ConfigurationManager.applyDefaultsIfUnset(shardRewrite.getRewrittenTask()));
                 boolean changed = storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(
                     task.get().getTaskId(), newConfiguration);
                 if (!changed) {

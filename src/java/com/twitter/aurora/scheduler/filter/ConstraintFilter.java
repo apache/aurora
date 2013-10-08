@@ -28,25 +28,25 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import com.twitter.aurora.gen.Attribute;
-import com.twitter.aurora.gen.Constraint;
-import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.scheduler.base.SchedulerException;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
 import com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
+import com.twitter.aurora.scheduler.storage.entities.IConstraint;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConstraint;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Filter that determines whether a task's constraints are satisfied.
  */
-class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
+class ConstraintFilter implements Function<IConstraint, Optional<Veto>> {
 
   private static final Logger LOG = Logger.getLogger(ConstraintFilter.class.getName());
 
-  private final JobKey jobKey;
-  private final Supplier<Collection<ScheduledTask>> activeTasksSupplier;
+  private final IJobKey jobKey;
+  private final Supplier<Collection<IScheduledTask>> activeTasksSupplier;
   private final AttributeLoader attributeLoader;
   private final Iterable<Attribute> hostAttributes;
 
@@ -59,8 +59,8 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
    * @param hostAttributes The attributes of the host to test against.
    */
   ConstraintFilter(
-      JobKey jobKey,
-      Supplier<Collection<ScheduledTask>> activeTasksSupplier,
+      IJobKey jobKey,
+      Supplier<Collection<IScheduledTask>> activeTasksSupplier,
       AttributeLoader attributeLoader,
       Iterable<Attribute> hostAttributes) {
 
@@ -86,11 +86,11 @@ class ConstraintFilter implements Function<Constraint, Optional<Veto>> {
   }
 
   @Override
-  public Optional<Veto> apply(Constraint constraint) {
+  public Optional<Veto> apply(IConstraint constraint) {
     Set<Attribute> attributes =
         ImmutableSet.copyOf(Iterables.filter(hostAttributes, new NameFilter(constraint.getName())));
 
-    TaskConstraint taskConstraint = constraint.getConstraint();
+    ITaskConstraint taskConstraint = constraint.getConstraint();
     switch (taskConstraint.getSetField()) {
       case VALUE:
         boolean matches =

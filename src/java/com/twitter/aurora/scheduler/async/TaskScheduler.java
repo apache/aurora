@@ -28,7 +28,6 @@ import com.google.inject.Inject;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskInfo;
 
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.async.TaskGroups.SchedulingAction;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.state.StateManager;
@@ -36,6 +35,7 @@ import com.twitter.aurora.scheduler.state.TaskAssigner;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
 
@@ -88,7 +88,7 @@ class TaskScheduler implements SchedulingAction {
         @Override public Boolean apply(MutableStoreProvider store) {
           LOG.fine("Attempting to schedule task " + taskId);
           Query.Builder pendingTaskQuery = Query.taskScoped(taskId).byStatus(PENDING);
-          final ScheduledTask task =
+          final IScheduledTask task =
               Iterables.getOnlyElement(store.getTaskStore().fetchTasks(pendingTaskQuery), null);
           if (task == null) {
             LOG.warning("Failed to look up task " + taskId + ", it may have been deleted.");

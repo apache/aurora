@@ -21,13 +21,13 @@ import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.TaskConfig;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.util.Clock;
 
 /**
  * A function that generates universally-unique (not guaranteed, but highly confident) task IDs.
  */
-class TaskIdGenerator implements Function<TaskConfig, String> {
+class TaskIdGenerator implements Function<ITaskConfig, String> {
 
   private final Clock clock;
 
@@ -37,7 +37,7 @@ class TaskIdGenerator implements Function<TaskConfig, String> {
   }
 
   @Override
-  public String apply(TaskConfig task) {
+  public String apply(ITaskConfig task) {
     String sep = "-";
     return new StringBuilder()
         .append(clock.nowMillis())               // Allows chronological sorting.

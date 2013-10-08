@@ -23,9 +23,9 @@ import com.google.common.base.Objects;
 
 import com.twitter.aurora.gen.HostStatus;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -47,13 +47,13 @@ public interface PubsubEvent {
    * Event sent when tasks were deleted.
    */
   public static class TasksDeleted implements PubsubEvent {
-    private final Set<ScheduledTask> tasks;
+    private final Set<IScheduledTask> tasks;
 
-    public TasksDeleted(Set<ScheduledTask> tasks) {
+    public TasksDeleted(Set<IScheduledTask> tasks) {
       this.tasks = checkNotNull(tasks);
     }
 
-    public Set<ScheduledTask> getTasks() {
+    public Set<IScheduledTask> getTasks() {
       return tasks;
     }
 
@@ -84,10 +84,10 @@ public interface PubsubEvent {
    * Event sent when a task changed state.
    */
   public static class TaskStateChange implements PubsubEvent {
-    private final ScheduledTask task;
+    private final IScheduledTask task;
     private final ScheduleStatus oldState;
 
-    public TaskStateChange(ScheduledTask task, ScheduleStatus oldState) {
+    public TaskStateChange(IScheduledTask task, ScheduleStatus oldState) {
       this.task = checkNotNull(task);
       this.oldState = checkNotNull(oldState);
     }
@@ -100,7 +100,7 @@ public interface PubsubEvent {
       return oldState;
     }
 
-    public ScheduledTask getTask() {
+    public IScheduledTask getTask() {
       return task;
     }
 

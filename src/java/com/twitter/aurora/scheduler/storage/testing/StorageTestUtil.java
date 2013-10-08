@@ -21,7 +21,6 @@ import org.easymock.Capture;
 import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
 
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.JobStore;
@@ -34,6 +33,7 @@ import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.easymock.EasyMock.capture;
@@ -122,8 +122,14 @@ public class StorageTestUtil {
     expectWriteOperation().anyTimes();
   }
 
-  public IExpectationSetters<?> expectTaskFetch(Query.Builder query, ScheduledTask... result) {
-    return expect(taskStore.fetchTasks(query))
-        .andReturn(ImmutableSet.<ScheduledTask>builder().add(result).build());
+  public IExpectationSetters<?> expectTaskFetch(
+      Query.Builder query,
+      ImmutableSet<IScheduledTask> result) {
+
+    return expect(taskStore.fetchTasks(query)).andReturn(result);
+  }
+
+  public IExpectationSetters<?> expectTaskFetch(Query.Builder query, IScheduledTask... result) {
+    return expectTaskFetch(query, ImmutableSet.<IScheduledTask>builder().add(result).build());
   }
 }

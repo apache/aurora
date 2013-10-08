@@ -37,7 +37,6 @@ import org.junit.Test;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
@@ -46,6 +45,8 @@ import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.state.StateManager;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
@@ -104,7 +105,7 @@ public class HistoryPrunerTest extends EasyMockTest {
   public void validateNoLeak() {
     synchronized (pruner.getTasksByJob()) {
       assertEquals(
-          ImmutableMultimap.<JobKey, String>of(),
+          ImmutableMultimap.<IJobKey, String>of(),
           ImmutableMultimap.copyOf(pruner.getTasksByJob()));
     }
   }
@@ -121,11 +122,11 @@ public class HistoryPrunerTest extends EasyMockTest {
   @Test
   public void testStorageStartWithoutPruning() {
     long taskATimestamp = clock.nowMillis();
-    ScheduledTask a = makeTask("a", FINISHED);
+    IScheduledTask a = makeTask("a", FINISHED);
 
     clock.advance(ONE_MS);
     long taskBTimestamp = clock.nowMillis();
-    ScheduledTask b = makeTask("b", LOST);
+    IScheduledTask b = makeTask("b", LOST);
 
     expectGetInactiveTasks(a, b);
     expectOneTaskWatch(taskATimestamp);
@@ -144,19 +145,19 @@ public class HistoryPrunerTest extends EasyMockTest {
   @Test
   public void testStorageStartedWithPruning() {
     long taskATimestamp = clock.nowMillis();
-    ScheduledTask a = makeTask("a", FINISHED);
+    IScheduledTask a = makeTask("a", FINISHED);
 
     clock.advance(ONE_MS);
     long taskBTimestamp = clock.nowMillis();
-    ScheduledTask b = makeTask("b", LOST);
+    IScheduledTask b = makeTask("b", LOST);
 
     clock.advance(ONE_MS);
     long taskCTimestamp = clock.nowMillis();
-    ScheduledTask c = makeTask("c", FINISHED);
+    IScheduledTask c = makeTask("c", FINISHED);
 
     clock.advance(ONE_MS);
-    ScheduledTask d = makeTask("d", FINISHED);
-    ScheduledTask e = makeTask("job-x", "e", FINISHED);
+    IScheduledTask d = makeTask("d", FINISHED);
+    IScheduledTask e = makeTask("job-x", "e", FINISHED);
 
     expectGetInactiveTasks(a, b, c, d, e);
     expectOneTaskWatch(taskATimestamp);
@@ -195,7 +196,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     changeState(STARTING, RUNNING);
 
     // Future set for terminal state transition.
-    ScheduledTask a = changeState(RUNNING, KILLED);
+    IScheduledTask a = changeState(RUNNING, KILLED);
 
     // Clean-up
     pruner.tasksDeleted(new TasksDeleted(ImmutableSet.of(a)));
@@ -232,9 +233,9 @@ public class HistoryPrunerTest extends EasyMockTest {
 
     changeState("a", RUNNING, KILLED);
     clock.advance(ONE_HOUR);
-    ScheduledTask b = changeState("b", RUNNING, KILLED);
+    IScheduledTask b = changeState("b", RUNNING, KILLED);
     clock.advance(ONE_HOUR);
-    ScheduledTask c = changeState("c", RUNNING, LOST);
+    IScheduledTask c = changeState("c", RUNNING, LOST);
 
     // Clean-up
     pruner.tasksDeleted(new TasksDeleted(ImmutableSet.of(b, c)));
@@ -242,8 +243,8 @@ public class HistoryPrunerTest extends EasyMockTest {
 
   @Test
   public void testTasksDeleted() {
-    ScheduledTask a = makeTask("a", FINISHED);
-    ScheduledTask b = makeTask("b", FINISHED);
+    IScheduledTask a = makeTask("a", FINISHED);
+    IScheduledTask b = makeTask("b", FINISHED);
     expectGetInactiveTasks(a);
     expectDefaultTaskWatch();
     expectCancelFuture();
@@ -387,36 +388,33 @@ public class HistoryPrunerTest extends EasyMockTest {
     return expect(future.cancel(false)).andReturn(true);
   }
 
-  private ScheduledTask changeState(ScheduleStatus from, ScheduleStatus to) {
+  private IScheduledTask changeState(ScheduleStatus from, ScheduleStatus to) {
     return changeState(TASK_ID, from, to);
   }
 
-  private ScheduledTask changeState(String taskId, ScheduleStatus from, ScheduleStatus to) {
-    ScheduledTask task = makeTask(taskId, to);
+  private IScheduledTask changeState(String taskId, ScheduleStatus from, ScheduleStatus to) {
+    IScheduledTask task = makeTask(taskId, to);
     pruner.recordStateChange(new PubsubEvent.TaskStateChange(task, from));
     return task;
   }
 
-  private void expectGetInactiveTasks(ScheduledTask... tasks) {
+  private void expectGetInactiveTasks(IScheduledTask... tasks) {
     expect(storageUtil.taskStore.fetchTasks(HistoryPruner.INACTIVE_QUERY))
-        .andReturn(ImmutableSet.<ScheduledTask>builder().add(tasks).build());
+        .andReturn(ImmutableSet.copyOf(tasks));
   }
 
-  private ScheduledTask makeTask(
+  private IScheduledTask makeTask(
       String job,
       String taskId,
       ScheduleStatus status) {
 
-    return new ScheduledTask()
+    return IScheduledTask.build(new ScheduledTask()
         .setStatus(status)
         .setTaskEvents(ImmutableList.of(new TaskEvent(clock.nowMillis(), status)))
-        .setAssignedTask(makeAssignedTask(job, taskId));
+        .setAssignedTask(makeAssignedTask(job, taskId)));
   }
 
-  private ScheduledTask makeTask(
-      String taskId,
-      ScheduleStatus status) {
-
+  private IScheduledTask makeTask(String taskId, ScheduleStatus status) {
     return makeTask(JOB_A, taskId, status);
   }
 

@@ -28,13 +28,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.ShardUpdateResult;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
@@ -46,6 +43,9 @@ import com.twitter.aurora.scheduler.state.StateManagerImpl.UpdateException;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
+import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -62,8 +62,8 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   private static final Logger LOG = Logger.getLogger(SchedulerCoreImpl.class.getName());
 
-  private static final Predicate<ScheduledTask> IS_UPDATING = new Predicate<ScheduledTask>() {
-    @Override public boolean apply(ScheduledTask task) {
+  private static final Predicate<IScheduledTask> IS_UPDATING = new Predicate<IScheduledTask>() {
+    @Override public boolean apply(IScheduledTask task) {
       return task.getStatus() == UPDATING || task.getStatus() == ROLLBACK;
     }
   };
@@ -79,7 +79,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   // State manager handles persistence of task modifications and state transitions.
   private final StateManagerImpl stateManager;
 
-  private final Function<TaskConfig, String> taskIdGenerator;
+  private final Function<ITaskConfig, String> taskIdGenerator;
   private final JobFilter jobFilter;
 
   /**
@@ -97,7 +97,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
       StateManagerImpl stateManager,
-      Function<TaskConfig, String> taskIdGenerator,
+      Function<ITaskConfig, String> taskIdGenerator,
       JobFilter jobFilter) {
 
     this.storage = checkNotNull(storage);
@@ -126,7 +126,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   @VisibleForTesting
   static final int MAX_TASK_ID_LENGTH = 255 - 90;
 
-  private void checkTaskIdLength(TaskConfig taskConfig) throws ScheduleException {
+  private void checkTaskIdLength(ITaskConfig taskConfig) throws ScheduleException {
     if (taskIdGenerator.apply(taskConfig).length() > MAX_TASK_ID_LENGTH) {
       throw new ScheduleException("Task ID is too long, please shorten your role or job name.");
     }
@@ -262,7 +262,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       @Override protected void execute(MutableStoreProvider storeProvider)
           throws ScheduleException {
 
-        Set<ScheduledTask> matchingTasks = storeProvider.getTaskStore().fetchTasks(query);
+        Set<IScheduledTask> matchingTasks = storeProvider.getTaskStore().fetchTasks(query);
         if (matchingTasks.size() != shards.size()) {
           throw new ScheduleException("Not all requested shards are active.");
         }
@@ -290,7 +290,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       @Override public Optional<String> apply(MutableStoreProvider storeProvider)
           throws ScheduleException {
         Query.Builder query = Query.jobScoped(jobKey).active();
-        Set<ScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(query);
+        Set<IScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(query);
 
         // Reject if any existing task for the job is in UPDATING/ROLLBACK
         if (Iterables.any(existingTasks, IS_UPDATING)) {
@@ -357,7 +357,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void preemptTask(AssignedTask task, AssignedTask preemptingTask) {
+  public synchronized void preemptTask(IAssignedTask task, IAssignedTask preemptingTask) {
     checkNotNull(task);
     checkNotNull(preemptingTask);
     // TODO(William Farner): Throw SchedulingException if either task doesn't exist, etc.

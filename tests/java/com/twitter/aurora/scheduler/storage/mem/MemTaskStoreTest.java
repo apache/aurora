@@ -15,11 +15,8 @@
  */
 package com.twitter.aurora.scheduler.storage.mem;
 
-import java.util.concurrent.atomic.AtomicReference;
-
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.util.concurrent.Atomics;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -35,17 +32,21 @@ import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
+
 public class MemTaskStoreTest {
 
-  private static final ScheduledTask TASK_A = makeTask("a");
-  private static final ScheduledTask TASK_B = makeTask("b");
-  private static final ScheduledTask TASK_C = makeTask("c");
-  private static final ScheduledTask TASK_D = makeTask("d");
+  private static final IScheduledTask TASK_A = makeTask("a");
+  private static final IScheduledTask TASK_B = makeTask("b");
+  private static final IScheduledTask TASK_C = makeTask("c");
+  private static final IScheduledTask TASK_D = makeTask("d");
 
   private MemTaskStore store;
 
@@ -63,7 +64,8 @@ public class MemTaskStoreTest {
     assertStoreContents(TASK_A, TASK_B, TASK_C, TASK_D);
 
     // Saving the same task should overwrite.
-    ScheduledTask taskAModified = TASK_A.deepCopy().setStatus(ScheduleStatus.RUNNING);
+    IScheduledTask taskAModified =
+        IScheduledTask.build(TASK_A.newBuilder().setStatus(RUNNING));
     store.saveTasks(ImmutableSet.of(taskAModified));
     assertStoreContents(taskAModified, TASK_B, TASK_C, TASK_D);
   }
@@ -101,51 +103,53 @@ public class MemTaskStoreTest {
   @Test
   public void testMutate() {
     store.saveTasks(ImmutableSet.of(TASK_A, TASK_B, TASK_C, TASK_D));
-    assertQueryResults(Query.statusScoped(ScheduleStatus.RUNNING));
+    assertQueryResults(Query.statusScoped(RUNNING));
 
     store.mutateTasks(Query.taskScoped("a"), new TaskMutation() {
-      @Override public ScheduledTask apply(ScheduledTask task) {
-        return task.setStatus(ScheduleStatus.RUNNING);
+      @Override
+      public IScheduledTask apply(IScheduledTask task) {
+        return IScheduledTask.build(task.newBuilder().setStatus(RUNNING));
       }
     });
 
     assertQueryResults(
-        Query.statusScoped(ScheduleStatus.RUNNING),
-        TASK_A.deepCopy().setStatus(ScheduleStatus.RUNNING));
+        Query.statusScoped(RUNNING),
+        IScheduledTask.build(TASK_A.newBuilder().setStatus(RUNNING)));
 
     store.mutateTasks(Query.unscoped(), new TaskMutation() {
-      @Override public ScheduledTask apply(ScheduledTask task) {
-        return task.setStatus(ScheduleStatus.ASSIGNED);
+      @Override
+      public IScheduledTask apply(IScheduledTask task) {
+        return IScheduledTask.build(task.newBuilder().setStatus(ScheduleStatus.ASSIGNED));
       }
     });
 
     assertStoreContents(
-        TASK_A.deepCopy().setStatus(ScheduleStatus.ASSIGNED),
-        TASK_B.deepCopy().setStatus(ScheduleStatus.ASSIGNED),
-        TASK_C.deepCopy().setStatus(ScheduleStatus.ASSIGNED),
-        TASK_D.deepCopy().setStatus(ScheduleStatus.ASSIGNED));
+        IScheduledTask.build(TASK_A.newBuilder().setStatus(ScheduleStatus.ASSIGNED)),
+        IScheduledTask.build(TASK_B.newBuilder().setStatus(ScheduleStatus.ASSIGNED)),
+        IScheduledTask.build(TASK_C.newBuilder().setStatus(ScheduleStatus.ASSIGNED)),
+        IScheduledTask.build(TASK_D.newBuilder().setStatus(ScheduleStatus.ASSIGNED)));
   }
 
   @Test
   public void testUnsafeModifyInPlace() {
-    TaskConfig updated = TASK_A
-        .getAssignedTask()
-        .getTask()
-        .deepCopy()
-        .setExecutorConfig(new ExecutorConfig("aurora", "new_config"));
+    ITaskConfig updated = ITaskConfig.build(
+        TASK_A.getAssignedTask()
+            .getTask()
+            .newBuilder()
+            .setExecutorConfig(new ExecutorConfig("aurora", "new_config")));
 
     String taskId = Tasks.id(TASK_A);
-    assertFalse(store.unsafeModifyInPlace(taskId, updated.deepCopy()));
+    assertFalse(store.unsafeModifyInPlace(taskId, updated));
 
     store.saveTasks(ImmutableSet.of(TASK_A));
-    assertTrue(store.unsafeModifyInPlace(taskId, updated.deepCopy()));
+    assertTrue(store.unsafeModifyInPlace(taskId, updated));
     Query.Builder query = Query.taskScoped(taskId);
-    TaskConfig stored =
+    ITaskConfig stored =
         Iterables.getOnlyElement(store.fetchTasks(query)).getAssignedTask().getTask();
     assertEquals(updated, stored);
 
     store.deleteTasks(ImmutableSet.of(taskId));
-    assertFalse(store.unsafeModifyInPlace(taskId, updated.deepCopy()));
+    assertFalse(store.unsafeModifyInPlace(taskId, updated));
   }
 
   @Test
@@ -167,38 +171,12 @@ public class MemTaskStoreTest {
   }
 
   @Test
-  public void testImmutable() {
-    ScheduledTask taskA = TASK_A.deepCopy();
-
-    // Mutate after saving.
-    store.saveTasks(ImmutableSet.of(taskA));
-    taskA.setStatus(ScheduleStatus.RUNNING);
-    assertStoreContents(TASK_A);
-
-    // Mutate query result.
-    Iterables.getOnlyElement(store.fetchTasks(Query.unscoped())).setStatus(ScheduleStatus.KILLED);
-    assertStoreContents(TASK_A);
-
-    // Capture reference during mutation and mutate later.
-    final AtomicReference<ScheduledTask> capture = Atomics.newReference();
-    store.mutateTasks(Query.unscoped(), new TaskMutation() {
-      @Override public ScheduledTask apply(ScheduledTask task) {
-        task.setStatus(ScheduleStatus.ASSIGNED);
-        capture.set(task);
-        return task;
-      }
-    });
-    capture.get().setStatus(ScheduleStatus.LOST);
-    assertStoreContents(TASK_A.deepCopy().setStatus(ScheduleStatus.ASSIGNED));
-  }
-
-  @Test
   public void testConsistentJobIndex() {
-    final ScheduledTask a = makeTask("a", "jim", "test", "job");
-    final ScheduledTask b = makeTask("b", "jim", "test", "job");
-    final ScheduledTask c = makeTask("c", "jim", "test", "job2");
-    final ScheduledTask d = makeTask("d", "joe", "test", "job");
-    final ScheduledTask e = makeTask("e", "jim", "prod", "job");
+    final IScheduledTask a = makeTask("a", "jim", "test", "job");
+    final IScheduledTask b = makeTask("b", "jim", "test", "job");
+    final IScheduledTask c = makeTask("c", "jim", "test", "job2");
+    final IScheduledTask d = makeTask("d", "joe", "test", "job");
+    final IScheduledTask e = makeTask("e", "jim", "prod", "job");
     final Query.Builder jimsJob = Query.jobScoped(JobKeys.from("jim", "test", "job"));
     final Query.Builder jimsJob2 = Query.jobScoped(JobKeys.from("jim", "test", "job2"));
     final Query.Builder joesJob = Query.jobScoped(JobKeys.from("joe", "test", "job"));
@@ -214,13 +192,12 @@ public class MemTaskStoreTest {
     assertQueryResults(joesJob, d);
 
     store.mutateTasks(jimsJob, new TaskMutation() {
-      @Override public ScheduledTask apply(ScheduledTask task) {
-        return task.setStatus(ScheduleStatus.RUNNING);
+      @Override public IScheduledTask apply(IScheduledTask task) {
+        return IScheduledTask.build(task.newBuilder().setStatus(RUNNING));
       }
     });
-    // Change 'a' locally to make subsequent equality checks pass.
-    a.setStatus(ScheduleStatus.RUNNING);
-    assertQueryResults(jimsJob, a);
+    IScheduledTask aRunning = IScheduledTask.build(a.newBuilder().setStatus(RUNNING));
+    assertQueryResults(jimsJob, aRunning);
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob, d);
 
@@ -228,55 +205,32 @@ public class MemTaskStoreTest {
     assertQueryResults(joesJob);
 
     store.deleteTasks(ImmutableSet.of(Tasks.id(d)));
-    assertQueryResults(jimsJob, a);
+    assertQueryResults(jimsJob, aRunning);
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob);
 
     store.saveTasks(ImmutableSet.of(b));
-    assertQueryResults(jimsJob, a, b);
+    assertQueryResults(jimsJob, aRunning, b);
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob);
   }
 
-  @Test
-  public void testIgnoresMutationInput() {
-    final ScheduledTask a = makeTask("a", "jim", "test", "job");
-    final Query.Builder jimsJob = Query.jobScoped(JobKeys.from("jim", "test", "job"));
-
-    final String bogusTaskId = "bogusTaskId";
-
-    store.saveTasks(ImmutableSet.of(a));
-    store.mutateTasks(jimsJob, new TaskMutation() {
-      @Override public ScheduledTask apply(ScheduledTask task) {
-        // Modify the supplied task and returned task differently, and make sure that only the
-        // returned value is honored.
-        ScheduledTask copy = task.deepCopy();
-        task.getAssignedTask().setTaskId(bogusTaskId);
-        task.setStatus(ScheduleStatus.FAILED);
-        return copy.setStatus(ScheduleStatus.FINISHED);
-      }
-    });
-
-    assertQueryResults(Query.taskScoped(bogusTaskId));
-    assertQueryResults(jimsJob, a.deepCopy().setStatus(ScheduleStatus.FINISHED));
-  }
-
-  private void assertStoreContents(ScheduledTask... tasks) {
+  private void assertStoreContents(IScheduledTask... tasks) {
     assertQueryResults(Query.unscoped(), tasks);
   }
 
-  private void assertQueryResults(TaskQuery query, ScheduledTask... tasks) {
+  private void assertQueryResults(TaskQuery query, IScheduledTask... tasks) {
     assertQueryResults(Query.arbitrary(query), tasks);
   }
 
-  private void assertQueryResults(Query.Builder query, ScheduledTask... tasks) {
+  private void assertQueryResults(Query.Builder query, IScheduledTask... tasks) {
     assertEquals(
-        ImmutableSet.<ScheduledTask>builder().add(tasks).build(),
+        ImmutableSet.<IScheduledTask>builder().add(tasks).build(),
         store.fetchTasks(query));
   }
 
-  private static ScheduledTask makeTask(String id, String role, String env, String jobName) {
-    return new ScheduledTask()
+  private static IScheduledTask makeTask(String id, String role, String env, String jobName) {
+    return IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.PENDING)
         .setAssignedTask(new AssignedTask()
             .setTaskId(id)
@@ -284,10 +238,10 @@ public class MemTaskStoreTest {
                 .setShardId(0)
                 .setJobName(jobName)
                 .setEnvironment(env)
-                .setOwner(new Identity(role, role))));
+                .setOwner(new Identity(role, role)))));
   }
 
-  private static ScheduledTask makeTask(String id) {
+  private static IScheduledTask makeTask(String id) {
     return makeTask(id, "role-" + id, "env-" + id, "job-" + id);
   }
 }

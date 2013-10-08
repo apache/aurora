@@ -55,7 +55,6 @@ import com.twitter.aurora.gen.storage.SaveHostAttributes;
 import com.twitter.aurora.gen.storage.SaveTasks;
 import com.twitter.aurora.gen.storage.Snapshot;
 import com.twitter.aurora.gen.storage.Transaction;
-import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.log.Log;
 import com.twitter.aurora.scheduler.log.Log.Entry;
 import com.twitter.aurora.scheduler.log.Log.Position;
@@ -478,9 +477,13 @@ public final class LogManager {
             // It is an expected invariant that an operation may reference a task (identified by
             // task ID) no more than one time.  Therefore, to coalesce two SaveTasks operations,
             // the most recent task definition overrides the prior operation.
-            Map<String, ScheduledTask> coalesced = Maps.newHashMap(Tasks.mapById(prior.getTasks()));
-            coalesced.putAll(Tasks.mapById(next.getTasks()));
-
+            Map<String, ScheduledTask> coalesced = Maps.newHashMap();
+            for (ScheduledTask task : prior.getTasks()) {
+              coalesced.put(task.getAssignedTask().getTaskId(), task);
+            }
+            for (ScheduledTask task : next.getTasks()) {
+              coalesced.put(task.getAssignedTask().getTaskId(), task);
+            }
             prior.setTasks(ImmutableSet.copyOf(coalesced.values()));
           } else {
             prior.setTasks(next.getTasks());

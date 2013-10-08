@@ -25,7 +25,6 @@ import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Shards;
@@ -34,6 +33,7 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.Storage.Work.Quiet;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -73,9 +73,11 @@ public interface QuotaManager {
       this.storage = checkNotNull(storage);
     }
 
-    private static Quota getUpdateQuota(Collection<TaskUpdateConfiguration> configs,
-        Function<TaskUpdateConfiguration, TaskConfig> taskExtractor) {
-      FluentIterable<TaskConfig> tasks =
+    private static Quota getUpdateQuota(
+        Collection<TaskUpdateConfiguration> configs,
+        Function<TaskUpdateConfiguration, ITaskConfig> taskExtractor) {
+
+      FluentIterable<ITaskConfig> tasks =
           FluentIterable
           .from(configs)
           .transform(taskExtractor)

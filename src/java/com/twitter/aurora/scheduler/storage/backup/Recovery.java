@@ -30,13 +30,13 @@ import com.google.inject.Inject;
 
 import com.twitter.aurora.codec.ThriftBinaryCodec;
 import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.storage.Snapshot;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.DistributedSnapshotStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
+import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.base.Command;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -69,7 +69,7 @@ public interface Recovery {
    * @return Tasks matching the query.
    * @throws RecoveryException If a backup is not staged, or could not be queried.
    */
-  Set<ScheduledTask> query(Query.Builder query) throws RecoveryException;
+  Set<IScheduledTask> query(Query.Builder query) throws RecoveryException;
 
   /**
    * Deletes tasks from a staged backup.
@@ -162,7 +162,7 @@ public interface Recovery {
       return loaded;
     }
 
-    @Override public Set<ScheduledTask> query(Query.Builder query) throws RecoveryException {
+    @Override public Set<IScheduledTask> query(Query.Builder query) throws RecoveryException {
       return getLoadedRecovery().query(query);
     }
 
@@ -198,7 +198,7 @@ public interface Recovery {
         });
       }
 
-      Set<ScheduledTask> query(final Query.Builder query) {
+      Set<IScheduledTask> query(final Query.Builder query) {
         return tempStorage.fetchTasks(query);
       }
 
