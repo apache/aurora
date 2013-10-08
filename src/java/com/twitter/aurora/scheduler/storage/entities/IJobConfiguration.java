@@ -16,6 +16,10 @@
 package com.twitter.aurora.scheduler.storage.entities;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.CronCollisionPolicy;
 import com.twitter.aurora.gen.JobConfiguration;
@@ -27,11 +31,31 @@ import com.twitter.aurora.gen.JobConfiguration;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class IJobConfiguration {
+public final class IJobConfiguration {
   private final JobConfiguration wrapped;
+  private final IJobKey key;
+  private final IIdentity owner;
+  private final ITaskConfig taskConfig;
 
-  public IJobConfiguration(JobConfiguration wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private IJobConfiguration(JobConfiguration wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+    this.key = !wrapped.isSetKey()
+        ? null
+        : IJobKey.buildNoCopy(wrapped.getKey());
+    this.owner = !wrapped.isSetOwner()
+        ? null
+        : IIdentity.buildNoCopy(wrapped.getOwner());
+    this.taskConfig = !wrapped.isSetTaskConfig()
+        ? null
+        : ITaskConfig.buildNoCopy(wrapped.getTaskConfig());
+  }
+
+  static IJobConfiguration buildNoCopy(JobConfiguration wrapped) {
+    return new IJobConfiguration(wrapped);
+  }
+
+  public static IJobConfiguration build(JobConfiguration wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<IJobConfiguration, JobConfiguration> TO_BUILDER =
@@ -50,16 +74,44 @@ public class IJobConfiguration {
         }
       };
 
+  public static ImmutableList<JobConfiguration> toBuildersList(Iterable<IJobConfiguration> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<IJobConfiguration> listFromBuilders(Iterable<JobConfiguration> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<JobConfiguration> toBuildersSet(Iterable<IJobConfiguration> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<IJobConfiguration> setFromBuilders(Iterable<JobConfiguration> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public JobConfiguration newBuilder() {
     return wrapped.deepCopy();
   }
 
+  public boolean isSetKey() {
+    return wrapped.isSetKey();
+  }
+
   public IJobKey getKey() {
-    return new IJobKey(wrapped.getKey());
+    return key;
+  }
+
+  public boolean isSetOwner() {
+    return wrapped.isSetOwner();
   }
 
   public IIdentity getOwner() {
-    return new IIdentity(wrapped.getOwner());
+    return owner;
+  }
+
+  public boolean isSetCronSchedule() {
+    return wrapped.isSetCronSchedule();
   }
 
   public String getCronSchedule() {
@@ -70,8 +122,16 @@ public class IJobConfiguration {
     return wrapped.getCronCollisionPolicy();
   }
 
+  public boolean isSetTaskConfig() {
+    return wrapped.isSetTaskConfig();
+  }
+
   public ITaskConfig getTaskConfig() {
-    return new ITaskConfig(wrapped.getTaskConfig());
+    return taskConfig;
+  }
+
+  public boolean isSetShardCount() {
+    return wrapped.isSetShardCount();
   }
 
   public int getShardCount() {

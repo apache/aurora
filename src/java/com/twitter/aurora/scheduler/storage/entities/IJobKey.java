@@ -16,6 +16,10 @@
 package com.twitter.aurora.scheduler.storage.entities;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.JobKey;
 
@@ -26,11 +30,19 @@ import com.twitter.aurora.gen.JobKey;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class IJobKey {
+public final class IJobKey {
   private final JobKey wrapped;
 
-  public IJobKey(JobKey wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private IJobKey(JobKey wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+  }
+
+  static IJobKey buildNoCopy(JobKey wrapped) {
+    return new IJobKey(wrapped);
+  }
+
+  public static IJobKey build(JobKey wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<IJobKey, JobKey> TO_BUILDER =
@@ -49,16 +61,44 @@ public class IJobKey {
         }
       };
 
+  public static ImmutableList<JobKey> toBuildersList(Iterable<IJobKey> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<IJobKey> listFromBuilders(Iterable<JobKey> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<JobKey> toBuildersSet(Iterable<IJobKey> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<IJobKey> setFromBuilders(Iterable<JobKey> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public JobKey newBuilder() {
     return wrapped.deepCopy();
+  }
+
+  public boolean isSetRole() {
+    return wrapped.isSetRole();
   }
 
   public String getRole() {
     return wrapped.getRole();
   }
 
+  public boolean isSetEnvironment() {
+    return wrapped.isSetEnvironment();
+  }
+
   public String getEnvironment() {
     return wrapped.getEnvironment();
+  }
+
+  public boolean isSetName() {
+    return wrapped.isSetName();
   }
 
   public String getName() {

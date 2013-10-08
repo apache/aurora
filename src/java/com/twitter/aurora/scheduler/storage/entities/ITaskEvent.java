@@ -16,6 +16,10 @@
 package com.twitter.aurora.scheduler.storage.entities;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.TaskEvent;
@@ -27,11 +31,19 @@ import com.twitter.aurora.gen.TaskEvent;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class ITaskEvent {
+public final class ITaskEvent {
   private final TaskEvent wrapped;
 
-  public ITaskEvent(TaskEvent wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private ITaskEvent(TaskEvent wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+  }
+
+  static ITaskEvent buildNoCopy(TaskEvent wrapped) {
+    return new ITaskEvent(wrapped);
+  }
+
+  public static ITaskEvent build(TaskEvent wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<ITaskEvent, TaskEvent> TO_BUILDER =
@@ -50,8 +62,28 @@ public class ITaskEvent {
         }
       };
 
+  public static ImmutableList<TaskEvent> toBuildersList(Iterable<ITaskEvent> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<ITaskEvent> listFromBuilders(Iterable<TaskEvent> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<TaskEvent> toBuildersSet(Iterable<ITaskEvent> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<ITaskEvent> setFromBuilders(Iterable<TaskEvent> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public TaskEvent newBuilder() {
     return wrapped.deepCopy();
+  }
+
+  public boolean isSetTimestamp() {
+    return wrapped.isSetTimestamp();
   }
 
   public long getTimestamp() {
@@ -62,8 +94,16 @@ public class ITaskEvent {
     return wrapped.getStatus();
   }
 
+  public boolean isSetMessage() {
+    return wrapped.isSetMessage();
+  }
+
   public String getMessage() {
     return wrapped.getMessage();
+  }
+
+  public boolean isSetScheduler() {
+    return wrapped.isSetScheduler();
   }
 
   public String getScheduler() {

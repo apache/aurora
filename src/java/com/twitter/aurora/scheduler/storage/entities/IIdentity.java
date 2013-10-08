@@ -16,6 +16,10 @@
 package com.twitter.aurora.scheduler.storage.entities;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.Identity;
 
@@ -26,11 +30,19 @@ import com.twitter.aurora.gen.Identity;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class IIdentity {
+public final class IIdentity {
   private final Identity wrapped;
 
-  public IIdentity(Identity wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private IIdentity(Identity wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+  }
+
+  static IIdentity buildNoCopy(Identity wrapped) {
+    return new IIdentity(wrapped);
+  }
+
+  public static IIdentity build(Identity wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<IIdentity, Identity> TO_BUILDER =
@@ -49,12 +61,36 @@ public class IIdentity {
         }
       };
 
+  public static ImmutableList<Identity> toBuildersList(Iterable<IIdentity> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<IIdentity> listFromBuilders(Iterable<Identity> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<Identity> toBuildersSet(Iterable<IIdentity> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<IIdentity> setFromBuilders(Iterable<Identity> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public Identity newBuilder() {
     return wrapped.deepCopy();
   }
 
+  public boolean isSetRole() {
+    return wrapped.isSetRole();
+  }
+
   public String getRole() {
     return wrapped.getRole();
+  }
+
+  public boolean isSetUser() {
+    return wrapped.isSetUser();
   }
 
   public String getUser() {

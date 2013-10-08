@@ -18,7 +18,11 @@ package com.twitter.aurora.scheduler.storage.entities;
 import java.util.Map;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.AssignedTask;
 
@@ -29,11 +33,27 @@ import com.twitter.aurora.gen.AssignedTask;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class IAssignedTask {
+public final class IAssignedTask {
   private final AssignedTask wrapped;
+  private final ITaskConfig task;
+  private final ImmutableMap<String, Integer> assignedPorts;
 
-  public IAssignedTask(AssignedTask wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private IAssignedTask(AssignedTask wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+    this.task = !wrapped.isSetTask()
+        ? null
+        : ITaskConfig.buildNoCopy(wrapped.getTask());
+    this.assignedPorts = !wrapped.isSetAssignedPorts()
+        ? ImmutableMap.<String, Integer>of()
+        : ImmutableMap.copyOf(wrapped.getAssignedPorts());
+  }
+
+  static IAssignedTask buildNoCopy(AssignedTask wrapped) {
+    return new IAssignedTask(wrapped);
+  }
+
+  public static IAssignedTask build(AssignedTask wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<IAssignedTask, AssignedTask> TO_BUILDER =
@@ -52,28 +72,64 @@ public class IAssignedTask {
         }
       };
 
+  public static ImmutableList<AssignedTask> toBuildersList(Iterable<IAssignedTask> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<IAssignedTask> listFromBuilders(Iterable<AssignedTask> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<AssignedTask> toBuildersSet(Iterable<IAssignedTask> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<IAssignedTask> setFromBuilders(Iterable<AssignedTask> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public AssignedTask newBuilder() {
     return wrapped.deepCopy();
+  }
+
+  public boolean isSetTaskId() {
+    return wrapped.isSetTaskId();
   }
 
   public String getTaskId() {
     return wrapped.getTaskId();
   }
 
+  public boolean isSetSlaveId() {
+    return wrapped.isSetSlaveId();
+  }
+
   public String getSlaveId() {
     return wrapped.getSlaveId();
+  }
+
+  public boolean isSetSlaveHost() {
+    return wrapped.isSetSlaveHost();
   }
 
   public String getSlaveHost() {
     return wrapped.getSlaveHost();
   }
 
+  public boolean isSetTask() {
+    return wrapped.isSetTask();
+  }
+
   public ITaskConfig getTask() {
-    return new ITaskConfig(wrapped.getTask());
+    return task;
+  }
+
+  public boolean isSetAssignedPorts() {
+    return wrapped.isSetAssignedPorts();
   }
 
   public Map<String, Integer> getAssignedPorts() {
-    return ImmutableMap.copyOf(wrapped.getAssignedPorts());
+    return assignedPorts;
   }
 
   @Override

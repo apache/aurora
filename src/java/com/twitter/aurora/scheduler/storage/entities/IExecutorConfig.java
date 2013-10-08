@@ -16,6 +16,10 @@
 package com.twitter.aurora.scheduler.storage.entities;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.ExecutorConfig;
 
@@ -26,11 +30,19 @@ import com.twitter.aurora.gen.ExecutorConfig;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class IExecutorConfig {
+public final class IExecutorConfig {
   private final ExecutorConfig wrapped;
 
-  public IExecutorConfig(ExecutorConfig wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private IExecutorConfig(ExecutorConfig wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+  }
+
+  static IExecutorConfig buildNoCopy(ExecutorConfig wrapped) {
+    return new IExecutorConfig(wrapped);
+  }
+
+  public static IExecutorConfig build(ExecutorConfig wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<IExecutorConfig, ExecutorConfig> TO_BUILDER =
@@ -49,12 +61,36 @@ public class IExecutorConfig {
         }
       };
 
+  public static ImmutableList<ExecutorConfig> toBuildersList(Iterable<IExecutorConfig> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<IExecutorConfig> listFromBuilders(Iterable<ExecutorConfig> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<ExecutorConfig> toBuildersSet(Iterable<IExecutorConfig> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<IExecutorConfig> setFromBuilders(Iterable<ExecutorConfig> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public ExecutorConfig newBuilder() {
     return wrapped.deepCopy();
   }
 
+  public boolean isSetName() {
+    return wrapped.isSetName();
+  }
+
   public String getName() {
     return wrapped.getName();
+  }
+
+  public boolean isSetData() {
+    return wrapped.isSetData();
   }
 
   public String getData() {

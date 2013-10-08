@@ -18,7 +18,10 @@ package com.twitter.aurora.scheduler.storage.entities;
 import java.util.List;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -30,11 +33,29 @@ import com.twitter.aurora.gen.ScheduledTask;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class IScheduledTask {
+public final class IScheduledTask {
   private final ScheduledTask wrapped;
+  private final IAssignedTask assignedTask;
+  private final ImmutableList<ITaskEvent> taskEvents;
 
-  public IScheduledTask(ScheduledTask wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private IScheduledTask(ScheduledTask wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+    this.assignedTask = !wrapped.isSetAssignedTask()
+        ? null
+        : IAssignedTask.buildNoCopy(wrapped.getAssignedTask());
+    this.taskEvents = !wrapped.isSetTaskEvents()
+        ? ImmutableList.<ITaskEvent>of()
+        : FluentIterable.from(wrapped.getTaskEvents())
+              .transform(ITaskEvent.FROM_BUILDER)
+              .toList();
+  }
+
+  static IScheduledTask buildNoCopy(ScheduledTask wrapped) {
+    return new IScheduledTask(wrapped);
+  }
+
+  public static IScheduledTask build(ScheduledTask wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<IScheduledTask, ScheduledTask> TO_BUILDER =
@@ -53,27 +74,56 @@ public class IScheduledTask {
         }
       };
 
+  public static ImmutableList<ScheduledTask> toBuildersList(Iterable<IScheduledTask> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<IScheduledTask> listFromBuilders(Iterable<ScheduledTask> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<ScheduledTask> toBuildersSet(Iterable<IScheduledTask> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<IScheduledTask> setFromBuilders(Iterable<ScheduledTask> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public ScheduledTask newBuilder() {
     return wrapped.deepCopy();
   }
 
+  public boolean isSetAssignedTask() {
+    return wrapped.isSetAssignedTask();
+  }
+
   public IAssignedTask getAssignedTask() {
-    return new IAssignedTask(wrapped.getAssignedTask());
+    return assignedTask;
   }
 
   public ScheduleStatus getStatus() {
     return wrapped.getStatus();
   }
 
+  public boolean isSetFailureCount() {
+    return wrapped.isSetFailureCount();
+  }
+
   public int getFailureCount() {
     return wrapped.getFailureCount();
   }
 
+  public boolean isSetTaskEvents() {
+    return wrapped.isSetTaskEvents();
+  }
+
   public List<ITaskEvent> getTaskEvents() {
-    return FluentIterable
-        .from(wrapped.getTaskEvents())
-        .transform(ITaskEvent.FROM_BUILDER)
-        .toList();
+    return taskEvents;
+  }
+
+  public boolean isSetAncestorId() {
+    return wrapped.isSetAncestorId();
   }
 
   public String getAncestorId() {

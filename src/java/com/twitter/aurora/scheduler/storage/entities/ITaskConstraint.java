@@ -16,6 +16,10 @@
 package com.twitter.aurora.scheduler.storage.entities;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.TaskConstraint;
 
@@ -26,11 +30,19 @@ import com.twitter.aurora.gen.TaskConstraint;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class ITaskConstraint {
+public final class ITaskConstraint {
   private final TaskConstraint wrapped;
 
-  public ITaskConstraint(TaskConstraint wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private ITaskConstraint(TaskConstraint wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+  }
+
+  static ITaskConstraint buildNoCopy(TaskConstraint wrapped) {
+    return new ITaskConstraint(wrapped);
+  }
+
+  public static ITaskConstraint build(TaskConstraint wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<ITaskConstraint, TaskConstraint> TO_BUILDER =
@@ -49,6 +61,22 @@ public class ITaskConstraint {
         }
       };
 
+  public static ImmutableList<TaskConstraint> toBuildersList(Iterable<ITaskConstraint> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<ITaskConstraint> listFromBuilders(Iterable<TaskConstraint> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<TaskConstraint> toBuildersSet(Iterable<ITaskConstraint> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<ITaskConstraint> setFromBuilders(Iterable<TaskConstraint> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public TaskConstraint newBuilder() {
     return wrapped.deepCopy();
   }
@@ -58,11 +86,11 @@ public class ITaskConstraint {
   }
 
   public IValueConstraint getValue() {
-    return new IValueConstraint(wrapped.getValue());
+    return IValueConstraint.build(wrapped.getValue());
   }
 
   public ILimitConstraint getLimit() {
-    return new ILimitConstraint(wrapped.getLimit());
+    return ILimitConstraint.build(wrapped.getLimit());
   }
 
   @Override

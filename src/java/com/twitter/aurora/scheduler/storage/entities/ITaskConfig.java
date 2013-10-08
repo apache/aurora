@@ -19,7 +19,9 @@ import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
@@ -32,11 +34,47 @@ import com.twitter.aurora.gen.TaskConfig;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class ITaskConfig {
+public final class ITaskConfig {
   private final TaskConfig wrapped;
+  private final IIdentity owner;
+  private final ImmutableSet<IConstraint> constraints;
+  private final ImmutableSet<String> requestedPorts;
+  private final ImmutableMap<String, String> taskLinks;
+  private final ImmutableSet<IPackage> packages;
+  private final IExecutorConfig executorConfig;
 
-  public ITaskConfig(TaskConfig wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private ITaskConfig(TaskConfig wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+    this.owner = !wrapped.isSetOwner()
+        ? null
+        : IIdentity.buildNoCopy(wrapped.getOwner());
+    this.constraints = !wrapped.isSetConstraints()
+        ? ImmutableSet.<IConstraint>of()
+        : FluentIterable.from(wrapped.getConstraints())
+              .transform(IConstraint.FROM_BUILDER)
+              .toSet();
+    this.requestedPorts = !wrapped.isSetRequestedPorts()
+        ? ImmutableSet.<String>of()
+        : ImmutableSet.copyOf(wrapped.getRequestedPorts());
+    this.taskLinks = !wrapped.isSetTaskLinks()
+        ? ImmutableMap.<String, String>of()
+        : ImmutableMap.copyOf(wrapped.getTaskLinks());
+    this.packages = !wrapped.isSetPackages()
+        ? ImmutableSet.<IPackage>of()
+        : FluentIterable.from(wrapped.getPackages())
+              .transform(IPackage.FROM_BUILDER)
+              .toSet();
+    this.executorConfig = !wrapped.isSetExecutorConfig()
+        ? null
+        : IExecutorConfig.buildNoCopy(wrapped.getExecutorConfig());
+  }
+
+  static ITaskConfig buildNoCopy(TaskConfig wrapped) {
+    return new ITaskConfig(wrapped);
+  }
+
+  public static ITaskConfig build(TaskConfig wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<ITaskConfig, TaskConfig> TO_BUILDER =
@@ -55,86 +93,168 @@ public class ITaskConfig {
         }
       };
 
+  public static ImmutableList<TaskConfig> toBuildersList(Iterable<ITaskConfig> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<ITaskConfig> listFromBuilders(Iterable<TaskConfig> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<TaskConfig> toBuildersSet(Iterable<ITaskConfig> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<ITaskConfig> setFromBuilders(Iterable<TaskConfig> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public TaskConfig newBuilder() {
     return wrapped.deepCopy();
   }
 
+  public boolean isSetOwner() {
+    return wrapped.isSetOwner();
+  }
+
   public IIdentity getOwner() {
-    return new IIdentity(wrapped.getOwner());
+    return owner;
+  }
+
+  public boolean isSetEnvironment() {
+    return wrapped.isSetEnvironment();
   }
 
   public String getEnvironment() {
     return wrapped.getEnvironment();
   }
 
+  public boolean isSetJobName() {
+    return wrapped.isSetJobName();
+  }
+
   public String getJobName() {
     return wrapped.getJobName();
+  }
+
+  public boolean isSetIsService() {
+    return wrapped.isSetIsService();
   }
 
   public boolean isIsService() {
     return wrapped.isIsService();
   }
 
+  public boolean isSetNumCpus() {
+    return wrapped.isSetNumCpus();
+  }
+
   public double getNumCpus() {
     return wrapped.getNumCpus();
+  }
+
+  public boolean isSetRamMb() {
+    return wrapped.isSetRamMb();
   }
 
   public long getRamMb() {
     return wrapped.getRamMb();
   }
 
+  public boolean isSetDiskMb() {
+    return wrapped.isSetDiskMb();
+  }
+
   public long getDiskMb() {
     return wrapped.getDiskMb();
+  }
+
+  public boolean isSetPriority() {
+    return wrapped.isSetPriority();
   }
 
   public int getPriority() {
     return wrapped.getPriority();
   }
 
+  public boolean isSetMaxTaskFailures() {
+    return wrapped.isSetMaxTaskFailures();
+  }
+
   public int getMaxTaskFailures() {
     return wrapped.getMaxTaskFailures();
+  }
+
+  public boolean isSetShardId() {
+    return wrapped.isSetShardId();
   }
 
   public int getShardId() {
     return wrapped.getShardId();
   }
 
+  public boolean isSetProduction() {
+    return wrapped.isSetProduction();
+  }
+
   public boolean isProduction() {
     return wrapped.isProduction();
+  }
+
+  public boolean isSetThermosConfig() {
+    return wrapped.isSetThermosConfig();
   }
 
   public byte[] getThermosConfig() {
     return wrapped.getThermosConfig();
   }
 
+  public boolean isSetConstraints() {
+    return wrapped.isSetConstraints();
+  }
+
   public Set<IConstraint> getConstraints() {
-    return FluentIterable
-        .from(wrapped.getConstraints())
-        .transform(IConstraint.FROM_BUILDER)
-        .toSet();
+    return constraints;
+  }
+
+  public boolean isSetRequestedPorts() {
+    return wrapped.isSetRequestedPorts();
   }
 
   public Set<String> getRequestedPorts() {
-    return ImmutableSet.copyOf(wrapped.getRequestedPorts());
+    return requestedPorts;
+  }
+
+  public boolean isSetTaskLinks() {
+    return wrapped.isSetTaskLinks();
   }
 
   public Map<String, String> getTaskLinks() {
-    return ImmutableMap.copyOf(wrapped.getTaskLinks());
+    return taskLinks;
+  }
+
+  public boolean isSetContactEmail() {
+    return wrapped.isSetContactEmail();
   }
 
   public String getContactEmail() {
     return wrapped.getContactEmail();
   }
 
+  public boolean isSetPackages() {
+    return wrapped.isSetPackages();
+  }
+
   public Set<IPackage> getPackages() {
-    return FluentIterable
-        .from(wrapped.getPackages())
-        .transform(IPackage.FROM_BUILDER)
-        .toSet();
+    return packages;
+  }
+
+  public boolean isSetExecutorConfig() {
+    return wrapped.isSetExecutorConfig();
   }
 
   public IExecutorConfig getExecutorConfig() {
-    return new IExecutorConfig(wrapped.getExecutorConfig());
+    return executorConfig;
   }
 
   @Override

@@ -16,6 +16,10 @@
 package com.twitter.aurora.scheduler.storage.entities;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.Package;
 
@@ -26,11 +30,19 @@ import com.twitter.aurora.gen.Package;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class IPackage {
+public final class IPackage {
   private final Package wrapped;
 
-  public IPackage(Package wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private IPackage(Package wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+  }
+
+  static IPackage buildNoCopy(Package wrapped) {
+    return new IPackage(wrapped);
+  }
+
+  public static IPackage build(Package wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<IPackage, Package> TO_BUILDER =
@@ -49,16 +61,44 @@ public class IPackage {
         }
       };
 
+  public static ImmutableList<Package> toBuildersList(Iterable<IPackage> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<IPackage> listFromBuilders(Iterable<Package> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<Package> toBuildersSet(Iterable<IPackage> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<IPackage> setFromBuilders(Iterable<Package> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public Package newBuilder() {
     return wrapped.deepCopy();
+  }
+
+  public boolean isSetRole() {
+    return wrapped.isSetRole();
   }
 
   public String getRole() {
     return wrapped.getRole();
   }
 
+  public boolean isSetName() {
+    return wrapped.isSetName();
+  }
+
   public String getName() {
     return wrapped.getName();
+  }
+
+  public boolean isSetVersion() {
+    return wrapped.isSetVersion();
   }
 
   public int getVersion() {

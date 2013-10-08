@@ -16,6 +16,10 @@
 package com.twitter.aurora.scheduler.storage.entities;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.Constraint;
 
@@ -26,11 +30,23 @@ import com.twitter.aurora.gen.Constraint;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class IConstraint {
+public final class IConstraint {
   private final Constraint wrapped;
+  private final ITaskConstraint constraint;
 
-  public IConstraint(Constraint wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private IConstraint(Constraint wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+    this.constraint = !wrapped.isSetConstraint()
+        ? null
+        : ITaskConstraint.buildNoCopy(wrapped.getConstraint());
+  }
+
+  static IConstraint buildNoCopy(Constraint wrapped) {
+    return new IConstraint(wrapped);
+  }
+
+  public static IConstraint build(Constraint wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<IConstraint, Constraint> TO_BUILDER =
@@ -49,16 +65,40 @@ public class IConstraint {
         }
       };
 
+  public static ImmutableList<Constraint> toBuildersList(Iterable<IConstraint> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<IConstraint> listFromBuilders(Iterable<Constraint> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<Constraint> toBuildersSet(Iterable<IConstraint> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<IConstraint> setFromBuilders(Iterable<Constraint> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public Constraint newBuilder() {
     return wrapped.deepCopy();
+  }
+
+  public boolean isSetName() {
+    return wrapped.isSetName();
   }
 
   public String getName() {
     return wrapped.getName();
   }
 
+  public boolean isSetConstraint() {
+    return wrapped.isSetConstraint();
+  }
+
   public ITaskConstraint getConstraint() {
-    return new ITaskConstraint(wrapped.getConstraint());
+    return constraint;
   }
 
   @Override

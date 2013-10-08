@@ -18,6 +18,9 @@ package com.twitter.aurora.scheduler.storage.entities;
 import java.util.Set;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.ValueConstraint;
@@ -29,11 +32,23 @@ import com.twitter.aurora.gen.ValueConstraint;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class IValueConstraint {
+public final class IValueConstraint {
   private final ValueConstraint wrapped;
+  private final ImmutableSet<String> values;
 
-  public IValueConstraint(ValueConstraint wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private IValueConstraint(ValueConstraint wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+    this.values = !wrapped.isSetValues()
+        ? ImmutableSet.<String>of()
+        : ImmutableSet.copyOf(wrapped.getValues());
+  }
+
+  static IValueConstraint buildNoCopy(ValueConstraint wrapped) {
+    return new IValueConstraint(wrapped);
+  }
+
+  public static IValueConstraint build(ValueConstraint wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<IValueConstraint, ValueConstraint> TO_BUILDER =
@@ -52,16 +67,40 @@ public class IValueConstraint {
         }
       };
 
+  public static ImmutableList<ValueConstraint> toBuildersList(Iterable<IValueConstraint> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<IValueConstraint> listFromBuilders(Iterable<ValueConstraint> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<ValueConstraint> toBuildersSet(Iterable<IValueConstraint> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<IValueConstraint> setFromBuilders(Iterable<ValueConstraint> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public ValueConstraint newBuilder() {
     return wrapped.deepCopy();
+  }
+
+  public boolean isSetNegated() {
+    return wrapped.isSetNegated();
   }
 
   public boolean isNegated() {
     return wrapped.isNegated();
   }
 
+  public boolean isSetValues() {
+    return wrapped.isSetValues();
+  }
+
   public Set<String> getValues() {
-    return ImmutableSet.copyOf(wrapped.getValues());
+    return values;
   }
 
   @Override

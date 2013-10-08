@@ -16,6 +16,10 @@
 package com.twitter.aurora.scheduler.storage.entities;
 
 import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.LimitConstraint;
 
@@ -26,11 +30,19 @@ import com.twitter.aurora.gen.LimitConstraint;
  * <p>
  * Yes, you're right, it shouldn't be checked in.  We'll get there, I promise.
  */
-public class ILimitConstraint {
+public final class ILimitConstraint {
   private final LimitConstraint wrapped;
 
-  public ILimitConstraint(LimitConstraint wrapped) {
-    this.wrapped = wrapped.deepCopy();
+  private ILimitConstraint(LimitConstraint wrapped) {
+    this.wrapped = Preconditions.checkNotNull(wrapped);
+  }
+
+  static ILimitConstraint buildNoCopy(LimitConstraint wrapped) {
+    return new ILimitConstraint(wrapped);
+  }
+
+  public static ILimitConstraint build(LimitConstraint wrapped) {
+    return buildNoCopy(wrapped.deepCopy());
   }
 
   public static final Function<ILimitConstraint, LimitConstraint> TO_BUILDER =
@@ -49,8 +61,28 @@ public class ILimitConstraint {
         }
       };
 
+  public static ImmutableList<LimitConstraint> toBuildersList(Iterable<ILimitConstraint> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toList();
+  }
+
+  public static ImmutableList<ILimitConstraint> listFromBuilders(Iterable<LimitConstraint> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toList();
+  }
+
+  public static ImmutableSet<LimitConstraint> toBuildersSet(Iterable<ILimitConstraint> w) {
+    return FluentIterable.from(w).transform(TO_BUILDER).toSet();
+  }
+
+  public static ImmutableSet<ILimitConstraint> setFromBuilders(Iterable<LimitConstraint> b) {
+    return FluentIterable.from(b).transform(FROM_BUILDER).toSet();
+  }
+
   public LimitConstraint newBuilder() {
     return wrapped.deepCopy();
+  }
+
+  public boolean isSetLimit() {
+    return wrapped.isSetLimit();
   }
 
   public int getLimit() {
