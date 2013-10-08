@@ -37,14 +37,9 @@ struct Identity {
 }
 
 struct SessionKey {
-  1: optional string deprecatedUser      // User name performing a request.
-  2: optional i64 deprecatedNonce        // Nonce for extablishing a session, which is a unix
-                                         // timestamp (in ms).
-  3: optional binary deprecatedNonceSig  // Signed version of the nonce, encrypted with the user's
-                                         // private SSH key.
-  4: optional string mechanism           // The name of the authentication mechanism, which
-                                         // instructs the server how to interpret the data field.
-  5: optional binary data                // A blob of data that the server uses for authentication.
+  4: optional string mechanism  // The name of the authentication mechanism, which
+                                // instructs the server how to interpret the data field.
+  5: optional binary data       // A blob of data that the server may use for authentication.
 }
 
 // Quota entry associated with a role.
