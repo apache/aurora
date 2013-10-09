@@ -25,14 +25,14 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -123,22 +123,22 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Iterable<JobConfiguration> fetchJobs(String managerId) {
+  public Iterable<IJobConfiguration> fetchJobs(String managerId) {
     return jobStore.fetchJobs(managerId);
   }
 
   @Override
-  public Optional<JobConfiguration> fetchJob(String managerId, JobKey jobKey) {
+  public Optional<IJobConfiguration> fetchJob(String managerId, IJobKey jobKey) {
     return jobStore.fetchJob(managerId, jobKey);
   }
 
   @Override
-  public void saveAcceptedJob(String managerId, JobConfiguration jobConfig) {
+  public void saveAcceptedJob(String managerId, IJobConfiguration jobConfig) {
     jobStore.saveAcceptedJob(managerId, jobConfig);
   }
 
   @Override
-  public void removeJob(JobKey jobKey) {
+  public void removeJob(IJobKey jobKey) {
     jobStore.removeJob(jobKey);
   }
 
@@ -191,7 +191,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(JobKey jobKey) {
+  public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(IJobKey jobKey) {
     return updateStore.fetchJobUpdateConfig(jobKey);
   }
 
@@ -236,7 +236,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void removeShardUpdateConfigs(JobKey jobKey) {
+  public void removeShardUpdateConfigs(IJobKey jobKey) {
     updateStore.removeShardUpdateConfigs(jobKey);
   }
 

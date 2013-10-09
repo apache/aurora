@@ -32,7 +32,6 @@ import org.antlr.stringtemplate.StringTemplate;
 import org.apache.thrift.TBase;
 
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.state.CronJobManager;
@@ -40,6 +39,8 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.Storage.Work.Quiet;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.common.base.Closure;
 import com.twitter.common.thrift.Util;
 
@@ -101,11 +102,12 @@ public class StructDump extends JerseyTemplateServlet {
       @PathParam("environment") final String environment,
       @PathParam("job") final String job) {
 
-    final JobKey jobKey = JobKeys.from(role, environment, job);
+    final IJobKey jobKey = JobKeys.from(role, environment, job);
     return dumpEntity("Cron job " + JobKeys.toPath(jobKey),
         new Work.Quiet<Optional<? extends TBase<?, ?>>>() {
           @Override public Optional<JobConfiguration> apply(StoreProvider storeProvider) {
-            return storeProvider.getJobStore().fetchJob(CronJobManager.MANAGER_KEY, jobKey);
+            return storeProvider.getJobStore().fetchJob(CronJobManager.MANAGER_KEY, jobKey)
+                .transform(IJobConfiguration.TO_BUILDER);
           }
         });
   }

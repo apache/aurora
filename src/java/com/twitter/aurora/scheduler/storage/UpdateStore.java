@@ -19,10 +19,10 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 /**
  * Stores all update configurations for on-going updates.
@@ -36,7 +36,7 @@ public interface UpdateStore {
    * @param jobKey Job to fetch update configuration for.
    * @return Optional job update configuration.
    */
-  Optional<JobUpdateConfiguration> fetchJobUpdateConfig(JobKey jobKey);
+  Optional<JobUpdateConfiguration> fetchJobUpdateConfig(IJobKey jobKey);
 
   /**
    * Fetches all active shard update configurations for a role.
@@ -82,7 +82,7 @@ public interface UpdateStore {
      *
      * @param jobKey Key of the job.
      */
-    void removeShardUpdateConfigs(JobKey jobKey);
+    void removeShardUpdateConfigs(IJobKey jobKey);
 
     /**
      * Deletes all update configurations.

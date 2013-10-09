@@ -19,10 +19,10 @@ import java.util.logging.Logger;
 
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -55,7 +55,7 @@ class ImmediateJobManager extends JobManager {
   }
 
   @Override
-  public boolean hasJob(final JobKey jobKey) {
+  public boolean hasJob(final IJobKey jobKey) {
     return !Storage.Util.consistentFetchTasks(storage, Query.jobScoped(jobKey).active()).isEmpty();
   }
 }

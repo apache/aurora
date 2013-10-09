@@ -36,7 +36,6 @@ import com.google.common.collect.Multimaps;
 
 import org.apache.commons.lang.StringUtils;
 
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.JobKeys;
@@ -241,13 +240,13 @@ class MemTaskStore implements TaskStore.Mutable {
   private FluentIterable<IScheduledTask> matches(TaskQuery query) {
     // Apply the query against the working set.
     Iterable<IScheduledTask> from;
-    Optional<JobKey> jobKey = JobKeys.from(Query.arbitrary(query));
+    Optional<IJobKey> jobKey = JobKeys.from(Query.arbitrary(query));
     if (query.isSetTaskIds()) {
       taskQueriesById.incrementAndGet();
       from = fromIdIndex(query.getTaskIds());
     } else if (jobKey.isPresent()) {
       taskQueriesByJob.incrementAndGet();
-      Collection<String> taskIds = tasksByJobKey.get(IJobKey.build(jobKey.get()));
+      Collection<String> taskIds = tasksByJobKey.get(jobKey.get());
       if (taskIds == null) {
         from = ImmutableList.of();
       } else {

@@ -3,10 +3,10 @@ package com.twitter.aurora.scheduler.state;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
-import com.twitter.aurora.gen.JobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 
 /**
- * An action that either accepts a {@link JobConfiguration} or rejects it with a reason.
+ * An action that either accepts a configuration or rejects it with a reason.
  */
 public interface JobFilter {
   /**
@@ -15,7 +15,7 @@ public interface JobFilter {
    * @param jobConfiguration The job configuration to filter.
    * @return A result and the reason the result was reached.
    */
-  JobFilterResult filter(JobConfiguration jobConfiguration);
+  JobFilterResult filter(IJobConfiguration jobConfiguration);
 
   /**
    * An indication of whether a job passed a filter or not.

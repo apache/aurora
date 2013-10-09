@@ -19,11 +19,10 @@ import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 
-import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
@@ -32,21 +31,21 @@ import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
  */
 public final class ParsedConfiguration {
 
-  private final JobConfiguration parsed;
+  private final IJobConfiguration parsed;
   private final Set<ITaskConfig> tasks;
 
   /**
    * Constructs a ParsedConfiguration object and populates the set of {@link ITaskConfig}s for
    * the provided config.
    *
-   * @param parsed A parsed {@link JobConfiguration}.
+   * @param parsed A parsed configuration..
    */
   @VisibleForTesting
-  public ParsedConfiguration(JobConfiguration parsed) {
+  public ParsedConfiguration(IJobConfiguration parsed) {
     this.parsed = parsed;
     ImmutableSet.Builder<ITaskConfig> builder = ImmutableSet.builder();
     for (int i = 0; i < parsed.getShardCount(); i++) {
-      builder.add(ITaskConfig.build(parsed.getTaskConfig().deepCopy().setShardId(i)));
+      builder.add(ITaskConfig.build(parsed.getTaskConfig().newBuilder().setShardId(i)));
     }
     this.tasks = builder.build();
   }
@@ -58,14 +57,13 @@ public final class ParsedConfiguration {
    * @return A wrapper containing the parsed configuration.
    * @throws TaskDescriptionException If the configuration is invalid.
    */
-  public static ParsedConfiguration fromUnparsed(JobConfiguration unparsed)
+  public static ParsedConfiguration fromUnparsed(IJobConfiguration unparsed)
       throws TaskDescriptionException {
 
-    Preconditions.checkNotNull(unparsed);
     return new ParsedConfiguration(ConfigurationManager.validateAndPopulate(unparsed));
   }
 
-  public JobConfiguration getJobConfig() {
+  public IJobConfiguration getJobConfig() {
     return parsed;
   }
 

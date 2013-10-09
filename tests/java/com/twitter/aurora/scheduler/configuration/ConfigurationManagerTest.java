@@ -30,6 +30,7 @@ import com.twitter.aurora.gen.LimitConstraint;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.gen.ValueConstraint;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -116,7 +117,7 @@ public class ConfigurationManagerTest {
 
   private void expectRejected(JobConfiguration job) {
     try {
-      ConfigurationManager.validateAndPopulate(job);
+      ConfigurationManager.validateAndPopulate(IJobConfiguration.build(job));
       fail();
     } catch (ConfigurationManager.TaskDescriptionException e) {
       // expected

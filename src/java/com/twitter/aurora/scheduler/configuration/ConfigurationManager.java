@@ -32,7 +32,6 @@ import com.google.common.collect.Sets;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.aurora.gen.Constraint;
-import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.LimitConstraint;
 import com.twitter.aurora.gen.TaskConfig;
@@ -40,6 +39,8 @@ import com.twitter.aurora.gen.TaskConfig._Fields;
 import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.entities.IConstraint;
+import com.twitter.aurora.scheduler.storage.entities.IIdentity;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConstraint;
 import com.twitter.aurora.scheduler.storage.entities.IValueConstraint;
@@ -183,7 +184,7 @@ public final class ConfigurationManager {
      }
   }
 
-  private static void assertOwnerValidity(Identity jobOwner) throws TaskDescriptionException {
+  private static void assertOwnerValidity(IIdentity jobOwner) throws TaskDescriptionException {
     checkNotNull(jobOwner, "No job owner specified!");
     checkNotNull(jobOwner.getRole(), "No job role specified!");
     checkNotNull(jobOwner.getUser(), "No job user specified!");
@@ -241,7 +242,7 @@ public final class ConfigurationManager {
    * @return A deep copy of {@code job} that has been populated.
    * @throws TaskDescriptionException If the job configuration is invalid.
    */
-  public static JobConfiguration validateAndPopulate(JobConfiguration job)
+  public static IJobConfiguration validateAndPopulate(IJobConfiguration job)
       throws TaskDescriptionException {
 
     Preconditions.checkNotNull(job);
@@ -262,7 +263,7 @@ public final class ConfigurationManager {
       throw new TaskDescriptionException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
     }
 
-    JobConfiguration copy = job.deepCopy();
+    JobConfiguration builder = job.newBuilder();
 
     assertOwnerValidity(job.getOwner());
 
@@ -285,8 +286,8 @@ public final class ConfigurationManager {
           "Job name contains illegal characters: " + job.getKey().getName());
     }
 
-    populateFields(copy);
-    TaskConfig config = copy.getTaskConfig();
+    builder.setTaskConfig(populateFields(IJobConfiguration.build(builder)).newBuilder());
+    TaskConfig config = builder.getTaskConfig();
 
     if (REQUIRE_CONTACT_EMAIL.get()
         && (!config.isSetContactEmail()
@@ -314,7 +315,7 @@ public final class ConfigurationManager {
       }
     }
 
-    return copy;
+    return IJobConfiguration.build(builder);
   }
 
   /**
@@ -325,45 +326,43 @@ public final class ConfigurationManager {
    * @throws TaskDescriptionException If the task is invalid.
    */
   @VisibleForTesting
-  public static TaskConfig populateFields(JobConfiguration job)
-      throws TaskDescriptionException {
-
-    TaskConfig config = job.getTaskConfig();
-    if (config == null) {
+  public static ITaskConfig populateFields(IJobConfiguration job) throws TaskDescriptionException {
+    TaskConfig builder = job.getTaskConfig().newBuilder();
+    if (builder == null) {
       throw new TaskDescriptionException("Task may not be null.");
     }
 
-    if (!config.isSetRequestedPorts()) {
-      config.setRequestedPorts(ImmutableSet.<String>of());
+    if (!builder.isSetRequestedPorts()) {
+      builder.setRequestedPorts(ImmutableSet.<String>of());
     }
 
-    maybeFillLinks(config);
+    maybeFillLinks(builder);
 
-    config.setOwner(job.getOwner());
-    config.setJobName(job.getKey().getName());
+    builder.setOwner(job.getOwner().newBuilder());
+    builder.setJobName(job.getKey().getName());
 
     // TODO(ksweeney): Remove the check for job.isSetKey when it's no longer optional.
-    if (StringUtils.isBlank(config.getEnvironment()) && job.isSetKey()) {
-      config.setEnvironment(job.getKey().getEnvironment());
+    if (StringUtils.isBlank(builder.getEnvironment()) && job.isSetKey()) {
+      builder.setEnvironment(job.getKey().getEnvironment());
     }
 
     // Only one of [service=true, cron_schedule] may be set.
-    if (!StringUtils.isEmpty(job.getCronSchedule()) && config.isIsService()) {
+    if (!StringUtils.isEmpty(job.getCronSchedule()) && builder.isIsService()) {
       throw new TaskDescriptionException(
-          "A service task may not be run on a cron schedule: " + config);
+          "A service task may not be run on a cron schedule: " + builder);
     }
 
     // TODO(maximk): Remove thermosConfig during the MESOS-2635 cleanup stage
-    if (!config.isSetThermosConfig() && !config.isSetExecutorConfig()) {
+    if (!builder.isSetThermosConfig() && !builder.isSetExecutorConfig()) {
       throw new TaskDescriptionException("Configuration may not be null");
     }
 
     // Maximize the usefulness of any thrown error message by checking required fields first.
     for (RequiredFieldValidator<?> validator : REQUIRED_FIELDS_VALIDATORS) {
-      validator.validate(config);
+      validator.validate(builder);
     }
 
-    return applyDefaultsIfUnset(config);
+    return ITaskConfig.build(applyDefaultsIfUnset(builder));
   }
 
   /**

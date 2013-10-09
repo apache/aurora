@@ -19,10 +19,10 @@ import java.util.Collections;
 
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 /**
  * Interface for a job manager.  A job manager is responsible for deciding whether and when to
@@ -60,7 +60,7 @@ public abstract class JobManager {
    * @return Jobs stored by this job manager.
    */
   // TODO(ksweeney): Consider adding a Map<JobKey, JobConfiguration> to complement this.
-  public Iterable<JobConfiguration> getJobs() {
+  public Iterable<IJobConfiguration> getJobs() {
     return Collections.emptyList();
   }
 
@@ -70,7 +70,7 @@ public abstract class JobManager {
    * @param jobKey Job key.
    * @return {@code true} if the manager has a matching job, {@code false} otherwise.
    */
-  public abstract boolean hasJob(JobKey jobKey);
+  public abstract boolean hasJob(IJobKey jobKey);
 
   /**
    * Instructs the manager to delete any jobs with the given key.
@@ -78,7 +78,7 @@ public abstract class JobManager {
    * @param jobKey Job key.
    * @return {@code true} if a matching job was deleted.
    */
-  public boolean deleteJob(JobKey jobKey) {
+  public boolean deleteJob(IJobKey jobKey) {
     // Optionally overridden by implementing class.
     return false;
   }

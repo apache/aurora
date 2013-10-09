@@ -24,9 +24,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
 
 import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
+import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.TaskQuery;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -66,7 +67,7 @@ public final class Query {
    * @return {@code true} if the query is strictly job scoped, otherwise {@code false}.
    */
   public static boolean isOnlyJobScoped(Builder query) {
-    Optional<JobKey> jobKey = JobKeys.from(query);
+    Optional<IJobKey> jobKey = JobKeys.from(query);
     return jobKey.isPresent() && Query.jobScoped(jobKey.get()).equals(query);
   }
 
@@ -86,15 +87,19 @@ public final class Query {
     return unscoped().byEnv(role, environment);
   }
 
-  public static Builder jobScoped(JobKey jobKey) {
+  public static Builder jobScoped(IJobKey jobKey) {
     return unscoped().byJob(jobKey);
   }
 
-  public static Builder shardScoped(JobKey jobKey, int shardId, int... shardIds) {
+  public static Builder shardScoped(ShardKey shardKey) {
+    return shardScoped(IJobKey.build(shardKey.getJobKey()), shardKey.getShardId());
+  }
+
+  public static Builder shardScoped(IJobKey jobKey, int shardId, int... shardIds) {
     return unscoped().byShards(jobKey, shardId, shardIds);
   }
 
-  public static Builder shardScoped(JobKey jobKey, Iterable<Integer> shardIds) {
+  public static Builder shardScoped(IJobKey jobKey, Iterable<Integer> shardIds) {
     return unscoped().byShards(jobKey, shardIds);
   }
 
@@ -241,7 +246,7 @@ public final class Query {
      * @param jobKey The key of the job to scope the query to.
      * @return A new Builder scoped to the given jobKey.
      */
-    public Builder byJob(JobKey jobKey) {
+    public Builder byJob(IJobKey jobKey) {
       JobKeys.assertValid(jobKey);
 
       return new Builder(
@@ -303,7 +308,7 @@ public final class Query {
      * @param shardIds Additional shardIds of the target job.
      * @return A new Builder scoped to the given shardIds.
      */
-    public Builder byShards(JobKey jobKey, int shardId, int... shardIds) {
+    public Builder byShards(IJobKey jobKey, int shardId, int... shardIds) {
       JobKeys.assertValid(jobKey);
 
       return new Builder(
@@ -320,13 +325,13 @@ public final class Query {
     /**
      * Create a new Builder scoped to shards.
      *
-     * @see Builder#byShards(com.twitter.aurora.gen.JobKey, int, int...)
+     * @see Builder#byShards(IJobKey, int, int...)
      *
      * @param jobKey The key identifying the job.
      * @param shardIds Shards of the target job.
      * @return A new Builder scoped to the given shardIds.
      */
-    public Builder byShards(JobKey jobKey, Iterable<Integer> shardIds) {
+    public Builder byShards(IJobKey jobKey, Iterable<Integer> shardIds) {
       JobKeys.assertValid(jobKey);
       checkNotNull(shardIds);
 

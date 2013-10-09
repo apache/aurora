@@ -47,7 +47,6 @@ import com.google.inject.Inject;
 import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.aurora.gen.CronCollisionPolicy;
-import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
@@ -57,6 +56,7 @@ import com.twitter.aurora.scheduler.quota.QuotaManager;
 import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
@@ -173,8 +173,8 @@ public class SchedulerzRole extends JerseyTemplateServlet {
       final String role,
       final Optional<String> environment) {
 
-    Predicate<JobConfiguration> byRoleEnv = new Predicate<JobConfiguration>() {
-      @Override public boolean apply(JobConfiguration job) {
+    Predicate<IJobConfiguration> byRoleEnv = new Predicate<IJobConfiguration>() {
+      @Override public boolean apply(IJobConfiguration job) {
         boolean roleMatch = job.getOwner().getRole().equals(role);
         boolean envMatch = !environment.isPresent()
             || job.getKey().getEnvironment().equals(environment.get());
@@ -182,20 +182,20 @@ public class SchedulerzRole extends JerseyTemplateServlet {
       }
     };
 
-    Iterable<JobConfiguration> jobs = FluentIterable
+    Iterable<IJobConfiguration> jobs = FluentIterable
         .from(cronJobManager.getJobs())
         .filter(byRoleEnv);
 
     return Maps.transformValues(Maps.uniqueIndex(jobs, JobKeys.FROM_CONFIG),
-        new Function<JobConfiguration, Map<?, ?>>() {
-          @Override public Map<?, ?> apply(JobConfiguration job) {
+        new Function<IJobConfiguration, Map<?, ?>>() {
+          @Override public Map<?, ?> apply(IJobConfiguration job) {
             return ImmutableMap.<Object, Object>builder()
                 .put("jobKey", job.getKey())
                 .put("name", job.getKey().getName())
                 .put("environment", job.getKey().getEnvironment())
                 .put("pendingTaskCount", job.getShardCount())
                 .put("cronSchedule", job.getCronSchedule())
-                .put("nextRun", cronPredictor.predictNextRun(job.cronSchedule).getTime())
+                .put("nextRun", cronPredictor.predictNextRun(job.getCronSchedule()).getTime())
                 .put("cronCollisionPolicy", cronCollisionPolicy(job))
                 .put("packages", getPackages(job))
                 .build();
@@ -203,15 +203,15 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         });
   }
 
-  private static CronCollisionPolicy cronCollisionPolicy(JobConfiguration jobConfiguration) {
+  private static CronCollisionPolicy cronCollisionPolicy(IJobConfiguration jobConfiguration) {
     return CronJobManager.orDefault(jobConfiguration.getCronCollisionPolicy());
   }
 
-  private static String getPackages(JobConfiguration job) {
+  private static String getPackages(IJobConfiguration job) {
     Set<String> packages = Sets.newHashSet();
 
     // Insert all packages for all tasks in the set to eliminate duplicates
-    ITaskConfig task = ITaskConfig.build(job.getTaskConfig());
+    ITaskConfig task = job.getTaskConfig();
     if (!task.getPackages().isEmpty()) {
       packages.addAll(Lists.newArrayList(
           Iterables.transform(task.getPackages(), TransformationUtils.PACKAGE_TOSTRING)));

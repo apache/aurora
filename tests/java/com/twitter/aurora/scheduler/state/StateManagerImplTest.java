@@ -38,7 +38,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ShardUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
@@ -52,6 +51,7 @@ import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.mem.MemStorage;
@@ -85,7 +85,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final String HOST_A = "host_a";
   private static final Identity JIM = new Identity("jim", "jim-user");
   private static final String MY_JOB = "myJob";
-  private static final JobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
+  private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
 
   private Driver driver;
   private Function<ITaskConfig, String> taskIdGenerator;

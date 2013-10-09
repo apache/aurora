@@ -45,8 +45,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.aurora.gen.CronCollisionPolicy;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
@@ -61,6 +59,8 @@ import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.application.ShutdownRegistry;
@@ -105,14 +105,14 @@ public class CronJobManager extends JobManager implements EventSubscriber {
 
   // Maps from the unique job identifier to the unique identifier used internally by the cron
   // scheduler.
-  private final Map<JobKey, String> scheduledJobs =
-      Collections.synchronizedMap(Maps.<JobKey, String>newHashMap());
+  private final Map<IJobKey, String> scheduledJobs =
+      Collections.synchronizedMap(Maps.<IJobKey, String>newHashMap());
 
   // Prevents runs from dogpiling while waiting for a run to transition out of the KILLING state.
   // This is necessary because killing a job (if dictated by cron collision policy) is an
   // asynchronous operation.
-  private final Map<JobKey, ParsedConfiguration> pendingRuns =
-      Collections.synchronizedMap(Maps.<JobKey, ParsedConfiguration>newHashMap());
+  private final Map<IJobKey, ParsedConfiguration> pendingRuns =
+      Collections.synchronizedMap(Maps.<IJobKey, ParsedConfiguration>newHashMap());
 
   private final StateManager stateManager;
   private final Storage storage;
@@ -156,8 +156,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     Stats.exportSize("cron_num_pending_runs", pendingRuns);
   }
 
-  private void mapScheduledJob(JobConfiguration job, String scheduledJobKey) {
-    JobKey jobKey = job.getKey();
+  private void mapScheduledJob(IJobConfiguration job, String scheduledJobKey) {
+    IJobKey jobKey = job.getKey();
     synchronized (scheduledJobs) {
       Preconditions.checkState(
           !scheduledJobs.containsKey(jobKey),
@@ -181,14 +181,14 @@ public class CronJobManager extends JobManager implements EventSubscriber {
       }
     });
 
-    Iterable<JobConfiguration> crons =
-        storage.consistentRead(new Work.Quiet<Iterable<JobConfiguration>>() {
-          @Override public Iterable<JobConfiguration> apply(Storage.StoreProvider storeProvider) {
+    Iterable<IJobConfiguration> crons =
+        storage.consistentRead(new Work.Quiet<Iterable<IJobConfiguration>>() {
+          @Override public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
             return storeProvider.getJobStore().fetchJobs(MANAGER_KEY);
           }
         });
 
-    for (JobConfiguration job : crons) {
+    for (IJobConfiguration job : crons) {
       try {
         mapScheduledJob(job, scheduleJob(ParsedConfiguration.fromUnparsed(job)));
       } catch (ScheduleException e) {
@@ -199,7 +199,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     }
   }
 
-  private void logLaunchFailure(JobConfiguration job, Exception e) {
+  private void logLaunchFailure(IJobConfiguration job, Exception e) {
     cronJobLaunchFailures.incrementAndGet();
     LOG.log(Level.SEVERE, "Scheduling failed for recovered job " + job, e);
   }
@@ -209,19 +209,19 @@ public class CronJobManager extends JobManager implements EventSubscriber {
    *
    * @param jobKey Key of the job to start.
    */
-  public void startJobNow(JobKey jobKey) throws TaskDescriptionException {
+  public void startJobNow(IJobKey jobKey) throws TaskDescriptionException {
     checkNotNull(jobKey);
 
-    Optional<JobConfiguration> jobConfig = fetchJob(jobKey);
+    Optional<IJobConfiguration> jobConfig = fetchJob(jobKey);
     checkArgument(jobConfig.isPresent(), "No such cron job " + JobKeys.toPath(jobKey));
 
     cronTriggered(ParsedConfiguration.fromUnparsed(jobConfig.get()));
   }
 
   private void delayedRun(final Query.Builder query, final ParsedConfiguration config) {
-    JobConfiguration job = config.getJobConfig();
+    IJobConfiguration job = config.getJobConfig();
     final String jobPath = JobKeys.toPath(job);
-    final JobKey jobKey = job.getKey().deepCopy();
+    final IJobKey jobKey = job.getKey();
     LOG.info("Waiting for job to terminate before launching cron job " + jobPath);
     if (pendingRuns.put(jobKey, config) == null) {
       LOG.info("Launching a task to wait for job to finish: " + jobPath);
@@ -235,7 +235,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     }
   }
 
-  private void runWhenTerminated(final Query.Builder query, final JobKey jobKey) {
+  private void runWhenTerminated(final Query.Builder query, final IJobKey jobKey) {
     try {
       delayedStartBackoff.doUntilSuccess(new Supplier<Boolean>() {
         @Override public Boolean get() {
@@ -273,15 +273,13 @@ public class CronJobManager extends JobManager implements EventSubscriber {
    */
   @VisibleForTesting
   void cronTriggered(ParsedConfiguration config) {
-    JobConfiguration job = config.getJobConfig();
+    IJobConfiguration job = config.getJobConfig();
     LOG.info(String.format("Cron triggered for %s at %s with policy %s",
         JobKeys.toPath(job), new Date(), job.getCronCollisionPolicy()));
     cronJobsTriggered.incrementAndGet();
 
     ImmutableSet.Builder<ITaskConfig> builder = ImmutableSet.builder();
-
     final Query.Builder activeQuery = Query.jobScoped(job.getKey()).active();
-
     Set<IScheduledTask> activeTasks = Storage.Util.consistentFetchTasks(storage, activeQuery);
 
     if (activeTasks.isEmpty()) {
@@ -343,7 +341,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   void updateJob(ParsedConfiguration config) throws ScheduleException {
-    JobConfiguration job = config.getJobConfig();
+    IJobConfiguration job = config.getJobConfig();
     if (!hasCronSchedule(job)) {
       throw new ScheduleException("A cron job may not be updated to a non-cron job.");
     }
@@ -358,14 +356,14 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     return MANAGER_KEY;
   }
 
-  private static boolean hasCronSchedule(JobConfiguration job) {
+  private static boolean hasCronSchedule(IJobConfiguration job) {
     checkNotNull(job);
     return !StringUtils.isEmpty(job.getCronSchedule());
   }
 
   @Override
   public boolean receiveJob(ParsedConfiguration config) throws ScheduleException {
-    final JobConfiguration job = config.getJobConfig();
+    final IJobConfiguration job = config.getJobConfig();
     if (!hasCronSchedule(job)) {
       return false;
     }
@@ -382,7 +380,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   private String scheduleJob(final ParsedConfiguration config) throws ScheduleException {
-    final JobConfiguration job = config.getJobConfig();
+    final IJobConfiguration job = config.getJobConfig();
     final String jobPath = JobKeys.toPath(job);
     if (!hasCronSchedule(job)) {
       throw new ScheduleException(
@@ -408,31 +406,31 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   @Override
-  public Iterable<JobConfiguration> getJobs() {
-    return storage.consistentRead(new Work.Quiet<Iterable<JobConfiguration>>() {
+  public Iterable<IJobConfiguration> getJobs() {
+    return storage.consistentRead(new Work.Quiet<Iterable<IJobConfiguration>>() {
       @Override
-      public Iterable<JobConfiguration> apply(Storage.StoreProvider storeProvider) {
+      public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobStore().fetchJobs(MANAGER_KEY);
       }
     });
   }
 
   @Override
-  public boolean hasJob(JobKey jobKey) {
+  public boolean hasJob(IJobKey jobKey) {
     return fetchJob(jobKey).isPresent();
   }
 
-  private Optional<JobConfiguration> fetchJob(final JobKey jobKey) {
+  private Optional<IJobConfiguration> fetchJob(final IJobKey jobKey) {
     checkNotNull(jobKey);
-    return storage.consistentRead(new Work.Quiet<Optional<JobConfiguration>>() {
-      @Override public Optional<JobConfiguration> apply(Storage.StoreProvider storeProvider) {
+    return storage.consistentRead(new Work.Quiet<Optional<IJobConfiguration>>() {
+      @Override public Optional<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobStore().fetchJob(MANAGER_KEY, jobKey);
       }
     });
   }
 
   @Override
-  public boolean deleteJob(final JobKey jobKey) {
+  public boolean deleteJob(final IJobKey jobKey) {
     checkNotNull(jobKey);
 
     if (!hasJob(jobKey)) {
@@ -458,15 +456,15 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     }
   };
 
-  public Map<JobKey, String> getScheduledJobs() {
+  public Map<IJobKey, String> getScheduledJobs() {
     synchronized (scheduledJobs) {
       return ImmutableMap.copyOf(Maps.transformValues(scheduledJobs, keyToSchedule));
     }
   }
 
-  public Set<JobKey> getPendingRuns() {
+  public Set<IJobKey> getPendingRuns() {
     synchronized (pendingRuns) {
-      return FluentIterable.from(pendingRuns.keySet()).transform(JobKeys.DEEP_COPY).toSet();
+      return ImmutableSet.copyOf(pendingRuns.keySet());
     }
   }
 }

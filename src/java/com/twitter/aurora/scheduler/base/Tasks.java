@@ -31,10 +31,8 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 
 import com.twitter.aurora.gen.Constants;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
@@ -85,14 +83,9 @@ public final class Tasks {
   public static final Function<ITaskConfig, IJobKey> INFO_TO_JOB_KEY =
       new Function<ITaskConfig, IJobKey>() {
         @Override public IJobKey apply(ITaskConfig task) {
-          return IJobKey.build(
-              JobKeys.from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName()));
+          return JobKeys.from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
         }
       };
-
-  public static JobKey getJobKey(TaskConfig task) {
-    return JobKeys.from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
-  }
 
   public static final Function<IAssignedTask, IJobKey> ASSIGNED_TO_JOB_KEY =
       Functions.compose(INFO_TO_JOB_KEY, ASSIGNED_TO_INFO);

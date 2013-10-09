@@ -48,7 +48,6 @@ import com.google.inject.Inject;
 import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -245,7 +244,7 @@ public class StateManagerImpl implements StateManager {
    *     is already in progress.
    * @return A unique string identifying the update.
    */
-  String registerUpdate(final JobKey jobKey, final Set<ITaskConfig> updatedTasks)
+  String registerUpdate(final IJobKey jobKey, final Set<ITaskConfig> updatedTasks)
       throws UpdateException {
 
     checkNotNull(jobKey);
@@ -288,7 +287,7 @@ public class StateManagerImpl implements StateManager {
         String updateToken = UUID.randomUUID().toString();
         updateStore.saveJobUpdateConfig(
             new JobUpdateConfiguration()
-                .setJobKey(jobKey)
+                .setJobKey(jobKey.newBuilder())
                 .setUpdateToken(updateToken)
                 .setConfigs(shardConfigBuilder.build()));
         return updateToken;
@@ -297,7 +296,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   private static final Set<ScheduleStatus> UPDATE_IN_PROGRESS = EnumSet.of(UPDATING, ROLLBACK);
-  private static void assertNotUpdatingOrRollingBack(JobKey jobKey, TaskStore taskStore)
+  private static void assertNotUpdatingOrRollingBack(IJobKey jobKey, TaskStore taskStore)
       throws UpdateException {
 
     Query.Builder query = Query.jobScoped(jobKey).byStatus(UPDATE_IN_PROGRESS);
@@ -320,7 +319,7 @@ public class StateManagerImpl implements StateManager {
    *     does not match the stored token.
    */
   boolean finishUpdate(
-      final JobKey jobKey,
+      final IJobKey jobKey,
       final String invokingUser,
       final Optional<String> updateToken,
       final UpdateResult result,
@@ -446,7 +445,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   Map<Integer, ShardUpdateResult> modifyShards(
-      final JobKey jobKey,
+      final IJobKey jobKey,
       final String invokingUser,
       final Set<Integer> shards,
       final String updateToken,
@@ -544,8 +543,7 @@ public class StateManagerImpl implements StateManager {
   private Optional<TaskUpdateConfiguration> fetchShardUpdateConfig(
       UpdateStore updateStore, IJobKey jobKey, int shard) {
 
-    Optional<JobUpdateConfiguration> optional =
-        updateStore.fetchJobUpdateConfig(jobKey.newBuilder());
+    Optional<JobUpdateConfiguration> optional = updateStore.fetchJobUpdateConfig(jobKey);
     if (optional.isPresent()) {
       Set<TaskUpdateConfiguration> matches =
           fetchShardUpdateConfigs(optional.get(), ImmutableSet.of(shard));
@@ -686,7 +684,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   // Supplier that checks if there is an active update for a job.
-  private Supplier<Boolean> taskUpdateChecker(final JobKey jobKey) {
+  private Supplier<Boolean> taskUpdateChecker(final IJobKey jobKey) {
     return new Supplier<Boolean>() {
       @Override public Boolean get() {
         return readOnlyStorage.consistentRead(new Work.Quiet<Boolean>() {
@@ -809,7 +807,7 @@ public class StateManagerImpl implements StateManager {
 
     if (!optional.isPresent()) {
       LOG.warning("No update configuration found for key "
-          + JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(oldConfig).newBuilder())
+          + JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(oldConfig))
           + " shard " + oldConfig.getShardId() + " : Assuming update has finished.");
       return;
     }
@@ -879,7 +877,7 @@ public class StateManagerImpl implements StateManager {
     return new TaskStateMachine(
         Tasks.id(task),
         task,
-        taskUpdateChecker(Tasks.SCHEDULED_TO_JOB_KEY.apply(task).newBuilder()),
+        taskUpdateChecker(Tasks.SCHEDULED_TO_JOB_KEY.apply(task)),
         workSink,
         clock,
         initialState);

@@ -21,9 +21,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.JobStore;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -33,11 +34,11 @@ public class MemJobStoreTest {
   private static final String MANAGER_1 = "manager1";
   private static final String MANAGER_2 = "manager2";
 
-  private static final JobConfiguration JOB_A = makeJob("a");
-  private static final JobConfiguration JOB_B = makeJob("b");
+  private static final IJobConfiguration JOB_A = makeJob("a");
+  private static final IJobConfiguration JOB_B = makeJob("b");
 
-  private static final JobKey KEY_A = JOB_A.getKey();
-  private static final JobKey KEY_B = JOB_B.getKey();
+  private static final IJobKey KEY_A = JOB_A.getKey();
+  private static final IJobKey KEY_B = JOB_B.getKey();
 
   private JobStore.Mutable store;
 
@@ -49,7 +50,7 @@ public class MemJobStoreTest {
   @Test
   public void testJobStore() {
     assertNull(store.fetchJob(MANAGER_1, JobKeys.from("nobody", "nowhere", "noname")).orNull());
-    assertEquals(ImmutableSet.<JobConfiguration>of(), store.fetchJobs(MANAGER_1));
+    assertEquals(ImmutableSet.<IJobConfiguration>of(), store.fetchJobs(MANAGER_1));
     assertEquals(ImmutableSet.<String>of(), store.fetchManagerIds());
 
     store.saveAcceptedJob(MANAGER_1, JOB_A);
@@ -68,26 +69,29 @@ public class MemJobStoreTest {
 
     store.removeJob(KEY_B);
     assertEquals(ImmutableSet.of(JOB_A), store.fetchJobs(MANAGER_1));
-    assertEquals(ImmutableSet.<JobConfiguration>of(), store.fetchJobs(MANAGER_2));
+    assertEquals(ImmutableSet.<IJobConfiguration>of(), store.fetchJobs(MANAGER_2));
 
     store.deleteJobs();
-    assertEquals(ImmutableSet.<JobConfiguration>of(), store.fetchJobs(MANAGER_1));
-    assertEquals(ImmutableSet.<JobConfiguration>of(), store.fetchJobs(MANAGER_2));
+    assertEquals(ImmutableSet.<IJobConfiguration>of(), store.fetchJobs(MANAGER_1));
+    assertEquals(ImmutableSet.<IJobConfiguration>of(), store.fetchJobs(MANAGER_2));
   }
 
   @Test
   public void testJobStoreSameEnvironment() {
-    JobConfiguration templateConfig = makeJob("labrat");
-    JobConfiguration prod = templateConfig.deepCopy();
-    prod.getKey().setEnvironment("prod");
-    JobConfiguration staging = templateConfig.deepCopy();
-    staging.getKey().setEnvironment("staging");
+    IJobConfiguration templateConfig = makeJob("labrat");
+    JobConfiguration prodBuilder = templateConfig.newBuilder();
+    prodBuilder.getKey().setEnvironment("prod");
+    IJobConfiguration prod = IJobConfiguration.build(prodBuilder);
+    JobConfiguration stagingBuilder = templateConfig.newBuilder();
+    stagingBuilder.getKey().setEnvironment("staging");
+    IJobConfiguration staging = IJobConfiguration.build(stagingBuilder);
 
     store.saveAcceptedJob(MANAGER_1, prod);
     store.saveAcceptedJob(MANAGER_1, staging);
 
-    assertNull(store.fetchJob(MANAGER_1, templateConfig.deepCopy().getKey().setEnvironment("test"))
-        .orNull());
+    assertNull(store.fetchJob(
+        MANAGER_1,
+        IJobKey.build(templateConfig.getKey().newBuilder().setEnvironment("test"))).orNull());
     assertEquals(prod, store.fetchJob(MANAGER_1, prod.getKey()).orNull());
     assertEquals(staging, store.fetchJob(MANAGER_1, staging.getKey()).orNull());
 
@@ -96,7 +100,9 @@ public class MemJobStoreTest {
     assertEquals(staging, store.fetchJob(MANAGER_1, staging.getKey()).orNull());
   }
 
-  private static JobConfiguration makeJob(String name) {
-    return new JobConfiguration().setKey(JobKeys.from("role-" + name, "env-" + name, name));
+  private static IJobConfiguration makeJob(String name) {
+    return IJobConfiguration.build(
+        new JobConfiguration().setKey(JobKeys.from("role-" + name, "env-" + name, name)
+            .newBuilder()));
   }
 }

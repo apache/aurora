@@ -22,9 +22,9 @@ import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 
-import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.TaskQuery;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -37,46 +37,36 @@ public final class JobKeys {
     // Utility class.
   }
 
-  public static final Function<JobKey, JobKey> DEEP_COPY = new Function<JobKey, JobKey>() {
-    @Override public JobKey apply(JobKey jobKey) {
-      return jobKey.deepCopy();
-    }
-  };
-
-  // No copy needed for Functions that extract an immutable object (e.g. String).
-  private static final Function<JobConfiguration, JobKey> FROM_CONFIG_NO_COPY =
-      new Function<JobConfiguration, JobKey>() {
-        @Override public JobKey apply(JobConfiguration job) {
+  public static final Function<IJobConfiguration, IJobKey> FROM_CONFIG =
+      new Function<IJobConfiguration, IJobKey>() {
+        @Override public IJobKey apply(IJobConfiguration job) {
           return job.getKey();
         }
       };
 
-  public static final Function<JobConfiguration, IJobKey> FROM_CONFIG =
-      Functions.compose(IJobKey.FROM_BUILDER, Functions.compose(DEEP_COPY, FROM_CONFIG_NO_COPY));
-
-  public static final Function<JobKey, String> TO_ROLE =
-      new Function<JobKey, String>() {
-        @Override public String apply(JobKey jobKey) {
+  public static final Function<IJobKey, String> TO_ROLE =
+      new Function<IJobKey, String>() {
+        @Override public String apply(IJobKey jobKey) {
           return jobKey.getRole();
         }
       };
 
-  public static final Function<JobKey, String> TO_ENVIRONMENT =
-      new Function<JobKey, String>() {
-        @Override public String apply(JobKey jobKey) {
+  public static final Function<IJobKey, String> TO_ENVIRONMENT =
+      new Function<IJobKey, String>() {
+        @Override public String apply(IJobKey jobKey) {
           return jobKey.getEnvironment();
         }
       };
 
-  public static final Function<JobKey, String> TO_JOB_NAME =
-      new Function<JobKey, String>() {
-        @Override public String apply(JobKey jobKey) {
+  public static final Function<IJobKey, String> TO_JOB_NAME =
+      new Function<IJobKey, String>() {
+        @Override public String apply(IJobKey jobKey) {
           return jobKey.getName();
         }
       };
 
-  public static final Function<JobConfiguration, String> CONFIG_TO_ROLE =
-      Functions.compose(TO_ROLE, FROM_CONFIG_NO_COPY);
+  public static final Function<IJobConfiguration, String> CONFIG_TO_ROLE =
+      Functions.compose(TO_ROLE, FROM_CONFIG);
 
   /**
    * Check that a jobKey struct is valid.
@@ -84,7 +74,7 @@ public final class JobKeys {
    * @param jobKey The jobKey to validate.
    * @return {@code true} if the jobKey validates.
    */
-  public static boolean isValid(@Nullable JobKey jobKey) {
+  public static boolean isValid(@Nullable IJobKey jobKey) {
     return jobKey != null
         && !Strings.isNullOrEmpty(jobKey.getRole())
         && !Strings.isNullOrEmpty(jobKey.getEnvironment())
@@ -98,7 +88,7 @@ public final class JobKeys {
    * @return The validated jobKey argument.
    * @throws IllegalArgumentException if the key struct fails to validate.
    */
-  public static JobKey assertValid(JobKey jobKey) throws IllegalArgumentException {
+  public static IJobKey assertValid(IJobKey jobKey) throws IllegalArgumentException {
     checkArgument(isValid(jobKey));
 
     return jobKey;
@@ -113,46 +103,45 @@ public final class JobKeys {
    * @return A valid JobKey if it can be created.
    * @throws IllegalArgumentException if the key fails to validate.
    */
-  public static JobKey from(String role, String environment, String name)
+  public static IJobKey from(String role, String environment, String name)
       throws IllegalArgumentException {
 
-    JobKey job = new JobKey()
+    IJobKey job = IJobKey.build(new JobKey()
         .setRole(role)
         .setEnvironment(environment)
-        .setName(name);
-
+        .setName(name));
     return assertValid(job);
   }
 
   /**
-   * Create a "/"-delimited String representation of {@code jobKey}, suitable for logging but not
+   * Create a "/"-delimited String representation of a job key, suitable for logging but not
    * necessarily suitable for use as a unique identifier.
    *
    * @param jobKey Key to represent.
    * @return "/"-delimited representation of the key.
    */
-  public static String toPath(JobKey jobKey) {
+  public static String toPath(IJobKey jobKey) {
     return jobKey.getRole() + "/" + jobKey.getEnvironment() + "/" + jobKey.getName();
   }
 
   /**
-   * Create a "/"-delimited String representation of {@code jobKey}, suitable for logging but not
+   * Create a "/"-delimited String representation of job key, suitable for logging but not
    * necessarily suitable for use as a unique identifier.
    *
    * @param job Job to represent.
    * @return "/"-delimited representation of the job's key.
    */
-  public static String toPath(JobConfiguration job) {
+  public static String toPath(IJobConfiguration job) {
     return toPath(job.getKey());
   }
 
   /**
-   * Attempt to extract a {@link JobKey} from the given query if it is scoped to a single job.
+   * Attempt to extract a job key from the given query if it is scoped to a single job.
    *
    * @param query Query to extract the key from.
    * @return A present if one can be extracted, absent otherwise.
    */
-  public static Optional<JobKey> from(Query.Builder query) {
+  public static Optional<IJobKey> from(Query.Builder query) {
     if (Query.isJobScoped(query)) {
       TaskQuery taskQuery = query.get();
       return Optional.of(

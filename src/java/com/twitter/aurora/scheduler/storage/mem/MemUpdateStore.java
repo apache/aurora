@@ -25,12 +25,12 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Maps;
 
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -43,17 +43,17 @@ class MemUpdateStore implements UpdateStore.Mutable {
       Util.deepCopier();
   private static final Function<Lock, Lock> DEEP_COPY_LOCK = Util.deepCopier();
 
-  private final Map<JobKey, JobUpdateConfiguration> configs = Maps.newConcurrentMap();
+  private final Map<IJobKey, JobUpdateConfiguration> configs = Maps.newConcurrentMap();
   private final Map<LockKey, Lock> locks = Maps.newConcurrentMap();
 
-  private JobKey key(JobKey jobKey) {
-    return JobKeys.assertValid(jobKey).deepCopy();
+  private IJobKey key(IJobKey jobKey) {
+    return JobKeys.assertValid(jobKey);
   }
 
-  private JobKey key(JobUpdateConfiguration config) {
+  private IJobKey key(JobUpdateConfiguration config) {
     checkNotNull(config);
 
-    return key(config.getJobKey());
+    return key(IJobKey.build(config.getJobKey()));
   }
 
   @Override
@@ -62,7 +62,7 @@ class MemUpdateStore implements UpdateStore.Mutable {
   }
 
   @Override
-  public void removeShardUpdateConfigs(JobKey jobKey) {
+  public void removeShardUpdateConfigs(IJobKey jobKey) {
     configs.remove(jobKey);
   }
 
@@ -87,7 +87,7 @@ class MemUpdateStore implements UpdateStore.Mutable {
   }
 
   @Override
-  public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(JobKey jobKey) {
+  public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(IJobKey jobKey) {
     return Optional.fromNullable(configs.get(key(jobKey)))
         .transform(DEEP_COPY_CONFIG);
   }

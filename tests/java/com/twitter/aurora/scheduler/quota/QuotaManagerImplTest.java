@@ -174,7 +174,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     // Simulate a job update that increases the job quota consumption.
     expectUpdateQuery().andReturn(
         ImmutableSet.of(new JobUpdateConfiguration(
-            JobKeys.from(ROLE, "env", "foo"),
+            JobKeys.from(ROLE, "env", "foo").newBuilder(),
             "token",
             ImmutableSet.of(new TaskUpdateConfiguration(
                 updatingTask.getAssignedTask().getTask().newBuilder(),

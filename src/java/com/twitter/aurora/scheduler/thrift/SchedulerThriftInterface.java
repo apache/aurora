@@ -103,6 +103,7 @@ import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
@@ -209,8 +210,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response createJob(JobConfiguration job, SessionKey session) {
-    checkNotNull(job);
+  public Response createJob(JobConfiguration mutableJob, SessionKey session) {
+    IJobConfiguration job = IJobConfiguration.build(mutableJob);
     checkNotNull(session);
 
     Response response = new Response();
@@ -253,7 +254,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     try {
       PopulateJobResult result = new PopulateJobResult()
           .setPopulated(ITaskConfig.toBuildersSet(
-              ParsedConfiguration.fromUnparsed(description).getTaskConfigs()));
+              ParsedConfiguration.fromUnparsed(
+                  IJobConfiguration.build(description)).getTaskConfigs()));
       response.setResult(Result.populateJobResult(result))
           .setResponseCode(OK)
           .setMessage("Tasks populated");
@@ -265,9 +267,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response startCronJob(JobKey jobKey, SessionKey session) {
+  public Response startCronJob(JobKey mutableJobKey, SessionKey session) {
     checkNotNull(session);
-    JobKeys.assertValid(jobKey);
+    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
 
     Response response = new Response();
     try {
@@ -318,7 +320,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
 
     // Ensure we only return one JobConfiguration for each JobKey.
-    Map<IJobKey, JobConfiguration> jobs = Maps.newHashMap();
+    Map<IJobKey, IJobConfiguration> jobs = Maps.newHashMap();
 
     // Query the task store, find immediate jobs, and synthesize a JobConfiguration for them.
     // This is necessary because the ImmediateJobManager doesn't store jobs directly and
@@ -330,29 +332,31 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         Tasks.byJobKey(Storage.Util.weaklyConsistentFetchTasks(storage, scope.active()));
 
     jobs.putAll(Maps.transformEntries(tasks.asMap(),
-        new Maps.EntryTransformer<IJobKey, Collection<IScheduledTask>, JobConfiguration>() {
+        new Maps.EntryTransformer<IJobKey, Collection<IScheduledTask>, IJobConfiguration>() {
           @Override
-          public JobConfiguration transformEntry(IJobKey jobKey, Collection<IScheduledTask> tasks) {
+          public IJobConfiguration transformEntry(
+              IJobKey jobKey,
+              Collection<IScheduledTask> tasks) {
 
             // Pick an arbitrary task for each immediate job. The chosen task might not be the most
             // recent if the job is in the middle of an update or some shards have been selectively
             // created.
             ScheduledTask firstTask = tasks.iterator().next().newBuilder();
             firstTask.getAssignedTask().getTask().unsetShardId();
-            return new JobConfiguration()
+            return IJobConfiguration.build(new JobConfiguration()
                 .setKey(jobKey.newBuilder())
                 .setOwner(firstTask.getAssignedTask().getTask().getOwner())
                 .setTaskConfig(firstTask.getAssignedTask().getTask())
-                .setShardCount(tasks.size());
+                .setShardCount(tasks.size()));
           }
         }));
 
     // Get cron jobs directly from the manager. Do this after querying the task store so the real
     // template JobConfiguration for a cron job will overwrite the synthesized one that could have
     // been created above.
-    Predicate<JobConfiguration> configFilter = ownerRole.isPresent()
+    Predicate<IJobConfiguration> configFilter = ownerRole.isPresent()
         ? Predicates.compose(Predicates.equalTo(ownerRole.get()), JobKeys.CONFIG_TO_ROLE)
-        : Predicates.<JobConfiguration>alwaysTrue();
+        : Predicates.<IJobConfiguration>alwaysTrue();
     jobs.putAll(Maps.uniqueIndex(
         FluentIterable.from(cronJobManager.getJobs()).filter(configFilter),
         JobKeys.FROM_CONFIG));
@@ -360,7 +364,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return new Response()
         .setResponseCode(OK)
         .setResult(Result.getJobsResult(new GetJobsResult()
-            .setConfigs(ImmutableSet.copyOf(jobs.values()))));
+            .setConfigs(IJobConfiguration.toBuildersSet(jobs.values()))));
   }
 
   private SessionContext validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
@@ -451,7 +455,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response startUpdate(JobConfiguration job, SessionKey session) {
+  public Response startUpdate(JobConfiguration mutableJob, SessionKey session) {
+    IJobConfiguration job = IJobConfiguration.build(mutableJob);
     checkNotNull(job);
     checkNotNull(session);
 
@@ -495,12 +500,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response updateShards(
-      JobKey jobKey,
+      JobKey mutableJobKey,
       Set<Integer> shards,
       String updateToken,
       SessionKey session) {
 
-    JobKeys.assertValid(jobKey);
+    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
     checkNotBlank(shards);
     checkNotBlank(updateToken);
     checkNotNull(session);
@@ -530,12 +535,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response rollbackShards(
-      JobKey jobKey,
+      JobKey mutableJobKey,
       Set<Integer> shards,
       String updateToken,
       SessionKey session) {
 
-    JobKeys.assertValid(jobKey);
+    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
     checkNotBlank(shards);
     checkNotBlank(updateToken);
     checkNotNull(session);
@@ -564,12 +569,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response finishUpdate(
-      JobKey jobKey,
+      JobKey mutableJobKey,
       UpdateResult updateResult,
       String updateToken,
       SessionKey session) {
 
-    JobKeys.assertValid(jobKey);
+    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
     checkNotNull(session);
 
     Response response = new Response();
@@ -595,11 +600,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response restartShards(
-      JobKey jobKey,
+      JobKey mutableJobKey,
       Set<Integer> shardIds,
       SessionKey session) {
 
-    JobKeys.assertValid(jobKey);
+    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
     MorePreconditions.checkNotBlank(shardIds);
     checkNotNull(session);
 
@@ -816,10 +821,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
   }
 
-  private static Multimap<String, JobConfiguration> jobsByKey(JobStore jobStore, JobKey jobKey) {
-    ImmutableMultimap.Builder<String, JobConfiguration> matches = ImmutableMultimap.builder();
+  private static Multimap<String, IJobConfiguration> jobsByKey(JobStore jobStore, IJobKey jobKey) {
+    ImmutableMultimap.Builder<String, IJobConfiguration> matches = ImmutableMultimap.builder();
     for (String managerId : jobStore.fetchManagerIds()) {
-      for (JobConfiguration job : jobStore.fetchJobs(managerId)) {
+      for (IJobConfiguration job : jobStore.fetchJobs(managerId)) {
         if (job.getKey().equals(jobKey)) {
           matches.put(managerId, job);
         }
@@ -847,11 +852,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           switch (command.getSetField()) {
             case JOB_REWRITE:
               JobConfigRewrite jobRewrite = command.getJobRewrite();
-              JobConfiguration existingJob = jobRewrite.getOldJob();
-              JobConfiguration rewrittenJob;
+              IJobConfiguration existingJob = IJobConfiguration.build(jobRewrite.getOldJob());
+              IJobConfiguration rewrittenJob;
               try {
-                rewrittenJob =
-                    ConfigurationManager.validateAndPopulate(jobRewrite.getRewrittenJob());
+                rewrittenJob = ConfigurationManager.validateAndPopulate(
+                    IJobConfiguration.build(jobRewrite.getRewrittenJob()));
               } catch (TaskDescriptionException e) {
                 // We could add an error here, but this is probably a hint of something wrong in
                 // the client that's causing a bad configuration to be applied.
@@ -863,7 +868,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                 errors.add("Disallowing rewrite attempting to change job owner.");
               } else {
                 JobStore.Mutable jobStore = storeProvider.getJobStore();
-                Multimap<String, JobConfiguration> matches =
+                Multimap<String, IJobConfiguration> matches =
                     jobsByKey(jobStore, existingJob.getKey());
                 switch (matches.size()) {
                   case 0:
@@ -871,9 +876,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                     break;
 
                   case 1:
-                    Map.Entry<String, JobConfiguration> match =
+                    Map.Entry<String, IJobConfiguration> match =
                         Iterables.getOnlyElement(matches.entries());
-                    JobConfiguration storedJob = match.getValue();
+                    IJobConfiguration storedJob = match.getValue();
                     if (!storedJob.equals(existingJob)) {
                       errors.add("CAS compare failed for " + JobKeys.toPath(storedJob));
                     } else {
@@ -891,7 +896,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               ShardConfigRewrite shardRewrite = command.getShardRewrite();
               ShardKey shardKey = shardRewrite.getShardKey();
               Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
-                  Query.shardScoped(shardKey.getJobKey(), shardKey.getShardId()).active());
+                  Query.shardScoped(IJobKey.build(shardKey.getJobKey()),
+                      shardKey.getShardId())
+                      .active());
               Optional<IAssignedTask> task =
                   Optional.fromNullable(Iterables.getOnlyElement(tasks, null))
                       .transform(Tasks.SCHEDULED_TO_ASSIGNED);

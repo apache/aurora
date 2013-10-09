@@ -33,11 +33,11 @@ import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 
-import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
@@ -106,7 +106,7 @@ public class SchedulerzHome extends JerseyTemplateServlet {
         }
 
         // Add cron job counts for each role.
-        for (JobConfiguration job : cronScheduler.getJobs()) {
+        for (IJobConfiguration job : cronScheduler.getJobs()) {
           owners.getUnchecked(job.getOwner().getRole()).accumulate(job);
         }
 
@@ -129,7 +129,7 @@ public class SchedulerzHome extends JerseyTemplateServlet {
       jobs.add(task.getJobName());
     }
 
-    private void accumulate(JobConfiguration job) {
+    private void accumulate(IJobConfiguration job) {
       cronJobs.add(job.getKey().getName());
     }
 

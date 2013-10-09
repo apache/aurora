@@ -22,7 +22,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
@@ -30,6 +29,7 @@ import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -40,8 +40,8 @@ public class MemUpdateStoreTest {
   private static final JobUpdateConfiguration CONFIG_B = makeConfig("b");
   private static final JobUpdateConfiguration CONFIG_C = makeConfig("c");
 
-  private static final JobKey KEY_A = CONFIG_A.getJobKey();
-  private static final JobKey KEY_B = CONFIG_B.getJobKey();
+  private static final IJobKey KEY_A = IJobKey.build(CONFIG_A.getJobKey());
+  private static final IJobKey KEY_B = IJobKey.build(CONFIG_B.getJobKey());
 
   private UpdateStore.Mutable store;
 
@@ -90,14 +90,14 @@ public class MemUpdateStoreTest {
     store.saveJobUpdateConfig(staging);
     store.saveJobUpdateConfig(prod);
 
-    assertNull(store.fetchJobUpdateConfig(staging.getJobKey().deepCopy().setEnvironment("devel"))
-        .orNull());
-    assertEquals(staging, store.fetchJobUpdateConfig(staging.getJobKey()).orNull());
-    assertEquals(prod, store.fetchJobUpdateConfig(prod.getJobKey()).orNull());
+    assertNull(store.fetchJobUpdateConfig(
+        IJobKey.build(staging.getJobKey().deepCopy().setEnvironment("devel"))).orNull());
+    assertEquals(staging, store.fetchJobUpdateConfig(IJobKey.build(staging.getJobKey())).orNull());
+    assertEquals(prod, store.fetchJobUpdateConfig(IJobKey.build(prod.getJobKey())).orNull());
 
-    store.removeShardUpdateConfigs(staging.getJobKey());
-    assertNull(store.fetchJobUpdateConfig(staging.getJobKey()).orNull());
-    assertEquals(prod, store.fetchJobUpdateConfig(prod.getJobKey()).orNull());
+    store.removeShardUpdateConfigs(IJobKey.build(staging.getJobKey()));
+    assertNull(store.fetchJobUpdateConfig(IJobKey.build(staging.getJobKey())).orNull());
+    assertEquals(prod, store.fetchJobUpdateConfig(IJobKey.build(prod.getJobKey())).orNull());
   }
 
   @Test
@@ -107,12 +107,12 @@ public class MemUpdateStoreTest {
     final String job1 = "testJob1";
     final String job2 = "testJob2";
     Lock lock1 = new Lock(
-        LockKey.job(JobKeys.from(role, env, job1)),
+        LockKey.job(JobKeys.from(role, env, job1).newBuilder()),
         "lock1",
         "testUser",
         12345L);
     Lock lock2 = new Lock(
-        LockKey.job(JobKeys.from(role, env, job2)),
+        LockKey.job(JobKeys.from(role, env, job2).newBuilder()),
         "lock2",
         "testUser",
         12345L);
@@ -122,23 +122,23 @@ public class MemUpdateStoreTest {
     store.saveLock(lock2);
 
     assertEquals(Optional.of(lock1),
-        store.fetchLock(LockKey.job(JobKeys.from(role, env, job1))));
+        store.fetchLock(LockKey.job(JobKeys.from(role, env, job1).newBuilder())));
     assertEquals(Optional.of(lock2),
-        store.fetchLock(LockKey.job(JobKeys.from(role, env, job2))));
+        store.fetchLock(LockKey.job(JobKeys.from(role, env, job2).newBuilder())));
     assertEquals(ImmutableSet.of(lock1, lock2), store.fetchLocks());
 
-    store.removeLock(LockKey.job(JobKeys.from(role, env, job1)));
+    store.removeLock(LockKey.job(JobKeys.from(role, env, job1).newBuilder()));
     assertEquals(Optional.<Lock>absent(),
-        store.fetchLock(LockKey.job(JobKeys.from(role, env, job1))));
+        store.fetchLock(LockKey.job(JobKeys.from(role, env, job1).newBuilder())));
 
     assertEquals(Optional.of(lock2),
-        store.fetchLock(LockKey.job(JobKeys.from(role, env, job2))));
-    assertNotNull(store.fetchLock(LockKey.job(JobKeys.from(role, env, job2)))
+        store.fetchLock(LockKey.job(JobKeys.from(role, env, job2).newBuilder())));
+    assertNotNull(store.fetchLock(LockKey.job(JobKeys.from(role, env, job2).newBuilder()))
         .get().getMessage());
     assertEquals(ImmutableSet.of(lock2), store.fetchLocks());
   }
 
-  private static JobKey makeKey(String id) {
+  private static IJobKey makeKey(String id) {
     return JobKeys.from("role-" + id, "env-" + id, id);
   }
 
@@ -146,13 +146,13 @@ public class MemUpdateStoreTest {
     return makeConfig(makeKey(id));
   }
 
-  private static JobUpdateConfiguration makeConfig(JobKey jobKey) {
+  private static JobUpdateConfiguration makeConfig(IJobKey jobKey) {
     TaskConfig template = new TaskConfig()
         .setOwner(new Identity().setRole(jobKey.getRole()).setUser("user-" + jobKey.getName()))
         .setEnvironment(jobKey.getEnvironment())
         .setJobName(jobKey.getName());
 
-    return new JobUpdateConfiguration().setJobKey(jobKey)
+    return new JobUpdateConfiguration().setJobKey(jobKey.newBuilder())
         .setConfigs(ImmutableSet.of(
             new TaskUpdateConfiguration(
                 template.deepCopy().setRequestedPorts(ImmutableSet.of("old")),

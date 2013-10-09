@@ -41,6 +41,7 @@ import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.storage.SnapshotStore;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -78,10 +79,12 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         "jobManager",
         new JobConfiguration().setKey(new JobKey("owner", "env", "name")));
     JobUpdateConfiguration update = new JobUpdateConfiguration(
-        JobKeys.from("role", "env", "job"), "token", ImmutableSet.<TaskUpdateConfiguration>of());
+        JobKeys.from("role", "env", "job").newBuilder(),
+        "token",
+        ImmutableSet.<TaskUpdateConfiguration>of());
     String frameworkId = "framework_id";
     Lock lock = new Lock(
-        LockKey.job(JobKeys.from("testRole", "testEnv", "testJob")),
+        LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()),
         "lockId",
         "testUser",
         12345L);
@@ -97,7 +100,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     expect(storageUtil.attributeStore.getHostAttributes()).andReturn(ImmutableSet.of(attribute));
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of("jobManager"));
     expect(storageUtil.jobStore.fetchJobs("jobManager"))
-        .andReturn(ImmutableSet.of(job.getJobConfiguration()));
+        .andReturn(ImmutableSet.of(IJobConfiguration.build(job.getJobConfiguration())));
     expect(storageUtil.updateStore.fetchUpdatingRoles()).andReturn(ImmutableSet.of("role"));
     expect(storageUtil.updateStore.fetchUpdateConfigs("role")).andReturn(ImmutableSet.of(update));
     expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(frameworkId);
@@ -107,7 +110,9 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     storageUtil.taskStore.saveTasks(tasks);
     storageUtil.quotaStore.saveQuota("steve", Quotas.noQuota());
     storageUtil.attributeStore.saveHostAttributes(attribute);
-    storageUtil.jobStore.saveAcceptedJob(job.getJobManagerId(), job.getJobConfiguration());
+    storageUtil.jobStore.saveAcceptedJob(
+        job.getJobManagerId(),
+        IJobConfiguration.build(job.getJobConfiguration()));
     storageUtil.updateStore.saveJobUpdateConfig(update);
     storageUtil.schedulerStore.saveFrameworkId(frameworkId);
     storageUtil.updateStore.saveLock(lock);

@@ -20,19 +20,17 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.JobStore;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -40,8 +38,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * An in-memory job store.
  */
 class MemJobStore implements JobStore.Mutable {
-
-  private static final Function<JobConfiguration, JobConfiguration> DEEP_COPY = Util.deepCopier();
 
   private final LoadingCache<String, Manager> managers = CacheBuilder.newBuilder()
       .build(new CacheLoader<String, Manager>() {
@@ -51,16 +47,16 @@ class MemJobStore implements JobStore.Mutable {
       });
 
   @Override
-  public void saveAcceptedJob(String managerId, JobConfiguration jobConfig) {
+  public void saveAcceptedJob(String managerId, IJobConfiguration jobConfig) {
     checkNotNull(managerId);
     checkNotNull(jobConfig);
 
-    JobKey key = JobKeys.assertValid(jobConfig.getKey()).deepCopy();
-    managers.getUnchecked(managerId).jobs.put(key, DEEP_COPY.apply(jobConfig));
+    IJobKey key = JobKeys.assertValid(jobConfig.getKey());
+    managers.getUnchecked(managerId).jobs.put(key, jobConfig);
   }
 
   @Override
-  public void removeJob(JobKey jobKey) {
+  public void removeJob(IJobKey jobKey) {
     checkNotNull(jobKey);
 
     for (Manager manager : managers.asMap().values()) {
@@ -74,7 +70,7 @@ class MemJobStore implements JobStore.Mutable {
   }
 
   @Override
-  public Iterable<JobConfiguration> fetchJobs(String managerId) {
+  public Iterable<IJobConfiguration> fetchJobs(String managerId) {
     checkNotNull(managerId);
 
     @Nullable Manager manager = managers.getIfPresent(managerId);
@@ -82,11 +78,13 @@ class MemJobStore implements JobStore.Mutable {
       return ImmutableSet.of();
     }
 
-    return FluentIterable.from(manager.jobs.values()).transform(DEEP_COPY).toSet();
+    synchronized (manager.jobs) {
+      return ImmutableSet.copyOf(manager.jobs.values());
+    }
   }
 
   @Override
-  public Optional<JobConfiguration> fetchJob(String managerId, JobKey jobKey) {
+  public Optional<IJobConfiguration> fetchJob(String managerId, IJobKey jobKey) {
     checkNotNull(managerId);
     checkNotNull(jobKey);
 
@@ -94,7 +92,7 @@ class MemJobStore implements JobStore.Mutable {
     if (!manager.isPresent()) {
       return Optional.absent();
     } else {
-      return Optional.fromNullable(manager.get().jobs.get(jobKey)).transform(DEEP_COPY);
+      return Optional.fromNullable(manager.get().jobs.get(jobKey));
     }
   }
 
@@ -104,6 +102,6 @@ class MemJobStore implements JobStore.Mutable {
   }
 
   private static class Manager {
-    private final Map<JobKey, JobConfiguration> jobs = Maps.newConcurrentMap();
+    private final Map<IJobKey, IJobConfiguration> jobs = Maps.newConcurrentMap();
   }
 }

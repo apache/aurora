@@ -28,8 +28,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ShardUpdateResult;
 import com.twitter.aurora.gen.UpdateResult;
@@ -44,6 +42,8 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -111,7 +111,7 @@ class SchedulerCoreImpl implements SchedulerCore {
     this.jobFilter = checkNotNull(jobFilter);
   }
 
-  private boolean hasActiveJob(JobConfiguration job) {
+  private boolean hasActiveJob(IJobConfiguration job) {
     return Iterables.any(jobManagers, managerHasJob(job));
   }
 
@@ -136,7 +136,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   public synchronized void createJob(ParsedConfiguration parsedConfiguration)
       throws ScheduleException {
 
-    JobConfiguration job = parsedConfiguration.getJobConfig();
+    IJobConfiguration job = parsedConfiguration.getJobConfig();
     if (hasActiveJob(job)) {
       throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
     }
@@ -162,7 +162,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void startCronJob(JobKey jobKey)
+  public synchronized void startCronJob(IJobKey jobKey)
       throws ScheduleException, TaskDescriptionException {
 
     checkNotNull(jobKey);
@@ -180,7 +180,7 @@ class SchedulerCoreImpl implements SchedulerCore {
    * @param job Job to match.
    * @return A new predicate matching the job owner and name given.
    */
-  private static Predicate<JobManager> managerHasJob(final JobConfiguration job) {
+  private static Predicate<JobManager> managerHasJob(final IJobConfiguration job) {
     return new Predicate<JobManager>() {
       @Override public boolean apply(JobManager manager) {
         return manager.hasJob(job.getKey());
@@ -211,7 +211,7 @@ class SchedulerCoreImpl implements SchedulerCore {
     if (Query.isOnlyJobScoped(query)) {
       // If this looks like a query for all tasks in a job, instruct the scheduler modules to
       // delete the job.
-      JobKey jobKey = JobKeys.from(query).get();
+      IJobKey jobKey = JobKeys.from(query).get();
       for (JobManager manager : jobManagers) {
         if (manager.deleteJob(jobKey)) {
           jobDeleted = true;
@@ -245,7 +245,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public void restartShards(
-      JobKey jobKey,
+      IJobKey jobKey,
       final Set<Integer> shards,
       final String requestingUser) throws ScheduleException {
 
@@ -279,8 +279,8 @@ class SchedulerCoreImpl implements SchedulerCore {
   public synchronized Optional<String> initiateJobUpdate(
       final ParsedConfiguration parsedConfiguration) throws ScheduleException {
 
-    final JobConfiguration job = parsedConfiguration.getJobConfig();
-    final JobKey jobKey = job.getKey();
+    final IJobConfiguration job = parsedConfiguration.getJobConfig();
+    final IJobKey jobKey = job.getKey();
     if (cronScheduler.hasJob(jobKey)) {
       cronScheduler.updateJob(parsedConfiguration);
       return Optional.absent();
@@ -313,7 +313,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized Map<Integer, ShardUpdateResult> updateShards(
-      JobKey jobKey,
+      IJobKey jobKey,
       String invokingUser,
       Set<Integer> shards,
       String updateToken) throws ScheduleException {
@@ -328,7 +328,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized Map<Integer, ShardUpdateResult> rollbackShards(
-      JobKey jobKey,
+      IJobKey jobKey,
       String invokingUser,
       Set<Integer> shards,
       String updateToken) throws ScheduleException {
@@ -343,7 +343,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized void finishUpdate(
-      JobKey jobKey,
+      IJobKey jobKey,
       String invokingUser,
       Optional<String> updateToken,
       UpdateResult result) throws ScheduleException {
@@ -366,7 +366,7 @@ class SchedulerCoreImpl implements SchedulerCore {
         Optional.of("Preempting in favor of " + preemptingTask.getTaskId()));
   }
 
-  private void checkFilterPasses(JobConfiguration job) throws ScheduleException {
+  private void checkFilterPasses(IJobConfiguration job) throws ScheduleException {
     JobFilter.JobFilterResult result = jobFilter.filter(job);
     if (!result.isPass()) {
       throw new ScheduleException(

@@ -20,7 +20,6 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ShardUpdateResult;
 import com.twitter.aurora.gen.UpdateResult;
@@ -29,6 +28,7 @@ import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
 /**
  * Scheduling core, stores scheduler state and makes decisions about which tasks to schedule when
@@ -58,7 +58,7 @@ public interface SchedulerCore {
    * @throws ScheduleException If the specified job does not exist, or is not a cron job.
    * @throws TaskDescriptionException If the parsing of the job failed.
    */
-  void startCronJob(JobKey jobKey) throws ScheduleException, TaskDescriptionException;
+  void startCronJob(IJobKey jobKey) throws ScheduleException, TaskDescriptionException;
 
   /**
    * Registers an update for a job.
@@ -67,8 +67,8 @@ public interface SchedulerCore {
    * @throws ScheduleException If there was an error in scheduling an update when no active tasks
    *                           are found for a job or an update for the job is already in progress.
    * @return A unique update token if an update must be coordinated through
-   *         {@link #updateShards(JobKey, String, Set, String)}and
-   *         {@link #finishUpdate(JobKey, String, Optional, UpdateResult)}, or an absent value if
+   *         {@link #updateShards(IJobKey, String, Set, String)}and
+   *         {@link #finishUpdate(IJobKey, String, Optional, UpdateResult)}, or an absent value if
    * the update was completed in-place and no further action is necessary.
    */
   Optional<String> initiateJobUpdate(ParsedConfiguration parsedConfiguration)
@@ -87,7 +87,7 @@ public interface SchedulerCore {
    * @return The action taken on each of the shards.
    */
   Map<Integer, ShardUpdateResult> updateShards(
-      JobKey jobKey,
+      IJobKey jobKey,
       String invokingUser,
       Set<Integer> shards,
       String updateToken) throws ScheduleException;
@@ -105,7 +105,7 @@ public interface SchedulerCore {
    * @return The action taken on each of the shards.
    */
   Map<Integer, ShardUpdateResult> rollbackShards(
-      JobKey jobKey,
+      IJobKey jobKey,
       String invokingUser,
       Set<Integer> shards,
       String updateToken) throws ScheduleException;
@@ -123,7 +123,7 @@ public interface SchedulerCore {
    *                           invalid.
    */
   void finishUpdate(
-      JobKey jobKey,
+      IJobKey jobKey,
       String invokingUser,
       Optional<String> updateToken,
       UpdateResult result) throws ScheduleException;
@@ -154,7 +154,7 @@ public interface SchedulerCore {
    * @param requestingUser User performing the restart action.
    * @throws ScheduleException If there are no matching active shards.
    */
-  void restartShards(JobKey jobKey, Set<Integer> shards, String requestingUser)
+  void restartShards(IJobKey jobKey, Set<Integer> shards, String requestingUser)
       throws ScheduleException;
 
   /**

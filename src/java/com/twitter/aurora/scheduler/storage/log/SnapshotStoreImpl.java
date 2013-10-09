@@ -24,7 +24,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.Quota;
@@ -40,6 +39,7 @@ import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Volatile;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.util.BuildInfo;
@@ -94,8 +94,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<StoredJob> jobs = ImmutableSet.builder();
           for (String managerId : store.getJobStore().fetchManagerIds()) {
-            for (JobConfiguration config : store.getJobStore().fetchJobs(managerId)) {
-              jobs.add(new StoredJob(managerId, config));
+            for (IJobConfiguration config : store.getJobStore().fetchJobs(managerId)) {
+              jobs.add(new StoredJob(managerId, config.newBuilder()));
             }
           }
           snapshot.setJobs(jobs.build());
@@ -106,8 +106,9 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
           if (snapshot.isSetJobs()) {
             for (StoredJob job : snapshot.getJobs()) {
-              store.getJobStore()
-                  .saveAcceptedJob(job.getJobManagerId(), job.getJobConfiguration());
+              store.getJobStore().saveAcceptedJob(
+                  job.getJobManagerId(),
+                  IJobConfiguration.build(job.getJobConfiguration()));
             }
           }
         }

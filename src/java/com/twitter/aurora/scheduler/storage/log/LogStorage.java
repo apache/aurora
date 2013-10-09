@@ -40,8 +40,6 @@ import com.google.inject.Inject;
 
 import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
@@ -79,6 +77,8 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.log.LogManager.StreamManager;
@@ -379,7 +379,9 @@ public class LogStorage extends ForwardingStore
 
       case SAVE_ACCEPTED_JOB:
         SaveAcceptedJob acceptedJob = op.getSaveAcceptedJob();
-        saveAcceptedJob(acceptedJob.getManagerId(), acceptedJob.getJobConfig());
+        saveAcceptedJob(
+            acceptedJob.getManagerId(),
+            IJobConfiguration.build(acceptedJob.getJobConfig()));
         break;
 
       case SAVE_JOB_UPDATE:
@@ -391,11 +393,11 @@ public class LogStorage extends ForwardingStore
         break;
 
       case REMOVE_JOB_UPDATE:
-        removeShardUpdateConfigs(op.getRemoveJobUpdate().getJobKey());
+        removeShardUpdateConfigs(IJobKey.build(op.getRemoveJobUpdate().getJobKey()));
         break;
 
       case REMOVE_JOB:
-        removeJob(op.getRemoveJob().getJobKey());
+        removeJob(IJobKey.build(op.getRemoveJob().getJobKey()));
         break;
 
       case SAVE_TASKS:
@@ -536,10 +538,10 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_log_job_save")
   @Override
-  public void saveAcceptedJob(final String managerId, final JobConfiguration jobConfig) {
+  public void saveAcceptedJob(final String managerId, final IJobConfiguration jobConfig) {
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig)));
+        log(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())));
         LogStorage.super.saveAcceptedJob(managerId, jobConfig);
       }
     });
@@ -547,12 +549,12 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_log_job_remove")
   @Override
-  public void removeJob(final JobKey jobKey) {
+  public void removeJob(final IJobKey jobKey) {
     checkNotNull(jobKey);
 
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.removeJob(new RemoveJob().setJobKey(jobKey)));
+        log(Op.removeJob(new RemoveJob().setJobKey(jobKey.newBuilder())));
         LogStorage.super.removeJob(jobKey);
       }
     });
@@ -644,12 +646,12 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_log_jobupdate_remove")
   @Override
-  public void removeShardUpdateConfigs(final JobKey jobKey) {
+  public void removeShardUpdateConfigs(final IJobKey jobKey) {
     checkNotNull(jobKey);
 
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.removeJobUpdate(new RemoveJobUpdate().setJobKey(jobKey)));
+        log(Op.removeJobUpdate(new RemoveJobUpdate().setJobKey(jobKey.newBuilder())));
         LogStorage.super.removeShardUpdateConfigs(jobKey);
       }
     });

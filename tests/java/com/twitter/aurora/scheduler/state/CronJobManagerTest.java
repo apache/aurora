@@ -45,6 +45,7 @@ import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.storage.Storage;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -79,7 +80,7 @@ public class CronJobManagerTest extends EasyMockTest {
   private CronScheduler cronScheduler;
   private ShutdownRegistry shutdownRegistry;
   private CronJobManager cron;
-  private JobConfiguration job;
+  private IJobConfiguration job;
   private ParsedConfiguration parsedConfiguration;
 
   @Before
@@ -104,7 +105,7 @@ public class CronJobManagerTest extends EasyMockTest {
     parsedConfiguration = ParsedConfiguration.fromUnparsed(job);
   }
 
-  private void expectJobAccepted(JobConfiguration savedJob) throws Exception {
+  private void expectJobAccepted(IJobConfiguration savedJob) throws Exception {
     storageUtil.jobStore.saveAcceptedJob(CronJobManager.MANAGER_KEY, savedJob);
     expect(cronScheduler.isValidSchedule(savedJob.getCronSchedule())).andReturn(true);
     expect(cronScheduler.schedule(eq(savedJob.getCronSchedule()), EasyMock.<Runnable>anyObject()))
@@ -129,7 +130,7 @@ public class CronJobManagerTest extends EasyMockTest {
     cronScheduler.start();
     shutdownRegistry.addAction(EasyMock.<ExceptionalCommand>anyObject());
     expect(storageUtil.jobStore.fetchJobs(CronJobManager.MANAGER_KEY))
-        .andReturn(ImmutableList.<JobConfiguration>of());
+        .andReturn(ImmutableList.<IJobConfiguration>of());
 
     control.replay();
 
@@ -274,7 +275,8 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testUpdate() throws Exception {
-    ParsedConfiguration updated = new ParsedConfiguration(job.setCronSchedule("1 2 3 4 5"));
+    ParsedConfiguration updated = new ParsedConfiguration(
+        IJobConfiguration.build(job.newBuilder().setCronSchedule("1 2 3 4 5")));
 
     expectJobAccepted();
     cronScheduler.deschedule("key");
@@ -291,14 +293,14 @@ public class CronJobManagerTest extends EasyMockTest {
     IScheduledTask scheduledTask = IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.RUNNING)
         .setAssignedTask(new AssignedTask().setTask(defaultTask())));
-    parsedConfiguration =
-        ParsedConfiguration.fromUnparsed(job.deepCopy().setCronCollisionPolicy(RUN_OVERLAP));
+    parsedConfiguration = ParsedConfiguration.fromUnparsed(
+        IJobConfiguration.build(job.newBuilder().setCronCollisionPolicy(RUN_OVERLAP)));
     expectJobAccepted();
     expectJobFetch();
     expectActiveTaskFetch(scheduledTask);
 
     stateManager.insertPendingTasks(ImmutableSet.of(ITaskConfig.build(
-        parsedConfiguration.getJobConfig().getTaskConfig().deepCopy().setShardId(1))));
+        parsedConfiguration.getJobConfig().getTaskConfig().newBuilder().setShardId(1))));
 
     control.replay();
 
@@ -308,7 +310,8 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testConsistentState() throws Exception {
-    JobConfiguration updated = makeJob().setCronSchedule("1 2 3 4 5");
+    IJobConfiguration updated =
+        IJobConfiguration.build(makeJob().newBuilder().setCronSchedule("1 2 3 4 5"));
 
     expectJobAccepted();
     cronScheduler.deschedule("key");
@@ -318,8 +321,8 @@ public class CronJobManagerTest extends EasyMockTest {
 
     cron.receiveJob(parsedConfiguration);
 
-    JobConfiguration failedUpdate = updated.deepCopy();
-    failedUpdate.unsetCronSchedule();
+    IJobConfiguration failedUpdate =
+        IJobConfiguration.build(updated.newBuilder().setCronSchedule(null));
     try {
       cron.updateJob(new ParsedConfiguration(failedUpdate));
       fail();
@@ -330,13 +333,13 @@ public class CronJobManagerTest extends EasyMockTest {
     cron.updateJob(new ParsedConfiguration(updated));
   }
 
-  private JobConfiguration makeJob() {
-    return new JobConfiguration()
+  private IJobConfiguration makeJob() {
+    return IJobConfiguration.build(new JobConfiguration()
         .setOwner(new Identity(OWNER, OWNER))
-        .setKey(JobKeys.from(OWNER, ENVIRONMENT, JOB_NAME))
+        .setKey(JobKeys.from(OWNER, ENVIRONMENT, JOB_NAME).newBuilder())
         .setCronSchedule("1 1 1 1 1")
         .setTaskConfig(defaultTask())
-        .setShardCount(1);
+        .setShardCount(1));
   }
 
   private static TaskConfig defaultTask() {

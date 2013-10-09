@@ -30,11 +30,13 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
+import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
+import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
@@ -56,9 +58,9 @@ public final class StorageBackfill {
 
   private static void backfillJobDefaults(JobStore.Mutable jobStore) {
     for (String id : jobStore.fetchManagerIds()) {
-      for (JobConfiguration job : jobStore.fetchJobs(id)) {
+      for (JobConfiguration job : IJobConfiguration.toBuildersList(jobStore.fetchJobs(id))) {
         ConfigurationManager.applyDefaultsIfUnset(job);
-        jobStore.saveAcceptedJob(id, job);
+        jobStore.saveAcceptedJob(id, IJobConfiguration.build(job));
       }
     }
   }
@@ -70,8 +72,9 @@ public final class StorageBackfill {
 
     if (Tasks.isActive(task.getStatus())) {
       // Perform a sanity check on the number of active shards.
+      TaskConfig config = task.getAssignedTask().getTask();
       Query.Builder query = Query.shardScoped(
-          Tasks.getJobKey(task.getAssignedTask().getTask()),
+          JobKeys.from(config.getOwner().getRole(), config.getEnvironment(), config.getJobName()),
           task.getAssignedTask().getTask().getShardId())
           .active();
       Set<String> activeTasksInShard = FluentIterable.from(taskStore.fetchTasks(query))
