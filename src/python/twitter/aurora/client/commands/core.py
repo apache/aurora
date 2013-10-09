@@ -124,10 +124,6 @@ def get_job_config(job_spec, config_file, options):
       select_env=select_env)
 
 @app.command
-def help(args):
-  app.help()
-
-@app.command
 def version(args):
   """usage: version
 
@@ -369,7 +365,7 @@ def list_jobs(cluster_and_role):
       print('{0}/{1.key.role}/{1.key.environment}/{1.key.name}'.format(cluster, job))
 
   def show_job_pretty(job):
-    print("Job %s/%s/%s/%s:" % 
+    print("Job %s/%s/%s/%s:" %
         (cluster, job.key.role, job.key.environment, job.key.name))
     print('\tcron schedule: %s' % job.cronSchedule)
     print('\tcron policy:   %s' % job.cronCollisionPolicy)
@@ -379,7 +375,7 @@ def list_jobs(cluster_and_role):
     print_fn = show_job_pretty
   else:
     print_fn = show_job_simple
-  # Take the cluster_and_role parameter, and split it into its two components.  
+  # Take the cluster_and_role parameter, and split it into its two components.
   if cluster_and_role.count('/') != 1:
     die('list_jobs parameter must be in cluster/role format')
   (cluster,role) = cluster_and_role.split('/')
