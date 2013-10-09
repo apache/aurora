@@ -331,7 +331,6 @@ class TaskObserver(ExceptionalThread, Lockable):
 
     return tasks
 
-
   @Lockable.sync
   def state(self, task_id):
     """Return a dict containing mapped information about a task's state"""
@@ -347,7 +346,6 @@ class TaskObserver(ExceptionalThread, Lockable):
         user = real_state.header.user
       )
 
-
   @Lockable.sync
   def raw_state(self, task_id):
     """
@@ -357,7 +355,6 @@ class TaskObserver(ExceptionalThread, Lockable):
     if task_id not in self.all_tasks:
       return None
     return self.all_tasks[task_id].state
-
 
   @Lockable.sync
   def _task_processes(self, task_id):
