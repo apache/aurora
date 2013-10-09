@@ -89,19 +89,20 @@ class DistributedCommandRunner(object):
       return cls.substitute_aurora(command, task, cluster, **kw)
 
   @classmethod
-  def query_from(cls, role, job):
-    return TaskQuery(statuses=LIVE_STATES, owner=Identity(role), jobName=job)
+  def query_from(cls, role, env, job):
+    return TaskQuery(statuses=LIVE_STATES, owner=Identity(role), jobName=job, environment=env)
 
-  def __init__(self, cluster, role, jobs, ssh_user=None):
+  def __init__(self, cluster, role, env, jobs, ssh_user=None):
     self._cluster = cluster
     self._api = AuroraClientAPI(cluster=cluster)
     self._role = role
+    self._env = env
     self._jobs = jobs
     self._ssh_user = ssh_user if ssh_user else self._role
 
   def resolve(self):
     for job in self._jobs:
-      resp = self._api.query(self.query_from(self._role, job))
+      resp = self._api.query(self.query_from(self._role, self._env, job))
       if not resp.responseCode:
         log.error('Failed to query job: %s' % job)
         continue

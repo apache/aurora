@@ -36,5 +36,5 @@ def run(args, options):
 
   command = ' '.join(args)
   cluster = CLUSTERS[cluster_name]
-  dcr = DistributedCommandRunner(cluster, role, [name], options.ssh_user)
+  dcr = DistributedCommandRunner(cluster, role, env, [name], options.ssh_user)
   dcr.run(command, parallelism=options.num_threads, executor_sandbox=options.executor_sandbox)
