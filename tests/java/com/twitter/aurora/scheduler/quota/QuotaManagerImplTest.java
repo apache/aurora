@@ -35,6 +35,7 @@ import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -85,11 +86,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
     storageUtil.expectOperations();
     returnNoTasks();
     noActiveUpdates();
-    expect(storageUtil.quotaStore.fetchQuota(ROLE)).andReturn(Optional.<Quota>absent());
+    expect(storageUtil.quotaStore.fetchQuota(ROLE)).andReturn(Optional.<IQuota>absent());
 
     control.replay();
 
-    assertFalse(quotaManager.hasRemaining(ROLE, new Quota(1, 1, 1)));
+    assertFalse(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(1, 1, 1))));
   }
 
   @Test
@@ -105,7 +106,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    Quota half = new Quota(1, 1, 1);
+    IQuota half = IQuota.build(new Quota(1, 1, 1));
     assertTrue(quotaManager.hasRemaining(ROLE, half));
     assertFalse(quotaManager.hasRemaining(ROLE, half));
   }
@@ -119,7 +120,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(quotaManager.hasRemaining(ROLE, new Quota(2, 1, 1)));
+    assertFalse(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(2, 1, 1))));
   }
 
   @Test
@@ -131,7 +132,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(quotaManager.hasRemaining(ROLE, new Quota(1, 2, 1)));
+    assertFalse(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(1, 2, 1))));
   }
 
   @Test
@@ -143,7 +144,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(quotaManager.hasRemaining(ROLE, new Quota(1, 1, 2)));
+    assertFalse(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(1, 1, 2))));
   }
 
   @Test
@@ -159,7 +160,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(quotaManager.hasRemaining(ROLE, new Quota(2, 2, 2)));
+    assertTrue(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(2, 2, 2))));
   }
 
   @Test
@@ -182,8 +183,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(quotaManager.hasRemaining(ROLE, new Quota(1, 1, 1)));
-    assertFalse(quotaManager.hasRemaining(ROLE, new Quota(2, 2, 2)));
+    assertTrue(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(1, 1, 1))));
+    assertFalse(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(2, 2, 2))));
   }
 
   private IExpectationSetters<?> returnTasks(IScheduledTask... tasks) {
@@ -202,8 +203,9 @@ public class QuotaManagerImplTest extends EasyMockTest {
     expectUpdateQuery().andReturn(ImmutableSet.<JobUpdateConfiguration>of()).anyTimes();
   }
 
-  private IExpectationSetters<Optional<Quota>> applyQuota(Quota quota) {
-    return expect(storageUtil.quotaStore.fetchQuota(ROLE)).andReturn(Optional.of(quota));
+  private IExpectationSetters<Optional<IQuota>> applyQuota(Quota quota) {
+    return expect(storageUtil.quotaStore.fetchQuota(ROLE))
+        .andReturn(Optional.of(IQuota.build(quota)));
   }
 
   private IScheduledTask createTask(

@@ -24,7 +24,6 @@ import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.JobUpdateConfiguration;
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Shards;
@@ -33,6 +32,7 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.Storage.Work.Quiet;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -49,7 +49,7 @@ public interface QuotaManager {
    * @param role to fetch quota usage for.
    * @return Resource quota used by {@code role}.
    */
-  Quota getConsumption(String role);
+  IQuota getConsumption(String role);
 
   /**
    * Tests whether the role has at least the specified amount of quota available.
@@ -59,7 +59,7 @@ public interface QuotaManager {
    * @return {@code true} if the role currently has at least {@code quota} quota remaining,
    *     {@code false} otherwise.
    */
-  boolean hasRemaining(String role, Quota quota);
+  boolean hasRemaining(String role, IQuota quota);
 
   /**
    * Quota provider that stores quotas in the canonical {@link Storage} system.
@@ -73,7 +73,7 @@ public interface QuotaManager {
       this.storage = checkNotNull(storage);
     }
 
-    private static Quota getUpdateQuota(
+    private static IQuota getUpdateQuota(
         Collection<TaskUpdateConfiguration> configs,
         Function<TaskUpdateConfiguration, ITaskConfig> taskExtractor) {
 
@@ -86,22 +86,22 @@ public interface QuotaManager {
     }
 
     @Override
-    public Quota getConsumption(final String role) {
+    public IQuota getConsumption(final String role) {
       checkNotBlank(role);
 
       final Query.Builder query = Query.roleScoped(role).active();
 
       return storage.consistentRead(
-          new Work.Quiet<Quota>() {
-            @Override public Quota apply(StoreProvider storeProvider) {
-              Quota quota = Quotas.fromProductionTasks(Iterables.transform(
+          new Work.Quiet<IQuota>() {
+            @Override public IQuota apply(StoreProvider storeProvider) {
+              IQuota quota = Quotas.fromProductionTasks(Iterables.transform(
                   storeProvider.getTaskStore().fetchTasks(query), Tasks.SCHEDULED_TO_INFO));
 
               for (JobUpdateConfiguration updateConfig
                   : storeProvider.getUpdateStore().fetchUpdateConfigs(role)) {
                 // If the user is performing an update that increases the quota for the job,
                 // bill them for the updated job.
-                Quota additionalQuota = Quotas.subtract(
+                IQuota additionalQuota = Quotas.subtract(
                     getUpdateQuota(updateConfig.getConfigs(), Shards.GET_NEW_CONFIG),
                     getUpdateQuota(updateConfig.getConfigs(), Shards.GET_ORIGINAL_CONFIG)
                 );
@@ -116,13 +116,13 @@ public interface QuotaManager {
     }
 
     @Override
-    public boolean hasRemaining(final String role, final Quota quota) {
+    public boolean hasRemaining(final String role, final IQuota quota) {
       checkNotBlank(role);
       checkNotNull(quota);
 
       return storage.consistentRead(new Quiet<Boolean>() {
         @Override public Boolean apply(StoreProvider storeProvider) {
-          Quota reserved = storeProvider.getQuotaStore().fetchQuota(role).or(Quotas.noQuota());
+          IQuota reserved = storeProvider.getQuotaStore().fetchQuota(role).or(Quotas.noQuota());
           return Quotas.geq(reserved, Quotas.add(getConsumption(role), quota));
         }
       });

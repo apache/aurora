@@ -74,6 +74,7 @@ import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -331,7 +332,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setDiskMb(100)
         .setRamMb(200);
     expectAuth(ROOT, true);
-    storageUtil.quotaStore.saveQuota(ROLE, quota);
+    storageUtil.quotaStore.saveQuota(ROLE, IQuota.build(quota));
 
     control.replay();
 
@@ -347,7 +348,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setRamMb(200);
     expectAuth(ROOT, false);
     expectAuth(Capability.PROVISIONER, true);
-    storageUtil.quotaStore.saveQuota(ROLE, quota);
+    storageUtil.quotaStore.saveQuota(ROLE, IQuota.build(quota));
 
     control.replay();
 

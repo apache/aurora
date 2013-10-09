@@ -21,6 +21,7 @@ import com.google.common.collect.Iterables;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -29,7 +30,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Convenience class for normalizing resource measures between tasks and offers.
  */
 public final class Quotas {
-  private static final Quota NO_QUOTA = new Quota(0, 0, 0);
+  private static final IQuota NO_QUOTA = IQuota.build(new Quota(0, 0, 0));
 
   private Quotas() {
     // Utility class.
@@ -40,8 +41,8 @@ public final class Quotas {
    *
    * @return A quota with all resource vectors zeroed.
    */
-  public static Quota noQuota() {
-    return NO_QUOTA.deepCopy();
+  public static IQuota noQuota() {
+    return NO_QUOTA;
   }
 
   /**
@@ -50,13 +51,13 @@ public final class Quotas {
    * @param job Job to count quota from.
    * @return Quota requirement to run {@code job}.
    */
-  public static Quota fromJob(IJobConfiguration job) {
+  public static IQuota fromJob(IJobConfiguration job) {
     checkNotNull(job);
-    Quota quota = fromProductionTasks(ImmutableSet.of(job.getTaskConfig()));
-    quota.setNumCpus(quota.getNumCpus() * job.getShardCount());
-    quota.setRamMb(quota.getRamMb() * job.getShardCount());
-    quota.setDiskMb(quota.getDiskMb() * job.getShardCount());
-    return quota;
+    Quota builder = fromProductionTasks(ImmutableSet.of(job.getTaskConfig())).newBuilder();
+    builder.setNumCpus(builder.getNumCpus() * job.getShardCount());
+    builder.setRamMb(builder.getRamMb() * job.getShardCount());
+    builder.setDiskMb(builder.getDiskMb() * job.getShardCount());
+    return IQuota.build(builder);
   }
 
   // TODO(Suman Karumuri): Refactor this function in to a new class.
@@ -67,7 +68,7 @@ public final class Quotas {
    * @param tasks Tasks to count quota from.
    * @return Quota requirement to run {@code tasks}.
    */
-  public static Quota fromProductionTasks(Iterable<ITaskConfig> tasks) {
+  public static IQuota fromProductionTasks(Iterable<ITaskConfig> tasks) {
     checkNotNull(tasks);
 
     return fromTasks(Iterables.filter(tasks, Tasks.IS_PRODUCTION));
@@ -79,7 +80,7 @@ public final class Quotas {
    * @param tasks Tasks to count quota from.
    * @return Quota requirement to run {@code tasks}.
    */
-  public static Quota fromTasks(Iterable<ITaskConfig> tasks) {
+  public static IQuota fromTasks(Iterable<ITaskConfig> tasks) {
     double cpu = 0;
     int ramMb = 0;
     int diskMb = 0;
@@ -89,16 +90,16 @@ public final class Quotas {
       diskMb += task.getDiskMb();
     }
 
-    return new Quota()
+    return IQuota.build(new Quota()
         .setNumCpus(cpu)
         .setRamMb(ramMb)
-        .setDiskMb(diskMb);
+        .setDiskMb(diskMb));
   }
 
   /**
    * a >= b
    */
-  public static boolean geq(Quota a, Quota b) {
+  public static boolean geq(IQuota a, IQuota b) {
     return (a.getNumCpus() >= b.getNumCpus())
         && (a.getRamMb() >= b.getRamMb())
         && (a.getDiskMb() >= b.getDiskMb());
@@ -107,7 +108,7 @@ public final class Quotas {
   /**
    * a > b
    */
-  public static boolean greaterThan(Quota a, Quota b) {
+  public static boolean greaterThan(IQuota a, IQuota b) {
     return (a.getNumCpus() > b.getNumCpus())
         && (a.getRamMb() > b.getRamMb())
         && (a.getDiskMb() > b.getDiskMb());
@@ -116,20 +117,20 @@ public final class Quotas {
   /**
    * a + b
    */
-  public static Quota add(Quota a, Quota b) {
-    return new Quota()
+  public static IQuota add(IQuota a, IQuota b) {
+    return IQuota.build(new Quota()
         .setNumCpus(a.getNumCpus() + b.getNumCpus())
         .setRamMb(a.getRamMb() + b.getRamMb())
-        .setDiskMb(a.getDiskMb() + b.getDiskMb());
+        .setDiskMb(a.getDiskMb() + b.getDiskMb()));
   }
 
   /**
    * a - b
    */
-  public static Quota subtract(Quota a, Quota b) throws IllegalStateException {
-    return new Quota()
+  public static IQuota subtract(IQuota a, IQuota b) throws IllegalStateException {
+    return IQuota.build(new Quota()
         .setNumCpus(a.getNumCpus() - b.getNumCpus())
         .setRamMb(a.getRamMb() - b.getRamMb())
-        .setDiskMb(a.getDiskMb() - b.getDiskMb());
+        .setDiskMb(a.getDiskMb() - b.getDiskMb()));
   }
 }

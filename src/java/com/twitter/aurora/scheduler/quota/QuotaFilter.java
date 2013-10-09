@@ -19,12 +19,12 @@ import javax.inject.Inject;
 
 import com.google.common.collect.Iterables;
 
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.state.JobFilter;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -49,12 +49,12 @@ class QuotaFilter implements JobFilter {
       return JobFilterResult.pass();
     }
 
-    Quota currentUsage = Quotas.fromProductionTasks(
+    IQuota currentUsage = Quotas.fromProductionTasks(
         Iterables.transform(
             Storage.Util.consistentFetchTasks(storage, Query.jobScoped(job.getKey()).active()),
         Tasks.SCHEDULED_TO_INFO));
 
-    Quota additionalRequested = Quotas.subtract(Quotas.fromJob(job), currentUsage);
+    IQuota additionalRequested = Quotas.subtract(Quotas.fromJob(job), currentUsage);
     if (!quotaManager.hasRemaining(job.getKey().getRole(), additionalRequested)) {
       return JobFilterResult.fail("Insufficient resource quota.");
     }

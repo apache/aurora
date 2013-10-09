@@ -29,7 +29,6 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
@@ -37,6 +36,7 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StorageException;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
@@ -87,7 +87,7 @@ public class ResourceCounter {
     return storage.weaklyConsistentRead(new Work.Quiet<Metric>() {
       @Override public Metric apply(StoreProvider storeProvider) {
         Metric allocation = new Metric();
-        for (Quota quota : storeProvider.getQuotaStore().fetchQuotas().values()) {
+        for (IQuota quota : storeProvider.getQuotaStore().fetchQuotas().values()) {
           allocation.accumulate(quota);
         }
         return allocation;
@@ -185,7 +185,7 @@ public class ResourceCounter {
       diskMb += task.getDiskMb();
     }
 
-    protected void accumulate(Quota quota) {
+    protected void accumulate(IQuota quota) {
       cpu += quota.getNumCpus();
       ramMb += quota.getRamMb();
       diskMb += quota.getDiskMb();

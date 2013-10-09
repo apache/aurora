@@ -77,6 +77,7 @@ import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.log.LogStorage.SchedulingService;
@@ -608,12 +609,12 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveQuota() throws Exception {
     final String role = "role";
-    final Quota quota = new Quota(1.0, 128L, 1024L);
+    final IQuota quota = IQuota.build(new Quota(1.0, 128L, 1024L));
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.quotaStore.saveQuota(role, quota);
-        streamMatcher.expectTransaction(Op.saveQuota(new SaveQuota(role, quota)))
+        streamMatcher.expectTransaction(Op.saveQuota(new SaveQuota(role, quota.newBuilder())))
             .andReturn(position);
       }
 

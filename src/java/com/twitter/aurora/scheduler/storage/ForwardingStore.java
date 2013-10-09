@@ -29,10 +29,10 @@ import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.MaintenanceMode;
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -241,7 +241,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Map<String, Quota> fetchQuotas() {
+  public Map<String, IQuota> fetchQuotas() {
     return quotaStore.fetchQuotas();
   }
 
@@ -256,12 +256,12 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void saveQuota(String role, Quota quota) {
+  public void saveQuota(String role, IQuota quota) {
     quotaStore.saveQuota(role, quota);
   }
 
   @Override
-  public Optional<Quota> fetchQuota(String role) {
+  public Optional<IQuota> fetchQuota(String role) {
     return quotaStore.fetchQuota(role);
   }
 

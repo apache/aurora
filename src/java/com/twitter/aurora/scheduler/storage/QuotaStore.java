@@ -19,7 +19,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 
-import com.twitter.aurora.gen.Quota;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 
 /**
  * Point of storage for quota records.
@@ -31,14 +31,14 @@ public interface QuotaStore {
    * @param role Role to fetch quota for.
    * @return Optional quota associated with {@code role}.
    */
-  Optional<Quota> fetchQuota(String role);
+  Optional<IQuota> fetchQuota(String role);
 
   /**
    * Fetches all allocated quotas.
    *
    * @return All allocated quotas.
    */
-  Map<String, Quota> fetchQuotas();
+  Map<String, IQuota> fetchQuotas();
 
   public interface Mutable extends QuotaStore {
 
@@ -60,6 +60,6 @@ public interface QuotaStore {
      * @param role Role to create or update a quota record for.
      * @param quota Quota to save.
      */
-    void saveQuota(String role, Quota quota);
+    void saveQuota(String role, IQuota quota);
   }
 }

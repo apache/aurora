@@ -41,6 +41,7 @@ import com.twitter.aurora.scheduler.state.StateManager;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.application.ShutdownRegistry;
@@ -58,7 +59,7 @@ public class ThriftIT extends EasyMockTest {
   private static final String USER = "someuser";
   private static final String ROOT_USER = "blue";
   private static final String PROVISIONER_USER = "red";
-  private static final Quota QUOTA = new Quota().setNumCpus(1).setRamMb(1).setDiskMb(1);
+  private static final IQuota QUOTA = IQuota.build(new Quota(1, 1, 1));
 
   private static final Map<Capability, String> CAPABILITIES =
       ImmutableMap.of(Capability.ROOT, ROOT_USER, Capability.PROVISIONER, PROVISIONER_USER);
@@ -156,7 +157,8 @@ public class ThriftIT extends EasyMockTest {
   private void setQuota(String user, boolean allowed) throws Exception {
     assertEquals(
         allowed ? OK : AUTH_FAILED,
-        thrift.setQuota(USER, QUOTA, new SessionKey().setData(user.getBytes())).getResponseCode());
+        thrift.setQuota(USER, QUOTA.newBuilder(), new SessionKey().setData(user.getBytes()))
+            .getResponseCode());
   }
 
   @Test

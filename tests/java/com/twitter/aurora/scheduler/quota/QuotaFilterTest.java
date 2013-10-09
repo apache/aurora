@@ -12,6 +12,7 @@ import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -26,10 +27,10 @@ public class QuotaFilterTest extends EasyMockTest {
   private static final String ROLE = "test";
   private static final IJobKey JOB_KEY = JobKeys.from(ROLE, "test", "test");
   private static final Query.Builder QUERY = Query.jobScoped(JOB_KEY).active();
-  private static final Quota QUOTA = new Quota()
+  private static final IQuota QUOTA = IQuota.build(new Quota()
       .setNumCpus(1.0)
       .setRamMb(256L)
-      .setDiskMb(512L);
+      .setDiskMb(512L));
   private static final ITaskConfig TASK_CONFIG = ITaskConfig.build(new TaskConfig()
       .setNumCpus(QUOTA.getNumCpus())
       .setRamMb(QUOTA.getRamMb())
@@ -91,7 +92,7 @@ public class QuotaFilterTest extends EasyMockTest {
         IScheduledTask.build(new ScheduledTask().setAssignedTask(
             new AssignedTask().setTask(jobBuilder.getTaskConfig()))));
 
-    expect(quotaManager.hasRemaining(ROLE, new Quota(0, 0, 0))).andReturn(true);
+    expect(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(0, 0, 0)))).andReturn(true);
 
     control.replay();
 

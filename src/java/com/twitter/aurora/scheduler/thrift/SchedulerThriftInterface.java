@@ -105,6 +105,7 @@ import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
@@ -631,8 +632,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response getQuota(final String ownerRole) {
     checkNotBlank(ownerRole);
 
-    Quota quota = storage.consistentRead(new Work.Quiet<Quota>() {
-      @Override public Quota apply(StoreProvider storeProvider) {
+    IQuota quota = storage.consistentRead(new Work.Quiet<IQuota>() {
+      @Override public IQuota apply(StoreProvider storeProvider) {
         return storeProvider.getQuotaStore().fetchQuota(ownerRole).or(Quotas.noQuota());
       }
     });
@@ -640,7 +641,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return new Response()
         .setResponseCode(OK)
         .setResult(Result.getQuotaResult(new GetQuotaResult()
-            .setQuota(quota)));
+            .setQuota(quota.newBuilder())));
   }
 
   @Override
@@ -686,7 +687,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getQuotaStore().saveQuota(ownerRole, quota);
+        storeProvider.getQuotaStore().saveQuota(ownerRole, IQuota.build(quota));
       }
     });
 

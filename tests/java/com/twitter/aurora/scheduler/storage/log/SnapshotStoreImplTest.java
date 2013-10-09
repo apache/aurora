@@ -72,7 +72,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     ImmutableSet<IScheduledTask> tasks = ImmutableSet.of(
         IScheduledTask.build(new ScheduledTask().setStatus(ScheduleStatus.PENDING)));
     Set<QuotaConfiguration> quotas =
-        ImmutableSet.of(new QuotaConfiguration("steve", Quotas.noQuota()));
+        ImmutableSet.of(new QuotaConfiguration("steve", Quotas.noQuota().newBuilder()));
     HostAttributes attribute = new HostAttributes("host",
         ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))));
     StoredJob job = new StoredJob(

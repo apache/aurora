@@ -33,10 +33,10 @@ import com.google.inject.Inject;
 
 import org.codehaus.jackson.annotate.JsonProperty;
 
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 
 /**
  * Servlet that exposes allocated resource quotas.
@@ -61,11 +61,11 @@ public class Quotas {
   public Response getOffers(@QueryParam("role") final String role) {
     return storage.weaklyConsistentRead(new Work.Quiet<Response>() {
       @Override public Response apply(StoreProvider storeProvider) {
-        Map<String, Quota> quotas;
+        Map<String, IQuota> quotas;
         if (role == null) {
           quotas = storeProvider.getQuotaStore().fetchQuotas();
         } else {
-          Optional<Quota> quota = storeProvider.getQuotaStore().fetchQuota(role);
+          Optional<IQuota> quota = storeProvider.getQuotaStore().fetchQuota(role);
           if (quota.isPresent()) {
             quotas = ImmutableMap.of(role, quota.get());
           } else {
@@ -78,8 +78,8 @@ public class Quotas {
     });
   }
 
-  private static final Function<Quota, QuotaBean> TO_BEAN = new Function<Quota, QuotaBean>() {
-    @Override public QuotaBean apply(Quota quota) {
+  private static final Function<IQuota, QuotaBean> TO_BEAN = new Function<IQuota, QuotaBean>() {
+    @Override public QuotaBean apply(IQuota quota) {
       return new QuotaBean(quota.getNumCpus(), quota.getRamMb(), quota.getDiskMb());
     }
   };

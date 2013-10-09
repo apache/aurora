@@ -51,7 +51,6 @@ import org.antlr.stringtemplate.StringTemplate;
 
 import com.twitter.aurora.gen.Constants;
 import com.twitter.aurora.gen.CronCollisionPolicy;
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
@@ -63,6 +62,7 @@ import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
@@ -160,11 +160,11 @@ public class SchedulerzRole extends JerseyTemplateServlet {
     });
   }
 
-  private Quota getQuota(final String role) {
+  private IQuota getQuota(final String role) {
     return Storage.Util.consistentFetchQuota(storage, role).or(Quotas.noQuota());
   }
 
-  private Quota getNonProdConsumption(String role) {
+  private IQuota getNonProdConsumption(String role) {
     FluentIterable<ITaskConfig> tasks = FluentIterable
         .from(Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(role).active()))
         .transform(Tasks.SCHEDULED_TO_INFO)

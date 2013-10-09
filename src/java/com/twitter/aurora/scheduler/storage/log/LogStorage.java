@@ -44,7 +44,6 @@ import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.MaintenanceMode;
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
@@ -79,6 +78,7 @@ import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.log.LogManager.StreamManager;
@@ -415,7 +415,7 @@ public class LogStorage extends ForwardingStore
 
       case SAVE_QUOTA:
         SaveQuota saveQuota = op.getSaveQuota();
-        saveQuota(saveQuota.getRole(), saveQuota.getQuota());
+        saveQuota(saveQuota.getRole(), IQuota.build(saveQuota.getQuota()));
         break;
 
       case REMOVE_QUOTA:
@@ -670,10 +670,10 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_log_quota_save")
   @Override
-  public void saveQuota(final String role, final Quota quota) {
+  public void saveQuota(final String role, final IQuota quota) {
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.saveQuota(new SaveQuota(role, quota)));
+        log(Op.saveQuota(new SaveQuota(role, quota.newBuilder())));
         LogStorage.super.saveQuota(role, quota);
       }
     });

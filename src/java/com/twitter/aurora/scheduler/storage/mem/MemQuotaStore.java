@@ -17,15 +17,12 @@ package com.twitter.aurora.scheduler.storage.mem;
 
 import java.util.Map;
 
-import javax.annotation.Nullable;
-
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.storage.QuotaStore;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -34,9 +31,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class MemQuotaStore implements QuotaStore.Mutable {
 
-  private static final Function<Quota, Quota> DEEP_COPY = Util.deepCopier();
-
-  private final Map<String, Quota> quotas = Maps.newConcurrentMap();
+  private final Map<String, IQuota> quotas = Maps.newConcurrentMap();
 
   @Override
   public void deleteQuotas() {
@@ -51,23 +46,21 @@ class MemQuotaStore implements QuotaStore.Mutable {
   }
 
   @Override
-  public void saveQuota(String role, Quota quota) {
+  public void saveQuota(String role, IQuota quota) {
     checkNotNull(role);
     checkNotNull(quota);
 
-    quotas.put(role, DEEP_COPY.apply(quota));
+    quotas.put(role, quota);
   }
 
   @Override
-  public Optional<Quota> fetchQuota(String role) {
+  public Optional<IQuota> fetchQuota(String role) {
     checkNotNull(role);
-
-    @Nullable Quota quota = quotas.get(role);
-    return (quota == null) ? Optional.<Quota>absent() : Optional.of(DEEP_COPY.apply(quota));
+    return Optional.fromNullable(quotas.get(role));
   }
 
   @Override
-  public Map<String, Quota> fetchQuotas() {
-    return ImmutableMap.copyOf(Maps.transformValues(quotas, DEEP_COPY));
+  public Map<String, IQuota> fetchQuotas() {
+    return ImmutableMap.copyOf(quotas);
   }
 }

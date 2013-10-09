@@ -24,9 +24,9 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.BindingAnnotation;
 
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.SchedulerException;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 
 /**
@@ -313,9 +313,9 @@ public interface Storage {
      * @return Quota returned from the fetch operation.
      * @see QuotaStore#fetchQuota(String)
      */
-    public static Optional<Quota> consistentFetchQuota(Storage storage, final String role) {
-      return storage.consistentRead(new Work.Quiet<Optional<Quota>>() {
-        @Override public Optional<Quota> apply(StoreProvider storeProvider) {
+    public static Optional<IQuota> consistentFetchQuota(Storage storage, final String role) {
+      return storage.consistentRead(new Work.Quiet<Optional<IQuota>>() {
+        @Override public Optional<IQuota> apply(StoreProvider storeProvider) {
           return storeProvider.getQuotaStore().fetchQuota(role);
         }
       });

@@ -26,7 +26,6 @@ import com.google.inject.Inject;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
-import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.storage.QuotaConfiguration;
 import com.twitter.aurora.gen.storage.SchedulerMetadata;
 import com.twitter.aurora.gen.storage.Snapshot;
@@ -40,6 +39,7 @@ import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Volatile;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.util.BuildInfo;
@@ -161,8 +161,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       new SnapshotField() {
         @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<QuotaConfiguration> quotas = ImmutableSet.builder();
-          for (Map.Entry<String, Quota> entry : store.getQuotaStore().fetchQuotas().entrySet()) {
-            quotas.add(new QuotaConfiguration(entry.getKey(), entry.getValue()));
+          for (Map.Entry<String, IQuota> entry : store.getQuotaStore().fetchQuotas().entrySet()) {
+            quotas.add(new QuotaConfiguration(entry.getKey(), entry.getValue().newBuilder()));
           }
 
           snapshot.setQuotaConfigurations(quotas.build());
@@ -173,7 +173,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
           if (snapshot.isSetQuotaConfigurations()) {
             for (QuotaConfiguration quota : snapshot.getQuotaConfigurations()) {
-              store.getQuotaStore().saveQuota(quota.getRole(), quota.getQuota());
+              store.getQuotaStore().saveQuota(quota.getRole(), IQuota.build(quota.getQuota()));
             }
           }
         }
