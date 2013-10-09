@@ -27,14 +27,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
-import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
@@ -56,6 +54,8 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import static com.twitter.aurora.scheduler.base.Tasks.LATEST_ACTIVITY;
+
 import static com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import static com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import static com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -67,13 +67,6 @@ import static com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
  */
 public class HistoryPruner implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(HistoryPruner.class.getName());
-
-  private static final Ordering<IScheduledTask> LATEST_ACTIVITY = Ordering.natural()
-      .onResultOf(new Function<IScheduledTask, Long>() {
-        @Override public Long apply(IScheduledTask task) {
-          return Iterables.getLast(task.getTaskEvents()).getTimestamp();
-        }
-      });
 
   @VisibleForTesting
   static final Query.Builder INACTIVE_QUERY = Query.unscoped().terminal();

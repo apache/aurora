@@ -176,4 +176,11 @@ public final class Tasks {
   public static String getJob(IScheduledTask task) {
     return task.getAssignedTask().getTask().getJobName();
   }
+
+  public static final Ordering<IScheduledTask> LATEST_ACTIVITY = Ordering.natural()
+      .onResultOf(new Function<IScheduledTask, Long>() {
+        @Override public Long apply(IScheduledTask task) {
+          return Iterables.getLast(task.getTaskEvents()).getTimestamp();
+        }
+      });
 }

@@ -30,24 +30,29 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 
+import com.twitter.aurora.gen.Constants;
 import com.twitter.aurora.gen.CronCollisionPolicy;
 import com.twitter.aurora.gen.Quota;
+import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -66,6 +71,8 @@ import com.twitter.common.quantity.Time;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import static com.twitter.aurora.scheduler.base.Tasks.GET_STATUS;
+import static com.twitter.aurora.scheduler.base.Tasks.LATEST_ACTIVITY;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
@@ -73,6 +80,21 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
  */
 @Path("/scheduler/{role}")
 public class SchedulerzRole extends JerseyTemplateServlet {
+
+  private static final List<ScheduleStatus> STATUSES = ImmutableList.<ScheduleStatus>builder()
+      .addAll(Constants.TERMINAL_STATES)
+      .addAll(Constants.ACTIVE_STATES)
+      .build();
+
+  // The freshest task is the latest active task
+  // or the latest inactive task if no active task exists.
+  private static final Ordering<IScheduledTask> FRESH_TASK_ORDER =
+      Ordering.explicit(STATUSES).onResultOf(GET_STATUS).compound(LATEST_ACTIVITY);
+
+  @VisibleForTesting
+  static IScheduledTask getFreshestTask(Iterable<IScheduledTask> tasks) {
+    return FRESH_TASK_ORDER.max(tasks);
+  }
 
   private final Storage storage;
   private final CronJobManager cronJobManager;
@@ -234,11 +256,12 @@ public class SchedulerzRole extends JerseyTemplateServlet {
             job.environment = jobKey.getEnvironment();
             job.name = jobKey.getName();
 
-            ITaskConfig config = Iterables.get(tasks, 0).getAssignedTask().getTask();
-            job.production = config.isProduction();
+            // Pick the freshest task's config and associate it with the job.
+            ITaskConfig freshestConfig = getFreshestTask(tasks).getAssignedTask().getTask();
+            job.production = freshestConfig.isProduction();
 
             // TODO(Suman Karumuri): Add a source/job type to TaskConfig and replace logic below
-            if (config.isIsService()) {
+            if (freshestConfig.isIsService()) {
               job.type = JobType.SERVICE;
             } else if (cronJobs.containsKey(jobKey)) {
               job.type = JobType.CRON;
