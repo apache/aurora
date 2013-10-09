@@ -1,4 +1,4 @@
 resources(
   name = 'http',
-  sources = rglobs('*.css', '*.js', '*.png', '*.st')
+  sources = rglobs('*.css', '*.html', '*.js', '*.png', '*.st')
 )

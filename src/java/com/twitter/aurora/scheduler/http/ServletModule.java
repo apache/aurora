@@ -41,6 +41,7 @@ import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 import com.twitter.common.webassets.bootstrap.BootstrapModule;
+import com.twitter.common.webassets.bootstrap.BootstrapModule.BootstrapVersion;
 import com.twitter.common.webassets.jquery.JQueryModule;
 import com.twitter.thrift.ServiceInstance;
 
@@ -66,7 +67,7 @@ public class ServletModule extends AbstractModule {
     requireBinding(QuotaManager.class);
 
     install(new JQueryModule());
-    install(new BootstrapModule());
+    install(new BootstrapModule(BootstrapVersion.VERSION_2_3_2));
 
     // Bindings required for the leader redirector.
     requireBinding(LocalServiceRegistry.class);
@@ -144,6 +145,14 @@ public class ServletModule extends AbstractModule {
         "assets/datatables/js/dataTables.htmlNumberType.js",
         "/js/dataTables.htmlNumberType.js");
 
+    registerAsset("assets/workflow/workflow.html", "/workflow/workflow.html");
+    registerAsset("assets/workflow/tangle/BVTouchable.js", "/workflow/tangle/BVTouchable.js");
+    registerAsset("assets/workflow/tangle/Tangle.js", "/workflow/tangle/Tangle.js");
+    registerAsset("assets/workflow/tangle/TangleKit.css", "/workflow/tangle/TangleKit.css");
+    registerAsset("assets/workflow/tangle/TangleKit.js", "/workflow/tangle/TangleKit.js");
+    registerAsset("assets/workflow/tangle/mootools.js", "/workflow/tangle/mootools.js");
+    registerAsset("assets/workflow/tangle/sprintf.js", "/workflow/tangle/sprintf.js");
+
     bind(LeaderRedirect.class).in(Singleton.class);
     LifecycleModule.bindStartupAction(binder(), RedirectMonitor.class);
   }
@@ -155,6 +164,8 @@ public class ServletModule extends AbstractModule {
       mediaType = MediaType.PNG;
     } else if (registerLocation.endsWith(".js")) {
       mediaType = MediaType.JAVASCRIPT_UTF_8;
+    } else if (registerLocation.endsWith(".html")) {
+      mediaType = MediaType.HTML_UTF_8;
     } else if (registerLocation.endsWith(".css")) {
       mediaType = MediaType.CSS_UTF_8;
     } else {

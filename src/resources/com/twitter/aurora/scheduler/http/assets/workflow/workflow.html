@@ -1,0 +1,659 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Aurora config builder</title>
+  <!-- Bootstrap -->
+  <script type="text/javascript" src="/js/jquery.min.js"></script>
+  <script type="text/javascript" src="/js/bootstrap.min.js"></script>
+  <link href="/css/bootstrap.min.css" rel="stylesheet" />
+
+  <!-- Tangle -->
+  <script type="text/javascript" src="tangle/Tangle.js"></script>
+  <script type="text/javascript" src="tangle/mootools.js"></script>
+  <script type="text/javascript" src="tangle/sprintf.js"></script>
+  <script type="text/javascript" src="tangle/BVTouchable.js"></script>
+  <script type="text/javascript" src="tangle/TangleKit.js"></script>
+  <link rel="stylesheet" href="tangle/TangleKit.css" type="text/css">
+
+  <!-- Workflow UI specific -->
+  <style type="text/css">
+    input[type='number']{
+      padding: 1px;
+    }
+  </style>
+</head>
+
+<body>
+<div class="page-header text-center">
+  <h1>Aurora config builder</h1>
+</div>
+
+<div class="auroraConfig well span6">
+  <h4>Application Info</h4>
+  <div class="appInfo span12">
+    <div class="span2">
+      <label class="pull-right">Application Name
+        <i class="icon-question-sign" rel="tooltip" title="Name of your application"></i>
+      </label>
+    </div>
+    <div id="appName" class="control-group">
+      <span data-var="appName" data-size="6" class="TKTextField span2" data-pattern="\w+"
+            data-maxlength=20 />
+    </div>
+  </div>
+
+  <div class="span12">
+    <div class="span2">
+      <label class="pull-right">Contact email
+        <i class="icon-question-sign" rel="tooltip"
+           title="Email address to send notifications about this job"></i>
+      </label></div>
+    <div id="contact" class="control-group">
+      <span data-var="contact" data-size="6" class="TKTextField span2" data-type="email" />
+    </div>
+  </div>
+
+  <div class="processType span12">
+    <div class="span2">
+      <label class="pull-right">Choose the type of service</label>
+    </div>
+
+    <div class="span2">
+      <span data-var="processType" class="TKSelect">
+        <option value="shell" selected="selected">Shell command</option>
+        <option value="java">Java service</option>
+        <option value="python">Python service</option>
+      </span>
+    </div>
+  </div>
+
+  <h4>Package Info
+    <i class="icon-question-sign" rel="tooltip" title="More info at go/packer and go/packerui"></i>
+  </h4>
+  <div class="packer span12">
+    <div>
+      <div class="span2"><label class="pull-right">Package Name</label></div>
+      <div id="packageName" class="control-group">
+        <span data-var="packageName" data-size="6" class="TKTextField span2" data-maxlength="100"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="span12">
+    <div class="span2"><label class="pull-right">Package version</label></div>
+    <div id="packageVersion" class="control-group">
+      <span data-var="packageVersion" data-size="6" class="TKTextField span2"/>
+    </div>
+  </div>
+
+  <div class="processArgs">
+    <span class="TKIf" data-var="shellDiv">
+      <h4>Process</h4>
+      <div class="span12" id="shell">
+        <div class="span2"><label class="pull-right">Command to run</label></div>
+        <div class="control-group">
+          <span data-var="command" class="TKTextArea span2" data-rows="4"/>
+        </div>
+      </div>
+    </span>
+
+    <span class="TKIf" data-var="javaDiv">
+      <h4>Process</h4>
+      <div id="java">
+        <div class="span12">
+          <div class="span2"><label class="pull-right">JVM arguments</label></div>
+          <div class="control-group">
+            <span data-var="jvmArgs" class="TKTextArea span2" data-rows="4"/>
+          </div>
+        </div>
+
+        <div class="span12">
+          <div class="span2"><label class="pull-right">JVM version</label></div>
+          <div class="control-group">
+            <span data-var="jvmVersion" data-size="6" class="TKSelect span2">
+              <option value="7" selected="selected">Java 7</option>
+              <option value="6">Java 6</option>
+            </span>
+          </div>
+        </div>
+      </div>
+    </span>
+
+    <span class="TKIf" data-var="pythonDiv">
+      <h4>Process</h4>
+      <div id="python">
+        <div class="span12">
+          <div class="span2"><label class="pull-right">Python arguments</label></div>
+          <div class="control-group">
+            <span data-var="pythonArgs" class="TKTextArea span2" data-rows="4"/>
+          </div>
+        </div>
+
+        <div class="span12">
+          <div class="span2"><label class="pull-right">Python version</label></div>
+          <div class="control-group">
+            <span data-var="pythonVersion" data-size="6" class="TKSelect span2">
+              <option value="26" selected="selected">2.6</option>
+              <option value="24">2.4</option>
+            </span>
+          </div>
+        </div>
+    </div>
+  </span>
+  </div>
+
+  <div class="task">
+    <div class="resources">
+      <h4>Resources Needed</h4>
+
+      <div class="span12">
+        <div class="span2"><label class="pull-right">CPU</label></div>
+        <div id="cpuCount" class="control-group">
+          <span data-var="cpuCount" data-size=6 class="TKNumberField span2"/>
+        </div>
+      </div>
+
+      <div class="span12">
+        <div class="span2"><label class="pull-right">RAM (in MB)</label></div>
+        <div id="ramMb" class="control-group">
+          <span data-var="ramMb" data-size=6 class="TKNumberField span2"/>
+        </div>
+      </div>
+
+      <div class="span12">
+        <div class="span2"><label class="pull-right">Disk (in GB)</label></div>
+        <div id="diskGb" class="control-group">
+          <span data-var="diskGb" data-size=6 class="TKNumberField span2"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="job">
+    <h4>Service</h4>
+
+    <div class="span12">
+      <div class="span2">
+        <label class="pull-right">Role
+          <i class="icon-question-sign" rel="tooltip"
+             title="The name of the unix account the service runs as"></i>
+        </label>
+      </div>
+      <div id="role" class="control-group">
+        <span data-var="role" class="TKTextField span2" data-pattern="[a-z]+"/>
+      </div>
+    </div>
+
+    <div class="span12">
+      <div class="span2">
+        <label class="pull-right">Instance count
+          <i class="icon-question-sign" rel="tooltip"
+             title="How many copies of this task do you want to run?"></i>
+        </label>
+      </div>
+      <div id="jobInstanceCount" class="control-group">
+        <span data-var="jobInstanceCount" class="TKNumberField span2"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="span12">
+    <div class="span2">
+      <label class="pull-right">Add help to config
+        <i class="icon-question-sign" rel="tooltip"
+           title="Do you want helpful comments in the generated config?"></i>
+      </label>
+    </div>
+    <span data-var="includeHelp" class="TKToggle span2"/>
+  </div>
+
+  <div class="span12">
+    <br>
+    <button class="btn btn-success span4" id="displayConfig">
+      Generate Config
+    </button>
+  </div>
+</div>
+
+<div class="well span6" data-offset-top="0" style="right : 5%" hidden="true" id="config">
+  <h2 class="text-center">Generated config file</h2>
+  <pre><span data-var="configFile" id="configFile"></span></pre>
+  <button type="button" class="btn btn-success center" id="downloadConfig">
+    Download config file
+  </button>
+  <h5>Deployment instructions</h5>
+  <pre><span data-var="commands" id="commands"></span></pre>
+</div>
+
+<script type="text/javascript">
+  var workflowUI = new WorkflowUI();
+  workflowUI.init();
+
+  //TODO(Suman Karumuri): Move the JS code into a standalone file.
+  function isPositiveInteger(str) {
+    var num = parseInt(str, 10);
+    return num && num > 0 && num.toString() === str;
+  }
+
+  function WorkflowUI() {
+    this.config = "";
+
+    this.init = function(){
+      $('#displayConfig').bind('click', showConfig);
+      $('#downloadConfig').bind('click', downloadConfig);
+      $("[rel=tooltip]").tooltip({ placement: 'bottom'});
+      this.tangleInit();
+    }
+
+    function downloadConfig() {
+      var cfg = $('#configFile span').html();
+      window.open('data:text/plain;charset=utf-8,' + encodeURIComponent(cfg));
+    }
+
+    function showConfig() {
+      $('#config').show();
+      $('#displayConfig').removeClass('btn-success').addClass('btn-inverse')
+          .text("See your generated config changes live.");
+    }
+
+    this.tangleInit = function() {
+      new Tangle(document, {
+        initialize: function () {
+          this.appName = "myapp";
+          this.contact = "";
+
+          //Packer related params
+          this.packageName = "mypackage";
+          this.packageVersion = "latest";
+
+          // process related params
+          this.processType = "shell";
+
+          this.shellDiv = true;
+          this.command = '';
+
+          this.javaDiv = false;
+          this.jvmVersion = "7";
+          this.jvmArgs = "";
+
+          this.pythonDiv = false;
+          this.pythonArgs = "";
+          this.pythonVersion = "26";
+
+          // task related params
+          this.cpuCount = 1;
+          this.ramMb = 512;
+          this.diskGb = 1;
+
+          // job related params
+          this.role = "role";
+          this.jobInstanceCount = 2;
+
+          // Output related params
+          this.includeHelp = "Yes";
+          this.configFile = "";
+          this.commands = "";
+        },
+
+        update: function () {
+          this.shellDiv = this.processType === "shell";
+          this.javaDiv = this.processType === "java";
+          this.pythonDiv = this.processType === "python";
+
+          checkConfig(this);
+          var auroraGenerator = getConfigGenerator(this);
+          this.configFile = auroraGenerator.generateAuroraConfig();
+          this.commands = auroraGenerator.generateAuroraDeploymentCommands();
+        }
+      });
+    }
+
+    // TODO: Disable generate config button on sanity check errors.
+    function checkConfig(tangleCfg) {
+      detectAndNotifyError(!tangleCfg['appName'], 'appName');
+      detectAndNotifyError(!tangleCfg['contact'], 'contact');
+      detectAndNotifyError(!tangleCfg['packageName'], 'packageName');
+
+      detectAndNotifyError(
+          (!tangleCfg['packageVersion']
+               || !(tangleCfg['packageVersion'] === 'latest'
+                        || tangleCfg['packageVersion'] === 'live'
+                        || isPositiveInteger(tangleCfg['packageVersion']))),
+          'packageVersion');
+
+      detectAndNotifyError(!tangleCfg['cpuCount'] || tangleCfg['cpuCount'] <= 0, 'cpuCount');
+      detectAndNotifyError(!tangleCfg['ramMb'] || tangleCfg['ramMb'] <= 0, 'ramMb');
+      detectAndNotifyError(!tangleCfg['diskGb'] || tangleCfg['diskGb'] <= 0, 'diskGb');
+
+      detectAndNotifyError(!tangleCfg['jobInstanceCount'] || tangleCfg['jobInstanceCount'] < 1,
+          'jobInstanceCount');
+      detectAndNotifyError(!tangleCfg['role'], 'role');
+    }
+
+    function detectAndNotifyError(expr, elemId) {
+      var uiElem = $('#' + elemId);
+      expr ? uiElem.addClass('error') : uiElem.removeClass('error');
+    }
+
+    function getConfigGenerator(tangleCfg) {
+      var appConfig = new AppConfig(tangleCfg['appName'], tangleCfg['includeHelp'] === "Yes");
+      var packageCfg = new PackageConfig(tangleCfg['packageName'], tangleCfg['packageVersion']);
+      var resourceCfg = new ResourceConfig(
+          tangleCfg['cpuCount'],
+          tangleCfg['ramMb'],
+          tangleCfg['diskGb']);
+      var jobCfg = new JobConfig(
+          tangleCfg['role'],
+          tangleCfg['jobInstanceCount'],
+          tangleCfg['contact']);
+      var processCfg = new ProcessConfig(
+          tangleCfg['processType'],
+          new ShellProcessConfig(tangleCfg['command']),
+          new JavaProcessConfig(tangleCfg['jvmArgs'], tangleCfg['jvmVersion']),
+          new PythonProcessConfig(tangleCfg['pythonArgs'], tangleCfg['pythonVersion']));
+      return new AuroraGenerator(appConfig, packageCfg, processCfg, resourceCfg, jobCfg);
+    }
+  }
+
+  function AppConfig(appName, includeHelp) {
+    this.appName = appName;
+    this.includeHelp = includeHelp;
+  }
+
+  function ProcessConfig(processType, shellCfg, javaCfg, pythonCfg) {
+    this.processType = processType;
+    this.shellCfg = shellCfg;
+    this.javaCfg = javaCfg;
+    this.pythonCfg = pythonCfg;
+  }
+
+  function ShellProcessConfig(command) {
+    this.command = command;
+  }
+
+  function JavaProcessConfig(jvmArgs, javaVersion) {
+    this.args = jvmArgs;
+    this.version = javaVersion;
+  }
+
+  function PythonProcessConfig(pythonArgs, pythonVersion) {
+    this.args = pythonArgs;
+    this.version = pythonVersion;
+  }
+
+  function ResourceConfig(cpuCount, ramMb, diskGb) {
+    this.cpuCount = cpuCount;
+    this.ramMb = ramMb;
+    this.diskGb = diskGb;
+  }
+
+  function PackageConfig(packageName, packageVersion) {
+    this.packageName = packageName;
+    this.packageVersion = getPkgVersionStr(packageVersion);
+
+    function getPkgVersionStr(pkgVersion) {
+      var pkgVersionStr = pkgVersion === "live" ? "'live'" : "'latest'";
+      return isPositiveInteger(pkgVersion) ? pkgVersion : pkgVersionStr;
+    }
+  }
+
+  function JobConfig(role, instanceCount, contact) {
+    this.role = role;
+    this.contact = contact;
+    this.instanceCount = instanceCount;
+
+    this.cluster = "";
+    this.environment = "";
+    this.name = "";
+    this.production = false;
+    this.updateCfg = "";
+    this.announcerCfg = "";
+  }
+
+  function CommandGenerator(appCfg, jobs) {
+    this.generate = function () {
+      var helpCommands = [];
+      var cfgFile = appCfg.appName + ".aurora";
+      helpCommands.push(sprintf("Download the config file into %s file.", cfgFile));
+
+      $.each(jobs, function (idx, job) {
+        var envStr = job.environment === "prod" ? "production" : "staging";
+        helpCommands.push(
+            sprintf("For %s run : %s", envStr, makeAuroraDeploymentCommand(job, cfgFile)));
+      });
+
+      return helpCommands.join("\n");
+    };
+
+    function makeAuroraDeploymentCommand(jobCfg, cfgFile) {
+      return sprintf("aurora deployment create %s/%s/%s/%s %s -r",
+          jobCfg.cluster, jobCfg.role, jobCfg.environment, jobCfg.name, cfgFile);
+    }
+  }
+
+  function AuroraGenerator(appCfg, packageCfg, processCfg, resourceCfg, jobCfg) {
+    var PACKAGE_INSTALLER_NAME = appCfg.appName + "_package_installer";
+    var RESOURCES_REF = 'resources';
+    var PROCESS_NAME = 'process';
+    var PROCESS_LIST_REF = 'procList';
+    var TASK_NAME = appCfg.appName + "_task";
+    var UPDATE_CONFIG_REF = 'updateCfg';
+    var ANNOUNCER_REF = 'announcer';
+    var EMPTY_LINE = "";
+
+    var jobCfgs = makeJobs(jobCfg);
+
+    function generateConfig(cfg) {
+      var configLines = [];
+
+      configLines.push(cfg.makeHeader());
+
+      configLines.push(cfg.makePackageCfg(PACKAGE_INSTALLER_NAME, packageCfg));
+      configLines.push(EMPTY_LINE);
+
+      configLines.push(cfg.makeResources(RESOURCES_REF, resourceCfg));
+
+      var processes = [];
+      processes.push(PACKAGE_INSTALLER_NAME);
+      configLines.push(cfg.makeProcessCfg(PROCESS_NAME, processCfg, RESOURCES_REF));
+      processes.push(PROCESS_NAME);
+
+      configLines.push(cfg.makeProcessList(PROCESS_LIST_REF, processes));
+      configLines.push(EMPTY_LINE);
+
+      configLines.push(cfg.makeTaskCfg(TASK_NAME, PROCESS_LIST_REF, RESOURCES_REF));
+      configLines.push(EMPTY_LINE);
+
+      configLines.push(cfg.makeUpdateCfg(UPDATE_CONFIG_REF));
+
+      configLines.push(cfg.makeAnnouncerCfg(ANNOUNCER_REF, ""));
+      configLines.push(EMPTY_LINE);
+
+      configLines.push(cfg.makeJobs(jobCfgs, TASK_NAME, packageCfg));
+
+      return configLines.join("\n");
+    }
+
+    this.generateAuroraConfig = function () {
+      var cfgGenerator = new SimpleTextConfigGenerator();
+      if(appCfg.includeHelp) {
+        cfgGenerator = new SimpleTextConfigHelpDecorator(cfgGenerator);
+      }
+      return generateConfig(cfgGenerator);
+    }
+
+    this.generateAuroraDeploymentCommands = function() {
+      var commandGen = new CommandGenerator(appCfg, jobCfgs);
+      return commandGen.generate();
+    }
+
+    function makeJobs(jobCfg) {
+      var jobs = [];
+
+      var prodJob = jQuery.extend(true, {}, jobCfg);
+      prodJob.cluster = "smf1";
+      prodJob.environment = "prod";
+      prodJob.name = appCfg.appName + "_prod";
+      prodJob.production = false;
+      prodJob.updateCfg = UPDATE_CONFIG_REF;
+      prodJob.announcerCfg = ANNOUNCER_REF;
+      jobs.push(prodJob);
+
+      var stagingJob = jQuery.extend(true, {}, jobCfg);
+      stagingJob.cluster = "smf1";
+      stagingJob.environment = "staging";
+      stagingJob.name = appCfg.appName + "_staging";
+      stagingJob.updateCfg = UPDATE_CONFIG_REF;
+      stagingJob.announcerCfg = ANNOUNCER_REF;
+      jobs.push(stagingJob);
+
+      return jobs;
+    }
+  }
+
+  /**
+   * A class that decorates the config generated by the simple text config with help info.
+   */
+  function SimpleTextConfigHelpDecorator(txtCfg) {
+    this.makeHeader = function () {
+      return "# Help and docs at go/auroraconfig";
+    };
+
+    this.makePackageCfg = function (installerName, packageCfg) {
+      return "# Packer info at: go/packer \n"
+                 + txtCfg.makePackageCfg(installerName, packageCfg);
+    };
+
+    this.makeProcessCfg = function (processRef, processCfg, resourceRef) {
+      return txtCfg.makeProcessCfg(processRef, processCfg, resourceRef);
+    };
+
+    this.makeProcessList = function (procListRef, processList) {
+      return txtCfg.makeProcessList(procListRef, processList);
+    };
+
+    this.makeResources = function (refName, resourceCfg) {
+      return txtCfg.makeResources(refName, resourceCfg);
+    };
+
+    this.makeTaskCfg = function (taskName, procList, resourceRef) {
+      return txtCfg.makeTaskCfg(taskName, procList, resourceRef);
+    };
+
+    this.makeUpdateCfg = function (refName) {
+      return "# UpdateConfig lets you configure rolling restart process. \n"
+                 + txtCfg.makeUpdateCfg(refName);
+    };
+
+    this.makeAnnouncerCfg = function (name) {
+      return "# Announcer determines how your job is discovered.\n"
+                 + "# The HTTP port of each task is registered by default.\n"
+                 + txtCfg.makeAnnouncerCfg(name);
+    };
+
+    this.makeJobs = function (jobs, taskName, packageCfg) {
+      return txtCfg.makeJobs(jobs, taskName, packageCfg);
+    };
+  }
+
+  /**
+   * A class that generates simple aurora config.
+   */
+  function SimpleTextConfigGenerator() {
+    this.makeHeader = function () {
+      return "";
+    };
+
+    this.makePackageCfg = function (installerName, packageCfg) {
+      return sprintf("%s = Packer.install(name='%s', version='{{pkg_version}}')",
+          installerName, packageCfg.packageName);
+    };
+
+    //TODO(Suman Karumuri): Refactor process config generation into a new class.
+    this.makeProcessCfg = function (processRefName, processCfg, resourceRef) {
+      switch (processCfg.processType) {
+        case "python":
+          return makePythonProcess(processRefName, processCfg.pythonCfg);
+        case "java":
+          return makeJavaProcess(processRefName, processCfg.javaCfg, resourceRef);
+        case "shell":
+        default:
+          return makeShellProcess(processRefName, processCfg.shellCfg);
+      }
+    };
+
+    function makeShellProcess(processRefName, shellCfg) {
+      return makeProcess(processRefName, shellCfg.command);
+    };
+
+    function makeProcess(processRefName, command) {
+      return sprintf("%s = Process(name='%s', cmdline='%s')",
+          processRefName, processRefName, command);
+    };
+
+    function makeJavaProcess(processRefName, jvmCfg, resourceRef) {
+      var jvm = jvmCfg.version === "7" ? "Java7()" : "Java6()";
+      return sprintf("%s = JVMProcess(name='%s', arguments='%s', resources=%s, jvm='%s')",
+          processRefName, processRefName, jvmCfg.args, resourceRef, jvm);
+    };
+
+    function makePythonProcess(processRefName, pythonCfg) {
+      var version = pythonCfg.version === "26" ? "python2.6" : "python2.4";
+      return makeProcess(processRefName, version + ' ' + pythonCfg.args);
+    };
+
+    this.makeProcessList = function (procListRef, processList) {
+      return sprintf("%s = [%s]", procListRef, processList.join(", "));
+    };
+
+    this.makeResources = function (refName, resourceCfg) {
+      return sprintf("%s = Resources(cpu=%s, ram=(%s * MB), disk=(%s * GB))",
+          refName, resourceCfg.cpuCount, resourceCfg.ramMb, resourceCfg.diskGb);
+    };
+
+    this.makeTaskCfg = function (taskName, procListRef, resourcesRef) {
+      return sprintf("%s = SequentialTask(processes=%s, resources=%s)",
+          taskName, procListRef, resourcesRef);
+    };
+
+    this.makeUpdateCfg = function (refName) {
+      return sprintf("%s = UpdateConfig()", refName);
+    };
+
+    this.makeAnnouncerCfg = function (name) {
+      return sprintf("%s = Announcer()", name);
+    };
+
+    function makeJobCfg(jobConfig, taskName) {
+      var prod = jobConfig.production ? 'True' : 'False';
+      return sprintf("%s = Service(contact='%s', cluster='%s', environment='%s', " +
+                         "role='%s', name='%s', task=%s, instances=%s, production=%s, " +
+                         "update_config=%s, announce=%s)",
+          jobConfig.name, jobConfig.contact, jobConfig.cluster, jobConfig.environment,
+          jobConfig.role, jobConfig.name, taskName, jobConfig.instanceCount, prod,
+          jobConfig.updateCfg, jobConfig.announcerCfg);
+    }
+
+    this.makeJobs = function (jobCfgs, taskName, packageCfg) {
+      var jobsStr = [];
+
+      $.each(jobCfgs, function (idx, jobCfg) {
+        jobsStr.push(makeJobCfg(jobCfg, taskName));
+        jobsStr.push("");
+      });
+
+      jobsStr.push(sprintf("jobs = [\n%s\n]",
+          $.map(jobCfgs,function (jobCfg, i) {
+            return sprintf("%s.bind(pkg_version=%s)", jobCfg.name, packageCfg.packageVersion);
+          }).join(",\n")));
+
+      return jobsStr.join("\n");
+    };
+  }
+
+  // TODO(Suman Karumuri): Make column alignment more DRY.
+  // TODO(Suman Karumuri): Move new TangleKit classes into a new file.
+</script>
+</body>
+</html>
