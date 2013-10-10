@@ -112,8 +112,8 @@ invoking cancel_update.
     update_resp.message = resp.message
 
     if resp.responseCode != ResponseCode.OK:
-      log.info("Error starting update: %s" % resp.message)
-      log.warning(self.UPDATE_FAILURE_WARNING)
+      log.error("Error starting update: %s" % resp.message)
+      log.error(self.UPDATE_FAILURE_WARNING)
       return update_resp
     elif not resp.result.startUpdateResult.rollingUpdateRequired:
       log.info('Update successful: %s' % resp.message)
@@ -123,7 +123,7 @@ invoking cancel_update.
         shards or list(range(config.instances())), health_check_interval_seconds)
 
     if failed_shards:
-      log.info('Update reverted, failures detected on shards %s' % failed_shards)
+      log.error('Update reverted, failures detected on shards %s' % failed_shards)
     else:
       log.info('Update successful')
 
