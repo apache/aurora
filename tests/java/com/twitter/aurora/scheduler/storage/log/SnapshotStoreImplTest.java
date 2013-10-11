@@ -42,6 +42,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.storage.SnapshotStore;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.ILock;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -83,11 +84,11 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         "token",
         ImmutableSet.<TaskUpdateConfiguration>of());
     String frameworkId = "framework_id";
-    Lock lock = new Lock(
-        LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()),
-        "lockId",
-        "testUser",
-        12345L);
+    ILock lock = ILock.build(new Lock()
+        .setKey(LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()))
+        .setToken("lockId")
+        .setUser("testUser")
+        .setTimestampMs(12345L));
     SchedulerMetadata metadata = new SchedulerMetadata()
         .setFrameworkId(frameworkId)
         .setVersion(CURRENT_API_VERSION);
@@ -127,7 +128,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setJobs(ImmutableSet.of(job))
         .setUpdateConfigurations(ImmutableSet.of(update))
         .setSchedulerMetadata(metadata)
-        .setLocks(ImmutableSet.of(lock));
+        .setLocks(ILock.toBuildersSet(ImmutableSet.of(lock)));
 
     assertEquals(expected, snapshotStore.createSnapshot());
 

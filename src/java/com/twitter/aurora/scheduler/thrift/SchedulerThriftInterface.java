@@ -48,6 +48,7 @@ import com.twitter.aurora.auth.CapabilityValidator;
 import com.twitter.aurora.auth.CapabilityValidator.AuditCheck;
 import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
+import com.twitter.aurora.gen.AcquireLockResult;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
 import com.twitter.aurora.gen.DrainHostsResult;
@@ -61,6 +62,9 @@ import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.ListBackupsResult;
+import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.gen.LockKey;
+import com.twitter.aurora.gen.LockValidation;
 import com.twitter.aurora.gen.MaintenanceStatusResult;
 import com.twitter.aurora.gen.PopulateJobResult;
 import com.twitter.aurora.gen.QueryRecoveryResult;
@@ -90,6 +94,8 @@ import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescr
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.state.CronJobManager;
+import com.twitter.aurora.scheduler.state.LockManager;
+import com.twitter.aurora.scheduler.state.LockManager.LockException;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
 import com.twitter.aurora.scheduler.storage.JobStore;
@@ -105,6 +111,8 @@ import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.ILock;
+import com.twitter.aurora.scheduler.storage.entities.ILockKey;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
@@ -158,6 +166,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   private final Storage storage;
   private final SchedulerCore schedulerCore;
+  private final LockManager lockManager;
   private final CapabilityValidator sessionValidator;
   private final StorageBackup backup;
   private final Recovery recovery;
@@ -170,6 +179,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   SchedulerThriftInterface(
       Storage storage,
       SchedulerCore schedulerCore,
+      LockManager lockManager,
       CapabilityValidator sessionValidator,
       StorageBackup backup,
       Recovery recovery,
@@ -178,6 +188,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     this(storage,
         schedulerCore,
+        lockManager,
         sessionValidator,
         backup,
         recovery,
@@ -191,6 +202,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   SchedulerThriftInterface(
       Storage storage,
       SchedulerCore schedulerCore,
+      LockManager lockManager,
       CapabilityValidator sessionValidator,
       StorageBackup backup,
       Recovery recovery,
@@ -201,6 +213,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     this.storage = checkNotNull(storage);
     this.schedulerCore = checkNotNull(schedulerCore);
+    this.lockManager = checkNotNull(lockManager);
     this.sessionValidator = checkNotNull(sessionValidator);
     this.backup = checkNotNull(backup);
     this.recovery = checkNotNull(recovery);
@@ -673,7 +686,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return new Response()
           .setResponseCode(OK)
           .setResult(Result.endMaintenanceResult(new EndMaintenanceResult()
-            .setStatuses(maintenance.endMaintenance(hosts.getHostNames()))));
+              .setStatuses(maintenance.endMaintenance(hosts.getHostNames()))));
   }
 
   @Requires(whitelist = Capability.PROVISIONER)
@@ -939,6 +952,67 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return new Response()
         .setResponseCode(OK)
         .setResult(Result.getVersionResult(CURRENT_API_VERSION));
+  }
+
+  private String getRoleFromLockKey(ILockKey lockKey) {
+    switch (lockKey.getSetField()) {
+      case JOB:
+        JobKeys.assertValid(lockKey.getJob());
+        return lockKey.getJob().getRole();
+      default:
+        throw new IllegalArgumentException("Unhandled LockKey: " + lockKey.getSetField());
+    }
+  }
+
+  @Override
+  public Response acquireLock(LockKey lockKey, SessionKey session) {
+    checkNotNull(lockKey);
+    checkNotNull(session);
+
+    ILockKey key = ILockKey.build(lockKey);
+    Response response = new Response();
+
+    try {
+      SessionContext context = sessionValidator.checkAuthenticated(
+          session,
+          ImmutableSet.of(getRoleFromLockKey(key)));
+
+      ILock lock = lockManager.acquireLock(key, context.getIdentity());
+      response.setResult(Result.acquireLockResult(
+          new AcquireLockResult().setLock(lock.newBuilder())));
+
+      return response.setResponseCode(OK).setMessage("Lock has been acquired.");
+    } catch (AuthFailedException e) {
+      return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+    } catch (LockException e) {
+      return response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+    }
+  }
+
+  @Override
+  public Response releaseLock(Lock lock, LockValidation validation, SessionKey session) {
+    checkNotNull(lock);
+    checkNotNull(validation);
+    checkNotNull(session);
+
+    Response response = new Response();
+    ILock wrappedLock = ILock.build(lock);
+
+    try {
+      sessionValidator.checkAuthenticated(
+          session,
+          ImmutableSet.of(getRoleFromLockKey(ILockKey.build(lock.getKey()))));
+
+      if (validation == LockValidation.CHECKED) {
+        lockManager.validateLock(wrappedLock);
+      }
+      lockManager.releaseLock(wrappedLock);
+      return response.setResponseCode(OK).setMessage("Lock has been released.");
+    } catch (AuthFailedException e) {
+      return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+    } catch (LockException e) {
+      return response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+    }
   }
 
   @VisibleForTesting

@@ -23,14 +23,15 @@ import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
 import com.twitter.aurora.gen.JobUpdateConfiguration;
-import com.twitter.aurora.gen.Lock;
-import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.ILock;
+import com.twitter.aurora.scheduler.storage.entities.ILockKey;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -41,10 +42,9 @@ class MemUpdateStore implements UpdateStore.Mutable {
 
   private static final Function<JobUpdateConfiguration, JobUpdateConfiguration> DEEP_COPY_CONFIG =
       Util.deepCopier();
-  private static final Function<Lock, Lock> DEEP_COPY_LOCK = Util.deepCopier();
 
   private final Map<IJobKey, JobUpdateConfiguration> configs = Maps.newConcurrentMap();
-  private final Map<LockKey, Lock> locks = Maps.newConcurrentMap();
+  private final Map<ILockKey, ILock> locks = Maps.newConcurrentMap();
 
   private IJobKey key(IJobKey jobKey) {
     return JobKeys.assertValid(jobKey);
@@ -72,12 +72,12 @@ class MemUpdateStore implements UpdateStore.Mutable {
   }
 
   @Override
-  public void saveLock(Lock lock) {
-    locks.put(lock.getKey(), DEEP_COPY_LOCK.apply(lock));
+  public void saveLock(ILock lock) {
+    locks.put(lock.getKey(), lock);
   }
 
   @Override
-  public void removeLock(LockKey lockKey) {
+  public void removeLock(ILockKey lockKey) {
     locks.remove(lockKey);
   }
 
@@ -108,15 +108,13 @@ class MemUpdateStore implements UpdateStore.Mutable {
   }
 
   @Override
-  public Set<Lock> fetchLocks() {
-    return FluentIterable.from(locks.values())
-        .transform(DEEP_COPY_LOCK)
-        .toSet();
+  public Set<ILock> fetchLocks() {
+    return ImmutableSet.copyOf(locks.values());
   }
 
   @Override
-  public Optional<Lock> fetchLock(LockKey lockKey) {
-    return Optional.fromNullable(locks.get(lockKey)).transform(DEEP_COPY_LOCK);
+  public Optional<ILock> fetchLock(ILockKey lockKey) {
+    return Optional.fromNullable(locks.get(lockKey));
   }
 
   private static final Function<JobUpdateConfiguration, String> GET_ROLE =

@@ -41,8 +41,6 @@ import com.google.inject.Inject;
 import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
-import com.twitter.aurora.gen.Lock;
-import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
@@ -78,6 +76,8 @@ import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.ILock;
+import com.twitter.aurora.scheduler.storage.entities.ILockKey;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
@@ -427,11 +427,11 @@ public class LogStorage extends ForwardingStore
         break;
 
       case SAVE_LOCK:
-        saveLock(op.getSaveLock().getLock());
+        saveLock(ILock.build(op.getSaveLock().getLock()));
         break;
 
       case REMOVE_LOCK:
-        removeLock(op.getRemoveLock().getLockKey());
+        removeLock(ILockKey.build(op.getRemoveLock().getLockKey()));
         break;
 
       default:
@@ -701,10 +701,10 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_lock_save")
   @Override
-  public void saveLock(final Lock lock) {
+  public void saveLock(final ILock lock) {
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.saveLock(new SaveLock(lock)));
+        log(Op.saveLock(new SaveLock(lock.newBuilder())));
         LogStorage.super.saveLock(lock);
       }
     });
@@ -712,10 +712,10 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_lock_remove")
   @Override
-  public void removeLock(final LockKey lockKey) {
+  public void removeLock(final ILockKey lockKey) {
     write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.removeLock(new RemoveLock(lockKey)));
+        log(Op.removeLock(new RemoveLock(lockKey.newBuilder())));
         LogStorage.super.removeLock(lockKey);
       }
     });

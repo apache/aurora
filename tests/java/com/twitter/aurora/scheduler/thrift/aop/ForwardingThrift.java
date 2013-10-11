@@ -23,6 +23,9 @@ import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
+import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.gen.LockKey;
+import com.twitter.aurora.gen.LockValidation;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
@@ -229,5 +232,17 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   @Override
   public Response getVersion() throws TException {
     return delegate.getVersion();
+  }
+
+  @Override
+  public Response acquireLock(LockKey lockKey, SessionKey session) throws TException {
+    return delegate.acquireLock(lockKey, session);
+  }
+
+  @Override
+  public Response releaseLock(Lock lock, LockValidation validation, SessionKey session)
+      throws TException {
+
+    return delegate.releaseLock(lock, validation, session);
   }
 }

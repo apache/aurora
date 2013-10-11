@@ -39,6 +39,7 @@ import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Volatile;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.ILock;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -180,7 +181,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       },
       new SnapshotField() {
         @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
-          snapshot.setLocks(ImmutableSet.copyOf(store.getUpdateStore().fetchLocks()));
+          snapshot.setLocks(ILock.toBuildersSet(store.getUpdateStore().fetchLocks()));
         }
 
         @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
@@ -188,7 +189,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
           if (snapshot.isSetLocks()) {
             for (Lock lock : snapshot.getLocks()) {
-              store.getUpdateStore().saveLock(lock);
+              store.getUpdateStore().saveLock(ILock.build(lock));
             }
           }
         }

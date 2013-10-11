@@ -26,12 +26,12 @@ import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
-import com.twitter.aurora.gen.Lock;
-import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.ILock;
+import com.twitter.aurora.scheduler.storage.entities.ILockKey;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
@@ -206,22 +206,22 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Set<Lock> fetchLocks() {
+  public Set<ILock> fetchLocks() {
     return updateStore.fetchLocks();
   }
 
   @Override
-  public Optional<Lock> fetchLock(LockKey lockKey) {
+  public Optional<ILock> fetchLock(ILockKey lockKey) {
     return updateStore.fetchLock(lockKey);
   }
 
   @Override
-  public void saveLock(Lock lock) {
+  public void saveLock(ILock lock) {
     updateStore.saveLock(lock);
   }
 
   @Override
-  public void removeLock(LockKey lockKey) {
+  public void removeLock(ILockKey lockKey) {
     updateStore.removeLock(lockKey);
   }
 

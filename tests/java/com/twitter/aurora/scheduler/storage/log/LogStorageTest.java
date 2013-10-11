@@ -77,6 +77,8 @@ import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.ILock;
+import com.twitter.aurora.scheduler.storage.entities.ILockKey;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
@@ -642,16 +644,16 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testSaveLock() throws Exception {
-    final Lock lock = new Lock(
-        LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()),
-        "testLockId",
-        "testUser",
-        12345L);
+    final ILock lock = ILock.build(new Lock()
+        .setKey(LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()))
+        .setToken("testLockId")
+        .setUser("testUser")
+        .setTimestampMs(12345L));
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.updateStore.saveLock(lock);
-        streamMatcher.expectTransaction(Op.saveLock(new SaveLock(lock)))
+        streamMatcher.expectTransaction(Op.saveLock(new SaveLock(lock.newBuilder())))
             .andReturn(position);
       }
 
@@ -663,13 +665,13 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testRemoveLock() throws Exception {
-    final LockKey lockKey =
-        LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder());
+    final ILockKey lockKey =
+        ILockKey.build(LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()));
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.updateStore.removeLock(lockKey);
-        streamMatcher.expectTransaction(Op.removeLock(new RemoveLock(lockKey)))
+        streamMatcher.expectTransaction(Op.removeLock(new RemoveLock(lockKey.newBuilder())))
             .andReturn(position);
       }
 

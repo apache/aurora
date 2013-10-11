@@ -35,6 +35,7 @@ import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.scheduler.cron.CronScheduler;
+import com.twitter.aurora.scheduler.state.LockManager;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
 import com.twitter.aurora.scheduler.state.StateManager;
@@ -140,6 +141,7 @@ public class ThriftIT extends EasyMockTest {
             bindMock(MaintenanceController.class);
             bindMock(Recovery.class);
             bindMock(SchedulerCore.class);
+            bindMock(LockManager.class);
             bindMock(ShutdownRegistry.class);
             bindMock(StateManager.class);
             storageTestUtil = new StorageTestUtil(ThriftIT.this);

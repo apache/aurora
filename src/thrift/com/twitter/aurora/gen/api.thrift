@@ -124,6 +124,12 @@ struct Lock {
   5: optional string message    // Optional message to record with the lock
 }
 
+// Defines the required lock validation level.
+enum LockValidation {
+  CHECKED   = 0,	// The lock must be valid in order to be released.
+  UNCHECKED = 1		// The lock will be released without validation (aka “force release”).
+}
+
 // A unique identifier for the active task within a job.
 struct ShardKey {
   1: JobKey jobKey  // Key identifying the job.
@@ -235,6 +241,11 @@ struct RollbackShardsResult {
 
 struct GetQuotaResult {
   1: Quota quota
+}
+
+// Wraps return results for the acquireLock API.
+struct AcquireLockResult {
+  1: Lock lock			// Acquired Lock instance.
 }
 
 // States that a task may be in.
@@ -432,6 +443,7 @@ union Result {
   13: UpdateShardsResult updateShardsResult
   14: RollbackShardsResult rollbackShardsResult
   15: APIVersion getVersionResult
+  16: AcquireLockResult acquireLockResult
 }
 
 struct Response {
@@ -503,6 +515,13 @@ service AuroraSchedulerManager {
 
   // Returns the current version of the API implementation
   Response getVersion()
+
+  // Creates and saves a new Lock instance guarding against multiple
+  // mutating operations within the context defined by LockKey.
+  Response acquireLock(1: LockKey lockKey, 2: SessionKey session)
+
+  // Releases the lock acquired earlier in acquireLock call.
+  Response releaseLock(1: Lock lock, 2: LockValidation validation, 3: SessionKey session)
 }
 
 struct ShardConfigRewrite {

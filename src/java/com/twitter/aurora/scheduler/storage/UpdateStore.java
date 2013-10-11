@@ -20,9 +20,9 @@ import java.util.Set;
 import com.google.common.base.Optional;
 
 import com.twitter.aurora.gen.JobUpdateConfiguration;
-import com.twitter.aurora.gen.Lock;
-import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.ILock;
+import com.twitter.aurora.scheduler.storage.entities.ILockKey;
 
 /**
  * Stores all update configurations for on-going updates.
@@ -58,7 +58,7 @@ public interface UpdateStore {
    *
    * @return All locks in the store.
    */
-  Set<Lock> fetchLocks();
+  Set<ILock> fetchLocks();
 
   /**
    * Fetches a lock by its key.
@@ -66,7 +66,7 @@ public interface UpdateStore {
    * @param lockKey Key of the lock to fetch.
    * @return Optional lock.
    */
-  Optional<Lock> fetchLock(LockKey lockKey);
+  Optional<ILock> fetchLock(ILockKey lockKey);
 
   public interface Mutable extends UpdateStore {
 
@@ -92,16 +92,16 @@ public interface UpdateStore {
     /**
      * Saves a new lock or overwrites the existing one with same LockKey.
      *
-     * @param lock Lock to save.
+     * @param lock ILock to save.
      */
-    void saveLock(Lock lock);
+    void saveLock(ILock lock);
 
     /**
      * Removes the lock from the store.
      *
      * @param lockKey Key of the lock to remove.
      */
-    void removeLock(LockKey lockKey);
+    void removeLock(ILockKey lockKey);
 
     /**
      * Deletes all locks from the store.

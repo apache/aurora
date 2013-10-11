@@ -24,7 +24,7 @@ import com.google.common.base.Preconditions;
  * A lock manager that wraps a ReadWriteLock and detects ill-fated attempts to upgrade
  * a read-locked thread to a write-locked thread, which would otherwise deadlock.
  */
-public class LockManager {
+public class ReadWriteLockManager {
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
   enum LockMode {

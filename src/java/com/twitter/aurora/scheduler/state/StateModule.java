@@ -25,6 +25,7 @@ import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
 import com.twitter.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
+import com.twitter.aurora.scheduler.state.UUIDGenerator.UUIDGeneratorImpl;
 
 /**
  * Binding module for scheduling logic and higher-level state management.
@@ -41,6 +42,11 @@ public class StateModule extends AbstractModule {
 
     bind(StateManager.class).to(StateManagerImpl.class);
     bind(StateManagerImpl.class).in(Singleton.class);
+
+    bind(UUIDGenerator.class).to(UUIDGeneratorImpl.class);
+    bind(UUIDGeneratorImpl.class).in(Singleton.class);
+    bind(LockManager.class).to(LockManagerImpl.class);
+    bind(LockManagerImpl.class).in(Singleton.class);
 
     bindCronJobManager(binder());
     bind(ImmediateJobManager.class).in(Singleton.class);

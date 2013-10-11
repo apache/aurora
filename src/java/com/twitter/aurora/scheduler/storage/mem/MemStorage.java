@@ -22,8 +22,8 @@ import com.google.inject.Inject;
 
 import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.JobStore;
-import com.twitter.aurora.scheduler.storage.LockManager;
 import com.twitter.aurora.scheduler.storage.QuotaStore;
+import com.twitter.aurora.scheduler.storage.ReadWriteLockManager;
 import com.twitter.aurora.scheduler.storage.SchedulerStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.TaskStore;
@@ -48,7 +48,7 @@ public class MemStorage implements Storage {
   private final AtomicLong writeLockWaitNanos = Stats.exportLong("write_lock_wait_nanos");
 
   private final MutableStoreProvider storeProvider;
-  private final LockManager lockManager = new LockManager();
+  private final ReadWriteLockManager lockManager = new ReadWriteLockManager();
 
   @Inject
   MemStorage(

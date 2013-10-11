@@ -47,6 +47,8 @@ import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.LimitConstraint;
+import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.ResponseCode;
@@ -67,6 +69,8 @@ import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.state.CronJobManager;
+import com.twitter.aurora.scheduler.state.LockManager;
+import com.twitter.aurora.scheduler.state.LockManager.LockException;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
 import com.twitter.aurora.scheduler.storage.Storage;
@@ -74,6 +78,8 @@ import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.ILock;
+import com.twitter.aurora.scheduler.storage.entities.ILockKey;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
@@ -94,6 +100,7 @@ import static org.junit.Assert.assertTrue;
 import static com.twitter.aurora.auth.CapabilityValidator.Capability.ROOT;
 import static com.twitter.aurora.auth.SessionValidator.SessionContext;
 import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
+import static com.twitter.aurora.gen.LockValidation.CHECKED;
 import static com.twitter.aurora.gen.MaintenanceMode.DRAINING;
 import static com.twitter.aurora.gen.MaintenanceMode.NONE;
 import static com.twitter.aurora.gen.MaintenanceMode.SCHEDULED;
@@ -118,6 +125,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
+  private LockManager lockManager;
   private CapabilityValidator userValidator;
   private SessionContext context;
   private StorageBackup backup;
@@ -131,6 +139,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     scheduler = createMock(SchedulerCore.class);
+    lockManager = createMock(LockManager.class);
     userValidator = createMock(CapabilityValidator.class);
     context = createMock(SessionContext.class);
     setUpValidationExpectations();
@@ -145,6 +154,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(Clock.class).toInstance(new FakeClock());
         bind(Storage.class).toInstance(storageUtil.storage);
         bind(SchedulerCore.class).toInstance(scheduler);
+        bind(LockManager.class).toInstance(lockManager);
         bind(CapabilityValidator.class).toInstance(userValidator);
         bind(StorageBackup.class).toInstance(backup);
         bind(Recovery.class).toInstance(recovery);
@@ -975,6 +985,98 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Response response = thrift.getVersion();
     assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testAcquireLock() throws Exception {
+    LockKey key = LockKey.job(JOB_KEY.newBuilder());
+    Lock lock = new Lock().setKey(key);
+    expectAuth(ROLE, true);
+    expect(lockManager.acquireLock(ILockKey.build(key), USER)).andReturn(ILock.build(lock));
+
+    control.replay();
+
+    Response response = thrift.acquireLock(key, SESSION);
+    assertEquals(lock, response.getResult().getAcquireLockResult().getLock());
+  }
+
+  @Test
+  public void testAcquireLockInvalidKey() throws Exception {
+    control.replay();
+
+    Response response = thrift.acquireLock(LockKey.job(new JobKey()), SESSION);
+    assertEquals(ResponseCode.ERROR, response.getResponseCode());
+  }
+
+  @Test
+  public void testAcquireLockAuthFailed() throws Exception {
+    expectAuth(ROLE, false);
+    control.replay();
+
+    Response response = thrift.acquireLock(LockKey.job(JOB_KEY.newBuilder()), SESSION);
+    assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
+  }
+
+  @Test
+  public void testAcquireLockFailed() throws Exception {
+    LockKey key = LockKey.job(JOB_KEY.newBuilder());
+    expectAuth(ROLE, true);
+    expect(lockManager.acquireLock(ILockKey.build(key), USER))
+        .andThrow(new LockException("Failed"));
+
+    control.replay();
+
+    Response response = thrift.acquireLock(key, SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+  }
+
+  @Test
+  public void testReleaseLock() throws Exception {
+    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
+    expectAuth(ROLE, true);
+    lockManager.validateLock(ILock.build(lock));
+    lockManager.releaseLock(ILock.build(lock));
+
+    control.replay();
+
+    Response response = thrift.releaseLock(lock, CHECKED, SESSION);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testReleaseLockInvalidKey() throws Exception {
+    control.replay();
+
+    Response response = thrift.releaseLock(
+        new Lock().setKey(LockKey.job(new JobKey())),
+        CHECKED,
+        SESSION);
+    assertEquals(ResponseCode.ERROR, response.getResponseCode());
+  }
+
+  @Test
+  public void testReleaseLockAuthFailed() throws Exception {
+    expectAuth(ROLE, false);
+    control.replay();
+
+    Response response = thrift.releaseLock(
+        new Lock().setKey(LockKey.job(new JobKey(JOB_KEY.newBuilder()))),
+        CHECKED,
+        SESSION);
+    assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
+  }
+
+  @Test
+  public void testReleaseLockFailed() throws Exception {
+    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
+    expectAuth(ROLE, true);
+    lockManager.validateLock(ILock.build(lock));
+    expectLastCall().andThrow(new LockException("Failed"));
+
+    control.replay();
+
+    Response response = thrift.releaseLock(lock, CHECKED, SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   private JobConfiguration makeJob() {

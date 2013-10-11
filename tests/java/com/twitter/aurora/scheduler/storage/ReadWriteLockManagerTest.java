@@ -36,14 +36,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class LockManagerTest extends TearDownTestCase {
+public class ReadWriteLockManagerTest extends TearDownTestCase {
 
-  private LockManager lockManager;
+  private ReadWriteLockManager lockManager;
   private ExecutorService executor;
 
   @Before
   public void setUp() {
-    lockManager = new LockManager();
+    lockManager = new ReadWriteLockManager();
     executor = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder().setNameFormat("LockManagerTest-%d").setDaemon(true).build());
     addTearDown(new TearDown() {
