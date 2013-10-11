@@ -1,4 +1,5 @@
 from collections import namedtuple
+import contextlib
 import functools
 from itertools import product
 import os
@@ -14,6 +15,7 @@ from twitter.common.concurrent import deadline, Timeout
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
+from twitter.common.testing.clock import ThreadedClock
 from twitter.thermos.config.schema import SimpleTask
 from twitter.thermos.runner import TaskRunner
 
@@ -106,17 +108,6 @@ def serialize_art(art, task_id=TASK_ID):
   return td
 
 
-class FakeClock(object):
-  def __init__(self):
-    self.slept = 0
-
-  def time(self):
-    return time.time()
-
-  def sleep(self, amount):
-    self.slept += amount
-
-
 class FakeExecutorDetector(object):
   class ExecutorScanf(object):
     def __init__(self, task_id):
@@ -132,13 +123,14 @@ class FakeExecutorDetector(object):
 
 class ThinTestThermosGCExecutor(ThermosGCExecutor):
   POLL_WAIT = Amount(1, Time.MICROSECONDS)
+  MINIMUM_KILL_AGE = Amount(5, Time.SECONDS)
+
   def __init__(self, checkpoint_root, active_executors=[]):
     self._active_executors = active_executors
-    self._clock = FakeClock()
     self._kills = set()
     self._losses = set()
     self._gcs = set()
-    ThermosGCExecutor.__init__(self, checkpoint_root, clock=self._clock,
+    ThermosGCExecutor.__init__(self, checkpoint_root, clock=ThreadedClock(time.time()),
         executor_detector=lambda: list)
 
   @property
@@ -300,11 +292,11 @@ def test_real_get_states():
       assert executor.get_sandbox(task) is not None
 
 
-def wait_until_not(thing, clock=time, timeout=0.5):
+def wait_until_not(thing, clock=time, timeout=1.0):
   """wait until something is booleany False"""
   def wait():
-    while thing:
-      clock.sleep(0.01)
+    while thing():
+      clock.sleep(1.0)
   try:
     deadline(wait, timeout=timeout, daemon=True)
   except Timeout:
@@ -320,8 +312,8 @@ def run_gc_with(active_executors, retained_tasks, lose=False):
     executor.start()
     art = AdjustRetainedTasks(retainedTasks=retained_tasks)
     executor.launchTask(proxy_driver, serialize_art(art, TASK_ID))
-    wait_until_not(executor._gc_task_queue)
-    wait_until_not(executor._task_id)
+    wait_until_not(lambda: executor._gc_task_queue, clock=executor._clock)
+    wait_until_not(lambda: executor._task_id, clock=executor._clock)
     assert len(executor._gc_task_queue) == 0
     assert not executor._task_id
   assert len(proxy_driver.updates) >= 1
@@ -416,7 +408,7 @@ def test_gc_killtask_current():
   with temporary_dir() as td:
     executor = build_blocking_gc_executor(td, proxy_driver)
     executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks()))
-    wait_until_not(executor._gc_task_queue)
+    wait_until_not(lambda: executor._gc_task_queue, clock=executor._clock)
     assert len(executor._gc_task_queue) == 0
     assert executor._task_id == TASK_ID
     executor.killTask(proxy_driver, TASK_ID)
@@ -475,6 +467,63 @@ def test_gc_shutdown():
   assert len(proxy_driver.updates) == 0
 
 
+def make_gc_executor_with_timeouts(
+    maximum_executor_wait=Amount(15, Time.MINUTES),
+    maximum_executor_lifetime=Amount(1, Time.DAYS)):
+  class TimeoutGCExecutor(ThinTestThermosGCExecutor):
+    MAXIMUM_EXECUTOR_WAIT = maximum_executor_wait
+    MAXIMUM_EXECUTOR_LIFETIME = maximum_executor_lifetime
+  return TimeoutGCExecutor
+
+
+@contextlib.contextmanager
+def run_gc_with_timeout(**kw):
+  proxy_driver = ProxyDriver()
+  with temporary_dir() as td:
+    executor_class = make_gc_executor_with_timeouts(**kw)
+    executor = executor_class(td)
+    executor.registered(proxy_driver, None, None, None)
+    executor.start()
+    yield (proxy_driver, executor)
+
+
+def test_gc_wait():
+  # run w/ no tasks
+  with run_gc_with_timeout(maximum_executor_wait=Amount(15, Time.SECONDS)) as (
+      proxy_driver, executor):
+    executor._clock.tick(10)
+    proxy_driver.stopped.wait(timeout=0.1)
+    assert not proxy_driver.stopped.is_set()
+    executor._clock.tick(5.1)
+    proxy_driver.stopped.wait(timeout=0.1)
+    assert proxy_driver.stopped.is_set()
+    assert not executor._stop_event.is_set()
+
+  # ensure launchTask restarts executor wait
+  with run_gc_with_timeout(maximum_executor_wait=Amount(15, Time.SECONDS)) as (
+      proxy_driver, executor):
+    executor._clock.tick(10)
+    proxy_driver.stopped.wait(timeout=0.1)
+    assert not proxy_driver.stopped.is_set()
+    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(retainedTasks={})))
+    executor._clock.tick(5.1)
+    proxy_driver.stopped.wait(timeout=0.1)
+    assert not proxy_driver.stopped.is_set()
+    executor._clock.tick(15.1)
+    proxy_driver.stopped.wait(timeout=0.1)
+    assert proxy_driver.stopped.is_set()
+    assert not executor._stop_event.is_set()
+
+
+def test_gc_lifetime():
+  with run_gc_with_timeout(maximum_executor_lifetime=Amount(500, Time.MILLISECONDS)) as (
+      proxy_driver, executor):
+    executor._clock.tick(1)
+    proxy_driver.stopped.wait(timeout=1.0)
+    assert proxy_driver.stopped.is_set()
+    assert not executor._stop_event.is_set()
+
+
 APPAPP_SANDBOX = 'twitter.aurora.executor.gc_executor.AppAppSandbox'
 DIRECTORY_SANDBOX = 'twitter.aurora.executor.gc_executor.DirectorySandbox'
 
@@ -483,7 +532,6 @@ class TestRealGC(unittest.TestCase):
     Test functions against the actual garbage_collect() functionality of the GC executor
   """
   def setUp(self):
-    self.clock = FakeClock()
     self.HELLO_WORLD= SimpleTask(name="foo", command="echo hello world")
 
   def setup_task(self, task, root, finished=False, corrupt=False):
@@ -495,7 +543,7 @@ class TestRealGC(unittest.TestCase):
         task=task,
         checkpoint_root=root,
         sandbox=os.path.join(root, 'sandbox', task.name().get()),
-        clock=self.clock)
+        clock=ThreadedClock(time.time()))
     with tr.control():
       # initialize checkpoint stream
       pass
@@ -525,7 +573,7 @@ class TestRealGC(unittest.TestCase):
         task_killer=FakeTaskKiller,
         executor_detector=detector,
         task_garbage_collector=FakeTaskGarbageCollector,
-        clock=self.clock)
+        clock=ThreadedClock(time.time()))
     return executor.garbage_collect()
 
   def test_active_task_no_runners(self):

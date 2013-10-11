@@ -57,6 +57,13 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
   # wait time between checking for new GC events from the slave and/or cleaning orphaned tasks
   POLL_WAIT = Amount(5, Time.MINUTES)
 
+  # maximum amount of time the executor will wait with no tasks before it exits.
+  MAXIMUM_EXECUTOR_WAIT = Amount(15, Time.MINUTES)
+
+  # maximum lifetime of this executor.  this is to prevent older GC executor binaries from
+  # running forever
+  MAXIMUM_EXECUTOR_LIFETIME = Amount(1, Time.DAYS)
+
   def __init__(self,
                checkpoint_root,
                verbose=True,
@@ -403,15 +410,28 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
       Periodically perform state reconciliation with the set of tasks provided
       by the slave, and garbage collect orphaned tasks on the system.
     """
-    while not self._stop_event.is_set():
+    run_start = self._clock.time()
+    last_gc_run = self._clock.time()
+
+    def should_terminate():
+      now = self._clock.time()
+      if now > run_start + self.MAXIMUM_EXECUTOR_LIFETIME.as_(Time.SECONDS):
+        return True
+      if now > last_gc_run + self.MAXIMUM_EXECUTOR_WAIT.as_(Time.SECONDS):
+        return True
+      return self._stop_event.is_set()
+
+    while not should_terminate():
       try:
         _, (task, retain_tasks, retain_start) = self._gc_task_queue.popitem(0)
+        last_gc_run = retain_start
         self._run_gc(task, retain_tasks, retain_start)
       except KeyError: # no enqueued GC tasks
         pass
       if self._driver is not None:
         self.clean_orphans(self._driver)
       self._stop_event.wait(self.POLL_WAIT.as_(Time.SECONDS))
+
     # shutdown called
     if self._driver is not None:
       self._driver.stop()
