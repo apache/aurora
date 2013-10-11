@@ -50,7 +50,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
   private static final Query.Builder ACTIVE_QUERY = Query.roleScoped(ROLE).active();
 
   private StorageTestUtil storageUtil;
-  private QuotaManager quotaManager;
+  // TODO(Kevin Sweeney): Move hasRemaining to QuotaFilter along with tests.
+  private QuotaManagerImpl quotaManager;
 
   @Before
   public void setUp() throws Exception {

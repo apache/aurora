@@ -153,4 +153,15 @@ public final class Quotas {
         (double) a.getDiskMb() / b.getDiskMb()
     ).intValue();
   }
+
+  /**
+   * sum(qs)
+   */
+  public static IQuota sum(Iterable<IQuota> qs) {
+    IQuota sum = noQuota();
+    for (IQuota q : qs) {
+      sum = Quotas.add(sum, q);
+    }
+    return sum;
+  }
 }

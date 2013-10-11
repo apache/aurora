@@ -52,20 +52,9 @@ public interface QuotaManager {
   IQuota getConsumption(String role);
 
   /**
-   * Tests whether the role has at least the specified amount of quota available.
-   *
-   * @param role Role to consume quota for.
-   * @param quota Quota amount to check for availability.
-   * @return {@code true} if the role currently has at least {@code quota} quota remaining,
-   *     {@code false} otherwise.
-   */
-  boolean hasRemaining(String role, IQuota quota);
-
-  /**
    * Quota provider that stores quotas in the canonical {@link Storage} system.
    */
   static class QuotaManagerImpl implements QuotaManager {
-
     private final Storage storage;
 
     @Inject
@@ -115,8 +104,15 @@ public interface QuotaManager {
           });
     }
 
-    @Override
-    public boolean hasRemaining(final String role, final IQuota quota) {
+    /**
+     * Tests whether the role has at least the specified amount of quota available.
+     *
+     * @param role Role to consume quota for.
+     * @param quota Quota amount to check for availability.
+     * @return {@code true} if the role currently has at least {@code quota} quota remaining,
+     *     {@code false} otherwise.
+     */
+    boolean hasRemaining(final String role, final IQuota quota) {
       checkNotBlank(role);
       checkNotNull(quota);
 

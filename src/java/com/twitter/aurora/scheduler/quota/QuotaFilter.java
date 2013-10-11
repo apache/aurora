@@ -21,6 +21,7 @@ import com.google.common.collect.Iterables;
 
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
+import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.aurora.scheduler.state.JobFilter;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -33,11 +34,11 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * A filter that fails production jobs for roles that do not have sufficient quota to run them.
  */
 class QuotaFilter implements JobFilter {
-  private final QuotaManager quotaManager;
+  private final QuotaManagerImpl quotaManager;
   private final Storage storage;
 
   @Inject
-  QuotaFilter(QuotaManager quotaManager, Storage storage) {
+  QuotaFilter(QuotaManagerImpl quotaManager, Storage storage) {
     this.quotaManager = checkNotNull(quotaManager);
     this.storage = checkNotNull(storage);
   }

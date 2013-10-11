@@ -10,6 +10,7 @@ import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
@@ -42,12 +43,12 @@ public class QuotaFilterTest extends EasyMockTest {
 
   private QuotaFilter quotaFilter;
 
-  private QuotaManager quotaManager;
+  private QuotaManagerImpl quotaManager;
   private StorageTestUtil storageTestUtil;
 
   @Before
   public void setUp() {
-    quotaManager = createMock(QuotaManager.class);
+    quotaManager = createMock(QuotaManagerImpl.class);
     storageTestUtil = new StorageTestUtil(this);
 
     quotaFilter = new QuotaFilter(quotaManager, storageTestUtil.storage);
