@@ -54,6 +54,8 @@ class Packer(object):
        (bzip2 -cd {{{{pkg}}.package}} | tar -xf -) && _delete_pkg
      elif [[ "{{{{pkg}}.package}}" == *".zip" ]]; then
        unzip {{{{pkg}}.package}} && _delete_pkg
+     elif [[ "{{{{pkg}}.package}}" == *".shar" ]]; then
+       sh {{{{pkg}}.package}} && _delete_pkg
      fi
   """)
 
