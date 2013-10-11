@@ -27,30 +27,34 @@
 <body>
 <div class="page-header text-center">
   <h1>Aurora config builder</h1>
+  <p><small>A workflow to simplify service deployments to aurora.</small></p>
 </div>
 
 <div class="auroraConfig well span6">
   <h4>Application Info</h4>
+  <div class="span12">
+    <div class="span2">
+      <label class="pull-right">Contact email
+        <i class="icon-question-sign" rel="tooltip"
+           title="Email address to contact about issues with about this job.
+           Please enter the login only, @twitter.com will be appended automatically."></i>
+      </label></div>
+    <div id="contact" class="control-group">
+      <span data-var="contact" data-size="6" class="TKTextField span2" data-type="text"
+            data-pattern="\w+"/>
+    </div>
+  </div>
+
   <div class="appInfo span12">
     <div class="span2">
       <label class="pull-right">Application Name
-        <i class="icon-question-sign" rel="tooltip" title="Name of your application"></i>
+        <i class="icon-question-sign" rel="tooltip" title="Name of your application.
+           Your application is uniquely identified by cluster/role/env/appName"></i>
       </label>
     </div>
     <div id="appName" class="control-group">
       <span data-var="appName" data-size="6" class="TKTextField span2" data-pattern="\w+"
             data-maxlength=20 />
-    </div>
-  </div>
-
-  <div class="span12">
-    <div class="span2">
-      <label class="pull-right">Contact email
-        <i class="icon-question-sign" rel="tooltip"
-           title="Email address to send notifications about this job"></i>
-      </label></div>
-    <div id="contact" class="control-group">
-      <span data-var="contact" data-size="6" class="TKTextField span2" data-type="email" />
     </div>
   </div>
 
@@ -171,13 +175,17 @@
   </div>
 
   <div class="job">
-    <h4>Service</h4>
+    <h4>Service<i class="icon-question-sign" rel="tooltip" title="A service is a job
+    that is will be restarted if it terminates. If you would like to create a one time job,
+    please use the Job Object instead of the Service object in the generated config.
+    For more info go/auroraconfig."></i>
+    </h4>
 
     <div class="span12">
       <div class="span2">
         <label class="pull-right">Role
-          <i class="icon-question-sign" rel="tooltip"
-             title="The name of the unix account the service runs as"></i>
+          <i class="icon-question-sign" rel="tooltip" title="The name of the unix account the
+          service runs as. It is recommended to use your team's service account e.g. ads"></i>
         </label>
       </div>
       <div id="role" class="control-group">
@@ -189,7 +197,8 @@
       <div class="span2">
         <label class="pull-right">Instance count
           <i class="icon-question-sign" rel="tooltip"
-             title="How many copies of this task do you want to run?"></i>
+             title="How many copies of this task do you want to run? It's best to favor many tasks
+             using few resources over few tasks using large fractions of a machine's resources."></i>
         </label>
       </div>
       <div id="jobInstanceCount" class="control-group">
@@ -258,13 +267,16 @@
     }
 
     this.tangleInit = function() {
+      var DEFAULT_APP_NAME = "myapp";
       new Tangle(document, {
         initialize: function () {
-          this.appName = "myapp";
+          this.appName = DEFAULT_APP_NAME;
+          this.prevAppName = DEFAULT_APP_NAME;
+
           this.contact = "";
 
           //Packer related params
-          this.packageName = "mypackage";
+          this.packageName = DEFAULT_APP_NAME;
           this.packageVersion = "latest";
 
           // process related params
@@ -287,7 +299,7 @@
           this.diskGb = 1;
 
           // job related params
-          this.role = "role";
+          this.role = "";
           this.jobInstanceCount = 2;
 
           // Output related params
@@ -297,9 +309,16 @@
         },
 
         update: function () {
+          // Show the div based on option selected by the user.
           this.shellDiv = this.processType === "shell";
           this.javaDiv = this.processType === "java";
           this.pythonDiv = this.processType === "python";
+
+          // Assume app name is same as package name unless the user changes it.
+          this.packageName = this.packageName === this.prevAppName
+                                 ? this.appName
+                                 : this.packageName;
+          this.prevAppName = this.appName;
 
           checkConfig(this);
           var auroraGenerator = getConfigGenerator(this);
@@ -400,7 +419,7 @@
 
   function JobConfig(role, instanceCount, contact) {
     this.role = role;
-    this.contact = contact;
+    this.contact = contact + "@twitter.com";
     this.instanceCount = instanceCount;
 
     this.cluster = "";
