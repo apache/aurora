@@ -17,6 +17,7 @@ package com.twitter.aurora.scheduler.quota;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Ordering;
 
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -52,12 +53,7 @@ public final class Quotas {
    * @return Quota requirement to run {@code job}.
    */
   public static IQuota fromJob(IJobConfiguration job) {
-    checkNotNull(job);
-    Quota builder = fromProductionTasks(ImmutableSet.of(job.getTaskConfig())).newBuilder();
-    builder.setNumCpus(builder.getNumCpus() * job.getShardCount());
-    builder.setRamMb(builder.getRamMb() * job.getShardCount());
-    builder.setDiskMb(builder.getDiskMb() * job.getShardCount());
-    return IQuota.build(builder);
+    return scale(fromProductionTasks(ImmutableSet.of(job.getTaskConfig())), job.getShardCount());
   }
 
   // TODO(Suman Karumuri): Refactor this function in to a new class.
@@ -127,10 +123,34 @@ public final class Quotas {
   /**
    * a - b
    */
-  public static IQuota subtract(IQuota a, IQuota b) throws IllegalStateException {
+  public static IQuota subtract(IQuota a, IQuota b) {
     return IQuota.build(new Quota()
         .setNumCpus(a.getNumCpus() - b.getNumCpus())
         .setRamMb(a.getRamMb() - b.getRamMb())
         .setDiskMb(a.getDiskMb() - b.getDiskMb()));
+  }
+
+  /**
+   * a * m
+   */
+  public static IQuota scale(IQuota a, int m) {
+    return IQuota.build(new Quota()
+        .setNumCpus(a.getNumCpus() * m)
+        .setRamMb(a.getRamMb() * m)
+        .setDiskMb(a.getDiskMb() * m));
+  }
+
+  /**
+   * a / b
+   * <p>
+   * This calculates how many times {@code b} "fits into" {@code a}.  Behavior is undefined when
+   * {@code b} contains resources with a value of zero.
+   */
+  public static int divide(IQuota a, IQuota b) {
+    return Ordering.natural().min(
+        a.getNumCpus() / b.getNumCpus(),
+        (double) a.getRamMb() / b.getRamMb(),
+        (double) a.getDiskMb() / b.getDiskMb()
+    ).intValue();
   }
 }

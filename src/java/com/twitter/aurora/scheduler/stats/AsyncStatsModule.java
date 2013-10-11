@@ -20,43 +20,51 @@ import java.lang.annotation.Target;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Logger;
 
-import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
+import com.google.common.base.Function;
+import com.google.common.collect.FluentIterable;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 
-import com.twitter.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
-import com.twitter.aurora.scheduler.stats.ResourceCounter.Metric;
-import com.twitter.aurora.scheduler.storage.Storage.StorageException;
+import org.apache.mesos.Protos.Offer;
+
+import com.twitter.aurora.gen.Quota;
+import com.twitter.aurora.scheduler.async.OfferQueue;
+import com.twitter.aurora.scheduler.configuration.Resources;
+import com.twitter.aurora.scheduler.stats.SlotSizeCounter.ResourceSlotProvider;
+import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.Stats;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * Module to configure export of cluster-wide resource allocation and consumption statistics.
  */
 public class AsyncStatsModule extends AbstractModule {
 
-  @CmdLine(name = "async_stat_update_interval",
-      help = "Interval on which to try to update async resource consumption stats.")
-  private static final Arg<Amount<Long, Time>> ASYNC_STAT_INTERVAL =
+  @CmdLine(name = "async_task_stat_update_interval",
+      help = "Interval on which to try to update resource consumption stats.")
+  private static final Arg<Amount<Long, Time>> TASK_STAT_INTERVAL =
       Arg.create(Amount.of(1L, Time.HOURS));
+
+  @CmdLine(name = "async_slot_stat_update_interval",
+      help = "Interval on which to try to update open slot stats.")
+  private static final Arg<Amount<Long, Time>> SLOT_STAT_INTERVAL =
+      Arg.create(Amount.of(1L, Time.MINUTES));
 
   @BindingAnnotation
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
@@ -66,52 +74,63 @@ public class AsyncStatsModule extends AbstractModule {
   protected void configure() {
     final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(
         new ThreadFactoryBuilder().setNameFormat("AsyncStat-%d").setDaemon(true).build());
+
+    bind(TaskStatCalculator.class).in(Singleton.class);
+    bind(CachedCounters.class).in(Singleton.class);
+    bind(ResourceSlotProvider.class).to(OfferAdapter.class);
+    bind(SlotSizeCounter.class).in(Singleton.class);
+
     bind(ScheduledExecutorService.class).annotatedWith(StatExecutor.class).toInstance(executor);
     LifecycleModule.bindStartupAction(binder(), StatUpdater.class);
   }
 
   static class StatUpdater implements Command {
-    private static final Logger LOG = Logger.getLogger(StatUpdater.class.getName());
-
     private final ScheduledExecutorService executor;
-    private final ResourceCounter counter;
-    private final LoadingCache<String, AtomicLong> stats = CacheBuilder.newBuilder().build(
-        new CacheLoader<String, AtomicLong>() {
-          @Override public AtomicLong load(String key) {
-            return Stats.exportLong(key);
-          }
-        }
-    );
+    private final TaskStatCalculator taskStats;
+    private final SlotSizeCounter slotCounter;
 
     @Inject
-    StatUpdater(@StatExecutor ScheduledExecutorService executor, ResourceCounter counter) {
-      this.executor = Preconditions.checkNotNull(executor);
-      this.counter = Preconditions.checkNotNull(counter);
+    StatUpdater(
+        @StatExecutor ScheduledExecutorService executor,
+        TaskStatCalculator taskStats,
+        SlotSizeCounter slotCounter) {
+
+      this.executor = checkNotNull(executor);
+      this.taskStats = checkNotNull(taskStats);
+      this.slotCounter = checkNotNull(slotCounter);
     }
 
     @Override
     public void execute() {
-      Runnable compute = new Runnable() {
-        private void update(String prefix, Metric metric) {
-          stats.getUnchecked(prefix + "_cpu").set(metric.getCpu());
-          stats.getUnchecked(prefix + "_ram_gb").set(metric.getRamGb());
-          stats.getUnchecked(prefix + "_disk_gb").set(metric.getDiskGb());
-        }
+      long taskInterval = TASK_STAT_INTERVAL.get().as(Time.SECONDS);
+      executor.scheduleAtFixedRate(taskStats, taskInterval, taskInterval, TimeUnit.SECONDS);
+      long slotInterval = SLOT_STAT_INTERVAL.get().as(Time.SECONDS);
+      executor.scheduleAtFixedRate(slotCounter, slotInterval, slotInterval, TimeUnit.SECONDS);
+    }
+  }
 
-        @Override public void run() {
-          try {
-            for (GlobalMetric metric : counter.computeConsumptionTotals()) {
-              update("resources_" + metric.type.name().toLowerCase(), metric);
-            }
-            update("resources_allocated_quota", counter.computeQuotaAllocationTotals());
-          } catch (StorageException e) {
-            LOG.fine("Unable to fetch metrics, storage is likely not ready.");
-          }
-        }
-      };
+  static class OfferAdapter implements ResourceSlotProvider {
+    private static final Function<Offer, IQuota> TO_QUOTA = new Function<Offer, IQuota>() {
+      @Override public IQuota apply(Offer offer) {
+        Resources resources = Resources.from(offer);
+        return IQuota.build(new Quota()
+            .setNumCpus(resources.getNumCpus())
+            .setRamMb(resources.getRam().as(Data.MB))
+            .setDiskMb(resources.getDisk().as(Data.MB)));
+      }
+    };
 
-      long intervalSecs = ASYNC_STAT_INTERVAL.get().as(Time.SECONDS);
-      executor.scheduleAtFixedRate(compute, intervalSecs, intervalSecs, TimeUnit.SECONDS);
+    private final OfferQueue offerQueue;
+
+    @Inject
+    OfferAdapter(OfferQueue offerQueue) {
+      this.offerQueue = checkNotNull(offerQueue);
+    }
+
+    @Override
+    public Iterable<IQuota> get() {
+      Iterable<Offer> offers = offerQueue.getOffers();
+      return FluentIterable.from(offers).transform(TO_QUOTA);
     }
   }
 }
