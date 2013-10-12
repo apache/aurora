@@ -235,7 +235,7 @@ public class MemTaskStoreTest {
         .setAssignedTask(new AssignedTask()
             .setTaskId(id)
             .setTask(new TaskConfig()
-                .setShardId(0)
+                .setInstanceId(0)
                 .setJobName(jobName)
                 .setEnvironment(env)
                 .setOwner(new Identity(role, role)))));

@@ -572,7 +572,7 @@ public class LogStorageTest extends EasyMockTest {
     final String updateToken = "update-ok";
     final ImmutableSet<TaskUpdateConfiguration> updateConfiguration =
         ImmutableSet.of(
-            new TaskUpdateConfiguration().setNewConfig(new TaskConfig().setShardId(42)));
+            new TaskUpdateConfiguration().setNewConfig(new TaskConfig().setInstanceId(42)));
     final JobUpdateConfiguration config =
         new JobUpdateConfiguration(jobKey, updateToken, updateConfiguration);
     final SaveJobUpdate saveOp = new SaveJobUpdate(jobKey, updateToken, updateConfiguration);

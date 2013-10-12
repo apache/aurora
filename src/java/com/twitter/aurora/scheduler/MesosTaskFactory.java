@@ -140,7 +140,7 @@ public interface MesosTaskFactory {
     }
 
     public static String getInstanceSourceName(ITaskConfig task) {
-      return String.format("%s.%s", getJobSourceName(task), task.getShardId());
+      return String.format("%s.%s", getJobSourceName(task), task.getInstanceId());
     }
 
     @Override

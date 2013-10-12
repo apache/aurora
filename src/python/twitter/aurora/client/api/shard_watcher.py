@@ -83,7 +83,7 @@ class ShardWatcher(object):
     while True:
       running_tasks = self._get_tasks_by_shard_id(shard_ids)
       now = self._clock.time()
-      tasks_by_shard = dict((task.assignedTask.task.shardId, task) for task in running_tasks)
+      tasks_by_shard = dict((task.assignedTask.task.instanceId, task) for task in running_tasks)
       for shard_id in shard_ids:
         if shard_id not in finished_shards():
           running_task = tasks_by_shard.get(shard_id)

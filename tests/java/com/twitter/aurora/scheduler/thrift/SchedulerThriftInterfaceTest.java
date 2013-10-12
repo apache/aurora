@@ -545,7 +545,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     JobConfiguration parsed = job.deepCopy();
     parsed.getTaskConfig()
-        .setShardId(0)
+        .setInstanceId(0)
         .setNumCpus(1.0)
         .setPriority(0)
         .setRamMb(1024)

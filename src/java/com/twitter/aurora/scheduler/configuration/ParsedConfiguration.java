@@ -45,7 +45,7 @@ public final class ParsedConfiguration {
     this.parsed = parsed;
     ImmutableSet.Builder<ITaskConfig> builder = ImmutableSet.builder();
     for (int i = 0; i < parsed.getShardCount(); i++) {
-      builder.add(ITaskConfig.build(parsed.getTaskConfig().newBuilder().setShardId(i)));
+      builder.add(ITaskConfig.build(parsed.getTaskConfig().newBuilder().setInstanceId(i)));
     }
     this.tasks = builder.build();
   }

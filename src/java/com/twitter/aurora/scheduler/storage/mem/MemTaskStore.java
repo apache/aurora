@@ -216,7 +216,7 @@ class MemTaskStore implements TaskStore.Mutable {
           }
         }
         if (query.getShardIdsSize() > 0) {
-          if (!query.getShardIds().contains(config.getShardId())) {
+          if (!query.getShardIds().contains(config.getInstanceId())) {
             return false;
           }
         }

@@ -230,7 +230,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertFalse(state.getAssignedTask().isSetSlaveId());
       // Need to clear shard ID since that was assigned when the job is scheduled.
       ITaskConfig config =
-          ITaskConfig.build(state.getAssignedTask().getTask().newBuilder().setShardId(0));
+          ITaskConfig.build(state.getAssignedTask().getTask().newBuilder().setInstanceId(0));
       assertEquals(populateFields(job.getJobConfig()), config);
     }
   }
@@ -288,7 +288,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setNumCpus(1.0)
         .setRamMb(ONE_GB)
         .setDiskMb(500)
-        .setShardId(0)
+        .setInstanceId(0)
         .setThermosConfig("thermosConfig".getBytes())
         .setRequestedPorts(ImmutableSet.<String>of())
         .setConstraints(ImmutableSet.<Constraint>of())
@@ -351,7 +351,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
                     .setAssignedTask(
                         new AssignedTask()
                             .setTaskId("task-" + taskId.incrementAndGet())
-                            .setTask(task.newBuilder().setShardId(0))));
+                            .setTask(task.newBuilder().setInstanceId(0))));
               }
             }));
 
@@ -678,8 +678,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertEquals(5, newTasks.size());
     for (IScheduledTask state : newTasks) {
       assertEquals(
-          getTask(state.getAncestorId()).getAssignedTask().getTask().getShardId(),
-          state.getAssignedTask().getTask().getShardId());
+          getTask(state.getAncestorId()).getAssignedTask().getTask().getInstanceId(),
+          state.getAssignedTask().getTask().getInstanceId());
     }
 
     assertEquals(10, getTasksByStatus(FINISHED).size());

@@ -373,7 +373,7 @@ public class StateManagerImpl implements StateManager {
           TaskConfig task = (config.getOldConfig() != null)
               ? config.getOldConfig()
               : config.getNewConfig();
-          return task.getShardId();
+          return task.getInstanceId();
         }
       };
 
@@ -557,8 +557,8 @@ public class StateManagerImpl implements StateManager {
       new Function<TaskUpdateConfiguration, Integer>() {
         @Override public Integer apply(TaskUpdateConfiguration config) {
           return config.isSetOldConfig()
-              ? config.getOldConfig().getShardId()
-              : config.getNewConfig().getShardId();
+              ? config.getOldConfig().getInstanceId()
+              : config.getNewConfig().getInstanceId();
         }
       };
 
@@ -734,7 +734,7 @@ public class StateManagerImpl implements StateManager {
                 new PubsubEvent.TaskRescheduled(
                     taskInfo.getOwner().getRole(),
                     taskInfo.getJobName(),
-                    taskInfo.getShardId()));
+                    taskInfo.getInstanceId()));
             break;
 
           case UPDATE:
@@ -826,7 +826,7 @@ public class StateManagerImpl implements StateManager {
     Optional<TaskUpdateConfiguration> optional = fetchShardUpdateConfig(
         storeProvider.getUpdateStore(),
         Tasks.INFO_TO_JOB_KEY.apply(oldConfig),
-        oldConfig.getShardId());
+        oldConfig.getInstanceId());
 
     // TODO(Sathya): Figure out a way to handle race condition when finish update is called
     //     before ROLLBACK
@@ -834,7 +834,7 @@ public class StateManagerImpl implements StateManager {
     if (!optional.isPresent()) {
       LOG.warning("No update configuration found for key "
           + JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(oldConfig))
-          + " shard " + oldConfig.getShardId() + " : Assuming update has finished.");
+          + " shard " + oldConfig.getInstanceId() + " : Assuming update has finished.");
       return;
     }
 

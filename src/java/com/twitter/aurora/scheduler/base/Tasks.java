@@ -73,7 +73,7 @@ public final class Tasks {
   public static final Function<ITaskConfig, Integer> INFO_TO_SHARD_ID =
       new Function<ITaskConfig, Integer>() {
         @Override public Integer apply(ITaskConfig task) {
-          return task.getShardId();
+          return task.getInstanceId();
         }
       };
 

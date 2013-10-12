@@ -86,7 +86,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
       return MesosTaskInstance.json_loads(thermos_task)
     else:
       mti, refs = task_instance_from_job(MesosJob.json_loads(thermos_task),
-          assigned_task.task.shardId)
+          assigned_task.task.instanceId)
       for ref in refs:
         # If the ref is {{thermos.task_id}} or a subscope of
         # {{thermos.ports}}, it currently gets bound by the Thermos Runner,
@@ -223,7 +223,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
           socket.gethostname(),
           mesos_task.announce().primary_port().get(),
           portmap,
-          assigned_task.task.shardId)
+          assigned_task.task.instanceId)
           # TODO(wickman) Possibly return this code once we've hashed out MESOS-2753
           # ensemble=self.extract_ensemble(assigned_task))
       health_checkers.append(discovery_manager)

@@ -153,9 +153,10 @@ struct TaskConfig {
  10: i64 diskMb
  11: i32 priority
  13: i32 maxTaskFailures
- 14: i32 shardId                             // TODO(Sathya): Deprecate. Push to AssignedTask.
-                                             // The shard ID for this task.
-                                             // Shard IDs must be unique and contiguous within a
+ 14: i32 instanceId                          // TODO(William Farner): Deprecate. Push to
+                                             //                       AssignedTask.
+                                             // The instance ID for this task.
+                                             // Instance IDs must be unique and contiguous within a
                                              // job, and will be in the range [0, N-1] (inclusive)
                                              // for a job that has N instances.
  18: optional bool production                // Whether this is a production task, which can preempt
@@ -168,7 +169,7 @@ struct TaskConfig {
                                              // on the scheduler dashboard.  Keys are anchor text,
                                              // values are URLs.
                                              // Wildcards are supported for dynamic link
-                                             // crafting based on host, ports, shard, etc.
+                                             // crafting based on host, ports, instance, etc.
  23: optional string contactEmail
  24: optional set<Package> packages          // Used only to display package information in the
                                              // scheduler UI.

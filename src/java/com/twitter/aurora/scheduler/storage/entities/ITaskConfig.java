@@ -185,12 +185,12 @@ public final class ITaskConfig {
     return wrapped.getMaxTaskFailures();
   }
 
-  public boolean isSetShardId() {
-    return wrapped.isSetShardId();
+  public boolean isSetInstanceId() {
+    return wrapped.isSetInstanceId();
   }
 
-  public int getShardId() {
-    return wrapped.getShardId();
+  public int getInstanceId() {
+    return wrapped.getInstanceId();
   }
 
   public boolean isSetProduction() {

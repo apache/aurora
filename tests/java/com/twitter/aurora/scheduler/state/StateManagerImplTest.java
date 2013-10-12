@@ -514,7 +514,7 @@ public class StateManagerImplTest extends EasyMockTest {
         .setOwner(owner)
         .setEnvironment(DEFAULT_ENVIRONMENT)
         .setJobName(job)
-        .setShardId(shard)
+        .setInstanceId(shard)
         .setRequestedPorts(ImmutableSet.<String>of()));
   }
 

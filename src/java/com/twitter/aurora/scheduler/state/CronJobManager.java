@@ -323,8 +323,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
             LOG.info("Adjusting shard IDs of " + JobKeys.toPath(job) + " by " + shardOffset
                 + " for overlapping cron run.");
             for (ITaskConfig task : config.getTaskConfigs()) {
-              builder.add(
-                  ITaskConfig.build(task.newBuilder().setShardId(task.getShardId() + shardOffset)));
+              builder.add(ITaskConfig.build(
+                  task.newBuilder().setInstanceId(task.getInstanceId() + shardOffset)));
             }
           }
           break;

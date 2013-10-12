@@ -36,7 +36,7 @@ class HealthCheckTest(unittest.TestCase):
     self._health_check_b = mox.MockObject(HealthCheck)
 
   def create_task(self, shard_id, task_id, status=RUNNING, host=HOST, port=HEALTH_PORT):
-    task = TaskConfig(shardId=shard_id)
+    task = TaskConfig(instanceId=shard_id)
     ports = {}
     if port:
       ports['health'] = port

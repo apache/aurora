@@ -62,12 +62,12 @@ class TestRestarter(MoxTestBase):
 
     self.restarter.restart([0, 1, 3, 4, 5])
 
-  def mock_status_active_tasks(self, shardids):
+  def mock_status_active_tasks(self, instance_ids):
     tasks = []
-    for i in shardids:
+    for i in instance_ids:
       tasks.append(ScheduledTask(
           status=ScheduleStatus.RUNNING,
-          assignedTask=AssignedTask(task=TaskConfig(shardId=i))
+          assignedTask=AssignedTask(task=TaskConfig(instanceId=i))
       ))
     response = Response(responseCode=ResponseCode.OK, message='test')
     response.result = Result()

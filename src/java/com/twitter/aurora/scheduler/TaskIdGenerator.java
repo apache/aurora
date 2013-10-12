@@ -48,7 +48,7 @@ class TaskIdGenerator implements Function<ITaskConfig, String> {
         .append(sep)
         .append(task.getJobName())
         .append(sep)
-        .append(task.getShardId())               // Collision prevention within job.
+        .append(task.getInstanceId())            // Collision prevention within job.
         .append(sep)
         .append(UUID.randomUUID())               // Just-in-case collision prevention.
         .toString().replaceAll("[^\\w-]", sep);  // Constrain character set.
