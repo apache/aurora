@@ -43,6 +43,8 @@ import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.HostStatus;
 import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.Identity;
+import com.twitter.aurora.gen.InstanceConfigRewrite;
+import com.twitter.aurora.gen.InstanceKey;
 import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
@@ -56,8 +58,6 @@ import com.twitter.aurora.gen.RewriteConfigsRequest;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.ShardConfigRewrite;
-import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.StartUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
@@ -579,17 +579,18 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testRewriteShardTaskMissing() throws Exception {
-    ShardKey shardKey = new ShardKey(JobKeys.from("foo", "bar", "baz").newBuilder(), 0);
+    InstanceKey instance = new InstanceKey(JobKeys.from("foo", "bar", "baz").newBuilder(), 0);
 
     expectAuth(ROOT, true);
     storageUtil.expectTaskFetch(
-        Query.instanceScoped(IJobKey.build(shardKey.getJobKey()), shardKey.getShardId()).active());
+        Query.instanceScoped(IJobKey.build(instance.getJobKey()), instance.getInstanceId())
+            .active());
 
     control.replay();
 
     RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.shardRewrite(
-            new ShardConfigRewrite(shardKey, productionTask(), productionTask()))));
+        ImmutableList.of(ConfigRewrite.instanceRewrite(
+            new InstanceConfigRewrite(instance, productionTask(), productionTask()))));
     assertEquals(WARNING, thrift.rewriteConfigs(request, SESSION).getResponseCode());
   }
 
@@ -600,7 +601,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
     IScheduledTask storedTask = IScheduledTask.build(
         new ScheduledTask().setAssignedTask(new AssignedTask().setTask(storedConfig)));
-    ShardKey shardKey = new ShardKey(
+    InstanceKey instance = new InstanceKey(
         JobKeys.from(
             storedConfig.getOwner().getRole(),
             storedConfig.getEnvironment(),
@@ -608,13 +609,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         0);
 
     expectAuth(ROOT, true);
-    storageUtil.expectTaskFetch(Query.instanceScoped(shardKey).active(), storedTask);
+    storageUtil.expectTaskFetch(Query.instanceScoped(instance).active(), storedTask);
 
     control.replay();
 
     RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.shardRewrite(
-            new ShardConfigRewrite(shardKey, modifiedConfig, modifiedConfig))));
+        ImmutableList.of(ConfigRewrite.instanceRewrite(
+            new InstanceConfigRewrite(instance, modifiedConfig, modifiedConfig))));
     assertEquals(WARNING, thrift.rewriteConfigs(request, SESSION).getResponseCode());
   }
 
@@ -628,7 +629,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         new AssignedTask()
             .setTaskId(taskId)
             .setTask(storedConfig)));
-    ShardKey shardKey = new ShardKey(
+    InstanceKey instanceKey = new InstanceKey(
         JobKeys.from(
             storedConfig.getOwner().getRole(),
             storedConfig.getEnvironment(),
@@ -636,7 +637,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         0);
 
     expectAuth(ROOT, true);
-    storageUtil.expectTaskFetch(Query.instanceScoped(shardKey).active(), storedTask);
+    storageUtil.expectTaskFetch(Query.instanceScoped(instanceKey).active(), storedTask);
     expect(storageUtil.taskStore.unsafeModifyInPlace(
         taskId,
         ITaskConfig.build(ConfigurationManager.applyDefaultsIfUnset(modifiedConfig.newBuilder()))))
@@ -645,8 +646,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     RewriteConfigsRequest request = new RewriteConfigsRequest(
-        ImmutableList.of(ConfigRewrite.shardRewrite(
-            new ShardConfigRewrite(shardKey, storedConfig, modifiedConfig.newBuilder()))));
+        ImmutableList.of(ConfigRewrite.instanceRewrite(
+            new InstanceConfigRewrite(instanceKey, storedConfig, modifiedConfig.newBuilder()))));
     assertEquals(OK, thrift.rewriteConfigs(request, SESSION).getResponseCode());
   }
 

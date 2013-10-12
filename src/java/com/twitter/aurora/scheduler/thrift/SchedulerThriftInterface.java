@@ -57,6 +57,8 @@ import com.twitter.aurora.gen.GetJobUpdatesResult;
 import com.twitter.aurora.gen.GetJobsResult;
 import com.twitter.aurora.gen.GetQuotaResult;
 import com.twitter.aurora.gen.Hosts;
+import com.twitter.aurora.gen.InstanceConfigRewrite;
+import com.twitter.aurora.gen.InstanceKey;
 import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
@@ -78,8 +80,6 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduleStatusResult;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.ShardConfigRewrite;
-import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.StartMaintenanceResult;
 import com.twitter.aurora.gen.StartUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
@@ -914,23 +914,23 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               }
               break;
 
-            case SHARD_REWRITE:
-              ShardConfigRewrite shardRewrite = command.getShardRewrite();
-              ShardKey shardKey = shardRewrite.getShardKey();
+            case INSTANCE_REWRITE:
+              InstanceConfigRewrite instanceRewrite = command.getInstanceRewrite();
+              InstanceKey instanceKey = instanceRewrite.getInstanceKey();
               Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
-                  Query.instanceScoped(IJobKey.build(shardKey.getJobKey()),
-                      shardKey.getShardId())
+                  Query.instanceScoped(IJobKey.build(instanceKey.getJobKey()),
+                      instanceKey.getInstanceId())
                       .active());
               Optional<IAssignedTask> task =
                   Optional.fromNullable(Iterables.getOnlyElement(tasks, null))
                       .transform(Tasks.SCHEDULED_TO_ASSIGNED);
               if (!task.isPresent()) {
-                errors.add("No active task found for " + shardKey);
-              } else if (!task.get().getTask().newBuilder().equals(shardRewrite.getOldTask())) {
-                errors.add("CAS compare failed for " + shardKey);
+                errors.add("No active task found for " + instanceKey);
+              } else if (!task.get().getTask().newBuilder().equals(instanceRewrite.getOldTask())) {
+                errors.add("CAS compare failed for " + instanceKey);
               } else {
                 ITaskConfig newConfiguration = ITaskConfig.build(
-                    ConfigurationManager.applyDefaultsIfUnset(shardRewrite.getRewrittenTask()));
+                    ConfigurationManager.applyDefaultsIfUnset(instanceRewrite.getRewrittenTask()));
                 boolean changed = storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(
                     task.get().getTaskId(), newConfiguration);
                 if (!changed) {

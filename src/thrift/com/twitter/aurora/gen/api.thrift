@@ -131,9 +131,9 @@ enum LockValidation {
 }
 
 // A unique identifier for the active task within a job.
-struct ShardKey {
-  1: JobKey jobKey  // Key identifying the job.
-  2: i32 shardId    // Unique shard ID for the active task in a job.
+struct InstanceKey {
+  1: JobKey jobKey   // Key identifying the job.
+  2: i32 instanceId  // Unique instance ID for the active task in a job.
 }
 
 struct ExecutorConfig {
@@ -533,10 +533,10 @@ service AuroraSchedulerManager {
   Response releaseLock(1: Lock lock, 2: LockValidation validation, 3: SessionKey session)
 }
 
-struct ShardConfigRewrite {
-  1: ShardKey shardKey              // Key for the task to rewrite.
-  2: TaskConfig oldTask             // The original configuration.
-  3: TaskConfig rewrittenTask       // The rewritten configuration.
+struct InstanceConfigRewrite {
+  1: InstanceKey instanceKey   // Key for the task to rewrite.
+  2: TaskConfig oldTask        // The original configuration.
+  3: TaskConfig rewrittenTask  // The rewritten configuration.
 }
 
 struct JobConfigRewrite {
@@ -546,7 +546,7 @@ struct JobConfigRewrite {
 
 union ConfigRewrite {
   1: JobConfigRewrite jobRewrite
-  2: ShardConfigRewrite shardRewrite
+  2: InstanceConfigRewrite instanceRewrite
 }
 
 struct RewriteConfigsRequest {

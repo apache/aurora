@@ -24,8 +24,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
 
 import com.twitter.aurora.gen.Identity;
+import com.twitter.aurora.gen.InstanceKey;
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
@@ -91,8 +91,8 @@ public final class Query {
     return unscoped().byJob(jobKey);
   }
 
-  public static Builder instanceScoped(ShardKey shardKey) {
-    return instanceScoped(IJobKey.build(shardKey.getJobKey()), shardKey.getShardId());
+  public static Builder instanceScoped(InstanceKey instanceKey) {
+    return instanceScoped(IJobKey.build(instanceKey.getJobKey()), instanceKey.getInstanceId());
   }
 
   public static Builder instanceScoped(IJobKey jobKey, int instanceId, int... instanceIds) {
