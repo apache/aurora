@@ -918,7 +918,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               ShardConfigRewrite shardRewrite = command.getShardRewrite();
               ShardKey shardKey = shardRewrite.getShardKey();
               Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
-                  Query.shardScoped(IJobKey.build(shardKey.getJobKey()),
+                  Query.instanceScoped(IJobKey.build(shardKey.getJobKey()),
                       shardKey.getShardId())
                       .active());
               Optional<IAssignedTask> task =

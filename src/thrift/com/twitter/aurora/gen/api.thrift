@@ -388,7 +388,7 @@ struct TaskQuery {
   4: set<string> taskIds
   5: set<ScheduleStatus> statuses
   6: string slaveHost
-  7: set<i32> shardIds
+  7: set<i32> instanceIds
 }
 
 struct HostStatus {

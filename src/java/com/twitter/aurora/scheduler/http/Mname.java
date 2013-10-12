@@ -199,7 +199,7 @@ public class Mname {
 
     IScheduledTask task = Iterables.getOnlyElement(
         Storage.Util.consistentFetchTasks(storage,
-            Query.shardScoped(JobKeys.from(role, env, job), shardId).active()),
+            Query.instanceScoped(JobKeys.from(role, env, job), shardId).active()),
         null);
     if (task == null) {
       return respond(NOT_FOUND, "No such live shard found.");

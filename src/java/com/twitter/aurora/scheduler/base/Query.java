@@ -91,16 +91,16 @@ public final class Query {
     return unscoped().byJob(jobKey);
   }
 
-  public static Builder shardScoped(ShardKey shardKey) {
-    return shardScoped(IJobKey.build(shardKey.getJobKey()), shardKey.getShardId());
+  public static Builder instanceScoped(ShardKey shardKey) {
+    return instanceScoped(IJobKey.build(shardKey.getJobKey()), shardKey.getShardId());
   }
 
-  public static Builder shardScoped(IJobKey jobKey, int shardId, int... shardIds) {
-    return unscoped().byShards(jobKey, shardId, shardIds);
+  public static Builder instanceScoped(IJobKey jobKey, int instanceId, int... instanceIds) {
+    return unscoped().byInstances(jobKey, instanceId, instanceIds);
   }
 
-  public static Builder shardScoped(IJobKey jobKey, Iterable<Integer> shardIds) {
-    return unscoped().byShards(jobKey, shardIds);
+  public static Builder instanceScoped(IJobKey jobKey, Iterable<Integer> instanceIds) {
+    return unscoped().byInstances(jobKey, instanceIds);
   }
 
   public static Builder taskScoped(String taskId, String... taskIds) {
@@ -126,7 +126,7 @@ public final class Query {
   /**
    * A Builder of TaskQueries. Builders are immutable and provide access to a set of convenience
    * methods to return a new builder of another scope. Available scope filters include slave,
-   * taskId, role, jobs of a role, and shards of a job.
+   * taskId, role, jobs of a role, and instances of a job.
    *
    * <p>
    * This class does not expose the full functionality of TaskQuery but rather subsets of it that
@@ -209,7 +209,7 @@ public final class Query {
     }
 
     /**
-     * Create a builder scoped to a role. A role scope conflicts with job and shards scopes.
+     * Create a builder scoped to a role. A role scope conflicts with job and instance scopes.
      *
      * @param role The role to scope the query to.
      * @return A new Builder scoped to the given role.
@@ -223,7 +223,7 @@ public final class Query {
 
     /**
      * Create a builder scoped to an environment. An environment scope conflicts with role, job,
-     * and shard scopes.
+     * and instance scopes.
      *
      * @param role The role to scope the query to.
      * @param environment The environment to scope the query to.
@@ -241,7 +241,7 @@ public final class Query {
 
     /**
      * Returns a new builder scoped to the job uniquely identified by the given key. A job scope
-     * conflicts with role and shards scopes.
+     * conflicts with role and instance scopes.
      *
      * @param jobKey The key of the job to scope the query to.
      * @return A new Builder scoped to the given jobKey.
@@ -300,15 +300,15 @@ public final class Query {
     }
 
     /**
-     * Returns a new Builder scoped to the given shards of the given job. A builder can only
-     * be scoped to a set of shards, a job, or a role once.
+     * Returns a new Builder scoped to the given instances of the given job. A builder can only
+     * be scoped to a set of instances, a job, or a role once.
      *
      * @param jobKey The key identifying the job.
-     * @param shardId A shardId of the target job.
-     * @param shardIds Additional shardIds of the target job.
-     * @return A new Builder scoped to the given shardIds.
+     * @param instanceId An instance id of the target job.
+     * @param instanceIds Additional instance ids of the target job.
+     * @return A new Builder scoped to the given instance ids.
      */
-    public Builder byShards(IJobKey jobKey, int shardId, int... shardIds) {
+    public Builder byInstances(IJobKey jobKey, int instanceId, int... instanceIds) {
       JobKeys.assertValid(jobKey);
 
       return new Builder(
@@ -316,31 +316,31 @@ public final class Query {
               .setOwner(new Identity().setRole(jobKey.getRole()))
               .setEnvironment(jobKey.getEnvironment())
               .setJobName(jobKey.getName())
-              .setShardIds(ImmutableSet.<Integer>builder()
-                  .add(shardId)
-                  .addAll(Ints.asList(shardIds))
+              .setInstanceIds(ImmutableSet.<Integer>builder()
+                  .add(instanceId)
+                  .addAll(Ints.asList(instanceIds))
                   .build()));
     }
 
     /**
-     * Create a new Builder scoped to shards.
+     * Create a new Builder scoped to instances.
      *
-     * @see Builder#byShards(IJobKey, int, int...)
+     * @see Builder#byInstances
      *
      * @param jobKey The key identifying the job.
-     * @param shardIds Shards of the target job.
-     * @return A new Builder scoped to the given shardIds.
+     * @param instanceIds Instances of the target job.
+     * @return A new Builder scoped to the given instance ids.
      */
-    public Builder byShards(IJobKey jobKey, Iterable<Integer> shardIds) {
+    public Builder byInstances(IJobKey jobKey, Iterable<Integer> instanceIds) {
       JobKeys.assertValid(jobKey);
-      checkNotNull(shardIds);
+      checkNotNull(instanceIds);
 
       return new Builder(
           query.deepCopy()
               .setOwner(new Identity().setRole(jobKey.getRole()))
               .setEnvironment(jobKey.getEnvironment())
               .setJobName(jobKey.getName())
-              .setShardIds(ImmutableSet.copyOf(shardIds)));
+              .setInstanceIds(ImmutableSet.copyOf(instanceIds)));
     }
 
     /**

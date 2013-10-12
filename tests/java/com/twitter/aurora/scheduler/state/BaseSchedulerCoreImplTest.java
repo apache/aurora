@@ -979,7 +979,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.startCronJob(KEY_A);
     assertTaskCount(10);
 
-    scheduler.killTasks(Query.shardScoped(KEY_A, 0), USER_A);
+    scheduler.killTasks(Query.instanceScoped(KEY_A, 0), USER_A);
     assertTaskCount(9);
     assertTrue(cron.hasJob(KEY_A));
 
@@ -1027,8 +1027,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(KEY_A, 2));
 
     Query.Builder builder = Query.unscoped().active();
-    String taskId1 = Tasks.id(getOnlyTask(builder.byShards(KEY_A, 0)));
-    String taskId2 = Tasks.id(getOnlyTask(builder.byShards(KEY_A, 1)));
+    String taskId1 = Tasks.id(getOnlyTask(builder.byInstances(KEY_A, 0)));
+    String taskId2 = Tasks.id(getOnlyTask(builder.byInstances(KEY_A, 1)));
 
     assignTask(taskId1, SLAVE_ID, SLAVE_HOST_1);
     assignTask(taskId2, SLAVE_ID, SLAVE_HOST_1);
@@ -1710,7 +1710,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(KEY_A, config, 1));
 
     String taskId = Tasks.id(getOnlyTask(
-        Query.shardScoped(KEY_A, 0).active()));
+        Query.instanceScoped(KEY_A, 0).active()));
 
     assignTask(taskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of(80, 81, 82));
 
@@ -1732,7 +1732,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(makeJob(KEY_A, config, 1));
 
     String taskId = Tasks.id(getOnlyTask(
-        Query.shardScoped(KEY_A, 0).active()));
+        Query.instanceScoped(KEY_A, 0).active()));
 
     assignTask(taskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of(80));
 
@@ -1740,7 +1740,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     changeStatus(taskId, LOST);
 
     String newTaskId = Tasks.id(getOnlyTask(
-        Query.shardScoped(KEY_A, 0).active()));
+        Query.instanceScoped(KEY_A, 0).active()));
     assignTask(newTaskId, SLAVE_ID, SLAVE_HOST_1, ImmutableSet.of(86));
 
     IAssignedTask task = getTask(newTaskId).getAssignedTask();

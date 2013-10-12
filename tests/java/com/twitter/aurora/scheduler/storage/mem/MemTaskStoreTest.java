@@ -84,7 +84,7 @@ public class MemTaskStoreTest {
         Query.unscoped().byStatus(ScheduleStatus.PENDING),
         TASK_A, TASK_B, TASK_C, TASK_D);
     assertQueryResults(
-        Query.shardScoped(JobKeys.from("role-a", "env-a", "job-a"), 0).active(), TASK_A);
+        Query.instanceScoped(JobKeys.from("role-a", "env-a", "job-a"), 0).active(), TASK_A);
     assertQueryResults(Query.jobScoped(JobKeys.from("role-b", "env-b", "job-b")).active(), TASK_B);
     assertQueryResults(Query.jobScoped(JobKeys.from("role-b", "devel", "job-b")).active());
 
@@ -93,7 +93,7 @@ public class MemTaskStoreTest {
     assertQueryResults(new TaskQuery().setTaskIds(null), TASK_A, TASK_B, TASK_C, TASK_D);
     assertQueryResults(new TaskQuery().setTaskIds(ImmutableSet.<String>of()));
     assertQueryResults(
-        new TaskQuery().setShardIds(ImmutableSet.<Integer>of()),
+        new TaskQuery().setInstanceIds(ImmutableSet.<Integer>of()),
         TASK_A, TASK_B, TASK_C, TASK_D);
     assertQueryResults(
         new TaskQuery().setStatuses(ImmutableSet.<ScheduleStatus>of()),

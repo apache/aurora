@@ -110,14 +110,14 @@ class ShardWatcher(object):
 
       self._clock.sleep(self._health_check_interval_seconds)
 
-  def _get_tasks_by_shard_id(self, shard_ids):
+  def _get_tasks_by_shard_id(self, instance_ids):
     log.debug('Querying shard statuses.')
     query = TaskQuery()
     query.owner = Identity(role=self._job_key.role)
     query.environment = self._job_key.environment
     query.jobName = self._job_key.name
     query.statuses = set([ScheduleStatus.RUNNING])
-    query.shardIds = shard_ids
+    query.instanceIds = instance_ids
     resp = self._scheduler.getTasksStatus(query)
 
     tasks = []

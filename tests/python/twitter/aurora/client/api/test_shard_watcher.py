@@ -45,13 +45,13 @@ class ShardWatcherTest(unittest.TestCase):
                                  health_check_interval_seconds=3,
                                  clock=self._clock)
 
-  def get_tasks_status_query(self, shard_ids):
+  def get_tasks_status_query(self, instance_ids):
     query = TaskQuery()
     query.owner = Identity(role=self._role)
     query.environment = self._env
     query.jobName = self._name
     query.statuses = set([ScheduleStatus.RUNNING])
-    query.shardIds = set(shard_ids)
+    query.instanceIds = set(instance_ids)
     return query
 
   def create_task(self, instance_id):

@@ -68,7 +68,7 @@ invoking cancel_update.
     log.info("Retrieving jobs for role %s" % role)
     return self._scheduler.getJobs(role)
 
-  def kill_job(self, job_key, shards=None):
+  def kill_job(self, job_key, instances=None):
     log.info("Killing tasks for job: %s" % job_key)
     if not isinstance(job_key, AuroraJobKey):
       raise TypeError('Expected type of job_key %r to be %s but got %s instead'
@@ -78,9 +78,9 @@ invoking cancel_update.
     # user.
     # TODO(wfarner): Refactor this when Identity is removed from TaskQuery.
     query = job_key.to_thrift_query()
-    if shards is not None:
-      log.info("Shards to be killed: %s" % shards)
-      query.shardIds = frozenset([int(s) for s in shards])
+    if instances is not None:
+      log.info("Instances to be killed: %s" % instances)
+      query.instanceIds = frozenset([int(s) for s in instances])
 
     return self._scheduler.killTasks(query)
 
@@ -91,9 +91,12 @@ invoking cancel_update.
     return self.query(job_key.to_thrift_query())
 
   @classmethod
-  def build_query(cls, role, job, shards=None, statuses=LIVE_STATES, env=None):
-    return TaskQuery(
-      owner=Identity(role=role), jobName=job, statuses=statuses, shardIds=shards, environment=env)
+  def build_query(cls, role, job, instances=None, statuses=LIVE_STATES, env=None):
+    return TaskQuery(owner=Identity(role=role),
+                     jobName=job,
+                     statuses=statuses,
+                     instanceIds=instances,
+                     environment=env)
 
   def query(self, query):
     return self._scheduler.getTasksStatus(query)

@@ -355,7 +355,7 @@ public class StateManagerImpl implements StateManager {
               (result == UpdateResult.SUCCESS) ? GET_NEW_CONFIG : GET_ORIGINAL_CONFIG;
           for (Integer shard : fetchRemovedShards(jobConfig.get(), removedSelector)) {
             changeState(
-                Query.shardScoped(jobKey, shard).active(),
+                Query.instanceScoped(jobKey, shard).active(),
                 KILLING,
                 Optional.of("Removed during update by " + invokingUser));
           }
@@ -481,7 +481,7 @@ public class StateManagerImpl implements StateManager {
               throw new UpdateException("Invalid update token for " + jobKey);
             }
 
-            Query.Builder query = Query.shardScoped(jobKey, shards).active();
+            Query.Builder query = Query.instanceScoped(jobKey, shards).active();
             Set<IScheduledTask> tasks = store.getTaskStore().fetchTasks(query);
 
             // Extract any shard IDs that are being added as a part of this stage in the update.
@@ -524,7 +524,7 @@ public class StateManagerImpl implements StateManager {
                 // TODO(William Farner): The additional query could be avoided here.
                 //                       Consider allowing state changes on tasks by task ID.
                 changeState(
-                    Query.shardScoped(jobKey, changedShards).active(),
+                    Query.instanceScoped(jobKey, changedShards).active(),
                     modifyingState,
                     Optional.of(auditMessage));
                 putResults(result, ShardUpdateResult.RESTARTING, changedShards);

@@ -73,7 +73,7 @@ public final class StorageBackfill {
     if (Tasks.isActive(task.getStatus())) {
       // Perform a sanity check on the number of active shards.
       TaskConfig config = task.getAssignedTask().getTask();
-      Query.Builder query = Query.shardScoped(
+      Query.Builder query = Query.instanceScoped(
           JobKeys.from(config.getOwner().getRole(), config.getEnvironment(), config.getJobName()),
           task.getAssignedTask().getTask().getInstanceId())
           .active();

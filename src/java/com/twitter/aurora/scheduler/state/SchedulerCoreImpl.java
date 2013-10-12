@@ -257,7 +257,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       throw new ScheduleException("At least one shard must be specified.");
     }
 
-    final Query.Builder query = Query.shardScoped(jobKey, shards).active();
+    final Query.Builder query = Query.instanceScoped(jobKey, shards).active();
     storage.write(new MutateWork.NoResult<ScheduleException>() {
       @Override protected void execute(MutableStoreProvider storeProvider)
           throws ScheduleException {

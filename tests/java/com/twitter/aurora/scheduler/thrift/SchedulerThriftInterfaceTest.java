@@ -583,7 +583,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAuth(ROOT, true);
     storageUtil.expectTaskFetch(
-        Query.shardScoped(IJobKey.build(shardKey.getJobKey()), shardKey.getShardId()).active());
+        Query.instanceScoped(IJobKey.build(shardKey.getJobKey()), shardKey.getShardId()).active());
 
     control.replay();
 
@@ -608,7 +608,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         0);
 
     expectAuth(ROOT, true);
-    storageUtil.expectTaskFetch(Query.shardScoped(shardKey).active(), storedTask);
+    storageUtil.expectTaskFetch(Query.instanceScoped(shardKey).active(), storedTask);
 
     control.replay();
 
@@ -636,7 +636,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         0);
 
     expectAuth(ROOT, true);
-    storageUtil.expectTaskFetch(Query.shardScoped(shardKey).active(), storedTask);
+    storageUtil.expectTaskFetch(Query.instanceScoped(shardKey).active(), storedTask);
     expect(storageUtil.taskStore.unsafeModifyInPlace(
         taskId,
         ITaskConfig.build(ConfigurationManager.applyDefaultsIfUnset(modifiedConfig.newBuilder()))))
