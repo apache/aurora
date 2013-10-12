@@ -49,6 +49,7 @@ import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
+import com.twitter.aurora.scheduler.state.StateManager.InstanceException;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
@@ -435,6 +436,47 @@ public class StateManagerImplTest extends EasyMockTest {
 
     insertTasks(task);
     stateManager.deleteTasks(ImmutableSet.of(taskId));
+  }
+
+  @Test
+  public void testAddInstances() throws Exception {
+    ITaskConfig existingTask = makeTask(JIM, MY_JOB, 0);
+    String existingId = "a";
+    ITaskConfig newTask = makeTask(JIM, MY_JOB, 1);
+    String newId = "b";
+    expect(taskIdGenerator.apply(existingTask)).andReturn(existingId);
+    expectStateTransitions(existingId, INIT, PENDING);
+    expect(taskIdGenerator.apply(newTask)).andReturn(newId);
+    expectStateTransitions(newId, INIT, PENDING);
+
+    control.replay();
+
+    insertTasks(existingTask);
+    stateManager.addInstances(JOB_KEY, ImmutableSet.of(newTask));
+  }
+
+  @Test(expected = InstanceException.class)
+  public void testAddInstancesIdCollision() throws Exception {
+    ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
+    String taskId = "a";
+    expect(taskIdGenerator.apply(taskInfo)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING);
+
+    control.replay();
+
+    insertTasks(taskInfo);
+    assignTask(taskId, HOST_A);
+    changeState(taskId, RUNNING);
+    stateManager.addInstances(JOB_KEY, ImmutableSet.of(taskInfo));
+  }
+
+  @Test(expected = InstanceException.class)
+  public void testAddInstancesJobDoesNotExist() throws Exception {
+    ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
+
+    control.replay();
+
+    stateManager.addInstances(JOB_KEY, ImmutableSet.of(taskInfo));
   }
 
   private void expectStateTransitions(

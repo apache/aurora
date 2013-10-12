@@ -516,6 +516,14 @@ service AuroraSchedulerManager {
   // Returns the current version of the API implementation
   Response getVersion()
 
+  // Adds new instances specified by the instances set.
+  // A job represented by the JobKey must be protected by Lock.
+  Response addInstances(
+      1: JobKey job,
+      2: set<TaskConfig> instances,
+      3: Lock lock,
+      4: SessionKey session)
+
   // Creates and saves a new Lock instance guarding against multiple
   // mutating operations within the context defined by LockKey.
   Response acquireLock(1: LockKey lockKey, 2: SessionKey session)

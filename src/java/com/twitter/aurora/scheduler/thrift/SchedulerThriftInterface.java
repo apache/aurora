@@ -82,6 +82,7 @@ import com.twitter.aurora.gen.ShardConfigRewrite;
 import com.twitter.aurora.gen.ShardKey;
 import com.twitter.aurora.gen.StartMaintenanceResult;
 import com.twitter.aurora.gen.StartUpdateResult;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.gen.UpdateShardsResult;
@@ -98,6 +99,8 @@ import com.twitter.aurora.scheduler.state.LockManager;
 import com.twitter.aurora.scheduler.state.LockManager.LockException;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
+import com.twitter.aurora.scheduler.state.StateManager;
+import com.twitter.aurora.scheduler.state.StateManager.InstanceException;
 import com.twitter.aurora.scheduler.storage.JobStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -166,6 +169,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   private final Storage storage;
   private final SchedulerCore schedulerCore;
+  private final StateManager stateManager;
   private final LockManager lockManager;
   private final CapabilityValidator sessionValidator;
   private final StorageBackup backup;
@@ -179,6 +183,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   SchedulerThriftInterface(
       Storage storage,
       SchedulerCore schedulerCore,
+      StateManager stateManager,
       LockManager lockManager,
       CapabilityValidator sessionValidator,
       StorageBackup backup,
@@ -188,6 +193,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     this(storage,
         schedulerCore,
+        stateManager,
         lockManager,
         sessionValidator,
         backup,
@@ -202,6 +208,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   SchedulerThriftInterface(
       Storage storage,
       SchedulerCore schedulerCore,
+      StateManager stateManager,
       LockManager lockManager,
       CapabilityValidator sessionValidator,
       StorageBackup backup,
@@ -213,6 +220,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     this.storage = checkNotNull(storage);
     this.schedulerCore = checkNotNull(schedulerCore);
+    this.stateManager = checkNotNull(stateManager);
     this.lockManager = checkNotNull(lockManager);
     this.sessionValidator = checkNotNull(sessionValidator);
     this.backup = checkNotNull(backup);
@@ -952,6 +960,38 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return new Response()
         .setResponseCode(OK)
         .setResult(Result.getVersionResult(CURRENT_API_VERSION));
+  }
+
+
+  @Override
+  public Response addInstances(
+      JobKey job,
+      Set<TaskConfig> instances,
+      Lock lock,
+      SessionKey session) {
+
+    IJobKey key = JobKeys.assertValid(IJobKey.build(job));
+    checkNotBlank(instances);
+    checkNotNull(lock);
+    checkNotNull(session);
+
+    Response resp = new Response();
+    if (cronJobManager.hasJob(key)) {
+      return resp.setResponseCode(INVALID_REQUEST).setMessage("Cron jobs are not supported here.");
+    }
+
+    try {
+      sessionValidator.checkAuthenticated(session, ImmutableSet.of(key.getRole()));
+
+      // TODO(maximk): Validate lock before proceeding further once LockManager changes are in.
+
+      stateManager.addInstances(key, ITaskConfig.setFromBuilders(instances));
+      return resp.setResponseCode(OK).setMessage("Successfully added instances.");
+    } catch (AuthFailedException e) {
+      return resp.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+    } catch (InstanceException e) {
+      return resp.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+    }
   }
 
   private String getRoleFromLockKey(ILockKey lockKey) {

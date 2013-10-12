@@ -31,6 +31,7 @@ import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.SessionKey;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
 
@@ -244,5 +245,15 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
       throws TException {
 
     return delegate.releaseLock(lock, validation, session);
+  }
+
+  @Override
+  public Response addInstances(
+      JobKey job,
+      Set<TaskConfig> instances,
+      Lock lock,
+      SessionKey session) throws TException {
+
+    return delegate.addInstances(job, instances, lock, session);
   }
 }

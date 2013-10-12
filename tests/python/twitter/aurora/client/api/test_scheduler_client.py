@@ -181,6 +181,13 @@ class TestSchedulerProxyInjection(unittest.TestCase):
 
     self.make_scheduler_proxy().getVersion()
 
+  def test_addInstances(self):
+    self.mock_thrift_client.addInstances(IsA(JobKey), IgnoreArg(), IsA(Lock), IsA(SessionKey))
+
+    self.mox.ReplayAll()
+
+    self.make_scheduler_proxy().addInstances(JobKey(), set([0]), Lock())
+
 
 class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
   def test_setQuota(self):

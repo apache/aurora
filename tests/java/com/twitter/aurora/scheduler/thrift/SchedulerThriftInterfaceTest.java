@@ -73,6 +73,8 @@ import com.twitter.aurora.scheduler.state.LockManager;
 import com.twitter.aurora.scheduler.state.LockManager.LockException;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
+import com.twitter.aurora.scheduler.state.StateManager;
+import com.twitter.aurora.scheduler.state.StateManager.InstanceException;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
@@ -125,6 +127,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
+  private StateManager stateManager;
   private LockManager lockManager;
   private CapabilityValidator userValidator;
   private SessionContext context;
@@ -139,6 +142,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     scheduler = createMock(SchedulerCore.class);
+    stateManager = createMock(StateManager.class);
     lockManager = createMock(LockManager.class);
     userValidator = createMock(CapabilityValidator.class);
     context = createMock(SessionContext.class);
@@ -154,6 +158,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(Clock.class).toInstance(new FakeClock());
         bind(Storage.class).toInstance(storageUtil.storage);
         bind(SchedulerCore.class).toInstance(scheduler);
+        bind(StateManager.class).toInstance(stateManager);
         bind(LockManager.class).toInstance(lockManager);
         bind(CapabilityValidator.class).toInstance(userValidator);
         bind(StorageBackup.class).toInstance(backup);
@@ -985,6 +990,76 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Response response = thrift.getVersion();
     assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testAddInstances() throws Exception {
+    ImmutableSet<TaskConfig> instances = ImmutableSet.of(defaultTask(true));
+    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    stateManager.addInstances(JOB_KEY, ITaskConfig.setFromBuilders(instances));
+
+    control.replay();
+
+    Response response = thrift.addInstances(
+        JOB_KEY.newBuilder(),
+        instances,
+        lock,
+        SESSION);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testAddInstancesFails() throws Exception {
+    ImmutableSet<TaskConfig> instances = ImmutableSet.of(defaultTask(true));
+    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    stateManager.addInstances(JOB_KEY, ITaskConfig.setFromBuilders(instances));
+    expectLastCall().andThrow(new InstanceException("Failed"));
+
+    control.replay();
+
+    Response response = thrift.addInstances(
+        JOB_KEY.newBuilder(),
+        instances,
+        lock,
+        SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+  }
+
+  @Test
+  public void testAddInstancesAuthFails() throws Exception {
+    ImmutableSet<TaskConfig> instances = ImmutableSet.of(defaultTask(true));
+    LockKey key = LockKey.job(JOB_KEY.newBuilder());
+    Lock lock = new Lock().setKey(key);
+    expectAuth(ROLE, false);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+
+    control.replay();
+
+    Response response = thrift.addInstances(
+        JOB_KEY.newBuilder(),
+        instances,
+        lock,
+        SESSION);
+    assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
+  }
+
+  @Test
+  public void testAddInstancesFailsForCronJob() throws Exception {
+    ImmutableSet<TaskConfig> instances = ImmutableSet.of(defaultTask(true));
+    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
+    control.replay();
+
+    Response response = thrift.addInstances(
+        JOB_KEY.newBuilder(),
+        instances,
+        lock,
+        SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test

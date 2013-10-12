@@ -110,16 +110,25 @@ class SideEffectStorage {
   }
 
   /**
-   * Work with side effects which does not throw checked exceptions or have a return
-   * value.
+   * Work with side effects that does not have a return value.
+   *
+   * @param <E> Work exception type.
    */
-  abstract class NoResultSideEffectWork extends SideEffectWork<Void, RuntimeException> {
-    @Override public final Void apply(MutableStoreProvider storeProvider) {
+  abstract class NoResultSideEffectWork<E extends Exception> extends SideEffectWork<Void, E> {
+
+    @Override public final Void apply(MutableStoreProvider storeProvider) throws E {
       execute(storeProvider);
       return null;
     }
 
-    abstract void execute(MutableStoreProvider storeProvider);
+    abstract void execute(MutableStoreProvider storeProvider) throws E;
+  }
+
+  /**
+   * Work with side effects which does not throw checked exceptions or have a return
+   * value.
+   */
+  abstract class NoResultQuietSideEffectWork extends NoResultSideEffectWork<RuntimeException> {
   }
 
   private <T, E extends Exception> MutateWork<T, E> executeSideEffectsAfter(

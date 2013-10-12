@@ -212,7 +212,7 @@ public class StateManagerImpl implements StateManager {
     // Done outside the write transaction to minimize the work done inside a transaction.
     final Set<IScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
 
-    storage.write(storage.new NoResultSideEffectWork() {
+    storage.write(storage.new NoResultQuietSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(scheduledTasks);
 
@@ -777,12 +777,38 @@ public class StateManagerImpl implements StateManager {
 
   @Override
   public void deleteTasks(final Set<String> taskIds) {
-    storage.write(storage.new NoResultSideEffectWork() {
+    storage.write(storage.new NoResultQuietSideEffectWork() {
       @Override protected void execute(final MutableStoreProvider storeProvider) {
         TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
         Iterable<IScheduledTask> tasks = taskStore.fetchTasks(Query.taskScoped(taskIds));
         addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(tasks)));
         taskStore.deleteTasks(taskIds);
+      }
+    });
+  }
+
+  @Override
+  public void addInstances(
+      final IJobKey jobKey,
+      final ImmutableSet<ITaskConfig> instances) throws InstanceException {
+
+    storage.write(storage.new NoResultSideEffectWork<InstanceException>() {
+      @Override void execute(MutableStoreProvider store) throws InstanceException {
+        ImmutableSet<IScheduledTask> tasks =
+            store.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active());
+
+        if (tasks.isEmpty()) {
+          throw new InstanceException(String.format("Job %s does not exist!", jobKey));
+        }
+
+        if (!Sets.intersection(
+            FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_SHARD_ID).toSet(),
+            FluentIterable.from(instances).transform(Tasks.INFO_TO_SHARD_ID).toSet()).isEmpty()) {
+
+          throw new InstanceException("Instance ID collision detected.");
+        }
+
+        insertPendingTasks(instances);
       }
     });
   }
