@@ -71,7 +71,7 @@ class Announcer(Struct):
   })
 
 
-# The thermosConfig populated inside of TaskConfig.
+# The executorConfig populated inside of TaskConfig.
 class MesosTaskInstance(Struct):
   task                       = Required(Task)
   layout                     = AppLayout

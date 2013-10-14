@@ -13,6 +13,7 @@ from gen.twitter.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
 from gen.twitter.aurora.ttypes import (
   Constraint,
   CronCollisionPolicy,
+  ExecutorConfig,
   Identity,
   JobConfiguration,
   JobKey,
@@ -245,16 +246,17 @@ def convert(job, packages=frozenset(), ports=frozenset()):
   cron_schedule = not_empty_or(job.cron_schedule(), '')
   cron_policy = select_cron_policy(job.cron_policy(), job.cron_collision_policy())
 
-  # TODO(Sathya): Re-evaluate this since the scheduler does not need to know about an update config.
-  task.thermosConfig = filter_aliased_fields(underlying).json_dumps()
+  task.executorConfig = ExecutorConfig(
+      name='AuroraExecutor',
+      data=filter_aliased_fields(underlying).json_dumps())
 
   return JobConfiguration(
-    key=key,
-    owner=owner,
-    cronSchedule=cron_schedule,
-    cronCollisionPolicy=cron_policy,
-    taskConfig=task,
-    shardCount=fully_interpolated(job.instances()))
+      key=key,
+      owner=owner,
+      cronSchedule=cron_schedule,
+      cronCollisionPolicy=cron_policy,
+      taskConfig=task,
+      shardCount=fully_interpolated(job.instances()))
 
 def resolve_thermos_config(task):
   """TODO(maximk): Delete this method when migration to executorConfig is done"""
