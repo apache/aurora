@@ -23,6 +23,7 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
@@ -82,7 +83,8 @@ class TaskStateMachine {
   private static final State UNKNOWN = State.create(ScheduleStatus.UNKNOWN);
   private static final State UPDATING = State.create(ScheduleStatus.UPDATING);
 
-  private static final Supplier<String> LOCAL_HOST_SUPPLIER = Suppliers.memoize(
+  @VisibleForTesting
+  static final Supplier<String> LOCAL_HOST_SUPPLIER = Suppliers.memoize(
       new Supplier<String>() {
         @Override public String get() {
           try {

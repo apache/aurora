@@ -37,10 +37,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.ScheduleStatus;
+import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.ShardUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
+import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.base.JobKeys;
@@ -170,6 +173,30 @@ public class StateManagerImplTest extends EasyMockTest {
   PubsubEvent matchTasksDeleted(String id, String... ids) {
     EasyMock.reportMatcher(new DeletedTasksMatcher(id, ids));
     return null;
+  }
+
+  @Test
+  public void testAddTasks() {
+    ITaskConfig task = makeTask(JIM, MY_JOB, 3);
+    String taskId = "a";
+    expect(taskIdGenerator.apply(task)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING);
+
+    control.replay();
+
+    insertTasks(task);
+    ScheduledTask expected = new ScheduledTask()
+        .setStatus(PENDING)
+        .setTaskEvents(ImmutableList.of(new TaskEvent()
+            .setTimestamp(clock.nowMillis())
+            .setScheduler(TaskStateMachine.LOCAL_HOST_SUPPLIER.get())
+            .setStatus(PENDING)))
+        .setAssignedTask(new AssignedTask()
+            .setInstanceId(3)
+            .setTaskId(taskId)
+            .setTask(task.newBuilder()));
+    assertEquals(ImmutableSet.of(IScheduledTask.build(expected)),
+        Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId)));
   }
 
   @Test

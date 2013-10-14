@@ -144,8 +144,10 @@ public class StateManagerImpl implements StateManager {
   private final Function<ITaskConfig, IScheduledTask> taskCreator =
       new Function<ITaskConfig, IScheduledTask>() {
         @Override public IScheduledTask apply(ITaskConfig task) {
-          AssignedTask assigned =
-              new AssignedTask().setTaskId(taskIdGenerator.apply(task)).setTask(task.newBuilder());
+          AssignedTask assigned = new AssignedTask()
+              .setTaskId(taskIdGenerator.apply(task))
+              .setInstanceId(task.getInstanceId())
+              .setTask(task.newBuilder());
           return IScheduledTask.build(new ScheduledTask()
               .setStatus(INIT)
               .setAssignedTask(assigned));

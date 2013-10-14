@@ -117,6 +117,10 @@ public final class StorageBackfill {
     }
   }
 
+  private static void populateInstanceId(ScheduledTask task) {
+    task.getAssignedTask().setInstanceId(task.getAssignedTask().getTask().getInstanceId());
+  }
+
   /**
    * Backfills the storage to make it match any assumptions that may have changed since
    * the structs were first written.
@@ -136,6 +140,7 @@ public final class StorageBackfill {
         // don't.
         guaranteeShardUniqueness(builder, storeProvider.getUnsafeTaskStore(), clock);
         convertToExecutorConfig(builder);
+        populateInstanceId(builder);
         return IScheduledTask.build(builder);
       }
     });
