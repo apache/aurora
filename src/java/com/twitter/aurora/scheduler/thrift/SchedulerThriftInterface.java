@@ -982,13 +982,13 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(key.getRole()));
-
-      // TODO(maximk): Validate lock before proceeding further once LockManager changes are in.
-
+      lockManager.validateLock(ILock.build(lock));
       stateManager.addInstances(key, ITaskConfig.setFromBuilders(instances));
       return resp.setResponseCode(OK).setMessage("Successfully added instances.");
     } catch (AuthFailedException e) {
       return resp.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+    } catch (LockException e) {
+      return resp.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     } catch (InstanceException e) {
       return resp.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }

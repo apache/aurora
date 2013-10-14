@@ -999,6 +999,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    lockManager.validateLock(ILock.build(lock));
     stateManager.addInstances(JOB_KEY, ITaskConfig.setFromBuilders(instances));
 
     control.replay();
@@ -1017,8 +1018,28 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    lockManager.validateLock(ILock.build(lock));
     stateManager.addInstances(JOB_KEY, ITaskConfig.setFromBuilders(instances));
     expectLastCall().andThrow(new InstanceException("Failed"));
+
+    control.replay();
+
+    Response response = thrift.addInstances(
+        JOB_KEY.newBuilder(),
+        instances,
+        lock,
+        SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+  }
+
+  @Test
+  public void testAddInstancesLockCheckFails() throws Exception {
+    ImmutableSet<TaskConfig> instances = ImmutableSet.of(defaultTask(true));
+    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    lockManager.validateLock(ILock.build(lock));
+    expectLastCall().andThrow(new LockException("Failed lock check."));
 
     control.replay();
 

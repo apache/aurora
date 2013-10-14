@@ -188,6 +188,20 @@ class TestSchedulerProxyInjection(unittest.TestCase):
 
     self.make_scheduler_proxy().addInstances(JobKey(), set([0]), Lock())
 
+  def test_acquireLock(self):
+    self.mock_thrift_client.acquireLock(IsA(Lock), IsA(SessionKey))
+
+    self.mox.ReplayAll()
+
+    self.make_scheduler_proxy().acquireLock(Lock())
+
+  def test_releaseLock(self):
+    self.mock_thrift_client.releaseLock(IsA(Lock), IsA(LockValidation), IsA(SessionKey))
+
+    self.mox.ReplayAll()
+
+    self.make_scheduler_proxy().releaseLock(Lock(), LockValidation())
+
 
 class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
   def test_setQuota(self):
@@ -273,17 +287,3 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mox.ReplayAll()
 
     self.make_scheduler_proxy().rewriteConfigs(RewriteConfigsRequest())
-
-  def test_acquireLock(self):
-    self.mock_thrift_client.acquireLock(IsA(Lock), IsA(SessionKey))
-
-    self.mox.ReplayAll()
-
-    self.make_scheduler_proxy().acquireLock(Lock())
-
-  def test_releaseLock(self):
-    self.mock_thrift_client.releaseLock(IsA(Lock), IsA(LockValidation), IsA(SessionKey))
-
-    self.mox.ReplayAll()
-
-    self.make_scheduler_proxy().releaseLock(Lock(), LockValidation())
