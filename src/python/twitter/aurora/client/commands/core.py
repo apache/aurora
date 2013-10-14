@@ -44,7 +44,7 @@ from twitter.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.aurora.config.thrift import resolve_thermos_config
 
 from gen.twitter.aurora.constants import ACTIVE_STATES, CURRENT_API_VERSION
-from gen.twitter.aurora.ttypes import ScheduleStatus
+from gen.twitter.aurora.ttypes import ResponseCode, ScheduleStatus
 
 
 def make_commands_str(commands):
@@ -194,11 +194,11 @@ def diff(job_spec, config_file):
     name = config.name()
   api = make_client(cluster)
   resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
-  if not resp.responseCode:
+  if resp.responseCode != ResponseCode.OK:
     die('Request failed, server responded with "%s"' % resp.message)
   remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
   resp = api.populate_job_config(config)
-  if not resp.responseCode:
+  if not resp.responseCode != ResponseCode.OK:
     die('Request failed, server responded with "%s"' % resp.message)
   local_tasks = resp.result.populateJobResult.populated
 
@@ -509,11 +509,11 @@ def update(job_spec, config_file):
     job_key = AuroraJobKey(config.cluster(), config.role(), config.environment(), config.name())
     resp = api.query(api.build_query(config.role(), config.name(),
         statuses=ACTIVE_STATES, env=config.environment()))
-    if not resp.responseCode:
+    if resp.responseCode != ResponseCode.OK:
       die('Could not get job status from server for comparison: %s' % resp.message)
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     resp = api.populate_job_config(config)
-    if not resp.responseCode:
+    if resp.responseCode != ResponseCode.OK:
       die('Server could not populate job config for comparison: %s' % resp.message)
     local_task_count = len(resp.result.populateJobResult.populated)
     remote_task_count = len(remote_tasks)

@@ -13,6 +13,7 @@ from twitter.thermos.config.schema import ThermosContext
 from gen.twitter.aurora.constants import LIVE_STATES
 from gen.twitter.aurora.ttypes import (
   Identity,
+  ResponseCode,
   TaskQuery)
 
 from pystachio import Environment, Required, String
@@ -103,7 +104,7 @@ class DistributedCommandRunner(object):
   def resolve(self):
     for job in self._jobs:
       resp = self._api.query(self.query_from(self._role, self._env, job))
-      if not resp.responseCode:
+      if resp.responseCode != ResponseCode.OK:
         log.error('Failed to query job: %s' % job)
         continue
       for task in resp.result.scheduleStatusResult.tasks:
