@@ -335,13 +335,18 @@ struct TaskEvent {
 
 // A task assignment that is provided to a slave.
 struct AssignedTask {
-  1: string taskId         // The mesos task ID for this task.  Guaranteed to be globally unique.
-  2: string slaveId        // The mesos slave ID that this task has been assigned to.
-                           // This will not be populated for a PENDING task.
-  3: string slaveHost      // The hostname of the machine that this task has been assigned to.
-                           // This will not be populated for a PENDING task.
-  4: TaskConfig task       // Information about how to run this task.
+  1: string taskId                   // The mesos task ID for this task.  Guaranteed to be globally
+                                     // unique.
+  2: string slaveId                  // The mesos slave ID that this task has been assigned to.
+                                     // This will not be populated for a PENDING task.
+  3: string slaveHost                // The name of the machine that this task has been assigned to.
+                                     // This will not be populated for a PENDING task.
+  4: TaskConfig task                 // Information about how to run this task.
   5: map<string, i32> assignedPorts  // Ports reserved on the machine while this task is running.
+  6: i32 instanceId                  // The instance ID assigned to this task.
+                                     // Instance IDs must be unique and contiguous within a
+                                     // job, and will be in the range [0, N-1] (inclusive)
+                                     // for a job that has N instances.
 }
 
 // A task that has been scheduled.
