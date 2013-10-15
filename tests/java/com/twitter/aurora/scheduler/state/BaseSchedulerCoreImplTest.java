@@ -32,7 +32,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -343,7 +342,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     ParsedConfiguration job = makeJob(KEY_A, 10);
     final Set<IScheduledTask> badTasks = ImmutableSet.copyOf(Iterables
-        .transform(job.getTaskConfigs(),
+        .transform(job.getTaskConfigs().values(),
             new Function<ITaskConfig, IScheduledTask>() {
               @Override public IScheduledTask apply(ITaskConfig task) {
                 return IScheduledTask.build(new ScheduledTask()
@@ -1169,11 +1168,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       ParsedConfiguration job,
       Closure<IScheduledTask> updatedTaskChecker) {
 
-    Map<Integer, IScheduledTask> fetchedShards =
+    Map<Integer, IScheduledTask> fetchedInstances =
         Maps.uniqueIndex(tasks, Tasks.SCHEDULED_TO_INSTANCE_ID);
-    Map<Integer, ITaskConfig> originalConfigsByShard =
-        Maps.uniqueIndex(job.getTaskConfigs(), Tasks.INFO_TO_INSTANCE_ID);
-    assertEquals(originalConfigsByShard.keySet(), fetchedShards.keySet());
+    assertEquals(job.getTaskConfigs().keySet(), fetchedInstances.keySet());
     for (IScheduledTask task : tasks) {
       updatedTaskChecker.execute(task);
     }
@@ -1196,13 +1193,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
           makeJob(KEY_A, productionTask().setRequestedPorts(NEW_PORTS), numTasks + additionalTasks);
       Optional<String> updateToken = scheduler.initiateJobUpdate(updatedJob);
 
-      Set<Integer> jobShards = FluentIterable.from(updatedJob.getTaskConfigs())
-          .transform(Tasks.INFO_TO_INSTANCE_ID).toSet();
-
       UpdateResult result = performRegisteredUpdate(
           updatedJob.getJobConfig(),
           updateToken.get(),
-          jobShards,
+          updatedJob.getTaskConfigs().keySet(),
           numTasks,
           additionalTasks);
 

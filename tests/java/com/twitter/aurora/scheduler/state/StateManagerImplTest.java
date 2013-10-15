@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Maps;
 import com.google.common.collect.PeekingIterator;
 
 import org.apache.mesos.Protos.SlaveID;
@@ -253,7 +254,8 @@ public class StateManagerImplTest extends EasyMockTest {
       // expected
     }
 
-    String token = stateManager.registerUpdate(JOB_KEY, ImmutableSet.of(taskInfo));
+    String token =
+        stateManager.registerUpdate(JOB_KEY, ImmutableMap.of(taskInfo.getInstanceId(), taskInfo));
     assertTrue(stateManager.finishUpdate(
         JOB_KEY, JIM.getUser(), Optional.of(token), UpdateResult.SUCCESS, true));
     assertFalse(stateManager.finishUpdate(
@@ -288,7 +290,8 @@ public class StateManagerImplTest extends EasyMockTest {
     insertTasks(taskInfo);
     changeState(id, ASSIGNED);
 
-    String token = stateManager.registerUpdate(JOB_KEY, ImmutableSet.of(updated));
+    String token =
+        stateManager.registerUpdate(JOB_KEY, ImmutableMap.of(updated.getInstanceId(), updated));
     stateManager.modifyShards(JOB_KEY, JIM.getUser(), ImmutableSet.of(0), token, true);
 
     // Since the task is still in UPDATING, it should not be possible to cancel the update.
@@ -334,7 +337,8 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(id, STARTING);
     changeState(id, RUNNING);
 
-    String token = stateManager.registerUpdate(JOB_KEY, ImmutableSet.of(updated));
+    String token =
+        stateManager.registerUpdate(JOB_KEY, ImmutableMap.of(updated.getInstanceId(), updated));
     Map<Integer, ShardUpdateResult> result =
         stateManager.modifyShards(JOB_KEY, JIM.getUser(), ImmutableSet.of(0), token, true);
     assertEquals(result, ImmutableMap.of(0, ShardUpdateResult.RESTARTING));
@@ -364,7 +368,8 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(id, ASSIGNED);
     changeState(id, STARTING);
     changeState(id, RUNNING);
-    String token = stateManager.registerUpdate(JOB_KEY, ImmutableSet.of(newConfig));
+    String token =
+        stateManager.registerUpdate(JOB_KEY, ImmutableMap.of(newConfig.getInstanceId(), newConfig));
     changeState(id, UPDATING);
     changeState(id, KILLED);
 
@@ -408,7 +413,7 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(taskId, STARTING);
     changeState(taskId, RUNNING);
 
-    stateManager.registerUpdate(JOB_KEY, ImmutableSet.of(taskInfo));
+    stateManager.registerUpdate(JOB_KEY, ImmutableMap.of(taskInfo.getInstanceId(), taskInfo));
     changeState(taskId, UPDATING);
     changeState(taskId, FINISHED);
 
@@ -479,7 +484,9 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     insertTasks(existingTask);
-    stateManager.addInstances(JOB_KEY, ImmutableSet.of(newTask));
+    stateManager.addInstances(
+        JOB_KEY,
+        Maps.uniqueIndex(ImmutableList.of(newTask), Tasks.INFO_TO_INSTANCE_ID));
   }
 
   @Test(expected = InstanceException.class)
@@ -494,7 +501,9 @@ public class StateManagerImplTest extends EasyMockTest {
     insertTasks(taskInfo);
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
-    stateManager.addInstances(JOB_KEY, ImmutableSet.of(taskInfo));
+    stateManager.addInstances(
+        JOB_KEY,
+        Maps.uniqueIndex(ImmutableList.of(taskInfo), Tasks.INFO_TO_INSTANCE_ID));
   }
 
   @Test(expected = InstanceException.class)
@@ -503,7 +512,9 @@ public class StateManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    stateManager.addInstances(JOB_KEY, ImmutableSet.of(taskInfo));
+    stateManager.addInstances(
+        JOB_KEY,
+        Maps.uniqueIndex(ImmutableList.of(taskInfo), Tasks.INFO_TO_INSTANCE_ID));
   }
 
   private void expectStateTransitions(
@@ -529,7 +540,8 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   private void insertTasks(ITaskConfig... tasks) {
-    stateManager.insertPendingTasks(ImmutableSet.copyOf(tasks));
+    stateManager.insertPendingTasks(
+        Maps.uniqueIndex(ImmutableSet.copyOf(tasks), Tasks.INFO_TO_INSTANCE_ID));
   }
 
   private int changeState(String taskId, ScheduleStatus status) {

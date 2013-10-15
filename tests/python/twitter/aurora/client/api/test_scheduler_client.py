@@ -186,7 +186,7 @@ class TestSchedulerProxyInjection(unittest.TestCase):
 
     self.mox.ReplayAll()
 
-    self.make_scheduler_proxy().addInstances(JobKey(), set([0]), Lock())
+    self.make_scheduler_proxy().addInstances(JobKey(), {}, Lock())
 
   def test_acquireLock(self):
     self.mock_thrift_client.acquireLock(IsA(Lock), IsA(SessionKey))

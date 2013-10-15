@@ -141,9 +141,11 @@ public class StateManagerImpl implements StateManager {
       }
     };
 
-  private final Function<ITaskConfig, IScheduledTask> taskCreator =
-      new Function<ITaskConfig, IScheduledTask>() {
-        @Override public IScheduledTask apply(ITaskConfig task) {
+  private final Function<Map.Entry<Integer, ITaskConfig>, IScheduledTask> taskCreator =
+      new Function<Map.Entry<Integer, ITaskConfig>, IScheduledTask>() {
+        @Override public IScheduledTask apply(Map.Entry<Integer, ITaskConfig> entry) {
+          ITaskConfig task = entry.getValue();
+          Preconditions.checkArgument(entry.getKey() == task.getInstanceId());
           AssignedTask assigned = new AssignedTask()
               .setTaskId(taskIdGenerator.apply(task))
               .setInstanceId(task.getInstanceId())
@@ -208,11 +210,12 @@ public class StateManagerImpl implements StateManager {
   }
 
   @Override
-  public void insertPendingTasks(final Set<ITaskConfig> tasks) {
+  public void insertPendingTasks(final Map<Integer, ITaskConfig> tasks) {
     checkNotNull(tasks);
 
     // Done outside the write transaction to minimize the work done inside a transaction.
-    final Set<IScheduledTask> scheduledTasks = ImmutableSet.copyOf(transform(tasks, taskCreator));
+    final Set<IScheduledTask> scheduledTasks =
+        ImmutableSet.copyOf(transform(tasks.entrySet(), taskCreator));
 
     storage.write(storage.new NoResultQuietSideEffectWork() {
       @Override protected void execute(MutableStoreProvider storeProvider) {
@@ -246,11 +249,11 @@ public class StateManagerImpl implements StateManager {
    *     is already in progress.
    * @return A unique string identifying the update.
    */
-  String registerUpdate(final IJobKey jobKey, final Set<ITaskConfig> updatedTasks)
+  String registerUpdate(final IJobKey jobKey, final Map<Integer, ITaskConfig> updatedTasks)
       throws UpdateException {
 
     checkNotNull(jobKey);
-    checkNotBlank(updatedTasks);
+    checkNotBlank(updatedTasks.values());
 
     return storage.write(storage.new SideEffectWork<String, UpdateException>() {
       @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
@@ -269,19 +272,17 @@ public class StateManagerImpl implements StateManager {
           throw new UpdateException("Update already in progress for " + jobKey);
         }
 
-        Map<Integer, ITaskConfig> oldShards = Maps.uniqueIndex(existingTasks,
-            Tasks.INFO_TO_INSTANCE_ID);
-        Map<Integer, ITaskConfig> newShards = Maps.uniqueIndex(updatedTasks,
+        Map<Integer, ITaskConfig> existingInstances = Maps.uniqueIndex(existingTasks,
             Tasks.INFO_TO_INSTANCE_ID);
 
         ImmutableSet.Builder<TaskUpdateConfiguration> shardConfigBuilder = ImmutableSet.builder();
-        for (int shard : Sets.union(oldShards.keySet(), newShards.keySet())) {
+        for (int instance: Sets.union(existingInstances.keySet(), updatedTasks.keySet())) {
           shardConfigBuilder.add(
               new TaskUpdateConfiguration(
-                  Optional.fromNullable(oldShards.get(shard))
+                  Optional.fromNullable(existingInstances.get(instance))
                       .transform(ITaskConfig.TO_BUILDER)
                       .orNull(),
-                  Optional.fromNullable(newShards.get(shard))
+                  Optional.fromNullable(updatedTasks.get(instance))
                       .transform(ITaskConfig.TO_BUILDER)
                       .orNull()));
         }
@@ -503,7 +504,7 @@ public class StateManagerImpl implements StateManager {
               }
 
               // Create new tasks, so they will be moved into the PENDING state.
-              insertPendingTasks(newTasks);
+              insertPendingTasks(Maps.uniqueIndex(newTasks, Tasks.INFO_TO_INSTANCE_ID));
               putResults(result, ShardUpdateResult.ADDED, newShardIds);
             }
 
@@ -792,7 +793,7 @@ public class StateManagerImpl implements StateManager {
   @Override
   public void addInstances(
       final IJobKey jobKey,
-      final ImmutableSet<ITaskConfig> instances) throws InstanceException {
+      final ImmutableMap<Integer, ITaskConfig> instances) throws InstanceException {
 
     storage.write(storage.new NoResultSideEffectWork<InstanceException>() {
       @Override void execute(MutableStoreProvider store) throws InstanceException {
@@ -806,7 +807,7 @@ public class StateManagerImpl implements StateManager {
         Set<Integer> existingInstanceIds =
             FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet();
         Set<Integer> newInstanceIds =
-            FluentIterable.from(instances).transform(Tasks.INFO_TO_INSTANCE_ID).toSet();
+            FluentIterable.from(instances.values()).transform(Tasks.INFO_TO_INSTANCE_ID).toSet();
         if (!Sets.intersection(existingInstanceIds, newInstanceIds).isEmpty()) {
           throw new InstanceException("Instance ID collision detected.");
         }
@@ -849,8 +850,10 @@ public class StateManagerImpl implements StateManager {
       return;
     }
 
+    Map.Entry<Integer, ITaskConfig> configEntry = Iterables.getOnlyElement(ImmutableMap.of(
+        newConfig.getInstanceId(), ITaskConfig.build(newConfig)).entrySet());
     IScheduledTask newTask =
-        IScheduledTask.build(taskCreator.apply(ITaskConfig.build(newConfig)).newBuilder()
+        IScheduledTask.build(taskCreator.apply(configEntry).newBuilder()
             .setAncestorId(taskId));
     taskStore.saveTasks(ImmutableSet.of(newTask));
     createStateMachine(newTask)

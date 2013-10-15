@@ -15,11 +15,12 @@
  */
 package com.twitter.aurora.scheduler.state;
 
+import java.util.Map;
 import java.util.concurrent.Executor;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -299,8 +300,11 @@ public class CronJobManagerTest extends EasyMockTest {
     expectJobFetch();
     expectActiveTaskFetch(scheduledTask);
 
-    stateManager.insertPendingTasks(ImmutableSet.of(ITaskConfig.build(
-        parsedConfiguration.getJobConfig().getTaskConfig().newBuilder().setInstanceId(1))));
+    Map<Integer, ITaskConfig> newConfig = ImmutableMap.of(
+        1,
+        ITaskConfig.build(
+            parsedConfiguration.getJobConfig().getTaskConfig().newBuilder().setInstanceId(1)));
+    stateManager.insertPendingTasks(newConfig);
 
     control.replay();
 

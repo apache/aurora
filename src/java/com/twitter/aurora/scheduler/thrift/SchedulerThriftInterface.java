@@ -33,6 +33,7 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -272,12 +273,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     // TODO(ksweeney): check valid JobKey in description after deprecating non-environment version.
 
     Response response = new Response();
-
     try {
       PopulateJobResult result = new PopulateJobResult()
           .setPopulated(ITaskConfig.toBuildersSet(
               ParsedConfiguration.fromUnparsed(
-                  IJobConfiguration.build(description)).getTaskConfigs()));
+                  IJobConfiguration.build(description)).getTaskConfigs().values()));
       response.setResult(Result.populateJobResult(result))
           .setResponseCode(OK)
           .setMessage("Tasks populated");
@@ -966,12 +966,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @Override
   public Response addInstances(
       JobKey job,
-      Set<TaskConfig> instances,
+      Map<Integer, TaskConfig> instances,
       Lock lock,
       SessionKey session) {
 
     IJobKey key = JobKeys.assertValid(IJobKey.build(job));
-    checkNotBlank(instances);
+    checkNotBlank(instances.values());
     checkNotNull(lock);
     checkNotNull(session);
 
@@ -983,7 +983,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(key.getRole()));
       lockManager.validateLock(ILock.build(lock));
-      stateManager.addInstances(key, ITaskConfig.setFromBuilders(instances));
+      stateManager.addInstances(
+          key,
+          ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
       return resp.setResponseCode(OK).setMessage("Successfully added instances.");
     } catch (AuthFailedException e) {
       return resp.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());

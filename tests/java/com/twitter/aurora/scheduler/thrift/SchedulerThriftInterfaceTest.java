@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -993,14 +994,20 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
+  private static ImmutableMap<Integer, TaskConfig> byInstanceId(TaskConfig task) {
+    return ImmutableMap.of(task.getInstanceId(), task);
+  }
+
   @Test
   public void testAddInstances() throws Exception {
-    ImmutableSet<TaskConfig> instances = ImmutableSet.of(defaultTask(true));
+    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
     Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateLock(ILock.build(lock));
-    stateManager.addInstances(JOB_KEY, ITaskConfig.setFromBuilders(instances));
+    stateManager.addInstances(
+        JOB_KEY,
+        ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
 
     control.replay();
 
@@ -1014,12 +1021,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testAddInstancesFails() throws Exception {
-    ImmutableSet<TaskConfig> instances = ImmutableSet.of(defaultTask(true));
+    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
     Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateLock(ILock.build(lock));
-    stateManager.addInstances(JOB_KEY, ITaskConfig.setFromBuilders(instances));
+    stateManager.addInstances(
+        JOB_KEY,
+        ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
     expectLastCall().andThrow(new InstanceException("Failed"));
 
     control.replay();
@@ -1034,7 +1043,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testAddInstancesLockCheckFails() throws Exception {
-    ImmutableSet<TaskConfig> instances = ImmutableSet.of(defaultTask(true));
+    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
     Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
@@ -1053,7 +1062,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testAddInstancesAuthFails() throws Exception {
-    ImmutableSet<TaskConfig> instances = ImmutableSet.of(defaultTask(true));
+    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
     LockKey key = LockKey.job(JOB_KEY.newBuilder());
     Lock lock = new Lock().setKey(key);
     expectAuth(ROLE, false);
@@ -1071,7 +1080,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testAddInstancesFailsForCronJob() throws Exception {
-    ImmutableSet<TaskConfig> instances = ImmutableSet.of(defaultTask(true));
+    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
     Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
     control.replay();

@@ -15,10 +15,11 @@
  */
 package com.twitter.aurora.scheduler.state;
 
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
 
 import org.apache.mesos.Protos.SlaveID;
 
@@ -65,9 +66,9 @@ public interface StateManager {
    * Inserts new tasks into the store. Tasks will immediately move into PENDING and will be eligible
    * for scheduling.
    *
-   * @param tasks Tasks to insert.
+   * @param tasks Tasks to insert, mapped by their instance IDs.
    */
-  void insertPendingTasks(Set<ITaskConfig> tasks);
+  void insertPendingTasks(Map<Integer, ITaskConfig> tasks);
 
   /**
    * Deletes records of tasks from the task store.
@@ -85,10 +86,10 @@ public interface StateManager {
    * unable to add job instances due to colliding instance IDs.
    *
    * @param jobKey {@link IJobKey} identifying the parent job.
-   * @param instances Set of instances to be added to the job.
+   * @param instances Set of instances to be added to the job, mapped by their instance IDs.
    * @throws InstanceException If any of the existing instance IDs already exist.
    */
-  void addInstances(IJobKey jobKey, ImmutableSet<ITaskConfig> instances)
+  void addInstances(IJobKey jobKey, ImmutableMap<Integer, ITaskConfig> instances)
       throws InstanceException;
 
   /**

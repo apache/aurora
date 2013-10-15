@@ -526,7 +526,7 @@ service AuroraSchedulerManager {
   // A job represented by the JobKey must be protected by Lock.
   Response addInstances(
       1: JobKey job,
-      2: set<TaskConfig> instances,
+      2: map<i32, TaskConfig> instances,  // New instances, mapped by proposed instance IDs.
       3: Lock lock,
       4: SessionKey session)
 

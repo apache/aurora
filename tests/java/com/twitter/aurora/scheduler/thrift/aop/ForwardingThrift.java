@@ -15,6 +15,7 @@
  */
 package com.twitter.aurora.scheduler.thrift.aop;
 
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.thrift.TException;
@@ -250,7 +251,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   @Override
   public Response addInstances(
       JobKey job,
-      Set<TaskConfig> instances,
+      Map<Integer, TaskConfig> instances,
       Lock lock,
       SessionKey session) throws TException {
 

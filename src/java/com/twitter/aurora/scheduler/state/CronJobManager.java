@@ -33,7 +33,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -244,7 +243,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
             ParsedConfiguration config = pendingRuns.remove(jobKey);
             checkNotNull(config, "Failed to fetch job for delayed run of " + jobKey);
             LOG.info("Launching " + config.getTaskConfigs().size() + " tasks.");
-            stateManager.insertPendingTasks(FluentIterable.from(config.getTaskConfigs()).toSet());
+            stateManager.insertPendingTasks(config.getTaskConfigs());
             return true;
           } else {
             LOG.info("Not yet safe to run cron " + jobKey);
@@ -278,12 +277,12 @@ public class CronJobManager extends JobManager implements EventSubscriber {
         JobKeys.toPath(job), new Date(), job.getCronCollisionPolicy()));
     cronJobsTriggered.incrementAndGet();
 
-    ImmutableSet.Builder<ITaskConfig> builder = ImmutableSet.builder();
+    ImmutableMap.Builder<Integer, ITaskConfig> builder = ImmutableMap.builder();
     final Query.Builder activeQuery = Query.jobScoped(job.getKey()).active();
     Set<IScheduledTask> activeTasks = Storage.Util.consistentFetchTasks(storage, activeQuery);
 
     if (activeTasks.isEmpty()) {
-      builder.addAll(config.getTaskConfigs());
+      builder.putAll(config.getTaskConfigs());
     } else {
       // Assign a default collision policy.
       CronCollisionPolicy collisionPolicy = orDefault(job.getCronCollisionPolicy());
@@ -295,7 +294,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
             // Check immediately if the tasks are gone.  This could happen if the existing tasks
             // were pending.
             if (!hasTasks(activeQuery)) {
-              builder.addAll(config.getTaskConfigs());
+              builder.putAll(config.getTaskConfigs());
             } else {
               delayedRun(activeQuery, config);
             }
@@ -313,7 +312,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
           Map<Integer, ScheduleStatus> existingTasks =
               Maps.transformValues(byInstance, Tasks.GET_STATUS);
           if (existingTasks.isEmpty()) {
-            builder.addAll(config.getTaskConfigs());
+            builder.putAll(config.getTaskConfigs());
           } else if (Iterables.any(existingTasks.values(), Predicates.equalTo(PENDING))) {
             LOG.info("Job " + JobKeys.toPath(job) + " has pending tasks, suppressing run.");
           } else {
@@ -322,9 +321,11 @@ public class CronJobManager extends JobManager implements EventSubscriber {
             int instanceOffset = Ordering.natural().max(existingTasks.keySet()) + 1;
             LOG.info("Adjusting instance IDs of " + JobKeys.toPath(job) + " by " + instanceOffset
                 + " for overlapping cron run.");
-            for (ITaskConfig task : config.getTaskConfigs()) {
-              builder.add(ITaskConfig.build(
-                  task.newBuilder().setInstanceId(task.getInstanceId() + instanceOffset)));
+            for (ITaskConfig task : config.getTaskConfigs().values()) {
+              int instanceId = task.getInstanceId() + instanceOffset;
+              builder.put(
+                  instanceId,
+                  ITaskConfig.build(task.newBuilder().setInstanceId(instanceId)));
             }
           }
           break;
@@ -334,7 +335,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
       }
     }
 
-    Set<ITaskConfig> newTasks = builder.build();
+    Map<Integer, ITaskConfig> newTasks = builder.build();
     if (!newTasks.isEmpty()) {
       stateManager.insertPendingTasks(newTasks);
     }

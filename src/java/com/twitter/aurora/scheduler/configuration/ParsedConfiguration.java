@@ -15,11 +15,11 @@
  */
 package com.twitter.aurora.scheduler.configuration;
 
-import java.util.Set;
+import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
 
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -32,7 +32,7 @@ import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 public final class ParsedConfiguration {
 
   private final IJobConfiguration parsed;
-  private final Set<ITaskConfig> tasks;
+  private final Map<Integer, ITaskConfig> tasks;
 
   /**
    * Constructs a ParsedConfiguration object and populates the set of {@link ITaskConfig}s for
@@ -43,9 +43,12 @@ public final class ParsedConfiguration {
   @VisibleForTesting
   public ParsedConfiguration(IJobConfiguration parsed) {
     this.parsed = parsed;
-    ImmutableSet.Builder<ITaskConfig> builder = ImmutableSet.builder();
+
+    // TODO(William Farner): Use Range.closedOpen, Maps.toMap, and Functions.constant once
+    //                       TaskConfig instances are not duplicated.
+    ImmutableMap.Builder<Integer, ITaskConfig> builder = ImmutableMap.builder();
     for (int i = 0; i < parsed.getInstanceCount(); i++) {
-      builder.add(ITaskConfig.build(parsed.getTaskConfig().newBuilder().setInstanceId(i)));
+      builder.put(i, ITaskConfig.build(parsed.getTaskConfig().newBuilder().setInstanceId(i)));
     }
     this.tasks = builder.build();
   }
@@ -67,7 +70,7 @@ public final class ParsedConfiguration {
     return parsed;
   }
 
-  public Set<ITaskConfig> getTaskConfigs() {
+  public Map<Integer, ITaskConfig> getTaskConfigs() {
     return tasks;
   }
 

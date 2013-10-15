@@ -142,7 +142,7 @@ class SchedulerCoreImpl implements SchedulerCore {
     }
 
     // TODO(William Farner); This is a short-term hack to stop the bleeding from MESOS-3788.
-    checkTaskIdLength(Iterables.getFirst(parsedConfiguration.getTaskConfigs(), null));
+    checkTaskIdLength(Iterables.getFirst(parsedConfiguration.getTaskConfigs().values(), null));
     checkFilterPasses(job);
 
     boolean accepted = false;
