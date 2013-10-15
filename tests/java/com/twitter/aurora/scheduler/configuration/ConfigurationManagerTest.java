@@ -50,7 +50,7 @@ public class ConfigurationManagerTest {
       .setKey(new JobKey("owner-role", DEFAULT_ENVIRONMENT, "email_stats"))
       .setCronSchedule("0 2 * * *")
       .setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING)
-      .setShardCount(1)
+      .setInstanceCount(1)
       .setTaskConfig(
           new TaskConfig()
               .setIsService(false)

@@ -44,7 +44,7 @@ public final class ParsedConfiguration {
   public ParsedConfiguration(IJobConfiguration parsed) {
     this.parsed = parsed;
     ImmutableSet.Builder<ITaskConfig> builder = ImmutableSet.builder();
-    for (int i = 0; i < parsed.getShardCount(); i++) {
+    for (int i = 0; i < parsed.getInstanceCount(); i++) {
       builder.add(ITaskConfig.build(parsed.getTaskConfig().newBuilder().setInstanceId(i)));
     }
     this.tasks = builder.build();

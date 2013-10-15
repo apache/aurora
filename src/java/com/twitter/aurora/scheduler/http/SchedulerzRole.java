@@ -215,7 +215,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
                 .put("jobKey", job.getKey())
                 .put("name", job.getKey().getName())
                 .put("environment", job.getKey().getEnvironment())
-                .put("pendingTaskCount", job.getShardCount())
+                .put("pendingTaskCount", job.getInstanceCount())
                 .put("cronSchedule", job.getCronSchedule())
                 .put("nextRun", cronPredictor.predictNextRun(job.getCronSchedule()).getTime())
                 .put("cronCollisionPolicy", cronCollisionPolicy(job))

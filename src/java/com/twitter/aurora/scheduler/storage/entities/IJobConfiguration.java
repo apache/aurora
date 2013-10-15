@@ -130,12 +130,12 @@ public final class IJobConfiguration {
     return taskConfig;
   }
 
-  public boolean isSetShardCount() {
-    return wrapped.isSetShardCount();
+  public boolean isSetInstanceCount() {
+    return wrapped.isSetInstanceCount();
   }
 
-  public int getShardCount() {
-    return wrapped.getShardCount();
+  public int getInstanceCount() {
+    return wrapped.getInstanceCount();
   }
 
   @Override

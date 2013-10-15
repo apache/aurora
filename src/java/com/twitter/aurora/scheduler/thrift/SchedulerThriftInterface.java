@@ -253,7 +253,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       schedulerCore.createJob(parsed);
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
-              parsed.getJobConfig().getShardCount(), JobKeys.toPath(job)));
+              parsed.getJobConfig().getInstanceCount(), JobKeys.toPath(job)));
     } catch (ConfigurationManager.TaskDescriptionException e) {
       response.setResponseCode(INVALID_REQUEST)
           .setMessage("Invalid task description: " + e.getMessage());
@@ -369,7 +369,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                 .setKey(jobKey.newBuilder())
                 .setOwner(firstTask.getAssignedTask().getTask().getOwner())
                 .setTaskConfig(firstTask.getAssignedTask().getTask())
-                .setShardCount(tasks.size()));
+                .setInstanceCount(tasks.size()));
           }
         }));
 

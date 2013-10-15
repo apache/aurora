@@ -251,15 +251,15 @@ public final class ConfigurationManager {
       throw new TaskDescriptionException("Job configuration must have taskConfig set.");
     }
 
-    if (!job.isSetShardCount()) {
+    if (!job.isSetInstanceCount()) {
       throw new TaskDescriptionException("Job configuration does not have shardCount set.");
     }
 
-    if (job.getShardCount() <= 0) {
+    if (job.getInstanceCount() <= 0) {
       throw new TaskDescriptionException("Shard count must be positive.");
     }
 
-    if (job.getShardCount() > MAX_TASKS_PER_JOB.get()) {
+    if (job.getInstanceCount() > MAX_TASKS_PER_JOB.get()) {
       throw new TaskDescriptionException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
     }
 

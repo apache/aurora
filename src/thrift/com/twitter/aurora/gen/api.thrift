@@ -188,20 +188,20 @@ enum CronCollisionPolicy {
 // heterogeneous.  One task will be scheduled for each task description.
 // The tuple (name, environment, owner.role) must be unique.
 struct JobConfiguration {
-  9: JobKey key                              // Key for this job. If not specified
-                                             // name, owner.role, and a reasonable default
-                                             // environment are used to construct it server-side.
-                                             // TODO(William Farner): Deprecate Identity and
-                                             // use JobKey instead (MESOS-4006).
-  7: Identity owner                          // Owner of this job.
-  4: string cronSchedule                     // If present, the job will be handled as a cron job
-                                             // with this crontab-syntax schedule.
-  5: CronCollisionPolicy cronCollisionPolicy // Collision policy to use when handling overlapping
-                                             // cron runs.  Default is KILL_EXISTING.
-  6: TaskConfig taskConfig                   // Task configuration for this job.
-  8: i32 shardCount                          // The number of shards in the job.  Generated
-                                             // shard IDs for tasks will be in the range
-                                             // [0, shardCount).
+  9: JobKey key                               // Key for this job. If not specified
+                                              // name, owner.role, and a reasonable default
+                                              // environment are used to construct it server-side.
+                                              // TODO(William Farner): Deprecate Identity and
+                                              // use JobKey instead (MESOS-4006).
+  7: Identity owner                           // Owner of this job.
+  4: string cronSchedule                      // If present, the job will be handled as a cron job
+                                              // with this crontab-syntax schedule.
+  5: CronCollisionPolicy cronCollisionPolicy  // Collision policy to use when handling overlapping
+                                              // cron runs.  Default is KILL_EXISTING.
+  6: TaskConfig taskConfig                    // Task configuration for this job.
+  8: i32 instanceCount                        // The number of instances in the job.  Generated
+                                              // instance IDs for tasks will be in the range
+                                              // [0, instances).
 }
 
 struct PopulateJobResult {

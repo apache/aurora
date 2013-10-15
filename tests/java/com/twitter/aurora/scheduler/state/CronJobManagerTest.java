@@ -339,7 +339,7 @@ public class CronJobManagerTest extends EasyMockTest {
         .setKey(JobKeys.from(OWNER, ENVIRONMENT, JOB_NAME).newBuilder())
         .setCronSchedule("1 1 1 1 1")
         .setTaskConfig(defaultTask())
-        .setShardCount(1));
+        .setInstanceCount(1));
   }
 
   private static TaskConfig defaultTask() {

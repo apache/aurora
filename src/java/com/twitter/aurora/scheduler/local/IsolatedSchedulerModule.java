@@ -265,7 +265,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
       return new JobConfiguration()
           .setKey(JobKeys.from(owner.getRole(), "test", jobName).newBuilder())
           .setOwner(owner)
-          .setShardCount(5)
+          .setInstanceCount(5)
           .setTaskConfig(new TaskConfig()
               .setOwner(owner)
               .setJobName(jobName)

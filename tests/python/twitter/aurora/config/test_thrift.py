@@ -45,7 +45,7 @@ HELLO_WORLD = Job(
 
 def test_simple_config():
   job = convert_pystachio_to_thrift(HELLO_WORLD)
-  assert job.shardCount == 1
+  assert job.instanceCount == 1
   tti = job.taskConfig
   assert job.key == JobKey(
     role=HELLO_WORLD.role().get(),
@@ -80,7 +80,7 @@ def test_config_with_options():
     environment = 'prod'
   )
   job = convert_pystachio_to_thrift(hwc)
-  assert job.shardCount == 1
+  assert job.instanceCount == 1
   tti = job.taskConfig
 
   assert tti.production == True
@@ -193,7 +193,7 @@ def test_cron_policy_alias():
 
 def test_packages_in_config():
   job = convert_pystachio_to_thrift(HELLO_WORLD, packages = [('alpha', 'beta', 1)])
-  assert job.shardCount == 1
+  assert job.instanceCount == 1
   tti = job.taskConfig
 
   assert len(tti.packages) == 1

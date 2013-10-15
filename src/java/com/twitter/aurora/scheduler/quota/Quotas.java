@@ -53,7 +53,7 @@ public final class Quotas {
    * @return Quota requirement to run {@code job}.
    */
   public static IQuota fromJob(IJobConfiguration job) {
-    return scale(fromProductionTasks(ImmutableSet.of(job.getTaskConfig())), job.getShardCount());
+    return scale(fromProductionTasks(ImmutableSet.of(job.getTaskConfig())), job.getInstanceCount());
   }
 
   // TODO(Suman Karumuri): Refactor this function in to a new class.

@@ -192,8 +192,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateHomogeneousJobNoShards() throws Exception {
     JobConfiguration job = makeJob();
-    job.setShardCount(0);
-    job.unsetShardCount();
+    job.setInstanceCount(0);
+    job.unsetInstanceCount();
     expectAuth(ROLE, true);
 
     control.replay();
@@ -205,7 +205,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateHomogeneousJob() throws Exception {
     JobConfiguration job = makeJob();
-    job.setShardCount(2);
+    job.setInstanceCount(2);
     expectAuth(ROLE, true);
     ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(IJobConfiguration.build(job));
     assertEquals(2, parsed.getTaskConfigs().size());
@@ -870,7 +870,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration ownedImmediateJob = new JobConfiguration()
         .setKey(JOB_KEY.newBuilder().setName("immediate"))
         .setOwner(ROLE_IDENTITY)
-        .setShardCount(1)
+        .setInstanceCount(1)
         .setTaskConfig(ownedImmediateTaskInfo);
     Query.Builder query = Query.roleScoped(ROLE).active();
 
@@ -932,7 +932,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration immediateJob = new JobConfiguration()
         .setKey(JOB_KEY.newBuilder().setName("immediate"))
         .setOwner(ROLE_IDENTITY)
-        .setShardCount(1)
+        .setInstanceCount(1)
         .setTaskConfig(immediateTaskConfig);
 
     Set<JobConfiguration> crons = ImmutableSet.of(cronJobOne, cronJobTwo);
@@ -1187,7 +1187,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private JobConfiguration makeJob(TaskConfig task, int shardCount) {
     return new JobConfiguration()
         .setOwner(ROLE_IDENTITY)
-        .setShardCount(shardCount)
+        .setInstanceCount(shardCount)
         .setTaskConfig(task)
         .setKey(JOB_KEY.newBuilder());
   }

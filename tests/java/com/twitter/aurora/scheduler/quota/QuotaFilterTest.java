@@ -38,7 +38,7 @@ public class QuotaFilterTest extends EasyMockTest {
       .setDiskMb(QUOTA.getDiskMb()));
   private static final IJobConfiguration JOB = IJobConfiguration.build(new JobConfiguration()
       .setKey(JOB_KEY.newBuilder())
-      .setShardCount(1)
+      .setInstanceCount(1)
       .setTaskConfig(TASK_CONFIG.newBuilder()));
 
   private QuotaFilter quotaFilter;
@@ -105,7 +105,7 @@ public class QuotaFilterTest extends EasyMockTest {
     int numTasks = DEFAULT_TASKS_IN_QUOTA;
     int additionalTasks = 1;
 
-    JobConfiguration jobBuilder = JOB.newBuilder().setShardCount(numTasks + additionalTasks);
+    JobConfiguration jobBuilder = JOB.newBuilder().setInstanceCount(numTasks + additionalTasks);
     jobBuilder.getTaskConfig().setProduction(true);
 
     IScheduledTask[] scheduledTasks = new IScheduledTask[numTasks];

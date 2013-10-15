@@ -1897,7 +1897,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     JobConfiguration job = new JobConfiguration()
         .setOwner(makeIdentity(jobKey.newBuilder()))
         .setKey(jobKey.newBuilder())
-        .setShardCount(numTasks)
+        .setInstanceCount(numTasks)
         .setTaskConfig(new TaskConfig(task)
           .setOwner(makeIdentity(jobKey.newBuilder()))
           .setEnvironment(jobKey.getEnvironment())
