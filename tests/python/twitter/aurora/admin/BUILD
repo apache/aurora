@@ -9,6 +9,7 @@ python_tests(name = 'mesos_maintenance',
   dependencies = [
     pants('src/python/twitter/aurora/admin:mesos_maintenance'),
     pants('src/python/twitter/aurora/common_internal:clusters'),
-    pants('3rdparty/python:mox'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('3rdparty/python:mock'),
   ],
 )
