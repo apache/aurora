@@ -204,12 +204,12 @@ public interface PubsubEvent {
   public static class TaskRescheduled implements PubsubEvent {
     private final String role;
     private final String job;
-    private final int shard;
+    private final int instance;
 
-    public TaskRescheduled(String role, String job, int shard) {
+    public TaskRescheduled(String role, String job, int instance) {
       this.role = role;
       this.job = job;
-      this.shard = shard;
+      this.instance = instance;
     }
 
     public String getRole() {
@@ -220,8 +220,8 @@ public interface PubsubEvent {
       return job;
     }
 
-    public int getShard() {
-      return shard;
+    public int getInstance() {
+      return instance;
     }
 
     @Override
@@ -233,12 +233,12 @@ public interface PubsubEvent {
       TaskRescheduled other = (TaskRescheduled) o;
       return Objects.equal(role, other.role)
           && Objects.equal(job, other.job)
-          && Objects.equal(shard, other.shard);
+          && Objects.equal(instance, other.instance);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(role, job, shard);
+      return Objects.hashCode(role, job, instance);
     }
   }
 

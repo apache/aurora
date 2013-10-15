@@ -62,20 +62,20 @@
           <div  id="scheduling-details" class="collapse" style="width: 400px; margin-top: 10px;">
             <table class="table table-condensed" style="margin-bottom: 0px;">
               <thead>
-                <th>Shards
+                <th>Instances
                 <th>Details
               </thead>
               <tbody>
-                $schedulingDetails.keys:{ shards |
+                $schedulingDetails.keys:{ instances |
                 <tr>
-                  <td style='text-align:center; vertical-align:middle'>$shards$
+                  <td style='text-align:center; vertical-align:middle'>$instances$
                   <td>
                     <table class="table table-condensed" style="margin-bottom: 0px;">
                       <tbody>
-                      $schedulingDetails.(shards).details.keys: { name |
+                      $schedulingDetails.(instances).details.keys: { name |
                         <tr>
                           <td>$name$
-                          <td>$schedulingDetails.(shards).details.(name)$
+                          <td>$schedulingDetails.(instances).details.(name)$
                         </tr>
                       }$
                       </tbody>
@@ -98,7 +98,7 @@
           <h3>Active Tasks</h3>
           <table class="table table-striped table-condensed table-hover">
             <thead>
-              <th>Shard
+              <th>Instance
               <th>Status
               $if(admin)$
               <th>Task ID
@@ -109,7 +109,7 @@
               $activeTasks:{ task |
               <tr>
                 <td style='vertical-align:middle'>
-                  $task.shardId$ $task.links.keys, task.links.values: { k, v | <a href='$v$'>$k$</a> }$
+                  $task.instanceId$ $task.links.keys, task.links.values: { k, v | <a href='$v$'>$k$</a> }$
                 <td style='vertical-align:middle'>
                   <a href='#accordion-$task.taskId$' class='expand-btn' title='Show details'>
                     <i class='icon-plus'></i>
@@ -149,7 +149,7 @@
         <h3>Completed Tasks</h3>
         <table class="table table-striped table-condensed table-hover">
           <thead>
-            <th>Shard
+            <th>Instance
             <th>Status
             <th>Running duration
             $if(admin)$
@@ -160,7 +160,7 @@
           <tbody>
           $completedTasks:{ task |
           <tr>
-            <td>$task.shardId$
+            <td>$task.instanceId$
             <td style='vertical-align:middle'>
               <a href='#collapse-$task.taskId$' class='expand-btn' title='Show details'>
                 <i class='icon-plus'></i>

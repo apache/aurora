@@ -63,8 +63,8 @@ import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
  * who also have {@code equal()} {@link ITaskConfig} values.
  * <p>
  * This is used to prevent redundant work in trying to schedule tasks as well as to provide
- * nearly-equal responsiveness when scheduling across jobs.  In other words, a 1000 shard job cannot
- * starve a 1 shard job.
+ * nearly-equal responsiveness when scheduling across jobs.  In other words, a 1000 instance job
+ * cannot starve a 1 instance job.
  */
 public class TaskGroups implements EventSubscriber {
 

@@ -92,8 +92,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
   private static final String OFFSET_PARAM = "o";
   private static final int PAGE_SIZE = 50;
 
-  private static final Ordering<IScheduledTask> SHARD_ID_COMPARATOR =
-    Ordering.natural().onResultOf(Tasks.SCHEDULED_TO_SHARD_ID);
+  private static final Ordering<IScheduledTask> INSTANCE_ID_COMPARATOR =
+    Ordering.natural().onResultOf(Tasks.SCHEDULED_TO_INSTANCE_ID);
 
   private static final Map<ScheduleStatus, Set<ScheduleStatus>> FILTER_MAP =
       ImmutableMap.<ScheduleStatus, Set<ScheduleStatus>>builder()
@@ -129,7 +129,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
   // Double percents to escape formatting sequence.
   private static final String PORT_FORMAT = "%%port:%s%%";
-  private static final String SHARD_ID_REGEXP = "%shard_id%";
+  // TODO(William Farner): Search for usage of this, figure out a deprecation strategy to switch
+  //                       to %instance_id%.
+  private static final String INSTANCE_ID_REGEXP = "%shard_id%";
   private static final String TASK_ID_REGEXP = "%task_id%";
   private static final String HOST_REGEXP = "%host%";
 
@@ -137,7 +139,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
     String expanded = value;
     ITaskConfig config = task.getTask();
 
-    expanded = expanded.replaceAll(SHARD_ID_REGEXP, String.valueOf(config.getInstanceId()));
+    expanded = expanded.replaceAll(INSTANCE_ID_REGEXP, String.valueOf(config.getInstanceId()));
     expanded = expanded.replaceAll(TASK_ID_REGEXP, task.getTaskId());
 
     if (task.isSetSlaveHost()) {
@@ -162,7 +164,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           final IAssignedTask task = scheduledTask.getAssignedTask();
           ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
             .put("taskId", task.getTaskId())
-            .put("shardId", task.getTask().getInstanceId())
+            .put("instanceId", task.getTask().getInstanceId())
             .put("slaveHost", task.isSetSlaveHost() ? task.getSlaveHost() : "")
             .put("status", scheduledTask.getStatus())
             .put("statusTimestamp", Iterables.getLast(scheduledTask.getTaskEvents()).getTimestamp())
@@ -327,14 +329,14 @@ public class SchedulerzJob extends JerseyTemplateServlet {
   private static Map<String, SchedulingDetails> buildSchedulingTable(
       Iterable<ITaskConfig> tasks) {
 
-    Map<Integer, ITaskConfig> byShard = Maps.uniqueIndex(tasks, Tasks.INFO_TO_SHARD_ID);
-    Map<Integer, SchedulingDetails> detailsByShard =
-        Maps.transformValues(byShard, CONFIG_TO_DETAILS);
-    Multimap<SchedulingDetails, Integer> shardsByDetails = Multimaps.invertFrom(
-        Multimaps.forMap(detailsByShard), HashMultimap.<SchedulingDetails, Integer>create());
-    Map<SchedulingDetails, String> shardStringsByDetails =
-        Maps.transformValues(shardsByDetails.asMap(), TransformationUtils.SHARDS_TOSTRING);
-    return HashBiMap.create(shardStringsByDetails).inverse();
+    Map<Integer, ITaskConfig> byInstance = Maps.uniqueIndex(tasks, Tasks.INFO_TO_INSTANCE_ID);
+    Map<Integer, SchedulingDetails> detailsByInstance =
+        Maps.transformValues(byInstance, CONFIG_TO_DETAILS);
+    Multimap<SchedulingDetails, Integer> instancesByDetails = Multimaps.invertFrom(
+        Multimaps.forMap(detailsByInstance), HashMultimap.<SchedulingDetails, Integer>create());
+    Map<SchedulingDetails, String> instanceStringsByDetails =
+        Maps.transformValues(instancesByDetails.asMap(), TransformationUtils.INSTANCES_TOSTRING);
+    return HashBiMap.create(instanceStringsByDetails).inverse();
   }
 
   /**
@@ -397,7 +399,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         if (activeQuery.isPresent()) {
           Set<IScheduledTask> activeTasks =
               Storage.Util.weaklyConsistentFetchTasks(storage, activeQuery.get());
-          List<IScheduledTask> liveTasks = SHARD_ID_COMPARATOR.sortedCopy(activeTasks);
+          List<IScheduledTask> liveTasks = INSTANCE_ID_COMPARATOR.sortedCopy(activeTasks);
           template.setAttribute("activeTasks",
               ImmutableList.copyOf(
                   Iterables.transform(offsetAndLimit(liveTasks, offset), taskToStringMap)));

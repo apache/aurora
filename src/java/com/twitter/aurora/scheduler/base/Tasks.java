@@ -70,15 +70,15 @@ public final class Tasks {
   public static final Function<IScheduledTask, String> SCHEDULED_TO_ID =
       Functions.compose(ASSIGNED_TO_ID, SCHEDULED_TO_ASSIGNED);
 
-  public static final Function<ITaskConfig, Integer> INFO_TO_SHARD_ID =
+  public static final Function<ITaskConfig, Integer> INFO_TO_INSTANCE_ID =
       new Function<ITaskConfig, Integer>() {
         @Override public Integer apply(ITaskConfig task) {
           return task.getInstanceId();
         }
       };
 
-  public static final Function<IScheduledTask, Integer> SCHEDULED_TO_SHARD_ID =
-      Functions.compose(INFO_TO_SHARD_ID, SCHEDULED_TO_INFO);
+  public static final Function<IScheduledTask, Integer> SCHEDULED_TO_INSTANCE_ID =
+      Functions.compose(INFO_TO_INSTANCE_ID, SCHEDULED_TO_INFO);
 
   public static final Function<ITaskConfig, IJobKey> INFO_TO_JOB_KEY =
       new Function<ITaskConfig, IJobKey>() {

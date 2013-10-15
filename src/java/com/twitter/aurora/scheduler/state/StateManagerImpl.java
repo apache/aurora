@@ -86,9 +86,9 @@ import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 import static com.twitter.aurora.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.aurora.gen.ScheduleStatus.UNKNOWN;
 import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
-import static com.twitter.aurora.scheduler.base.Shards.GET_NEW_CONFIG;
-import static com.twitter.aurora.scheduler.base.Shards.GET_ORIGINAL_CONFIG;
-import static com.twitter.aurora.scheduler.base.Tasks.SCHEDULED_TO_SHARD_ID;
+import static com.twitter.aurora.scheduler.base.TaskInstances.GET_NEW_CONFIG;
+import static com.twitter.aurora.scheduler.base.TaskInstances.GET_ORIGINAL_CONFIG;
+import static com.twitter.aurora.scheduler.base.Tasks.SCHEDULED_TO_INSTANCE_ID;
 import static com.twitter.aurora.scheduler.state.SideEffectStorage.OperationFinalizer;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
@@ -270,9 +270,9 @@ public class StateManagerImpl implements StateManager {
         }
 
         Map<Integer, ITaskConfig> oldShards = Maps.uniqueIndex(existingTasks,
-            Tasks.INFO_TO_SHARD_ID);
+            Tasks.INFO_TO_INSTANCE_ID);
         Map<Integer, ITaskConfig> newShards = Maps.uniqueIndex(updatedTasks,
-            Tasks.INFO_TO_SHARD_ID);
+            Tasks.INFO_TO_INSTANCE_ID);
 
         ImmutableSet.Builder<TaskUpdateConfiguration> shardConfigBuilder = ImmutableSet.builder();
         for (int shard : Sets.union(oldShards.keySet(), newShards.keySet())) {
@@ -369,7 +369,7 @@ public class StateManagerImpl implements StateManager {
     });
   }
 
-  private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD_ID =
+  private static final Function<TaskUpdateConfiguration, Integer> GET_INSTANCE_ID =
       new Function<TaskUpdateConfiguration, Integer>() {
         @Override public Integer apply(TaskUpdateConfiguration config) {
           TaskConfig task = (config.getOldConfig() != null)
@@ -385,7 +385,7 @@ public class StateManagerImpl implements StateManager {
 
     return FluentIterable.from(jobConfig.getConfigs())
         .filter(Predicates.compose(Predicates.isNull(), configSelector))
-        .transform(GET_SHARD_ID)
+        .transform(GET_INSTANCE_ID)
         .toSet();
   }
 
@@ -442,7 +442,7 @@ public class StateManagerImpl implements StateManager {
         .toSet();
     Set<ITaskConfig> changedTasks = Sets.difference(compareTo, existingTasks);
     return FluentIterable.from(changedTasks)
-        .transform(Tasks.INFO_TO_SHARD_ID)
+        .transform(Tasks.INFO_TO_INSTANCE_ID)
         .toSet();
   }
 
@@ -488,7 +488,7 @@ public class StateManagerImpl implements StateManager {
 
             // Extract any shard IDs that are being added as a part of this stage in the update.
             Set<Integer> newShardIds = Sets.difference(shards,
-                ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_SHARD_ID)));
+                ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_INSTANCE_ID)));
 
             if (!newShardIds.isEmpty()) {
               Set<ITaskConfig> newTasks = fetchTaskUpdateConfigs(
@@ -496,7 +496,7 @@ public class StateManagerImpl implements StateManager {
                   newShardIds,
                   configSelector);
               Set<Integer> unrecognizedShards = Sets.difference(newShardIds,
-                  ImmutableSet.copyOf(Iterables.transform(newTasks, Tasks.INFO_TO_SHARD_ID)));
+                  ImmutableSet.copyOf(Iterables.transform(newTasks, Tasks.INFO_TO_INSTANCE_ID)));
               if (!unrecognizedShards.isEmpty()) {
                 throw new UpdateException(
                     "Cannot update unrecognized shards " + unrecognizedShards);
@@ -803,10 +803,11 @@ public class StateManagerImpl implements StateManager {
           throw new InstanceException(String.format("Job %s does not exist!", jobKey));
         }
 
-        if (!Sets.intersection(
-            FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_SHARD_ID).toSet(),
-            FluentIterable.from(instances).transform(Tasks.INFO_TO_SHARD_ID).toSet()).isEmpty()) {
-
+        Set<Integer> existingInstanceIds =
+            FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet();
+        Set<Integer> newInstanceIds =
+            FluentIterable.from(instances).transform(Tasks.INFO_TO_INSTANCE_ID).toSet();
+        if (!Sets.intersection(existingInstanceIds, newInstanceIds).isEmpty()) {
           throw new InstanceException("Instance ID collision detected.");
         }
 

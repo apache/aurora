@@ -45,11 +45,11 @@ final class TransformationUtils {
         }
       };
 
-  public static final Function<Collection<Integer>, String> SHARDS_TOSTRING =
+  public static final Function<Collection<Integer>, String> INSTANCES_TOSTRING =
       new Function<Collection<Integer>, String>() {
-        @Override public String apply(Collection<Integer> shards) {
+        @Override public String apply(Collection<Integer> instances) {
           return Joiner.on(", ")
-              .join(Iterables.transform(Numbers.toRanges(shards), RANGE_TOSTRING));
+              .join(Iterables.transform(Numbers.toRanges(instances), RANGE_TOSTRING));
         }
       };
 

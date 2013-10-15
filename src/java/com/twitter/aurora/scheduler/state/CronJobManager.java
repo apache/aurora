@@ -308,23 +308,23 @@ public class CronJobManager extends JobManager implements EventSubscriber {
           break;
 
         case RUN_OVERLAP:
-          Map<Integer, IScheduledTask> byShard =
-              Maps.uniqueIndex(activeTasks, Tasks.SCHEDULED_TO_SHARD_ID);
+          Map<Integer, IScheduledTask> byInstance =
+              Maps.uniqueIndex(activeTasks, Tasks.SCHEDULED_TO_INSTANCE_ID);
           Map<Integer, ScheduleStatus> existingTasks =
-              Maps.transformValues(byShard, Tasks.GET_STATUS);
+              Maps.transformValues(byInstance, Tasks.GET_STATUS);
           if (existingTasks.isEmpty()) {
             builder.addAll(config.getTaskConfigs());
           } else if (Iterables.any(existingTasks.values(), Predicates.equalTo(PENDING))) {
             LOG.info("Job " + JobKeys.toPath(job) + " has pending tasks, suppressing run.");
           } else {
-            // To safely overlap this run, we need to adjust the shard IDs of the overlapping
-            // run (maintaining the role/job/shard UUID invariant).
-            int shardOffset = Ordering.natural().max(existingTasks.keySet()) + 1;
-            LOG.info("Adjusting shard IDs of " + JobKeys.toPath(job) + " by " + shardOffset
+            // To safely overlap this run, we need to adjust the instance IDs of the overlapping
+            // run (maintaining the role/job/instance UUID invariant).
+            int instanceOffset = Ordering.natural().max(existingTasks.keySet()) + 1;
+            LOG.info("Adjusting instance IDs of " + JobKeys.toPath(job) + " by " + instanceOffset
                 + " for overlapping cron run.");
             for (ITaskConfig task : config.getTaskConfigs()) {
               builder.add(ITaskConfig.build(
-                  task.newBuilder().setInstanceId(task.getInstanceId() + shardOffset)));
+                  task.newBuilder().setInstanceId(task.getInstanceId() + instanceOffset)));
             }
           }
           break;

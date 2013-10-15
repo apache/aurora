@@ -1170,9 +1170,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       Closure<IScheduledTask> updatedTaskChecker) {
 
     Map<Integer, IScheduledTask> fetchedShards =
-        Maps.uniqueIndex(tasks, Tasks.SCHEDULED_TO_SHARD_ID);
+        Maps.uniqueIndex(tasks, Tasks.SCHEDULED_TO_INSTANCE_ID);
     Map<Integer, ITaskConfig> originalConfigsByShard =
-        Maps.uniqueIndex(job.getTaskConfigs(), Tasks.INFO_TO_SHARD_ID);
+        Maps.uniqueIndex(job.getTaskConfigs(), Tasks.INFO_TO_INSTANCE_ID);
     assertEquals(originalConfigsByShard.keySet(), fetchedShards.keySet());
     for (IScheduledTask task : tasks) {
       updatedTaskChecker.execute(task);
@@ -1197,7 +1197,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       Optional<String> updateToken = scheduler.initiateJobUpdate(updatedJob);
 
       Set<Integer> jobShards = FluentIterable.from(updatedJob.getTaskConfigs())
-          .transform(Tasks.INFO_TO_SHARD_ID).toSet();
+          .transform(Tasks.INFO_TO_INSTANCE_ID).toSet();
 
       UpdateResult result = performRegisteredUpdate(
           updatedJob.getJobConfig(),

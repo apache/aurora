@@ -26,7 +26,7 @@ import com.google.inject.Inject;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.Shards;
+import com.twitter.aurora.scheduler.base.TaskInstances;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
@@ -91,8 +91,8 @@ public interface QuotaManager {
                 // If the user is performing an update that increases the quota for the job,
                 // bill them for the updated job.
                 IQuota additionalQuota = Quotas.subtract(
-                    getUpdateQuota(updateConfig.getConfigs(), Shards.GET_NEW_CONFIG),
-                    getUpdateQuota(updateConfig.getConfigs(), Shards.GET_ORIGINAL_CONFIG)
+                    getUpdateQuota(updateConfig.getConfigs(), TaskInstances.GET_NEW_CONFIG),
+                    getUpdateQuota(updateConfig.getConfigs(), TaskInstances.GET_ORIGINAL_CONFIG)
                 );
                 if (Quotas.greaterThan(additionalQuota, Quotas.noQuota())) {
                   quota = Quotas.add(quota, additionalQuota);

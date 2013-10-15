@@ -77,136 +77,136 @@ public class Mname {
   public Response getUsage() {
     return Response
         .status(Status.BAD_REQUEST)
-        .entity("<html>Usage: /mname/{role}/{env}/{job}/{shard}</html>")
+        .entity("<html>Usage: /mname/{role}/{env}/{job}/{instance}</html>")
         .build();
   }
 
   @GET
-  @Path("/{role}/{env}/{job}/{shard}/{forward:.+}")
+  @Path("/{role}/{env}/{job}/{instance}/{forward:.+}")
   @Produces(MediaType.TEXT_HTML)
   public Response getWithForwardRequest(
       @PathParam("role") String role,
       @PathParam("env") String env,
       @PathParam("job") String job,
-      @PathParam("shard") int shardId,
+      @PathParam("instance") int instanceId,
       @PathParam("forward") String forward,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, shardId, uriInfo, Optional.of(forward));
+    return get(role, env, job, instanceId, uriInfo, Optional.of(forward));
   }
 
   @PUT
-  @Path("/{role}/{env}/{job}/{shard}/{forward:.+}")
+  @Path("/{role}/{env}/{job}/{instance}/{forward:.+}")
   @Produces(MediaType.TEXT_HTML)
   public Response putWithForwardRequest(
       @PathParam("role") String role,
       @PathParam("env") String env,
       @PathParam("job") String job,
-      @PathParam("shard") int shardId,
+      @PathParam("instance") int instanceId,
       @PathParam("forward") String forward,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, shardId, uriInfo, Optional.of(forward));
+    return get(role, env, job, instanceId, uriInfo, Optional.of(forward));
   }
 
   @POST
-  @Path("/{role}/{env}/{job}/{shard}/{forward:.+}")
+  @Path("/{role}/{env}/{job}/{instance}/{forward:.+}")
   @Produces(MediaType.TEXT_HTML)
   public Response postWithForwardRequest(
       @PathParam("role") String role,
       @PathParam("env") String env,
       @PathParam("job") String job,
-      @PathParam("shard") int shardId,
+      @PathParam("instance") int instanceId,
       @PathParam("forward") String forward,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, shardId, uriInfo, Optional.of(forward));
+    return get(role, env, job, instanceId, uriInfo, Optional.of(forward));
   }
 
   @DELETE
-  @Path("/{role}/{env}/{job}/{shard}/{forward:.+}")
+  @Path("/{role}/{env}/{job}/{instance}/{forward:.+}")
   @Produces(MediaType.TEXT_HTML)
   public Response deleteWithForwardRequest(
       @PathParam("role") String role,
       @PathParam("env") String env,
       @PathParam("job") String job,
-      @PathParam("shard") int shardId,
+      @PathParam("instance") int instanceId,
       @PathParam("forward") String forward,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, shardId, uriInfo, Optional.of(forward));
+    return get(role, env, job, instanceId, uriInfo, Optional.of(forward));
   }
 
   @GET
-  @Path("/{role}/{env}/{job}/{shard}")
+  @Path("/{role}/{env}/{job}/{instance}")
   @Produces(MediaType.TEXT_HTML)
   public Response get(
       @PathParam("role") String role,
       @PathParam("env") String env,
       @PathParam("job") String job,
-      @PathParam("shard") int shardId,
+      @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, shardId, uriInfo, Optional.<String>absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.<String>absent());
   }
 
   @PUT
-  @Path("/{role}/{env}/{job}/{shard}")
+  @Path("/{role}/{env}/{job}/{instance}")
   @Produces(MediaType.TEXT_HTML)
   public Response put(
       @PathParam("role") String role,
       @PathParam("env") String env,
       @PathParam("job") String job,
-      @PathParam("shard") int shardId,
+      @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, shardId, uriInfo, Optional.<String>absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.<String>absent());
   }
 
   @POST
-  @Path("/{role}/{env}/{job}/{shard}")
+  @Path("/{role}/{env}/{job}/{instance}")
   @Produces(MediaType.TEXT_HTML)
   public Response post(
       @PathParam("role") String role,
       @PathParam("env") String env,
       @PathParam("job") String job,
-      @PathParam("shard") int shardId,
+      @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, shardId, uriInfo, Optional.<String>absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.<String>absent());
   }
 
   @DELETE
-  @Path("/{role}/{env}/{job}/{shard}")
+  @Path("/{role}/{env}/{job}/{instance}")
   @Produces(MediaType.TEXT_HTML)
   public Response delete(
       @PathParam("role") String role,
       @PathParam("env") String env,
       @PathParam("job") String job,
-      @PathParam("shard") int shardId,
+      @PathParam("instance") int instanceId,
       @Context UriInfo uriInfo) {
 
-    return get(role, env, job, shardId, uriInfo, Optional.<String>absent());
+    return get(role, env, job, instanceId, uriInfo, Optional.<String>absent());
   }
 
   private Response get(
       String role,
       String env,
       String job,
-      int shardId,
+      int instanceId,
       UriInfo uriInfo,
       Optional<String> forwardRequest) {
 
     IScheduledTask task = Iterables.getOnlyElement(
         Storage.Util.consistentFetchTasks(storage,
-            Query.instanceScoped(JobKeys.from(role, env, job), shardId).active()),
+            Query.instanceScoped(JobKeys.from(role, env, job), instanceId).active()),
         null);
     if (task == null) {
-      return respond(NOT_FOUND, "No such live shard found.");
+      return respond(NOT_FOUND, "No such live instance found.");
     }
 
     if (task.getStatus() != RUNNING) {
-      return respond(NOT_FOUND, "The selected shard is currently in state " + task.getStatus());
+      return respond(NOT_FOUND, "The selected instance is currently in state " + task.getStatus());
     }
 
     IAssignedTask assignedTask = task.getAssignedTask();

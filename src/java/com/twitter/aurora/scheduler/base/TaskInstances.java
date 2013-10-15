@@ -23,13 +23,13 @@ import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
- * Utility class for dealing with individual shards of a job.
+ * Utility class for dealing with individual instances of a job.
  */
-public final class Shards {
+public final class TaskInstances {
 
   /**
-   * Gets the original task configuration for a shard update.  Result may be null if the update
-   * adds the shard.
+   * Gets the original task configuration for an instance update.  Result may be null if the update
+   * adds the instance.
    */
   public static final Function<TaskUpdateConfiguration, ITaskConfig> GET_ORIGINAL_CONFIG =
       new Function<TaskUpdateConfiguration, ITaskConfig>() {
@@ -41,8 +41,8 @@ public final class Shards {
       };
 
   /**
-   * Gets the updated task configuration for a shard update.  Result may be null if the update
-   * removes the shard.
+   * Gets the updated task configuration for an instance update.  Result may be null if the update
+   * removes the instance.
    */
   public static final Function<TaskUpdateConfiguration, ITaskConfig> GET_NEW_CONFIG =
       new Function<TaskUpdateConfiguration, ITaskConfig>() {
@@ -53,7 +53,7 @@ public final class Shards {
         }
       };
 
-  private Shards() {
+  private TaskInstances() {
     // Utility.
   }
 }
