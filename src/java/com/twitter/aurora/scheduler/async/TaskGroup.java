@@ -17,14 +17,18 @@ package com.twitter.aurora.scheduler.async;
 
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import javax.annotation.Nullable;
-
+import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Queues;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Ordering;
 
 import com.twitter.aurora.scheduler.async.TaskGroups.GroupKey;
+import com.twitter.common.base.Function;
 import com.twitter.common.util.BackoffStrategy;
 
 /**
@@ -33,7 +37,18 @@ import com.twitter.common.util.BackoffStrategy;
 class TaskGroup {
   private final GroupKey key;
   private final BackoffStrategy backoffStrategy;
-  private final Queue<String> taskIds = Queues.newLinkedBlockingQueue();
+
+  private static final Function<Task, Long> TO_TIMESTAMP = new Function<Task, Long>() {
+    @Override public Long apply(Task item) {
+      return item.readyTimestampMs;
+    }
+  };
+
+  // Order the tasks by the time they are ready to be scheduled
+  private static final Ordering<Task> TASK_ORDERING = Ordering.natural().onResultOf(TO_TIMESTAMP);
+  // 11 is the magic number used by PriorityBlockingQueue as the initial size.
+  private final Queue<Task> tasks = new PriorityBlockingQueue<Task>(11, TASK_ORDERING);
+  // Penalty for the task group for failing to schedule.
   private final AtomicLong penaltyMs;
 
   TaskGroup(GroupKey key, BackoffStrategy backoffStrategy) {
@@ -47,17 +62,31 @@ class TaskGroup {
     return key;
   }
 
-  @Nullable
-  String pop() {
-    return taskIds.poll();
+  private static final Function<Task, String> TO_TASK_ID =
+      new Function<Task, String>() {
+        @Override public String apply(Task item) {
+          return item.taskId;
+        }
+      };
+
+  /**
+   * Removes the task at the head of the queue.
+   *
+   * @return String the id of the head task.
+   * @throws IllegalStateException if the queue is empty.
+   */
+  String pop() throws IllegalStateException {
+    Optional<Task> head = Optional.fromNullable(tasks.poll());
+    Preconditions.checkState(head.isPresent());
+    return head.transform(TO_TASK_ID).get();
   }
 
   void remove(String taskId) {
-    taskIds.remove(taskId);
+    Iterables.removeIf(tasks, Predicates.compose(Predicates.equalTo(taskId), TO_TASK_ID));
   }
 
-  void push(final String taskId) {
-    taskIds.offer(taskId);
+  void push(final String taskId, long readyTimestamp) {
+    tasks.offer(new Task(taskId, readyTimestamp));
   }
 
   synchronized long resetPenaltyAndGet() {
@@ -70,17 +99,45 @@ class TaskGroup {
     return getPenaltyMs();
   }
 
+  GroupState isReady(long nowMs) {
+    Task task = tasks.peek();
+    if (task == null) {
+      return GroupState.EMPTY;
+    }
+
+    if (task.readyTimestampMs > nowMs) {
+      return GroupState.NOT_READY;
+    }
+    return GroupState.READY;
+  }
   // Begin methods used for debug interfaces.
 
   public String getName() {
     return key.toString();
   }
 
+  // TODO(zmanji): Return Task instances here. Can use them to display flapping penalty on web UI.
   public Set<String> getTaskIds() {
-    return ImmutableSet.copyOf(taskIds);
+    return ImmutableSet.copyOf(Iterables.transform(tasks, TO_TASK_ID));
   }
 
   public long getPenaltyMs() {
     return penaltyMs.get();
+  }
+
+  private static class Task {
+    private final String taskId;
+    private final long readyTimestampMs;
+
+    Task(String taskId, long readyTimestampMs) {
+      this.taskId = Preconditions.checkNotNull(taskId);
+      this.readyTimestampMs = readyTimestampMs;
+    }
+  }
+
+  enum GroupState {
+    EMPTY,      // The group is empty.
+    NOT_READY,  // Every task in the group is not ready yet.
+    READY       // The task at the head of the queue is ready.
   }
 }

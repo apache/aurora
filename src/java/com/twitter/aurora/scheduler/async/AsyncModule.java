@@ -35,11 +35,12 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
-import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
 import static com.twitter.aurora.scheduler.async.HistoryPruner.PruneThreshold;
+import static com.twitter.aurora.scheduler.async.TaskGroups.FlappingTaskSettings;
+import static com.twitter.aurora.scheduler.async.TaskGroups.SchedulingSettings;
 
 /**
  * Binding module for async task management.
@@ -79,6 +80,21 @@ public class AsyncModule extends AbstractModule {
       help = "Maximum number of scheduling attempts to make per second.")
   private static final Arg<Double> MAX_SCHEDULE_ATTEMPTS_PER_SEC = Arg.create(10D);
 
+  @CmdLine(name = "flapping_task_threshold",
+      help = "A task that repeatedly runs for less than this time is considered to be flapping.")
+  private static final Arg<Amount<Long, Time>> FLAPPING_THRESHOLD =
+      Arg.create(Amount.of(5L, Time.MINUTES));
+
+  @CmdLine(name = "initial_flapping_task_delay",
+      help = "Initial amount of time to wait before attempting to schedule a flapping task.")
+  private static final Arg<Amount<Long, Time>> INITIAL_FLAPPING_DELAY =
+      Arg.create(Amount.of(30L, Time.SECONDS));
+
+  @CmdLine(name = "max_flapping_task_delay",
+      help = "Maximum delay between attempts to schedule a flapping task.")
+  private static final Arg<Amount<Long, Time>> MAX_FLAPPING_DELAY =
+      Arg.create(Amount.of(5L, Time.MINUTES));
+
   @Override
   protected void configure() {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
@@ -108,9 +124,13 @@ public class AsyncModule extends AbstractModule {
 
     binder().install(new PrivateModule() {
       @Override protected void configure() {
-        bind(BackoffStrategy.class).toInstance(
-            new TruncatedBinaryBackoff(INITIAL_SCHEDULE_DELAY.get(), MAX_SCHEDULE_DELAY.get()));
-        bind(RateLimiter.class).toInstance(RateLimiter.create(MAX_SCHEDULE_ATTEMPTS_PER_SEC.get()));
+        bind(SchedulingSettings.class).toInstance(new SchedulingSettings(
+            new TruncatedBinaryBackoff(INITIAL_SCHEDULE_DELAY.get(), MAX_SCHEDULE_DELAY.get()),
+            RateLimiter.create(MAX_SCHEDULE_ATTEMPTS_PER_SEC.get())));
+        bind(FlappingTaskSettings.class).toInstance(new FlappingTaskSettings(
+            new TruncatedBinaryBackoff(INITIAL_FLAPPING_DELAY.get(), MAX_FLAPPING_DELAY.get()),
+            FLAPPING_THRESHOLD.get()
+        ));
         bind(SchedulingAction.class).to(TaskScheduler.class);
         bind(TaskScheduler.class).in(Singleton.class);
         bind(TaskGroups.class).in(Singleton.class);

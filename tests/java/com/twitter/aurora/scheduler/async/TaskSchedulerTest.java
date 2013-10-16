@@ -40,6 +40,7 @@ import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
+import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
@@ -64,14 +65,17 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
+import com.twitter.common.util.testing.FakeClock;
 
 import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.isA;
 import static org.junit.Assert.assertEquals;
 
+import static com.twitter.aurora.gen.ScheduleStatus.FAILED;
 import static com.twitter.aurora.gen.ScheduleStatus.FINISHED;
 import static com.twitter.aurora.gen.ScheduleStatus.INIT;
 import static com.twitter.aurora.gen.ScheduleStatus.KILLED;
@@ -100,6 +104,8 @@ public class TaskSchedulerTest extends EasyMockTest {
   private OfferReturnDelay returnDelay;
   private OfferQueue offerQueue;
   private TaskGroups taskGroups;
+  private FakeClock clock;
+  private BackoffStrategy flappingStrategy;
 
   @Before
   public void setUp() {
@@ -112,15 +118,26 @@ public class TaskSchedulerTest extends EasyMockTest {
     executor = createMock(ScheduledExecutorService.class);
     future = createMock(ScheduledFuture.class);
     returnDelay = createMock(OfferReturnDelay.class);
+    clock = new FakeClock();
+    flappingStrategy = createMock(BackoffStrategy.class);
   }
 
   private void replayAndCreateScheduler() {
     control.replay();
     offerQueue = new OfferQueueImpl(driver, returnDelay, executor, maintenance);
     RateLimiter rateLimiter = RateLimiter.create(1);
+    Amount<Long, Time> flappingThreshold = Amount.of(5L, Time.MINUTES);
     SchedulingAction scheduler =
         new TaskScheduler(storage, stateManager, assigner, offerQueue);
-    taskGroups = new TaskGroups(executor, storage, retryStrategy, rateLimiter, scheduler);
+    taskGroups = new TaskGroups(
+        executor,
+        storage,
+        retryStrategy,
+        rateLimiter,
+        scheduler,
+        flappingThreshold,
+        clock,
+        flappingStrategy);
   }
 
   private Capture<Runnable> expectOffer() {
@@ -163,13 +180,13 @@ public class TaskSchedulerTest extends EasyMockTest {
     return capture;
   }
 
-  private Capture<Runnable> expectTaskBackoff(long previousPenaltyMs, long nextPenaltyMs) {
+  private Capture<Runnable> expectTaskGroupBackoff(long previousPenaltyMs, long nextPenaltyMs) {
     expect(retryStrategy.calculateBackoffMs(previousPenaltyMs)).andReturn(nextPenaltyMs);
     return expectTaskRetryIn(nextPenaltyMs);
   }
 
-  private Capture<Runnable> expectTaskBackoff(long nextPenaltyMs) {
-    return expectTaskBackoff(0, nextPenaltyMs);
+  private Capture<Runnable> expectTaskGroupBackoff(long nextPenaltyMs) {
+    return expectTaskGroupBackoff(0, nextPenaltyMs);
   }
 
   @Test
@@ -186,8 +203,8 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testNoOffers() {
-    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
-    expectTaskBackoff(10, 20);
+    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
+    expectTaskGroupBackoff(10, 20);
 
     replayAndCreateScheduler();
 
@@ -213,7 +230,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testLoadFromStorage() {
-    expectTaskBackoff(10);
+    expectTaskGroupBackoff(10);
 
     replayAndCreateScheduler();
 
@@ -232,7 +249,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testTaskMissing() {
-    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
 
     replayAndCreateScheduler();
 
@@ -248,15 +265,15 @@ public class TaskSchedulerTest extends EasyMockTest {
     IScheduledTask task = makeTask("a", PENDING);
     TaskInfo mesosTask = makeTaskInfo(task);
 
-    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.<TaskInfo>absent());
 
-    Capture<Runnable> timeoutCapture2 = expectTaskBackoff(10, 20);
+    Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(10, 20);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.of(mesosTask));
     driver.launchTask(OFFER_A.getId(), mesosTask);
 
-    Capture<Runnable> timeoutCapture3 = expectTaskBackoff(10);
-    expectTaskBackoff(10, 20);
+    Capture<Runnable> timeoutCapture3 = expectTaskGroupBackoff(10);
+    expectTaskGroupBackoff(10, 20);
 
     replayAndCreateScheduler();
 
@@ -279,7 +296,7 @@ public class TaskSchedulerTest extends EasyMockTest {
         .setSlaveId(SlaveID.newBuilder().setValue("slaveId"))
         .build();
 
-    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
     expectAnyMaintenanceCalls();
     expectOfferDeclineIn(10);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.of(mesosTask));
@@ -307,12 +324,12 @@ public class TaskSchedulerTest extends EasyMockTest {
         .setSlaveId(SlaveID.newBuilder().setValue("slaveId"))
         .build();
 
-    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
     expectAnyMaintenanceCalls();
     expectOfferDeclineIn(10);
     expect(assigner.maybeAssign(OFFER_A, task)).andThrow(new StorageException("Injected failure."));
 
-    Capture<Runnable> timeoutCapture2 = expectTaskBackoff(10, 20);
+    Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(10, 20);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.of(mesosTask));
     driver.launchTask(OFFER_A.getId(), mesosTask);
     expectLastCall();
@@ -329,13 +346,13 @@ public class TaskSchedulerTest extends EasyMockTest {
   public void testExpiration() {
     IScheduledTask task = makeTask("a", PENDING);
 
-    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
     Capture<Runnable> offerExpirationCapture = expectOfferDeclineIn(10);
     expectAnyMaintenanceCalls();
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.<TaskInfo>absent());
-    Capture<Runnable> timeoutCapture2 = expectTaskBackoff(10, 20);
+    Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(10, 20);
     driver.declineOffer(OFFER_A.getId());
-    expectTaskBackoff(20, 30);
+    expectTaskGroupBackoff(20, 30);
 
     replayAndCreateScheduler();
 
@@ -382,13 +399,13 @@ public class TaskSchedulerTest extends EasyMockTest {
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
     expect(assigner.maybeAssign(OFFER_A, taskA)).andReturn(Optional.of(mesosTaskA));
     driver.launchTask(OFFER_A.getId(), mesosTaskA);
-    Capture<Runnable> captureA = expectTaskBackoff(10);
+    Capture<Runnable> captureA = expectTaskGroupBackoff(10);
 
     IScheduledTask taskB = makeTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
     expect(assigner.maybeAssign(OFFER_B, taskB)).andReturn(Optional.of(mesosTaskB));
     driver.launchTask(OFFER_B.getId(), mesosTaskB);
-    Capture<Runnable> captureB = expectTaskBackoff(10);
+    Capture<Runnable> captureB = expectTaskGroupBackoff(10);
 
     replayAndCreateScheduler();
 
@@ -417,13 +434,13 @@ public class TaskSchedulerTest extends EasyMockTest {
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
     expect(assigner.maybeAssign(OFFER_B, taskA)).andReturn(Optional.of(mesosTaskA));
     driver.launchTask(OFFER_B.getId(), mesosTaskA);
-    Capture<Runnable> captureA = expectTaskBackoff(10);
+    Capture<Runnable> captureA = expectTaskGroupBackoff(10);
 
     IScheduledTask taskB = makeTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
     expect(assigner.maybeAssign(OFFER_C, taskB)).andReturn(Optional.of(mesosTaskB));
     driver.launchTask(OFFER_C.getId(), mesosTaskB);
-    Capture<Runnable> captureB = expectTaskBackoff(10);
+    Capture<Runnable> captureB = expectTaskGroupBackoff(10);
 
     replayAndCreateScheduler();
 
@@ -479,14 +496,14 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectOfferDeclineIn(10);
     expectOfferDeclineIn(10);
 
-    Capture<Runnable> timeoutA = expectTaskBackoff(10);
-    Capture<Runnable> timeoutB = expectTaskBackoff(10);
+    Capture<Runnable> timeoutA = expectTaskGroupBackoff(10);
+    Capture<Runnable> timeoutB = expectTaskGroupBackoff(10);
 
     Capture<IScheduledTask> firstScheduled = expectTaskScheduled(jobA0);
     Capture<IScheduledTask> secondScheduled = expectTaskScheduled(jobB0);
 
     // Expect another watch of the task group for job A.
-    expectTaskBackoff(10);
+    expectTaskGroupBackoff(10);
 
     replayAndCreateScheduler();
 
@@ -512,9 +529,9 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     final IScheduledTask task = makeTask("a", PENDING);
 
-    Capture<Runnable> timeoutCapture = expectTaskBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.<TaskInfo>absent());
-    expectTaskBackoff(10, 20);
+    expectTaskGroupBackoff(10, 20);
 
     replayAndCreateScheduler();
 
@@ -532,6 +549,121 @@ public class TaskSchedulerTest extends EasyMockTest {
     taskGroups.tasksDeleted(new TasksDeleted(ImmutableSet.of(task)));
     timeoutCapture.getValue().run();
   }
+
+  @Test
+  public void testNoPenaltyForNoAncestor() {
+    // If a task doesn't have an ancestor there should be no penality for flapping.
+    expectAnyMaintenanceCalls();
+    clock.setNowMillis(0);
+    IScheduledTask task = makeTask("a1", INIT);
+
+    expectOfferDeclineIn(10);
+    Capture<Runnable> first = expectTaskGroupBackoff(1);
+    expectTaskScheduled(task);
+
+    replayAndCreateScheduler();
+    offerQueue.addOffer(OFFER_A);
+
+    changeState(task, INIT, PENDING);
+
+    first.getValue().run();
+  }
+
+  @Test
+  public void testFlappingTasksBackoffTruncation() {
+    expectAnyMaintenanceCalls();
+    clock.setNowMillis(0);
+
+    makeFlappyTask("a0", null);
+    makeFlappyTask("a1", "a0");
+    makeFlappyTask("a2", "a1");
+    IScheduledTask taskA3 = IScheduledTask.build(makeTask("a3", INIT).newBuilder()
+        .setAncestorId("a2"));
+
+    expectOfferDeclineIn(10);
+
+    Capture<Runnable> first = expectTaskGroupBackoff(10);
+    // The ancestry chain is 3 long, but if the backoff strategy truncates, we don't traverse the
+    // entire history.
+    expect(flappingStrategy.calculateBackoffMs(0)).andReturn(5L);
+    expect(flappingStrategy.calculateBackoffMs(5L)).andReturn(5L);
+    Capture<Runnable> flapping = expectTaskRetryIn(10);
+
+    expectTaskScheduled(taskA3);
+
+    replayAndCreateScheduler();
+    offerQueue.addOffer(OFFER_A);
+
+    changeState(taskA3, INIT, PENDING);
+
+    first.getValue().run();
+    clock.waitFor(10);
+    flapping.getValue().run();
+  }
+
+  @Test
+  public void testFlappingTasks() {
+    expectAnyMaintenanceCalls();
+    this.clock.setNowMillis(0);
+
+    makeFlappyTask("a0", null);
+    IScheduledTask taskA1 = IScheduledTask.build(makeTask("a1", INIT).newBuilder()
+        .setAncestorId("a0"));
+
+    expectOfferDeclineIn(10);
+    Capture<Runnable> first = expectTaskGroupBackoff(10);
+
+    expect(flappingStrategy.calculateBackoffMs(0)).andReturn(5L);
+    // Since A1 has been penalized, the task has to wait for another 10 ms until the penalty has
+    // expired.
+    Capture<Runnable> flapping = expectTaskRetryIn(10);
+
+    expectTaskScheduled(taskA1);
+
+    replayAndCreateScheduler();
+
+    offerQueue.addOffer(OFFER_A);
+
+    changeState(taskA1, INIT, PENDING);
+
+    first.getValue().run();
+    clock.waitFor(10);
+    flapping.getValue().run();
+  }
+
+  private IScheduledTask makeFlappyTask(String taskId, String ancestorId) {
+    Amount<Long, Time> timeInState = Amount.of(10L, Time.SECONDS);
+
+    // TODO(zmanji): Accept clock or starting timestamp as an argument.
+
+    ScheduledTask base = makeTask(taskId, INIT).newBuilder();
+
+    base.addToTaskEvents(new TaskEvent(clock.nowMillis(), INIT));
+    clock.advance(timeInState);
+
+    base.addToTaskEvents(new TaskEvent(clock.nowMillis(), PENDING));
+    clock.advance(timeInState);
+
+    base.addToTaskEvents(new TaskEvent(clock.nowMillis(), FAILED));
+    clock.advance(timeInState);
+
+    base.setAncestorId(ancestorId);
+
+    final IScheduledTask result = IScheduledTask.build(base);
+
+    // Insert the task if it doesn't already exist.
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
+        if (taskStore.fetchTasks(Query.taskScoped(Tasks.id(result))).isEmpty()) {
+          taskStore.saveTasks(ImmutableSet.of(result));
+        }
+      }
+    });
+
+    return result;
+  }
+
 
   private TaskInfo makeTaskInfo(IScheduledTask task) {
     return TaskInfo.newBuilder()
