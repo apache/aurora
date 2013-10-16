@@ -45,7 +45,7 @@ public class MesosTaskFactoryImplTest {
           .setOwner(new Identity("role", "user"))
           .setEnvironment("environment")
           .setJobName("job-name")
-          .setInstanceId(2)
+          .setInstanceIdDEPRECATED(2)
           .setDiskMb(10)
           .setRamMb(100)
           .setNumCpus(5)));

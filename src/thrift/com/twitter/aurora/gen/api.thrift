@@ -153,8 +153,8 @@ struct TaskConfig {
  10: i64 diskMb
  11: i32 priority
  13: i32 maxTaskFailures
- 14: i32 instanceId                          // TODO(William Farner): Deprecate. Push to
-                                             //                       AssignedTask.
+ 14: i32 instanceIdDEPRECATED                // TODO(William Farner): Deprecated. Use
+                                             // AssignedTask.instanceId instead.
                                              // The instance ID for this task.
                                              // Instance IDs must be unique and contiguous within a
                                              // job, and will be in the range [0, N-1] (inclusive)

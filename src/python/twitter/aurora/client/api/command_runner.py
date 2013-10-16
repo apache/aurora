@@ -60,7 +60,7 @@ class DistributedCommandRunner(object):
         task_id=task.assignedTask.taskId,
         ports=task.assignedTask.assignedPorts)
     mesos_namespace = MesosContext(
-        instance=task.assignedTask.task.instanceId)
+        instance=task.assignedTask.task.instanceIdDEPRECATED)
     command = String(prefix_command + command) % Environment(
         thermos=thermos_namespace,
         mesos=mesos_namespace)
@@ -76,7 +76,7 @@ class DistributedCommandRunner(object):
   @classmethod
   def substitute_aurora(cls, command, task, cluster, **kw):
     command = ('cd %s;' % cls.aurora_sandbox(cluster, **kw)) + command
-    command = command.replace('%shard_id%', str(task.assignedTask.task.instanceId))
+    command = command.replace('%shard_id%', str(task.assignedTask.task.instanceIdDEPRECATED))
     command = command.replace('%task_id%', task.assignedTask.taskId)
     for name, port in task.assignedTask.assignedPorts.items():
       command = command.replace('%port:' + name + '%', str(port))

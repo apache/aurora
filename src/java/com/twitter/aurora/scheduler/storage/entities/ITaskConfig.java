@@ -185,12 +185,12 @@ public final class ITaskConfig {
     return wrapped.getMaxTaskFailures();
   }
 
-  public boolean isSetInstanceId() {
-    return wrapped.isSetInstanceId();
+  public boolean isSetInstanceIdDEPRECATED() {
+    return wrapped.isSetInstanceIdDEPRECATED();
   }
 
-  public int getInstanceId() {
-    return wrapped.getInstanceId();
+  public int getInstanceIdDEPRECATED() {
+    return wrapped.getInstanceIdDEPRECATED();
   }
 
   public boolean isSetProduction() {

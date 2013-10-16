@@ -40,7 +40,7 @@ class Restarter(object):
 
       tasks = status.result.scheduleStatusResult.tasks
 
-      shards = sorted(task.assignedTask.task.instanceId for task in tasks)
+      shards = sorted(task.assignedTask.task.instanceIdDEPRECATED for task in tasks)
       if not shards:
         log.info("No shards specified, and no active shards found in job %s" % self._job_key)
         log.info("Nothing to do.")

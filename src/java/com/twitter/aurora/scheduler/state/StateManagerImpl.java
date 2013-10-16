@@ -145,10 +145,10 @@ public class StateManagerImpl implements StateManager {
       new Function<Map.Entry<Integer, ITaskConfig>, IScheduledTask>() {
         @Override public IScheduledTask apply(Map.Entry<Integer, ITaskConfig> entry) {
           ITaskConfig task = entry.getValue();
-          Preconditions.checkArgument(entry.getKey() == task.getInstanceId());
+          Preconditions.checkArgument(entry.getKey() == task.getInstanceIdDEPRECATED());
           AssignedTask assigned = new AssignedTask()
               .setTaskId(taskIdGenerator.apply(task))
-              .setInstanceId(task.getInstanceId())
+              .setInstanceId(task.getInstanceIdDEPRECATED())
               .setTask(task.newBuilder());
           return IScheduledTask.build(new ScheduledTask()
               .setStatus(INIT)
@@ -376,7 +376,7 @@ public class StateManagerImpl implements StateManager {
           TaskConfig task = (config.getOldConfig() != null)
               ? config.getOldConfig()
               : config.getNewConfig();
-          return task.getInstanceId();
+          return task.getInstanceIdDEPRECATED();
         }
       };
 
@@ -560,8 +560,8 @@ public class StateManagerImpl implements StateManager {
       new Function<TaskUpdateConfiguration, Integer>() {
         @Override public Integer apply(TaskUpdateConfiguration config) {
           return config.isSetOldConfig()
-              ? config.getOldConfig().getInstanceId()
-              : config.getNewConfig().getInstanceId();
+              ? config.getOldConfig().getInstanceIdDEPRECATED()
+              : config.getNewConfig().getInstanceIdDEPRECATED();
         }
       };
 
@@ -737,7 +737,7 @@ public class StateManagerImpl implements StateManager {
                 new PubsubEvent.TaskRescheduled(
                     taskInfo.getOwner().getRole(),
                     taskInfo.getJobName(),
-                    taskInfo.getInstanceId()));
+                    taskInfo.getInstanceIdDEPRECATED()));
             break;
 
           case UPDATE:
@@ -830,7 +830,7 @@ public class StateManagerImpl implements StateManager {
     Optional<TaskUpdateConfiguration> optional = fetchShardUpdateConfig(
         storeProvider.getUpdateStore(),
         Tasks.INFO_TO_JOB_KEY.apply(oldConfig),
-        oldConfig.getInstanceId());
+        oldConfig.getInstanceIdDEPRECATED());
 
     // TODO(Sathya): Figure out a way to handle race condition when finish update is called
     //     before ROLLBACK
@@ -838,7 +838,7 @@ public class StateManagerImpl implements StateManager {
     if (!optional.isPresent()) {
       LOG.warning("No update configuration found for key "
           + JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(oldConfig))
-          + " shard " + oldConfig.getInstanceId() + " : Assuming update has finished.");
+          + " shard " + oldConfig.getInstanceIdDEPRECATED() + " : Assuming update has finished.");
       return;
     }
 
@@ -851,7 +851,7 @@ public class StateManagerImpl implements StateManager {
     }
 
     Map.Entry<Integer, ITaskConfig> configEntry = Iterables.getOnlyElement(ImmutableMap.of(
-        newConfig.getInstanceId(), ITaskConfig.build(newConfig)).entrySet());
+        newConfig.getInstanceIdDEPRECATED(), ITaskConfig.build(newConfig)).entrySet());
     IScheduledTask newTask =
         IScheduledTask.build(taskCreator.apply(configEntry).newBuilder()
             .setAncestorId(taskId));

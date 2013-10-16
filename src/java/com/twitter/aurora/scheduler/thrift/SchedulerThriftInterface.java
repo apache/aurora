@@ -374,7 +374,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             // recent if the job is in the middle of an update or some shards have been selectively
             // created.
             ScheduledTask firstTask = tasks.iterator().next().newBuilder();
-            firstTask.getAssignedTask().getTask().unsetInstanceId();
+            firstTask.getAssignedTask().getTask().unsetInstanceIdDEPRECATED();
             return IJobConfiguration.build(new JobConfiguration()
                 .setKey(jobKey.newBuilder())
                 .setOwner(firstTask.getAssignedTask().getTask().getOwner())

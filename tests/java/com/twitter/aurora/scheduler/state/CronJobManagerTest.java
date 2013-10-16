@@ -303,7 +303,8 @@ public class CronJobManagerTest extends EasyMockTest {
     Map<Integer, ITaskConfig> newConfig = ImmutableMap.of(
         1,
         ITaskConfig.build(
-            parsedConfiguration.getJobConfig().getTaskConfig().newBuilder().setInstanceId(1)));
+            parsedConfiguration.getJobConfig().getTaskConfig().newBuilder()
+                .setInstanceIdDEPRECATED(1)));
     stateManager.insertPendingTasks(newConfig);
 
     control.replay();

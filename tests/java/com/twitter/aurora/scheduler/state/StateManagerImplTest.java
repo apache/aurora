@@ -254,8 +254,9 @@ public class StateManagerImplTest extends EasyMockTest {
       // expected
     }
 
-    String token =
-        stateManager.registerUpdate(JOB_KEY, ImmutableMap.of(taskInfo.getInstanceId(), taskInfo));
+    String token = stateManager.registerUpdate(
+        JOB_KEY,
+        ImmutableMap.of(taskInfo.getInstanceIdDEPRECATED(), taskInfo));
     assertTrue(stateManager.finishUpdate(
         JOB_KEY, JIM.getUser(), Optional.of(token), UpdateResult.SUCCESS, true));
     assertFalse(stateManager.finishUpdate(
@@ -290,8 +291,9 @@ public class StateManagerImplTest extends EasyMockTest {
     insertTasks(taskInfo);
     changeState(id, ASSIGNED);
 
-    String token =
-        stateManager.registerUpdate(JOB_KEY, ImmutableMap.of(updated.getInstanceId(), updated));
+    String token = stateManager.registerUpdate(
+        JOB_KEY,
+        ImmutableMap.of(updated.getInstanceIdDEPRECATED(), updated));
     stateManager.modifyShards(JOB_KEY, JIM.getUser(), ImmutableSet.of(0), token, true);
 
     // Since the task is still in UPDATING, it should not be possible to cancel the update.
@@ -337,8 +339,9 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(id, STARTING);
     changeState(id, RUNNING);
 
-    String token =
-        stateManager.registerUpdate(JOB_KEY, ImmutableMap.of(updated.getInstanceId(), updated));
+    String token = stateManager.registerUpdate(
+        JOB_KEY,
+        ImmutableMap.of(updated.getInstanceIdDEPRECATED(), updated));
     Map<Integer, ShardUpdateResult> result =
         stateManager.modifyShards(JOB_KEY, JIM.getUser(), ImmutableSet.of(0), token, true);
     assertEquals(result, ImmutableMap.of(0, ShardUpdateResult.RESTARTING));
@@ -368,8 +371,9 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(id, ASSIGNED);
     changeState(id, STARTING);
     changeState(id, RUNNING);
-    String token =
-        stateManager.registerUpdate(JOB_KEY, ImmutableMap.of(newConfig.getInstanceId(), newConfig));
+    String token = stateManager.registerUpdate(
+        JOB_KEY,
+        ImmutableMap.of(newConfig.getInstanceIdDEPRECATED(), newConfig));
     changeState(id, UPDATING);
     changeState(id, KILLED);
 
@@ -413,7 +417,9 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(taskId, STARTING);
     changeState(taskId, RUNNING);
 
-    stateManager.registerUpdate(JOB_KEY, ImmutableMap.of(taskInfo.getInstanceId(), taskInfo));
+    stateManager.registerUpdate(
+        JOB_KEY,
+        ImmutableMap.of(taskInfo.getInstanceIdDEPRECATED(), taskInfo));
     changeState(taskId, UPDATING);
     changeState(taskId, FINISHED);
 
@@ -553,7 +559,7 @@ public class StateManagerImplTest extends EasyMockTest {
         .setOwner(owner)
         .setEnvironment(DEFAULT_ENVIRONMENT)
         .setJobName(job)
-        .setInstanceId(shard)
+        .setInstanceIdDEPRECATED(shard)
         .setRequestedPorts(ImmutableSet.<String>of()));
   }
 

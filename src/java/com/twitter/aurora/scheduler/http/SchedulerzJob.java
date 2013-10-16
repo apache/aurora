@@ -139,7 +139,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
     String expanded = value;
     ITaskConfig config = task.getTask();
 
-    expanded = expanded.replaceAll(INSTANCE_ID_REGEXP, String.valueOf(config.getInstanceId()));
+    expanded =
+        expanded.replaceAll(INSTANCE_ID_REGEXP, String.valueOf(config.getInstanceIdDEPRECATED()));
     expanded = expanded.replaceAll(TASK_ID_REGEXP, task.getTaskId());
 
     if (task.isSetSlaveHost()) {
@@ -164,7 +165,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           final IAssignedTask task = scheduledTask.getAssignedTask();
           ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
             .put("taskId", task.getTaskId())
-            .put("instanceId", task.getTask().getInstanceId())
+            .put("instanceId", task.getTask().getInstanceIdDEPRECATED())
             .put("slaveHost", task.isSetSlaveHost() ? task.getSlaveHost() : "")
             .put("status", scheduledTask.getStatus())
             .put("statusTimestamp", Iterables.getLast(scheduledTask.getTaskEvents()).getTimestamp())

@@ -51,7 +51,7 @@ class StatusHealthCheck(HealthCheck):
 
   def health(self, task):
     task_id = task.assignedTask.taskId
-    shard_id = task.assignedTask.task.instanceId
+    shard_id = task.assignedTask.task.instanceIdDEPRECATED
     status = task.status
 
     if status == ScheduleStatus.RUNNING:
@@ -77,7 +77,7 @@ class HttpHealthCheck(HealthCheck):
 
   def health(self, task):
     assigned_task = task.assignedTask
-    shard_id = assigned_task.task.instanceId
+    shard_id = assigned_task.task.instanceIdDEPRECATED
     host_port = (assigned_task.slaveHost, assigned_task.assignedPorts['health'])
     http_signaler = None
     if shard_id in self._http_signalers:

@@ -48,7 +48,9 @@ public final class ParsedConfiguration {
     //                       TaskConfig instances are not duplicated.
     ImmutableMap.Builder<Integer, ITaskConfig> builder = ImmutableMap.builder();
     for (int i = 0; i < parsed.getInstanceCount(); i++) {
-      builder.put(i, ITaskConfig.build(parsed.getTaskConfig().newBuilder().setInstanceId(i)));
+      builder.put(
+          i,
+          ITaskConfig.build(parsed.getTaskConfig().newBuilder().setInstanceIdDEPRECATED(i)));
     }
     this.tasks = builder.build();
   }

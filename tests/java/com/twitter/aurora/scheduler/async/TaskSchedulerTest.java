@@ -218,7 +218,7 @@ public class TaskSchedulerTest extends EasyMockTest {
             .setTaskId(taskId)
             .setTask(new TaskConfig()
                 .setJobName("job-" + taskId)
-                .setInstanceId(0)
+                .setInstanceIdDEPRECATED(0)
                 .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))
                 .setEnvironment("env-" + taskId))));
   }
@@ -481,12 +481,12 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     ScheduledTask jobA1Builder = jobA0.newBuilder();
     jobA1Builder.getAssignedTask().setTaskId("a1");
-    jobA1Builder.getAssignedTask().getTask().setInstanceId(1);
+    jobA1Builder.getAssignedTask().getTask().setInstanceIdDEPRECATED(1);
     IScheduledTask jobA1 = IScheduledTask.build(jobA1Builder);
 
     ScheduledTask jobA2Builder = jobA0.newBuilder();
     jobA2Builder.getAssignedTask().setTaskId("a2");
-    jobA2Builder.getAssignedTask().getTask().setInstanceId(2);
+    jobA2Builder.getAssignedTask().getTask().setInstanceIdDEPRECATED(2);
     IScheduledTask jobA2 = IScheduledTask.build(jobA2Builder);
 
     IScheduledTask jobB0 = makeTask("b0", PENDING);

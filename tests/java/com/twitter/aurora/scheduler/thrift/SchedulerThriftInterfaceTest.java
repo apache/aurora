@@ -583,7 +583,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     JobConfiguration parsed = job.deepCopy();
     parsed.getTaskConfig()
-        .setInstanceId(0)
+        .setInstanceIdDEPRECATED(0)
         .setNumCpus(1.0)
         .setPriority(0)
         .setRamMb(1024)
@@ -1039,7 +1039,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private static ImmutableMap<Integer, TaskConfig> byInstanceId(TaskConfig task) {
-    return ImmutableMap.of(task.getInstanceId(), task);
+    return ImmutableMap.of(task.getInstanceIdDEPRECATED(), task);
   }
 
   @Test

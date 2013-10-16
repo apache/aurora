@@ -228,8 +228,8 @@ public final class ConfigurationManager {
     TaskConfig copy = task.newBuilder();
     // Unsetting only changes the isset bit vector.  For equals() comparison, the value must also be
     // canonical.
-    copy.setInstanceId(0);
-    copy.unsetInstanceId();
+    copy.setInstanceIdDEPRECATED(0);
+    copy.unsetInstanceIdDEPRECATED();
     return ITaskConfig.build(copy);
   }
 

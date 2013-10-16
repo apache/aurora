@@ -55,7 +55,8 @@ class ShardWatcherTest(unittest.TestCase):
     return query
 
   def create_task(self, instance_id):
-    return ScheduledTask(assignedTask=AssignedTask(task=TaskConfig(instanceId=instance_id)))
+    return ScheduledTask(assignedTask=AssignedTask(
+        task=TaskConfig(instanceIdDEPRECATED=instance_id)))
 
   def expect_get_statuses(self, shard_ids=WATCH_SHARDS, num_calls=EXPECTED_CYCLES):
     tasks = [self.create_task(shard_id) for shard_id in shard_ids]

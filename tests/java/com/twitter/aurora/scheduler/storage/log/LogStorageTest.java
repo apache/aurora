@@ -570,9 +570,8 @@ public class LogStorageTest extends EasyMockTest {
   public void testSaveShardUpdateConfigs() throws Exception {
     final JobKey jobKey = JobKeys.from("role", "env", "job").newBuilder();
     final String updateToken = "update-ok";
-    final ImmutableSet<TaskUpdateConfiguration> updateConfiguration =
-        ImmutableSet.of(
-            new TaskUpdateConfiguration().setNewConfig(new TaskConfig().setInstanceId(42)));
+    final ImmutableSet<TaskUpdateConfiguration> updateConfiguration = ImmutableSet.of(
+        new TaskUpdateConfiguration().setNewConfig(new TaskConfig().setInstanceIdDEPRECATED(42)));
     final JobUpdateConfiguration config =
         new JobUpdateConfiguration(jobKey, updateToken, updateConfiguration);
     final SaveJobUpdate saveOp = new SaveJobUpdate(jobKey, updateToken, updateConfiguration);

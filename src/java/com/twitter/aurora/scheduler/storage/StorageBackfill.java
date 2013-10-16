@@ -75,7 +75,7 @@ public final class StorageBackfill {
       TaskConfig config = task.getAssignedTask().getTask();
       Query.Builder query = Query.instanceScoped(
           JobKeys.from(config.getOwner().getRole(), config.getEnvironment(), config.getJobName()),
-          task.getAssignedTask().getTask().getInstanceId())
+          task.getAssignedTask().getTask().getInstanceIdDEPRECATED())
           .active();
       Set<String> activeTasksInShard = FluentIterable.from(taskStore.fetchTasks(query))
           .transform(Tasks.SCHEDULED_TO_ID)
@@ -118,7 +118,8 @@ public final class StorageBackfill {
   }
 
   private static void populateInstanceId(ScheduledTask task) {
-    task.getAssignedTask().setInstanceId(task.getAssignedTask().getTask().getInstanceId());
+    task.getAssignedTask().setInstanceId(
+        task.getAssignedTask().getTask().getInstanceIdDEPRECATED());
   }
 
   /**
