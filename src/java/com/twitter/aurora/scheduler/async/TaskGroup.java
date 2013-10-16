@@ -20,7 +20,6 @@ import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
@@ -76,9 +75,9 @@ class TaskGroup {
    * @throws IllegalStateException if the queue is empty.
    */
   String pop() throws IllegalStateException {
-    Optional<Task> head = Optional.fromNullable(tasks.poll());
-    Preconditions.checkState(head.isPresent());
-    return head.transform(TO_TASK_ID).get();
+    Task head = tasks.poll();
+    Preconditions.checkState(head != null);
+    return head.taskId;
   }
 
   void remove(String taskId) {
