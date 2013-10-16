@@ -282,7 +282,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
     private void submitJob(JobConfiguration job) {
       Response response;
       try {
-        response = thrift.createJob(job, new SessionKey());
+        response = thrift.createJob(job, null, new SessionKey());
       } catch (TException e) {
         throw Throwables.propagate(e);
       }

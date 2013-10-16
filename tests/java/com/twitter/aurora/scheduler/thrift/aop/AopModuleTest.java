@@ -89,7 +89,7 @@ public class AopModuleTest extends EasyMockTest {
     control.replay();
 
     Iface thrift = getIface(ImmutableMap.of("createJob", false));
-    assertEquals(ResponseCode.ERROR, thrift.createJob(job, session).getResponseCode());
+    assertEquals(ResponseCode.ERROR, thrift.createJob(job, null, session).getResponseCode());
   }
 
   @Test(expected = CreationException.class)
@@ -101,11 +101,11 @@ public class AopModuleTest extends EasyMockTest {
   private void assertCreateAllowed(Map<String, Boolean> toggledMethods) throws Exception {
     JobConfiguration job = new JobConfiguration();
     Response response = new Response();
-    expect(mockThrift.createJob(job, SESSION_KEY)).andReturn(response);
+    expect(mockThrift.createJob(job, null, SESSION_KEY)).andReturn(response);
 
     control.replay();
 
     Iface thrift = getIface(toggledMethods);
-    assertSame(response, thrift.createJob(job, SESSION_KEY));
+    assertSame(response, thrift.createJob(job, null, SESSION_KEY));
   }
 }

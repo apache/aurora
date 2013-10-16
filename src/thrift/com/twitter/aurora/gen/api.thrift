@@ -465,7 +465,7 @@ struct Response {
 service AuroraSchedulerManager {
   // Creates a new job.  The request will be denied if a job with the provided
   // name already exists in the cluster.
-  Response createJob(1: JobConfiguration description, 2: SessionKey session)
+  Response createJob(1: JobConfiguration description, 3: Lock lock, 2: SessionKey session)
 
   // Populates fields in a job configuration as though it were about to be run.
   // This can be used to diff a configuration running tasks.

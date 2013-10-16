@@ -50,10 +50,11 @@ invoking cancel_update.
   def scheduler(self):
     return self._scheduler
 
-  def create_job(self, config):
+  def create_job(self, config, lock=None):
     log.info('Creating job %s' % config.name())
     log.debug('Full configuration: %s' % config.job())
-    return self._scheduler.createJob(config.job())
+    log.debug('Lock %s' % lock)
+    return self._scheduler.createJob(config.job(), lock)
 
   def populate_job_config(self, config):
     return self._scheduler.populateJobConfig(config.job())

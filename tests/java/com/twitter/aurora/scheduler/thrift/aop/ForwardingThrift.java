@@ -108,10 +108,10 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response createJob(JobConfiguration description, SessionKey session)
+  public Response createJob(JobConfiguration description, Lock lock, SessionKey session)
       throws TException {
 
-    return delegate.createJob(description, session);
+    return delegate.createJob(description, lock, session);
   }
 
   @Override

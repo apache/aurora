@@ -233,7 +233,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response createJob(JobConfiguration mutableJob, SessionKey session) {
+  public Response createJob(
+      JobConfiguration mutableJob,
+      @Nullable Lock mutableLock,
+      SessionKey session) {
+
     IJobConfiguration job = IJobConfiguration.build(mutableJob);
     checkNotNull(session);
 
@@ -250,11 +254,17 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     try {
+      lockManager.validateIfLocked(
+          ILockKey.build(LockKey.job(job.getKey().newBuilder())),
+          Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
+
       ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
       schedulerCore.createJob(parsed);
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
               parsed.getJobConfig().getInstanceCount(), JobKeys.toPath(job)));
+    } catch (LockException e) {
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     } catch (ConfigurationManager.TaskDescriptionException e) {
       response.setResponseCode(INVALID_REQUEST)
           .setMessage("Invalid task description: " + e.getMessage());

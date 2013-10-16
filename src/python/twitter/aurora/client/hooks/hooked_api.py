@@ -137,9 +137,9 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
 
     return resp
 
-  def create_job(self, config):
+  def create_job(self, config, lock=None):
     return self._hooked_call(config, None,
-        _partial(super(HookedAuroraClientAPI, self).create_job, config))
+        _partial(super(HookedAuroraClientAPI, self).create_job, config, lock))
 
   def cancel_update(self, job_key, config=None):
     return self._hooked_call(config, job_key,
