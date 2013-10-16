@@ -21,7 +21,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
@@ -31,6 +30,7 @@ import com.google.inject.Inject;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ShardUpdateResult;
 import com.twitter.aurora.gen.UpdateResult;
+import com.twitter.aurora.scheduler.TaskIdGenerator;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
@@ -79,7 +79,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   // State manager handles persistence of task modifications and state transitions.
   private final StateManagerImpl stateManager;
 
-  private final Function<ITaskConfig, String> taskIdGenerator;
+  private final TaskIdGenerator taskIdGenerator;
   private final JobFilter jobFilter;
 
   /**
@@ -97,7 +97,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
       StateManagerImpl stateManager,
-      Function<ITaskConfig, String> taskIdGenerator,
+      TaskIdGenerator taskIdGenerator,
       JobFilter jobFilter) {
 
     this.storage = checkNotNull(storage);
@@ -127,7 +127,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   static final int MAX_TASK_ID_LENGTH = 255 - 90;
 
   private void checkTaskIdLength(ITaskConfig taskConfig) throws ScheduleException {
-    if (taskIdGenerator.apply(taskConfig).length() > MAX_TASK_ID_LENGTH) {
+    if (taskIdGenerator.generate(taskConfig).length() > MAX_TASK_ID_LENGTH) {
       throw new ScheduleException("Task ID is too long, please shorten your role or job name.");
     }
   }

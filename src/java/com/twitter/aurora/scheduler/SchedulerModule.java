@@ -17,7 +17,6 @@ package com.twitter.aurora.scheduler;
 
 import java.util.List;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
@@ -32,10 +31,10 @@ import org.apache.mesos.SchedulerDriver;
 import com.twitter.aurora.scheduler.Driver.DriverImpl;
 import com.twitter.aurora.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.aurora.scheduler.SchedulerLifecycle.DriverReference;
+import com.twitter.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher;
 import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutor;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
@@ -64,7 +63,7 @@ public class SchedulerModule extends AbstractModule {
     bind(Scheduler.class).to(MesosSchedulerImpl.class);
     bind(MesosSchedulerImpl.class).in(Singleton.class);
 
-    bind(new TypeLiteral<Function<ITaskConfig, String>>() { }).to(TaskIdGenerator.class);
+    bind(TaskIdGenerator.class).to(TaskIdGeneratorImpl.class);
 
     bind(new TypeLiteral<Optional<String>>() { }).annotatedWith(GcExecutor.class)
         .toInstance(Optional.fromNullable(GC_EXECUTOR_PATH.get()));

@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -47,6 +46,7 @@ import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.Driver;
+import com.twitter.aurora.scheduler.TaskIdGenerator;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -93,7 +93,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
 
   private Driver driver;
-  private Function<ITaskConfig, String> taskIdGenerator;
+  private TaskIdGenerator taskIdGenerator;
   private Closure<PubsubEvent> eventSink;
   private StateManagerImpl stateManager;
   private final FakeClock clock = new FakeClock();
@@ -101,7 +101,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Before
   public void setUp() throws Exception {
-    taskIdGenerator = createMock(new Clazz<Function<ITaskConfig, String>>() { });
+    taskIdGenerator = createMock(TaskIdGenerator.class);
     driver = createMock(Driver.class);
     eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
     // TODO(William Farner): Use a mocked storage.
@@ -180,7 +180,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testAddTasks() {
     ITaskConfig task = makeTask(JIM, MY_JOB, 3);
     String taskId = "a";
-    expect(taskIdGenerator.apply(task)).andReturn(taskId);
+    expect(taskIdGenerator.generate(task)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
 
     control.replay();
@@ -204,7 +204,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testKillPendingTask() {
     ITaskConfig task = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
-    expect(taskIdGenerator.apply(task)).andReturn(taskId);
+    expect(taskIdGenerator.generate(task)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
     eventSink.execute(matchTasksDeleted(taskId));
 
@@ -219,7 +219,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testLostKillingTask() {
     ITaskConfig task = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
-    expect(taskIdGenerator.apply(task)).andReturn(taskId);
+    expect(taskIdGenerator.generate(task)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING);
     eventSink.execute(matchTasksDeleted(taskId));
 
@@ -239,7 +239,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testUpdate() throws Exception {
     ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
-    expect(taskIdGenerator.apply(taskInfo)).andReturn(taskId);
+    expect(taskIdGenerator.generate(taskInfo)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
 
     control.replay();
@@ -271,16 +271,16 @@ public class StateManagerImplTest extends EasyMockTest {
 
     ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String id = "a";
-    expect(taskIdGenerator.apply(taskInfo)).andReturn("a");
+    expect(taskIdGenerator.generate(taskInfo)).andReturn("a");
     expectStateTransitions(id, INIT, PENDING, ASSIGNED, UPDATING, FINISHED);
 
     ITaskConfig updated = ITaskConfig.build(taskInfo.newBuilder().setNumCpus(1000));
     String updatedId = "a-updated";
-    expect(taskIdGenerator.apply(updated)).andReturn(updatedId);
+    expect(taskIdGenerator.generate(updated)).andReturn(updatedId);
     expectStateTransitions(updatedId, INIT, PENDING, ASSIGNED, ROLLBACK, FINISHED);
 
     String rollbackId = "a-rollback";
-    expect(taskIdGenerator.apply(taskInfo)).andReturn(rollbackId);
+    expect(taskIdGenerator.generate(taskInfo)).andReturn(rollbackId);
     expectStateTransitions(rollbackId, INIT, PENDING);
 
     driver.killTask(EasyMock.<String>anyObject());
@@ -327,7 +327,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testUpdatingToRollback() throws Exception {
     ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String id = "a";
-    expect(taskIdGenerator.apply(taskInfo)).andReturn(id);
+    expect(taskIdGenerator.generate(taskInfo)).andReturn(id);
     expectStateTransitions(id, INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, ROLLBACK);
     ITaskConfig updated = ITaskConfig.build(taskInfo.newBuilder().setNumCpus(1000));
     driver.killTask(EasyMock.<String>anyObject());
@@ -354,12 +354,12 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testRollbackToUpdating() throws Exception {
     ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String id = "a";
-    expect(taskIdGenerator.apply(taskInfo)).andReturn(id);
+    expect(taskIdGenerator.generate(taskInfo)).andReturn(id);
     expectStateTransitions(id, INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, KILLED);
 
     ITaskConfig newConfig = ITaskConfig.build(taskInfo.newBuilder().setNumCpus(1000));
     String newTaskId = "a-rescheduled";
-    expect(taskIdGenerator.apply(newConfig)).andReturn(newTaskId);
+    expect(taskIdGenerator.generate(newConfig)).andReturn(newTaskId);
     expectStateTransitions(
         newTaskId, INIT, PENDING, ASSIGNED, STARTING, RUNNING, ROLLBACK, UPDATING);
 
@@ -391,15 +391,15 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testRollback() throws Exception {
     ITaskConfig taskInfo = makeTaskWithPorts(JIM, MY_JOB, 0, "foo");
     String taskId = "a";
-    expect(taskIdGenerator.apply(taskInfo)).andReturn(taskId);
+    expect(taskIdGenerator.generate(taskInfo)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, FINISHED);
 
     String newTaskId = "a-updated";
-    expect(taskIdGenerator.apply(taskInfo)).andReturn(newTaskId);
+    expect(taskIdGenerator.generate(taskInfo)).andReturn(newTaskId);
     expectStateTransitions(newTaskId, INIT, PENDING, ASSIGNED, STARTING, ROLLBACK, FINISHED);
 
     String rolledBackId = "a-rollback";
-    expect(taskIdGenerator.apply(taskInfo)).andReturn(rolledBackId);
+    expect(taskIdGenerator.generate(taskInfo)).andReturn(rolledBackId);
     expectStateTransitions(rolledBackId, INIT, PENDING, ASSIGNED);
 
     driver.killTask(EasyMock.<String>anyObject());
@@ -442,7 +442,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testNestedEvents() {
     String id = "a";
     ITaskConfig task = makeTask(JIM, MY_JOB, 0);
-    expect(taskIdGenerator.apply(task)).andReturn(id);
+    expect(taskIdGenerator.generate(task)).andReturn(id);
 
     // Trigger an event that produces a side-effect and a PubSub event .
     eventSink.execute(matchStateChange(id, INIT, PENDING));
@@ -466,7 +466,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testDeleteTask() {
     ITaskConfig task = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
-    expect(taskIdGenerator.apply(task)).andReturn(taskId);
+    expect(taskIdGenerator.generate(task)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
     eventSink.execute(matchTasksDeleted(taskId));
 
@@ -482,9 +482,9 @@ public class StateManagerImplTest extends EasyMockTest {
     String existingId = "a";
     ITaskConfig newTask = makeTask(JIM, MY_JOB, 1);
     String newId = "b";
-    expect(taskIdGenerator.apply(existingTask)).andReturn(existingId);
+    expect(taskIdGenerator.generate(existingTask)).andReturn(existingId);
     expectStateTransitions(existingId, INIT, PENDING);
-    expect(taskIdGenerator.apply(newTask)).andReturn(newId);
+    expect(taskIdGenerator.generate(newTask)).andReturn(newId);
     expectStateTransitions(newId, INIT, PENDING);
 
     control.replay();
@@ -499,7 +499,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testAddInstancesIdCollision() throws Exception {
     ITaskConfig taskInfo = makeTask(JIM, MY_JOB, 0);
     String taskId = "a";
-    expect(taskIdGenerator.apply(taskInfo)).andReturn(taskId);
+    expect(taskIdGenerator.generate(taskInfo)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING);
 
     control.replay();

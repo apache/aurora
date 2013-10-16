@@ -56,6 +56,7 @@ import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.Driver;
+import com.twitter.aurora.scheduler.TaskIdGenerator;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -108,7 +109,7 @@ public class StateManagerImpl implements StateManager {
     return storage;
   }
 
-  private final Function<ITaskConfig, String> taskIdGenerator;
+  private final TaskIdGenerator taskIdGenerator;
 
   // TODO(William Farner): Eliminate this and update all callers to use Storage directly.
   interface ReadOnlyStorage {
@@ -147,7 +148,7 @@ public class StateManagerImpl implements StateManager {
           ITaskConfig task = entry.getValue();
           Preconditions.checkArgument(entry.getKey() == task.getInstanceIdDEPRECATED());
           AssignedTask assigned = new AssignedTask()
-              .setTaskId(taskIdGenerator.apply(task))
+              .setTaskId(taskIdGenerator.generate(task))
               .setInstanceId(task.getInstanceIdDEPRECATED())
               .setTask(task.newBuilder());
           return IScheduledTask.build(new ScheduledTask()
@@ -183,7 +184,7 @@ public class StateManagerImpl implements StateManager {
       final Storage storage,
       final Clock clock,
       Driver driver,
-      Function<ITaskConfig, String> taskIdGenerator,
+      TaskIdGenerator taskIdGenerator,
       Closure<PubsubEvent> taskEventSink) {
 
     checkNotNull(storage);
@@ -723,7 +724,7 @@ public class StateManagerImpl implements StateManager {
             builder.unsetTaskEvents();
             builder.setAncestorId(taskId);
             String newTaskId =
-                taskIdGenerator.apply(ITaskConfig.build(builder.getAssignedTask().getTask()));
+                taskIdGenerator.generate(ITaskConfig.build(builder.getAssignedTask().getTask()));
             builder.getAssignedTask().setTaskId(newTaskId);
 
             LOG.info("Task being rescheduled: " + taskId);

@@ -62,6 +62,7 @@ import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.gen.ValueConstraint;
 import com.twitter.aurora.scheduler.Driver;
+import com.twitter.aurora.scheduler.TaskIdGenerator;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
@@ -149,8 +150,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   // TODO(William Farner): Set up explicit expectations for calls to generate task IDs.
   private final AtomicLong idCounter = new AtomicLong();
-  private Function<ITaskConfig, String> taskIdGenerator = new Function<ITaskConfig, String>() {
-    @Override public String apply(ITaskConfig input) {
+  private TaskIdGenerator taskIdGenerator = new TaskIdGenerator() {
+    @Override public String generate(ITaskConfig input) {
       return "task-" + idCounter.incrementAndGet();
     }
   };
@@ -1773,8 +1774,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test
   public void testTaskIdLimit() throws Exception {
-    taskIdGenerator = new Function<ITaskConfig, String>() {
-      @Override public String apply(ITaskConfig input) {
+    taskIdGenerator = new TaskIdGenerator() {
+      @Override public String generate(ITaskConfig input) {
         return Strings.repeat("a", SchedulerCoreImpl.MAX_TASK_ID_LENGTH);
       }
     };
@@ -1787,8 +1788,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
   @Test(expected = ScheduleException.class)
   public void testRejectLongTaskId() throws Exception {
-    taskIdGenerator = new Function<ITaskConfig, String>() {
-      @Override public String apply(ITaskConfig input) {
+    taskIdGenerator = new TaskIdGenerator() {
+      @Override public String generate(ITaskConfig input) {
         return Strings.repeat("a", SchedulerCoreImpl.MAX_TASK_ID_LENGTH + 1);
       }
     };

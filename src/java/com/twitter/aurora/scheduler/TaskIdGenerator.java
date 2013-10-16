@@ -17,7 +17,6 @@ package com.twitter.aurora.scheduler;
 
 import java.util.UUID;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 
@@ -27,30 +26,41 @@ import com.twitter.common.util.Clock;
 /**
  * A function that generates universally-unique (not guaranteed, but highly confident) task IDs.
  */
-class TaskIdGenerator implements Function<ITaskConfig, String> {
+public interface TaskIdGenerator {
 
-  private final Clock clock;
+  /**
+   * Generates a universally-unique ID for the task.  This is not necessarily a repeatable
+   * operation, two subsequent invocations with the same object need not return the same value.
+   *
+   * @param task Task to generate an ID for.
+   * @return Unique ID for the task.
+   */
+  String generate(ITaskConfig task);
 
-  @Inject
-  TaskIdGenerator(Clock clock) {
-    this.clock = Preconditions.checkNotNull(clock);
-  }
+  class TaskIdGeneratorImpl implements TaskIdGenerator {
+    private final Clock clock;
 
-  @Override
-  public String apply(ITaskConfig task) {
-    String sep = "-";
-    return new StringBuilder()
-        .append(clock.nowMillis())               // Allows chronological sorting.
-        .append(sep)
-        .append(task.getOwner().getRole())       // Identification and collision prevention.
-        .append(sep)
-        .append(task.getEnvironment())
-        .append(sep)
-        .append(task.getJobName())
-        .append(sep)
-        .append(task.getInstanceIdDEPRECATED())  // Collision prevention within job.
-        .append(sep)
-        .append(UUID.randomUUID())               // Just-in-case collision prevention.
-        .toString().replaceAll("[^\\w-]", sep);  // Constrain character set.
+    @Inject
+    TaskIdGeneratorImpl(Clock clock) {
+      this.clock = Preconditions.checkNotNull(clock);
+    }
+
+    @Override
+    public String generate(ITaskConfig task) {
+      String sep = "-";
+      return new StringBuilder()
+          .append(clock.nowMillis())               // Allows chronological sorting.
+          .append(sep)
+          .append(task.getOwner().getRole())       // Identification and collision prevention.
+          .append(sep)
+          .append(task.getEnvironment())
+          .append(sep)
+          .append(task.getJobName())
+          .append(sep)
+          .append(task.getInstanceIdDEPRECATED())  // Collision prevention within job.
+          .append(sep)
+          .append(UUID.randomUUID())               // Just-in-case collision prevention.
+          .toString().replaceAll("[^\\w-]", sep);  // Constrain character set.
+    }
   }
 }
