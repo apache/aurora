@@ -31,6 +31,7 @@ __all__ = (
 class PackerObject(Struct):
   package = String
   package_uri = String
+  package_md5 = String
   copy_command = String
 
 
