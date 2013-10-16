@@ -15,6 +15,8 @@
  */
 package com.twitter.aurora.scheduler.state;
 
+import com.google.common.base.Optional;
+
 import com.twitter.aurora.scheduler.storage.entities.ILock;
 import com.twitter.aurora.scheduler.storage.entities.ILockKey;
 
@@ -42,12 +44,16 @@ public interface LockManager {
   void releaseLock(ILock lock);
 
   /**
-   * Verifies if the provided lock instance is identical to the one stored in Scheduler.
+   * Verifies if the provided lock instance is identical to the one stored in the scheduler
+   * ONLY if the operation context represented by the {@link ILockKey} is in fact locked.
+   * No validation will be performed in case there is no correspondent scheduler lock
+   * found for the provided context.
    *
-   * @param lock {@link ILock} instance to validate.
+   * @param context Operation context to validate with the provided lock.
+   * @param heldLock Lock to validate.
    * @throws LockException If provided lock does not exist or not identical to the stored one.
    */
-  void validateLock(ILock lock) throws LockException;
+  void validateIfLocked(ILockKey context, Optional<ILock> heldLock) throws LockException;
 
   /**
    * Thrown when {@link ILock} related operation failed.

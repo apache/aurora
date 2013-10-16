@@ -125,6 +125,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final Identity ROLE_IDENTITY = new Identity(ROLE, USER);
   private static final SessionKey SESSION = new SessionKey();
   private static final IJobKey JOB_KEY = JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, JOB_NAME);
+  private static final ILockKey LOCK_KEY = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
+  private static final ILock LOCK = ILock.build(new Lock().setKey(LOCK_KEY.newBuilder()));
 
   private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
@@ -1001,10 +1003,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testAddInstances() throws Exception {
     ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
-    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    lockManager.validateLock(ILock.build(lock));
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     stateManager.addInstances(
         JOB_KEY,
         ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
@@ -1014,18 +1015,33 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Response response = thrift.addInstances(
         JOB_KEY.newBuilder(),
         instances,
-        lock,
+        LOCK.newBuilder(),
         SESSION);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testAddInstancesWithNullLock() throws Exception {
+    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    stateManager.addInstances(
+        JOB_KEY,
+        ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
+
+    control.replay();
+
+    Response response = thrift.addInstances(JOB_KEY.newBuilder(), instances, null, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
   @Test
   public void testAddInstancesFails() throws Exception {
     ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
-    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    lockManager.validateLock(ILock.build(lock));
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     stateManager.addInstances(
         JOB_KEY,
         ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
@@ -1036,7 +1052,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Response response = thrift.addInstances(
         JOB_KEY.newBuilder(),
         instances,
-        lock,
+        LOCK.newBuilder(),
         SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
@@ -1044,10 +1060,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testAddInstancesLockCheckFails() throws Exception {
     ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
-    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    lockManager.validateLock(ILock.build(lock));
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     expectLastCall().andThrow(new LockException("Failed lock check."));
 
     control.replay();
@@ -1055,7 +1070,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Response response = thrift.addInstances(
         JOB_KEY.newBuilder(),
         instances,
-        lock,
+        LOCK.newBuilder(),
         SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
@@ -1063,8 +1078,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testAddInstancesAuthFails() throws Exception {
     ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
-    LockKey key = LockKey.job(JOB_KEY.newBuilder());
-    Lock lock = new Lock().setKey(key);
     expectAuth(ROLE, false);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
 
@@ -1073,7 +1086,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Response response = thrift.addInstances(
         JOB_KEY.newBuilder(),
         instances,
-        lock,
+        LOCK.newBuilder(),
         SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
@@ -1081,29 +1094,26 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testAddInstancesFailsForCronJob() throws Exception {
     ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
-    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
     control.replay();
 
     Response response = thrift.addInstances(
         JOB_KEY.newBuilder(),
         instances,
-        lock,
+        LOCK.newBuilder(),
         SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test
   public void testAcquireLock() throws Exception {
-    LockKey key = LockKey.job(JOB_KEY.newBuilder());
-    Lock lock = new Lock().setKey(key);
     expectAuth(ROLE, true);
-    expect(lockManager.acquireLock(ILockKey.build(key), USER)).andReturn(ILock.build(lock));
+    expect(lockManager.acquireLock(LOCK_KEY, USER)).andReturn(LOCK);
 
     control.replay();
 
-    Response response = thrift.acquireLock(key, SESSION);
-    assertEquals(lock, response.getResult().getAcquireLockResult().getLock());
+    Response response = thrift.acquireLock(LOCK_KEY.newBuilder(), SESSION);
+    assertEquals(LOCK.newBuilder(), response.getResult().getAcquireLockResult().getLock());
   }
 
   @Test
@@ -1119,33 +1129,31 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, false);
     control.replay();
 
-    Response response = thrift.acquireLock(LockKey.job(JOB_KEY.newBuilder()), SESSION);
+    Response response = thrift.acquireLock(LOCK_KEY.newBuilder(), SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
   @Test
   public void testAcquireLockFailed() throws Exception {
-    LockKey key = LockKey.job(JOB_KEY.newBuilder());
     expectAuth(ROLE, true);
-    expect(lockManager.acquireLock(ILockKey.build(key), USER))
+    expect(lockManager.acquireLock(LOCK_KEY, USER))
         .andThrow(new LockException("Failed"));
 
     control.replay();
 
-    Response response = thrift.acquireLock(key, SESSION);
+    Response response = thrift.acquireLock(LOCK_KEY.newBuilder(), SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test
   public void testReleaseLock() throws Exception {
-    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expectAuth(ROLE, true);
-    lockManager.validateLock(ILock.build(lock));
-    lockManager.releaseLock(ILock.build(lock));
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    lockManager.releaseLock(LOCK);
 
     control.replay();
 
-    Response response = thrift.releaseLock(lock, CHECKED, SESSION);
+    Response response = thrift.releaseLock(LOCK.newBuilder(), CHECKED, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -1165,23 +1173,19 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, false);
     control.replay();
 
-    Response response = thrift.releaseLock(
-        new Lock().setKey(LockKey.job(new JobKey(JOB_KEY.newBuilder()))),
-        CHECKED,
-        SESSION);
+    Response response = thrift.releaseLock(LOCK.newBuilder(), CHECKED, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
   @Test
   public void testReleaseLockFailed() throws Exception {
-    Lock lock = new Lock().setKey(LockKey.job(JOB_KEY.newBuilder()));
     expectAuth(ROLE, true);
-    lockManager.validateLock(ILock.build(lock));
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     expectLastCall().andThrow(new LockException("Failed"));
 
     control.replay();
 
-    Response response = thrift.releaseLock(lock, CHECKED, SESSION);
+    Response response = thrift.releaseLock(LOCK.newBuilder(), CHECKED, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 

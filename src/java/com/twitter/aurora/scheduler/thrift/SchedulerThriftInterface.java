@@ -773,7 +773,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     try {
       response.setResponseCode(OK)
           .setResult(Result.queryRecoveryResult(new QueryRecoveryResult()
-          .setTasks(IScheduledTask.toBuildersSet(recovery.query(Query.arbitrary(query))))));
+              .setTasks(IScheduledTask.toBuildersSet(recovery.query(Query.arbitrary(query))))));
     } catch (RecoveryException e) {
       response.setResponseCode(ERROR).setMessage(e.getMessage());
       LOG.log(Level.WARNING, "Failed to query recovery: " + e, e);
@@ -965,26 +965,27 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response addInstances(
-      JobKey job,
+      JobKey mutableJobKey,
       Map<Integer, TaskConfig> instances,
-      Lock lock,
+      @Nullable Lock mutableLock,
       SessionKey session) {
 
-    IJobKey key = JobKeys.assertValid(IJobKey.build(job));
+    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
     checkNotBlank(instances.values());
-    checkNotNull(lock);
     checkNotNull(session);
 
     Response resp = new Response();
-    if (cronJobManager.hasJob(key)) {
+    if (cronJobManager.hasJob(jobKey)) {
       return resp.setResponseCode(INVALID_REQUEST).setMessage("Cron jobs are not supported here.");
     }
 
     try {
-      sessionValidator.checkAuthenticated(session, ImmutableSet.of(key.getRole()));
-      lockManager.validateLock(ILock.build(lock));
+      sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
+      lockManager.validateIfLocked(
+          ILockKey.build(LockKey.job(mutableJobKey)),
+          Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
       stateManager.addInstances(
-          key,
+          jobKey,
           ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
       return resp.setResponseCode(OK).setMessage("Successfully added instances.");
     } catch (AuthFailedException e) {
@@ -1007,19 +1008,19 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response acquireLock(LockKey lockKey, SessionKey session) {
-    checkNotNull(lockKey);
+  public Response acquireLock(LockKey mutableLockKey, SessionKey session) {
+    checkNotNull(mutableLockKey);
     checkNotNull(session);
 
-    ILockKey key = ILockKey.build(lockKey);
+    ILockKey lockKey = ILockKey.build(mutableLockKey);
     Response response = new Response();
 
     try {
       SessionContext context = sessionValidator.checkAuthenticated(
           session,
-          ImmutableSet.of(getRoleFromLockKey(key)));
+          ImmutableSet.of(getRoleFromLockKey(lockKey)));
 
-      ILock lock = lockManager.acquireLock(key, context.getIdentity());
+      ILock lock = lockManager.acquireLock(lockKey, context.getIdentity());
       response.setResult(Result.acquireLockResult(
           new AcquireLockResult().setLock(lock.newBuilder())));
 
@@ -1032,23 +1033,23 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response releaseLock(Lock lock, LockValidation validation, SessionKey session) {
-    checkNotNull(lock);
+  public Response releaseLock(Lock mutableLock, LockValidation validation, SessionKey session) {
+    checkNotNull(mutableLock);
     checkNotNull(validation);
     checkNotNull(session);
 
     Response response = new Response();
-    ILock wrappedLock = ILock.build(lock);
+    ILock lock = ILock.build(mutableLock);
 
     try {
       sessionValidator.checkAuthenticated(
           session,
-          ImmutableSet.of(getRoleFromLockKey(ILockKey.build(lock.getKey()))));
+          ImmutableSet.of(getRoleFromLockKey(lock.getKey())));
 
       if (validation == LockValidation.CHECKED) {
-        lockManager.validateLock(wrappedLock);
+        lockManager.validateIfLocked(lock.getKey(), Optional.of(lock));
       }
-      lockManager.releaseLock(wrappedLock);
+      lockManager.releaseLock(lock);
       return response.setResponseCode(OK).setMessage("Lock has been released.");
     } catch (AuthFailedException e) {
       return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());

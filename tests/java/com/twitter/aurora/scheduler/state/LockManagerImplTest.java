@@ -17,6 +17,8 @@ package com.twitter.aurora.scheduler.state;
 
 import java.util.UUID;
 
+import com.google.common.base.Optional;
+
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
@@ -44,7 +46,7 @@ public class LockManagerImplTest extends EasyMockTest {
   private static final Identity JIM = new Identity("jim", USER);
   private static final String MY_JOB = "myJob";
   private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
-  private static final LockKey LOCK_KEY = LockKey.job(JOB_KEY.newBuilder());
+  private static final ILockKey LOCK_KEY = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
   private static final UUID TOKEN = UUID.fromString("79d6d790-3212-11e3-aa6e-0800200c9a66");
 
   private LockManager lockManager;
@@ -66,7 +68,7 @@ public class LockManagerImplTest extends EasyMockTest {
   @Test
   public void testAcquireLock() throws Exception {
     ILock expected = ILock.build(new Lock()
-        .setKey(LOCK_KEY)
+        .setKey(LOCK_KEY.newBuilder())
         .setToken(TOKEN.toString())
         .setTimestampMs(timestampMs)
         .setUser(USER));
@@ -77,39 +79,47 @@ public class LockManagerImplTest extends EasyMockTest {
 
   @Test(expected = LockException.class)
   public void testAcquireLockInProgress() throws Exception {
-    ILockKey key = ILockKey.build(LOCK_KEY);
-    lockManager.acquireLock(key, USER);
-    lockManager.acquireLock(key, USER);
+    lockManager.acquireLock(LOCK_KEY, USER);
+    lockManager.acquireLock(LOCK_KEY, USER);
   }
 
   @Test
   public void testReleaseLock() throws Exception {
-    ILockKey key = ILockKey.build(LOCK_KEY);
-    ILock lock = lockManager.acquireLock(key, USER);
+    ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
     lockManager.releaseLock(lock);
 
     // Should be able to lock again after releasing.
-    lockManager.acquireLock(key, USER);
+    lockManager.acquireLock(LOCK_KEY, USER);
   }
 
   @Test
-  public void testValidateLock() throws Exception {
-    ILock lock = lockManager.acquireLock(ILockKey.build(LOCK_KEY), USER);
-    lockManager.validateLock(lock);
+  public void testValidateLockStoredEqualHeld() throws Exception {
+    ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(lock));
+  }
+
+  @Test
+  public void testValidateLockNotStoredNotHeld() throws Exception {
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
   }
 
   @Test(expected = LockException.class)
-  public void testValidateLockDoesNotExist() throws Exception {
-    ILock lock = lockManager.acquireLock(ILockKey.build(LOCK_KEY), USER);
-    lock = ILock.build(
-        lock.newBuilder().setKey(LockKey.job(JobKeys.from("1", "2", "3").newBuilder())));
-    lockManager.validateLock(lock);
-  }
-
-  @Test(expected = LockException.class)
-  public void testValidateLockDoesNotMatch() throws Exception {
-    ILock lock = lockManager.acquireLock(ILockKey.build(LOCK_KEY), USER);
+  public void testValidateLockStoredNotEqualHeld() throws Exception {
+    ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
     lock = ILock.build(lock.newBuilder().setUser("bob"));
-    lockManager.validateLock(lock);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(lock));
+  }
+
+  @Test(expected = LockException.class)
+  public void testValidateLockStoredNotEqualHeldWithHeldNull() throws Exception {
+    lockManager.acquireLock(LOCK_KEY, USER);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+  }
+
+  @Test(expected = LockException.class)
+  public void testValidateLockNotStoredHeld() throws Exception {
+    ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
+    ILockKey key = ILockKey.build(LockKey.job(JobKeys.from("r", "e", "n").newBuilder()));
+    lockManager.validateIfLocked(key, Optional.of(lock));
   }
 }

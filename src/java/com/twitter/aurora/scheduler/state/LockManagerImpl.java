@@ -88,21 +88,31 @@ class LockManagerImpl implements LockManager {
   }
 
   @Override
-  public synchronized void validateLock(final ILock lock) throws LockException {
+  public synchronized void validateIfLocked(final ILockKey context, Optional<ILock> heldLock)
+      throws LockException {
+
     Optional<ILock> stored = storage.consistentRead(new Work.Quiet<Optional<ILock>>() {
       @Override public Optional<ILock> apply(StoreProvider storeProvider) {
-        return storeProvider.getUpdateStore().fetchLock(lock.getKey());
+        return storeProvider.getUpdateStore().fetchLock(context);
       }
     });
 
-    if (!stored.isPresent()) {
-      throw new LockException("No operation is in progress for: " + lock.getKey());
-    }
-
-    if (!stored.get().equals(lock)) {
-      throw new LockException(String.format(
-          "Unable to finish operation for: %s. Use override/cancel option.",
-          lock.getKey()));
+    // The implementation below assumes the following use cases:
+    // +-----------+-----------------+----------+
+    // |   eq      |     held        | not held |
+    // +-----------+-----------------+----------+
+    // |stored     |(stored == held)?| invalid  |
+    // +-----------+-----------------+----------+
+    // |not stored |    invalid      |  valid   |
+    // +-----------+-----------------+----------+
+    if (!stored.equals(heldLock)) {
+      if (stored.isPresent()) {
+        throw new LockException(String.format(
+            "Unable to perform operation for: %s. Use override/cancel option.",
+            context));
+      } else if (heldLock.isPresent()) {
+        throw new LockException(String.format("Invalid operation context: %s", context));
+      }
     }
   }
 }
