@@ -617,7 +617,7 @@
 
     function makeJavaProcess(processRefName, jvmCfg, resourceRef) {
       var jvm = jvmCfg.version === "7" ? "Java7()" : "Java6()";
-      return sprintf("%s = JVMProcess(name='%s', arguments='%s', resources=%s, jvm='%s')",
+      return sprintf("%s = JVMProcess(name='%s', arguments='%s', resources=%s, jvm=%s)",
           processRefName, processRefName, jvmCfg.args, resourceRef, jvm);
     };
 
