@@ -69,7 +69,7 @@ invoking cancel_update.
     log.info("Retrieving jobs for role %s" % role)
     return self._scheduler.getJobs(role)
 
-  def kill_job(self, job_key, instances=None):
+  def kill_job(self, job_key, instances=None, lock=None):
     log.info("Killing tasks for job: %s" % job_key)
     if not isinstance(job_key, AuroraJobKey):
       raise TypeError('Expected type of job_key %r to be %s but got %s instead'
@@ -83,7 +83,7 @@ invoking cancel_update.
       log.info("Instances to be killed: %s" % instances)
       query.instanceIds = frozenset([int(s) for s in instances])
 
-    return self._scheduler.killTasks(query)
+    return self._scheduler.killTasks(query, lock)
 
   def check_status(self, job_key):
     self._assert_valid_job_key(job_key)

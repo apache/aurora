@@ -181,8 +181,8 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response killTasks(TaskQuery query, SessionKey session) throws TException {
-    return delegate.killTasks(query, session);
+  public Response killTasks(TaskQuery query, Lock lock, SessionKey session) throws TException {
+    return delegate.killTasks(query, lock, session);
   }
 
   @Override

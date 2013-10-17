@@ -274,62 +274,77 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
+  private static IScheduledTask buildScheduledTask(String jobName) {
+     return IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask()
+            .setTask(new TaskConfig()
+                .setOwner(ROLE_IDENTITY)
+                .setEnvironment(DEFAULT_ENVIRONMENT)
+                .setJobName(jobName))));
+  }
+
   @Test
   public void testKillTasksImmediate() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-    IScheduledTask task = IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(new AssignedTask()
-            .setTask(new TaskConfig()
-                .setOwner(ROLE_IDENTITY))));
-
     expectAuth(ROOT, false);
     expectAuth(ROLE, true);
-    storageUtil.expectTaskFetch(query, task);
+    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME)).times(2);
     scheduler.killTasks(query, USER);
     storageUtil.expectTaskFetch(query);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
 
     control.replay();
 
-    Response response = thrift.killTasks(query.get(), SESSION);
+    Response response = thrift.killTasks(query.get(), LOCK.newBuilder(), SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
   @Test
   public void testKillTasksDelayed() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-    IScheduledTask task = IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(new AssignedTask()
-            .setTask(new TaskConfig()
-                .setOwner(ROLE_IDENTITY))));
-
+    IScheduledTask task = buildScheduledTask(JOB_NAME);
     expectAuth(ROOT, false);
     expectAuth(ROLE, true);
-    storageUtil.expectTaskFetch(query, task);
     scheduler.killTasks(query, USER);
     storageUtil.expectTaskFetch(query, task).times(2);
     storageUtil.expectTaskFetch(query);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
 
     control.replay();
 
-    Response response = thrift.killTasks(query.get(), SESSION);
+    Response response = thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testKillTasksLockCheckFailed() throws Exception {
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
+    IScheduledTask task2 = buildScheduledTask("job_bar");
+    ILockKey key2 = ILockKey.build(LockKey.job(
+        JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, "job_bar").newBuilder()));
+    expectAuth(ROOT, false);
+    expectAuth(ROLE, true);
+    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME), task2);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    lockManager.validateIfLocked(key2, Optional.of(LOCK));
+    expectLastCall().andThrow(new LockException("Failed lock check."));
+
+    control.replay();
+
+    Response response = thrift.killTasks(query.get(), LOCK.newBuilder(), SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test
   public void testKillTasksAuthFailure() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-    IScheduledTask task = IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(new AssignedTask()
-            .setTask(new TaskConfig()
-                .setOwner(ROLE_IDENTITY))));
-
     expectAuth(ROOT, false);
     expectAuth(ROLE, false);
-    storageUtil.expectTaskFetch(query, task);
+    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME));
 
     control.replay();
 
-    Response response = thrift.killTasks(query.get(), SESSION);
+    Response response = thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
@@ -339,11 +354,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAuth(ROOT, true);
     scheduler.killTasks(query, USER);
-    storageUtil.expectTaskFetch(query);
+    storageUtil.expectTaskFetch(query).times(2);
 
     control.replay();
 
-    Response response = thrift.killTasks(query.get(), SESSION);
+    Response response = thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
@@ -355,7 +370,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    Response response = thrift.killTasks(query, SESSION);
+    Response response = thrift.killTasks(query, DEFAULT_LOCK, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
@@ -367,10 +382,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     scheduler.killTasks(query, USER);
     expectLastCall().andThrow(new ScheduleException("No jobs matching query"));
+    storageUtil.expectTaskFetch(query);
 
     control.replay();
 
-    Response response = thrift.killTasks(query.get(), SESSION);
+    Response response = thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
@@ -1016,18 +1032,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ImmutableSet.of("foo", ROLE), true);
 
     Query.Builder query = Query.roleScoped("foo");
-    IScheduledTask task = IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(new AssignedTask()
-            .setTask(new TaskConfig()
-                .setOwner(ROLE_IDENTITY))));
 
-    storageUtil.expectTaskFetch(query, task);
+    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME));
     scheduler.killTasks(query, USER);
     storageUtil.expectTaskFetch(query.active());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
 
     control.replay();
 
-    assertEquals(OK, thrift.killTasks(query.get(), SESSION).getResponseCode());
+    assertEquals(OK, thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION).getResponseCode());
   }
 
   @Test

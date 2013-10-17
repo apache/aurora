@@ -399,11 +399,24 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             .setConfigs(IJobConfiguration.toBuildersSet(jobs.values()))));
   }
 
-  private SessionContext validateSessionKeyForTasks(SessionKey session, TaskQuery taskQuery)
-      throws AuthFailedException {
+  private void validateLockForTasks(Optional<ILock> lock, Iterable<IScheduledTask> tasks)
+      throws LockException {
 
-    Set<IScheduledTask> tasks =
-        Storage.Util.consistentFetchTasks(storage, Query.arbitrary(taskQuery));
+    ImmutableSet<IJobKey> uniqueKeys = FluentIterable.from(tasks)
+        .transform(Tasks.SCHEDULED_TO_JOB_KEY)
+        .toSet();
+
+    // Validate lock against every unique job key derived from the tasks.
+    for (IJobKey key : uniqueKeys) {
+      lockManager.validateIfLocked(ILockKey.build(LockKey.job(key.newBuilder())), lock);
+    }
+  }
+
+  private SessionContext validateSessionKeyForTasks(
+      SessionKey session,
+      TaskQuery taskQuery,
+      Iterable<IScheduledTask> tasks) throws AuthFailedException {
+
     // Authenticate the session against any affected roles, always including the role for a
     // role-scoped query.  This papers over the implementation detail that dormant cron jobs are
     // authenticated this way.
@@ -425,7 +438,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response killTasks(final TaskQuery query, SessionKey session) {
+  public Response killTasks(final TaskQuery query, Lock mutablelock, SessionKey session) {
     // TODO(wfarner): Determine whether this is a useful function, or if it should simply be
     //     switched to 'killJob'.
 
@@ -440,12 +453,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return response;
     }
 
+    Set<IScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, Query.arbitrary(query));
+
     Optional<SessionContext> context = isAdmin(session);
     if (context.isPresent()) {
       LOG.info("Granting kill query to admin user: " + query);
     } else {
       try {
-        context = Optional.of(validateSessionKeyForTasks(session, query));
+        context = Optional.of(validateSessionKeyForTasks(session, query, tasks));
       } catch (AuthFailedException e) {
         response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
         return response;
@@ -453,7 +468,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     try {
+      validateLockForTasks(Optional.fromNullable(mutablelock).transform(ILock.FROM_BUILDER), tasks);
       schedulerCore.killTasks(Query.arbitrary(query), context.get().getIdentity());
+    } catch (LockException e) {
+      return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
       return response;

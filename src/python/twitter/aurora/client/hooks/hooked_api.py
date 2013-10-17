@@ -36,8 +36,8 @@ class NonHookedAuroraClientAPI(AuroraClientAPI):
   def cancel_update(self, job_key, config=None):
     return super(NonHookedAuroraClientAPI, self).cancel_update(job_key)
 
-  def kill_job(self, job_key, shards=None, config=None):
-    return super(NonHookedAuroraClientAPI, self).kill_job(job_key, shards=shards)
+  def kill_job(self, job_key, shards=None, lock=None, config=None):
+    return super(NonHookedAuroraClientAPI, self).kill_job(job_key, shards=shards, lock=lock)
 
   def restart(self, job_key, shards, updater_config, health_check_interval_seconds, config=None):
     return super(NonHookedAuroraClientAPI, self).restart(job_key, shards, updater_config,
@@ -146,10 +146,10 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
         _partial(super(HookedAuroraClientAPI, self).cancel_update,
             job_key, config=config))
 
-  def kill_job(self, job_key, shards=None, config=None):
+  def kill_job(self, job_key, shards=None, lock=None, config=None):
     return self._hooked_call(config, job_key,
         _partial(super(HookedAuroraClientAPI, self).kill_job,
-            job_key, shards=shards, config=config))
+            job_key, shards=shards, lock=lock, config=config))
 
   def restart(self, job_key, shards, updater_config, health_check_interval_seconds, config=None):
     return self._hooked_call(config, job_key,

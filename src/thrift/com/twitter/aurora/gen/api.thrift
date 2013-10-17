@@ -514,7 +514,7 @@ service AuroraSchedulerManager {
   Response getJobs(1: string ownerRole)
 
   // Initiates a kill on tasks.
-  Response killTasks(1: TaskQuery query, 2: SessionKey session)
+  Response killTasks(1: TaskQuery query, 3: Lock lock, 2: SessionKey session)
 
   // Fetches the quota allocated for a user.
   Response getQuota(1: string ownerRole)
