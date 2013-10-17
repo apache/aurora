@@ -198,7 +198,7 @@ def diff(job_spec, config_file):
     die('Request failed, server responded with "%s"' % resp.message)
   remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
   resp = api.populate_job_config(config)
-  if not resp.responseCode != ResponseCode.OK:
+  if resp.responseCode != ResponseCode.OK:
     die('Request failed, server responded with "%s"' % resp.message)
   local_tasks = resp.result.populateJobResult.populated
 
