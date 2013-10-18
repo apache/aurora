@@ -44,7 +44,7 @@ DEFAULT_CODE_CACHE = 64
 CMDLINE = ''' 
     export JAVA_HOME={{__profile.java_home}} &&
     export PATH={{__profile.java_home}}/bin:$PATH &&
-    export _JAVA_OPTIONS=" -Xmx{{__profile.heap}}M -Xms{{__profile.heap}}M -Xmn{{__profile.new_gen}}M {{__profile.perm_gen}}  {{__profile.code_cache}} -XX:ParallelGCThreads={{__profile.cpu_cores}} -Xloggc:{{__profile.gc_log}} {{__profile.best_practice_jvm_flags}} {{__profile.print_gc_jvm_flags}} {{__profile.oome_jvm_flags}} -Dmesos.resources.cpu={{__profile.cpu_cores}} {{__profile.collector}} {{__profile.agentlib}} {{__profile.extra_jvm_flags}} " &&
+    export _JAVA_OPTIONS=" -Xmx{{__profile.heap}}M -Xms{{__profile.heap}}M -Xmn{{__profile.new_gen}}M {{__profile.perm_gen}}  {{__profile.code_cache}} -XX:ParallelGCThreads={{__profile.cpu_cores}} -Xloggc:{{__profile.gc_log}} {{__profile.best_practice_jvm_flags}} {{__profile.print_gc_jvm_flags}} {{__profile.oome_jvm_flags}} -Dcom.twitter.jvm.numProcs={{__profile.cpu_cores}} {{__profile.collector}} {{__profile.agentlib}} {{__profile.extra_jvm_flags}} " &&
     {{__profile.java_home}}/bin/java {{__profile.arguments}}'''
 DOWNLOAD_CANARY_PACKAGE = '''  
     _RH_VERSION=`grep -Eo [0-9] /etc/redhat-release |head -1` &&
@@ -252,7 +252,7 @@ def sanity_checks(jvm):
   """
   assert jvm.java_home().get() is not Empty, "JAVA_HOME not supplied"
   assert jvm.arguments().get() is not Empty, "Java Arguments not supplied"
-  assert jvm.check().ok(), "JVM Configuration Error: %s" % jvm
+  assert jvm.check().ok(), "JVM Configuration Error: %s JVM Configuration - %s" % (jvm.check(), jvm)
 
 def check_canary_version(jvm):
   """Checks the JDK Canary Version to be used
