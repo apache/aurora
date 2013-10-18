@@ -86,6 +86,10 @@ class SchedulerClient(object):
       except TTransport.TTransportException:
         time.sleep(SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
         continue
+      except Exception as e:
+        # Monkey-patched proxies, like socks, can generate a proxy error here.
+        # without adding a dependency, we can't catch those in a more specific way.
+        raise SchedulerClient.CouldNotConnect('Connection to scheduler failed: %s' % e)
     raise SchedulerClient.CouldNotConnect('Could not connect to %s:%s' % (host, port))
 
 
