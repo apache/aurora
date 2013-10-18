@@ -15,9 +15,12 @@
  */
 package com.twitter.aurora.scheduler.async;
 
+import java.util.EnumSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+
+import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
@@ -68,13 +71,13 @@ import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.testing.FakeClock;
 
 import static org.easymock.EasyMock.capture;
-import static org.easymock.EasyMock.createMock;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.isA;
 import static org.junit.Assert.assertEquals;
 
+import static com.twitter.aurora.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.aurora.gen.ScheduleStatus.FAILED;
 import static com.twitter.aurora.gen.ScheduleStatus.FINISHED;
 import static com.twitter.aurora.gen.ScheduleStatus.INIT;
@@ -82,6 +85,7 @@ import static com.twitter.aurora.gen.ScheduleStatus.KILLED;
 import static com.twitter.aurora.gen.ScheduleStatus.LOST;
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
+import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
 
 /**
  * TODO(wfarner): Break this test up to independently test TaskScheduler and OfferQueueImpl.
@@ -119,6 +123,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     future = createMock(ScheduledFuture.class);
     returnDelay = createMock(OfferReturnDelay.class);
     clock = new FakeClock();
+    clock.setNowMillis(0);
     flappingStrategy = createMock(BackoffStrategy.class);
   }
 
@@ -554,7 +559,6 @@ public class TaskSchedulerTest extends EasyMockTest {
   public void testNoPenaltyForNoAncestor() {
     // If a task doesn't have an ancestor there should be no penality for flapping.
     expectAnyMaintenanceCalls();
-    clock.setNowMillis(0);
     IScheduledTask task = makeTask("a1", INIT);
 
     expectOfferDeclineIn(10);
@@ -572,7 +576,6 @@ public class TaskSchedulerTest extends EasyMockTest {
   @Test
   public void testFlappingTasksBackoffTruncation() {
     expectAnyMaintenanceCalls();
-    clock.setNowMillis(0);
 
     makeFlappyTask("a0", null);
     makeFlappyTask("a1", "a0");
@@ -604,7 +607,6 @@ public class TaskSchedulerTest extends EasyMockTest {
   @Test
   public void testFlappingTasks() {
     expectAnyMaintenanceCalls();
-    this.clock.setNowMillis(0);
 
     makeFlappyTask("a0", null);
     IScheduledTask taskA1 = IScheduledTask.build(makeTask("a1", INIT).newBuilder()
@@ -631,21 +633,41 @@ public class TaskSchedulerTest extends EasyMockTest {
     flapping.getValue().run();
   }
 
-  private IScheduledTask makeFlappyTask(String taskId, String ancestorId) {
-    Amount<Long, Time> timeInState = Amount.of(10L, Time.SECONDS);
+  @Test
+  public void testNoPenaltyForInterruptedTasks() {
+    expectAnyMaintenanceCalls();
 
-    // TODO(zmanji): Accept clock or starting timestamp as an argument.
+    makeFlappyTaskWithStates("a0", EnumSet.of(INIT, PENDING, ASSIGNED, UPDATING, FAILED), null);
+    IScheduledTask taskA1 = IScheduledTask.build(makeTask("a1", INIT).newBuilder()
+        .setAncestorId("a0"));
+
+    expectOfferDeclineIn(10);
+    Capture<Runnable> first = expectTaskGroupBackoff(10);
+
+    expectTaskScheduled(taskA1);
+
+    replayAndCreateScheduler();
+
+    offerQueue.addOffer(OFFER_A);
+
+    changeState(taskA1, INIT, PENDING);
+
+    first.getValue().run();
+  }
+
+  private IScheduledTask makeFlappyTaskWithStates(
+      String taskId,
+      Iterable<ScheduleStatus> states,
+      @Nullable String ancestorId) {
+
+    Amount<Long, Time> timeInState = Amount.of(10L, Time.SECONDS);
 
     ScheduledTask base = makeTask(taskId, INIT).newBuilder();
 
-    base.addToTaskEvents(new TaskEvent(clock.nowMillis(), INIT));
-    clock.advance(timeInState);
-
-    base.addToTaskEvents(new TaskEvent(clock.nowMillis(), PENDING));
-    clock.advance(timeInState);
-
-    base.addToTaskEvents(new TaskEvent(clock.nowMillis(), FAILED));
-    clock.advance(timeInState);
+    for (ScheduleStatus status : states) {
+      base.addToTaskEvents(new TaskEvent(clock.nowMillis(), status));
+      clock.advance(timeInState);
+    }
 
     base.setAncestorId(ancestorId);
 
@@ -664,6 +686,12 @@ public class TaskSchedulerTest extends EasyMockTest {
     return result;
   }
 
+  private IScheduledTask makeFlappyTask(String taskId, @Nullable String ancestorId) {
+    return makeFlappyTaskWithStates(
+        taskId,
+        EnumSet.of(INIT, PENDING, ASSIGNED, RUNNING, FAILED),
+        ancestorId);
+  }
 
   private TaskInfo makeTaskInfo(IScheduledTask task) {
     return TaskInfo.newBuilder()

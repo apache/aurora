@@ -15,7 +15,9 @@
  */
 package com.twitter.aurora.scheduler.async;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -63,7 +65,11 @@ import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import static com.twitter.aurora.gen.ScheduleStatus.KILLING;
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
+import static com.twitter.aurora.gen.ScheduleStatus.RESTARTING;
+import static com.twitter.aurora.gen.ScheduleStatus.ROLLBACK;
+import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
 import static com.twitter.aurora.scheduler.async.TaskGroup.GroupState;
 
 /**
@@ -226,14 +232,23 @@ public class TaskGroups implements EventSubscriber {
     }
   };
 
+  private static final Set<ScheduleStatus> INTERRUPTED_TASK_STATES =
+      EnumSet.of(RESTARTING, KILLING, UPDATING, ROLLBACK);
+
   private final Predicate<IScheduledTask> flapped = new Predicate<IScheduledTask>() {
-    @Override
-    public boolean apply(IScheduledTask task) {
+    @Override public boolean apply(IScheduledTask task) {
       if (!task.isSetTaskEvents()) {
         return false;
       }
 
       List<ITaskEvent> events = Lists.reverse(task.getTaskEvents());
+
+      // Avoid penalizing tasks that were interrupted by outside action, such as a user
+      // restarting them.
+      if (Iterables.any(Iterables.transform(events, TO_STATUS),
+          Predicates.in(INTERRUPTED_TASK_STATES))) {
+        return false;
+      }
 
       ITaskEvent terminalEvent = Iterables.get(events, 0);
       ScheduleStatus terminalState = terminalEvent.getStatus();
