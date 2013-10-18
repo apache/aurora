@@ -30,8 +30,8 @@ class TestNonHookedAuroraClientAPI(unittest.TestCase):
         test_obj.API_CALL = functools.partial(self.cancel_update, job_key)
         return test_obj.RETURN_VALUE
 
-      def kill_job(self, job_key, shards=None, lock=None):
-        test_obj.API_CALL = functools.partial(self.kill_job, job_key, shards, lock)
+      def kill_job(self, job_key, instances=None, lock=None):
+        test_obj.API_CALL = functools.partial(self.kill_job, job_key, instances, lock)
         return test_obj.RETURN_VALUE
 
       def restart(self, job_key, shards, updater_config, health_check_interval_seconds):
