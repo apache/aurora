@@ -354,6 +354,8 @@ public class CronJobManagerTest extends EasyMockTest {
         .setNumCpus(1)
         .setRamMb(1024)
         .setDiskMb(1024)
+        .setJobName(JOB_NAME)
+        .setOwner(new Identity(OWNER, OWNER))
         .setEnvironment(DEFAULT_ENVIRONMENT);
   }
 }

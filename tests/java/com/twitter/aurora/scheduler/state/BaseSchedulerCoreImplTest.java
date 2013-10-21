@@ -114,7 +114,7 @@ import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
 import static com.twitter.aurora.gen.UpdateResult.SUCCESS;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.hostLimitConstraint;
-import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.populateFields;
+import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.validateAndPopulate;
 
 /**
  * Base integration test for the SchedulerCoreImpl, subclasses should supply a concrete Storage
@@ -231,7 +231,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       // Need to clear shard ID since that was assigned when the job is scheduled.
       ITaskConfig config = ITaskConfig.build(
           state.getAssignedTask().getTask().newBuilder().setInstanceIdDEPRECATED(0));
-      assertEquals(populateFields(job.getJobConfig()), config);
+      assertEquals(validateAndPopulate(job.getJobConfig().getTaskConfig()), config);
     }
   }
 

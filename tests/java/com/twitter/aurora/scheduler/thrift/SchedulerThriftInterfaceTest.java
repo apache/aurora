@@ -592,6 +592,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setIsService(true)
         .setProduction(true)
         .setOwner(ROLE_IDENTITY)
+        .setEnvironment(DEFAULT_ENVIRONMENT)
         .setJobName(JOB_NAME);
     JobConfiguration job = makeJob(task);
 

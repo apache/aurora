@@ -180,8 +180,8 @@ public final class ConfigurationManager {
 
   private static void checkNotNull(Object value, String error) throws TaskDescriptionException {
     if (value == null) {
-       throw new TaskDescriptionException(error);
-     }
+      throw new TaskDescriptionException(error);
+    }
   }
 
   private static void assertOwnerValidity(IIdentity jobOwner) throws TaskDescriptionException {
@@ -286,17 +286,69 @@ public final class ConfigurationManager {
           "Job name contains illegal characters: " + job.getKey().getName());
     }
 
-    builder.setTaskConfig(populateFields(IJobConfiguration.build(builder)).newBuilder());
-    TaskConfig config = builder.getTaskConfig();
+    builder.setTaskConfig(
+        validateAndPopulate(ITaskConfig.build(builder.getTaskConfig())).newBuilder());
+
+    // Only one of [service=true, cron_schedule] may be set.
+    if (!StringUtils.isEmpty(job.getCronSchedule()) && builder.getTaskConfig().isIsService()) {
+      throw new TaskDescriptionException(
+          "A service task may not be run on a cron schedule: " + builder);
+    }
+
+    return IJobConfiguration.build(builder);
+  }
+
+  /**
+   * Check validity of and populates defaults in a task configuration.  This will return a deep copy
+   * of the provided task configuration with default configuration values applied, and configuration
+   * map values parsed and applied to their respective struct fields.
+   *
+   *
+   * @param config Task config to validate and populate.
+   * @return A reference to the modified {@code config} (for chaining).
+   * @throws TaskDescriptionException If the task is invalid.
+   */
+  public static ITaskConfig validateAndPopulate(ITaskConfig config)
+      throws TaskDescriptionException {
+
+    TaskConfig builder = config.newBuilder();
+
+    if (!builder.isSetRequestedPorts()) {
+      builder.setRequestedPorts(ImmutableSet.<String>of());
+    }
+
+    maybeFillLinks(builder);
+
+    assertOwnerValidity(config.getOwner());
+
+    if (!isGoodIdentifier(config.getJobName())) {
+      throw new TaskDescriptionException(
+          "Job name contains illegal characters: " + config.getJobName());
+    }
 
     if (REQUIRE_CONTACT_EMAIL.get()
         && (!config.isSetContactEmail()
-            || !config.getContactEmail().matches("[^@]+@twitter.com"))) {
+        || !config.getContactEmail().matches("[^@]+@twitter.com"))) {
       throw new TaskDescriptionException(
           "A valid twitter.com contact email address is required.");
     }
 
-    IConstraint constraint = getDedicatedConstraint(ITaskConfig.build(config));
+    if (!isGoodIdentifier(config.getEnvironment())) {
+      throw new TaskDescriptionException(
+          "Environment contains illegal characters: " + config.getEnvironment());
+    }
+
+    // TODO(maximk): Remove thermosConfig during the MESOS-2635 cleanup stage
+    if (!builder.isSetThermosConfig() && !builder.isSetExecutorConfig()) {
+      throw new TaskDescriptionException("Configuration may not be null");
+    }
+
+    // Maximize the usefulness of any thrown error message by checking required fields first.
+    for (RequiredFieldValidator<?> validator : REQUIRED_FIELDS_VALIDATORS) {
+      validator.validate(builder);
+    }
+
+    IConstraint constraint = getDedicatedConstraint(config);
     if (constraint != null) {
       if (!isValueConstraint(constraint.getConstraint())) {
         throw new TaskDescriptionException("A dedicated constraint must be of value type.");
@@ -309,57 +361,10 @@ public final class ConfigurationManager {
       }
 
       String dedicatedRole = getRole(valueConstraint);
-      if (!job.getOwner().getRole().equals(dedicatedRole)) {
+      if (!config.getOwner().getRole().equals(dedicatedRole)) {
         throw new TaskDescriptionException(
             "Only " + dedicatedRole + " may use hosts dedicated for that role.");
       }
-    }
-
-    return IJobConfiguration.build(builder);
-  }
-
-  /**
-   * Populates fields in an individual task configuration, using the job as context.
-   *
-   * @param job The job that the task is a member of.
-   * @return A reference to the modified {@code config} (for chaining).
-   * @throws TaskDescriptionException If the task is invalid.
-   */
-  @VisibleForTesting
-  public static ITaskConfig populateFields(IJobConfiguration job) throws TaskDescriptionException {
-    TaskConfig builder = job.getTaskConfig().newBuilder();
-    if (builder == null) {
-      throw new TaskDescriptionException("Task may not be null.");
-    }
-
-    if (!builder.isSetRequestedPorts()) {
-      builder.setRequestedPorts(ImmutableSet.<String>of());
-    }
-
-    maybeFillLinks(builder);
-
-    builder.setOwner(job.getOwner().newBuilder());
-    builder.setJobName(job.getKey().getName());
-
-    // TODO(ksweeney): Remove the check for job.isSetKey when it's no longer optional.
-    if (StringUtils.isBlank(builder.getEnvironment()) && job.isSetKey()) {
-      builder.setEnvironment(job.getKey().getEnvironment());
-    }
-
-    // Only one of [service=true, cron_schedule] may be set.
-    if (!StringUtils.isEmpty(job.getCronSchedule()) && builder.isIsService()) {
-      throw new TaskDescriptionException(
-          "A service task may not be run on a cron schedule: " + builder);
-    }
-
-    // TODO(maximk): Remove thermosConfig during the MESOS-2635 cleanup stage
-    if (!builder.isSetThermosConfig() && !builder.isSetExecutorConfig()) {
-      throw new TaskDescriptionException("Configuration may not be null");
-    }
-
-    // Maximize the usefulness of any thrown error message by checking required fields first.
-    for (RequiredFieldValidator<?> validator : REQUIRED_FIELDS_VALIDATORS) {
-      validator.validate(builder);
     }
 
     return ITaskConfig.build(applyDefaultsIfUnset(builder));
