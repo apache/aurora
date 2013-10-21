@@ -75,6 +75,13 @@ class TestSchedulerProxyInjection(unittest.TestCase):
 
     self.make_scheduler_proxy().createJob(JobConfiguration())
 
+  def test_replaceCronTemplate(self):
+    self.mock_thrift_client.replaceCronTemplate(IsA(JobConfiguration), IsA(Lock), IsA(SessionKey))
+
+    self.mox.ReplayAll()
+
+    self.make_scheduler_proxy().replaceCronTemplate(JobConfiguration(), Lock())
+
   def test_populateJobConfig(self):
     self.mock_thrift_client.populateJobConfig(IsA(JobConfiguration))
 

@@ -536,6 +536,10 @@ service AuroraSchedulerManager {
 
   // Releases the lock acquired earlier in acquireLock call.
   Response releaseLock(1: Lock lock, 2: LockValidation validation, 3: SessionKey session)
+
+  // Replaces the template (configuration) for the existing cron job.
+  // The cron job template (configuration) must exist for the call to succeed.
+  Response replaceCronTemplate(1: JobConfiguration config, 2: Lock lock, 3: SessionKey session)
 }
 
 struct InstanceConfigRewrite {

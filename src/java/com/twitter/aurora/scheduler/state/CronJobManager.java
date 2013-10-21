@@ -341,7 +341,13 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     }
   }
 
-  void updateJob(ParsedConfiguration config) throws ScheduleException {
+  /**
+   * Updates (re-schedules) the existing cron job.
+   *
+   * @param config New job configuration to update to.
+   * @throws ScheduleException If non-cron job confuration provided.
+   */
+  public void updateJob(ParsedConfiguration config) throws ScheduleException {
     IJobConfiguration job = config.getJobConfig();
     if (!hasCronSchedule(job)) {
       throw new ScheduleException("A cron job may not be updated to a non-cron job.");

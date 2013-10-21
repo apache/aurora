@@ -239,13 +239,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       SessionKey session) {
 
     IJobConfiguration job = IJobConfiguration.build(mutableJob);
+    IJobKey jobKey = JobKeys.assertValid(job.getKey());
     checkNotNull(session);
 
     Response response = new Response();
-    if (!JobKeys.isValid(job.getKey())) {
-      return response.setResponseCode(INVALID_REQUEST)
-          .setMessage("Invalid job key: " + job.getKey());
-    }
 
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
@@ -255,7 +252,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     try {
       lockManager.validateIfLocked(
-          ILockKey.build(LockKey.job(job.getKey().newBuilder())),
+          ILockKey.build(LockKey.job(jobKey.newBuilder())),
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
       ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
@@ -265,15 +262,54 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               parsed.getJobConfig().getInstanceCount(), JobKeys.toPath(job)));
     } catch (LockException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    } catch (ConfigurationManager.TaskDescriptionException e) {
-      response.setResponseCode(INVALID_REQUEST)
-          .setMessage("Invalid task description: " + e.getMessage());
+    } catch (TaskDescriptionException e) {
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     } catch (ScheduleException e) {
-      response.setResponseCode(INVALID_REQUEST)
-          .setMessage("Failed to schedule job - " + e.getMessage());
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
 
     return response;
+  }
+
+  @Override
+  public Response replaceCronTemplate(
+      JobConfiguration mutableConfig,
+      @Nullable Lock mutableLock,
+      SessionKey session) {
+
+    checkNotNull(mutableConfig);
+    IJobConfiguration job = IJobConfiguration.build(mutableConfig);
+    IJobKey jobKey = JobKeys.assertValid(job.getKey());
+    checkNotNull(session);
+
+    Response response = new Response();
+    try {
+      sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
+    } catch (AuthFailedException e) {
+      return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+    }
+
+    try {
+      lockManager.validateIfLocked(
+          ILockKey.build(LockKey.job(jobKey.newBuilder())),
+          Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
+
+      ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
+
+      if (!cronJobManager.hasJob(jobKey)) {
+        return response.setResponseCode(INVALID_REQUEST).setMessage(
+            "No cron template found for the given key: " + jobKey);
+      }
+      cronJobManager.updateJob(parsed);
+      return response.setResponseCode(OK).setMessage("Replaced template for: " + jobKey);
+
+    } catch (LockException e) {
+      return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+    } catch (TaskDescriptionException e) {
+      return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+    } catch (ScheduleException e) {
+      return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+    }
   }
 
   @Override

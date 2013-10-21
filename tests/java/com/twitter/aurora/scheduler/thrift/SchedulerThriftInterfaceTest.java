@@ -127,6 +127,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final IJobKey JOB_KEY = JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, JOB_NAME);
   private static final ILockKey LOCK_KEY = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
   private static final ILock LOCK = ILock.build(new Lock().setKey(LOCK_KEY.newBuilder()));
+  private static final JobConfiguration CRON_JOB = makeJob().setCronSchedule("test");
   private static final Lock DEFAULT_LOCK = null;
 
   private StorageTestUtil storageUtil;
@@ -632,6 +633,54 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     JobConfiguration job = makeJob(nonProductionTask(), MAX_TASKS_PER_JOB.get() + 1);
     assertEquals(INVALID_REQUEST, thrift.createJob(job, DEFAULT_LOCK, SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testReplaceCronTemplate() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
+    cronJobManager.updateJob(anyObject(ParsedConfiguration.class));
+    control.replay();
+
+    assertEquals(
+        OK,
+        thrift.replaceCronTemplate(CRON_JOB, DEFAULT_LOCK, SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testReplaceCronTemplateFailedAuth() throws Exception {
+    expectAuth(ROLE, false);
+
+    control.replay();
+
+    assertEquals(
+        AUTH_FAILED,
+        thrift.replaceCronTemplate(CRON_JOB, DEFAULT_LOCK, SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testCreateCronJobFailedLockCheck() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    expectLastCall().andThrow(new LockException("Lock check failed."));
+    control.replay();
+
+    assertEquals(
+        INVALID_REQUEST,
+        thrift.replaceCronTemplate(CRON_JOB, LOCK.newBuilder(), SESSION).getResponseCode());
+  }
+
+  @Test
+  public void testReplaceCronTemplateDoesNotExist() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    control.replay();
+
+    assertEquals(
+        INVALID_REQUEST,
+        thrift.replaceCronTemplate(CRON_JOB, DEFAULT_LOCK, SESSION).getResponseCode());
   }
 
   @Test
@@ -1245,15 +1294,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
-  private JobConfiguration makeJob() {
+  private static JobConfiguration makeJob() {
     return makeJob(nonProductionTask(), 1);
   }
 
-  private JobConfiguration makeJob(TaskConfig task) {
+  private static JobConfiguration makeJob(TaskConfig task) {
     return makeJob(task, 1);
   }
 
-  private JobConfiguration makeJob(TaskConfig task, int shardCount) {
+  private static JobConfiguration makeJob(TaskConfig task, int shardCount) {
     return new JobConfiguration()
         .setOwner(ROLE_IDENTITY)
         .setInstanceCount(shardCount)
