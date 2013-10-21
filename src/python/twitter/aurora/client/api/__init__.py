@@ -143,7 +143,7 @@ invoking cancel_update.
     self._assert_valid_job_key(job_key)
 
     log.info("Canceling update on job %s" % job_key)
-    resp = Updater.cancel_update(self._scheduler, job_key.role, job_key.env, job_key.name)
+    resp = Updater.cancel_update(self._scheduler, job_key)
     if resp.responseCode != ResponseCode.OK:
       log.error('Error cancelling the update: %s' % resp.message)
     return resp

@@ -14,11 +14,10 @@ from .scheduler_client import SchedulerProxy
 
 
 class Updater(object):
-  """Update the shards of a job in batches."""
+  """Update the instances of a job in batches."""
 
   class Error(Exception): pass
   class InvalidConfigError(Error): pass
-  class UpdateInProgressError(Error): pass
 
   def __init__(self, config, scheduler=None):
     self._config = config
@@ -34,10 +33,7 @@ class Updater(object):
     """Start an update.
 
        Returns:
-         True if an update is necessary
-         False if an update is not necessary
-
-       UpdateInProgressError exception is thrown if an update is already in progress.
+         Response instance from the scheduler call.
     """
     resp = self._scheduler.startUpdate(self._config.job())
     if resp.responseCode == ResponseCode.OK and resp.result.startUpdateResult.rollingUpdateRequired:
@@ -48,10 +44,8 @@ class Updater(object):
     """Finish an update.  If you seek a rollback on finish, set rollback=True.
 
        Returns:
-         True if update succeeded
-         False if update failed
+         Response instance from the scheduler call.
     """
-
     resp = self._scheduler.finishUpdate(self._job_key,
         UpdateResult.FAILED if rollback else UpdateResult.SUCCESS,
         self._update_token)
@@ -60,41 +54,35 @@ class Updater(object):
       resp._update_token = None
     return resp
 
-  def cancel(self):
-    return self.cancel_update(self._scheduler, self._job_key.role, self._job_key.environment,
-        self._job_key.jobname, self._update_token)
-
   @classmethod
-  def cancel_update(cls, scheduler, role, env, jobname, token=None):
-    job_key = JobKey(role=role, environment=env, name=jobname)
-
+  def cancel_update(cls, scheduler, job_key, token=None):
     return scheduler.finishUpdate(job_key, UpdateResult.TERMINATE, token)
 
-  def _get_shards_to_watch(self, shard_states, batch_shards):
-    if shard_states:
+  def _get_instances_to_watch(self, instance_states, batch_instances):
+    if instance_states:
       no_watch_states = (ShardUpdateResult.UNCHANGED, )
       watch_states = (ShardUpdateResult.RESTARTING, ShardUpdateResult.ADDED)
-      unchanged_shards = [shard for (shard, state) in shard_states.items() if state in no_watch_states]
-      if unchanged_shards:
-        log.info('Not watching unchanged shards %s' % unchanged_shards)
-      watch_shards = [shard for (shard, state) in shard_states.items() if state in watch_states]
+      unchanged_instances = [instance for (instance, state) in instance_states.items() if state in no_watch_states]
+      if unchanged_instances:
+        log.info('Not watching unchanged instances %s' % unchanged_instances)
+      watch_instances = [instance for (instance, state) in instance_states.items() if state in watch_states]
     else:
-      log.error('No shard actions returned by scheduler, assuming all shards restarted.')
-      watch_shards = batch_shards
-    return watch_shards
+      log.error('No instance actions returned by scheduler, assuming all instances restarted.')
+      watch_instances = batch_instances
+    return watch_instances
 
-  def update(self, initial_shards, health_check_interval_seconds, shard_watcher=None):
+  def update(self, initial_instances, health_check_interval_seconds, instance_watcher=None):
     """Performs the job update, blocking until it completes.
     A rollback will be performed if the update was considered a failure based on the
     update configuration.
 
     Arguments:
-    initial_shards -- a list of shards to update.
+    initial_instances -- a list of instances to update.
     health_check_interval_seconds -- Time to wait between consecutive status checks.
 
-    Returns the set of shards that failed to update.
+    Returns the set of instances that failed to update.
     """
-    self._shard_watcher = shard_watcher or ShardWatcher(
+    self._instance_watcher = instance_watcher or ShardWatcher(
         self._scheduler,
         self._job_key,
         self._update_config.restart_threshold,
@@ -105,84 +93,84 @@ class Updater(object):
         self._update_config.max_per_shard_failures,
         self._update_config.max_total_failures
     )
-    failed_shards = set()
-    ShardState = collections.namedtuple('ShardState', ['shard_id', 'is_updated'])
-    remaining_shards = [ShardState(shard_id, is_updated=False) for shard_id in initial_shards]
+    failed_instances = set()
+    InstanceState = collections.namedtuple('InstanceState', ['instance_id', 'is_updated'])
+    remaining_instances = [InstanceState(instance_id, is_updated=False) for instance_id in initial_instances]
 
     log.info('Starting job update.')
-    while remaining_shards and not failure_threshold.is_failed_update():
-      batch_shards = remaining_shards[0 : self._update_config.batch_size]
-      remaining_shards = list(set(remaining_shards) - set(batch_shards))
-      shards_to_restart = [s.shard_id for s in batch_shards if s.is_updated]
-      shards_to_update = [s.shard_id for s in batch_shards if not s.is_updated]
+    while remaining_instances and not failure_threshold.is_failed_update():
+      batch_instances = remaining_instances[0 : self._update_config.batch_size]
+      remaining_instances = list(set(remaining_instances) - set(batch_instances))
+      instances_to_restart = [s.instance_id for s in batch_instances if s.is_updated]
+      instances_to_update = [s.instance_id for s in batch_instances if not s.is_updated]
 
-      shards_to_watch = []
-      if shards_to_restart:
-        self._restart_shards(shards_to_restart)
-        shards_to_watch += shards_to_restart
+      instances_to_watch = []
+      if instances_to_restart:
+        self._restart_instances(instances_to_restart)
+        instances_to_watch += instances_to_restart
 
-      if shards_to_update:
-        shard_states = self._update_shards(shards_to_update)
-        shards_to_watch += self._get_shards_to_watch(shard_states, shards_to_update)
+      if instances_to_update:
+        instance_states = self._update_instances(instances_to_update)
+        instances_to_watch += self._get_instances_to_watch(instance_states, instances_to_update)
 
-      failed_shards = self._shard_watcher.watch(shards_to_watch) if shards_to_watch else set()
+      failed_instances = self._instance_watcher.watch(instances_to_watch) if instances_to_watch else set()
 
-      if failed_shards:
-        log.error('Failed shards: %s' % failed_shards)
-      remaining_shards += [ShardState(shard_id, is_updated=True) for shard_id in failed_shards]
-      remaining_shards.sort(key=lambda tup: tup.shard_id)
-      failure_threshold.update_failure_counts(failed_shards)
+      if failed_instances:
+        log.error('Failed instances: %s' % failed_instances)
+      remaining_instances += [InstanceState(instance_id, is_updated=True) for instance_id in failed_instances]
+      remaining_instances.sort(key=lambda tup: tup.instance_id)
+      failure_threshold.update_failure_counts(failed_instances)
 
-    if failed_shards:
-      untouched_shards = [s.shard_id for s in remaining_shards if not s.is_updated]
-      shards_to_rollback = list(set(initial_shards) - set(untouched_shards))
-      self._rollback(shards_to_rollback)
+    if failed_instances:
+      untouched_instances = [s.instance_id for s in remaining_instances if not s.is_updated]
+      instances_to_rollback = list(set(initial_instances) - set(untouched_instances))
+      self._rollback(instances_to_rollback)
 
-    return failed_shards
+    return failed_instances
 
-  def _rollback(self, shards_to_rollback):
+  def _rollback(self, instances_to_rollback):
     """Performs the job rollback.
 
     Arguments:
-    shards_to_rollback -- shard ids.
+    instances_to_rollback -- instance ids.
     """
-    log.info('Reverting update for %s' % shards_to_rollback)
-    shards_to_rollback.sort()
-    failed_shards = []
-    while shards_to_rollback:
-      batch_shards = shards_to_rollback[0 : self._update_config.batch_size]
-      shards_to_rollback = list(set(shards_to_rollback) - set(batch_shards))
+    log.info('Reverting update for %s' % instances_to_rollback)
+    instances_to_rollback.sort()
+    failed_instances = []
+    while instances_to_rollback:
+      batch_instances = instances_to_rollback[0 : self._update_config.batch_size]
+      instances_to_rollback = list(set(instances_to_rollback) - set(batch_instances))
 
-      resp = self._scheduler.rollbackShards(self._job_key, batch_shards, self._update_token)
+      resp = self._scheduler.rollbackShards(self._job_key, batch_instances, self._update_token)
       self._check_and_log_update_response(resp)
-      shards = resp.result.rollbackShardsResult.shards
-      shards_to_watch = self._get_shards_to_watch(shards, batch_shards)
-      failed_shards += self._shard_watcher.watch(shards_to_watch)
+      instances = resp.result.rollbackShardsResult.shards
+      instances_to_watch = self._get_instances_to_watch(instances, batch_instances)
+      failed_instances += self._instance_watcher.watch(instances_to_watch)
 
-    if failed_shards:
-      log.error('Rollback failed for shards: %s' % failed_shards)
+    if failed_instances:
+      log.error('Rollback failed for instances: %s' % failed_instances)
 
-  def _update_shards(self, shard_ids):
-    """Instructs the scheduler to update shards.
+  def _update_instances(self, instance_ids):
+    """Instructs the scheduler to update instances.
 
     Arguments:
-    shard_ids -- set of shards to be updated by the scheduler.
+    instance_ids -- set of instances to be updated by the scheduler.
 
-    Returns a map of the current status of the updated shards as returned by the scheduler.
+    Returns a map of the current status of the updated instances as returned by the scheduler.
     """
-    log.info('Updating shards: %s' % shard_ids)
-    resp = self._scheduler.updateShards(self._job_key, shard_ids, self._update_token)
+    log.info('Updating instances: %s' % instance_ids)
+    resp = self._scheduler.updateShards(self._job_key, instance_ids, self._update_token)
     self._check_and_log_update_response(resp)
     return resp.result.updateShardsResult.shards
 
-  def _restart_shards(self, shard_ids):
-    """Instructs the scheduler to restart shards.
+  def _restart_instances(self, instance_ids):
+    """Instructs the scheduler to restart instances.
 
     Arguments:
-    shard_ids -- set of shards to be restarted by the scheduler.
+    instance_ids -- set of instances to be restarted by the scheduler.
     """
-    log.info('Restarting shards: %s' % shard_ids)
-    resp = self._scheduler.restartShards(self._job_key, shard_ids)
+    log.info('Restarting instances: %s' % instance_ids)
+    resp = self._scheduler.restartShards(self._job_key, instance_ids)
     self._check_and_log_response(resp)
 
   @classmethod
