@@ -35,8 +35,8 @@ class HealthCheckTest(unittest.TestCase):
     self._health_check_a = mox.MockObject(HealthCheck)
     self._health_check_b = mox.MockObject(HealthCheck)
 
-  def create_task(self, shard_id, task_id, status=RUNNING, host=HOST, port=HEALTH_PORT):
-    task = TaskConfig(instanceIdDEPRECATED=shard_id)
+  def create_task(self, instance_id, task_id, status=RUNNING, host=HOST, port=HEALTH_PORT):
+    task = TaskConfig(instanceIdDEPRECATED=instance_id)
     ports = {}
     if port:
       ports['health'] = port
@@ -60,7 +60,7 @@ class HealthCheckTest(unittest.TestCase):
     mox.Verify(self._health_check_b)
 
   def test_simple_status_health_check(self):
-    """Verify that running shards are reported healthy"""
+    """Verify that running instances are reported healthy"""
     task_a = self.create_task(0, 'a')
     task_b = self.create_task(1, 'b')
     assert self._status_health_check.health(task_a) == Retriable.alive()
@@ -74,7 +74,7 @@ class HealthCheckTest(unittest.TestCase):
     assert self._status_health_check.health(failed_task) == Retriable.dead()
 
   def test_changed_task_id(self):
-    """Verifes that a shard with a different task id causes the health check to fail"""
+    """Verifes that an instance with a different task id causes the health check to fail"""
     task_a = self.create_task(0, 'a')
     task_b = self.create_task(0, 'b')
     assert self._status_health_check.health(task_a) == Retriable.alive()
@@ -92,12 +92,12 @@ class HealthCheckTest(unittest.TestCase):
     self.verify()
 
   def test_unmatched_host_port(self):
-    """Test if a shard with a modified a (host, port) triggers a new http health checker creation"""
-    shard_id = 0
-    task_a = self.create_task(shard_id, 'a')
+    """Test if an instance with a modified a (host, port) triggers a new http health checker creation"""
+    instance_id = 0
+    task_a = self.create_task(instance_id, 'a')
     self.expect_http_signaler_creation()
     self.expect_health_check()
-    task_b = self.create_task(shard_id, 'b', host='host-b', port=44444)
+    task_b = self.create_task(instance_id, 'b', host='host-b', port=44444)
     self.expect_http_signaler_creation(host='host-b', port=44444)
     self.expect_health_check()
     self.replay()
@@ -143,14 +143,14 @@ class HealthCheckTest(unittest.TestCase):
     assert NotRetriable.alive() == (True, False)
     assert NotRetriable.dead() == (False, False)
 
-  def test_shardwatcher_health_check(self):
+  def test_instancewatcher_health_check(self):
     """Verifies that if the task has no health port, only status check is performed"""
     task = self.create_task(0, 'a', port=None)
     self.replay()
     assert self._smart_health_check.health(task) == Retriable.alive()
     self.verify()
 
-  def test_shardwatcher_http_health_check(self):
+  def test_instancewatcher_http_health_check(self):
     """Verifies that http health check is performed if the task has a health port"""
     task = self.create_task(0, 'a')
     self.expect_http_signaler_creation()
@@ -159,7 +159,7 @@ class HealthCheckTest(unittest.TestCase):
     assert self._smart_health_check.health(task) == Retriable.dead()
     self.verify()
 
-  def test_shardwatcher_http_health_check_one_http_signaler(self):
+  def test_instancewatcher_http_health_check_one_http_signaler(self):
     """Verifies that upon multiple http health checks only one HttpHealthChecker is created"""
     task = self.create_task(0, 'a')
     self.expect_http_signaler_creation()

@@ -102,9 +102,9 @@ invoking cancel_update.
   def query(self, query):
     return self._scheduler.getTasksStatus(query)
 
-  def update_job(self, config, health_check_interval_seconds=3, shards=None):
-    """Run a job update for a given config, for the specified shards.  If
-       shards is left unspecified, update all shards.  Returns whether or not
+  def update_job(self, config, health_check_interval_seconds=3, instances=None):
+    """Run a job update for a given config, for the specified instances.  If
+       instances is left unspecified, update all instances.  Returns whether or not
        the update was successful."""
 
     log.info("Updating job: %s" % config.name())
@@ -123,15 +123,15 @@ invoking cancel_update.
       log.info('Update successful: %s' % resp.message)
       return update_resp
 
-    failed_shards = updater.update(
-        shards or list(range(config.instances())), health_check_interval_seconds)
+    failed_instances = updater.update(
+      instances or list(range(config.instances())), health_check_interval_seconds)
 
-    if failed_shards:
-      log.error('Update reverted, failures detected on shards %s' % failed_shards)
+    if failed_instances:
+      log.error('Update reverted, failures detected on instances %s' % failed_instances)
     else:
       log.info('Update successful')
 
-    resp = updater.finish(failed_shards)
+    resp = updater.finish(failed_instances)
     if resp.responseCode != ResponseCode.OK:
       log.error('There was an error finalizing the update: %s' % resp.message)
 
@@ -148,15 +148,15 @@ invoking cancel_update.
       log.error('Error cancelling the update: %s' % resp.message)
     return resp
 
-  def restart(self, job_key, shards, updater_config, health_check_interval_seconds):
-    """Perform a rolling restart of the job. If shards is None or [], restart all shards. Returns
-       the scheduler response for the last restarted batch of shards (which allows the client to
+  def restart(self, job_key, instances, updater_config, health_check_interval_seconds):
+    """Perform a rolling restart of the job. If instances is None or [], restart all instances. Returns
+       the scheduler response for the last restarted batch of instances (which allows the client to
        show the job URL), or the status check response if no tasks were active.
     """
     self._assert_valid_job_key(job_key)
 
     return Restarter(job_key, updater_config, health_check_interval_seconds, self._scheduler
-    ).restart(shards)
+    ).restart(instances)
 
   def start_maintenance(self, hosts):
     log.info("Starting maintenance for: %s" % hosts.hostNames)

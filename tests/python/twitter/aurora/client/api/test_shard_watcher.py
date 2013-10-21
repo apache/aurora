@@ -26,7 +26,7 @@ def find_expected_cycles(period, sleep_secs):
 
 
 class ShardWatcherTest(unittest.TestCase):
-  WATCH_SHARDS = range(3)
+  WATCH_INSTANCES = range(3)
   RESTART_THRESHOLD = WATCH_SECS = 50
   EXPECTED_CYCLES = find_expected_cycles(WATCH_SECS, 3.0)
 
@@ -58,27 +58,27 @@ class ShardWatcherTest(unittest.TestCase):
     return ScheduledTask(assignedTask=AssignedTask(
         task=TaskConfig(instanceIdDEPRECATED=instance_id)))
 
-  def expect_get_statuses(self, shard_ids=WATCH_SHARDS, num_calls=EXPECTED_CYCLES):
-    tasks = [self.create_task(shard_id) for shard_id in shard_ids]
+  def expect_get_statuses(self, instance_ids=WATCH_INSTANCES, num_calls=EXPECTED_CYCLES):
+    tasks = [self.create_task(instance_id) for instance_id in instance_ids]
     response = Response(responseCode=ResponseCode.OK, message='test')
     response.result = Result()
     response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
 
-    query = self.get_tasks_status_query(shard_ids)
+    query = self.get_tasks_status_query(instance_ids)
     for x in range(int(num_calls)):
       self._scheduler.getTasksStatus(query).AndReturn(response)
 
   def mock_health_check(self, task, status, retry):
     self._health_check.health(task).InAnyOrder().AndReturn((status, retry))
 
-  def expect_health_check(self, shard, status, retry=True, num_calls=EXPECTED_CYCLES):
+  def expect_health_check(self, instance, status, retry=True, num_calls=EXPECTED_CYCLES):
     for x in range(int(num_calls)):
-      self.mock_health_check(self.create_task(shard), status, retry)
+      self.mock_health_check(self.create_task(instance), status, retry)
 
-  def assert_watch_result(self, expected_failed_shards, shards_to_watch=WATCH_SHARDS):
-    shards_returned = self._watcher.watch(shards_to_watch, self._health_check)
-    assert set(expected_failed_shards) == shards_returned, (
-        'Expected shards (%s) : Returned shards (%s)' % (expected_failed_shards, shards_returned))
+  def assert_watch_result(self, expected_failed_instances, instances_to_watch=WATCH_INSTANCES):
+    instances_returned = self._watcher.watch(instances_to_watch, self._health_check)
+    assert set(expected_failed_instances) == instances_returned, (
+        'Expected instances (%s) : Returned instances (%s)' % (expected_failed_instances, instances_returned))
 
   def replay_mocks(self):
     mox.Replay(self._scheduler)
@@ -89,7 +89,7 @@ class ShardWatcherTest(unittest.TestCase):
     mox.Verify(self._health_check)
 
   def test_successful_watch(self):
-    """All shards are healthy immediately"""
+    """All instances are healthy immediately"""
     self.expect_get_statuses()
     self.expect_health_check(0, True)
     self.expect_health_check(1, True)
@@ -98,8 +98,8 @@ class ShardWatcherTest(unittest.TestCase):
     self.assert_watch_result([])
     self.verify_mocks()
 
-  def test_single_shard_failure(self):
-    """One failed shard in a batch of shards"""
+  def test_single_instance_failure(self):
+    """One failed instance in a batch of instances"""
     self.expect_get_statuses()
     self.expect_health_check(0, False)
     self.expect_health_check(1, True)
@@ -108,8 +108,8 @@ class ShardWatcherTest(unittest.TestCase):
     self.assert_watch_result([0])
     self.verify_mocks()
 
-  def test_all_shard_failure(self):
-    """All failed shard in a batch of shards"""
+  def test_all_instance_failure(self):
+    """All failed instance in a batch of instances"""
     self.expect_get_statuses()
     self.expect_health_check(0, False)
     self.expect_health_check(1, False)
@@ -119,7 +119,7 @@ class ShardWatcherTest(unittest.TestCase):
     self.verify_mocks()
 
   def test_restart_threshold_fail_fast(self):
-    """Shards are reported unhealthy with retry set to False"""
+    """Instances are reported unhealthy with retry set to False"""
     self.expect_get_statuses(num_calls=1)
     self.expect_health_check(0, False, retry=False, num_calls=1)
     self.expect_health_check(1, False, retry=False, num_calls=1)
@@ -129,7 +129,7 @@ class ShardWatcherTest(unittest.TestCase):
     self.verify_mocks()
 
   def test_restart_threshold(self):
-    """Shards are reported healthy at the end of the restart_threshold"""
+    """Instances are reported healthy at the end of the restart_threshold"""
     self.expect_get_statuses(num_calls=self.EXPECTED_CYCLES - 1)
     self.expect_health_check(0, False, num_calls=self.EXPECTED_CYCLES - 1)
     self.expect_health_check(1, False, num_calls=self.EXPECTED_CYCLES - 1)
@@ -143,7 +143,7 @@ class ShardWatcherTest(unittest.TestCase):
     self.verify_mocks()
 
   def test_watch_period_failure(self):
-    """Shards are reported unhealthy before watch_secs expires"""
+    """Instances are reported unhealthy before watch_secs expires"""
     self.expect_get_statuses()
     self.expect_health_check(0, True, num_calls=self.EXPECTED_CYCLES - 1)
     self.expect_health_check(1, True, num_calls=self.EXPECTED_CYCLES - 1)
@@ -156,7 +156,7 @@ class ShardWatcherTest(unittest.TestCase):
     self.verify_mocks()
 
   def test_single_watch_period_failure(self):
-    """One shard is reported unhealthy before watch_secs expires"""
+    """One instance is reported unhealthy before watch_secs expires"""
     self.expect_get_statuses()
     self.expect_health_check(0, True)
     self.expect_health_check(1, True)

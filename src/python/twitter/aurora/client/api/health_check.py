@@ -51,15 +51,15 @@ class StatusHealthCheck(HealthCheck):
 
   def health(self, task):
     task_id = task.assignedTask.taskId
-    shard_id = task.assignedTask.task.instanceIdDEPRECATED
+    instance_id = task.assignedTask.task.instanceIdDEPRECATED
     status = task.status
 
     if status == ScheduleStatus.RUNNING:
-      if shard_id in self._task_ids:
-        return Retriable.alive() if task_id == self._task_ids.get(shard_id) else NotRetriable.dead()
+      if instance_id in self._task_ids:
+        return Retriable.alive() if task_id == self._task_ids.get(instance_id) else NotRetriable.dead()
       else:
-        log.info('Detected RUNNING shard %s' % shard_id)
-        self._task_ids[shard_id] = task_id
+        log.info('Detected RUNNING instance %s' % instance_id)
+        self._task_ids[instance_id] = task_id
         return Retriable.alive()
     else:
       return Retriable.dead()
@@ -68,8 +68,8 @@ class StatusHealthCheck(HealthCheck):
 class HttpHealthCheck(HealthCheck):
   """Verifies the health of a task based on http health checks. A new http signaler is created for a
   task iff,
-    1. The shard id of the task is unknown.
-    2. The shard id is known but the (host, port) is different for the task.
+    1. The instance id of the task is unknown.
+    2. The instance id is known but the (host, port) is different for the task.
   """
   def __init__(self, http_signaler_factory=HttpSignaler):
     self._http_signalers = {}
@@ -77,17 +77,17 @@ class HttpHealthCheck(HealthCheck):
 
   def health(self, task):
     assigned_task = task.assignedTask
-    shard_id = assigned_task.task.instanceIdDEPRECATED
+    instance_id = assigned_task.task.instanceIdDEPRECATED
     host_port = (assigned_task.slaveHost, assigned_task.assignedPorts['health'])
     http_signaler = None
-    if shard_id in self._http_signalers:
-      checker_host_port, signaler = self._http_signalers.get(shard_id)
+    if instance_id in self._http_signalers:
+      checker_host_port, signaler = self._http_signalers.get(instance_id)
       # Only reuse the health checker if it is for the same destination.
       if checker_host_port == host_port:
         http_signaler = signaler
     if not http_signaler:
       http_signaler = self._http_signaler_factory(host_port[1], host_port[0])
-      self._http_signalers[shard_id] = (host_port, http_signaler)
+      self._http_signalers[instance_id] = (host_port, http_signaler)
     return Retriable.alive() if http_signaler.health()[0] else Retriable.dead()
 
 

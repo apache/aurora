@@ -31,29 +31,29 @@ class TestRestarter(MoxTestBase):
     super(TestRestarter, self).setUp()
 
     self.mock_scheduler = self.mox.CreateMock(scheduler_client)
-    self.mock_shard_watcher = self.mox.CreateMock(ShardWatcher)
+    self.mock_instance_watcher = self.mox.CreateMock(ShardWatcher)
 
     self.restarter = Restarter(
         JOB, UPDATER_CONFIG, HEALTH_CHECK_INTERVAL_SECONDS,
-        FakeSchedulerProxy(CLUSTER, self.mock_scheduler, SESSION_KEY), self.mock_shard_watcher)
+        FakeSchedulerProxy(CLUSTER, self.mock_scheduler, SESSION_KEY), self.mock_instance_watcher)
 
-  def mock_restart_shards(self, shards):
+  def mock_restart_instances(self, instances):
     response = Response(responseCode=ResponseCode.OK, message='test')
 
-    self.mock_scheduler.restartShards(JOB.to_thrift(), shards, SESSION_KEY).AndReturn(response)
-    self.mock_shard_watcher.watch(shards).AndReturn([])
+    self.mock_scheduler.restartShards(JOB.to_thrift(), instances, SESSION_KEY).AndReturn(response)
+    self.mock_instance_watcher.watch(instances).AndReturn([])
 
   def test_restart_one_iteration(self):
-    self.mock_restart_shards([0, 1])
+    self.mock_restart_instances([0, 1])
 
     self.mox.ReplayAll()
 
     self.restarter.restart([0, 1])
 
   def mock_three_iterations(self):
-    self.mock_restart_shards([0, 1])
-    self.mock_restart_shards([3, 4])
-    self.mock_restart_shards([5])
+    self.mock_restart_instances([0, 1])
+    self.mock_restart_instances([3, 4])
+    self.mock_restart_instances([5])
 
   def test_rolling_restart(self):
     self.mock_three_iterations()
@@ -75,7 +75,7 @@ class TestRestarter(MoxTestBase):
 
     self.mock_scheduler.getTasksStatus(IgnoreArg()).AndReturn(response)
 
-  def test_restart_all_shards(self):
+  def test_restart_all_instances(self):
     self.mock_status_active_tasks([0, 1, 3, 4, 5])
     self.mock_three_iterations()
 
@@ -87,7 +87,7 @@ class TestRestarter(MoxTestBase):
     response = Response(responseCode=ResponseCode.INVALID_REQUEST, message='test')
     self.mock_scheduler.getTasksStatus(IgnoreArg()).AndReturn(response)
 
-  def test_restart_no_shard_active(self):
+  def test_restart_no_instance_active(self):
     self.mock_status_no_active_task()
 
     self.mox.ReplayAll()
@@ -99,7 +99,7 @@ class TestRestarter(MoxTestBase):
 
     self.mock_scheduler.restartShards(JOB.to_thrift(), IgnoreArg(), SESSION_KEY).AndReturn(response)
 
-  def test_restart_shard_fails(self):
+  def test_restart_instance_fails(self):
     self.mock_status_active_tasks([0, 1])
     self.mock_restart_fails()
 
@@ -107,16 +107,16 @@ class TestRestarter(MoxTestBase):
 
     assert self.restarter.restart(None).responseCode == ResponseCode.ERROR
 
-  def mock_restart_watch_fails(self, shards):
+  def mock_restart_watch_fails(self, instances):
     response = Response(responseCode=ResponseCode.OK, message='test')
 
-    self.mock_scheduler.restartShards(JOB.to_thrift(), shards, SESSION_KEY).AndReturn(response)
-    self.mock_shard_watcher.watch(shards).AndReturn(shards)
+    self.mock_scheduler.restartShards(JOB.to_thrift(), instances, SESSION_KEY).AndReturn(response)
+    self.mock_instance_watcher.watch(instances).AndReturn(instances)
 
-  def test_restart_shards_watch_fails(self):
-    shards = [0, 1]
-    self.mock_status_active_tasks(shards)
-    self.mock_restart_watch_fails(shards)
+  def test_restart_instances_watch_fails(self):
+    instances = [0, 1]
+    self.mock_status_active_tasks(instances)
+    self.mock_restart_watch_fails(instances)
 
     self.mox.ReplayAll()
 

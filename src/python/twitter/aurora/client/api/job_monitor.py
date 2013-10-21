@@ -48,11 +48,11 @@ class JobMonitor(object):
   def states(self):
     states = {}
     for task in self.iter_query():
-      status, shard_id = task.status, task.assignedTask.task.instanceIdDEPRECATED
+      status, instance_id = task.status, task.assignedTask.task.instanceIdDEPRECATED
       first_timestamp = task.taskEvents[0].timestamp
-      if shard_id not in states or first_timestamp > states[shard_id][0]:
-        states[shard_id] = (first_timestamp, status)
-    return dict((shard_id, status[1]) for (shard_id, status) in states.items())
+      if instance_id not in states or first_timestamp > states[instance_id][0]:
+        states[instance_id] = (first_timestamp, status)
+    return dict((instance_id, status[1]) for (instance_id, status) in states.items())
 
   def wait_until(self, predicate):
     """Given a predicate (from ScheduleStatus => Boolean), return once all tasks
