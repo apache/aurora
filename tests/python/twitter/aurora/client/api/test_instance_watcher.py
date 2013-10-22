@@ -2,7 +2,7 @@ from math import ceil
 import unittest
 
 from twitter.aurora.client.api.health_check import HealthCheck
-from twitter.aurora.client.api.shard_watcher import ShardWatcher
+from twitter.aurora.client.api.instance_watcher import InstanceWatcher
 
 from gen.twitter.aurora.ttypes import *
 from gen.twitter.aurora.AuroraSchedulerManager import Client as scheduler_client
@@ -25,7 +25,7 @@ def find_expected_cycles(period, sleep_secs):
   return ceil(period / sleep_secs) + 1
 
 
-class ShardWatcherTest(unittest.TestCase):
+class InstanceWatcherTest(unittest.TestCase):
   WATCH_INSTANCES = range(3)
   RESTART_THRESHOLD = WATCH_SECS = 50
   EXPECTED_CYCLES = find_expected_cycles(WATCH_SECS, 3.0)
@@ -38,7 +38,7 @@ class ShardWatcherTest(unittest.TestCase):
     self._scheduler = mox.MockObject(scheduler_client)
     job_key = JobKey(name=self._name, environment=self._env, role=self._role)
     self._health_check = mox.MockObject(HealthCheck)
-    self._watcher = ShardWatcher(self._scheduler,
+    self._watcher = InstanceWatcher(self._scheduler,
                                  job_key,
                                  self.RESTART_THRESHOLD,
                                  self.WATCH_SECS,

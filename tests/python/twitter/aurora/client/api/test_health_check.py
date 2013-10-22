@@ -8,7 +8,7 @@ from twitter.aurora.client.api.health_check import (
   HttpHealthCheck,
   NotRetriable,
   Retriable,
-  ShardWatcherHealthCheck,
+  InstanceWatcherHealthCheck,
   StatusHealthCheck
 )
 
@@ -31,7 +31,7 @@ class HealthCheckTest(unittest.TestCase):
     self._http_signaler = mox.MockObject(HttpSignaler)
     self._status_health_check = StatusHealthCheck()
     self._http_health_check = HttpHealthCheck(self._http_signaler)
-    self._smart_health_check = ShardWatcherHealthCheck(self._http_signaler)
+    self._smart_health_check = InstanceWatcherHealthCheck(self._http_signaler)
     self._health_check_a = mox.MockObject(HealthCheck)
     self._health_check_b = mox.MockObject(HealthCheck)
 

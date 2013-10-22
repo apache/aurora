@@ -49,7 +49,7 @@ python_library(
   name = 'restarter',
   sources = ['restarter.py'],
   dependencies = [
-    pants(':shard_watcher'),
+    pants(':instance_watcher'),
     pants(':updater_util'),
     pants('src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
@@ -72,8 +72,8 @@ python_library(
 )
 
 python_library(
-  name = 'shard_watcher',
-  sources = ['shard_watcher.py', 'health_check.py'],
+  name = 'instance_watcher',
+  sources = ['instance_watcher.py', 'health_check.py'],
   dependencies = [
     pants(':scheduler_client'),
     pants('src/python/twitter/aurora/common:http_signaler'),
@@ -88,7 +88,7 @@ python_library(
   sources = ['updater.py'],
   dependencies = [
     pants(':scheduler_client'),
-    pants(':shard_watcher'),
+    pants(':instance_watcher'),
     pants(':updater_util'),
     pants('src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),

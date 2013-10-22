@@ -9,7 +9,7 @@ from gen.twitter.aurora.ttypes import (
   UpdateResult,
 )
 from .updater_util import FailureThreshold, UpdaterConfig
-from .shard_watcher import ShardWatcher
+from .instance_watcher import InstanceWatcher
 from .scheduler_client import SchedulerProxy
 
 
@@ -82,7 +82,7 @@ class Updater(object):
 
     Returns the set of instances that failed to update.
     """
-    self._instance_watcher = instance_watcher or ShardWatcher(
+    self._instance_watcher = instance_watcher or InstanceWatcher(
         self._scheduler,
         self._job_key,
         self._update_config.restart_threshold,
@@ -90,7 +90,7 @@ class Updater(object):
         health_check_interval_seconds)
 
     failure_threshold = FailureThreshold(
-        self._update_config.max_per_shard_failures,
+        self._update_config.max_per_instance_failures,
         self._update_config.max_total_failures
     )
     failed_instances = set()

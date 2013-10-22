@@ -104,7 +104,7 @@ class ChainedHealthCheck(HealthCheck):
     return Retriable.alive()
 
 
-class ShardWatcherHealthCheck(HealthCheck):
+class InstanceWatcherHealthCheck(HealthCheck):
   """Makes the decision: if a task has health port, then use Status+HTTP, else use only status.
      Caveat: Only works if either ALL tasks have a health port or none of them have a health port.
   """

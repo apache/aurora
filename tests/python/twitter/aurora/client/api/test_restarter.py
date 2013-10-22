@@ -1,5 +1,5 @@
 from twitter.aurora.client.api.restarter import Restarter
-from twitter.aurora.client.api.shard_watcher import ShardWatcher
+from twitter.aurora.client.api.instance_watcher import InstanceWatcher
 from twitter.aurora.client.api.updater_util import UpdaterConfig
 from twitter.aurora.common.aurora_job_key import AuroraJobKey
 
@@ -20,7 +20,7 @@ UPDATER_CONFIG = UpdaterConfig(
     2, # batch_size
     23, # restart_threshold
     45, #watch_secs
-    0, # max_per_shard_failures
+    0, # max_per_instance_failures
     0 # max_total_failures
 )
 
@@ -31,7 +31,7 @@ class TestRestarter(MoxTestBase):
     super(TestRestarter, self).setUp()
 
     self.mock_scheduler = self.mox.CreateMock(scheduler_client)
-    self.mock_instance_watcher = self.mox.CreateMock(ShardWatcher)
+    self.mock_instance_watcher = self.mox.CreateMock(InstanceWatcher)
 
     self.restarter = Restarter(
         JOB, UPDATER_CONFIG, HEALTH_CHECK_INTERVAL_SECONDS,

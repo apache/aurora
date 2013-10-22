@@ -1,7 +1,7 @@
 import time
 
 from twitter.common import log
-from .health_check import ShardWatcherHealthCheck
+from .health_check import InstanceWatcherHealthCheck
 
 from gen.twitter.aurora.ttypes import (
   Identity,
@@ -10,7 +10,7 @@ from gen.twitter.aurora.ttypes import (
   TaskQuery,
 )
 
-class Shard(object):
+class Instance(object):
   def __init__(self, birthday=None, finished=False):
     self.birthday = birthday
     self.finished = finished
@@ -24,7 +24,7 @@ class Shard(object):
     return ('[birthday=%s, healthy=%s, finished=%s]' % (self.birthday, self.healthy, self.finished))
 
 
-class ShardWatcher(object):
+class InstanceWatcher(object):
   def __init__(self,
                scheduler,
                job_key,
@@ -50,26 +50,26 @@ class ShardWatcher(object):
     """
     log.info('Watching instances: %s' % instance_ids)
     instance_ids = set(instance_ids)
-    health_check = health_check or ShardWatcherHealthCheck()
+    health_check = health_check or InstanceWatcherHealthCheck()
     now = self._clock.time()
     expected_healthy_by = now + self._restart_threshold
     max_time = now + self._restart_threshold + self._watch_secs
 
     instance_states = {}
 
-    def finished_shards():
+    def finished_instances():
       return dict((s_id, s) for s_id, s in instance_states.items() if s.finished)
 
-    def set_shard_healthy(instance_id, now):
+    def set_instance_healthy(instance_id, now):
       if instance_id not in instance_states:
-        instance_states[instance_id] = Shard(now)
+        instance_states[instance_id] = Instance(now)
       instance = instance_states.get(instance_id)
       if now > (instance.birthday + self._watch_secs):
         log.info('Instance %s has been up and healthy for at least %d seconds' % (
           instance_id, self._watch_secs))
         instance.set_healthy(True)
 
-    def maybe_set_shard_unhealthy(instance_id, retriable):
+    def maybe_set_instance_unhealthy(instance_id, retriable):
       # An instance that was previously healthy and currently unhealthy has failed.
       if instance_id in instance_states:
         log.info('Instance %s is unhealthy' % instance_id)
@@ -78,7 +78,7 @@ class ShardWatcher(object):
       elif now > expected_healthy_by or not retriable:
         log.info('Instance %s was not reported healthy within %d seconds' % (
           instance_id, self._restart_threshold))
-        instance_states[instance_id] = Shard(finished=True)
+        instance_states[instance_id] = Instance(finished=True)
 
     while True:
       running_tasks = self._get_tasks_by_instance_id(instance_ids)
@@ -86,22 +86,22 @@ class ShardWatcher(object):
       tasks_by_instance = dict((task.assignedTask.task.instanceIdDEPRECATED, task)
                             for task in running_tasks)
       for instance_id in instance_ids:
-        if instance_id not in finished_shards():
+        if instance_id not in finished_instances():
           running_task = tasks_by_instance.get(instance_id)
           if running_task is not None:
             task_healthy, retriable = health_check.health(running_task)
             if task_healthy:
-              set_shard_healthy(instance_id, now)
+              set_instance_healthy(instance_id, now)
             else:
-              maybe_set_shard_unhealthy(instance_id, retriable)
+              maybe_set_instance_unhealthy(instance_id, retriable)
           else:
             # Set retriable=True since an instance should be retried if it has not been healthy.
-            maybe_set_shard_unhealthy(instance_id, retriable=True)
+            maybe_set_instance_unhealthy(instance_id, retriable=True)
 
       log.debug('Instances health: %s' % ['%s: %s' % val for val in instance_states.items()])
 
       # Return if all tasks are finished.
-      if set(finished_shards().keys()) == instance_ids:
+      if set(finished_instances().keys()) == instance_ids:
         return set([s_id for s_id, s in instance_states.items() if not s.healthy])
 
       # Return if time is up.

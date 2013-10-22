@@ -3,7 +3,7 @@ from twitter.common import log
 from gen.twitter.aurora.constants import ACTIVE_STATES
 from gen.twitter.aurora.ttypes import ResponseCode
 
-from .shard_watcher import ShardWatcher
+from .instance_watcher import InstanceWatcher
 from .updater_util import FailureThreshold
 
 
@@ -18,7 +18,7 @@ class Restarter(object):
     self._update_config = update_config
     self.health_check_interval_seconds = health_check_interval_seconds
     self._scheduler = scheduler
-    self._instance_watcher = instance_watcher or ShardWatcher(
+    self._instance_watcher = instance_watcher or InstanceWatcher(
         scheduler,
         job_key.to_thrift(),
         update_config.restart_threshold,
@@ -27,7 +27,7 @@ class Restarter(object):
 
   def restart(self, instances):
     failure_threshold = FailureThreshold(
-        self._update_config.max_per_shard_failures,
+        self._update_config.max_per_instance_failures,
         self._update_config.max_total_failures)
 
     if not instances:

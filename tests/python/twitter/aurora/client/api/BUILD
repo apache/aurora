@@ -4,7 +4,7 @@ python_test_suite(name = 'all',
     pants(':job_monitor'),
     pants(':restarter'),
     pants(':scheduler_client'),
-    pants(':shard_watcher'),
+    pants(':instance_watcher'),
     pants(':updater'),
   ],
 )
@@ -50,11 +50,11 @@ python_tests(name = 'scheduler_client',
   ]
 )
 
-python_tests(name = 'shard_watcher',
-  sources = ['test_shard_watcher.py', 'test_health_check.py'],
+python_tests(name = 'instance_watcher',
+  sources = ['test_instance_watcher.py', 'test_health_check.py'],
   dependencies = [
     pants('3rdparty/python:mox'),
-    pants('src/python/twitter/aurora/client/api:shard_watcher'),
+    pants('src/python/twitter/aurora/client/api:instance_watcher'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

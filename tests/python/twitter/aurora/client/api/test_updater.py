@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from twitter.aurora.client.api.shard_watcher import ShardWatcher
+from twitter.aurora.client.api.instance_watcher import InstanceWatcher
 from twitter.aurora.client.api.updater import Updater
 
 from gen.twitter.aurora.ttypes import *
@@ -50,11 +50,11 @@ class FakeConfig(object):
 
 class UpdaterTest(unittest.TestCase):
   UPDATE_CONFIG = {
-    'batch_size':             3,
-    'restart_threshold':     50,
-    'watch_secs':            50,
-    'max_per_shard_failures': 0,
-    'max_total_failures':     0,
+    'batch_size':                 3,
+    'restart_threshold':          50,
+    'watch_secs':                 50,
+    'max_per_instance_failures':  0,
+    'max_total_failures':         0,
   }
 
   def setUp(self):
@@ -64,7 +64,7 @@ class UpdaterTest(unittest.TestCase):
     self._job_key = JobKey(name=self._name, environment=self._env, role=self._role)
     self._session_key = 'test_session'
     self._update_token = 'test_update'
-    self._instance_watcher = mox.MockObject(ShardWatcher)
+    self._instance_watcher = mox.MockObject(InstanceWatcher)
     self._scheduler = mox.MockObject(scheduler_client)
     self._scheduler_proxy = FakeSchedulerProxy('test-cluster', self._scheduler, self._session_key)
     self._initial_instances = range(10)
@@ -160,7 +160,7 @@ class UpdaterTest(unittest.TestCase):
   def test_initial_failed_instances(self):
     """Tasks 1, 2, 3 fail to move into RUNNING when restarted - Complete rollback performed."""
     update_config = self.UPDATE_CONFIG.copy()
-    update_config.update(max_total_failures=2, max_per_shard_failures=1)
+    update_config.update(max_total_failures=2, max_per_instance_failures=1)
     self.init_updater(update_config)
     self.expect_update([0, 1, 2])
     self.expect_watch_instances([0, 1, 2], failed_instances=[0, 1, 2])
@@ -175,7 +175,7 @@ class UpdaterTest(unittest.TestCase):
   def test_all_failed_instances(self):
     """Tests if appropriate calls are made if all instances in an update fail."""
     update_config = self.UPDATE_CONFIG.copy()
-    update_config.update(max_total_failures=2, max_per_shard_failures=1)
+    update_config.update(max_total_failures=2, max_per_instance_failures=1)
     self.init_updater(update_config)
     self.expect_update([0, 1, 2])
     self.expect_watch_instances([0, 1, 2], failed_instances=[0, 1, 2])
@@ -190,7 +190,7 @@ class UpdaterTest(unittest.TestCase):
   def test_successful_instance_restart(self):
     """An instance fails during an initial update but succeeds after a successive restart"""
     update_config = self.UPDATE_CONFIG.copy()
-    update_config.update(max_total_failures=2, max_per_shard_failures=1)
+    update_config.update(max_total_failures=2, max_per_instance_failures=1)
     self.init_updater(update_config)
     self.expect_update([0])
     self.expect_watch_instances([0], failed_instances=[0])
@@ -203,7 +203,7 @@ class UpdaterTest(unittest.TestCase):
   def test_single_failed_instance(self):
     """All tasks fail to move into running state when re-started - Complete rollback performed."""
     update_config = self.UPDATE_CONFIG.copy()
-    update_config.update(max_total_failures=0, max_per_shard_failures=2)
+    update_config.update(max_total_failures=0, max_per_instance_failures=2)
     self.init_updater(update_config)
     self.expect_update([0, 1, 2])
     self.expect_watch_instances([0, 1, 2], failed_instances=[0])
