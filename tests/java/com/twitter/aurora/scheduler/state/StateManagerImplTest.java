@@ -490,9 +490,7 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     insertTasks(existingTask);
-    stateManager.addInstances(
-        JOB_KEY,
-        Maps.uniqueIndex(ImmutableList.of(newTask), Tasks.INFO_TO_INSTANCE_ID));
+    stateManager.addInstances(JOB_KEY, ImmutableSet.of(1), newTask);
   }
 
   @Test(expected = InstanceException.class)
@@ -507,9 +505,7 @@ public class StateManagerImplTest extends EasyMockTest {
     insertTasks(taskInfo);
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
-    stateManager.addInstances(
-        JOB_KEY,
-        Maps.uniqueIndex(ImmutableList.of(taskInfo), Tasks.INFO_TO_INSTANCE_ID));
+    stateManager.addInstances(JOB_KEY, ImmutableSet.of(0), taskInfo);
   }
 
   @Test(expected = InstanceException.class)
@@ -518,9 +514,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    stateManager.addInstances(
-        JOB_KEY,
-        Maps.uniqueIndex(ImmutableList.of(taskInfo), Tasks.INFO_TO_INSTANCE_ID));
+    stateManager.addInstances(JOB_KEY, ImmutableSet.of(0), taskInfo);
   }
 
   private void expectStateTransitions(

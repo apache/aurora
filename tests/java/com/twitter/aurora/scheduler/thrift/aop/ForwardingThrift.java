@@ -15,11 +15,11 @@
  */
 package com.twitter.aurora.scheduler.thrift.aop;
 
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.thrift.TException;
 
+import com.twitter.aurora.gen.AddInstancesConfig;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.JobConfiguration;
@@ -32,7 +32,6 @@ import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
 
@@ -257,11 +256,10 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
 
   @Override
   public Response addInstances(
-      JobKey job,
-      Map<Integer, TaskConfig> instances,
+      AddInstancesConfig config,
       Lock lock,
       SessionKey session) throws TException {
 
-    return delegate.addInstances(job, instances, lock, session);
+    return delegate.addInstances(config, lock, session);
   }
 }

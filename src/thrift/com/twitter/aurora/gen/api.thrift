@@ -126,8 +126,8 @@ struct Lock {
 
 // Defines the required lock validation level.
 enum LockValidation {
-  CHECKED   = 0,	// The lock must be valid in order to be released.
-  UNCHECKED = 1		// The lock will be released without validation (aka “force release”).
+  CHECKED   = 0   // The lock must be valid in order to be released.
+  UNCHECKED = 1   // The lock will be released without validation (aka “force release”).
 }
 
 // A unique identifier for the active task within a job.
@@ -202,6 +202,13 @@ struct JobConfiguration {
   8: i32 instanceCount                        // The number of instances in the job.  Generated
                                               // instance IDs for tasks will be in the range
                                               // [0, instances).
+}
+
+// A request to add the following instances to an existing job. Used by addInstances.
+struct AddInstancesConfig {
+  1: JobKey key
+  2: TaskConfig taskConfig
+  3: set<i32> instanceIds
 }
 
 struct PopulateJobResult {
@@ -522,13 +529,12 @@ service AuroraSchedulerManager {
   // Returns the current version of the API implementation
   Response getVersion()
 
-  // Adds new instances specified by the instances set.
+  // Adds new instances specified by the AddInstancesConfig.
   // A job represented by the JobKey must be protected by Lock.
   Response addInstances(
-      1: JobKey job,
-      2: map<i32, TaskConfig> instances,  // New instances, mapped by proposed instance IDs.
-      3: Lock lock,
-      4: SessionKey session)
+      1: AddInstancesConfig config,
+      2: Lock lock,
+      3: SessionKey session)
 
   // Creates and saves a new Lock instance guarding against multiple
   // mutating operations within the context defined by LockKey.

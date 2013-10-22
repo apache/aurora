@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -794,7 +795,8 @@ public class StateManagerImpl implements StateManager {
   @Override
   public void addInstances(
       final IJobKey jobKey,
-      final ImmutableMap<Integer, ITaskConfig> instances) throws InstanceException {
+      final ImmutableSet<Integer> instancesIds,
+      final ITaskConfig config) throws InstanceException {
 
     storage.write(storage.new NoResultSideEffectWork<InstanceException>() {
       @Override void execute(MutableStoreProvider store) throws InstanceException {
@@ -807,13 +809,11 @@ public class StateManagerImpl implements StateManager {
 
         Set<Integer> existingInstanceIds =
             FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet();
-        Set<Integer> newInstanceIds =
-            FluentIterable.from(instances.values()).transform(Tasks.INFO_TO_INSTANCE_ID).toSet();
-        if (!Sets.intersection(existingInstanceIds, newInstanceIds).isEmpty()) {
+        if (!Sets.intersection(existingInstanceIds, instancesIds).isEmpty()) {
           throw new InstanceException("Instance ID collision detected.");
         }
 
-        insertPendingTasks(instances);
+        insertPendingTasks(Maps.asMap(instancesIds, Functions.constant(config)));
       }
     });
   }

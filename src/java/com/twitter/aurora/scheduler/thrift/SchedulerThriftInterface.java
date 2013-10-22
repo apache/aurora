@@ -33,7 +33,6 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -50,6 +49,7 @@ import com.twitter.aurora.auth.CapabilityValidator.AuditCheck;
 import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
 import com.twitter.aurora.gen.AcquireLockResult;
+import com.twitter.aurora.gen.AddInstancesConfig;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
 import com.twitter.aurora.gen.DrainHostsResult;
@@ -83,7 +83,6 @@ import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.StartMaintenanceResult;
 import com.twitter.aurora.gen.StartUpdateResult;
-import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.gen.UpdateShardsResult;
@@ -1029,16 +1028,22 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response addInstances(
-      JobKey mutableJobKey,
-      Map<Integer, TaskConfig> instances,
+      AddInstancesConfig config,
       @Nullable Lock mutableLock,
       SessionKey session) {
 
-    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
-    checkNotBlank(instances.values());
+    checkNotNull(config);
     checkNotNull(session);
+    checkNotBlank(config.getInstanceIds());
+    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(config.getKey()));
 
     Response resp = new Response();
+    try {
+      ConfigurationManager.validateAndPopulate(ITaskConfig.build(config.getTaskConfig()));
+    } catch (TaskDescriptionException e) {
+      return resp.setResponseCode(ERROR).setMessage(e.getMessage());
+    }
+
     if (cronJobManager.hasJob(jobKey)) {
       return resp.setResponseCode(INVALID_REQUEST).setMessage("Cron jobs are not supported here.");
     }
@@ -1046,11 +1051,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
       lockManager.validateIfLocked(
-          ILockKey.build(LockKey.job(mutableJobKey)),
+          ILockKey.build(LockKey.job(jobKey.newBuilder())),
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
       stateManager.addInstances(
           jobKey,
-          ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
+          ImmutableSet.copyOf(config.getInstanceIds()),
+          ITaskConfig.build(config.getTaskConfig()));
       return resp.setResponseCode(OK).setMessage("Successfully added instances.");
     } catch (AuthFailedException e) {
       return resp.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());

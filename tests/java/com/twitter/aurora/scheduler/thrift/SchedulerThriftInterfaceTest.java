@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -36,6 +35,7 @@ import com.twitter.aurora.auth.CapabilityValidator;
 import com.twitter.aurora.auth.CapabilityValidator.AuditCheck;
 import com.twitter.aurora.auth.CapabilityValidator.Capability;
 import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
+import com.twitter.aurora.gen.AddInstancesConfig;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
@@ -1101,70 +1101,68 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
-  private static ImmutableMap<Integer, TaskConfig> byInstanceId(TaskConfig task) {
-    return ImmutableMap.of(task.getInstanceIdDEPRECATED(), task);
+  private static AddInstancesConfig createInstanceConfig(TaskConfig task) {
+    return new AddInstancesConfig()
+        .setTaskConfig(task)
+        .setInstanceIds(ImmutableSet.of(0))
+        .setKey(JOB_KEY.newBuilder());
   }
 
   @Test
   public void testAddInstances() throws Exception {
-    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
+    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     stateManager.addInstances(
         JOB_KEY,
-        ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
+        ImmutableSet.copyOf(config.getInstanceIds()),
+        ITaskConfig.build(config.getTaskConfig()));
 
     control.replay();
 
-    Response response = thrift.addInstances(
-        JOB_KEY.newBuilder(),
-        instances,
-        LOCK.newBuilder(),
-        SESSION);
+    Response response = thrift.addInstances(config, LOCK.newBuilder(), SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
   @Test
   public void testAddInstancesWithNullLock() throws Exception {
-    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
+    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     stateManager.addInstances(
         JOB_KEY,
-        ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
+        ImmutableSet.copyOf(config.getInstanceIds()),
+        ITaskConfig.build(config.getTaskConfig()));
 
     control.replay();
 
-    Response response = thrift.addInstances(JOB_KEY.newBuilder(), instances, null, SESSION);
+    Response response = thrift.addInstances(config, null, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
   @Test
   public void testAddInstancesFails() throws Exception {
-    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
+    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     stateManager.addInstances(
         JOB_KEY,
-        ImmutableMap.copyOf(Maps.transformValues(instances, ITaskConfig.FROM_BUILDER)));
+        ImmutableSet.copyOf(config.getInstanceIds()),
+        ITaskConfig.build(config.getTaskConfig()));
     expectLastCall().andThrow(new InstanceException("Failed"));
 
     control.replay();
 
-    Response response = thrift.addInstances(
-        JOB_KEY.newBuilder(),
-        instances,
-        LOCK.newBuilder(),
-        SESSION);
+    Response response = thrift.addInstances(config, LOCK.newBuilder(), SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test
   public void testAddInstancesLockCheckFails() throws Exception {
-    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
+    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
@@ -1172,41 +1170,41 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    Response response = thrift.addInstances(
-        JOB_KEY.newBuilder(),
-        instances,
-        LOCK.newBuilder(),
-        SESSION);
+    Response response = thrift.addInstances(config, LOCK.newBuilder(), SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test
+  public void testAddInstancesInvalidConfig() throws Exception {
+    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
+    TaskConfig taskConfig = config.getTaskConfig().setExecutorConfig(null);
+    config.setTaskConfig(taskConfig);
+
+    control.replay();
+
+    Response response = thrift.addInstances(config, LOCK.newBuilder(), SESSION);
+    assertEquals(ResponseCode.ERROR, response.getResponseCode());
+  }
+
+  @Test
   public void testAddInstancesAuthFails() throws Exception {
-    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
+    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
     expectAuth(ROLE, false);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
 
     control.replay();
 
-    Response response = thrift.addInstances(
-        JOB_KEY.newBuilder(),
-        instances,
-        LOCK.newBuilder(),
-        SESSION);
+    Response response = thrift.addInstances(config, LOCK.newBuilder(), SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
   @Test
   public void testAddInstancesFailsForCronJob() throws Exception {
-    ImmutableMap<Integer, TaskConfig> instances = byInstanceId(defaultTask(true));
+    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
     control.replay();
 
-    Response response = thrift.addInstances(
-        JOB_KEY.newBuilder(),
-        instances,
-        LOCK.newBuilder(),
-        SESSION);
+    Response response = thrift.addInstances(config, LOCK.newBuilder(), SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
