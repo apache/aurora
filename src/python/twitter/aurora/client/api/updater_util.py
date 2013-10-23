@@ -19,7 +19,7 @@ class UpdaterConfig(object):
                batch_size,
                restart_threshold,
                watch_secs,
-               max_per_instance_failures,
+               max_per_shard_failures,
                max_total_failures):
 
     if batch_size <= 0:
@@ -32,7 +32,7 @@ class UpdaterConfig(object):
     self.restart_threshold = restart_threshold
     self.watch_secs = watch_secs
     self.max_total_failures = max_total_failures
-    self.max_per_instance_failures = max_per_instance_failures
+    self.max_per_instance_failures = max_per_shard_failures
 
 
 class FailureThreshold(object):

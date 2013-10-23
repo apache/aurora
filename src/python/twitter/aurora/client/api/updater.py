@@ -4,6 +4,7 @@ from twitter.common import log
 
 from gen.twitter.aurora.ttypes import (
   JobKey,
+  Response,
   ResponseCode,
   ShardUpdateResult,
   UpdateResult,
@@ -15,21 +16,37 @@ from .scheduler_client import SchedulerProxy
 
 class Updater(object):
   """Update the instances of a job in batches."""
+  UPDATE_FAILURE_WARNING = """
+Note: if the scheduler detects that an update is in progress (or was not
+properly completed) it will reject subsequent updates.  This is because your
+job is likely in a partially-updated state.  You should only begin another
+update if you are confident that no other team members are updating this
+job, and that the job is in a state suitable for an update.
 
+After checking on the above, you may release the update lock on the job by
+invoking cancel_update.
+"""
   class Error(Exception): pass
   class InvalidConfigError(Error): pass
 
-  def __init__(self, config, scheduler=None):
+  def __init__(self, config, health_check_interval_seconds, scheduler=None, instance_watcher=None):
     self._config = config
     self._job_key = JobKey(role=config.role(), environment=config.environment(), name=config.name())
+    self._health_check_interval_seconds = health_check_interval_seconds
     self._scheduler = scheduler or SchedulerProxy(config.cluster())
     try:
       self._update_config = UpdaterConfig(**config.update_config().get())
     except ValueError as e:
       raise self.InvalidConfigError(str(e))
     self._update_token = None
+    self._instance_watcher = instance_watcher or InstanceWatcher(
+        self._scheduler,
+        self._job_key,
+        self._update_config.restart_threshold,
+        self._update_config.watch_secs,
+        self._health_check_interval_seconds)
 
-  def start(self):
+  def _start(self):
     """Start an update.
 
        Returns:
@@ -40,7 +57,7 @@ class Updater(object):
       self._update_token = resp.result.startUpdateResult.updateToken
     return resp
 
-  def finish(self, rollback=False):
+  def _finish(self, rollback=False):
     """Finish an update.  If you seek a rollback on finish, set rollback=True.
 
        Returns:
@@ -53,10 +70,6 @@ class Updater(object):
     if resp.responseCode == ResponseCode.OK:
       resp._update_token = None
     return resp
-
-  @classmethod
-  def cancel_update(cls, scheduler, job_key, token=None):
-    return scheduler.finishUpdate(job_key, UpdateResult.TERMINATE, token)
 
   def _get_instances_to_watch(self, instance_states, batch_instances):
     if instance_states:
@@ -71,24 +84,15 @@ class Updater(object):
       watch_instances = batch_instances
     return watch_instances
 
-  def update(self, initial_instances, health_check_interval_seconds, instance_watcher=None):
-    """Performs the job update, blocking until it completes.
-    A rollback will be performed if the update was considered a failure based on the
-    update configuration.
+  def _update(self, initial_instances):
+    """Drives execution of the update logic. Performs a batched update/rollback for all instances
+    affected by the current update request.
 
     Arguments:
     initial_instances -- a list of instances to update.
-    health_check_interval_seconds -- Time to wait between consecutive status checks.
 
     Returns the set of instances that failed to update.
     """
-    self._instance_watcher = instance_watcher or InstanceWatcher(
-        self._scheduler,
-        self._job_key,
-        self._update_config.restart_threshold,
-        self._update_config.watch_secs,
-        health_check_interval_seconds)
-
     failure_threshold = FailureThreshold(
         self._update_config.max_per_instance_failures,
         self._update_config.max_total_failures
@@ -172,6 +176,47 @@ class Updater(object):
     log.info('Restarting instances: %s' % instance_ids)
     resp = self._scheduler.restartShards(self._job_key, instance_ids)
     self._check_and_log_response(resp)
+
+  def update(self, instances=None):
+    """Performs the job update, blocking until it completes.
+    A rollback will be performed if the update was considered a failure based on the
+    update configuration.
+
+    Arguments:
+    instances -- (optional) instances to update. If not specified, all instances will be updated.
+
+    Returns a response object with update result status.
+    """
+    resp = self._start()
+    update_resp = Response()
+    update_resp.responseCode = resp.responseCode
+    update_resp.message = resp.message
+
+    if resp.responseCode != ResponseCode.OK:
+      log.error("Error starting update: %s" % resp.message)
+      log.error(self.UPDATE_FAILURE_WARNING)
+      return update_resp
+    elif not resp.result.startUpdateResult.rollingUpdateRequired:
+      log.info('Update successful: %s' % resp.message)
+      return update_resp
+
+    failed_instances = self._update(instances or list(range(self._config.instances())))
+
+    if failed_instances:
+      log.error('Update reverted, failures detected on instances %s' % failed_instances)
+    else:
+      log.info('Update successful')
+
+    resp = self._finish(failed_instances)
+    if resp.responseCode != ResponseCode.OK:
+      log.error('There was an error finalizing the update: %s' % resp.message)
+
+    return resp
+
+  # TODO(maximk): Re-evaluate to see if it makes sense as an instance method.
+  @classmethod
+  def cancel_update(cls, scheduler, job_key, token=None):
+    return scheduler.finishUpdate(job_key.to_thrift(), UpdateResult.TERMINATE, token)
 
   @classmethod
   def _handle_unexpected_response(cls, name, message):
