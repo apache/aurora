@@ -68,6 +68,17 @@ class InstanceWatcherTest(unittest.TestCase):
     for x in range(int(num_calls)):
       self._scheduler.getTasksStatus(query).AndReturn(response)
 
+  def expect_io_error_in_get_statuses(self, instance_ids=WATCH_INSTANCES, num_calls=EXPECTED_CYCLES):
+    tasks = [self.create_task(instance_id) for instance_id in instance_ids]
+    response = Response(responseCode=ResponseCode.OK, message='test')
+    response.result = Result()
+    response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
+
+    query = self.get_tasks_status_query(instance_ids)
+    for x in range(int(num_calls)):
+      self._scheduler.getTasksStatus(query).AndRaise(IOError('oops'))
+
+
   def mock_health_check(self, task, status, retry):
     self._health_check.health(task).InAnyOrder().AndReturn((status, retry))
 
@@ -107,6 +118,16 @@ class InstanceWatcherTest(unittest.TestCase):
     self.replay_mocks()
     self.assert_watch_result([0])
     self.verify_mocks()
+
+  def test_io_failure(self):
+    """Check that IO errors (socket errors) communicating with the scheduler get handled
+     correctly"""
+
+    self.expect_io_error_in_get_statuses()
+    self.replay_mocks()
+    self.assert_watch_result([0, 1, 2])
+    self.verify_mocks()
+
 
   def test_all_instance_failure(self):
     """All failed instance in a batch of instances"""

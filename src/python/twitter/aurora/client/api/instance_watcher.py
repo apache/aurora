@@ -118,8 +118,13 @@ class InstanceWatcher(object):
     query.environment = self._job_key.environment
     query.jobName = self._job_key.name
     query.statuses = set([ScheduleStatus.RUNNING])
+
     query.instanceIds = instance_ids
-    resp = self._scheduler.getTasksStatus(query)
+    try:
+      resp = self._scheduler.getTasksStatus(query)
+    except IOError as e:
+      log.error('IO Exception during scheduler call: %s' % e)
+      return []
 
     tasks = []
     if resp.responseCode == ResponseCode.OK:
