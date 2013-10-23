@@ -1,6 +1,7 @@
 import threading
 import time
 
+from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 
 from .health_interface import HealthInterface, FailureReason
@@ -46,18 +47,24 @@ class HealthCheckerThread(HealthInterface, ExceptionalThread):
       return FailureReason('Failed health check! %s' % self._reason)
 
   def run(self):
+    log.debug('Health checker thread started.')
     self._clock.sleep(self._initial_interval)
+    log.debug('Initial interval expired.')
     while not self._dead.is_set():
       self._maybe_update_failure_count(*self._checker())
       self._clock.sleep(self._interval)
 
   def _maybe_update_failure_count(self, is_healthy, reason):
     if not is_healthy:
+      log.warning('Health check failure: %s' % reason)
       self._current_consecutive_failures += 1
       if self._current_consecutive_failures > self._max_consecutive_failures:
+        log.warning('Reached consecutive failure limit.')
         self._healthy = False
         self._reason = reason
     else:
+      if self._current_consecutive_failures > 0:
+        log.debug('Reset consecutive failures counter.')
       self._current_consecutive_failures = 0
 
   def start(self):
@@ -65,4 +72,5 @@ class HealthCheckerThread(HealthInterface, ExceptionalThread):
     ExceptionalThread.start(self)
 
   def stop(self):
+    log.debug('Health checker thread stopped.')
     self._dead.set()

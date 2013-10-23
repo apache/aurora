@@ -3,17 +3,25 @@ from abc import abstractproperty
 from twitter.common.lang import Interface
 from twitter.common.metrics import LambdaGauge, Observable
 
-import mesos_pb2 as mesos_pb
+
+class FailureState(object):
+  FAILED = object()
+  KILLED = object()
+  ALL_STATES = {
+    FAILED: 'FAILED',
+    KILLED: 'KILLED',
+  }
 
 
 class FailureReason(object):
   """
-    Encapsulates a reason for failure and an optional associated core status, which by
-    default is mesos_pb2.TASK_FAILED
+    Encapsulates a reason for failure and an optional reason which defaults to
+    FailureState.FAILED.
   """
-  def __init__(self, reason, status=mesos_pb.TASK_FAILED):
+
+  def __init__(self, reason, status=FailureState.FAILED):
     self._reason = reason
-    if status not in mesos_pb._TASKSTATE.values_by_number:
+    if status not in FailureState.ALL_STATES:
       raise ValueError('Unknown task state: %r' % status)
     self._status = status
 
@@ -26,8 +34,10 @@ class FailureReason(object):
     return self._status
 
   def __repr__(self):
-    return '%s(%r, status=%r)' % (self.__class__.__name__, self._reason,
-        mesos_pb._TASKSTATE.values_by_number[self._status].name)
+    return '%s(%r, status=%r)' % (
+        self.__class__.__name__,
+        self._reason,
+        FailureState.ALL_STATES[self._status])
 
 
 class HealthInterface(Observable, Interface):

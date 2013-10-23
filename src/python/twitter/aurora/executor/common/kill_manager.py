@@ -1,8 +1,6 @@
 import threading
 
-from .health_interface import FailureReason, HealthInterface
-
-import mesos_pb2 as mesos_pb
+from .health_interface import FailureReason, FailureState, HealthInterface
 
 
 class KillManager(HealthInterface):
@@ -19,7 +17,7 @@ class KillManager(HealthInterface):
 
   @property
   def failure_reason(self):
-    return FailureReason(self._reason, status=mesos_pb.TASK_KILLED)
+    return FailureReason(self._reason, status=FailureState.KILLED)
 
   def kill(self, reason):
     self._reason = reason

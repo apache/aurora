@@ -1,15 +1,16 @@
 import threading
 import time
 
-import mesos_pb2 as mesos_pb
-
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
 
 from gen.twitter.thermos.ttypes import TaskState
 
+from .common.health_interface import FailureState
 from .executor_base import ThermosExecutorBase
+
+import mesos_pb2 as mesos_pb
 
 
 class StatusManager(ExceptionalThread):
@@ -139,11 +140,21 @@ class StatusManager(ExceptionalThread):
         log.error("Unknown task state = %r!" % last_state)
         finish_state = mesos_pb.TASK_FAILED
 
+    def translate_failure_status(status):
+      if status == FailureState.FAILED:
+        return mesos_pb.TASK_FAILED
+      elif status == FailureState.KILLED:
+        return mesos_pb.TASK_KILLED
+      return mesos_pb.TASK_FAILED
+
     # TODO(wickman) This should be using ExecutorBase.send_status -- or the
     # sending of status should be decoupled from the status_manager.
     update = mesos_pb.TaskStatus()
     update.task_id.value = self._task_id
-    update.state = failure_reason.status if failure_reason is not None else finish_state
+    if failure_reason is not None:
+      update.state = translate_failure_status(failure_reason.status)
+    else:
+      update.state = finish_state
     if failure_reason and failure_reason.reason:
       update.message = failure_reason.reason
     task_state = mesos_pb._TASKSTATE.values_by_number.get(update.state)

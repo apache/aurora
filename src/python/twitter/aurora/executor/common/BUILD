@@ -2,7 +2,6 @@ python_library(
   name = 'health_interface',
   sources = ['health_interface.py'],
   dependencies = [
-    pants('src/python/twitter/aurora:mesos-core'),
     pants('src/python/twitter/common/metrics'),
   ]
 )
@@ -12,7 +11,8 @@ python_library(
   sources = ['health_checker.py'],
   dependencies = [
     pants(':health_interface'),
-    pants('src/python/twitter/common/exceptions')
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/exceptions'),
   ]
 )
 
@@ -31,7 +31,6 @@ python_library(
   sources = ['kill_manager.py'],
   dependencies = [
     pants('src/python/twitter/aurora/executor/common:health_interface'),
-    pants('src/python/twitter/aurora:mesos-core'),
   ]
 )
 
