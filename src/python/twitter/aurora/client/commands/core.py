@@ -210,8 +210,7 @@ def diff(job_spec, config_file):
     return pp.pformat(vars(task))
 
   def pretty_print_tasks(tasks):
-    shard_ordered = sorted(tasks, key=lambda t: t.instanceIdDEPRECATED)
-    return ',\n'.join([pretty_print_task(t) for t in shard_ordered])
+    return ',\n'.join([pretty_print_task(t) for t in tasks])
 
   def dump_tasks(tasks, out_file):
     out_file.write(pretty_print_tasks(tasks))
@@ -448,7 +447,7 @@ def status(args, options):
              (task.assignedTask.task.owner.role,
               task.assignedTask.task.environment,
               task.assignedTask.task.jobName,
-              task.assignedTask.task.instanceIdDEPRECATED,
+              task.assignedTask.instanceId,
               ScheduleStatus._VALUES_TO_NAMES[task.status],
               task.assignedTask.slaveHost,
               taskString))

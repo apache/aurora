@@ -147,10 +147,9 @@ public class StateManagerImpl implements StateManager {
       new Function<Map.Entry<Integer, ITaskConfig>, IScheduledTask>() {
         @Override public IScheduledTask apply(Map.Entry<Integer, ITaskConfig> entry) {
           ITaskConfig task = entry.getValue();
-          Preconditions.checkArgument(entry.getKey() == task.getInstanceIdDEPRECATED());
           AssignedTask assigned = new AssignedTask()
-              .setTaskId(taskIdGenerator.generate(task))
-              .setInstanceId(task.getInstanceIdDEPRECATED())
+              .setTaskId(taskIdGenerator.generate(task, entry.getKey()))
+              .setInstanceId(entry.getKey())
               .setTask(task.newBuilder());
           return IScheduledTask.build(new ScheduledTask()
               .setStatus(INIT)
@@ -242,6 +241,22 @@ public class StateManagerImpl implements StateManager {
     }
   }
 
+  private static Function<ITaskConfig, ITaskConfig> includeDeprecatedInstance(final int id) {
+    return new Function<ITaskConfig, ITaskConfig>() {
+      @Override public ITaskConfig apply(ITaskConfig task) {
+        return ITaskConfig.build(task.newBuilder().setInstanceIdDEPRECATED(id));
+      }
+    };
+  }
+
+  private static final Function<IAssignedTask, ITaskConfig> TO_INFO_WITH_DEPRECATED_INSTANCE_ID =
+      new Function<IAssignedTask, ITaskConfig>() {
+        @Override public ITaskConfig apply(IAssignedTask task) {
+          return ITaskConfig.build(
+              task.getTask().newBuilder().setInstanceIdDEPRECATED(task.getInstanceId()));
+        }
+      };
+
   /**
    * Registers a new update.
    *
@@ -261,9 +276,9 @@ public class StateManagerImpl implements StateManager {
       @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
         assertNotUpdatingOrRollingBack(jobKey, storeProvider.getTaskStore());
 
-        Set<ITaskConfig> existingTasks = ImmutableSet.copyOf(Iterables.transform(
+        Set<IAssignedTask> existingTasks = ImmutableSet.copyOf(Iterables.transform(
             storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()),
-            Tasks.SCHEDULED_TO_INFO));
+            Tasks.SCHEDULED_TO_ASSIGNED));
 
         if (existingTasks.isEmpty()) {
           throw new UpdateException("No active tasks found for job " + JobKeys.toPath(jobKey));
@@ -274,17 +289,23 @@ public class StateManagerImpl implements StateManager {
           throw new UpdateException("Update already in progress for " + jobKey);
         }
 
-        Map<Integer, ITaskConfig> existingInstances = Maps.uniqueIndex(existingTasks,
-            Tasks.INFO_TO_INSTANCE_ID);
+        Map<Integer, IAssignedTask> existingInstances = Maps.uniqueIndex(existingTasks,
+            Tasks.ASSIGNED_TO_INSTANCE_ID);
 
         ImmutableSet.Builder<TaskUpdateConfiguration> shardConfigBuilder = ImmutableSet.builder();
         for (int instance: Sets.union(existingInstances.keySet(), updatedTasks.keySet())) {
+          // It's important to include the deprecated instance ID here since that information is
+          // otherwise lost when storing a TaskUpdateConfiguration.  This will disappear once
+          // the update routine is fully-coordinated by the client.
           shardConfigBuilder.add(
               new TaskUpdateConfiguration(
                   Optional.fromNullable(existingInstances.get(instance))
+                      .transform(Tasks.ASSIGNED_TO_INFO)
+                      .transform(includeDeprecatedInstance(instance))
                       .transform(ITaskConfig.TO_BUILDER)
                       .orNull(),
                   Optional.fromNullable(updatedTasks.get(instance))
+                      .transform(includeDeprecatedInstance(instance))
                       .transform(ITaskConfig.TO_BUILDER)
                       .orNull()));
         }
@@ -439,13 +460,18 @@ public class StateManagerImpl implements StateManager {
     }
   };
 
-  private Set<Integer> getChangedShards(Set<IScheduledTask> tasks, Set<ITaskConfig> compareTo) {
-    Set<ITaskConfig> existingTasks = FluentIterable.from(tasks)
-        .transform(Tasks.SCHEDULED_TO_INFO)
+  private Set<Integer> getChangedShards(
+      Set<IScheduledTask> tasksWithoutInstanceId,
+      Set<ITaskConfig> compareToWithDeprecatedInstanceId) {
+
+    Set<ITaskConfig> existingTasks = FluentIterable.from(tasksWithoutInstanceId)
+        .transform(Tasks.SCHEDULED_TO_ASSIGNED)
+        .transform(TO_INFO_WITH_DEPRECATED_INSTANCE_ID)
         .toSet();
-    Set<ITaskConfig> changedTasks = Sets.difference(compareTo, existingTasks);
+    Set<ITaskConfig> changedTasks =
+        Sets.difference(compareToWithDeprecatedInstanceId, existingTasks);
     return FluentIterable.from(changedTasks)
-        .transform(Tasks.INFO_TO_INSTANCE_ID)
+        .transform(Tasks.INFO_TO_INSTANCE_ID_DEPRECATED)
         .toSet();
   }
 
@@ -498,15 +524,17 @@ public class StateManagerImpl implements StateManager {
                   updateConfig.get(),
                   newShardIds,
                   configSelector);
-              Set<Integer> unrecognizedShards = Sets.difference(newShardIds,
-                  ImmutableSet.copyOf(Iterables.transform(newTasks, Tasks.INFO_TO_INSTANCE_ID)));
+              Set<Integer> unrecognizedShards = Sets.difference(
+                  newShardIds,
+                  ImmutableSet.copyOf(
+                      Iterables.transform(newTasks, Tasks.INFO_TO_INSTANCE_ID_DEPRECATED)));
               if (!unrecognizedShards.isEmpty()) {
                 throw new UpdateException(
                     "Cannot update unrecognized shards " + unrecognizedShards);
               }
 
               // Create new tasks, so they will be moved into the PENDING state.
-              insertPendingTasks(Maps.uniqueIndex(newTasks, Tasks.INFO_TO_INSTANCE_ID));
+              insertPendingTasks(Maps.uniqueIndex(newTasks, Tasks.INFO_TO_INSTANCE_ID_DEPRECATED));
               putResults(result, ShardUpdateResult.ADDED, newShardIds);
             }
 
@@ -724,8 +752,9 @@ public class StateManagerImpl implements StateManager {
             builder.getAssignedTask().unsetAssignedPorts();
             builder.unsetTaskEvents();
             builder.setAncestorId(taskId);
-            String newTaskId =
-                taskIdGenerator.generate(ITaskConfig.build(builder.getAssignedTask().getTask()));
+            String newTaskId = taskIdGenerator.generate(
+                ITaskConfig.build(builder.getAssignedTask().getTask()),
+                builder.getAssignedTask().getInstanceId());
             builder.getAssignedTask().setTaskId(newTaskId);
 
             LOG.info("Task being rescheduled: " + taskId);
@@ -739,7 +768,7 @@ public class StateManagerImpl implements StateManager {
                 new PubsubEvent.TaskRescheduled(
                     taskInfo.getOwner().getRole(),
                     taskInfo.getJobName(),
-                    taskInfo.getInstanceIdDEPRECATED()));
+                    task.getAssignedTask().getInstanceId()));
             break;
 
           case UPDATE:
@@ -825,21 +854,21 @@ public class StateManagerImpl implements StateManager {
 
     TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
 
-    ITaskConfig oldConfig = Tasks.SCHEDULED_TO_INFO.apply(
-        Iterables.getOnlyElement(taskStore.fetchTasks(Query.taskScoped(taskId))));
+    IAssignedTask oldConfig =
+        Iterables.getOnlyElement(taskStore.fetchTasks(Query.taskScoped(taskId))).getAssignedTask();
 
     Optional<TaskUpdateConfiguration> optional = fetchShardUpdateConfig(
         storeProvider.getUpdateStore(),
-        Tasks.INFO_TO_JOB_KEY.apply(oldConfig),
-        oldConfig.getInstanceIdDEPRECATED());
+        Tasks.ASSIGNED_TO_JOB_KEY.apply(oldConfig),
+        oldConfig.getInstanceId());
 
     // TODO(Sathya): Figure out a way to handle race condition when finish update is called
     //     before ROLLBACK
 
     if (!optional.isPresent()) {
       LOG.warning("No update configuration found for key "
-          + JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(oldConfig))
-          + " shard " + oldConfig.getInstanceIdDEPRECATED() + " : Assuming update has finished.");
+          + JobKeys.toPath(Tasks.ASSIGNED_TO_JOB_KEY.apply(oldConfig))
+          + " shard " + oldConfig.getInstanceId() + " : Assuming update has finished.");
       return;
     }
 

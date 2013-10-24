@@ -139,8 +139,8 @@ public interface MesosTaskFactory {
       return getJobSourceName(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
     }
 
-    public static String getInstanceSourceName(ITaskConfig task) {
-      return String.format("%s.%s", getJobSourceName(task), task.getInstanceIdDEPRECATED());
+    public static String getInstanceSourceName(ITaskConfig task, int instanceId) {
+      return String.format("%s.%s", getJobSourceName(task), instanceId);
     }
 
     @Override
@@ -179,7 +179,7 @@ public interface MesosTaskFactory {
           .setCommand(CommandUtil.create(executorPath))
           .setExecutorId(getExecutorId(task.getTaskId()))
           .setName(EXECUTOR_NAME)
-          .setSource(getInstanceSourceName(config))
+          .setSource(getInstanceSourceName(config, task.getInstanceId()))
           .addResources(Resources.makeMesosResource(Resources.CPUS, CPUS))
           .addResources(
               Resources.makeMesosResource(Resources.RAM_MB, RAM.as(Data.MB)))

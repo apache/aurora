@@ -18,8 +18,12 @@ package com.twitter.aurora.scheduler.configuration;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Functions;
 import com.google.common.base.Objects;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ContiguousSet;
+import com.google.common.collect.DiscreteDomain;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Range;
 
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -43,16 +47,11 @@ public final class ParsedConfiguration {
   @VisibleForTesting
   public ParsedConfiguration(IJobConfiguration parsed) {
     this.parsed = parsed;
-
-    // TODO(William Farner): Use Range.closedOpen, Maps.toMap, and Functions.constant once
-    //                       TaskConfig instances are not duplicated.
-    ImmutableMap.Builder<Integer, ITaskConfig> builder = ImmutableMap.builder();
-    for (int i = 0; i < parsed.getInstanceCount(); i++) {
-      builder.put(
-          i,
-          ITaskConfig.build(parsed.getTaskConfig().newBuilder().setInstanceIdDEPRECATED(i)));
-    }
-    this.tasks = builder.build();
+    this.tasks = Maps.toMap(
+        ContiguousSet.create(
+            Range.closedOpen(0, parsed.getInstanceCount()),
+            DiscreteDomain.integers()),
+        Functions.constant(parsed.getTaskConfig()));
   }
 
   /**
@@ -72,6 +71,7 @@ public final class ParsedConfiguration {
     return parsed;
   }
 
+  // TODO(William Farner): Rework this API now that all configs are identical.
   public Map<Integer, ITaskConfig> getTaskConfigs() {
     return tasks;
   }

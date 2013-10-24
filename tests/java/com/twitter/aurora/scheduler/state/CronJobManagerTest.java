@@ -300,11 +300,8 @@ public class CronJobManagerTest extends EasyMockTest {
     expectJobFetch();
     expectActiveTaskFetch(scheduledTask);
 
-    Map<Integer, ITaskConfig> newConfig = ImmutableMap.of(
-        1,
-        ITaskConfig.build(
-            parsedConfiguration.getJobConfig().getTaskConfig().newBuilder()
-                .setInstanceIdDEPRECATED(1)));
+    Map<Integer, ITaskConfig> newConfig =
+        ImmutableMap.of(1, parsedConfiguration.getJobConfig().getTaskConfig());
     stateManager.insertPendingTasks(newConfig);
 
     control.replay();

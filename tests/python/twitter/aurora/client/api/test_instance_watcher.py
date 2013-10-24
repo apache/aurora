@@ -55,8 +55,8 @@ class InstanceWatcherTest(unittest.TestCase):
     return query
 
   def create_task(self, instance_id):
-    return ScheduledTask(assignedTask=AssignedTask(
-        task=TaskConfig(instanceIdDEPRECATED=instance_id)))
+    return ScheduledTask(
+        assignedTask=AssignedTask(instanceId=instance_id, task=TaskConfig()))
 
   def expect_get_statuses(self, instance_ids=WATCH_INSTANCES, num_calls=EXPECTED_CYCLES):
     tasks = [self.create_task(instance_id) for instance_id in instance_ids]

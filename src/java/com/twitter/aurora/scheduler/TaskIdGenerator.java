@@ -32,10 +32,11 @@ public interface TaskIdGenerator {
    * Generates a universally-unique ID for the task.  This is not necessarily a repeatable
    * operation, two subsequent invocations with the same object need not return the same value.
    *
-   * @param task Task to generate an ID for.
-   * @return Unique ID for the task.
+   * @param task Configuration of the task to create an ID for.
+   * @param instanceId Instance ID for the task.
+   * @return A universally-unique ID for the task.
    */
-  String generate(ITaskConfig task);
+  String generate(ITaskConfig task, int instanceId);
 
   class TaskIdGeneratorImpl implements TaskIdGenerator {
     private final Clock clock;
@@ -46,7 +47,7 @@ public interface TaskIdGenerator {
     }
 
     @Override
-    public String generate(ITaskConfig task) {
+    public String generate(ITaskConfig task, int instanceId) {
       String sep = "-";
       return new StringBuilder()
           .append(clock.nowMillis())               // Allows chronological sorting.
@@ -57,7 +58,7 @@ public interface TaskIdGenerator {
           .append(sep)
           .append(task.getJobName())
           .append(sep)
-          .append(task.getInstanceIdDEPRECATED())  // Collision prevention within job.
+          .append(instanceId)                      // Collision prevention within job.
           .append(sep)
           .append(UUID.randomUUID())               // Just-in-case collision prevention.
           .toString().replaceAll("[^\\w-]", sep);  // Constrain character set.

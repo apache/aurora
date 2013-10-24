@@ -79,10 +79,10 @@ import com.twitter.aurora.gen.RewriteConfigsRequest;
 import com.twitter.aurora.gen.RollbackShardsResult;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduleStatusResult;
-import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.StartMaintenanceResult;
 import com.twitter.aurora.gen.StartUpdateResult;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.gen.UpdateShardsResult;
@@ -408,12 +408,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             // Pick an arbitrary task for each immediate job. The chosen task might not be the most
             // recent if the job is in the middle of an update or some shards have been selectively
             // created.
-            ScheduledTask firstTask = tasks.iterator().next().newBuilder();
-            firstTask.getAssignedTask().getTask().unsetInstanceIdDEPRECATED();
+            TaskConfig firstTask = tasks.iterator().next().getAssignedTask().getTask().newBuilder();
             return IJobConfiguration.build(new JobConfiguration()
                 .setKey(jobKey.newBuilder())
-                .setOwner(firstTask.getAssignedTask().getTask().getOwner())
-                .setTaskConfig(firstTask.getAssignedTask().getTask())
+                .setOwner(firstTask.getOwner())
+                .setTaskConfig(firstTask)
                 .setInstanceCount(tasks.size()));
           }
         }));

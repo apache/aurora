@@ -42,7 +42,7 @@ class Restarter(object):
 
       tasks = status.result.scheduleStatusResult.tasks
 
-      instances = sorted(task.assignedTask.task.instanceIdDEPRECATED for task in tasks)
+      instances = sorted(task.assignedTask.instanceId for task in tasks)
       if not instances:
         log.info("No instances specified, and no active instances found in job %s" % self._job_key)
         log.info("Nothing to do.")

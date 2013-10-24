@@ -70,15 +70,22 @@ public final class Tasks {
   public static final Function<IScheduledTask, String> SCHEDULED_TO_ID =
       Functions.compose(ASSIGNED_TO_ID, SCHEDULED_TO_ASSIGNED);
 
-  public static final Function<ITaskConfig, Integer> INFO_TO_INSTANCE_ID =
+  public static final Function<ITaskConfig, Integer> INFO_TO_INSTANCE_ID_DEPRECATED =
       new Function<ITaskConfig, Integer>() {
         @Override public Integer apply(ITaskConfig task) {
           return task.getInstanceIdDEPRECATED();
         }
       };
 
+  public static final Function<IAssignedTask, Integer> ASSIGNED_TO_INSTANCE_ID =
+      new Function<IAssignedTask, Integer>() {
+        @Override public Integer apply(IAssignedTask task) {
+          return task.getInstanceId();
+        }
+      };
+
   public static final Function<IScheduledTask, Integer> SCHEDULED_TO_INSTANCE_ID =
-      Functions.compose(INFO_TO_INSTANCE_ID, SCHEDULED_TO_INFO);
+      Functions.compose(ASSIGNED_TO_INSTANCE_ID, SCHEDULED_TO_ASSIGNED);
 
   public static final Function<ITaskConfig, IJobKey> INFO_TO_JOB_KEY =
       new Function<ITaskConfig, IJobKey>() {

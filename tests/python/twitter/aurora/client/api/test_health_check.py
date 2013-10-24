@@ -36,11 +36,14 @@ class HealthCheckTest(unittest.TestCase):
     self._health_check_b = mox.MockObject(HealthCheck)
 
   def create_task(self, instance_id, task_id, status=RUNNING, host=HOST, port=HEALTH_PORT):
-    task = TaskConfig(instanceIdDEPRECATED=instance_id)
     ports = {}
     if port:
       ports['health'] = port
-    assigned_task = AssignedTask(taskId=task_id, task=task, slaveHost=host, assignedPorts=ports)
+    assigned_task = AssignedTask(taskId=task_id,
+                                 instanceId=instance_id,
+                                 task=TaskConfig(),
+                                 slaveHost=host,
+                                 assignedPorts=ports)
     return ScheduledTask(assignedTask=assigned_task, status=status)
 
   def expect_http_signaler_creation(self, host=HOST, port=HEALTH_PORT):

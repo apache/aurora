@@ -83,8 +83,7 @@ class InstanceWatcher(object):
     while True:
       running_tasks = self._get_tasks_by_instance_id(instance_ids)
       now = self._clock.time()
-      tasks_by_instance = dict((task.assignedTask.task.instanceIdDEPRECATED, task)
-                            for task in running_tasks)
+      tasks_by_instance = dict((task.assignedTask.instanceId, task) for task in running_tasks)
       for instance_id in instance_ids:
         if instance_id not in finished_instances():
           running_task = tasks_by_instance.get(instance_id)

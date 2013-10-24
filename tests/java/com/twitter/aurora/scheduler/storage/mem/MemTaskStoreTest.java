@@ -233,9 +233,9 @@ public class MemTaskStoreTest {
     return IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.PENDING)
         .setAssignedTask(new AssignedTask()
+            .setInstanceId(0)
             .setTaskId(id)
             .setTask(new TaskConfig()
-                .setInstanceIdDEPRECATED(0)
                 .setJobName(jobName)
                 .setEnvironment(env)
                 .setOwner(new Identity(role, role)))));

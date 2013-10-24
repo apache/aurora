@@ -321,11 +321,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
             int instanceOffset = Ordering.natural().max(existingTasks.keySet()) + 1;
             LOG.info("Adjusting instance IDs of " + JobKeys.toPath(job) + " by " + instanceOffset
                 + " for overlapping cron run.");
-            for (ITaskConfig task : config.getTaskConfigs().values()) {
-              int instanceId = task.getInstanceIdDEPRECATED() + instanceOffset;
-              builder.put(
-                  instanceId,
-                  ITaskConfig.build(task.newBuilder().setInstanceIdDEPRECATED(instanceId)));
+            for (Map.Entry<Integer, ITaskConfig> entry : config.getTaskConfigs().entrySet()) {
+              builder.put(entry.getKey() + instanceOffset, entry.getValue());
             }
           }
           break;

@@ -126,8 +126,8 @@ class SchedulerCoreImpl implements SchedulerCore {
   @VisibleForTesting
   static final int MAX_TASK_ID_LENGTH = 255 - 90;
 
-  private void checkTaskIdLength(ITaskConfig taskConfig) throws ScheduleException {
-    if (taskIdGenerator.generate(taskConfig).length() > MAX_TASK_ID_LENGTH) {
+  private void checkTaskIdLength(ITaskConfig taskConfig, int instanceId) throws ScheduleException {
+    if (taskIdGenerator.generate(taskConfig, instanceId).length() > MAX_TASK_ID_LENGTH) {
       throw new ScheduleException("Task ID is too long, please shorten your role or job name.");
     }
   }
@@ -141,8 +141,11 @@ class SchedulerCoreImpl implements SchedulerCore {
       throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
     }
 
-    // TODO(William Farner); This is a short-term hack to stop the bleeding from MESOS-3788.
-    checkTaskIdLength(Iterables.getFirst(parsedConfiguration.getTaskConfigs().values(), null));
+    // TODO(William Farner); This is a short-term hack to stop the bleeding from
+    //                       https://issues.apache.org/jira/browse/MESOS-691
+    checkTaskIdLength(
+        parsedConfiguration.getJobConfig().getTaskConfig(),
+        parsedConfiguration.getJobConfig().getInstanceCount());
     checkFilterPasses(job);
 
     boolean accepted = false;

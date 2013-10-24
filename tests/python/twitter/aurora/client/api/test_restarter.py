@@ -72,7 +72,7 @@ class TestRestarter(MoxTestBase):
     for i in instance_ids:
       tasks.append(ScheduledTask(
           status=ScheduleStatus.RUNNING,
-          assignedTask=AssignedTask(task=TaskConfig(instanceIdDEPRECATED=i))
+          assignedTask=AssignedTask(task=TaskConfig(), instanceId=i)
       ))
     response = Response(responseCode=ResponseCode.OK, message='test')
     response.result = Result()

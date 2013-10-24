@@ -136,8 +136,9 @@ class ProxyDriver(object):
     self._stop_event.set()
 
 
-def make_task(thermos_config, assigned_ports={}, **kw):
+def make_task(thermos_config, assigned_ports={}, instance_id=0, **kw):
   at = AssignedTask(task=TaskConfig(thermosConfig=thermos_config.json_dumps(), **kw),
+                    instanceId=instance_id,
                     assignedPorts=assigned_ports)
   td = mesos_pb.TaskInfo()
   td.task_id.value = thermos_config.task().name().get() + '-001'
@@ -168,35 +169,32 @@ MESOS_JOB = MesosJob(
 
 def test_deserialize_thermos_task_old():
   """TODO(maximk): decomission this test once migration to thermosConfigData is done."""
-  assigned_task = AssignedTask(task=TaskConfig(
-      thermosConfig=MESOS_JOB(task=HELLO_WORLD).json_dumps(),
-      instanceIdDEPRECATED=0))
+  assigned_task = AssignedTask(
+      instanceId=0,
+      task=TaskConfig(thermosConfig=MESOS_JOB(task=HELLO_WORLD).json_dumps()))
   assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
 
-  assigned_task = AssignedTask(task=TaskConfig(
-      thermosConfig=HELLO_WORLD_MTI.json_dumps(),
-      instanceIdDEPRECATED=0))
+  assigned_task = AssignedTask(
+      instanceId=0,
+      task=TaskConfig(thermosConfig=HELLO_WORLD_MTI.json_dumps()))
   assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
 
 def test_deserialize_thermos_task():
-  assigned_task = AssignedTask(task=TaskConfig(
-    executorConfig=ExecutorConfig(
-      name='thermos',
-      data=MESOS_JOB(task=HELLO_WORLD).json_dumps()),
-    instanceIdDEPRECATED=0))
+  assigned_task = AssignedTask(
+      instanceId=0,
+      task=TaskConfig(executorConfig=ExecutorConfig(name='thermos',
+                      data=MESOS_JOB(task=HELLO_WORLD).json_dumps())))
   assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
 
-  assigned_task = AssignedTask(task=TaskConfig(
-    executorConfig=ExecutorConfig(
-      name='thermos',
-      data=HELLO_WORLD_MTI.json_dumps()),
-    instanceIdDEPRECATED=0))
+  assigned_task = AssignedTask(
+      instanceId=0,
+      task=TaskConfig(executorConfig=ExecutorConfig(name='thermos',
+                      data=HELLO_WORLD_MTI.json_dumps())))
   assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
 
 def test_extract_ensemble():
   def make_assigned_task(thermos_config):
-    return AssignedTask(task=TaskConfig(thermosConfig=thermos_config.json_dumps(),
-        instanceIdDEPRECATED=0))
+    return AssignedTask(instanceId=0, task=TaskConfig(thermosConfig=thermos_config.json_dumps()))
 
   assigned_task = make_assigned_task(MESOS_JOB(task=HELLO_WORLD, cluster='unknown'))
   assert ThermosExecutor.extract_ensemble(assigned_task) == TwitterCluster.DEFAULT_ENSEMBLE
@@ -214,7 +212,7 @@ def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False
   manager_class = TestStatusManager if fast_status else StatusManager
   te = FastThermosExecutor(runner_class=runner_class, manager_class=manager_class)
   ExecutorTimeout(te.launched, proxy_driver, timeout=Amount(100, Time.MILLISECONDS)).start()
-  task_description = make_task(task, assigned_ports=ports, instanceIdDEPRECATED=0)
+  task_description = make_task(task, assigned_ports=ports, instance_id=0)
   te.launchTask(proxy_driver, task_description)
 
   while not te._runner.is_started():
@@ -323,7 +321,7 @@ class TestThermosExecutor(object):
     with temporary_dir() as tempdir:
       runner_class = alternate_root_task_runner(TestTaskRunner, tempdir)
       te = ThermosExecutor(runner_class=runner_class)
-      te.launchTask(proxy_driver, make_task(MESOS_JOB(task=HELLO_WORLD), instanceIdDEPRECATED=0))
+      te.launchTask(proxy_driver, make_task(MESOS_JOB(task=HELLO_WORLD), instance_id=0))
       while te._runner.is_alive():
         time.sleep(0.1)
       while te._manager is None:

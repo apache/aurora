@@ -40,12 +40,12 @@ public class MesosTaskFactoryImplTest {
 
   private static final String EXECUTOR_PATH = "/twitter/fake/executor.sh";
   private static final IAssignedTask TASK = IAssignedTask.build(new AssignedTask()
+      .setInstanceId(2)
       .setTaskId("task-id")
       .setTask(new TaskConfig()
           .setOwner(new Identity("role", "user"))
           .setEnvironment("environment")
           .setJobName("job-name")
-          .setInstanceIdDEPRECATED(2)
           .setDiskMb(10)
           .setRamMb(100)
           .setNumCpus(5)));
@@ -66,7 +66,7 @@ public class MesosTaskFactoryImplTest {
     ExecutorInfo expected = ExecutorInfo.newBuilder()
         .setExecutorId(MesosTaskFactoryImpl.getExecutorId(TASK.getTaskId()))
         .setName(MesosTaskFactoryImpl.EXECUTOR_NAME)
-        .setSource(MesosTaskFactoryImpl.getInstanceSourceName(TASK.getTask()))
+        .setSource(MesosTaskFactoryImpl.getInstanceSourceName(TASK.getTask(), TASK.getInstanceId()))
         .addResources(Resource.newBuilder()
             .setName("cpus")
             .setType(Type.SCALAR)

@@ -151,7 +151,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   // TODO(William Farner): Set up explicit expectations for calls to generate task IDs.
   private final AtomicLong idCounter = new AtomicLong();
   private TaskIdGenerator taskIdGenerator = new TaskIdGenerator() {
-    @Override public String generate(ITaskConfig input) {
+    @Override public String generate(ITaskConfig input, int instanceId) {
       return "task-" + idCounter.incrementAndGet();
     }
   };
@@ -228,10 +228,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertEquals(PENDING, state.getStatus());
       assertTrue(state.getAssignedTask().isSetTaskId());
       assertFalse(state.getAssignedTask().isSetSlaveId());
-      // Need to clear shard ID since that was assigned when the job is scheduled.
-      ITaskConfig config = ITaskConfig.build(
-          state.getAssignedTask().getTask().newBuilder().setInstanceIdDEPRECATED(0));
-      assertEquals(validateAndPopulate(job.getJobConfig().getTaskConfig()), config);
+      assertEquals(
+          validateAndPopulate(job.getJobConfig()).getTaskConfig(),
+          state.getAssignedTask().getTask());
     }
   }
 
@@ -288,7 +287,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setNumCpus(1.0)
         .setRamMb(ONE_GB)
         .setDiskMb(500)
-        .setInstanceIdDEPRECATED(0)
         .setThermosConfig("thermosConfig".getBytes())
         .setRequestedPorts(ImmutableSet.<String>of())
         .setConstraints(ImmutableSet.<Constraint>of())
@@ -350,8 +348,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
                     .setStatus(RUNNING)
                     .setAssignedTask(
                         new AssignedTask()
+                            .setInstanceId(0)
                             .setTaskId("task-" + taskId.incrementAndGet())
-                            .setTask(task.newBuilder().setInstanceIdDEPRECATED(0))));
+                            .setTask(task.newBuilder())));
               }
             }));
 
@@ -678,8 +677,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertEquals(5, newTasks.size());
     for (IScheduledTask state : newTasks) {
       assertEquals(
-          getTask(state.getAncestorId()).getAssignedTask().getTask().getInstanceIdDEPRECATED(),
-          state.getAssignedTask().getTask().getInstanceIdDEPRECATED());
+          getTask(state.getAncestorId()).getAssignedTask().getInstanceId(),
+          state.getAssignedTask().getInstanceId());
     }
 
     assertEquals(10, getTasksByStatus(FINISHED).size());
@@ -1775,7 +1774,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testTaskIdLimit() throws Exception {
     taskIdGenerator = new TaskIdGenerator() {
-      @Override public String generate(ITaskConfig input) {
+      @Override public String generate(ITaskConfig input, int instanceCount) {
         return Strings.repeat("a", SchedulerCoreImpl.MAX_TASK_ID_LENGTH);
       }
     };
@@ -1789,7 +1788,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testRejectLongTaskId() throws Exception {
     taskIdGenerator = new TaskIdGenerator() {
-      @Override public String generate(ITaskConfig input) {
+      @Override public String generate(ITaskConfig input, int instanceCount) {
         return Strings.repeat("a", SchedulerCoreImpl.MAX_TASK_ID_LENGTH + 1);
       }
     };

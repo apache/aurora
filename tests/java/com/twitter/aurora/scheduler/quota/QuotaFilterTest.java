@@ -112,7 +112,7 @@ public class QuotaFilterTest extends EasyMockTest {
     for (int i = 0; i < numTasks; i++) {
       ScheduledTask builder = new ScheduledTask().setAssignedTask(
           new AssignedTask().setTask(jobBuilder.getTaskConfig()));
-      builder.getAssignedTask().getTask().setInstanceIdDEPRECATED(i);
+      builder.getAssignedTask().setInstanceId(i);
       scheduledTasks[i] = IScheduledTask.build(builder);
     }
 

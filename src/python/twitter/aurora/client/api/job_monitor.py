@@ -48,7 +48,7 @@ class JobMonitor(object):
   def states(self):
     states = {}
     for task in self.iter_query():
-      status, instance_id = task.status, task.assignedTask.task.instanceIdDEPRECATED
+      status, instance_id = task.status, task.assignedTask.instanceId
       first_timestamp = task.taskEvents[0].timestamp
       if instance_id not in states or first_timestamp > states[instance_id][0]:
         states[instance_id] = (first_timestamp, status)

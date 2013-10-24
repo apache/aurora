@@ -75,7 +75,7 @@ public final class StorageBackfill {
       TaskConfig config = task.getAssignedTask().getTask();
       Query.Builder query = Query.instanceScoped(
           JobKeys.from(config.getOwner().getRole(), config.getEnvironment(), config.getJobName()),
-          task.getAssignedTask().getTask().getInstanceIdDEPRECATED())
+          task.getAssignedTask().getInstanceId())
           .active();
       Set<String> activeTasksInShard = FluentIterable.from(taskStore.fetchTasks(query))
           .transform(Tasks.SCHEDULED_TO_ID)

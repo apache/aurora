@@ -132,6 +132,14 @@ public final class IAssignedTask {
     return assignedPorts;
   }
 
+  public boolean isSetInstanceId() {
+    return wrapped.isSetInstanceId();
+  }
+
+  public int getInstanceId() {
+    return wrapped.getInstanceId();
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof IAssignedTask)) {

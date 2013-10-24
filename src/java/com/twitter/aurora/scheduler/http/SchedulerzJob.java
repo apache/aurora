@@ -136,12 +136,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
   private static final String HOST_REGEXP = "%host%";
 
   private static String expandText(String value, IAssignedTask task) {
-    String expanded = value;
-    ITaskConfig config = task.getTask();
-
-    expanded =
-        expanded.replaceAll(INSTANCE_ID_REGEXP, String.valueOf(config.getInstanceIdDEPRECATED()));
-    expanded = expanded.replaceAll(TASK_ID_REGEXP, task.getTaskId());
+    String expanded = value
+        .replaceAll(INSTANCE_ID_REGEXP, String.valueOf(task.getInstanceId()))
+        .replaceAll(TASK_ID_REGEXP, task.getTaskId());
 
     if (task.isSetSlaveHost()) {
       expanded = expanded.replaceAll(HOST_REGEXP, task.getSlaveHost());
@@ -165,7 +162,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           final IAssignedTask task = scheduledTask.getAssignedTask();
           ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
             .put("taskId", task.getTaskId())
-            .put("instanceId", task.getTask().getInstanceIdDEPRECATED())
+            .put("instanceId", task.getInstanceId())
             .put("slaveHost", task.isSetSlaveHost() ? task.getSlaveHost() : "")
             .put("status", scheduledTask.getStatus())
             .put("statusTimestamp", Iterables.getLast(scheduledTask.getTaskEvents()).getTimestamp())
@@ -328,9 +325,11 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
 
   private static Map<String, SchedulingDetails> buildSchedulingTable(
-      Iterable<ITaskConfig> tasks) {
+      Iterable<IAssignedTask> tasks) {
 
-    Map<Integer, ITaskConfig> byInstance = Maps.uniqueIndex(tasks, Tasks.INFO_TO_INSTANCE_ID);
+    Map<Integer, ITaskConfig> byInstance = Maps.transformValues(
+        Maps.uniqueIndex(tasks, Tasks.ASSIGNED_TO_INSTANCE_ID),
+        Tasks.ASSIGNED_TO_INFO);
     Map<Integer, SchedulingDetails> detailsByInstance =
         Maps.transformValues(byInstance, CONFIG_TO_DETAILS);
     Multimap<SchedulingDetails, Integer> instancesByDetails = Multimaps.invertFrom(
@@ -406,7 +405,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
                   Iterables.transform(offsetAndLimit(liveTasks, offset), taskToStringMap)));
           hasMore = hasMore || (liveTasks.size() > (offset + PAGE_SIZE));
           template.setAttribute("schedulingDetails",
-              buildSchedulingTable(Iterables.transform(liveTasks, Tasks.SCHEDULED_TO_INFO)));
+              buildSchedulingTable(Iterables.transform(liveTasks, Tasks.SCHEDULED_TO_ASSIGNED)));
         }
         if (completedQuery.isPresent()) {
           List<IScheduledTask> completedTasks = Lists.newArrayList(
