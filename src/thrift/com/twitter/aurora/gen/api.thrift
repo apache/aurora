@@ -511,7 +511,7 @@ service AuroraSchedulerManager {
       5: SessionKey session)
 
   // Restarts a batch of shards.
-  Response restartShards(5: JobKey job, 3: set<i32> shardIds, 4: SessionKey session)
+  Response restartShards(5: JobKey job, 3: set<i32> shardIds, 6: Lock lock 4: SessionKey session)
 
   // Fetches the status of tasks.
   Response getTasksStatus(1: TaskQuery query)

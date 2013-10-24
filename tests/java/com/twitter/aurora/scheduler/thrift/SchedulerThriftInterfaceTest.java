@@ -503,12 +503,27 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Set<Integer> shards = ImmutableSet.of(1, 6);
 
     expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     scheduler.restartShards(JOB_KEY, shards, USER);
 
     control.replay();
 
-    Response resp = thrift.restartShards(JOB_KEY.newBuilder(), shards, SESSION);
+    Response resp = thrift.restartShards(JOB_KEY.newBuilder(), shards, LOCK.newBuilder(), SESSION);
     assertEquals(ResponseCode.OK, resp.getResponseCode());
+  }
+
+  @Test
+  public void testRestartShardsLockCheckFails() throws Exception {
+    Set<Integer> shards = ImmutableSet.of(1, 6);
+
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    expectLastCall().andThrow(new LockException("test"));
+
+    control.replay();
+
+    Response resp = thrift.restartShards(JOB_KEY.newBuilder(), shards, LOCK.newBuilder(), SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, resp.getResponseCode());
   }
 
   @Test
@@ -517,12 +532,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     String message = "Injected.";
     expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     scheduler.restartShards(JOB_KEY, shards, USER);
     expectLastCall().andThrow(new ScheduleException(message));
 
     control.replay();
 
-    Response resp = thrift.restartShards(JOB_KEY.newBuilder(), shards, SESSION);
+    Response resp = thrift.restartShards(JOB_KEY.newBuilder(), shards, DEFAULT_LOCK, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, resp.getResponseCode());
     assertEquals(message, resp.getMessage());
   }

@@ -174,7 +174,8 @@ invoking cancel_update.
     instance_ids -- set of instances to be restarted by the scheduler.
     """
     log.info('Restarting instances: %s' % instance_ids)
-    resp = self._scheduler.restartShards(self._job_key, instance_ids)
+    # TODO(maximk): passing None for lock as this logic will be refactored shortly.
+    resp = self._scheduler.restartShards(self._job_key, instance_ids, None)
     self._check_and_log_response(resp)
 
   def update(self, instances=None):

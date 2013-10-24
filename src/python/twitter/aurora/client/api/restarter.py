@@ -13,11 +13,13 @@ class Restarter(object):
                update_config,
                health_check_interval_seconds,
                scheduler,
-               instance_watcher=None):
+               instance_watcher=None,
+               lock=None):
     self._job_key = job_key
     self._update_config = update_config
     self.health_check_interval_seconds = health_check_interval_seconds
     self._scheduler = scheduler
+    self._lock = lock
     self._instance_watcher = instance_watcher or InstanceWatcher(
         scheduler,
         job_key.to_thrift(),
@@ -54,7 +56,7 @@ class Restarter(object):
 
       log.info("Restarting instances: %s", batch)
 
-      resp = self._scheduler.restartShards(self._job_key.to_thrift(), batch)
+      resp = self._scheduler.restartShards(self._job_key.to_thrift(), batch, self._lock)
       if resp.responseCode != ResponseCode.OK:
         log.error('Error restarting instances: %s', resp.message)
         return resp

@@ -171,9 +171,10 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   public Response restartShards(
       JobKey job,
       Set<Integer> shardIds,
+      Lock lock,
       SessionKey session) throws TException {
 
-    return delegate.restartShards(job, shardIds, session);
+    return delegate.restartShards(job, shardIds, lock, session);
   }
 
   @Override

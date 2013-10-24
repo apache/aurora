@@ -687,6 +687,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response restartShards(
       JobKey mutableJobKey,
       Set<Integer> shardIds,
+      Lock mutableLock,
       SessionKey session) {
 
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
@@ -703,8 +704,13 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     try {
+      lockManager.validateIfLocked(
+          ILockKey.build(LockKey.job(jobKey.newBuilder())),
+          Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
       schedulerCore.restartShards(jobKey, shardIds, context.getIdentity());
       response.setResponseCode(OK).setMessage("Shards are restarting.");
+    } catch (LockException e) {
+      response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     }
