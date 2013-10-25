@@ -832,10 +832,6 @@ public class StateManagerImpl implements StateManager {
         ImmutableSet<IScheduledTask> tasks =
             store.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active());
 
-        if (tasks.isEmpty()) {
-          throw new InstanceException(String.format("Job %s does not exist!", jobKey));
-        }
-
         Set<Integer> existingInstanceIds =
             FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet();
         if (!Sets.intersection(existingInstanceIds, instancesIds).isEmpty()) {

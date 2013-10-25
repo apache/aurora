@@ -482,6 +482,18 @@ public class StateManagerImplTest extends EasyMockTest {
     stateManager.addInstances(JOB_KEY, ImmutableSet.of(1), newTask);
   }
 
+  @Test
+  public void testAddInstancesNoExistingTasks() throws Exception {
+    ITaskConfig newTask = makeTask(JIM, MY_JOB);
+    String newId = "a";
+    expect(taskIdGenerator.generate(newTask, 1)).andReturn(newId);
+    expectStateTransitions(newId, INIT, PENDING);
+
+    control.replay();
+
+    stateManager.addInstances(JOB_KEY, ImmutableSet.of(1), newTask);
+  }
+
   @Test(expected = InstanceException.class)
   public void testAddInstancesIdCollision() throws Exception {
     ITaskConfig taskInfo = makeTask(JIM, MY_JOB);
@@ -494,15 +506,6 @@ public class StateManagerImplTest extends EasyMockTest {
     insertTask(taskInfo, 0);
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
-    stateManager.addInstances(JOB_KEY, ImmutableSet.of(0), taskInfo);
-  }
-
-  @Test(expected = InstanceException.class)
-  public void testAddInstancesJobDoesNotExist() throws Exception {
-    ITaskConfig taskInfo = makeTask(JIM, MY_JOB);
-
-    control.replay();
-
     stateManager.addInstances(JOB_KEY, ImmutableSet.of(0), taskInfo);
   }
 
