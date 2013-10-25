@@ -47,6 +47,7 @@ import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.InstanceConfigRewrite;
 import com.twitter.aurora.gen.InstanceKey;
 import com.twitter.aurora.gen.JobConfigRewrite;
+import com.twitter.aurora.gen.JobConfigValidation;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.LimitConstraint;
@@ -70,6 +71,7 @@ import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.state.CronJobManager;
+import com.twitter.aurora.scheduler.state.JobFilter;
 import com.twitter.aurora.scheduler.state.LockManager;
 import com.twitter.aurora.scheduler.state.LockManager.LockException;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
@@ -141,6 +143,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private MaintenanceController maintenance;
   private AuroraAdmin.Iface thrift;
   private CronJobManager cronJobManager;
+  private JobFilter jobFilter;
 
   @Before
   public void setUp() throws Exception {
@@ -156,6 +159,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     recovery = createMock(Recovery.class);
     maintenance = createMock(MaintenanceController.class);
     cronJobManager = createMock(CronJobManager.class);
+    jobFilter = createMock(JobFilter.class);
 
     // Use guice and install AuthModule to apply AOP-style auth layer.
     Module testModule = new AbstractModule() {
@@ -170,6 +174,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(Recovery.class).toInstance(recovery);
         bind(MaintenanceController.class).toInstance(maintenance);
         bind(CronJobManager.class).toInstance(cronJobManager);
+        bind(JobFilter.class).toInstance(jobFilter);
         bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
       }
     };
@@ -180,6 +185,36 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private void setUpValidationExpectations() throws Exception {
     expect(userValidator.toString(SESSION)).andReturn(USER).anyTimes();
     expect(context.getIdentity()).andReturn(USER).anyTimes();
+  }
+
+  @Test
+  public void testPopulateJobConfig() throws Exception {
+    JobConfiguration job = makeJob();
+    jobFilter.filter(ParsedConfiguration.fromUnparsed(IJobConfiguration.build(job)).getJobConfig());
+    expectLastCall().andReturn(JobFilter.JobFilterResult.pass());
+    control.replay();
+
+    Response response = thrift.populateJobConfig(job, JobConfigValidation.RUN_FILTERS);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testPopulateJobConfigNoValidation() throws Exception {
+    control.replay();
+
+    Response response = thrift.populateJobConfig(makeJob(), null);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testPopulateJobConfigFailFilter() throws Exception {
+    JobConfiguration job = makeJob();
+    jobFilter.filter(ParsedConfiguration.fromUnparsed(IJobConfiguration.build(job)).getJobConfig());
+    expectLastCall().andReturn(JobFilter.JobFilterResult.fail("test"));
+    control.replay();
+
+    Response response = thrift.populateJobConfig(job, JobConfigValidation.RUN_FILTERS);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test

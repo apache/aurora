@@ -22,6 +22,7 @@ import org.apache.thrift.TException;
 import com.twitter.aurora.gen.AddInstancesConfig;
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.Hosts;
+import com.twitter.aurora.gen.JobConfigValidation;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.Lock;
@@ -121,8 +122,11 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response populateJobConfig(JobConfiguration description) throws TException {
-    return delegate.populateJobConfig(description);
+  public Response populateJobConfig(
+      JobConfiguration description,
+      JobConfigValidation validation) throws TException {
+
+    return delegate.populateJobConfig(description, validation);
   }
 
   @Override

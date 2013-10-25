@@ -61,6 +61,7 @@ import com.twitter.aurora.gen.Hosts;
 import com.twitter.aurora.gen.InstanceConfigRewrite;
 import com.twitter.aurora.gen.InstanceKey;
 import com.twitter.aurora.gen.JobConfigRewrite;
+import com.twitter.aurora.gen.JobConfigValidation;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.JobUpdateConfiguration;
@@ -95,6 +96,7 @@ import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescr
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.state.CronJobManager;
+import com.twitter.aurora.scheduler.state.JobFilter;
 import com.twitter.aurora.scheduler.state.LockManager;
 import com.twitter.aurora.scheduler.state.LockManager.LockException;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
@@ -176,6 +178,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final Recovery recovery;
   private final MaintenanceController maintenance;
   private final CronJobManager cronJobManager;
+  private final JobFilter jobFilter;
   private final Amount<Long, Time> killTaskInitialBackoff;
   private final Amount<Long, Time> killTaskMaxBackoff;
 
@@ -189,6 +192,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       StorageBackup backup,
       Recovery recovery,
       CronJobManager cronJobManager,
+      JobFilter jobFilter,
       MaintenanceController maintenance) {
 
     this(storage,
@@ -200,6 +204,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         recovery,
         maintenance,
         cronJobManager,
+        jobFilter,
         KILL_TASK_INITIAL_BACKOFF.get(),
         KILL_TASK_MAX_BACKOFF.get());
   }
@@ -215,6 +220,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       Recovery recovery,
       MaintenanceController maintenance,
       CronJobManager cronJobManager,
+      JobFilter jobFilter,
       Amount<Long, Time> initialBackoff,
       Amount<Long, Time> maxBackoff) {
 
@@ -227,6 +233,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.recovery = checkNotNull(recovery);
     this.maintenance = checkNotNull(maintenance);
     this.cronJobManager = checkNotNull(cronJobManager);
+    this.jobFilter = checkNotNull(jobFilter);
     this.killTaskInitialBackoff = checkNotNull(initialBackoff);
     this.killTaskMaxBackoff = checkNotNull(maxBackoff);
   }
@@ -312,17 +319,24 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response populateJobConfig(JobConfiguration description) {
-    checkNotNull(description);
+  public Response populateJobConfig(JobConfiguration description, JobConfigValidation validation) {
 
-    // TODO(ksweeney): check valid JobKey in description after deprecating non-environment version.
+    checkNotNull(description);
 
     Response response = new Response();
     try {
+      ParsedConfiguration parsed =
+          ParsedConfiguration.fromUnparsed(IJobConfiguration.build(description));
+
+      if (validation != null && validation == JobConfigValidation.RUN_FILTERS) {
+        JobFilter.JobFilterResult filterResult = jobFilter.filter(parsed.getJobConfig());
+        if (!filterResult.isPass()) {
+          return response.setResponseCode(INVALID_REQUEST).setMessage(filterResult.getReason());
+        }
+      }
+
       PopulateJobResult result = new PopulateJobResult()
-          .setPopulated(ITaskConfig.toBuildersSet(
-              ParsedConfiguration.fromUnparsed(
-                  IJobConfiguration.build(description)).getTaskConfigs().values()));
+          .setPopulated(ITaskConfig.toBuildersSet(parsed.getTaskConfigs().values()));
       response.setResult(Result.populateJobResult(result))
           .setResponseCode(OK)
           .setMessage("Tasks populated");
@@ -1052,6 +1066,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     if (cronJobManager.hasJob(jobKey)) {
       return resp.setResponseCode(INVALID_REQUEST).setMessage("Cron jobs are not supported here.");
     }
+
+    // TODO(maximk): Add quota check here. Tracked by MESOS-4296.
 
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
