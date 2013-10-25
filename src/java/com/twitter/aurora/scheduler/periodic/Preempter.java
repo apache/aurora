@@ -20,6 +20,7 @@ import java.lang.annotation.Target;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -45,6 +46,7 @@ import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -96,6 +98,13 @@ class Preempter implements Runnable {
           >= preemptionCandidacyDelay.as(Time.MILLISECONDS);
     }
   };
+
+  private final AtomicLong tasksPreempted = Stats.exportLong("preemptor_tasks_preempted");
+  private final AtomicLong failedPreemptions = Stats.exportLong("preemptor_failed_preemptions");
+  // Incremented every time the preemptor is invoked and finds tasks pending and preemptable tasks.
+  private final AtomicLong attemptedPreemptions = Stats.exportLong("preemptor_attempts");
+  // Incremented every time we fail to find tasks to preempt for a pending task.
+  private final AtomicLong noSlotsFound = Stats.exportLong("preemptor_no_slots_found");
 
   private Storage storage;
   private final SchedulerCore scheduler;
@@ -158,6 +167,8 @@ class Preempter implements Runnable {
       return;
     }
 
+    attemptedPreemptions.incrementAndGet();
+
     // Arrange the pending tasks in scheduling order.
     Collections.sort(pendingTasks, Tasks.SCHEDULING_ORDER);
 
@@ -189,9 +200,13 @@ class Preempter implements Runnable {
         pendingTasks.remove(preempting);
         try {
           scheduler.preemptTask(preemptableTask, preempting);
+          tasksPreempted.incrementAndGet();
         } catch (ScheduleException e) {
           LOG.log(Level.SEVERE, "Preemption failed", e);
+          failedPreemptions.incrementAndGet();
         }
+      } else {
+        noSlotsFound.incrementAndGet();
       }
     }
   }
