@@ -481,7 +481,7 @@ def status(args, options):
 @app.command_option(
     '--force',
     dest='force',
-    default=False,
+    default=True,  # TODO(maximk): Temporary bandaid for MESOS-4310 until a better fix is available.
     action='store_true',
     help='Turn off warning message that the update looks large enough to be disruptive.')
 @requires.exactly('cluster/role/env/job', 'config')
