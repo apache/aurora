@@ -20,6 +20,7 @@ import com.google.inject.Singleton;
 
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.scheduler.thrift.aop.AopModule;
+import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.thrift.ThriftServer;
 
@@ -33,6 +34,8 @@ public class ThriftModule extends AbstractModule {
     bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
     bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
     LifecycleModule.bindServiceRunner(binder(), ThriftServerLauncher.class);
+
+    Registration.registerServlet(binder(), "/api", SchedulerAPIServlet.class, true);
 
     install(new AopModule());
   }
