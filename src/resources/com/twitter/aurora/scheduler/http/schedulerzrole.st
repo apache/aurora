@@ -2,6 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="/images/aurora.png" type="image/png" />
     <title>Aurora $cluster_name$ scheduler - Jobs for $role$</title>
     <link href="/css/bootstrap.min.css" rel="stylesheet" />
     <link href="/css/jquery.dataTables.css" rel="stylesheet" />

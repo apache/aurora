@@ -108,6 +108,7 @@ public class ServletModule extends AbstractModule {
     registerAsset("assets/util.js", "/js/util.js");
     registerAsset("assets/dictionary.js", "/js/dictionary.js");
     registerAsset("assets/images/viz.png", "/images/viz.png");
+    registerAsset("assets/images/aurora.png", "/images/aurora.png");
     registerAsset("assets/datatables/css/jquery.dataTables.css", "/css/jquery.dataTables.css");
     registerAsset("assets/datatables/images/back_disabled.png", "/images/back_disabled.png");
     registerAsset(

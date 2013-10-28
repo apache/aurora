@@ -2,6 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8">
+    <link rel="icon" href="/images/aurora.png" type="image/png" />
     <title>Aurora $cluster_name$ scheduler - Tasks for $role$/$environment$/$job$</title>
     <link href="/css/bootstrap.min.css" rel="stylesheet" />
     <script type="text/javascript" src="/js/jquery.min.js"></script>
