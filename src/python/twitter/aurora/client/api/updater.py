@@ -198,7 +198,7 @@ invoking cancel_update.
       log.error(self.UPDATE_FAILURE_WARNING)
       return update_resp
     elif not resp.result.startUpdateResult.rollingUpdateRequired:
-      log.info('Update successful: %s' % resp.message)
+      log.info('Jobs updated successfully: %s' % resp.message)
       return update_resp
 
     failed_instances = self._update(instances or list(range(self._config.instances())))
@@ -206,11 +206,13 @@ invoking cancel_update.
     if failed_instances:
       log.error('Update reverted, failures detected on instances %s' % failed_instances)
     else:
-      log.info('Update successful')
+      log.info('Rolling update successful; now cleaning up.')
 
     resp = self._finish(failed_instances)
     if resp.responseCode != ResponseCode.OK:
       log.error('There was an error finalizing the update: %s' % resp.message)
+    else:
+      log.info('Update complete')
 
     return resp
 
