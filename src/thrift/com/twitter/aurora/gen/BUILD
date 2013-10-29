@@ -20,12 +20,7 @@ java_thrift_library(
     name = 'aurora',
     repo = pants('build-support/twitter/ivy:internal'),
   ),
-  sources = globs('*.thrift') - TEST_DATA,
-)
-
-java_thrift_library(
-  name = 'thrift-test',
-  sources = TEST_DATA,
+  sources = globs('*.thrift'),
 )
 
 python_thrift_library(
