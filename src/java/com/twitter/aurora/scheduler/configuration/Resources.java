@@ -22,12 +22,15 @@ import java.util.Set;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.builder.EqualsBuilder;
@@ -193,6 +196,39 @@ public class Resources {
         getNumAvailablePorts(offer.getResourcesList()));
   }
 
+  private static final Resources NO_RESOURCES =
+      new Resources(0, Amount.of(0L, Data.BITS), Amount.of(0L, Data.BITS), 0);
+
+  private static Resources none() {
+    return NO_RESOURCES;
+  }
+
+  /**
+   * sum(a, b)
+   */
+  public static Resources sum(Resources a, Resources b) {
+    return sum(ImmutableList.of(a, b));
+  }
+
+  /**
+   * sum(rs)
+   */
+  public static Resources sum(Iterable<Resources> rs) {
+    Resources sum = none();
+
+    for (Resources r : rs) {
+      double numCpus = sum.getNumCpus() + r.getNumCpus();
+      Amount<Long, Data> disk =
+          Amount.of(sum.getDisk().as(Data.BYTES) + r.getDisk().as(Data.BYTES), Data.BYTES);
+      Amount<Long, Data> ram =
+          Amount.of(sum.getRam().as(Data.BYTES) + r.getRam().as(Data.BYTES), Data.BYTES);
+      int ports = sum.getNumPorts() + r.getNumPorts();
+      sum =  new Resources(numCpus, ram, disk, ports);
+    }
+
+    return sum;
+  }
+
   private static int getNumAvailablePorts(List<Resource> resource) {
     int offeredPorts = 0;
     for (Range range : getPortRanges(resource)) {
@@ -347,4 +383,53 @@ public class Resources {
     Collections.shuffle(availablePorts);
     return ImmutableSet.copyOf(availablePorts.subList(0, numPorts));
   }
+
+  /**
+   * A Resources object is greater than another iff _all_ of its resource components are greater
+   * or equal. A Resources object compares as equal if some but not all components are greater than
+   * or equal to the other.
+   */
+  public static final Ordering<Resources> RESOURCE_ORDER = new Ordering<Resources>() {
+    @Override public int compare(Resources left, Resources right) {
+      int diskC = left.getDisk().compareTo(right.getDisk());
+      int ramC = left.getRam().compareTo(right.getRam());
+      int portC = Integer.compare(left.getNumPorts(), right.getNumPorts());
+      int cpuC = Double.compare(left.getNumCpus(), right.getNumCpus());
+
+      FluentIterable<Integer> vector =
+          FluentIterable.from(ImmutableList.of(diskC, ramC, portC, cpuC));
+
+      if (vector.allMatch(IS_ZERO))  {
+        return 0;
+      }
+
+      if (vector.filter(Predicates.not(IS_ZERO)).allMatch(IS_POSITIVE)) {
+        return 1;
+      }
+
+      if (vector.filter(Predicates.not(IS_ZERO)).allMatch(IS_NEGATIVE)) {
+        return -1;
+      }
+
+      return 0;
+    }
+  };
+
+  private static final Predicate<Integer> IS_POSITIVE = new Predicate<Integer>() {
+    @Override public boolean apply(Integer input) {
+      return input > 0;
+    }
+  };
+
+  private static final Predicate<Integer> IS_NEGATIVE = new Predicate<Integer>() {
+    @Override public boolean apply(Integer input) {
+      return input < 0;
+    }
+  };
+
+  private static final Predicate<Integer> IS_ZERO = new Predicate<Integer>() {
+    @Override public boolean apply(Integer input) {
+      return input == 0;
+    }
+  };
 }

@@ -17,19 +17,28 @@ package com.twitter.aurora.scheduler.periodic;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
@@ -44,6 +53,7 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StorageException;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -146,6 +156,65 @@ class Preempter implements Runnable {
     return fetch(query, Predicates.<IScheduledTask>alwaysTrue());
   }
 
+  private static final Function<IAssignedTask, String> TASK_TO_HOST =
+      new Function<IAssignedTask, String>() {
+        @Override public String apply(IAssignedTask input) {
+          return input.getSlaveHost();
+        }
+      };
+
+  private static Predicate<IAssignedTask> canPreempt(final IAssignedTask pending) {
+    return new Predicate<IAssignedTask>() {
+      @Override public boolean apply(IAssignedTask possibleVictim) {
+        return preemptionFilter(possibleVictim).apply(pending);
+      }
+    };
+  }
+
+  private static final Function<IAssignedTask, Resources> TO_RESOURCES =
+      new Function<IAssignedTask, Resources>() {
+        @Override public Resources apply(IAssignedTask input) {
+          return Resources.from(input.getTask());
+        }
+      };
+
+  // TODO(zmanji) Consider using Dominant Resource Fairness for ordering instead of the vector
+  // ordering
+  private static final Ordering<IAssignedTask> RESOURCE_ORDER =
+      Resources.RESOURCE_ORDER.onResultOf(TO_RESOURCES).reverse();
+
+  private Set<IAssignedTask> getTasksToPreempt(
+      Iterable<IAssignedTask> possibleVictims,
+      IAssignedTask pendingTask,
+      String host) {
+
+    FluentIterable<IAssignedTask> preemptableTasks =
+        FluentIterable.from(possibleVictims).filter(canPreempt(pendingTask));
+
+    if (preemptableTasks.isEmpty()) {
+      return ImmutableSet.of();
+    }
+
+    List<IAssignedTask> toPreemptTasks = Lists.newArrayList();
+
+    Iterable<IAssignedTask> sortedVictims = RESOURCE_ORDER.immutableSortedCopy(preemptableTasks);
+
+    for (IAssignedTask victim : sortedVictims) {
+      toPreemptTasks.add(victim);
+
+      // TODO(zmanji): Factor in the executor resources.
+      Resources totalResource = Resources.sum(Iterables.transform(toPreemptTasks, TO_RESOURCES));
+
+      Set<SchedulingFilter.Veto> vetos =
+          schedulingFilter.filter(totalResource, host, pendingTask.getTask(),
+              pendingTask.getTaskId());
+      if (vetos.isEmpty()) {
+        return ImmutableSet.copyOf(toPreemptTasks);
+      }
+    }
+    return ImmutableSet.of();
+  }
+
   @Override
   public void run() {
     // We are only interested in preempting in favor of pending tasks.
@@ -175,32 +244,40 @@ class Preempter implements Runnable {
     // Walk through the preemption candidates in reverse scheduling order.
     Collections.sort(activeTasks, Tasks.SCHEDULING_ORDER.reverse());
 
-    for (IAssignedTask preemptableTask : activeTasks) {
-      // TODO(William Farner): This doesn't fully work, since the preemption is based solely on
-      // the resources reserved for the task running, and does not account for slack resource on
-      // the machine.  For example, a machine has 1 CPU available, and is running a low priority
-      // task reserving 1 CPU.  If we have a pending high priority task requiring 2 CPUs, it will
-      // still not be scheduled.  This implies that a preempter would need to be in the resource
-      // offer flow, or that we should make accepting of resource offers asynchronous, so that we
-      // operate scheduling and preemption in an independent loop.
-      Predicate<IAssignedTask> preemptionFilter = preemptionFilter(preemptableTask);
+    // Group the tasks by host
+    Multimap<String, IAssignedTask> hostsToActiveTasks =
+        Multimaps.index(activeTasks, TASK_TO_HOST);
 
-      Resources slot = Resources.from(preemptableTask.getTask());
-      String host = preemptableTask.getSlaveHost();
+    // TODO(William Farner): This doesn't fully work, since the preemption is based solely on
+    // the resources reserved for the task running, and does not account for slack resource on
+    // the machine.  For example, a machine has 1 CPU available, and is running a low priority
+    // task reserving 1 CPU.  If we have a pending high priority task requiring 2 CPUs, it will
+    // still not be scheduled.  This implies that a preempter would need to be in the resource
+    // offer flow, or that we should make accepting of resource offers asynchronous, so that we
+    // operate scheduling and preemption in an independent loop.
+    for (Map.Entry<String, Collection<IAssignedTask>> tasksOnHost
+        : hostsToActiveTasks.asMap().entrySet()) {
 
-      IAssignedTask preempting = null;
-      for (IAssignedTask task : Iterables.filter(pendingTasks, preemptionFilter)) {
-        if (schedulingFilter.filter(slot, host, task.getTask(), task.getTaskId()).isEmpty()) {
-          preempting = task;
+      // Stores the task causing preemption and the tasks to preempt
+      Optional<Pair<IAssignedTask, Set<IAssignedTask>>> preemptionPair = Optional.absent();
+
+      for (IAssignedTask pendingTask : pendingTasks) {
+        Set<IAssignedTask> minimalSet =
+            getTasksToPreempt(tasksOnHost.getValue(), pendingTask, tasksOnHost.getKey());
+
+        if (!minimalSet.isEmpty()) {
+          preemptionPair = Optional.of(Pair.of(pendingTask, minimalSet));
           break;
         }
       }
 
-      if (preempting != null) {
-        pendingTasks.remove(preempting);
+      if (preemptionPair.isPresent()) {
+        pendingTasks.remove(preemptionPair.get().getFirst());
         try {
-          scheduler.preemptTask(preemptableTask, preempting);
-          tasksPreempted.incrementAndGet();
+          for (IAssignedTask toPreempt : preemptionPair.get().getSecond()) {
+            scheduler.preemptTask(toPreempt, preemptionPair.get().getFirst());
+            tasksPreempted.incrementAndGet();
+          }
         } catch (ScheduleException e) {
           LOG.log(Level.SEVERE, "Preemption failed", e);
           failedPreemptions.incrementAndGet();
@@ -225,7 +302,7 @@ class Preempter implements Runnable {
    * @return A filter that will compare the priorities and resources required by other tasks
    *     with {@code preemptableTask}.
    */
-  private Predicate<IAssignedTask> preemptionFilter(IAssignedTask preemptableTask) {
+  private static Predicate<IAssignedTask> preemptionFilter(IAssignedTask preemptableTask) {
     Predicate<IAssignedTask> preemptableIsProduction = preemptableTask.getTask().isProduction()
         ? Predicates.<IAssignedTask>alwaysTrue()
         : Predicates.<IAssignedTask>alwaysFalse();
@@ -238,7 +315,7 @@ class Preempter implements Runnable {
     );
   }
 
-  private Predicate<IAssignedTask> isOwnedBy(final String role) {
+  private static Predicate<IAssignedTask> isOwnedBy(final String role) {
     return new Predicate<IAssignedTask>() {
       @Override public boolean apply(IAssignedTask task) {
         return getRole(task).equals(role);
