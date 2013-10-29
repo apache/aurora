@@ -1057,8 +1057,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(config.getKey()));
 
     Response resp = new Response();
+    ITaskConfig task;
     try {
-      ConfigurationManager.validateAndPopulate(ITaskConfig.build(config.getTaskConfig()));
+      task = ConfigurationManager.validateAndPopulate(ITaskConfig.build(config.getTaskConfig()));
     } catch (TaskDescriptionException e) {
       return resp.setResponseCode(ERROR).setMessage(e.getMessage());
     }
@@ -1067,17 +1068,18 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return resp.setResponseCode(INVALID_REQUEST).setMessage("Cron jobs are not supported here.");
     }
 
-    // TODO(maximk): Add quota check here. Tracked by MESOS-4296.
+    JobFilter.JobFilterResult filterResult = jobFilter.filter(task, config.getInstanceIdsSize());
+    if (!filterResult.isPass()) {
+      return resp.setResponseCode(INVALID_REQUEST).setMessage(filterResult.getReason());
+    }
 
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
       lockManager.validateIfLocked(
           ILockKey.build(LockKey.job(jobKey.newBuilder())),
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
-      stateManager.addInstances(
-          jobKey,
-          ImmutableSet.copyOf(config.getInstanceIds()),
-          ITaskConfig.build(config.getTaskConfig()));
+
+      stateManager.addInstances(jobKey, ImmutableSet.copyOf(config.getInstanceIds()), task);
       return resp.setResponseCode(OK).setMessage("Successfully added instances.");
     } catch (AuthFailedException e) {
       return resp.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());

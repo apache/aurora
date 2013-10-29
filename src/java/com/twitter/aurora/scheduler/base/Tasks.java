@@ -90,7 +90,7 @@ public final class Tasks {
   public static final Function<ITaskConfig, IJobKey> INFO_TO_JOB_KEY =
       new Function<ITaskConfig, IJobKey>() {
         @Override public IJobKey apply(ITaskConfig task) {
-          return JobKeys.from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
+          return JobKeys.from(task);
         }
       };
 

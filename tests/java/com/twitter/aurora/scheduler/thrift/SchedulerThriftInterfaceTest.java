@@ -1165,14 +1165,29 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     stateManager.addInstances(
-        JOB_KEY,
-        ImmutableSet.copyOf(config.getInstanceIds()),
-        ITaskConfig.build(config.getTaskConfig()));
+        eq(JOB_KEY),
+        eq(ImmutableSet.copyOf(config.getInstanceIds())),
+        anyObject(ITaskConfig.class));
+    jobFilter.filter(anyObject(ITaskConfig.class), eq(1));
+    expectLastCall().andReturn(JobFilter.JobFilterResult.pass());
 
     control.replay();
 
     Response response = thrift.addInstances(config, LOCK.newBuilder(), SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testAddInstancesJobFilterFails() throws Exception {
+    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    jobFilter.filter(anyObject(ITaskConfig.class), eq(1));
+    expectLastCall().andReturn(JobFilter.JobFilterResult.fail("test"));
+
+    control.replay();
+
+    Response response = thrift.addInstances(config, LOCK.newBuilder(), SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test
@@ -1182,9 +1197,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     stateManager.addInstances(
-        JOB_KEY,
-        ImmutableSet.copyOf(config.getInstanceIds()),
-        ITaskConfig.build(config.getTaskConfig()));
+        eq(JOB_KEY),
+        eq(ImmutableSet.copyOf(config.getInstanceIds())),
+        anyObject(ITaskConfig.class));
+    jobFilter.filter(anyObject(ITaskConfig.class), eq(1));
+    expectLastCall().andReturn(JobFilter.JobFilterResult.pass());
 
     control.replay();
 
@@ -1199,10 +1216,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     stateManager.addInstances(
-        JOB_KEY,
-        ImmutableSet.copyOf(config.getInstanceIds()),
-        ITaskConfig.build(config.getTaskConfig()));
+        eq(JOB_KEY),
+        eq(ImmutableSet.copyOf(config.getInstanceIds())),
+        anyObject(ITaskConfig.class));
     expectLastCall().andThrow(new InstanceException("Failed"));
+    jobFilter.filter(anyObject(ITaskConfig.class), eq(1));
+    expectLastCall().andReturn(JobFilter.JobFilterResult.pass());
 
     control.replay();
 
@@ -1217,6 +1236,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     expectLastCall().andThrow(new LockException("Failed lock check."));
+    jobFilter.filter(anyObject(ITaskConfig.class), eq(1));
+    expectLastCall().andReturn(JobFilter.JobFilterResult.pass());
 
     control.replay();
 
@@ -1241,6 +1262,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     AddInstancesConfig config = createInstanceConfig(defaultTask(true));
     expectAuth(ROLE, false);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    jobFilter.filter(anyObject(ITaskConfig.class), eq(1));
+    expectLastCall().andReturn(JobFilter.JobFilterResult.pass());
 
     control.replay();
 

@@ -26,6 +26,7 @@ import com.twitter.aurora.gen.JobKey;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -111,6 +112,17 @@ public final class JobKeys {
         .setEnvironment(environment)
         .setName(name));
     return assertValid(job);
+  }
+
+  /**
+   * Attempts to create a valid JobKey from the given task.
+   *
+   * @param task The task to create job key from.
+   * @return A valid JobKey if it can be created.
+   * @throws IllegalArgumentException if the key fails to validate.
+   */
+  public static IJobKey from(ITaskConfig task) throws IllegalArgumentException {
+    return from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
   }
 
   /**

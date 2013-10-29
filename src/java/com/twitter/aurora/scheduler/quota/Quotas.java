@@ -21,7 +21,6 @@ import com.google.common.collect.Ordering;
 
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.base.Tasks;
-import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -47,13 +46,13 @@ public final class Quotas {
   }
 
   /**
-   * Determines the amount of quota required for a job.
+   * Determines the amount of quota required for a set of job tasks.
    *
-   * @param job Job to count quota from.
+   * @param taskConfig Task template to count quota from.
    * @return Quota requirement to run {@code job}.
    */
-  public static IQuota fromJob(IJobConfiguration job) {
-    return scale(fromProductionTasks(ImmutableSet.of(job.getTaskConfig())), job.getInstanceCount());
+  public static IQuota fromTasks(ITaskConfig taskConfig, int instanceCount) {
+    return scale(fromProductionTasks(ImmutableSet.of(taskConfig)), instanceCount);
   }
 
   // TODO(Suman Karumuri): Refactor this function in to a new class.

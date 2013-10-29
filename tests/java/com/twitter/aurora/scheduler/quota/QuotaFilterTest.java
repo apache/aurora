@@ -4,6 +4,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
+import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -26,7 +27,9 @@ import static org.junit.Assert.assertTrue;
 public class QuotaFilterTest extends EasyMockTest {
   private static final int DEFAULT_TASKS_IN_QUOTA = 10;
   private static final String ROLE = "test";
-  private static final IJobKey JOB_KEY = JobKeys.from(ROLE, "test", "test");
+  private static final String JOB_NAME = "test_job";
+  private static final String ENV = "test_env";
+  private static final IJobKey JOB_KEY = JobKeys.from(ROLE, ENV, JOB_NAME);
   private static final Query.Builder QUERY = Query.jobScoped(JOB_KEY).active();
   private static final IQuota QUOTA = IQuota.build(new Quota()
       .setNumCpus(1.0)
@@ -124,5 +127,35 @@ public class QuotaFilterTest extends EasyMockTest {
     control.replay();
 
     assertFalse(quotaFilter.filter(IJobConfiguration.build(jobBuilder)).isPass());
+  }
+
+  @Test
+  public void testUpdateProductionTasksChecksQuota() {
+    JobConfiguration jobBuilder = JOB.newBuilder();
+    TaskConfig config = jobBuilder.getTaskConfig()
+        .setProduction(true)
+        .setOwner(new Identity(ROLE, "user"))
+        .setEnvironment(ENV)
+        .setJobName(JOB_NAME);
+
+    storageTestUtil.expectOperations();
+    storageTestUtil.expectTaskFetch(QUERY,
+        IScheduledTask.build(new ScheduledTask().setAssignedTask(
+            new AssignedTask().setTask(jobBuilder.getTaskConfig()))));
+
+    expect(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(0, 0, 0)))).andReturn(true);
+
+    control.replay();
+
+    assertTrue(quotaFilter.filter(ITaskConfig.build(config), 1).isPass());
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testUpdateProductionTasksFailsJobKeyCreation() {
+    JobConfiguration jobBuilder = JOB.newBuilder();
+    jobBuilder.getTaskConfig().setOwner(new Identity(ROLE, "user"));
+    control.replay();
+
+    quotaFilter.filter(ITaskConfig.build(jobBuilder.getTaskConfig()), 1);
   }
 }

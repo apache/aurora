@@ -19,12 +19,14 @@ import javax.inject.Inject;
 
 import com.google.common.collect.Iterables;
 
+import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.aurora.scheduler.state.JobFilter;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -44,19 +46,32 @@ class QuotaFilter implements JobFilter {
   }
 
   @Override
-  public synchronized JobFilterResult filter(final IJobConfiguration job) {
-    ITaskConfig template = job.getTaskConfig();
+  public JobFilterResult filter(final IJobConfiguration job) {
+    return filterByTask(job.getKey(), job.getTaskConfig(), job.getInstanceCount());
+  }
+
+  @Override
+  public JobFilterResult filter(ITaskConfig template, int instanceCount) {
+    return filterByTask(JobKeys.from(template), template, instanceCount);
+  }
+
+  private synchronized JobFilterResult filterByTask(
+      IJobKey jobKey,
+      ITaskConfig template,
+      int instanceCount) {
+
     if (!template.isProduction()) {
       return JobFilterResult.pass();
     }
 
     IQuota currentUsage = Quotas.fromProductionTasks(
         Iterables.transform(
-            Storage.Util.consistentFetchTasks(storage, Query.jobScoped(job.getKey()).active()),
-        Tasks.SCHEDULED_TO_INFO));
+            Storage.Util.consistentFetchTasks(storage, Query.jobScoped(jobKey).active()),
+            Tasks.SCHEDULED_TO_INFO));
 
-    IQuota additionalRequested = Quotas.subtract(Quotas.fromJob(job), currentUsage);
-    if (!quotaManager.hasRemaining(job.getKey().getRole(), additionalRequested)) {
+    IQuota additionalRequested =
+        Quotas.subtract(Quotas.fromTasks(template, instanceCount), currentUsage);
+    if (!quotaManager.hasRemaining(jobKey.getRole(), additionalRequested)) {
       return JobFilterResult.fail("Insufficient resource quota.");
     }
 

@@ -4,6 +4,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * An action that either accepts a configuration or rejects it with a reason.
@@ -16,6 +17,16 @@ public interface JobFilter {
    * @return A result and the reason the result was reached.
    */
   JobFilterResult filter(IJobConfiguration jobConfiguration);
+
+  /**
+   * Accept the TaskConfig with the specified number of instances
+   * or reject it with a reason.
+   *
+   * @param template The task configuration to filter.
+   * @param instanceCount Number of instances to apply taskConfig to.
+   * @return A result and the reason the result was reached.
+   */
+  JobFilterResult filter(ITaskConfig template, int instanceCount);
 
   /**
    * An indication of whether a job passed a filter or not.
