@@ -23,7 +23,15 @@ class Java(Struct):
 Java7 = Java(
   java_home                 = '/usr/lib/jvm/java-1.7.0-openjdk',
   best_practice_jvm_flags   = '-XX:+CMSScavengeBeforeRemark',
-  print_gc_jvm_flags        = '-verbosegc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintHeapAtGC -XX:+PrintTenuredClassDistribution',
+  print_gc_jvm_flags        = ' '.join((
+    '-verbosegc',
+    '-XX:+PrintGCDetails',
+    '-XX:+PrintGCTimeStamps',
+    '-XX:+PrintGCDateStamps',
+    '-XX:+PrintTenuringDistribution',
+    '-XX:+PrintHeapAtGC',
+    '-XX:+PrintTenuredClassDistribution'
+  )),
   oome_jvm_flags            = '-XX:+HeapDumpOnOutOfMemoryError',
   agentlib                  = '-agentlib:perfagent'
 )
@@ -35,18 +43,33 @@ Canary = Java7(
 Java6 = Java(
   java_home                 = '/usr/lib/jvm/java-1.6.0',
   best_practice_jvm_flags   = '-XX:+CMSScavengeBeforeRemark -XX:+CMSClassUnloadingEnabled',
-  print_gc_jvm_flags        = '-verbosegc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintHeapAtGC',
+  print_gc_jvm_flags        = ' '.join((
+    '-verbosegc',
+    '-XX:+PrintGCDetails',
+    '-XX:+PrintGCTimeStamps',
+    '-XX:+PrintGCDateStamps',
+    '-XX:+PrintTenuringDistribution',
+    '-XX:+PrintHeapAtGC',
+  )),
   oome_jvm_flags            = '-XX:+HeapDumpOnOutOfMemoryError',
 )
 
 DEFAULT_PERM_GEN = 128
 DEFAULT_CODE_CACHE = 64
-CMDLINE = ''' 
-    export JAVA_HOME={{__profile.java_home}} &&
-    export PATH={{__profile.java_home}}/bin:$PATH &&
-    export _JAVA_OPTIONS=" -Xmx{{__profile.heap}}M -Xms{{__profile.heap}}M -Xmn{{__profile.new_gen}}M {{__profile.perm_gen}}  {{__profile.code_cache}} -XX:ParallelGCThreads={{__profile.cpu_cores}} -Xloggc:{{__profile.gc_log}} {{__profile.best_practice_jvm_flags}} {{__profile.print_gc_jvm_flags}} {{__profile.oome_jvm_flags}} -Dcom.twitter.jvm.numProcs={{__profile.cpu_cores}} {{__profile.collector}} {{__profile.agentlib}} {{__profile.extra_jvm_flags}} " &&
-    {{__profile.java_home}}/bin/java {{__profile.arguments}}'''
-DOWNLOAD_CANARY_PACKAGE = '''  
+CMDLINE = '''
+    export PATH={{__profile.java_home}}/bin:$PATH \
+      JAVA_HOME={{__profile.java_home}} \
+      _JAVA_OPTIONS="-Xmx{{__profile.heap}}M -Xms{{__profile.heap}}M -Xmn{{__profile.new_gen}}M
+                     {{__profile.perm_gen}} {{__profile.code_cache}}
+                     -XX:ParallelGCThreads={{__profile.cpu_cores}} -Xloggc:{{__profile.gc_log}}
+                     {{__profile.best_practice_jvm_flags}} {{__profile.print_gc_jvm_flags}}
+                     {{__profile.oome_jvm_flags}}
+                     -Dcom.twitter.jvm.numProcs={{__profile.cpu_cores}}
+                     {{__profile.collector}} {{__profile.agentlib}}
+                     {{__profile.extra_jvm_flags}}"
+    echo $$ > {{name}}-jvmprocess.pid &&
+    exec {{__profile.java_home}}/bin/java {{__profile.arguments}}'''
+DOWNLOAD_CANARY_PACKAGE = '''
     _RH_VERSION=`grep -Eo [0-9] /etc/redhat-release |head -1` &&
     if [ "$_RH_VERSION" -eq "5" ]; then
       echo "CentOS $_RH_VERSION, downloading jdk package version {{__profile.canary_package_version}}";
@@ -57,7 +80,7 @@ DOWNLOAD_CANARY_PACKAGE = '''
       {{packer[jvm-release][centos6jdk][{{__profile.canary_package_version}}].copy_command}};
       tar -xvf centos6jdk.tar.gz;
     else
-      echo "Appropriate JDK Package could not be downloaded. OS version not supported or OS version mis-match";
+      echo "Appropriate JDK Package could not be downloaded. OS version not supported or OS version mismatch";
     fi'''
 
 def JVMProcess(arguments, resources, name='Java', jvm=Java7, **kw):
@@ -73,7 +96,7 @@ def JVMProcess(arguments, resources, name='Java', jvm=Java7, **kw):
      Usage:
 
      RESOURCES = Resources(cpu = 1.0, ram = 1024*MB, disk = 128*MB)
- 
+
      JOB_TEMPLATE = Job(
       name = 'java_setup_sh',
       role = os.environ['USER'],
@@ -86,7 +109,7 @@ def JVMProcess(arguments, resources, name='Java', jvm=Java7, **kw):
         ]
       )
      )
-    
+
      Wiki Page: http://confluence.twitter.biz/display/RUNTIMESYSTEMS/Mesos+JVM+Process+Template
 
   """
@@ -111,7 +134,7 @@ def JVMProcess(arguments, resources, name='Java', jvm=Java7, **kw):
   # Check if the user gave us values for heap, if not, use the available RAM in resources
   if jvm.heap() is not Empty:
     heap_ram = (int(jvm.heap().get()) / 1024) / 1024
-    # Since the User has supplied a heap size, no effort will be made to size down the heap.  
+    # Since the User has supplied a heap size, no effort will be made to size down the heap.
     adaptive_heap_size = False
   else:
     heap_ram = normalized_ram
@@ -126,7 +149,7 @@ def JVMProcess(arguments, resources, name='Java', jvm=Java7, **kw):
   # Subtract perm_gen and code_cache from heap_ram
   if adaptive_heap_size:
     heap_ram = heap_ram - perm_gen - code_cache
-  
+
   # Set Young Gen
   new_gen = get_young_gen(jvm, heap_ram)
 
@@ -136,7 +159,7 @@ def JVMProcess(arguments, resources, name='Java', jvm=Java7, **kw):
   # Set Collector
   collector = get_collector(jvm)
 
-  # Check Canary Version use 
+  # Check Canary Version use
   check_canary_version(jvm)
 
   # Get JAVA_HOME
@@ -222,7 +245,11 @@ def get_cpu_cores(jvm, cpu):
   AssertionError if this value is bigger than allocated CPU Cores in resource definition.
   """
   if jvm.cpu_cores() is not Empty:
-    assert int(jvm.cpu_cores().get()) <= cpu, "cpu_cores cannot be more than allocated CPUs. cpu_cores: %s ; Allocated: %s" % (jvm.cpu_cores().get(), cpu)
+    assert int(jvm.cpu_cores().get()) <= cpu, (
+      "cpu_cores cannot be more than allocated CPUs. cpu_cores: %s ; Allocated: %s" %
+        (jvm.cpu_cores().get(), cpu)
+    )
+
     cpu_cores = int(jvm.cpu_cores().get())
   else:
     cpu_cores = int(cpu)
@@ -238,7 +265,9 @@ def get_collector(jvm):
     elif jvm.collector().get().lower() == 'throughput':
       collector = '-XX:+UseParallelOldGC'
     elif jvm.collector().get().lower() == 'g1':
-      assert 'java-1.6' not in jvm.java_home().get(), "G1 is experimental in JDK6uX; Use latency or throughput"
+      assert 'java-1.6' not in jvm.java_home().get(), (
+        "G1 is experimental in JDK6uX; Use latency or throughput"
+      )
       collector = '-XX:+UseG1GC'
     else:
       collector = '-XX:+UseConcMarkSweepGC'
@@ -259,7 +288,9 @@ def check_canary_version(jvm):
   AssertionError if the canary_package_version is not defined when using Canary JDK.
   """
   if jvm.java_home().get() == 'canary':
-    assert jvm.canary_package_version().get() is not '', "canary_package_version should be live or a valid version number" 
+    assert jvm.canary_package_version().get() is not '', (
+      "canary_package_version should be live or a valid version number"
+    )
 
 def get_java_home(jvm):
   """Returns the correct JAVA_HOME path for canaries
