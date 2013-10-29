@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
@@ -178,7 +179,7 @@ public class TaskSchedulerTest extends EasyMockTest {
   private Capture<Runnable> expectTaskRetryIn(long penaltyMs) {
     Capture<Runnable> capture = createCapture();
     executor.schedule(
-        EasyMock.capture(capture),
+        capture(capture),
         eq(penaltyMs),
         eq(TimeUnit.MILLISECONDS));
     expectLastCall().andReturn(future);
@@ -379,13 +380,28 @@ public class TaskSchedulerTest extends EasyMockTest {
     driver.declineOffer(OFFER_A.getId());
     driver.declineOffer(offerAB.getId());
 
-    // No attempt is made to avoid declining offers multiple times, so OFFER_A is declined twice.
-    driver.declineOffer(OFFER_A.getId());
-
     replayAndCreateScheduler();
 
     offerQueue.addOffer(OFFER_A);
     offerQueue.addOffer(offerAB);
+    offerExpirationCapture.getValue().run();
+  }
+
+  @Test
+  public void testDontDeclineAcceptedOffer() throws OfferQueue.LaunchException {
+    expectAnyMaintenanceCalls();
+    Capture<Runnable> offerExpirationCapture = expectOfferDeclineIn(10);
+
+    Function<Offer, Optional<TaskInfo>> offerAcceptor =
+        createMock(new Clazz<Function<Offer, Optional<TaskInfo>>>() { });
+    final TaskInfo taskInfo = TaskInfo.getDefaultInstance();
+    expect(offerAcceptor.apply(OFFER_A)).andReturn(Optional.of(taskInfo));
+    driver.launchTask(OFFER_A.getId(), taskInfo);
+
+    replayAndCreateScheduler();
+
+    offerQueue.addOffer(OFFER_A);
+    offerQueue.launchFirst(offerAcceptor);
     offerExpirationCapture.getValue().run();
   }
 
@@ -471,7 +487,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     Capture<IScheduledTask> taskScheduled = createCapture();
     expect(assigner.maybeAssign(EasyMock.<Offer>anyObject(), capture(taskScheduled)))
         .andReturn(Optional.of(mesosTask));
-    driver.launchTask(EasyMock.<OfferID>anyObject(), EasyMock.eq(mesosTask));
+    driver.launchTask(EasyMock.<OfferID>anyObject(), eq(mesosTask));
     return taskScheduled;
   }
 

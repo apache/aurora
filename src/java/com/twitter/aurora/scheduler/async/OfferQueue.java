@@ -178,34 +178,45 @@ public interface OfferQueue extends EventSubscriber {
         executor.schedule(
             new Runnable() {
               @Override public void run() {
-                decline(offer.getId());
+                removeAndDecline(offer.getId());
               }
             },
             returnDelay.get().as(Time.MILLISECONDS),
             TimeUnit.MILLISECONDS);
       } else {
+        // If there are existing offers for the slave, decline all of them so the master can
+        // compact all of those offers into a single offer and send them back.
         LOG.info("Returning " + (sameSlave.size() + 1)
             + " offers for " + offer.getSlaveId().getValue() + " for compaction.");
         decline(offer.getId());
         for (HostOffer sameSlaveOffer : sameSlave) {
-          decline(sameSlaveOffer.offer.getId());
+          removeAndDecline(sameSlaveOffer.offer.getId());
         }
+      }
+    }
+
+    void removeAndDecline(OfferID id) {
+      if (removeFromHostOffers(id)) {
+        decline(id);
       }
     }
 
     void decline(OfferID id) {
       LOG.fine("Declining offer " + id);
-      cancelOffer(id);
       driver.declineOffer(id);
     }
 
     @Override
     public void cancelOffer(final OfferID offerId) {
+      removeFromHostOffers(offerId);
+    }
+
+    private boolean removeFromHostOffers(final OfferID offerId) {
       Preconditions.checkNotNull(offerId);
 
       // The small risk of inconsistency is acceptable here - if we have an accept/remove race
       // on an offer, the master will mark the task as LOST and it will be retried.
-      Iterables.removeIf(hostOffers,
+      return Iterables.removeIf(hostOffers,
           new Predicate<HostOffer>() {
             @Override public boolean apply(HostOffer input) {
               return input.offer.getId().equals(offerId);
