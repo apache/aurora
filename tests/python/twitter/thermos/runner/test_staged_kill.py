@@ -19,6 +19,8 @@ from gen.twitter.thermos.ttypes import (
   ProcessState
 )
 
+import pytest
+
 sleepy_process = Process(
   name = "sleepy",
   cmdline = "sleep 3",
@@ -190,6 +192,8 @@ class TestRunnerKillProcessTrappingSIGTERM(RunnerBase):
     assert len(state.processes['ignorant_process']) == 1
     assert state.processes['ignorant_process'][0].state == ProcessState.LOST
 
+  # TODO(wickman) MESOS-4326
+  @pytest.mark.skipif('True')
   def test_preemption_wait(self):
     runner = self.start_runner()
     tm = TaskMonitor(runner.pathspec, runner.task_id)
