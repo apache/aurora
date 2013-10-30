@@ -3,7 +3,19 @@ apply plugin: 'idea'
 apply plugin: 'java'
 apply plugin: 'maven-publish'
 
-sourceCompatibility = 1.7
+compileJava {
+  options.compilerArgs << '-Werror'
+  options.compilerArgs << '-Xlint:all'
+  // Don't fail for annotations not claimed by annotation processors.
+  options.compilerArgs << '-Xlint:-processing'
+  // Don't fail for serialVersionUID warnings.
+  options.compilerArgs << '-Xlint:-serial'
+  // TODO(William Farner): Fix deprecation warnings and remove this.
+  options.compilerArgs << '-Xlint:-deprecation'
+  sourceCompatibility = 1.7
+  targetCompatibility = 1.7
+}
+
 task sourceJar(type: Jar) {
   from sourceSets.main.allJava
 }
