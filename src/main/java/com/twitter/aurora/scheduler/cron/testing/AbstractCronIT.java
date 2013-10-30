@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.cron;
+package com.twitter.aurora.scheduler.cron.testing;
 
 import java.util.concurrent.CountDownLatch;
 
 import org.junit.Test;
 
+import com.twitter.aurora.scheduler.cron.CronPredictor;
+import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.junit.Assert.assertTrue;
