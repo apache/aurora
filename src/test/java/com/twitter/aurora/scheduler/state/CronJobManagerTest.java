@@ -129,7 +129,7 @@ public class CronJobManagerTest extends EasyMockTest {
   @Test
   public void testPubsubWiring() throws Exception {
     cronScheduler.start();
-    shutdownRegistry.addAction(EasyMock.<ExceptionalCommand>anyObject());
+    shutdownRegistry.addAction(EasyMock.<ExceptionalCommand<?>>anyObject());
     expect(storageUtil.jobStore.fetchJobs(CronJobManager.MANAGER_KEY))
         .andReturn(ImmutableList.<IJobConfiguration>of());
 

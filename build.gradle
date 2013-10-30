@@ -10,8 +10,6 @@ compileJava {
   options.compilerArgs << '-Xlint:-processing'
   // Don't fail for serialVersionUID warnings.
   options.compilerArgs << '-Xlint:-serial'
-  // TODO(William Farner): Fix deprecation warnings and remove this.
-  options.compilerArgs << '-Xlint:-deprecation'
   sourceCompatibility = 1.7
   targetCompatibility = 1.7
 }

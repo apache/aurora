@@ -67,7 +67,7 @@ public class LeaderRedirect {
    * @throws MonitorException If monitoring failed to initialize.
    */
   public void monitor() throws MonitorException {
-    schedulers.monitor(new SchedulerMonitor());
+    schedulers.watch(new SchedulerMonitor());
   }
 
   private Optional<HostAndPort> getLeaderHttp() {

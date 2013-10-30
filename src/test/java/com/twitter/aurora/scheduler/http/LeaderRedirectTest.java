@@ -44,6 +44,7 @@ import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
 import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 import static com.twitter.aurora.scheduler.http.LeaderRedirect.HTTP_PORT_NAME;
@@ -82,7 +83,7 @@ public class LeaderRedirectTest extends EasyMockTest {
     leaderRedirector = new LeaderRedirect(serviceRegistry, schedulers);
 
     monitorCapture = new Capture<>();
-    schedulers.monitor(capture(monitorCapture));
+    expect(schedulers.watch(capture(monitorCapture))).andReturn(null);
     control.replay();
     leaderRedirector.monitor();
   }
