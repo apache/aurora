@@ -1,6 +1,36 @@
 apply plugin: 'application'
 apply plugin: 'idea'
 apply plugin: 'java'
+apply plugin: 'maven-publish'
+
+task sourceJar(type: Jar) {
+  from sourceSets.main.allJava
+}
+
+publishing {
+  publications {
+    maven(MavenPublication) {
+      groupId 'com.twitter.aurora'
+      artifactId 'twitter-aurora'
+      version '0.0.1'
+
+      from components.java
+
+      artifact sourceJar {
+        classifier "sources"
+      }
+    }
+  }
+  repositories {
+    maven {
+      credentials {
+        username = internalMavenUser
+        password = internalMavenPass
+      }
+      url internalMavenUrl
+    }
+  }
+}
 
 repositories {
   mavenCentral()
@@ -9,7 +39,7 @@ repositories {
   }
   // TODO(William Farner): Remove this when source is fully detached from internal.
   maven {
-    url "$System.env.INTERNAL_ARTIFACTORY"
+    url internalMavenUrl
   }
 }
 
@@ -32,7 +62,7 @@ dependencies {
   compile 'org.apache.mesos:mesos:0.13.0'
   compile 'org.apache.thrift:libthrift:0.5.0-1'
   compile 'org.apache.zookeeper:zookeeper:3.3.4'
-  def slf4jRev = '1.6.1'  
+  def slf4jRev = '1.6.1'
   compile "org.slf4j:slf4j-api:${slf4jRev}"
   compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
   compile 'com.twitter.aurora:aurora:0.0.2'
