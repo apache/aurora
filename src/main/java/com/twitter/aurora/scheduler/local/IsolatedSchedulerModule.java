@@ -145,9 +145,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
             Future<?> future = (Future<?>) runnable;
             try {
               future.get();
-            } catch (InterruptedException e) {
-              e.printStackTrace();
-            } catch (ExecutionException e) {
+            } catch (InterruptedException | ExecutionException e) {
               e.printStackTrace();
             }
           }

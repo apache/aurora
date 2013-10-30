@@ -69,9 +69,7 @@ class FileLog implements Log {
         @Override public void execute(FileLogContents logContents) {
           try {
             Files.write(ThriftBinaryCodec.encode(logContents), logFile);
-          } catch (IOException e) {
-            throw Throwables.propagate(e);
-          } catch (CodingException e) {
+          } catch (IOException | CodingException e) {
             throw Throwables.propagate(e);
           }
         }

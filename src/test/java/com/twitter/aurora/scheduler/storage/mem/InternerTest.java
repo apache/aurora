@@ -39,7 +39,7 @@ public class InternerTest {
 
   @Before
   public void setUp() {
-    interner = new Interner<Internable, String>();
+    interner = new Interner<>();
   }
 
   @Test

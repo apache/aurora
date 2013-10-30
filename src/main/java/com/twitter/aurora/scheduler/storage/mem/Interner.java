@@ -45,7 +45,7 @@ class Interner<T, A> {
   synchronized T addAssociation(T t, A association) {
     InternEntry<A, T> entry = pool.get(t);
     if (entry == null) {
-      entry = new InternEntry<A, T>(t, association);
+      entry = new InternEntry<>(t, association);
       pool.put(t, entry);
     } else {
       entry.associations.add(association);

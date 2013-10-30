@@ -121,7 +121,7 @@ public class StateManagerImpl implements StateManager {
   // Work queue to receive state machine side effect work.
   // Items are sorted to place DELETE entries last.  This is to ensure that within an operation,
   // a delete is always processed after a state transition.
-  private final Queue<WorkEntry> workQueue = new PriorityQueue<WorkEntry>(10,
+  private final Queue<WorkEntry> workQueue = new PriorityQueue<>(10,
       new Comparator<WorkEntry>() {
         @Override public int compare(WorkEntry a, WorkEntry b) {
           if ((a.command == WorkCommand.DELETE) != (b.command == WorkCommand.DELETE)) {

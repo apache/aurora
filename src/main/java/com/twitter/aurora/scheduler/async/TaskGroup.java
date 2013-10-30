@@ -46,7 +46,7 @@ class TaskGroup {
   // Order the tasks by the time they are ready to be scheduled
   private static final Ordering<Task> TASK_ORDERING = Ordering.natural().onResultOf(TO_TIMESTAMP);
   // 11 is the magic number used by PriorityBlockingQueue as the initial size.
-  private final Queue<Task> tasks = new PriorityBlockingQueue<Task>(11, TASK_ORDERING);
+  private final Queue<Task> tasks = new PriorityBlockingQueue<>(11, TASK_ORDERING);
   // Penalty for the task group for failing to schedule.
   private final AtomicLong penaltyMs;
 

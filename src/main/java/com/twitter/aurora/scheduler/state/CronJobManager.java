@@ -190,9 +190,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     for (IJobConfiguration job : crons) {
       try {
         mapScheduledJob(job, scheduleJob(ParsedConfiguration.fromUnparsed(job)));
-      } catch (ScheduleException e) {
-        logLaunchFailure(job, e);
-      } catch (TaskDescriptionException e) {
+      } catch (ScheduleException | TaskDescriptionException e) {
         logLaunchFailure(job, e);
       }
     }

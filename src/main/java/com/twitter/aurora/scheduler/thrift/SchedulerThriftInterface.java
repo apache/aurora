@@ -266,11 +266,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
               parsed.getJobConfig().getInstanceCount(), JobKeys.toPath(job)));
-    } catch (LockException e) {
-      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    } catch (TaskDescriptionException e) {
-      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    } catch (ScheduleException e) {
+    } catch (LockException | TaskDescriptionException | ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
 
@@ -587,9 +583,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       } else {
         response.setMessage("Job successfully updated.");
       }
-    } catch (ScheduleException e) {
-      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    } catch (ConfigurationManager.TaskDescriptionException e) {
+    } catch (ScheduleException | TaskDescriptionException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
 
@@ -722,9 +716,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
       schedulerCore.restartShards(jobKey, shardIds, context.getIdentity());
       response.setResponseCode(OK).setMessage("Shards are restarting.");
-    } catch (LockException e) {
-      response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
-    } catch (ScheduleException e) {
+    } catch (LockException | ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     }
 

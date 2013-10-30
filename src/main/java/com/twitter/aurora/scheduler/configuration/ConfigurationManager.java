@@ -164,9 +164,9 @@ public final class ConfigurationManager {
 
   private static final Iterable<RequiredFieldValidator<?>> REQUIRED_FIELDS_VALIDATORS =
       ImmutableList.<RequiredFieldValidator<?>>of(
-          new RequiredFieldValidator<Number>(_Fields.NUM_CPUS, new GreaterThan(0.0, "num_cpus")),
-          new RequiredFieldValidator<Number>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")),
-          new RequiredFieldValidator<Number>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")));
+          new RequiredFieldValidator<>(_Fields.NUM_CPUS, new GreaterThan(0.0, "num_cpus")),
+          new RequiredFieldValidator<>(_Fields.RAM_MB, new GreaterThan(0.0, "ram_mb")),
+          new RequiredFieldValidator<>(_Fields.DISK_MB, new GreaterThan(0.0, "disk_mb")));
 
   private ConfigurationManager() {
     // Utility class.

@@ -119,8 +119,7 @@ public class LogManagerTest extends EasyMockTest {
     expect(log.open()).andReturn(stream);
 
     ShutdownRegistry shutdownRegistry = createMock(ShutdownRegistry.class);
-    Capture<ExceptionalCommand<IOException>> shutdownAction =
-        new Capture<ExceptionalCommand<IOException>>();
+    Capture<ExceptionalCommand<IOException>> shutdownAction = new Capture<>();
     shutdownRegistry.addAction(capture(shutdownAction));
 
     // The registered shutdown command should close the stream
@@ -358,7 +357,7 @@ public class LogManagerTest extends EasyMockTest {
             .addAll(Iterables.transform(message2.chunks, ENCODE))
             .build();
 
-    final Deque<byte[]> actualAppends = new LinkedBlockingDeque<byte[]>();
+    final Deque<byte[]> actualAppends = new LinkedBlockingDeque<>();
 
     Stream mockStream = new Stream() {
       @Override
@@ -403,9 +402,7 @@ public class LogManagerTest extends EasyMockTest {
         try {
           message1Started.await();
           tr2.commit();
-        } catch (CodingException e) {
-          throw new RuntimeException(e);
-        } catch (InterruptedException e) {
+        } catch (CodingException | InterruptedException e) {
           throw new RuntimeException(e);
         }
       }

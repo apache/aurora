@@ -3,6 +3,7 @@ apply plugin: 'idea'
 apply plugin: 'java'
 apply plugin: 'maven-publish'
 
+sourceCompatibility = 1.7
 task sourceJar(type: Jar) {
   from sourceSets.main.allJava
 }

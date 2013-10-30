@@ -81,7 +81,7 @@ public class LeaderRedirectTest extends EasyMockTest {
         new LocalServiceRegistry(Providers.of(services), new ShutdownRegistryImpl());
     leaderRedirector = new LeaderRedirect(serviceRegistry, schedulers);
 
-    monitorCapture = new Capture<HostChangeMonitor<ServiceInstance>>();
+    monitorCapture = new Capture<>();
     schedulers.monitor(capture(monitorCapture));
     control.replay();
     leaderRedirector.monitor();

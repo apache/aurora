@@ -135,8 +135,7 @@ public interface OfferQueue extends EventSubscriber {
             })
             .compound(Ordering.arbitrary());
 
-    private final Set<HostOffer> hostOffers =
-        new ConcurrentSkipListSet<HostOffer>(PREFERENCE_COMPARATOR);
+    private final Set<HostOffer> hostOffers = new ConcurrentSkipListSet<>(PREFERENCE_COMPARATOR);
     private final AtomicLong offerRaces = Stats.exportLong("offer_accept_races");
 
     private final Driver driver;

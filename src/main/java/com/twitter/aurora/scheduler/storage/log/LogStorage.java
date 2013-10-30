@@ -327,11 +327,7 @@ public class LogStorage extends ForwardingStore
           replay(logEntry);
         }
       });
-    } catch (CodingException e) {
-      throw new RecoveryFailedException(e);
-    } catch (InvalidPositionException e) {
-      throw new RecoveryFailedException(e);
-    } catch (StreamAccessException e) {
+    } catch (CodingException | InvalidPositionException | StreamAccessException e) {
       throw new RecoveryFailedException(e);
     }
   }
