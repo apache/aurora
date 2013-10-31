@@ -293,7 +293,7 @@ public class StateManagerImpl implements StateManager {
             Tasks.ASSIGNED_TO_INSTANCE_ID);
 
         ImmutableSet.Builder<TaskUpdateConfiguration> shardConfigBuilder = ImmutableSet.builder();
-        for (int instance: Sets.union(existingInstances.keySet(), updatedTasks.keySet())) {
+        for (int instance : Sets.union(existingInstances.keySet(), updatedTasks.keySet())) {
           // It's important to include the deprecated instance ID here since that information is
           // otherwise lost when storing a TaskUpdateConfiguration.  This will disappear once
           // the update routine is fully-coordinated by the client.

@@ -411,7 +411,7 @@ public final class ConfigurationManager {
    */
   @VisibleForTesting
   public static TaskConfig applyDefaultsIfUnset(TaskConfig task) {
-    for (Closure<TaskConfig> populator: DEFAULT_FIELD_POPULATORS) {
+    for (Closure<TaskConfig> populator : DEFAULT_FIELD_POPULATORS) {
       populator.execute(task);
     }
 
