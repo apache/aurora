@@ -260,6 +260,8 @@ struct AcquireLockResult {
 enum ScheduleStatus {
   // Initial state for a task.  A task will remain in this state until it has been persisted.
   INIT             = 11,
+  // The task will be rescheduled, but is being throttled for restarting too frequently.
+  THROTTLED        = 16,
   // Task is awaiting assignment to a slave.
   PENDING          = 0,
   // Task has been assigned to a slave.
