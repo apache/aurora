@@ -1,5 +1,14 @@
 python_test_suite(
   name = 'all',
-  dependencies = []
+  dependencies = [ pants(':commands') ]
 )
 
+python_tests(
+  name='commands',
+  sources = [ 'test_core.py' ],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/client/commands:core'),
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
+  ])
