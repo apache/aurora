@@ -15,8 +15,16 @@
  */
 package com.twitter.aurora.scheduler.storage.mem;
 
+import java.util.IdentityHashMap;
+import java.util.Map;
+import java.util.Set;
+
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -213,6 +221,29 @@ public class MemTaskStoreTest {
     assertQueryResults(jimsJob, aRunning, b);
     assertQueryResults(jimsJob2, c);
     assertQueryResults(joesJob);
+  }
+
+  @Test
+  public void testCanonicalTaskConfigs() {
+    IScheduledTask a = makeTask("a", "role", "env", "job");
+    IScheduledTask b = makeTask("a", "role", "env", "job");
+    IScheduledTask c = makeTask("a", "role", "env", "job");
+    Set<IScheduledTask> inserted = ImmutableSet.of(a, b, c);
+
+    store.saveTasks(inserted);
+    Set<ITaskConfig> storedConfigs = FluentIterable.from(store.fetchTasks(Query.unscoped()))
+        .transform(Tasks.SCHEDULED_TO_INFO)
+        .toSet();
+    assertEquals(
+        FluentIterable.from(inserted).transform(Tasks.SCHEDULED_TO_INFO).toSet(),
+        storedConfigs);
+    Map<ITaskConfig, ITaskConfig> identityMap = Maps.newIdentityHashMap();
+    for (ITaskConfig stored : storedConfigs) {
+      identityMap.put(stored, stored);
+    }
+    assertEquals(
+        ImmutableMap.of(Tasks.SCHEDULED_TO_INFO.apply(a), Tasks.SCHEDULED_TO_INFO.apply(a)),
+        identityMap);
   }
 
   private void assertStoreContents(IScheduledTask... tasks) {

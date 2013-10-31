@@ -23,6 +23,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -30,6 +31,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -37,6 +39,7 @@ import com.google.common.collect.Multimaps;
 import org.apache.commons.lang.StringUtils;
 
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
@@ -69,9 +72,14 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private final long slowQueryThresholdNanos = SLOW_QUERY_LOG_THRESHOLD.get().as(Time.NANOSECONDS);
 
-  private final Map<String, IScheduledTask> tasks = Maps.newConcurrentMap();
+  private final Map<String, Task> tasks = Maps.newConcurrentMap();
   private final Multimap<IJobKey, String> tasksByJobKey =
       Multimaps.synchronizedSetMultimap(HashMultimap.<IJobKey, String>create());
+
+  // An interner is used here to collapse equivalent TaskConfig instances into canonical instances.
+  // Ideally this would fall out of the object hierarchy (TaskConfig being associated with the job
+  // rather than the task), but we intuit this detail here for performance reasons.
+  private final Interner<TaskConfig, String> configInterner = new Interner<TaskConfig, String>();
 
   private final AtomicLong taskQueriesById = Stats.exportLong("task_queries_by_id");
   private final AtomicLong taskQueriesByJob = Stats.exportLong("task_queries_by_job");
@@ -94,6 +102,13 @@ class MemTaskStore implements TaskStore.Mutable {
     return result;
   }
 
+  private final Function<IScheduledTask, Task> toTask =
+      new Function<IScheduledTask, Task>() {
+        @Override public Task apply(IScheduledTask task) {
+          return new Task(task, configInterner);
+        }
+      };
+
   @Timed("mem_storage_save_tasks")
   @Override
   public void saveTasks(Set<IScheduledTask> newTasks) {
@@ -101,14 +116,15 @@ class MemTaskStore implements TaskStore.Mutable {
     Preconditions.checkState(Tasks.ids(newTasks).size() == newTasks.size(),
         "Proposed new tasks would create task ID collision.");
 
-    tasks.putAll(Maps.uniqueIndex(newTasks, Tasks.SCHEDULED_TO_ID));
-    tasksByJobKey.putAll(taskIdsByJobKey(newTasks));
+    Iterable<Task> canonicalized = Iterables.transform(newTasks, toTask);
+    tasks.putAll(Maps.uniqueIndex(canonicalized, TO_ID));
+    tasksByJobKey.putAll(taskIdsByJobKey(canonicalized));
   }
 
-  private Multimap<IJobKey, String> taskIdsByJobKey(Iterable<IScheduledTask> toIndex) {
+  private Multimap<IJobKey, String> taskIdsByJobKey(Iterable<Task> toIndex) {
     return Multimaps.transformValues(
-        Multimaps.index(toIndex, Tasks.SCHEDULED_TO_JOB_KEY),
-        Tasks.SCHEDULED_TO_ID);
+        Multimaps.index(toIndex, Functions.compose(Tasks.SCHEDULED_TO_JOB_KEY, TO_SCHEDULED)),
+        TO_ID);
   }
 
   @Timed("mem_storage_delete_all_tasks")
@@ -116,6 +132,7 @@ class MemTaskStore implements TaskStore.Mutable {
   public void deleteAllTasks() {
     tasks.clear();
     tasksByJobKey.clear();
+    configInterner.clear();
   }
 
   @Timed("mem_storage_delete_tasks")
@@ -124,9 +141,10 @@ class MemTaskStore implements TaskStore.Mutable {
     checkNotNull(taskIds);
 
     for (String id : taskIds) {
-      IScheduledTask removed = tasks.remove(id);
+      Task removed = tasks.remove(id);
       if (removed != null) {
-        tasksByJobKey.remove(Tasks.SCHEDULED_TO_JOB_KEY.apply(removed), Tasks.id(removed));
+        tasksByJobKey.remove(Tasks.SCHEDULED_TO_JOB_KEY.apply(removed.task), id);
+        configInterner.removeAssociation(removed.task.getAssignedTask().getTask().newBuilder(), id);
       }
     }
   }
@@ -147,7 +165,7 @@ class MemTaskStore implements TaskStore.Mutable {
         Preconditions.checkState(
             Tasks.id(original).equals(Tasks.id(maybeMutated)),
             "A task's ID may not be mutated.");
-        tasks.put(Tasks.id(maybeMutated), maybeMutated);
+        tasks.put(Tasks.id(maybeMutated), toTask.apply(maybeMutated));
         mutated.add(maybeMutated);
       }
     }
@@ -161,13 +179,13 @@ class MemTaskStore implements TaskStore.Mutable {
     MorePreconditions.checkNotBlank(taskId);
     checkNotNull(taskConfiguration);
 
-    IScheduledTask stored = tasks.get(taskId);
+    Task stored = tasks.get(taskId);
     if (stored == null) {
       return false;
     } else {
-      ScheduledTask updated = stored.newBuilder();
+      ScheduledTask updated = stored.task.newBuilder();
       updated.getAssignedTask().setTask(taskConfiguration.newBuilder());
-      tasks.put(taskId, IScheduledTask.build(updated));
+      tasks.put(taskId, toTask.apply(IScheduledTask.build(updated)));
       return true;
     }
   }
@@ -226,10 +244,10 @@ class MemTaskStore implements TaskStore.Mutable {
     };
   }
 
-  private Iterable<IScheduledTask> fromIdIndex(Iterable<String> taskIds) {
-    ImmutableList.Builder<IScheduledTask> matches = ImmutableList.builder();
+  private Iterable<Task> fromIdIndex(Iterable<String> taskIds) {
+    ImmutableList.Builder<Task> matches = ImmutableList.builder();
     for (String id : taskIds) {
-      IScheduledTask match = tasks.get(id);
+      Task match = tasks.get(id);
       if (match != null) {
         matches.add(match);
       }
@@ -239,7 +257,7 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private FluentIterable<IScheduledTask> matches(TaskQuery query) {
     // Apply the query against the working set.
-    Iterable<IScheduledTask> from;
+    Iterable<Task> from;
     Optional<IJobKey> jobKey = JobKeys.from(Query.arbitrary(query));
     if (query.isSetTaskIds()) {
       taskQueriesById.incrementAndGet();
@@ -257,6 +275,30 @@ class MemTaskStore implements TaskStore.Mutable {
       from = tasks.values();
     }
 
-    return FluentIterable.from(from).filter(queryFilter(query));
+    return FluentIterable.from(from).transform(TO_SCHEDULED).filter(queryFilter(query));
+  }
+
+  private static final Function<Task, IScheduledTask> TO_SCHEDULED =
+      new Function<Task, IScheduledTask>() {
+        @Override public IScheduledTask apply(Task task) {
+          return task.task;
+        }
+      };
+
+  private static final Function<Task, String> TO_ID =
+      Functions.compose(Tasks.SCHEDULED_TO_ID, TO_SCHEDULED);
+
+  private static class Task {
+    private final IScheduledTask task;
+
+    Task(IScheduledTask task, Interner<TaskConfig, String> interner) {
+      interner.removeAssociation(task.getAssignedTask().getTask().newBuilder(), Tasks.id(task));
+      TaskConfig canonical = interner.addAssociation(
+          task.getAssignedTask().getTask().newBuilder(),
+          Tasks.id(task));
+      ScheduledTask builder = task.newBuilder();
+      builder.getAssignedTask().setTask(canonical);
+      this.task = IScheduledTask.build(builder);
+    }
   }
 }
