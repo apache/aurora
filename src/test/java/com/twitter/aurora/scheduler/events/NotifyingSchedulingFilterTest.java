@@ -23,7 +23,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.scheduler.configuration.Resources;
+import com.twitter.aurora.scheduler.ResourceSlot;
 import com.twitter.aurora.scheduler.events.PubsubEvent.Vetoed;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
@@ -40,7 +40,7 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
       .setNumCpus(1)
       .setRamMb(1024)
       .setDiskMb(1024));
-  private static final Resources TASK_RESOURCES = Resources.from(TASK);
+  private static final ResourceSlot TASK_RESOURCES = ResourceSlot.from(TASK);
   private static final String TASK_ID = "taskId";
   private static final String SLAVE = "slaveHost";
 

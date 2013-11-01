@@ -37,7 +37,7 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.scheduler.configuration.Resources;
+import com.twitter.aurora.scheduler.ResourceSlot;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.filter.SchedulingFilterImpl;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
@@ -331,10 +331,10 @@ public class PreempterTest extends EasyMockTest {
   public void testProductionPreemptingManyNonProduction() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(storageUtil.storage, maintenance);
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(1024);
+    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
 
     ScheduledTask b1 = makeTask(USER_B, JOB_B, TASK_ID_B + "_b1");
-    b1.getAssignedTask().getTask().setNumCpus(2).setRamMb(512);
+    b1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
 
     setUpHost(HOST_A, RACK_A);
 
@@ -418,7 +418,7 @@ public class PreempterTest extends EasyMockTest {
   public void testMultipleProductionPreemptingManyNonProduction() throws Exception {
     schedulingFilter = new SchedulingFilterImpl(storageUtil.storage, maintenance);
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(2).setRamMb(512);
+    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
 
     ScheduledTask a2 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a2");
     a2.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
@@ -454,7 +454,7 @@ public class PreempterTest extends EasyMockTest {
 
   private IExpectationSetters<Set<Veto>> expectFiltering() {
     return expect(schedulingFilter.filter(
-        EasyMock.<Resources>anyObject(),
+        EasyMock.<ResourceSlot>anyObject(),
         EasyMock.<String>anyObject(),
         EasyMock.<ITaskConfig>anyObject(),
         EasyMock.<String>anyObject())).andAnswer(

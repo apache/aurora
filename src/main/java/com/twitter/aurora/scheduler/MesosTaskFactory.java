@@ -42,7 +42,6 @@ import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
-import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -86,37 +85,6 @@ public interface MesosTaskFactory {
      */
     @VisibleForTesting
     static final String EXECUTOR_NAME = "aurora.task";
-
-    /**
-     * CPU allocated for each executor.  TODO(wickman) Consider lowing this number if sufficient.
-     */
-    @VisibleForTesting
-    static final double CPUS = 0.25;
-
-    /**
-     * RAM required for the executor.  Executors in the wild have been observed using 48-54MB RSS,
-     * setting to 128MB to be extra vigilant initially.
-     */
-    @VisibleForTesting
-    static final Amount<Long, Data> RAM = Amount.of(128L, Data.MB);
-
-    /**
-     * Return the total CPU consumption of this task including the executor.
-     *
-     * @param taskCpus Number of CPUs required for the user task.
-     */
-    public static double getTotalTaskCpus(double taskCpus) {
-      return taskCpus + CPUS;
-    }
-
-    /**
-     * Return the total RAM consumption of this task including the executor.
-     *
-     * @param taskRamMb Memory requirement for the user task, in megabytes.
-     */
-    public static Amount<Long, Data> getTotalTaskRam(long taskRamMb) {
-      return Amount.of(taskRamMb + RAM.as(Data.MB), Data.MB);
-    }
 
     private final String executorPath;
 
@@ -180,9 +148,9 @@ public interface MesosTaskFactory {
           .setExecutorId(getExecutorId(task.getTaskId()))
           .setName(EXECUTOR_NAME)
           .setSource(getInstanceSourceName(config, task.getInstanceId()))
-          .addResources(Resources.makeMesosResource(Resources.CPUS, CPUS))
+          .addResources(Resources.makeMesosResource(Resources.CPUS, ResourceSlot.EXECUTOR_CPUS))
           .addResources(
-              Resources.makeMesosResource(Resources.RAM_MB, RAM.as(Data.MB)))
+              Resources.makeMesosResource(Resources.RAM_MB, ResourceSlot.EXECUTOR_RAM.as(Data.MB)))
           .build();
       return taskBuilder
           .setExecutor(executor)

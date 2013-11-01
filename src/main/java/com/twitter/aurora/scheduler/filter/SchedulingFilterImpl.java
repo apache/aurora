@@ -36,11 +36,10 @@ import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
+import com.twitter.aurora.scheduler.ResourceSlot;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
-import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.Storage;
@@ -153,30 +152,32 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     }
   }
 
-  private Iterable<FilterRule> rulesFromOffer(final Resources available) {
+  private Iterable<FilterRule> rulesFromOffer(final ResourceSlot available) {
     return ImmutableList.<FilterRule>of(
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(ITaskConfig task) {
             return CPU.maybeVeto(
                 available.getNumCpus(),
-                MesosTaskFactoryImpl.getTotalTaskCpus(task.getNumCpus()));
+                ResourceSlot.from(task).getNumCpus());
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(ITaskConfig task) {
             return RAM.maybeVeto(
                 available.getRam().as(Data.MB),
-                MesosTaskFactoryImpl.getTotalTaskRam(task.getRamMb()).as(Data.MB));
+                ResourceSlot.from(task).getRam().as(Data.MB));
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(ITaskConfig task) {
-            return DISK.maybeVeto(available.getDisk().as(Data.MB), task.getDiskMb());
+            return DISK.maybeVeto(available.getDisk().as(Data.MB),
+                ResourceSlot.from(task).getDisk().as(Data.MB));
           }
         },
         new SingleVetoRule() {
           @Override public Optional<Veto> doApply(ITaskConfig task) {
-            return PORTS.maybeVeto(available.getNumPorts(), task.getRequestedPorts().size());
+            return PORTS.maybeVeto(available.getNumPorts(),
+                ResourceSlot.from(task).getNumPorts());
           }
         }
     );
@@ -259,7 +260,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         : NO_VETO;
   }
 
-  private Set<Veto> getResourceVetoes(Resources offer, ITaskConfig task) {
+  private Set<Veto> getResourceVetoes(ResourceSlot offer, ITaskConfig task) {
     ImmutableSet.Builder<Veto> builder = ImmutableSet.builder();
     for (FilterRule rule : rulesFromOffer(offer)) {
       builder.addAll(rule.apply(task));
@@ -279,7 +280,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   }
 
   @Override
-  public Set<Veto> filter(Resources offer, String slaveHost, ITaskConfig task, String taskId) {
+  public Set<Veto> filter(ResourceSlot offer, String slaveHost, ITaskConfig task, String taskId) {
     if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
       return ImmutableSet.of(DEDICATED_HOST_VETO);
     }

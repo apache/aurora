@@ -41,10 +41,9 @@ import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.gen.ValueConstraint;
-import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
+import com.twitter.aurora.scheduler.ResourceSlot;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
-import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.storage.AttributeStore;
@@ -100,10 +99,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final int DEFAULT_CPUS = 4;
   private static final long DEFAULT_RAM = 1000;
   private static final long DEFAULT_DISK = 2000;
-  private static final Resources DEFAULT_OFFER = new Resources(
-      MesosTaskFactoryImpl.getTotalTaskCpus(DEFAULT_CPUS),
-      MesosTaskFactoryImpl.getTotalTaskRam(DEFAULT_RAM),
-      Amount.of(DEFAULT_DISK, Data.MB), 0);
+  private static final ResourceSlot DEFAULT_OFFER = ResourceSlot.from(
+      DEFAULT_CPUS,
+      Amount.of(DEFAULT_RAM, Data.MB),
+      Amount.of(DEFAULT_DISK, Data.MB),
+      0);
 
   private final AtomicLong taskIdCounter = new AtomicLong();
 
@@ -160,10 +160,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     control.replay();
 
-    Resources twoPorts = new Resources(
-        DEFAULT_OFFER.getNumCpus(),
-        DEFAULT_OFFER.getRam(),
-        Amount.of(DEFAULT_DISK, Data.MB), 2);
+    ResourceSlot twoPorts = ResourceSlot.from(
+        DEFAULT_CPUS,
+        Amount.of(DEFAULT_RAM, Data.MB),
+        Amount.of(DEFAULT_DISK, Data.MB),
+        2);
 
     ITaskConfig noPortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .newBuilder()

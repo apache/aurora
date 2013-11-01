@@ -43,10 +43,10 @@ import com.google.common.collect.Sets;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Inject;
 
+import com.twitter.aurora.scheduler.ResourceSlot;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
-import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
 import com.twitter.aurora.scheduler.storage.Storage;
@@ -171,17 +171,17 @@ class Preempter implements Runnable {
     };
   }
 
-  private static final Function<IAssignedTask, Resources> TO_RESOURCES =
-      new Function<IAssignedTask, Resources>() {
-        @Override public Resources apply(IAssignedTask input) {
-          return Resources.from(input.getTask());
+  private static final Function<IAssignedTask, ResourceSlot> TO_RESOURCES =
+      new Function<IAssignedTask, ResourceSlot>() {
+        @Override public ResourceSlot apply(IAssignedTask input) {
+          return ResourceSlot.from(input.getTask());
         }
       };
 
   // TODO(zmanji) Consider using Dominant Resource Fairness for ordering instead of the vector
   // ordering
   private static final Ordering<IAssignedTask> RESOURCE_ORDER =
-      Resources.RESOURCE_ORDER.onResultOf(TO_RESOURCES).reverse();
+      ResourceSlot.ORDER.onResultOf(TO_RESOURCES).reverse();
 
   private Set<IAssignedTask> getTasksToPreempt(
       Iterable<IAssignedTask> possibleVictims,
@@ -202,8 +202,8 @@ class Preempter implements Runnable {
     for (IAssignedTask victim : sortedVictims) {
       toPreemptTasks.add(victim);
 
-      // TODO(zmanji): Factor in the executor resources.
-      Resources totalResource = Resources.sum(Iterables.transform(toPreemptTasks, TO_RESOURCES));
+      ResourceSlot totalResource =
+          ResourceSlot.sum(Iterables.transform(toPreemptTasks, TO_RESOURCES));
 
       Set<SchedulingFilter.Veto> vetos =
           schedulingFilter.filter(totalResource, host, pendingTask.getTask(),

@@ -25,6 +25,7 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskInfo;
 
 import com.twitter.aurora.scheduler.MesosTaskFactory;
+import com.twitter.aurora.scheduler.ResourceSlot;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
@@ -84,7 +85,7 @@ public interface TaskAssigner {
     @Override
     public Optional<TaskInfo> maybeAssign(Offer offer, IScheduledTask task) {
       Set<Veto> vetoes = filter.filter(
-          Resources.from(offer),
+          ResourceSlot.from(offer),
           offer.getHostname(),
           task.getAssignedTask().getTask(),
           Tasks.id(task));
