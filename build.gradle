@@ -130,6 +130,10 @@ sourceSets {
   }
 }
 
+tasks.withType(Test) {
+  maxParallelForks = Runtime.runtime.availableProcessors()
+}
+
 // Configuration parameters for the application plugin.
 applicationName = 'aurora-scheduler'
 mainClassName = 'com.twitter.aurora.scheduler.app.SchedulerMain'
