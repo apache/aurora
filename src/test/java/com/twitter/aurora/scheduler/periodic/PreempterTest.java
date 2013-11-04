@@ -514,6 +514,7 @@ public class PreempterTest extends EasyMockTest {
     task.setStatus(RUNNING);
     addEvent(task, RUNNING);
     task.getAssignedTask().setSlaveHost(host);
+    task.getAssignedTask().setSlaveId(host + "_id");
   }
 
   private Attribute host(String host) {

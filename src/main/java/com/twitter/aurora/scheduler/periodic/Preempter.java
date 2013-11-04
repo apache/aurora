@@ -127,7 +127,7 @@ class Preempter implements Runnable {
    *
    * @param storage Backing store for tasks.
    * @param scheduler Scheduler to fetch task information from, and instruct when preempting tasks.
-   * @param schedulingFilter Filter to identify whether tasks may reside on given host machines.
+   * @param schedulingFilter Filter to identify whether tasks may reside on given slaves.
    * @param preemptionCandidacyDelay Time a task must be PENDING before it may preempt other tasks.
    * @param clock Clock to check current time.
    */
@@ -155,6 +155,13 @@ class Preempter implements Runnable {
   private List<IAssignedTask> fetch(Query.Builder query) {
     return fetch(query, Predicates.<IScheduledTask>alwaysTrue());
   }
+
+  private static final Function<IAssignedTask, String> TASK_TO_SLAVE_ID =
+      new Function<IAssignedTask, String>() {
+        @Override public String apply(IAssignedTask input) {
+          return input.getSlaveId();
+        }
+      };
 
   private static final Function<IAssignedTask, String> TASK_TO_HOST =
       new Function<IAssignedTask, String>() {
@@ -185,8 +192,7 @@ class Preempter implements Runnable {
 
   private Set<IAssignedTask> getTasksToPreempt(
       Iterable<IAssignedTask> possibleVictims,
-      IAssignedTask pendingTask,
-      String host) {
+      IAssignedTask pendingTask) {
 
     FluentIterable<IAssignedTask> preemptableTasks =
         FluentIterable.from(possibleVictims).filter(canPreempt(pendingTask));
@@ -204,10 +210,14 @@ class Preempter implements Runnable {
 
       ResourceSlot totalResource =
           ResourceSlot.sum(Iterables.transform(toPreemptTasks, TO_RESOURCES));
+      Set<String> hosts = FluentIterable.from(toPreemptTasks).transform(TASK_TO_HOST).toSet();
 
-      Set<SchedulingFilter.Veto> vetos =
-          schedulingFilter.filter(totalResource, host, pendingTask.getTask(),
-              pendingTask.getTaskId());
+      Set<SchedulingFilter.Veto> vetos = schedulingFilter.filter(
+          totalResource,
+          Iterables.getOnlyElement(hosts),
+          pendingTask.getTask(),
+          pendingTask.getTaskId());
+
       if (vetos.isEmpty()) {
         return ImmutableSet.copyOf(toPreemptTasks);
       }
@@ -244,9 +254,9 @@ class Preempter implements Runnable {
     // Walk through the preemption candidates in reverse scheduling order.
     Collections.sort(activeTasks, Tasks.SCHEDULING_ORDER.reverse());
 
-    // Group the tasks by host
-    Multimap<String, IAssignedTask> hostsToActiveTasks =
-        Multimaps.index(activeTasks, TASK_TO_HOST);
+    // Group the tasks by slave id so they can be paired with offers from the same slave.
+    Multimap<String, IAssignedTask> slavesToActiveTasks =
+        Multimaps.index(activeTasks, TASK_TO_SLAVE_ID);
 
     // TODO(William Farner): This doesn't fully work, since the preemption is based solely on
     // the resources reserved for the task running, and does not account for slack resource on
@@ -255,15 +265,14 @@ class Preempter implements Runnable {
     // still not be scheduled.  This implies that a preempter would need to be in the resource
     // offer flow, or that we should make accepting of resource offers asynchronous, so that we
     // operate scheduling and preemption in an independent loop.
-    for (Map.Entry<String, Collection<IAssignedTask>> tasksOnHost
-        : hostsToActiveTasks.asMap().entrySet()) {
+    for (Map.Entry<String, Collection<IAssignedTask>> tasksOnSlave
+        : slavesToActiveTasks.asMap().entrySet()) {
 
       // Stores the task causing preemption and the tasks to preempt
       Optional<Pair<IAssignedTask, Set<IAssignedTask>>> preemptionPair = Optional.absent();
 
       for (IAssignedTask pendingTask : pendingTasks) {
-        Set<IAssignedTask> minimalSet =
-            getTasksToPreempt(tasksOnHost.getValue(), pendingTask, tasksOnHost.getKey());
+        Set<IAssignedTask> minimalSet = getTasksToPreempt(tasksOnSlave.getValue(), pendingTask);
 
         if (!minimalSet.isEmpty()) {
           preemptionPair = Optional.of(Pair.of(pendingTask, minimalSet));
