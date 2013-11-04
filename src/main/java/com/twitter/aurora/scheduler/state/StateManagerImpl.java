@@ -150,7 +150,7 @@ public class StateManagerImpl implements StateManager {
           AssignedTask assigned = new AssignedTask()
               .setTaskId(taskIdGenerator.generate(task, entry.getKey()))
               .setInstanceId(entry.getKey())
-              .setTask(task.newBuilder());
+              .setTask(task.newBuilder().setInstanceIdDEPRECATED(entry.getKey()));
           return IScheduledTask.build(new ScheduledTask()
               .setStatus(INIT)
               .setAssignedTask(assigned));

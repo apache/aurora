@@ -24,6 +24,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
+import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
@@ -117,9 +118,36 @@ public final class StorageBackfill {
     }
   }
 
-  private static void populateInstanceId(ScheduledTask task) {
-    task.getAssignedTask().setInstanceId(
-        task.getAssignedTask().getTask().getInstanceIdDEPRECATED());
+  private static final AtomicLong BOTH_FIELDS_SET = Stats.exportLong("both_instance_ids_set");
+  private static final AtomicLong OLD_FIELD_SET = Stats.exportLong("old_instance_id_set");
+  private static final AtomicLong NEW_FIELD_SET = Stats.exportLong("new_instance_id_set");
+  private static final AtomicLong FIELDS_INCONSISTENT =
+      Stats.exportLong("instance_ids_inconsistent");
+
+  /**
+   * Ensures backwards-compatible data is present for both the new and deprecated instance ID
+   * fields.
+   *
+   * @param task Task to possibly modify when ensuring backwards compatibility.
+   */
+  public static void dualWriteInstanceId(AssignedTask task) {
+    boolean oldFieldSet = task.getTask().isSetInstanceIdDEPRECATED();
+    boolean newFieldSet = task.isSetInstanceId();
+    if (oldFieldSet && newFieldSet) {
+      BOTH_FIELDS_SET.incrementAndGet();
+      if (task.getInstanceId() != task.getTask().getInstanceIdDEPRECATED()) {
+        FIELDS_INCONSISTENT.incrementAndGet();
+      }
+    } else if (oldFieldSet) {
+      OLD_FIELD_SET.incrementAndGet();
+      task.setInstanceId(task.getTask().getInstanceIdDEPRECATED());
+    } else if (newFieldSet) {
+      NEW_FIELD_SET.incrementAndGet();
+      task.getTask().setInstanceIdDEPRECATED(task.getInstanceId());
+    } else {
+      throw new IllegalStateException(
+          "Task " + task.getTaskId() + " does not have an instance id.");
+    }
   }
 
   /**
@@ -141,7 +169,7 @@ public final class StorageBackfill {
         // don't.
         guaranteeShardUniqueness(builder, storeProvider.getUnsafeTaskStore(), clock);
         convertToExecutorConfig(builder);
-        populateInstanceId(builder);
+        dualWriteInstanceId(builder.getAssignedTask());
         return IScheduledTask.build(builder);
       }
     });

@@ -194,7 +194,7 @@ public class StateManagerImplTest extends EasyMockTest {
         .setAssignedTask(new AssignedTask()
             .setInstanceId(3)
             .setTaskId(taskId)
-            .setTask(task.newBuilder()));
+            .setTask(task.newBuilder().setInstanceIdDEPRECATED(3)));
     assertEquals(ImmutableSet.of(IScheduledTask.build(expected)),
         Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId)));
   }

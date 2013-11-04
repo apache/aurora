@@ -32,12 +32,16 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ContiguousSet;
+import com.google.common.collect.DiscreteDomain;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
+import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 
 import org.apache.mesos.Protos.SlaveID;
@@ -230,8 +234,19 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertFalse(state.getAssignedTask().isSetSlaveId());
       assertEquals(
           validateAndPopulate(job.getJobConfig()).getTaskConfig(),
-          state.getAssignedTask().getTask());
+          ConfigurationManager.scrubNonUniqueTaskFields(state.getAssignedTask().getTask()));
     }
+    Set<Integer> expectedInstanceIds =
+        ContiguousSet.create(Range.closedOpen(0, numTasks), DiscreteDomain.integers());
+    assertEquals(
+        expectedInstanceIds,
+        FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet());
+    assertEquals(
+        expectedInstanceIds,
+        FluentIterable.from(tasks)
+            .transform(Tasks.SCHEDULED_TO_INFO)
+            .transform(Tasks.INFO_TO_INSTANCE_ID_DEPRECATED)
+            .toSet());
   }
 
   private static Constraint dedicatedConstraint(Set<String> values) {
@@ -293,8 +308,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setTaskLinks(ImmutableMap.<String, String>of());
 
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
             IScheduledTask.build(
               new ScheduledTask()
@@ -303,6 +317,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
                   .setAssignedTask(
                       new AssignedTask()
                           .setTaskId(storedTaskId)
+                          .setInstanceId(0)
                           .setTask(storedTask)))));
       }
     });
