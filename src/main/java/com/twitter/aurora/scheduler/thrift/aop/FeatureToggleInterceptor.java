@@ -17,8 +17,9 @@ package com.twitter.aurora.scheduler.thrift.aop;
 
 import java.lang.reflect.Method;
 
+import javax.inject.Inject;
+
 import com.google.common.base.Predicate;
-import com.google.inject.Inject;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;

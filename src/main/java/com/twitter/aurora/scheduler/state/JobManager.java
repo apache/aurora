@@ -17,7 +17,7 @@ package com.twitter.aurora.scheduler.state;
 
 import java.util.Collections;
 
-import com.google.inject.Inject;
+import javax.inject.Inject;
 
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;

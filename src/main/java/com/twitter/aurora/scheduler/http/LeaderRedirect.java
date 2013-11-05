@@ -19,6 +19,7 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -28,7 +29,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Atomics;
-import com.google.inject.Inject;
 
 import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.net.pool.DynamicHostSet;

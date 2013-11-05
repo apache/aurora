@@ -18,6 +18,8 @@ package com.twitter.aurora.scheduler;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -28,7 +30,6 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.ScheduleStatus;

@@ -68,6 +68,7 @@ dependencies {
   compile "com.sun.jersey:jersey-servlet:${jerseyRev}"
   compile "com.sun.jersey.contribs:jersey-guice:${jerseyRev}"
   compile 'commons-lang:commons-lang:2.5'
+  compile 'javax.inject:javax.inject:1'
   compile 'javax.servlet:servlet-api:2.5'
   compile 'log4j:log4j:1.2.17'
   compile 'org.antlr:stringtemplate:3.2.1'

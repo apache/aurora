@@ -17,12 +17,13 @@ package com.twitter.aurora.scheduler.log.mesos;
 
 import java.io.File;
 
+import javax.inject.Singleton;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
-import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
 import org.apache.mesos.Log;

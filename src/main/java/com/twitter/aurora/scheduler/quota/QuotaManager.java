@@ -17,11 +17,12 @@ package com.twitter.aurora.scheduler.quota;
 
 import java.util.Collection;
 
+import javax.inject.Inject;
+
 import com.google.common.base.Function;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;

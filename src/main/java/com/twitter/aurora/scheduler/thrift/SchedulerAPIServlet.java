@@ -1,6 +1,6 @@
 package com.twitter.aurora.scheduler.thrift;
 
-import com.google.inject.Inject;
+import javax.inject.Inject;
 
 import org.apache.thrift.protocol.TJSONProtocol;
 import org.apache.thrift.server.TServlet;

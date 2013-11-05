@@ -20,11 +20,12 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
 import com.google.inject.BindingAnnotation;
-import com.google.inject.Inject;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
-import com.google.inject.Singleton;
 
 import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
 import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;

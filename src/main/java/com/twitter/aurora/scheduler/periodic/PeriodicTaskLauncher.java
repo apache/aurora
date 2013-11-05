@@ -22,9 +22,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
+
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.BindingAnnotation;
-import com.google.inject.Inject;
 
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;

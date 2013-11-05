@@ -20,6 +20,8 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Set;
 
+import javax.inject.Inject;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -30,7 +32,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.MaintenanceMode;

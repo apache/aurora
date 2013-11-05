@@ -2,7 +2,7 @@ package com.twitter.aurora.scheduler.stats;
 
 import java.util.logging.Logger;
 
-import com.google.inject.Inject;
+import javax.inject.Inject;
 
 import com.twitter.aurora.scheduler.stats.AsyncStatsModule.StatUpdater;
 import com.twitter.aurora.scheduler.stats.ResourceCounter.GlobalMetric;

@@ -17,7 +17,7 @@ package com.twitter.aurora.scheduler.state;
 
 import java.util.logging.Logger;
 
-import com.google.inject.Inject;
+import javax.inject.Inject;
 
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;

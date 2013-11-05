@@ -19,14 +19,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
-import com.google.inject.Inject;
 import com.google.inject.Key;
 import com.google.inject.Provides;
-import com.google.inject.Singleton;
 
 import org.apache.mesos.Scheduler;
 import org.apache.zookeeper.data.ACL;

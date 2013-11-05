@@ -17,6 +17,8 @@ package com.twitter.aurora.scheduler.metadata;
 
 import java.util.Set;
 
+import javax.inject.Inject;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -27,7 +29,6 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.scheduler.base.Tasks;

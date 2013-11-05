@@ -15,8 +15,9 @@
  */
 package com.twitter.aurora.scheduler.cron.noop;
 
+import javax.inject.Singleton;
+
 import com.google.inject.AbstractModule;
-import com.google.inject.Singleton;
 
 import com.twitter.aurora.scheduler.cron.CronPredictor;
 import com.twitter.aurora.scheduler.cron.CronScheduler;

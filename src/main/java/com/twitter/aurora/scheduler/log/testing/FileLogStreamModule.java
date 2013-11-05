@@ -17,9 +17,10 @@ package com.twitter.aurora.scheduler.log.testing;
 
 import java.io.File;
 
+import javax.inject.Singleton;
+
 import com.google.common.base.Preconditions;
 import com.google.inject.PrivateModule;
-import com.google.inject.Singleton;
 
 import com.twitter.aurora.scheduler.log.Log;
 import com.twitter.common.args.Arg;

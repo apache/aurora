@@ -15,8 +15,9 @@
  */
 package com.twitter.aurora.scheduler.quota;
 
+import javax.inject.Singleton;
+
 import com.google.inject.AbstractModule;
-import com.google.inject.Singleton;
 
 import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.aurora.scheduler.state.JobFilter;

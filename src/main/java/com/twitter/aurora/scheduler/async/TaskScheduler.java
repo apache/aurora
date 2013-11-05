@@ -19,11 +19,12 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
-import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskInfo;

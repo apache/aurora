@@ -17,11 +17,12 @@ package com.twitter.aurora.scheduler.stats;
 
 import java.util.Map;
 
+import javax.inject.Inject;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.scheduler.quota.Quotas;

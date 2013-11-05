@@ -23,14 +23,14 @@ import java.net.InetSocketAddress;
 import java.util.logging.Logger;
 
 import javax.annotation.Nonnegative;
+import javax.inject.Inject;
+import javax.inject.Singleton;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
-import com.google.inject.Inject;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
-import com.google.inject.Singleton;
 
 import com.twitter.aurora.auth.CapabilityValidator;
 import com.twitter.aurora.auth.SessionValidator;

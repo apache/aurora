@@ -15,6 +15,7 @@
  */
 package com.twitter.aurora.scheduler.http;
 
+import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -26,7 +27,6 @@ import javax.ws.rs.core.Response.Status;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
-import com.google.inject.Inject;
 
 import org.antlr.stringtemplate.StringTemplate;
 import org.apache.thrift.TBase;

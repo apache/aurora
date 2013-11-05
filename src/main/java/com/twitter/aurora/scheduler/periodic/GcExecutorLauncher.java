@@ -21,10 +21,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
+
 import com.google.common.base.Optional;
 import com.google.common.collect.Maps;
 import com.google.inject.BindingAnnotation;
-import com.google.inject.Inject;
 import com.google.protobuf.ByteString;
 
 import org.apache.mesos.Protos.ExecutorID;

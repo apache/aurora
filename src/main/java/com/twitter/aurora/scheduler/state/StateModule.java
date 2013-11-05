@@ -15,10 +15,11 @@
  */
 package com.twitter.aurora.scheduler.state;
 
+import javax.inject.Singleton;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
-import com.google.inject.Singleton;
 
 import com.twitter.aurora.scheduler.MesosTaskFactory;
 import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;

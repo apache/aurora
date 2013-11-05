@@ -20,8 +20,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
+
 import com.google.common.collect.ImmutableSet;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobUpdateConfiguration;

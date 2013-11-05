@@ -19,8 +19,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.Set;
 
+import javax.inject.Inject;
+
 import com.google.inject.BindingAnnotation;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.scheduler.ResourceSlot;
 import com.twitter.aurora.scheduler.events.PubsubEvent.Vetoed;

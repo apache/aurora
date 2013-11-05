@@ -18,10 +18,11 @@ package com.twitter.aurora.scheduler;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
+
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
-import com.google.inject.Inject;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.OfferID;

@@ -15,9 +15,10 @@
  */
 package com.twitter.aurora.scheduler.storage.mem;
 
+import javax.inject.Singleton;
+
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
-import com.google.inject.Singleton;
 
 import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.JobStore;

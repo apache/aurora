@@ -20,12 +20,11 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
-
-import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.AuroraAdmin.Iface;

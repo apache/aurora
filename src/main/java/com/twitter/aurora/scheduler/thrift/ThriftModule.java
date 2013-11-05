@@ -15,8 +15,9 @@
  */
 package com.twitter.aurora.scheduler.thrift;
 
+import javax.inject.Singleton;
+
 import com.google.inject.AbstractModule;
-import com.google.inject.Singleton;
 
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.scheduler.thrift.aop.AopModule;

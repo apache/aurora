@@ -17,10 +17,11 @@ package com.twitter.aurora.scheduler.storage.log;
 
 import java.lang.annotation.Annotation;
 
+import javax.inject.Singleton;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
-import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
 import com.twitter.aurora.scheduler.log.Log;

@@ -18,8 +18,9 @@ package com.twitter.aurora.scheduler.state;
 import java.util.Set;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
+
 import com.google.common.base.Optional;
-import com.google.inject.Inject;
 
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskInfo;

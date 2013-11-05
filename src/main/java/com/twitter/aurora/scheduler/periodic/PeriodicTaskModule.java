@@ -15,8 +15,9 @@
  */
 package com.twitter.aurora.scheduler.periodic;
 
+import javax.inject.Singleton;
+
 import com.google.inject.AbstractModule;
-import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
 import com.twitter.aurora.scheduler.periodic.PeriodicTaskLauncher.PeriodicTaskInterval;

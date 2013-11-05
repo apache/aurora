@@ -18,11 +18,11 @@ package com.twitter.aurora.scheduler.local;
 import java.util.Collection;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.inject.Provider;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.inject.Inject;
-import com.google.inject.Provider;
 
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Filters;

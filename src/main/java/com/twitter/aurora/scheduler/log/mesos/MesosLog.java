@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
 import javax.inject.Provider;
 
 import com.google.common.base.Preconditions;
@@ -33,7 +34,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.UnmodifiableIterator;
 import com.google.common.primitives.Longs;
 import com.google.inject.BindingAnnotation;
-import com.google.inject.Inject;
 
 import org.apache.mesos.Log;
 

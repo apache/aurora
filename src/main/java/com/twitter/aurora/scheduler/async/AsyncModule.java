@@ -18,11 +18,12 @@ package com.twitter.aurora.scheduler.async;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
+import javax.inject.Singleton;
+
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
-import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;

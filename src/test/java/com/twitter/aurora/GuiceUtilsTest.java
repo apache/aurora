@@ -17,12 +17,13 @@ package com.twitter.aurora;
 
 import java.util.List;
 
+import javax.inject.Singleton;
+
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.CreationException;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.Singleton;
 
 import org.junit.Test;
 

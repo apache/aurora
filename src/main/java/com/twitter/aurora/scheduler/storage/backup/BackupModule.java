@@ -17,11 +17,12 @@ package com.twitter.aurora.scheduler.storage.backup;
 
 import java.io.File;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.inject.Inject;
 import com.google.inject.PrivateModule;
-import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
 import com.twitter.aurora.gen.storage.Snapshot;

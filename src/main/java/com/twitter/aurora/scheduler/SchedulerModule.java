@@ -17,12 +17,13 @@ package com.twitter.aurora.scheduler;
 
 import java.util.List;
 
+import javax.inject.Singleton;
+
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
-import com.google.inject.Singleton;
 import com.google.inject.TypeLiteral;
 
 import org.apache.mesos.Scheduler;

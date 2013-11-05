@@ -26,6 +26,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -35,7 +37,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.BindingAnnotation;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -55,7 +56,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static com.twitter.aurora.scheduler.base.Tasks.LATEST_ACTIVITY;
-
 import static com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import static com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import static com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;

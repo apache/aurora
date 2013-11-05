@@ -17,8 +17,9 @@ package com.twitter.aurora.scheduler;
 
 import java.util.UUID;
 
+import javax.inject.Inject;
+
 import com.google.common.base.Preconditions;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.util.Clock;

@@ -20,9 +20,10 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import javax.inject.Inject;
+
 import com.google.inject.Binder;
 import com.google.inject.BindingAnnotation;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;

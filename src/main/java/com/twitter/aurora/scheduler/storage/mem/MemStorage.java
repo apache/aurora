@@ -17,8 +17,9 @@ package com.twitter.aurora.scheduler.storage.mem;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.inject.Inject;
+
 import com.google.common.annotations.VisibleForTesting;
-import com.google.inject.Inject;
 
 import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.JobStore;

@@ -17,10 +17,11 @@ package com.twitter.aurora.scheduler.stats;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.inject.Inject;
+
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.inject.Inject;
 
 import com.twitter.common.stats.StatsProvider;
 
