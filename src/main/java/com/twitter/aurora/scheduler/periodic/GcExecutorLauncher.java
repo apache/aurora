@@ -23,6 +23,7 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.Maps;
 import com.google.inject.BindingAnnotation;
@@ -72,10 +73,17 @@ public class GcExecutorLauncher implements TaskLauncher {
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   public @interface GcExecutor { }
 
-  private static final Resources GC_EXECUTOR_RESOURCES =
-      new Resources(0.19, Amount.of(127L, Data.MB), Amount.of(15L, Data.MB), 0);
-  private static final Resources ALMOST_EMPTY_TASK_RESOURCES =
+  @VisibleForTesting
+  static final Resources TOTAL_GC_EXECUTOR_RESOURCES =
+      new Resources(0.2, Amount.of(128L, Data.MB), Amount.of(16L, Data.MB), 0);
+
+  // An epsilon is used because we are required to supply executor and task resources.
+  @VisibleForTesting
+  static final Resources EPSILON =
       new Resources(0.01, Amount.of(1L, Data.MB), Amount.of(1L, Data.MB), 0);
+
+  private static final Resources GC_EXECUTOR_RESOURCES =
+      Resources.subtract(TOTAL_GC_EXECUTOR_RESOURCES, EPSILON);
 
   private static final String SYSTEM_TASK_PREFIX = "system-gc-";
   private static final String EXECUTOR_NAME = "aurora.gc";
@@ -97,7 +105,9 @@ public class GcExecutorLauncher implements TaskLauncher {
 
   @Override
   public Optional<TaskInfo> createTask(Offer offer) {
-    if (!gcExecutorPath.isPresent() || pulseMonitor.isAlive(offer.getHostname())) {
+    if (!gcExecutorPath.isPresent()
+        || !Resources.from(offer).greaterThanOrEqual(TOTAL_GC_EXECUTOR_RESOURCES)
+        || pulseMonitor.isAlive(offer.getHostname())) {
       return Optional.absent();
     }
 
@@ -127,7 +137,7 @@ public class GcExecutorLauncher implements TaskLauncher {
         .setSlaveId(offer.getSlaveId())
         .setData(ByteString.copyFrom(data))
         .setExecutor(executor)
-        .addAllResources(ALMOST_EMPTY_TASK_RESOURCES.toResourceList())
+        .addAllResources(EPSILON.toResourceList())
         .build());
   }
 

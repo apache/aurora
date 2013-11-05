@@ -26,6 +26,7 @@ import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
+import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.junit.Before;
@@ -42,6 +43,7 @@ import com.twitter.aurora.gen.comm.AdjustRetainedTasks;
 import com.twitter.aurora.scheduler.PulseMonitor;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
+import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -58,11 +60,12 @@ public class GcExecutorLauncherTest extends EasyMockTest {
   private static final String HOST = "slave-host";
 
   private static final Offer OFFER = Offer.newBuilder()
-        .setSlaveId(SlaveID.newBuilder().setValue("slave-id"))
-        .setHostname(HOST)
-        .setFrameworkId(FrameworkID.newBuilder().setValue("framework-id").build())
-        .setId(OfferID.newBuilder().setValue("offer-id"))
-        .build();
+      .setSlaveId(SlaveID.newBuilder().setValue("slave-id"))
+      .setHostname(HOST)
+      .setFrameworkId(FrameworkID.newBuilder().setValue("framework-id").build())
+      .setId(OfferID.newBuilder().setValue("offer-id"))
+      .addAllResources(GcExecutorLauncher.TOTAL_GC_EXECUTOR_RESOURCES.toResourceList())
+      .build();
 
   private static final String JOB_A = "jobA";
 
@@ -121,6 +124,21 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
     // Same executor should be re-used for both tasks
     assertEquals(executor1, taskInfo.get().getExecutor());
+  }
+
+  @Test
+  public void testNoAcceptingSmallOffers() {
+    control.replay();
+
+    Iterable<Resource> resources =
+        Resources.subtract(
+            GcExecutorLauncher.TOTAL_GC_EXECUTOR_RESOURCES,
+            GcExecutorLauncher.EPSILON).toResourceList();
+    Offer smallOffer = OFFER.toBuilder()
+        .clearResources()
+        .addAllResources(resources)
+        .build();
+    assertFalse(gcExecutorLauncher.createTask(smallOffer).isPresent());
   }
 
   private static void assertRetainedTasks(TaskInfo taskInfo, IScheduledTask... tasks)

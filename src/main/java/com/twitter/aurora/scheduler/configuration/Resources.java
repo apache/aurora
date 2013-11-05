@@ -50,6 +50,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A container for multiple resource vectors.
+ * TODO(wfarner): Collapse this in with Quotas.
  */
 public class Resources {
 
@@ -201,6 +202,17 @@ public class Resources {
 
   private static Resources none() {
     return NO_RESOURCES;
+  }
+
+  /**
+   * a - b
+   */
+  public static Resources subtract(Resources a, Resources b) {
+    return new Resources(
+        a.getNumCpus() - b.getNumCpus(),
+        Amount.of(a.getRam().as(Data.MB) - b.getRam().as(Data.MB), Data.MB),
+        Amount.of(a.getDisk().as(Data.MB) - b.getDisk().as(Data.MB), Data.MB),
+        a.getNumPorts() - b.getNumPorts());
   }
 
   /**
