@@ -432,8 +432,15 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
         self.clean_orphans(self._driver)
       self._stop_event.wait(self.POLL_WAIT.as_(Time.SECONDS))
 
-    # shutdown called
+    # shutdown
     if self._driver is not None:
+      try:
+        prev_task_id, _ = self._gc_task_queue.popitem(0)
+      except KeyError: # no enqueued GC tasks
+        pass
+      else:
+        self.send_update(self._driver, prev_task_id, 'FINISHED',
+                         'Garbage collection skipped - GC executor shutting down')
       self._driver.stop()
 
   """ Mesos Executor API methods follow """

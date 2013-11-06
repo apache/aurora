@@ -467,6 +467,25 @@ def test_gc_shutdown():
   assert len(proxy_driver.updates) == 0
 
 
+def test_gc_shutdown_queued():
+  TASK2_ID = "task2"
+  proxy_driver = ProxyDriver()
+  with temporary_dir() as td:
+    executor = build_blocking_gc_executor(td, proxy_driver)
+    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks()))
+    thread_yield()
+    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK2_ID))
+    thread_yield()
+    assert len(executor._gc_task_queue) == 1
+    executor.shutdown(proxy_driver)
+    executor._stop_event.wait(timeout=1.0)
+    assert executor._stop_event.is_set()
+  assert proxy_driver.stopped.is_set()
+  assert len(proxy_driver.updates) == 1
+  assert proxy_driver.updates[-1][0] == mesos.TASK_FINISHED
+  assert proxy_driver.updates[-1][1] == TASK2_ID
+
+
 def make_gc_executor_with_timeouts(
     maximum_executor_wait=Amount(15, Time.MINUTES),
     maximum_executor_lifetime=Amount(1, Time.DAYS)):
