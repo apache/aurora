@@ -138,3 +138,11 @@ tasks.withType(Test) {
 // Configuration parameters for the application plugin.
 applicationName = 'aurora-scheduler'
 mainClassName = 'com.twitter.aurora.scheduler.app.SchedulerMain'
+
+// Simplify direct running of the scheduler, pass command line args.
+// This can be used by passing -PrunArgs="-arg1=val -arg2=val"
+run {
+  if (project.hasProperty("runArgs")) {
+    args runArgs.split('\\s+')
+  }
+}
