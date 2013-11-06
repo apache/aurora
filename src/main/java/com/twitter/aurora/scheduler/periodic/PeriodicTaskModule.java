@@ -41,7 +41,7 @@ public class PeriodicTaskModule extends AbstractModule {
   @CmdLine(name = "preemption_delay",
       help = "Time interval after which a pending task becomes eligible to preempt other tasks")
   private static final Arg<Amount<Long, Time>> PREEMPTION_DELAY =
-      Arg.create(Amount.of(2L, Time.MINUTES));
+      Arg.create(Amount.of(10L, Time.MINUTES));
 
   @Override
   protected void configure() {
