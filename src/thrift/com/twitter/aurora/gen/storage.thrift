@@ -92,10 +92,15 @@ union Op {
   13: RemoveLock removeLock
 }
 
+// The current schema version ID.  This should be incremented each time the
+// schema is changed, and support code for schema migrations should be added.
+const i32 CURRENT_SCHEMA_VERSION = 1
+
 // Represents a series of local storage mutations that should be applied in a single atomic
 // transaction.
 struct Transaction {
   1: list<Op> ops
+  2: i32 schemaVersion
 }
 
 struct StoredJob {
