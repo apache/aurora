@@ -34,6 +34,7 @@ import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
@@ -125,6 +126,11 @@ class FakeDriverFactory implements DriverFactory {
 
     @Override public Status sendFrameworkMessage(ExecutorID executorID, SlaveID slaveID,
         byte[] bytes) {
+      return null;
+    }
+
+    @Override
+    public Status reconcileTasks(Collection<TaskStatus> statuses) {
       return null;
     }
   }
