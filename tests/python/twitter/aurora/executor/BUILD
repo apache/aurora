@@ -71,6 +71,7 @@ python_tests(name = 'thermos_executor',
 python_tests(name = 'executor_vars',
   sources = ['test_executor_vars.py'],
   dependencies = [
+    pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/aurora/executor:executor_vars'),
   ]
 )

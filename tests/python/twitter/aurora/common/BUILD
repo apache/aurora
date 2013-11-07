@@ -30,6 +30,7 @@ python_tests(
   dependencies = [
     pants('3rdparty/python:pyyaml'),
     pants('src/python/twitter/aurora/common:clusters'),
+    pants('src/python/twitter/common/contextutil'),
   ]
 )
 

@@ -36,8 +36,9 @@ python_library(
   name = 'process',
   sources = ['process.py'],
   dependencies = [
-    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/contextutil'),
     pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/recordio:recordio-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]

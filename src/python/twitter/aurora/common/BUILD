@@ -33,6 +33,7 @@ python_library(
   dependencies = [
     pants(':cluster'),
     pants('3rdparty/python:pystachio'),
+    pants('src/python/twitter/common/collections'),
   ]
 )
 

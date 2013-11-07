@@ -35,6 +35,7 @@ python_library(
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/quantity'),
     python_requirement('watchdog'),
   ]
 )

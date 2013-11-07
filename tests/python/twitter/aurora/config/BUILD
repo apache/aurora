@@ -12,6 +12,7 @@ python_tests(name = 'test_base',
   sources = ['test_base.py'],
   dependencies = [
     pants('src/python/twitter/aurora/config'),
+    pants('src/python/twitter/common/contextutil'),
   ]
 )
 

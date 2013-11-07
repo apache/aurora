@@ -14,8 +14,8 @@ import time
 from tempfile import NamedTemporaryFile
 
 from twitter.common import app, log
-from twitter.common.python.pex import PexInfo
 from twitter.common.python.dirwrapper import PythonDirectoryWrapper
+from twitter.common.python.pex import PexInfo
 
 from twitter.aurora.client.base import (
     check_and_log_response,

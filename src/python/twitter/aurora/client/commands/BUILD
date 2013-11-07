@@ -23,6 +23,7 @@ python_library(
     pants('src/python/twitter/aurora/common'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/python'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
