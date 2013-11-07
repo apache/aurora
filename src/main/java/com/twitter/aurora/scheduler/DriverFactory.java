@@ -23,8 +23,10 @@ import javax.inject.Provider;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
 
 import org.apache.mesos.MesosSchedulerDriver;
+import org.apache.mesos.Protos.Credential;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.FrameworkInfo;
 import org.apache.mesos.Scheduler;
@@ -46,8 +48,17 @@ public interface DriverFactory extends Function<String, SchedulerDriver> {
 
     @NotNull
     @CmdLine(name = "mesos_master_address",
-            help = "Address for the mesos master, can be a socket address or zookeeper path.")
+        help = "Address for the mesos master, can be a socket address or zookeeper path.")
     private static final Arg<String> MESOS_MASTER_ADDRESS = Arg.create();
+
+    @CmdLine(name = "framework_authentication_principal",
+        help = "Principal used to authenticate to the Mesos master.")
+    private static final Arg<String> FRAMEWORK_AUTHENTICATION_PRINCIPAL = Arg.create();
+
+    // TODO(Kevin Sweeney): Read a file here to avoid leaking secrets on the command-line.
+    @CmdLine(name = "framework_authentication_secret",
+        help = "Secret used to authenticate to the Mesos master.")
+    private static final Arg<String> FRAMEWORK_AUTHENTICATION_SECRET = Arg.create();
 
     @CmdLine(name = "framework_failover_timeout",
         help = "Time after which a framework is considered deleted.  SHOULD BE VERY HIGH.")
@@ -110,8 +121,29 @@ public interface DriverFactory extends Function<String, SchedulerDriver> {
         LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
       }
 
-      return new MesosSchedulerDriver(scheduler.get(), frameworkInfo.build(),
-          MESOS_MASTER_ADDRESS.get());
+      if (FRAMEWORK_AUTHENTICATION_PRINCIPAL.hasAppliedValue()
+          && FRAMEWORK_AUTHENTICATION_SECRET.hasAppliedValue()) {
+
+        LOG.info(String.format("Connecting to master using authentication (principal: %s).",
+            FRAMEWORK_AUTHENTICATION_PRINCIPAL.get()));
+
+        Credential credential = Credential.newBuilder()
+            .setPrincipal(FRAMEWORK_AUTHENTICATION_PRINCIPAL.get())
+            .setSecret(ByteString.copyFromUtf8(FRAMEWORK_AUTHENTICATION_SECRET.get()))
+            .build();
+
+        return new MesosSchedulerDriver(
+            scheduler.get(),
+            frameworkInfo.build(),
+            MESOS_MASTER_ADDRESS.get(),
+            credential);
+      } else {
+        LOG.warning("Connecting to master without authentication!");
+        return new MesosSchedulerDriver(
+            scheduler.get(),
+            frameworkInfo.build(),
+            MESOS_MASTER_ADDRESS.get());
+      }
     }
   }
 }
