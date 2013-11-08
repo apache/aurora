@@ -17,11 +17,9 @@ package com.twitter.aurora.scheduler.periodic;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -45,6 +43,7 @@ import com.google.common.collect.Sets;
 import com.google.inject.BindingAnnotation;
 
 import com.twitter.aurora.scheduler.ResourceSlot;
+import com.twitter.aurora.scheduler.async.OfferQueue;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -64,6 +63,8 @@ import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import org.apache.mesos.Protos.Offer;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -117,8 +118,12 @@ class Preempter implements Runnable {
   // Incremented every time we fail to find tasks to preempt for a pending task.
   private final AtomicLong noSlotsFound = Stats.exportLong("preemptor_no_slots_found");
 
+  // TODO(zmanji): Move this code to the regular scheduling flow. Now that the preemptor has access
+  // to the offer queue and considers slack on machines when preempting, it is useful enough to be
+  // invoked by TaskGroups directly.
   private Storage storage;
   private final SchedulerCore scheduler;
+  private final OfferQueue offerQueue;
   private final SchedulingFilter schedulingFilter;
   private final Amount<Long, Time> preemptionCandidacyDelay;
   private final Clock clock;
@@ -128,6 +133,7 @@ class Preempter implements Runnable {
    *
    * @param storage Backing store for tasks.
    * @param scheduler Scheduler to fetch task information from, and instruct when preempting tasks.
+   * @param offerQueue Queue that contains available Mesos resource offers.
    * @param schedulingFilter Filter to identify whether tasks may reside on given slaves.
    * @param preemptionCandidacyDelay Time a task must be PENDING before it may preempt other tasks.
    * @param clock Clock to check current time.
@@ -136,12 +142,14 @@ class Preempter implements Runnable {
   Preempter(
       Storage storage,
       SchedulerCore scheduler,
+      OfferQueue offerQueue,
       SchedulingFilter schedulingFilter,
       @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
       Clock clock) {
 
     this.storage = checkNotNull(storage);
     this.scheduler = checkNotNull(scheduler);
+    this.offerQueue = checkNotNull(offerQueue);
     this.schedulingFilter = checkNotNull(schedulingFilter);
     this.preemptionCandidacyDelay = checkNotNull(preemptionCandidacyDelay);
     this.clock = checkNotNull(clock);
@@ -179,27 +187,70 @@ class Preempter implements Runnable {
     };
   }
 
-  private static final Function<IAssignedTask, ResourceSlot> TO_RESOURCES =
+  private static final Function<IAssignedTask, ResourceSlot> TASK_TO_RESOURCES =
       new Function<IAssignedTask, ResourceSlot>() {
         @Override public ResourceSlot apply(IAssignedTask input) {
           return ResourceSlot.from(input.getTask());
         }
       };
 
+  private static final Function<Offer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
+      new Function<Offer, ResourceSlot>() {
+        @Override public ResourceSlot apply(Offer offer) {
+          return ResourceSlot.from(offer);
+        }
+      };
+
+  private static final Function<Offer, String> OFFER_TO_HOST =
+      new Function<Offer, String>() {
+        @Override public String apply(Offer offer) {
+          return offer.getHostname();
+        }
+      };
+
   // TODO(zmanji) Consider using Dominant Resource Fairness for ordering instead of the vector
   // ordering
   private static final Ordering<IAssignedTask> RESOURCE_ORDER =
-      ResourceSlot.ORDER.onResultOf(TO_RESOURCES).reverse();
+      ResourceSlot.ORDER.onResultOf(TASK_TO_RESOURCES).reverse();
 
-  private Set<IAssignedTask> getTasksToPreempt(
+  /**
+   * Optional.absent indicates that this slave does not have enough resources to satisfy the task.
+   * The empty set indicates the offers (slack) are enough.
+   * A set with elements indicates those tasks and the offers are enough.
+   */
+  private Optional<Set<IAssignedTask>> getTasksToPreempt(
       Iterable<IAssignedTask> possibleVictims,
+      Iterable<Offer> offers,
       IAssignedTask pendingTask) {
+
+    // This enforces the precondition that all of the resources are from the same host. We need to
+    // get the host for the schedulingFilter.
+    Set<String> hosts = ImmutableSet.<String>builder()
+        .addAll(Iterables.transform(possibleVictims, TASK_TO_HOST))
+        .addAll(Iterables.transform(offers, OFFER_TO_HOST)).build();
+
+    String host = Iterables.getOnlyElement(hosts);
+
+    ResourceSlot slackResources =
+        ResourceSlot.sum(Iterables.transform(offers, OFFER_TO_RESOURCE_SLOT));
+
+    if (!Iterables.isEmpty(offers)) {
+      Set<SchedulingFilter.Veto> p = schedulingFilter.filter(
+          slackResources,
+          host,
+          pendingTask.getTask(),
+          pendingTask.getTaskId());
+
+      if (p.isEmpty()) {
+        return Optional.<Set<IAssignedTask>>of(ImmutableSet.<IAssignedTask>of());
+      }
+    }
 
     FluentIterable<IAssignedTask> preemptableTasks =
         FluentIterable.from(possibleVictims).filter(canPreempt(pendingTask));
 
     if (preemptableTasks.isEmpty()) {
-      return ImmutableSet.of();
+      return Optional.absent();
     }
 
     List<IAssignedTask> toPreemptTasks = Lists.newArrayList();
@@ -209,22 +260,29 @@ class Preempter implements Runnable {
     for (IAssignedTask victim : sortedVictims) {
       toPreemptTasks.add(victim);
 
-      ResourceSlot totalResource =
-          ResourceSlot.sum(Iterables.transform(toPreemptTasks, TO_RESOURCES));
-      Set<String> hosts = FluentIterable.from(toPreemptTasks).transform(TASK_TO_HOST).toSet();
+      ResourceSlot totalResource = ResourceSlot.sum(
+          ResourceSlot.sum(Iterables.transform(toPreemptTasks, TASK_TO_RESOURCES)),
+          slackResources);
 
       Set<SchedulingFilter.Veto> vetos = schedulingFilter.filter(
           totalResource,
-          Iterables.getOnlyElement(hosts),
+          host,
           pendingTask.getTask(),
           pendingTask.getTaskId());
 
       if (vetos.isEmpty()) {
-        return ImmutableSet.copyOf(toPreemptTasks);
+        return Optional.<Set<IAssignedTask>>of(ImmutableSet.copyOf(toPreemptTasks));
       }
     }
-    return ImmutableSet.of();
+    return Optional.absent();
   }
+
+  private static final Function<Offer, String> OFFER_TO_SLAVE_ID =
+      new Function<Offer, String>() {
+        @Override public String apply(Offer offer) {
+          return offer.getSlaveId().getValue();
+        }
+      };
 
   @Override
   public void run() {
@@ -259,24 +317,26 @@ class Preempter implements Runnable {
     Multimap<String, IAssignedTask> slavesToActiveTasks =
         Multimaps.index(activeTasks, TASK_TO_SLAVE_ID);
 
-    // TODO(William Farner): This doesn't fully work, since the preemption is based solely on
-    // the resources reserved for the task running, and does not account for slack resource on
-    // the machine.  For example, a machine has 1 CPU available, and is running a low priority
-    // task reserving 1 CPU.  If we have a pending high priority task requiring 2 CPUs, it will
-    // still not be scheduled.  This implies that a preempter would need to be in the resource
-    // offer flow, or that we should make accepting of resource offers asynchronous, so that we
-    // operate scheduling and preemption in an independent loop.
-    for (Map.Entry<String, Collection<IAssignedTask>> tasksOnSlave
-        : slavesToActiveTasks.asMap().entrySet()) {
+    // Group the offers by slave id so they can be paired with active tasks from the same slave.
+    Multimap<String, Offer> slavesToOffers =
+        Multimaps.index(offerQueue.getOffers(), OFFER_TO_SLAVE_ID);
 
+    // We only want to consider slaves that have active tasks. Tasks that only have offers will
+    // not result in any preemption.
+    Set<String> allSlaves = slavesToActiveTasks.keySet();
+
+    for (String slaveID : allSlaves) {
       // Stores the task causing preemption and the tasks to preempt
       Optional<Pair<IAssignedTask, Set<IAssignedTask>>> preemptionPair = Optional.absent();
 
       for (IAssignedTask pendingTask : pendingTasks) {
-        Set<IAssignedTask> minimalSet = getTasksToPreempt(tasksOnSlave.getValue(), pendingTask);
+        Optional<Set<IAssignedTask>> minimalSet = getTasksToPreempt(
+            slavesToActiveTasks.get(slaveID),
+            slavesToOffers.get(slaveID),
+            pendingTask);
 
-        if (!minimalSet.isEmpty()) {
-          preemptionPair = Optional.of(Pair.of(pendingTask, minimalSet));
+        if (minimalSet.isPresent()) {
+          preemptionPair = Optional.of(Pair.of(pendingTask, minimalSet.get()));
           break;
         }
       }

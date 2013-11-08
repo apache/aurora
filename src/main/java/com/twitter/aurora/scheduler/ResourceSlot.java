@@ -15,6 +15,8 @@
  */
 package com.twitter.aurora.scheduler;
 
+import java.util.Arrays;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
@@ -88,6 +90,10 @@ public final class ResourceSlot {
     Amount<Long, Data> totalRAM = Amount.of(ram.as(Data.MB) + EXECUTOR_RAM.as(Data.MB), Data.MB);
 
     return new ResourceSlot(new Resources(totalCPU, totalRAM, disk, ports));
+  }
+
+  public static ResourceSlot sum(ResourceSlot... rs) {
+    return sum(Arrays.asList(rs));
   }
 
   public static ResourceSlot sum(Iterable<ResourceSlot> rs) {
