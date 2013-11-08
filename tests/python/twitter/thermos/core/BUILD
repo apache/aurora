@@ -98,6 +98,7 @@ python_tests(name = 'test_staged_kill',
   sources = ['test_staged_kill.py'],
   dependencies = [
      pants(':runner_baselibs'),
+     pants('src/python/twitter/common/process'),
      pants('src/python/twitter/thermos/monitoring:monitor'),
   ]
 )

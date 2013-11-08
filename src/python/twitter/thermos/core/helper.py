@@ -5,8 +5,7 @@ import signal
 import time
 
 from twitter.common import log
-from twitter.common.dirutil import safe_mkdir, lock_file
-from twitter.common.process import ProcessProviderFactory
+from twitter.common.dirutil import lock_file, safe_mkdir
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordWriter
 from twitter.thermos.common.ckpt import CheckpointDispatcher
@@ -26,6 +25,7 @@ class TaskKiller(object):
   """
     Task killing interface.
   """
+
   def __init__(self, task_id, checkpoint_root):
     self._task_id = task_id
     self._checkpoint_root = checkpoint_root
@@ -39,17 +39,17 @@ class TaskKiller(object):
                           terminal_status=TaskState.LOST)
 
 
-# TaskRunnerHelper is sort of a mishmash of "checkpoint-only" operations and
-# the "Process Platform" stuff that started to get pulled into process.py
-#
-# This really needs some hard design thought to see if it can be extracted out
-# even further.
-
 class TaskRunnerHelper(object):
   """
     TaskRunner helper methods that can be operated directly upon checkpoint
     state.  These operations do not require knowledge of the underlying
     task.
+
+    TaskRunnerHelper is sort of a mishmash of "checkpoint-only" operations and
+    the "Process Platform" stuff that started to get pulled into process.py
+
+    This really needs some hard design thought to see if it can be extracted out
+    even further.
   """
   class Error(Exception): pass
   class PermissionError(Error): pass

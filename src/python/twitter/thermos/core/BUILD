@@ -5,7 +5,6 @@ python_library(
     pants('src/python/twitter/thermos:psutil'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/process'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/common/recordio:recordio-thrift'),
     pants('src/python/twitter/thermos/common:ckpt'),
