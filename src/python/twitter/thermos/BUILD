@@ -1,23 +1,15 @@
-python_binary(
-  name = 'thermos',
-  source = 'bin/thermos.py',
-  dependencies = [
-    pants(':thermos-lib'),
-  ],
-)
+page(name = 'readme', source = 'README.md')
 
 python_library(
-  name = 'thermos-lib',
+  name = 'thermos',
   dependencies = [
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/thermos/base'),
-    pants('src/python/twitter/thermos/config:schema'),
-    pants('src/python/twitter/thermos/monitoring'),
-    pants('src/python/twitter/thermos/runner'),
-    pants('src/thrift/com/twitter/thermos:py-thrift')
+    pants('src/python/twitter/thermos/core'),
   ],
+  provides = setup_py(
+    name = 'twitter.thermos',
+    version = '0.1.0',
+    descripton = 'The Twitter Thermos runtime.',
+  ).with_binaries(
+    thermos = pants('src/python/twitter/thermos/bin:thermos'),
+  )
 )
-
-
-page(name = 'readme', source = 'README.md')

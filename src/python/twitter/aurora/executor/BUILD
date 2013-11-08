@@ -6,8 +6,8 @@ python_library(
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/http'),
-    pants('src/python/twitter/thermos/base'),
-    pants('src/python/twitter/thermos/runner'),
+    pants('src/python/twitter/thermos/common'),
+    pants('src/python/twitter/thermos/core'),
     pants('src/python/twitter/thermos/monitoring:monitor'),
     pants('src/python/twitter/thermos/config:schema'),
   ]
@@ -107,9 +107,9 @@ python_binary(
     pants('src/python/twitter/common/app/modules:exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
-    pants('src/python/twitter/thermos/base:planner'),
+    pants('src/python/twitter/thermos/common:planner'),
     pants('src/python/twitter/thermos/config:schema'),
-    pants('src/python/twitter/thermos/runner'),
+    pants('src/python/twitter/thermos/core'),
   ],
 )
 
@@ -129,12 +129,12 @@ python_library(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/thermos/base:ckpt'),
-    pants('src/python/twitter/thermos/base:path'),
+    pants('src/python/twitter/thermos/common:ckpt'),
+    pants('src/python/twitter/thermos/common:path'),
     pants('src/python/twitter/thermos/monitoring:detector'),
     pants('src/python/twitter/thermos/monitoring:garbage'),
-    pants('src/python/twitter/thermos/runner:helper'),
-    pants('src/python/twitter/thermos/runner:inspector'),
+    pants('src/python/twitter/thermos/core:helper'),
+    pants('src/python/twitter/thermos/core:inspector'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

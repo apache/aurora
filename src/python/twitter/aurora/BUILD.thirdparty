@@ -1,0 +1,20 @@
+python_library(
+  name = 'mesos-core',
+  dependencies = [
+    python_requirement('mesos==0.15.0-rc3'),
+  ],
+)
+
+python_library(
+  name = 'thermos-core',
+  dependencies = [
+    python_requirement('twitter.thermos.core==0.1.0'),
+  ]
+)
+
+python_library(
+  name = 'thermos-observer',
+  dependencies = [
+    python_requirement('twitter.thermos.observer==0.1.0'),
+  ]
+)

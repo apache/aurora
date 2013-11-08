@@ -1,6 +1,6 @@
 import os
 
-from twitter.thermos.base.path import TaskPath
+from twitter.thermos.common.path import TaskPath
 
 
 def test_legacy_task_roots():

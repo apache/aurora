@@ -15,12 +15,14 @@ import threading
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
-from twitter.thermos.base.ckpt import CheckpointDispatcher
+from twitter.thermos.common.ckpt import CheckpointDispatcher
+
 from gen.twitter.thermos.ttypes import (
   ProcessState,
   RunnerCkpt,
   RunnerState,
-  TaskState)
+  TaskState,
+)
 
 
 class TaskMonitor(object):

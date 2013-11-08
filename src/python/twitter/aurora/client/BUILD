@@ -48,6 +48,6 @@ python_library(
   sources = ['options.py'],
   dependencies = [
     pants('src/python/twitter/aurora/common:aurora_job_key'),
-    pants('src/python/twitter/thermos/base:options'),
+    pants('src/python/twitter/thermos/common:options'),
   ]
 )

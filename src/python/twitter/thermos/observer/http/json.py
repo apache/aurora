@@ -1,5 +1,7 @@
 import urllib
+
 from twitter.common.http import HttpServer
+
 
 class TaskObserverJSONBindings(object):
   """

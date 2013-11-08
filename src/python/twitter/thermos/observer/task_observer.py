@@ -5,161 +5,25 @@ finished Thermos tasks on a system. The primary entry point is the TaskObserver,
 polls a designated Thermos checkpoint root and collates information about all tasks it discovers.
 
 """
-import os
-import errno
-import time
-import json
-import urllib
-import threading
-from abc import abstractmethod, abstractproperty
-from collections import defaultdict
 from operator import attrgetter
+import os
+import threading
+import time
 
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
-from twitter.common.lang import AbstractClass, Lockable
+from twitter.common.lang import Lockable
 from twitter.common.quantity import Amount, Time
-from twitter.common.recordio import ThriftRecordReader
 
+from twitter.thermos.common.path import TaskPath
 from twitter.thermos.monitoring.detector import TaskDetector
 from twitter.thermos.monitoring.monitor import TaskMonitor
 from twitter.thermos.monitoring.process import ProcessSample
 from twitter.thermos.monitoring.resource import ResourceMonitorBase, TaskResourceMonitor
 
-from twitter.thermos.base.path import TaskPath
-from twitter.thermos.base.ckpt import CheckpointDispatcher
+from gen.twitter.thermos.ttypes import ProcessState, TaskState
 
-from pystachio import Environment
-from twitter.thermos.config.schema import ThermosContext
-from twitter.thermos.config.loader import (
-  ThermosTaskWrapper,
-  ThermosProcessWrapper)
-
-from gen.twitter.thermos.ttypes import *
-
-
-def safe_mtime(path):
-  try:
-    return os.path.getmtime(path)
-  except OSError:
-    return None
-
-
-class ObservedTask(AbstractClass):
-  """ Represents a Task being observed """
-  def __init__(self, task_id, pathspec):
-    self._task_id = task_id
-    self._pathspec = pathspec
-    self._mtime = self._get_mtime()
-
-  @abstractproperty
-  def type(self):
-    """Indicates the type of task (active or finished)"""
-
-  def _read_task(self, memoized={}):
-    """Read the corresponding task from disk and return a ThermosTask.  Memoizes already-read tasks.
-    """
-    if self._task_id not in memoized:
-      path = self._pathspec.given(task_id=self._task_id, state=self.type).getpath('task_path')
-      if os.path.exists(path):
-        task = ThermosTaskWrapper.from_file(path)
-        if task is None:
-          log.error('Error reading ThermosTask from %s in observer.' % path)
-        else:
-          context = self.context(self._task_id)
-          if not context:
-            log.warning('Task not yet available: %s' % self._task_id)
-          task = task.task() % Environment(thermos=context)
-          memoized[self._task_id] = task
-
-    return memoized.get(self._task_id, None)
-
-  def _get_mtime(self):
-    """Retrieve the mtime of the task's state directory"""
-    get_path = lambda state: self._pathspec.given(
-      task_id=self._task_id, state=state).getpath('task_path')
-    mtime = safe_mtime(get_path('active'))
-    if mtime is None:
-      mtime = safe_mtime(get_path('finished'))
-    if mtime is None:
-      log.error("Couldn't get mtime for task %s!" % self._task_id)
-    return mtime
-
-  def context(self, task_id):
-    state = self.state
-    if state.header is None:
-      return None
-    return ThermosContext(
-      ports = state.header.ports if state.header.ports else {},
-      task_id = state.header.task_id,
-      user = state.header.user,
-    )
-
-  @property
-  def task(self):
-    """Return a ThermosTask representing this task"""
-    return self._read_task()
-
-  @property
-  def task_id(self):
-    """Return the task's task_id"""
-    return self._task_id
-
-  @property
-  def mtime(self):
-    """Return mtime of task file"""
-    return self._mtime
-
-  @abstractproperty
-  def state(self):
-    """Return state of task (gen.twitter.thermos.ttypes.RunnerState)"""
-
-
-class ActiveObservedTask(ObservedTask):
-  """An active Task known by the TaskObserver"""
-  def __init__(self, task_id, pathspec, task_monitor, resource_monitor):
-    super(ActiveObservedTask, self).__init__(task_id, pathspec)
-    self._task_monitor = task_monitor
-    self._resource_monitor = resource_monitor
-
-  @property
-  def type(self):
-    return 'active'
-
-  @property
-  def state(self):
-    """Return a RunnerState representing the current state of task, retrieved from TaskMonitor"""
-    return self.task_monitor.get_state()
-
-  @property
-  def task_monitor(self):
-    """Return a TaskMonitor monitoring this task"""
-    return self._task_monitor
-
-  @property
-  def resource_monitor(self):
-    """Return a ResourceMonitor implementation monitoring this task's resources"""
-    return self._resource_monitor
-
-
-class FinishedObservedTask(ObservedTask):
-  """A finished Task known by the TaskObserver"""
-  def __init__(self, task_id, pathspec):
-    super(FinishedObservedTask, self).__init__(task_id, pathspec)
-    self._state = None
-
-  @property
-  def type(self):
-    return 'finished'
-
-  @property
-  def state(self):
-    """Return final state of Task (RunnerState, read from disk and cached for future access)"""
-    if self._state is None:
-      path = self._pathspec.given(task_id=self._task_id).getpath('runner_checkpoint')
-      self._state = CheckpointDispatcher.from_file(path)
-    return self._state
-
+from .observed_task import ActiveObservedTask, FinishedObservedTask
 
 
 class TaskObserver(ExceptionalThread, Lockable):
@@ -282,7 +146,6 @@ class TaskObserver(ExceptionalThread, Lockable):
           log.debug('task_id %s finished -> (unknown)' % unknown)
           self.remove_finished_task(unknown)
 
-
   @Lockable.sync
   def process_from_name(self, task_id, process_id):
     if task_id in self.all_tasks:
@@ -299,9 +162,9 @@ class TaskObserver(ExceptionalThread, Lockable):
       This may be <= self.task_id_count()
     """
     return dict(
-      active = len(self.active_tasks),
-      finished = len(self.finished_tasks),
-      all = len(self.all_tasks),
+      active=len(self.active_tasks),
+      finished=len(self.finished_tasks),
+      all=len(self.all_tasks),
     )
 
   @Lockable.sync
@@ -311,18 +174,14 @@ class TaskObserver(ExceptionalThread, Lockable):
     """
     num_active = len(list(self._detector.get_task_ids(state='active')))
     num_finished = len(list(self._detector.get_task_ids(state='finished')))
-    return dict(
-      active = num_active,
-      finished = num_finished,
-      all = num_active + num_finished,
-    )
+    return dict(active=num_active, finished=num_finished, all=num_active + num_finished)
 
   def _get_tasks_of_type(self, type):
     """Convenience function to return all tasks of a given type"""
     tasks = {
-      'active':   self.active_tasks,
+      'active': self.active_tasks,
       'finished': self.finished_tasks,
-      'all':      self.all_tasks,
+      'all': self.all_tasks,
     }.get(type, None)
 
     if tasks is None:
@@ -339,11 +198,11 @@ class TaskObserver(ExceptionalThread, Lockable):
       return {}
     else:
       return dict(
-        task_id = real_state.header.task_id,
-        launch_time = real_state.header.launch_time_ms/1000.0,
-        sandbox = real_state.header.sandbox,
-        hostname = real_state.header.hostname,
-        user = real_state.header.user
+        task_id=real_state.header.task_id,
+        launch_time=real_state.header.launch_time_ms / 1000.0,
+        sandbox=real_state.header.sandbox,
+        hostname=real_state.header.hostname,
+        user=real_state.header.user
       )
 
   @Lockable.sync
@@ -388,16 +247,10 @@ class TaskObserver(ExceptionalThread, Lockable):
           killed.append(process)
         else:
           # TODO(wickman)  Consider log.error instead of raising.
-          raise TaskObserver.UnexpectedState(
+          raise self.UnexpectedState(
             "Unexpected ProcessHistoryState: %s" % state.processes[process].state)
 
-    return dict(
-      waiting = waiting,
-      running = running,
-      success = success,
-      failed = failed,
-      killed = killed
-    )
+    return dict(waiting=waiting, running=running, success=success, failed=failed, killed=killed)
 
   @Lockable.sync
   def main(self, type=None, offset=None, num=None):
@@ -436,13 +289,6 @@ class TaskObserver(ExceptionalThread, Lockable):
     end += offset
     tasks = tasks[offset:end]
 
-#    # Gather filtered set of task_ids representing tasks of interest
-#    task_map = self.task_ids(type, offset, num)
-#    task_ids = task_map['task_ids']
-#
-#    tasks = dict((task_id, self._task(task_id)) for task_id in self._get_tasks_of_type(type)
-#                  if task_id in task_ids)
-
     def task_row(observed_task):
       """Generate an output row for a Task"""
       task = self._task(observed_task.task_id)
@@ -465,7 +311,6 @@ class TaskObserver(ExceptionalThread, Lockable):
       num=num,
       task_count=self.task_count()[type],
     )
-
 
   def _sample(self, task_id):
     if task_id not in self.active_tasks:
@@ -501,9 +346,8 @@ class TaskObserver(ExceptionalThread, Lockable):
 
     # Get the timestamp of the transition into the current state.
     return [
-      (TaskState._VALUES_TO_NAMES.get(state.state, 'UNKNOWN'), state.timestamp_ms / 1000)
-      for state in state.statuses]
-
+      (TaskState._VALUES_TO_NAMES.get(st.state, 'UNKNOWN'), st.timestamp_ms / 1000)
+      for st in state.statuses]
 
   @Lockable.sync
   def _task(self, task_id):
@@ -552,16 +396,16 @@ class TaskObserver(ExceptionalThread, Lockable):
       last_state = status.state
 
     return dict(
-       task_id = task_id,
-       name = task.name().get(),
-       launch_timestamp = state.statuses[0].timestamp_ms / 1000,
-       state = TaskState._VALUES_TO_NAMES[state.statuses[-1].state],
-       state_timestamp = state_timestamp,
-       user = state.header.user,
-       resource_consumption = self._sample(task_id),
-       ports = state.header.ports,
-       processes = self._task_processes(task_id),
-       task_struct = task
+       task_id=task_id,
+       name=task.name().get(),
+       launch_timestamp=state.statuses[0].timestamp_ms / 1000,
+       state=TaskState._VALUES_TO_NAMES[state.statuses[-1].state],
+       state_timestamp=state_timestamp,
+       user=state.header.user,
+       resource_consumption=self._sample(task_id),
+       ports=state.header.ports,
+       processes=self._task_processes(task_id),
+       task_struct=task,
     )
 
   @Lockable.sync
@@ -595,14 +439,14 @@ class TaskObserver(ExceptionalThread, Lockable):
       process_run = history[run]
       run = run % len(history)
       d = dict(
-        process_name = process_run.process,
-        process_run = run,
-        state = ProcessState._VALUES_TO_NAMES[process_run.state],
+        process_name=process_run.process,
+        process_run=run,
+        state=ProcessState._VALUES_TO_NAMES[process_run.state],
       )
       if process_run.start_time:
-        d.update(start_time = process_run.start_time)
+        d.update(start_time=process_run.start_time)
       if process_run.stop_time:
-        d.update(stop_time = process_run.stop_time)
+        d.update(stop_time=process_run.stop_time)
       return d
 
   @Lockable.sync
@@ -660,7 +504,7 @@ class TaskObserver(ExceptionalThread, Lockable):
     d = dict()
     for process_type in processes:
       for process_name in processes[process_type]:
-        d.update({ process_name: self.process(task_id, process_name) })
+        d[process_name] = self.process(task_id, process_name)
     return d
 
   @Lockable.sync
@@ -682,7 +526,7 @@ class TaskObserver(ExceptionalThread, Lockable):
           return run % len(runner_state.processes[process])
 
   @Lockable.sync
-  def logs(self, task_id, process, run = None):
+  def logs(self, task_id, process, run=None):
     """
       Given a task_id and a process and (optional) run number, return a dict:
       {
@@ -703,8 +547,8 @@ class TaskObserver(ExceptionalThread, Lockable):
     log_path = self._pathspec.given(task_id=task_id, process=process, run=run,
                                     log_dir=runner_state.header.log_dir).getpath('process_logdir')
     return dict(
-      stdout = [log_path, 'stdout'],
-      stderr = [log_path, 'stderr']
+      stdout=[log_path, 'stdout'],
+      stderr=[log_path, 'stderr']
     )
 
   @staticmethod
@@ -744,7 +588,7 @@ class TaskObserver(ExceptionalThread, Lockable):
       return None, None
     try:
       chroot = runner_state.header.sandbox
-    except:
+    except AttributeError:
       return None, None
     chroot, path = self._sanitize_path(chroot, path)
     if chroot and path:
@@ -772,7 +616,7 @@ class TaskObserver(ExceptionalThread, Lockable):
       return empty
     try:
       chroot = runner_state.header.sandbox
-    except:
+    except AttributeError:
       return empty
     if chroot is None:  # chroot-less job
       return empty

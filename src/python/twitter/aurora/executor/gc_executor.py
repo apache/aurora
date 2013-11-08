@@ -15,10 +15,10 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import Observable
 from twitter.common.metrics.gauge import AtomicGauge
 from twitter.common.quantity import Amount, Time
-from twitter.thermos.base.ckpt import CheckpointDispatcher
-from twitter.thermos.base.path import TaskPath
-from twitter.thermos.runner.inspector import CheckpointInspector
-from twitter.thermos.runner.helper import TaskKiller
+from twitter.thermos.common.ckpt import CheckpointDispatcher
+from twitter.thermos.common.path import TaskPath
+from twitter.thermos.core.inspector import CheckpointInspector
+from twitter.thermos.core.helper import TaskKiller
 from twitter.thermos.monitoring.detector import TaskDetector
 from twitter.thermos.monitoring.garbage import TaskGarbageCollector
 

@@ -30,9 +30,18 @@ python_test_suite(name = 'large',
   ]
 )
 
-python_library(name = 'runner_baselibs',
+python_library(
+  name = 'runner_baselibs',
+  sources = ['runner_base.py'],
   dependencies = [
-    pants('src/python/twitter/thermos/runner'),
+    pants('3rdparty/python:thrift'),
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/thermos/common:ckpt'),
+    pants('src/python/twitter/thermos/common:path'),
+    pants('src/python/twitter/thermos/config'),
+    pants('src/python/twitter/thermos/core'),
+    pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]
 )
 
@@ -72,7 +81,7 @@ python_tests(name = 'test_helper',
   dependencies = [
     pants('3rdparty/python:mock'),
     pants('3rdparty/python:psutil'),
-    pants('src/python/twitter/thermos/runner:helper'),
+    pants('src/python/twitter/thermos/core:helper'),
   ]
 )
 
@@ -80,7 +89,8 @@ python_tests(name = 'test_process',
   sources = ['test_process.py'],
   dependencies = [
     pants(':runner_baselibs'),
-    pants('3rdparty/python:mock')
+    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/common/contextutil'),
   ],
 )
 

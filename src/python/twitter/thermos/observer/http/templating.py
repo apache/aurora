@@ -1,6 +1,7 @@
 import os
 import pkg_resources
 
+
 class HttpTemplate(object):
   @staticmethod
   def load(name):

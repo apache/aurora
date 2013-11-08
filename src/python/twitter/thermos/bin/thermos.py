@@ -18,16 +18,16 @@ from twitter.common.dirutil.tail import tail as tail_closed
 from twitter.common.quantity import Amount, Time, Data
 from twitter.common.quantity.parse_simple import parse_time, parse_data
 from twitter.common.recordio import RecordIO, ThriftRecordReader
-from twitter.thermos.base.path import TaskPath
-from twitter.thermos.base.ckpt import CheckpointDispatcher
-from twitter.thermos.base.options import add_port_to, add_binding_to
+from twitter.thermos.common.path import TaskPath
+from twitter.thermos.common.ckpt import CheckpointDispatcher
+from twitter.thermos.common.options import add_port_to, add_binding_to
 from twitter.thermos.config.loader import ThermosConfigLoader, ThermosTaskWrapper
 from twitter.thermos.config.schema import (
   Process,
   Resources,
   Task)
-from twitter.thermos.runner import TaskRunner
-from twitter.thermos.runner.helper import TaskRunnerHelper
+from twitter.thermos.core.helper import TaskRunnerHelper
+from twitter.thermos.core.runner import TaskRunner
 from twitter.thermos.monitoring.detector import TaskDetector
 from twitter.thermos.monitoring.garbage import TaskGarbageCollector, DefaultCollector
 from twitter.thermos.monitoring.monitor import TaskMonitor

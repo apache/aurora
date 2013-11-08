@@ -7,6 +7,7 @@ ProcessSample might correspond to one individual process, or to an aggregate of 
 
 from collections import namedtuple
 
+
 class ProcessSample(namedtuple('ProcessSample', 'rate user system rss vms nice status threads')):
   """ Sample of statistics about a process's resource consumption (either a single process or an
   aggregate of processes) """

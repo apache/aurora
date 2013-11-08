@@ -1,6 +1,6 @@
 import pytest
 from twitter.common.testing.clock import ThreadedClock
-from twitter.thermos.base.planner import TaskPlanner
+from twitter.thermos.common.planner import TaskPlanner
 from twitter.thermos.config.schema import *
 
 

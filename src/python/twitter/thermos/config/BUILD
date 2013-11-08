@@ -1,24 +1,22 @@
 python_library(
-  name = "schema",
+  name = 'schema',
   sources = globs('*.py'),
   dependencies = [
-    pants('3rdparty/python:pystachio'),
-    pants("src/python/twitter/common/lang"),
-    pants("src/python/twitter/thermos/base:planner")
-  ]
+    pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/thermos:pystachio'),
+    pants('src/python/twitter/thermos/common:planner')
+  ],
 )
 
-python_binary(
-  name = "repl",
-  source = "bin/config_repl.py",
-  dependencies = [pants(":schema")]
-)
-
-python_binary(
-  name = "load",
-  source = "bin/config_load.py",
+python_library(
+  name = 'config',
   dependencies = [
-    pants(":schema"),
-    pants("src/python/twitter/common/app")
-  ]
+    pants(':schema'),
+    pants('src/python/twitter/thermos/common'),  # cover common:planner
+  ],
+  provides = setup_py(
+    name = 'twitter.thermos.config',
+    version = '0.1.0',
+    description = 'Thermos configuration schema and loader.',
+  )
 )

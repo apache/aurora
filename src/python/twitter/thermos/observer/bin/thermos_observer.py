@@ -4,9 +4,9 @@ import time
 
 from twitter.common import app
 from twitter.common.app.modules.http import RootServer
-from twitter.thermos.base.path import TaskPath
-from twitter.thermos.observer.observer import TaskObserver
-from twitter.thermos.observer.http import BottleObserver
+from twitter.thermos.common.path import TaskPath
+from twitter.thermos.observer.task_observer import TaskObserver
+from twitter.thermos.observer.http.http_observer import BottleObserver
 
 
 app.add_option("--root",
@@ -18,8 +18,6 @@ app.add_option("--root",
 
 app.configure(module='twitter.common.app.modules.http',
     port=1338, host='0.0.0.0', enable=True, framework='cherrypy')
-app.configure(module='twitter.common.app.modules.scribe_exception_handler',
-    category='test_thermos_observer_exceptions')
 
 
 def main(args, opts):

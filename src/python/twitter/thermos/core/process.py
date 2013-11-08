@@ -18,21 +18,19 @@ import time
 
 from twitter.common import log
 from twitter.common.dirutil import (
-  lock_file,
-  safe_mkdir,
-  safe_open)
+    lock_file,
+    safe_mkdir,
+    safe_open,
+)
 from twitter.common.lang import Interface
-from twitter.common.quantity import (
-  Amount,
-  Time)
-from twitter.common.recordio import (
-  ThriftRecordReader,
-  ThriftRecordWriter)
+from twitter.common.quantity import Amount, Time
+from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
 from gen.twitter.thermos.ttypes import (
-  ProcessState,
-  ProcessStatus,
-  RunnerCkpt)
+    ProcessState,
+    ProcessStatus,
+    RunnerCkpt,
+)
 
 
 class Platform(Interface):

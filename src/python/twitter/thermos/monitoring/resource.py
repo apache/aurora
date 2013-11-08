@@ -13,13 +13,13 @@ disk consumption and retaining a limited (FIFO) in-memory history of this data.
 
 """
 
-import platform
-import threading
-import time
 from abc import abstractmethod
 from bisect import bisect_left
 from collections import namedtuple
 from operator import attrgetter
+import platform
+import threading
+import time
 
 from twitter.common import log
 from twitter.common.collections import RingBuffer

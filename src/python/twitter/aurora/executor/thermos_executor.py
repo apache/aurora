@@ -16,7 +16,7 @@ from twitter.aurora.common.http_signaler import HttpSignaler
 from twitter.aurora.config import PortResolver
 from twitter.aurora.config.schema.base import MesosJob, MesosTaskInstance
 from twitter.aurora.config.thrift import task_instance_from_job, resolve_thermos_config
-from twitter.thermos.base.path import TaskPath
+from twitter.thermos.common.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
 
 from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT

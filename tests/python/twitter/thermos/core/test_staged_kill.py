@@ -13,7 +13,7 @@ from twitter.thermos.config.schema import (
   Resources,
   Process)
 from twitter.thermos.monitoring.monitor import TaskMonitor
-from twitter.thermos.runner.runner import TaskRunner
+from twitter.thermos.core.runner import TaskRunner
 from gen.twitter.thermos.ttypes import (
   TaskState,
   ProcessState

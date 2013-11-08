@@ -12,10 +12,10 @@ from twitter.common.log.options import LogOptions
 from twitter.common.dirutil import chmod_plus_x
 from twitter.common.quantity import Amount, Time
 
-from twitter.thermos.base.path import TaskPath
-from twitter.thermos.runner import TaskRunner
-from twitter.thermos.monitoring.monitor import TaskMonitor
+from twitter.thermos.common.path import TaskPath
 from twitter.thermos.config.loader import ThermosTaskWrapper
+from twitter.thermos.core.runner import TaskRunner
+from twitter.thermos.monitoring.monitor import TaskMonitor
 
 from .common.sandbox import SandboxInterface
 

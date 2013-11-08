@@ -33,9 +33,9 @@ from twitter.aurora.executor.thermos_executor import ThermosExecutor
 from twitter.aurora.executor.task_runner_wrapper import TaskRunnerWrapper
 from twitter.aurora.executor.common.sandbox import DirectorySandbox
 from twitter.aurora.executor.status_manager import StatusManager
-from twitter.thermos.base.path import TaskPath
+from twitter.thermos.common.path import TaskPath
+from twitter.thermos.core.runner import TaskRunner
 from twitter.thermos.monitoring.monitor import TaskMonitor
-from twitter.thermos.runner.runner import TaskRunner
 
 from gen.twitter.aurora.ttypes import (
   AssignedTask,

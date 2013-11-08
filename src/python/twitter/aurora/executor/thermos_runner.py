@@ -7,10 +7,10 @@ import traceback
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
-from twitter.thermos.base.options import add_port_to
-from twitter.thermos.base.planner import TaskPlanner
+from twitter.thermos.common.options import add_port_to
+from twitter.thermos.common.planner import TaskPlanner
 from twitter.thermos.config.loader import ThermosConfigLoader
-from twitter.thermos.runner import TaskRunner
+from twitter.thermos.core.runner import TaskRunner
 
 
 app.add_option("--thermos_json", dest = "thermos_json", default=None,

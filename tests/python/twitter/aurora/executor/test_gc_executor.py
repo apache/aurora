@@ -17,7 +17,7 @@ from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time, Data
 from twitter.common.testing.clock import ThreadedClock
 from twitter.thermos.config.schema import SimpleTask
-from twitter.thermos.runner import TaskRunner
+from twitter.thermos.core.runner import TaskRunner
 
 from gen.twitter.aurora.comm.ttypes import AdjustRetainedTasks, SchedulerMessage
 from gen.twitter.aurora.constants import ACTIVE_STATES, LIVE_STATES, TERMINAL_STATES

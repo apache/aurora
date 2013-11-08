@@ -1,5 +1,5 @@
 import pytest
-from twitter.thermos.base.planner import Planner
+from twitter.thermos.common.planner import Planner
 
 
 def details(planner):

@@ -5,8 +5,6 @@ from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
 from gen.twitter.thermos.ttypes import RunnerCkpt
 
-__author__ = 'wickman@twitter.com (brian wickman)'
-__tested__ = False
 
 class ProcessMuxer(object):
   class ProcessExists(Exception): pass

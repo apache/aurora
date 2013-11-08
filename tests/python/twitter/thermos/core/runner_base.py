@@ -11,8 +11,8 @@ import time
 
 from twitter.common import log
 from twitter.common.contextutil import temporary_file, environment_as
-from twitter.thermos.base.path import TaskPath
-from twitter.thermos.base.ckpt import CheckpointDispatcher
+from twitter.thermos.common.path import TaskPath
+from twitter.thermos.common.ckpt import CheckpointDispatcher
 from twitter.thermos.config.loader import ThermosTaskWrapper
 from thrift.TSerialization import deserialize as thrift_deserialize
 
@@ -31,9 +31,8 @@ import sys
 from twitter.common import log
 from twitter.common.log.options import LogOptions
 from twitter.thermos.config.loader import ThermosConfigLoader
-from twitter.thermos.runner import TaskRunner
-from twitter.thermos.runner.helper import TaskRunnerHelper
-from twitter.thermos.runner.runner import TaskRunnerUniversalHandler
+from twitter.thermos.core.helper import TaskRunnerHelper
+from twitter.thermos.core.runner import TaskRunner, TaskRunnerUniversalHandler
 from thrift.TSerialization import serialize as thrift_serialize
 
 random.seed(%(random_seed)d)

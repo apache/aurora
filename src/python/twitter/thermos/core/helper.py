@@ -9,8 +9,8 @@ from twitter.common.dirutil import safe_mkdir, lock_file
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordWriter
-from twitter.thermos.base.ckpt import CheckpointDispatcher
-from twitter.thermos.base.path import TaskPath
+from twitter.thermos.common.ckpt import CheckpointDispatcher
+from twitter.thermos.common.path import TaskPath
 
 from gen.twitter.thermos.ttypes import (
   ProcessState,

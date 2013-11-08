@@ -34,20 +34,18 @@ import sys
 import time
 import traceback
 
-from pystachio import Environment
-
 from twitter.common import log
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader
 
-from twitter.thermos.base.ckpt import (
+from twitter.thermos.common.ckpt import (
   CheckpointDispatcher,
   UniversalStateHandler,
   ProcessStateHandler,
   TaskStateHandler)
-from twitter.thermos.base.path import TaskPath
-from twitter.thermos.base.planner import TaskPlanner
+from twitter.thermos.common.path import TaskPath
+from twitter.thermos.common.planner import TaskPlanner
 from twitter.thermos.config.loader import (
   ThermosConfigLoader,
   ThermosProcessWrapper,
@@ -68,6 +66,8 @@ from gen.twitter.thermos.ttypes import (
 from .helper import TaskRunnerHelper
 from .muxer import ProcessMuxer
 from .process import Process
+
+from pystachio import Environment
 
 
 # TODO(wickman) Currently this is messy because of all the private access into ._runner.

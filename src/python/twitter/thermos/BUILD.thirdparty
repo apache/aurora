@@ -1,0 +1,24 @@
+python_requirement(
+  name = 'psutil',
+  requirement = 'psutil==1.1.2',
+)
+
+python_requirement(
+  name = 'pystachio',
+  requirement = 'pystachio==0.7.2',
+)
+
+python_requirement(
+  name = 'mako',
+  requirement = 'mako==0.4.0',
+)
+
+python_requirement(
+  name = 'cherrypy',
+  requirement = 'cherrypy==3.2.2',
+)
+
+python_requirement(
+  name = 'bottle',
+  requirement = 'bottle==0.11.6',
+)

@@ -6,7 +6,7 @@ import textwrap
 
 from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
-from twitter.thermos.base.planner import TaskPlanner
+from twitter.thermos.common.planner import TaskPlanner
 from twitter.thermos.config.schema import Task
 
 from pystachio import Ref
