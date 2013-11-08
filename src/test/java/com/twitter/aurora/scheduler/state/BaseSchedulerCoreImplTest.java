@@ -17,7 +17,6 @@ package com.twitter.aurora.scheduler.state;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.nio.ByteBuffer;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
@@ -28,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
@@ -294,6 +294,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
 
     storage = createStorage();
+    String thermosConfig = "thermosConfig";
 
     final TaskConfig storedTask = new TaskConfig()
         .setOwner(OWNER_A)
@@ -302,7 +303,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setNumCpus(1.0)
         .setRamMb(ONE_GB)
         .setDiskMb(500)
-        .setThermosConfig("thermosConfig".getBytes())
+        .setThermosConfig(thermosConfig.getBytes(Charsets.UTF_8))
+        .setExecutorConfig(new ExecutorConfig("AuroraExecutor", thermosConfig))
         .setRequestedPorts(ImmutableSet.<String>of())
         .setConstraints(ImmutableSet.<Constraint>of())
         .setTaskLinks(ImmutableMap.<String, String>of());
@@ -330,8 +332,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     ITaskConfig expected = ITaskConfig.build(new TaskConfig(storedTask)
         .setProduction(false)
         .setMaxTaskFailures(1)
-        .setExecutorConfig(new ExecutorConfig("AuroraExecutor", "thermosConfig"))
-        .setThermosConfig((ByteBuffer) null)
+        .setThermosConfig(thermosConfig.getBytes(Charsets.UTF_8))
+        .setExecutorConfig(new ExecutorConfig("AuroraExecutor", thermosConfig))
         .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1))));
 
     assertEquals(expected, getTask(storedTaskId).getAssignedTask().getTask());

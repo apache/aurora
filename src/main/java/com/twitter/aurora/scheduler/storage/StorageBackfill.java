@@ -105,16 +105,71 @@ public final class StorageBackfill {
     }
   }
 
-  private static void convertToExecutorConfig(ScheduledTask task) {
+  private static final AtomicLong BOTH_CONFIGS_SET = Stats.exportLong("both_configs_set");
+  private static final AtomicLong OLD_CONFIG_SET = Stats.exportLong("old_conifg_id_set");
+  private static final AtomicLong NEW_CONFIG_SET = Stats.exportLong("new_config_set");
+  private static final AtomicLong CONFIGS_INCONSISTENT = Stats.exportLong("configs_inconsistent");
+
+  private static final AtomicLong JOB_BOTH_CONFIGS_SET = Stats.exportLong("job_both_configs_set");
+  private static final AtomicLong JOB_OLD_CONFIG_SET = Stats.exportLong("job_old_conifg_id_set");
+  private static final AtomicLong JOB_NEW_CONFIG_SET = Stats.exportLong("job_new_config_set");
+  private static final AtomicLong JOB_CONFIGS_INCONSISTENT =
+      Stats.exportLong("job_configs_inconsistent");
+
+  private static void mutateTaskConfig(
+      TaskConfig taskConfig,
+      AtomicLong bothSet,
+      AtomicLong oldSet,
+      AtomicLong newSet,
+      AtomicLong inconsistent) {
     // TODO(maximk): remove this as part of MESOS-2635 cleanup
-    if (task.getAssignedTask().getTask().isSetThermosConfig()) {
-      TaskConfig taskConfig = task.getAssignedTask().getTask();
+    boolean oldFieldSet = taskConfig.isSetThermosConfig();
+    boolean newFieldSet = taskConfig.isSetExecutorConfig();
+    if (oldFieldSet && newFieldSet) {
+      bothSet.incrementAndGet();
+      if (!taskConfig.getExecutorConfig().getData().equals(
+          new String(taskConfig.getThermosConfig(), Charsets.UTF_8))) {
+
+        inconsistent.incrementAndGet();
+      }
+    } else if (oldFieldSet) {
+      oldSet.incrementAndGet();
       taskConfig.setExecutorConfig(
           new ExecutorConfig(
               "AuroraExecutor",
               new String(taskConfig.getThermosConfig(), Charsets.UTF_8)));
+    } else if (newFieldSet) {
+      newSet.incrementAndGet();
+      taskConfig.setThermosConfig(
+          taskConfig.getExecutorConfig().getData().getBytes(Charsets.UTF_8));
+    } else {
+      throw new IllegalStateException(
+          "Task for " + taskConfig.getJobName() + " does not have a thermos config.");
+    }
+  }
 
-      taskConfig.unsetThermosConfig();
+  private static void convertToExecutorConfig(ScheduledTask task) {
+    // TODO(maximk): remove this as part of MESOS-2635 cleanup
+    mutateTaskConfig(
+        task.getAssignedTask().getTask(),
+        BOTH_CONFIGS_SET,
+        OLD_CONFIG_SET,
+        NEW_CONFIG_SET,
+        CONFIGS_INCONSISTENT);
+  }
+
+  private static void convertToExecutorConfig(JobStore.Mutable jobStore) {
+    // TODO(maximk): remove this as part of MESOS-2635 cleanup
+    for (String id : jobStore.fetchManagerIds()) {
+      for (JobConfiguration job : IJobConfiguration.toBuildersList(jobStore.fetchJobs(id))) {
+        mutateTaskConfig(
+            job.getTaskConfig(),
+            JOB_BOTH_CONFIGS_SET,
+            JOB_OLD_CONFIG_SET,
+            JOB_NEW_CONFIG_SET,
+            JOB_CONFIGS_INCONSISTENT);
+        jobStore.saveAcceptedJob(id, IJobConfiguration.build(job));
+      }
     }
   }
 
@@ -159,6 +214,7 @@ public final class StorageBackfill {
    */
   public static void backfill(final MutableStoreProvider storeProvider, final Clock clock) {
     backfillJobDefaults(storeProvider.getJobStore());
+    convertToExecutorConfig(storeProvider.getJobStore());
 
     LOG.info("Performing shard uniqueness sanity check.");
     storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {
