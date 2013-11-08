@@ -72,7 +72,6 @@ class AuroraClientAPI(object):
     if instances is not None:
       log.info("Instances to be killed: %s" % instances)
       query.instanceIds = frozenset([int(s) for s in instances])
-
     return self._scheduler.killTasks(query, lock)
 
   def check_status(self, job_key):

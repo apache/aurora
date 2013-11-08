@@ -306,7 +306,7 @@ jobs = [HELLO_WORLD]
       assert mock_api.create_job.call_count == 0
       # scheduler.scheduler() should not have been called, because the config was invalid.
       assert mock_api.scheduler.scheduler.call_count == 0
-      # getTasksStatus was called once, before the create_job
+
       assert mock_scheduler.getTasksStatus.call_count == 0
       # make_client should not have been called.
       assert make_client.call_count == 0
