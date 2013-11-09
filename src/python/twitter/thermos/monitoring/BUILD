@@ -82,7 +82,10 @@ python_library(
     pants(':garbage'),
     pants(':monitor'),
     pants(':process'),
-    pants(':resource')
+    pants(':resource'),
+
+    # covering dependency for common
+    pants('src/python/twitter/thermos/common'),
   ],
   provides = setup_py(
     name = 'twitter.thermos.monitoring',

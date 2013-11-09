@@ -441,6 +441,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
       else:
         self.send_update(self._driver, prev_task_id, 'FINISHED',
                          'Garbage collection skipped - GC executor shutting down')
+
       self._driver.stop()
 
   """ Mesos Executor API methods follow """

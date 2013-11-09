@@ -16,6 +16,8 @@ python_tests(name = 'gc_executor',
   dependencies = [
     pants('3rdparty/python:mock'),
     pants('3rdparty/python:mox'),
+    pants('aurora/twitterdeps/src/python/twitter/thermos/core'),
+    pants('aurora/twitterdeps/src/thrift/com/twitter/thermos:py-thrift'),
     pants('src/python/twitter/aurora/executor:gc_executor'),
     # TODO(wickman) This should go away?
     pants('src/python/twitter/aurora/executor/common_internal:appapp_sandbox'),
@@ -23,9 +25,7 @@ python_tests(name = 'gc_executor',
     pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/common/testing'),
-    pants('src/python/twitter/thermos/core'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
-    pants('src/thrift/com/twitter/thermos:py-thrift'),
   ],
   coverage = 'twitter.mesos.executor.gc_executor'
 )
@@ -54,6 +54,9 @@ python_tests(name = 'thermos_executor',
   sources = ['test_thermos_executor.py'],
   timeout = Amount(5, Time.MINUTES),
   dependencies = [
+    pants('aurora/twitterdeps/src/python/twitter/thermos/core'),
+    pants('aurora/twitterdeps/src/python/twitter/thermos/monitoring'),
+    pants('aurora/twitterdeps/src/thrift/com/twitter/thermos:py-thrift'),
     pants('src/python/twitter/aurora/config:schema'),
     pants('src/python/twitter/aurora/executor/common:executor_timeout'),
     pants('src/python/twitter/aurora/executor:thermos_executor'),
@@ -61,10 +64,7 @@ python_tests(name = 'thermos_executor',
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/pants:pants-lib'),
-    pants('src/python/twitter/thermos/core'),
-    pants('src/python/twitter/thermos/monitoring:monitor'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
-    pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]
 )
 

@@ -2,14 +2,14 @@ python_library(
   name = 'task_runner_wrapper',
   sources = ['task_runner_wrapper.py'],
   dependencies = [
+    pants('aurora/twitterdeps/src/python/twitter/thermos/common'),
+    pants('aurora/twitterdeps/src/python/twitter/thermos/config'),
+    pants('aurora/twitterdeps/src/python/twitter/thermos/core'),
+    pants('aurora/twitterdeps/src/python/twitter/thermos/monitoring'),
     pants('src/python/twitter/aurora/executor/common:sandbox'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/http'),
-    pants('src/python/twitter/thermos/common'),
-    pants('src/python/twitter/thermos/core'),
-    pants('src/python/twitter/thermos/monitoring:monitor'),
-    pants('src/python/twitter/thermos/config:schema'),
   ]
 )
 
@@ -50,12 +50,12 @@ python_library(
   dependencies = [
     pants(':health_interfaces'),
     pants(':thermos_executor_base'),
+    pants('aurora/twitterdeps/src/thrift/com/twitter/thermos:py-thrift'),
     pants('src/python/twitter/aurora:mesos-core'),
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]
 )
 
@@ -63,13 +63,13 @@ python_library(
   name = 'thermos_executor_base',
   sources = ['executor_base.py'],
   dependencies = [
+    pants('aurora/twitterdeps/src/thrift/com/twitter/thermos:py-thrift'),
     pants('src/python/twitter/aurora:mesos-core'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/app/modules:exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
-    pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]
 )
 
@@ -103,13 +103,13 @@ python_binary(
   name = 'thermos_runner',
   source = 'thermos_runner.py',
   dependencies = [
+    pants('aurora/twitterdeps/src/python/twitter/thermos/common'),
+    pants('aurora/twitterdeps/src/python/twitter/thermos/config'),
+    pants('aurora/twitterdeps/src/python/twitter/thermos/core'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/app/modules:exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
-    pants('src/python/twitter/thermos/common:planner'),
-    pants('src/python/twitter/thermos/config:schema'),
-    pants('src/python/twitter/thermos/core'),
   ],
 )
 
@@ -119,22 +119,19 @@ python_library(
   dependencies = [
     pants('3rdparty/python:psutil'),
     pants(':executor_detector'),
-    pants('src/python/twitter/aurora/executor/common:sandbox'),
-    pants('src/python/twitter/aurora/executor/common_internal:appapp_sandbox'),
     pants(':thermos_executor_base'),
+    pants('aurora/twitterdeps/src/python/twitter/thermos/common'),
+    pants('aurora/twitterdeps/src/python/twitter/thermos/core'),
+    pants('aurora/twitterdeps/src/python/twitter/thermos/monitoring'),
     pants('src/python/twitter/aurora/common_internal:clusters'),
     pants('src/python/twitter/aurora/config:schema'),
+    pants('src/python/twitter/aurora/executor/common:sandbox'),
+    pants('src/python/twitter/aurora/executor/common_internal:appapp_sandbox'),
     pants('src/python/twitter/common/collections'),
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/metrics'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/thermos/common:ckpt'),
-    pants('src/python/twitter/thermos/common:path'),
-    pants('src/python/twitter/thermos/monitoring:detector'),
-    pants('src/python/twitter/thermos/monitoring:garbage'),
-    pants('src/python/twitter/thermos/core:helper'),
-    pants('src/python/twitter/thermos/core:inspector'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
