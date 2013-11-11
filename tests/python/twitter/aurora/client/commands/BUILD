@@ -5,7 +5,8 @@ python_test_suite(
 
 python_tests(
   name='commands',
-  sources = [ 'test_create.py', 'test_kill.py', 'test_update.py' ],
+  sources = [ 'test_create.py', 'test_kill.py', 'test_update.py', 'test_listjobs.py',
+      'test_status.py' ],
   dependencies = [
     pants('3rdparty/python:mock'),
     pants('src/python/twitter/aurora/client/commands:core'),

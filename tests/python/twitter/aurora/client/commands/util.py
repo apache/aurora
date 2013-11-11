@@ -32,3 +32,12 @@ def create_mock_api():
   mock_api = Mock(spec=HookedAuroraClientAPI)
   mock_api.scheduler = mock_scheduler_client
   return (mock_api, mock_scheduler_client)
+
+
+def create_mock_api_factory():
+  """Create a collection of mocks for a test that wants to mock out the client API
+  by patching the api factory."""
+  mock_api, mock_scheduler_client = create_mock_api()
+  mock_api_factory = Mock()
+  mock_api_factory.return_value = mock_api
+  return mock_api_factory, mock_scheduler_client
