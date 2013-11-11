@@ -106,15 +106,6 @@ jobs = [HELLO_WORLD]
     return mock_options
 
   @classmethod
-  def setup_mock_api(cls):
-    """Builds up a mock API object, with a mock SchedulerProxy"""
-    mock_api = Mock(spec=HookedAuroraClientAPI)
-    mock_scheduler = Mock()
-    mock_scheduler.url = "http://something_or_other"
-    mock_api.scheduler = mock_scheduler
-    return (mock_api, mock_scheduler)
-
-  @classmethod
   def setup_mock_updater(cls):
     updater = Mock(spec=Updater)
     return updater
@@ -299,14 +290,14 @@ jobs = [HELLO_WORLD]
     assert last_addinst[0][0].key == JobKey(environment='test', role='mchucarroll', name='hello')
 
   @classmethod
-  def assert_correct_killtask_calls(self, api):
+  def assert_correct_killtask_calls(cls, api):
     assert api.killTasks.call_count == 4
     # Check the last call's parameters.
     api.killTasks.assert_called_with(
         TaskQuery(taskIds=None, jobName='hello', environment='test',
             instanceIds=frozenset([16, 17, 18, 19, 15]),
             owner=Identity(role=u'mchucarroll', user=None),
-           statuses=self.QUERY_STATUSES),
+           statuses=cls.QUERY_STATUSES),
         'foo')
 
   @classmethod
@@ -314,8 +305,9 @@ jobs = [HELLO_WORLD]
     # getTasksStatus gets called a lot of times. The exact number isn't fixed; it loops
     # over the health checks until all of them pass for a configured period of time.
     # The minumum number of calls is 5: once before the tasks are restarted, and then
-    # once for each batch of restarts.
-    assert api.getTasksStatus.call_count >= 4
+    # once for each batch of restarts (Since the batch size is set to 5, and the
+    # total number of jobs is 20, that's 4 batches.)
+    assert api.getTasksStatus.call_count >= 5
     # In the first getStatus call, it uses an expansive query; in the rest, it only queries for
     # status RUNNING.
     status_calls = api.getTasksStatus.call_args_list

@@ -3,17 +3,18 @@ import unittest
 
 from twitter.aurora.common.cluster import Cluster
 from twitter.aurora.common.clusters import Clusters
-from twitter.aurora.client.commands.core import kill
-from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
-from twitter.common.contextutil import temporary_file
+from twitter.aurora.client.commands.core import cancel_update
 from twitter.aurora.client.commands.util import (
     create_mock_api_factory,
     create_simple_success_response
 )
+from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from twitter.common.contextutil import temporary_file
 
 from gen.twitter.aurora.ttypes import (
     Identity,
+    JobKey,
     ScheduleStatus,
     ScheduleStatusResult,
     TaskQuery,
@@ -22,7 +23,7 @@ from gen.twitter.aurora.ttypes import (
 from mock import Mock, patch
 
 
-class TestClientKllCommand(unittest.TestCase):
+class TestClientCancelUpdateCommand(unittest.TestCase):
   # Configuration to use
   CONFIG_BASE = """
 HELLO_WORLD = Job(
@@ -44,10 +45,10 @@ jobs = [HELLO_WORLD]
   TEST_ROLE = 'mchucarroll'
   TEST_ENV = 'test'
   TEST_JOB = 'hello'
-  TEST_CLUSTER = 'smfd'
+  TEST_CLUSTER = 'west'
 
   TEST_CLUSTERS = Clusters([Cluster(
-    name='smfd',
+    name='west',
     packer_copy_command='copying {{package}}',
     zk='zookeeper.example.com',
     scheduler_zk_path='/foo/bar',
@@ -75,13 +76,12 @@ jobs = [HELLO_WORLD]
   @classmethod
   def setup_mock_api_factory(cls):
     mock_api_factory, mock_api = create_mock_api_factory()
-    mock_api_factory.return_value.kill_job.return_value = cls.get_kill_job_response()
+    mock_api_factory.return_value.cancel_update.return_value = cls.get_cancel_update_response()
     return mock_api_factory
 
   @classmethod
   def create_mock_status_query_result(cls, scheduleStatus):
-    mock_query_result = Mock(spec=Response)
-    mock_query_result.result = Mock(spec=Result)
+    mock_query_result = create_simple_success_response()
     mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     if scheduleStatus == ScheduleStatus.INIT:
       # status query result for before job is launched.
@@ -98,19 +98,23 @@ jobs = [HELLO_WORLD]
         jobName=cls.TEST_JOB)
 
   @classmethod
-  def get_kill_job_response(cls):
+  def get_cancel_update_response(cls):
     return create_simple_success_response()
 
   @classmethod
-  def assert_kill_job_called(cls, mock_api):
-    assert mock_api.kill_job.call_count == 1
+  def assert_cancel_update_called(cls, mock_api):
+    # Running cancel update should result in calling the API cancel_update
+    # method once, with an AuroraJobKey parameter.
+    assert mock_api.cancel_update.call_count == 1
+    assert mock_api.cancel_update.called_with(
+        AuroraJobKey(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB),
+        config=None)
 
   @classmethod
   def assert_scheduler_called(cls, mock_api):
-    # scheduler.scheduler() is called once, as a part of the handle_open call.
     assert mock_api.scheduler.scheduler.call_count == 1
 
-  def test_simple_successful_kill_job(self):
+  def test_simple_successful_cancel_update(self):
     """Run a test of the "kill" command against a mocked-out API:
     Verifies that the kill command sends the right API RPCs, and performs the correct
     tests on the result."""
@@ -122,22 +126,11 @@ jobs = [HELLO_WORLD]
             return_value=mock_api_factory),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('twitter.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            mock_make_client_factory,
-            options, mock_get_job_config):
+            mock_make_client_factory, options, mock_get_job_config):
       mock_api = mock_api_factory.return_value
 
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        kill(['smfd/mchucarroll/test/hello', fp.name], mock_options)
-
-      # Now check that the right API calls got made.
-      self.assert_kill_job_called(mock_api)
-      mock_api.kill_job.assert_called_with(
-        AuroraJobKey(cluster=self.TEST_CLUSTER, role=self.TEST_ROLE, env=self.TEST_ENV,
-            name=self.TEST_JOB), None, config=mock_config)
-      self.assert_scheduler_called(mock_api)
-      assert mock_make_client_factory.call_count == 1
+      cancel_update(['west/mchucarroll/test/hello'], mock_options)
+      self.assert_cancel_update_called(mock_api)
 
   @classmethod
   def setup_mock_api(cls):
@@ -155,67 +148,38 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def get_expected_task_query(cls, shards=None):
-    """Helper to create the query that will be a parameter to job kill."""
     instance_ids = frozenset(shards) if shards is not None else None
+    # Helper to create the query that will be a parameter to job kill.
     return TaskQuery(taskIds=None, jobName=cls.TEST_JOB, environment=cls.TEST_ENV,
         instanceIds=instance_ids, owner=Identity(role=cls.TEST_ROLE, user=None))
 
-  def test_kill_job_api_level(self):
+  @classmethod
+  def get_release_lock_response(cls):
+    """Set up the response to a startUpdate API call."""
+    return create_simple_success_response()
+
+  def test_cancel_update_api_level(self):
     """Test kill client-side API logic."""
     mock_options = self.setup_mock_options()
+
     mock_config = Mock()
     mock_config.hooks = []
     mock_config.raw.return_value.enable_hooks.return_value.get.return_value = False
     (mock_api, mock_scheduler) = self.setup_mock_api()
-    mock_api_factory = Mock(return_value=mock_api)
-    mock_scheduler.killTasks.return_value = self.get_kill_job_response()
+    mock_scheduler.releaseLock.return_value = self.get_release_lock_response()
     with contextlib.nested(
-        patch('twitter.aurora.client.factory.make_client_factory', return_value=mock_api_factory),
         patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
         patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('twitter.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            mock_api_factory_patch,
-            mock_scheduler_proxy_class,
-            mock_clusters,
-            options, mock_get_job_config):
+            mock_scheduler_proxy_class, mock_clusters, options, mock_get_job_config):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        kill(['smfd/mchucarroll/test/hello', fp.name], mock_options)
+        cancel_update(['west/mchucarroll/test/hello'], mock_options)
 
-      # Now check that the right API calls got made.
-      self.assert_scheduler_called(mock_api)
-      assert mock_scheduler.killTasks.call_count == 1
-      mock_scheduler.killTasks.assert_called_with(self.get_expected_task_query(), None)
-
-  def test_kill_job_api_level_with_shards(self):
-    """Test kill client-side API logic."""
-    mock_options = self.setup_mock_options()
-    mock_options.shards = [0, 1, 2, 3]
-    mock_config = Mock()
-    mock_config.hooks = []
-    mock_config.raw.return_value.enable_hooks.return_value.get.return_value = False
-    (mock_api, mock_scheduler) = self.setup_mock_api()
-    mock_api_factory = Mock(return_value=mock_api)
-    mock_scheduler.killTasks.return_value = self.get_kill_job_response()
-    with contextlib.nested(
-        patch('twitter.aurora.client.factory.make_client_factory', return_value=mock_api_factory),
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('twitter.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            mock_api_factory_patch,
-            mock_scheduler_proxy_class,
-            mock_clusters,
-            options, mock_get_job_config):
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        kill(['smfd/mchucarroll/test/hello', fp.name], mock_options)
-
-      # Now check that the right API calls got made.
-      self.assert_scheduler_called(mock_api)
-      assert mock_scheduler.killTasks.call_count == 1
-      query = self.get_expected_task_query([0, 1, 2, 3])
-      mock_scheduler.killTasks.assert_called_with(query, None)
+      # All that cancel_update really does is release the update lock.
+      # So that's all we really need to check.
+      assert mock_scheduler.releaseLock.call_count == 1
+      assert mock_scheduler.releaseLock.call_args[0][0].key.job == JobKey(environment='test',
+          role='mchucarroll', name='hello')

@@ -3,6 +3,10 @@ import unittest
 
 
 from twitter.aurora.client.commands.core import create
+from twitter.aurora.client.commands.util import (
+    create_blank_response,
+    create_simple_success_response
+)
 from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from twitter.aurora.config import AuroraConfig
 from twitter.common import app
@@ -92,8 +96,7 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def create_mock_status_query_result(cls, scheduleStatus):
-    mock_query_result = Mock(spec=Response)
-    mock_query_result.result = Mock(spec=Result)
+    mock_query_result = create_simple_success_response()
     mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     if scheduleStatus == ScheduleStatus.INIT:
       # status query result for before job is launched.
@@ -112,18 +115,11 @@ jobs = [HELLO_WORLD]
   @classmethod
   def get_createjob_response(cls):
     # Then, we call api.create_job(config)
-    mock_resp = Mock(spec=Response)
-    mock_resp.responseCode = ResponseCode.OK
-    mock_resp.message = "OK"
-    return mock_resp
+    return create_simple_success_response()
 
   @classmethod
   def get_failed_createjob_response(cls):
-    # Then, we call api.create_job(config)
-    mock_resp = Mock(spec=Response)
-    mock_resp.responseCode = ResponseCode.ERROR
-    mock_resp.message = "Create job failed"
-    return mock_resp
+    return create_blank_response(ResponseCode.ERROR, 'Create job failed')
 
   @classmethod
   def assert_create_job_called(cls, mock_api):
