@@ -34,6 +34,15 @@ from gen.twitter.aurora.ttypes import (
 from mock import Mock, patch
 
 
+FAKE_TIME = 42131
+
+
+def fake_time():
+  global FAKE_TIME
+  FAKE_TIME += 2
+  return FAKE_TIME
+
+
 class TestUpdateCommand(unittest.TestCase):
   CONFIG_BASE = """
 HELLO_WORLD = Job(
@@ -255,7 +264,11 @@ jobs = [HELLO_WORLD]
         patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
             return_value=mock_health_check),
-    ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory):
+        patch('time.time', side_effect=fake_time),
+        patch('time.sleep', return_value=None)
+
+    ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
+          time_patch, sleep_patch):
       self.setup_mock_scheduler_for_simple_update(mock_api)
       with temporary_file() as fp:
         fp.write(self.get_config(self.TEST_CLUSTER, self.TEST_ROLE, self.TEST_ENV, self.TEST_JOB))
