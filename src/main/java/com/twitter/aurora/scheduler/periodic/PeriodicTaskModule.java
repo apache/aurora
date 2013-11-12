@@ -20,8 +20,9 @@ import javax.inject.Singleton;
 import com.google.inject.AbstractModule;
 import com.google.inject.TypeLiteral;
 
+import com.twitter.aurora.scheduler.async.Preemptor;
+import com.twitter.aurora.scheduler.async.Preemptor.PreemptionDelay;
 import com.twitter.aurora.scheduler.periodic.PeriodicTaskLauncher.PeriodicTaskInterval;
-import com.twitter.aurora.scheduler.periodic.Preempter.PreemptionDelay;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -51,7 +52,7 @@ public class PeriodicTaskModule extends AbstractModule {
 
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
         .toInstance(PREEMPTION_DELAY.get());
-    bind(Preempter.class).in(Singleton.class);
+    bind(Preemptor.class).in(Singleton.class);
 
     LifecycleModule.bindStartupAction(binder(), PeriodicTaskLauncher.class);
   }

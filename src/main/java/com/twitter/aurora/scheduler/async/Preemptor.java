@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.periodic;
+package com.twitter.aurora.scheduler.async;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -43,7 +43,6 @@ import com.google.common.collect.Sets;
 import com.google.inject.BindingAnnotation;
 
 import com.twitter.aurora.scheduler.ResourceSlot;
-import com.twitter.aurora.scheduler.async.OfferQueue;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -78,7 +77,8 @@ import static com.twitter.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
  * To avoid excessive churn, the preempter requires that a task is PENDING for a duration (dictated
  * by {@link #preemptionCandidacyDelay}) before it becomes eligible to preempt other tasks.
  */
-class Preempter implements Runnable {
+// TODO(zmanji): Remove public attribute when periodic module is removed.
+public class Preemptor implements Runnable {
 
   /**
    * Binding annotation for the time interval after which a pending task becomes eligible to
@@ -86,7 +86,8 @@ class Preempter implements Runnable {
    */
   @BindingAnnotation
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-  @interface PreemptionDelay { }
+  // TODO(zmanji): Remove public attribute when periodic module is removed.
+  public @interface PreemptionDelay { }
 
   @VisibleForTesting
   static final Query.Builder PENDING_QUERY = Query.statusScoped(PENDING);
@@ -95,7 +96,7 @@ class Preempter implements Runnable {
   static final Query.Builder ACTIVE_NOT_PENDING_QUERY = Query.statusScoped(
       EnumSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(PENDING))));
 
-  private static final Logger LOG = Logger.getLogger(Preempter.class.getName());
+  private static final Logger LOG = Logger.getLogger(Preemptor.class.getName());
 
   private static final Function<IAssignedTask, Integer> GET_PRIORITY =
       new Function<IAssignedTask, Integer>() {
@@ -139,7 +140,7 @@ class Preempter implements Runnable {
    * @param clock Clock to check current time.
    */
   @Inject
-  Preempter(
+  Preemptor(
       Storage storage,
       SchedulerCore scheduler,
       OfferQueue offerQueue,

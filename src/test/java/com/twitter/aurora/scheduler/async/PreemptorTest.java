@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.periodic;
+package com.twitter.aurora.scheduler.async;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -41,7 +41,6 @@ import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.ResourceSlot;
-import com.twitter.aurora.scheduler.async.OfferQueue;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.filter.SchedulingFilterImpl;
@@ -66,7 +65,7 @@ import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
 import static com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
 
-public class PreempterTest extends EasyMockTest {
+public class PreemptorTest extends EasyMockTest {
 
   private static final String USER_A = "user_a";
   private static final String USER_B = "user_b";
@@ -107,7 +106,7 @@ public class PreempterTest extends EasyMockTest {
   }
 
   private void runPreempter() {
-    Preempter preempter = new Preempter(
+    Preemptor preempter = new Preemptor(
         storageUtil.storage,
         scheduler,
         offerQueue,
@@ -131,13 +130,13 @@ public class PreempterTest extends EasyMockTest {
 
   private void expectGetPendingTasks(ScheduledTask... returnedTasks) {
     storageUtil.expectTaskFetch(
-        Preempter.PENDING_QUERY,
+        Preemptor.PENDING_QUERY,
         IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
   }
 
   private void expectGetActiveTasks(ScheduledTask... returnedTasks) {
     storageUtil.expectTaskFetch(
-        Preempter.ACTIVE_NOT_PENDING_QUERY,
+        Preemptor.ACTIVE_NOT_PENDING_QUERY,
         IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
   }
 

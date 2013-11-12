@@ -27,6 +27,7 @@ import javax.inject.Inject;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.BindingAnnotation;
 
+import com.twitter.aurora.scheduler.async.Preemptor;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
@@ -58,14 +59,14 @@ public class PeriodicTaskLauncher implements Command, Runnable {
   public @interface PeriodicTaskInterval { }
 
   private final ShutdownRegistry shutdownRegistry;
-  private final Preempter preeempter;
+  private final Preemptor preeempter;
   private final ScheduledExecutorService executor;
   private final Amount<Long, Time> taskInterval;
 
   @Inject
   PeriodicTaskLauncher(
       ShutdownRegistry shutdownRegistry,
-      Preempter preeempter,
+      Preemptor preeempter,
       @PeriodicTaskInterval Amount<Long, Time> taskInterval) {
 
     this.shutdownRegistry = checkNotNull(shutdownRegistry);
