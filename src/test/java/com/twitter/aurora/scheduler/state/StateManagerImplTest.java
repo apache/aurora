@@ -52,7 +52,6 @@ import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
-import com.twitter.aurora.scheduler.state.StateManager.InstanceException;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
@@ -463,50 +462,6 @@ public class StateManagerImplTest extends EasyMockTest {
 
     insertTask(task, 0);
     stateManager.deleteTasks(ImmutableSet.of(taskId));
-  }
-
-  @Test
-  public void testAddInstances() throws Exception {
-    ITaskConfig existingTask = makeTask(JIM, MY_JOB);
-    String existingId = "a";
-    ITaskConfig newTask = makeTask(JIM, MY_JOB);
-    String newId = "b";
-    expect(taskIdGenerator.generate(existingTask, 0)).andReturn(existingId);
-    expectStateTransitions(existingId, INIT, PENDING);
-    expect(taskIdGenerator.generate(newTask, 1)).andReturn(newId);
-    expectStateTransitions(newId, INIT, PENDING);
-
-    control.replay();
-
-    insertTask(existingTask, 0);
-    stateManager.addInstances(JOB_KEY, ImmutableSet.of(1), newTask);
-  }
-
-  @Test
-  public void testAddInstancesNoExistingTasks() throws Exception {
-    ITaskConfig newTask = makeTask(JIM, MY_JOB);
-    String newId = "a";
-    expect(taskIdGenerator.generate(newTask, 1)).andReturn(newId);
-    expectStateTransitions(newId, INIT, PENDING);
-
-    control.replay();
-
-    stateManager.addInstances(JOB_KEY, ImmutableSet.of(1), newTask);
-  }
-
-  @Test(expected = InstanceException.class)
-  public void testAddInstancesIdCollision() throws Exception {
-    ITaskConfig taskInfo = makeTask(JIM, MY_JOB);
-    String taskId = "a";
-    expect(taskIdGenerator.generate(taskInfo, 0)).andReturn(taskId);
-    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING);
-
-    control.replay();
-
-    insertTask(taskInfo, 0);
-    assignTask(taskId, HOST_A);
-    changeState(taskId, RUNNING);
-    stateManager.addInstances(JOB_KEY, ImmutableSet.of(0), taskInfo);
   }
 
   private void expectStateTransitions(

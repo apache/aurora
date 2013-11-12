@@ -19,14 +19,12 @@ import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
 
 import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
@@ -79,26 +77,4 @@ public interface StateManager {
    * @param taskIds IDs of tasks to delete.
    */
   void deleteTasks(final Set<String> taskIds);
-
-  /**
-   * Adds new instances specified by the instances set.
-   * Requires unique (per job) instance IDs. Will fail with {@link InstanceException} if
-   * unable to add job instances due to colliding instance IDs.
-   *
-   * @param jobKey {@link IJobKey} identifying the parent job.
-   * @param instancesIds Set of instance IDs to be added to the job.
-   * @param config {@link ITaskConfig} to use with new instances.
-   * @throws InstanceException If any of the existing instance IDs already exist.
-   */
-  void addInstances(IJobKey jobKey, ImmutableSet<Integer> instancesIds, ITaskConfig config)
-      throws InstanceException;
-
-  /**
-   * Thrown when instance related operation fails.
-   */
-  static class InstanceException extends Exception {
-    public InstanceException(String msg) {
-      super(msg);
-    }
-  }
 }

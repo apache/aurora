@@ -31,7 +31,6 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -235,9 +234,6 @@ public class StateManagerImpl implements StateManager {
   static class UpdateException extends Exception {
     public UpdateException(String msg) {
       super(msg);
-    }
-    public UpdateException(String msg, Throwable cause) {
-      super(msg, cause);
     }
   }
 
@@ -817,28 +813,6 @@ public class StateManagerImpl implements StateManager {
         Iterable<IScheduledTask> tasks = taskStore.fetchTasks(Query.taskScoped(taskIds));
         addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(tasks)));
         taskStore.deleteTasks(taskIds);
-      }
-    });
-  }
-
-  @Override
-  public void addInstances(
-      final IJobKey jobKey,
-      final ImmutableSet<Integer> instancesIds,
-      final ITaskConfig config) throws InstanceException {
-
-    storage.write(storage.new NoResultSideEffectWork<InstanceException>() {
-      @Override void execute(MutableStoreProvider store) throws InstanceException {
-        ImmutableSet<IScheduledTask> tasks =
-            store.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active());
-
-        Set<Integer> existingInstanceIds =
-            FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet();
-        if (!Sets.intersection(existingInstanceIds, instancesIds).isEmpty()) {
-          throw new InstanceException("Instance ID collision detected.");
-        }
-
-        insertPendingTasks(Maps.asMap(instancesIds, Functions.constant(config)));
       }
     });
   }

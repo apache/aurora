@@ -46,7 +46,6 @@ import com.twitter.aurora.scheduler.storage.entities.ITaskConstraint;
 import com.twitter.aurora.scheduler.storage.entities.IValueConstraint;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 
@@ -65,10 +64,6 @@ public final class ConfigurationManager {
 
   @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
   @VisibleForTesting public static final String RACK_CONSTRAINT = "rack";
-
-  @Positive
-  @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
-  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(1000);
 
   @CmdLine(name = "require_contact_email",
       help = "If true, reject jobs that do not specify a contact email address.")
@@ -257,10 +252,6 @@ public final class ConfigurationManager {
 
     if (job.getInstanceCount() <= 0) {
       throw new TaskDescriptionException("Shard count must be positive.");
-    }
-
-    if (job.getInstanceCount() > MAX_TASKS_PER_JOB.get()) {
-      throw new TaskDescriptionException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
     }
 
     JobConfiguration builder = job.newBuilder();

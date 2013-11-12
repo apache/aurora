@@ -23,10 +23,15 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ShardUpdateResult;
@@ -47,6 +52,9 @@ import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.Positive;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -60,6 +68,9 @@ import static com.twitter.aurora.scheduler.base.Tasks.ACTIVE_STATES;
  * Implementation of the scheduler core.
  */
 class SchedulerCoreImpl implements SchedulerCore {
+  @Positive
+  @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
+  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(1000);
 
   private static final Logger LOG = Logger.getLogger(SchedulerCoreImpl.class.getName());
 
@@ -79,7 +90,6 @@ class SchedulerCoreImpl implements SchedulerCore {
   // TODO(Bill Farner): Avoid using StateManagerImpl.
   // State manager handles persistence of task modifications and state transitions.
   private final StateManagerImpl stateManager;
-
   private final TaskIdGenerator taskIdGenerator;
   private final JobFilter jobFilter;
 
@@ -90,6 +100,7 @@ class SchedulerCoreImpl implements SchedulerCore {
    * @param cronScheduler Cron scheduler.
    * @param immediateScheduler Immediate scheduler.
    * @param stateManager Persistent state manager.
+   * @param taskIdGenerator Task ID generator.
    * @param jobFilter Job filter.
    */
   @Inject
@@ -121,18 +132,6 @@ class SchedulerCoreImpl implements SchedulerCore {
     setTaskStatus(Query.taskScoped(taskIds), ScheduleStatus.UNKNOWN, Optional.<String>absent());
   }
 
-  // This number is derived from the maximum file name length limit on most UNIX systems, less
-  // the number of characters we've observed being added by mesos for the executor ID, prefix, and
-  // delimiters.
-  @VisibleForTesting
-  static final int MAX_TASK_ID_LENGTH = 255 - 90;
-
-  private void checkTaskIdLength(ITaskConfig taskConfig, int instanceId) throws ScheduleException {
-    if (taskIdGenerator.generate(taskConfig, instanceId).length() > MAX_TASK_ID_LENGTH) {
-      throw new ScheduleException("Task ID is too long, please shorten your role or job name.");
-    }
-  }
-
   @Override
   public synchronized void createJob(ParsedConfiguration parsedConfiguration)
       throws ScheduleException {
@@ -142,12 +141,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
     }
 
-    // TODO(William Farner); This is a short-term hack to stop the bleeding from
-    //                       https://issues.apache.org/jira/browse/MESOS-691
-    checkTaskIdLength(
-        parsedConfiguration.getJobConfig().getTaskConfig(),
-        parsedConfiguration.getJobConfig().getInstanceCount());
-    checkFilterPasses(job);
+    runJobFilters(job.getKey(), job.getTaskConfig(), job.getInstanceCount(), false);
 
     boolean accepted = false;
     for (final JobManager manager : jobManagers) {
@@ -163,6 +157,74 @@ class SchedulerCoreImpl implements SchedulerCore {
       LOG.severe("Discarded job: " + job);
       throw new ScheduleException("Job not accepted, discarding.");
     }
+  }
+
+  // This number is derived from the maximum file name length limit on most UNIX systems, less
+  // the number of characters we've observed being added by mesos for the executor ID, prefix, and
+  // delimiters.
+  @VisibleForTesting
+  static final int MAX_TASK_ID_LENGTH = 255 - 90;
+
+  // TODO(maximk): Consider a better approach to quota checking. MESOS-4476.
+  private void runJobFilters(IJobKey jobKey, ITaskConfig task, int count, boolean incremental)
+      throws ScheduleException {
+
+    int instanceCount = count;
+    if (incremental) {
+      instanceCount +=
+          Storage.Util.weaklyConsistentFetchTasks(storage, Query.jobScoped(jobKey).active()).size();
+    }
+
+    // TODO(maximk): This is a short-term hack to stop the bleeding from
+    //               https://issues.apache.org/jira/browse/MESOS-691
+    if (taskIdGenerator.generate(task, instanceCount).length() > MAX_TASK_ID_LENGTH) {
+      throw new ScheduleException(
+          "Task ID is too long, please shorten your role or job name.");
+    }
+
+    JobFilter.JobFilterResult filterResult = jobFilter.filter(task, instanceCount);
+    // TODO(maximk): Consider deprecating JobFilterResult in favor of custom exception.
+    if (!filterResult.isPass()) {
+      throw new ScheduleException(filterResult.getReason());
+    }
+
+    if (instanceCount > MAX_TASKS_PER_JOB.get()) {
+      throw new ScheduleException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
+    }
+  }
+
+  @Override
+  public void validateJobResources(ParsedConfiguration parsedConfiguration)
+      throws ScheduleException {
+
+    IJobConfiguration job = parsedConfiguration.getJobConfig();
+    runJobFilters(job.getKey(), job.getTaskConfig(), job.getInstanceCount(), false);
+  }
+
+  @Override
+  public void addInstances(
+      final IJobKey jobKey,
+      final ImmutableSet<Integer> instanceIds,
+      final ITaskConfig config) throws ScheduleException {
+
+    runJobFilters(jobKey, config, instanceIds.size(), true);
+    storage.write(new MutateWork.NoResult<ScheduleException>() {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider)
+          throws ScheduleException {
+
+        ImmutableSet<IScheduledTask> tasks =
+            storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active());
+
+        Set<Integer> existingInstanceIds =
+            FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet();
+        if (!Sets.intersection(existingInstanceIds, instanceIds).isEmpty()) {
+          throw new ScheduleException("Instance ID collision detected.");
+        }
+
+        stateManager.insertPendingTasks(Maps.asMap(instanceIds, Functions.constant(config)));
+      }
+    });
   }
 
   @Override
@@ -302,7 +364,7 @@ class SchedulerCoreImpl implements SchedulerCore {
               + JobKeys.toPath(job));
         }
 
-        checkFilterPasses(job);
+        runJobFilters(jobKey, job.getTaskConfig(), job.getInstanceCount(), false);
 
         try {
           return Optional.of(
@@ -368,13 +430,5 @@ class SchedulerCoreImpl implements SchedulerCore {
 
     stateManager.changeState(Query.taskScoped(task.getTaskId()), ScheduleStatus.PREEMPTING,
         Optional.of("Preempting in favor of " + preemptingTask.getTaskId()));
-  }
-
-  private void checkFilterPasses(IJobConfiguration job) throws ScheduleException {
-    JobFilter.JobFilterResult result = jobFilter.filter(job);
-    if (!result.isPass()) {
-      throw new ScheduleException(
-          "Job was rejected (Reason: " + result.getReason() + ")");
-    }
   }
 }

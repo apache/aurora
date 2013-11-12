@@ -95,6 +95,7 @@ import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
+import static org.easymock.EasyMock.anyInt;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -175,8 +176,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .andStubReturn("key");
     expect(cronScheduler.isValidSchedule(anyObject(String.class))).andStubReturn(true);
 
-    expect(jobFilter.filter(anyObject(IJobConfiguration.class))).andStubReturn(
-        JobFilter.JobFilterResult.pass());
+    expect(jobFilter.filter(anyObject(ITaskConfig.class), anyInt())).andStubReturn(
+        JobFilterResult.pass());
   }
 
   /**
@@ -1789,6 +1790,30 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testEnsureCanAddInstances() throws Exception {
+    ParsedConfiguration job = makeJob(KEY_A, 1);
+    expect(jobFilter.filter(job.getJobConfig().getTaskConfig(), 1))
+        .andReturn(JobFilterResult.pass());
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.validateJobResources(job);
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testEnsureCanAddInstancesFails() throws Exception {
+    ParsedConfiguration job = makeJob(KEY_A, 1);
+    expect(jobFilter.filter(job.getJobConfig().getTaskConfig(), 1))
+        .andReturn(JobFilterResult.fail("fail"));
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.validateJobResources(job);
+  }
+
+  @Test
   public void testTaskIdLimit() throws Exception {
     taskIdGenerator = new TaskIdGenerator() {
       @Override public String generate(ITaskConfig input, int instanceCount) {
@@ -1819,7 +1844,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testFilterFailRejectsCreate() throws Exception {
     ParsedConfiguration job = makeJob(KEY_A, 1);
-    expect(jobFilter.filter(job.getJobConfig())).andReturn(JobFilterResult.fail("failed"));
+    expect(jobFilter.filter(job.getJobConfig().getTaskConfig(), 1))
+        .andReturn(JobFilterResult.fail("failed"));
 
     control.replay();
 
@@ -1830,12 +1856,95 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testFilterFailRejectsUpdate() throws Exception {
     ParsedConfiguration job = makeJob(KEY_A, 1);
-    expect(jobFilter.filter(job.getJobConfig())).andReturn(JobFilterResult.fail("failed"));
+    expect(jobFilter.filter(job.getJobConfig().getTaskConfig(), 1))
+        .andReturn(JobFilterResult.fail("failed"));
 
     control.replay();
 
     buildScheduler();
     scheduler.initiateJobUpdate(job);
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testFilterFailRejectsAddInstances() throws Exception {
+    IJobConfiguration job = makeJob(KEY_A, 1).getJobConfig();
+    expect(jobFilter.filter(job.getTaskConfig(), 1)).andReturn(JobFilterResult.fail("failed"));
+
+    control.replay();
+
+    buildScheduler();
+    scheduler.addInstances(job.getKey(), ImmutableSet.of(1), job.getTaskConfig());
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testMaxJobCheckFailsForAddInstances() throws Exception {
+    IJobConfiguration job = makeJob(KEY_A, 1).getJobConfig();
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.addInstances(
+        job.getKey(),
+        ImmutableSet.copyOf(
+            ContiguousSet.create(Range.closed(0, SchedulerCoreImpl.MAX_TASKS_PER_JOB.get()),
+                DiscreteDomain.integers())),
+        job.getTaskConfig());
+  }
+
+  @Test
+  public void testAddInstances() throws Exception {
+    TaskConfig existingTask = productionTask();
+    TaskConfig newTask = productionTask()
+        .setEnvironment(ENV_A)
+        .setJobName(KEY_A.getName())
+        .setOwner(OWNER_A);
+    expect(jobFilter.filter(ITaskConfig.build(newTask), 2)).andReturn(JobFilterResult.pass());
+    ImmutableSet<Integer> instances = ImmutableSet.of(1);
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(KEY_A, existingTask, 1));
+
+    assertTaskCount(1);
+    scheduler.addInstances(KEY_A, instances, ITaskConfig.build(newTask));
+    assertTaskCount(2);
+  }
+
+  @Test
+  public void testAddInstancesNoExistingTasks() throws Exception {
+    TaskConfig newTask = productionTask()
+        .setEnvironment(ENV_A)
+        .setJobName(KEY_A.getName())
+        .setOwner(OWNER_A);
+
+    ImmutableSet<Integer> instances = ImmutableSet.of(1);
+
+    control.replay();
+    buildScheduler();
+
+    assertTaskCount(0);
+    scheduler.addInstances(KEY_A, instances, ITaskConfig.build(newTask));
+    assertTaskCount(1);
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testAddInstancesIdCollision() throws Exception {
+    TaskConfig existingTask = productionTask();
+    TaskConfig newTask = productionTask()
+        .setEnvironment(ENV_A)
+        .setJobName(KEY_A.getName())
+        .setOwner(OWNER_A);
+
+    ImmutableSet<Integer> instances = ImmutableSet.of(0);
+
+    control.replay();
+    buildScheduler();
+
+    scheduler.createJob(makeJob(KEY_A, existingTask, 1));
+
+    assertTaskCount(1);
+    scheduler.addInstances(KEY_A, instances, ITaskConfig.build(newTask));
   }
 
   private static String getLocalHost() {

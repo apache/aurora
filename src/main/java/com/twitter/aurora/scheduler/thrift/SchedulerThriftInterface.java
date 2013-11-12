@@ -96,13 +96,10 @@ import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescr
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.state.CronJobManager;
-import com.twitter.aurora.scheduler.state.JobFilter;
 import com.twitter.aurora.scheduler.state.LockManager;
 import com.twitter.aurora.scheduler.state.LockManager.LockException;
 import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
-import com.twitter.aurora.scheduler.state.StateManager;
-import com.twitter.aurora.scheduler.state.StateManager.InstanceException;
 import com.twitter.aurora.scheduler.storage.JobStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -171,14 +168,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   private final Storage storage;
   private final SchedulerCore schedulerCore;
-  private final StateManager stateManager;
   private final LockManager lockManager;
   private final CapabilityValidator sessionValidator;
   private final StorageBackup backup;
   private final Recovery recovery;
   private final MaintenanceController maintenance;
   private final CronJobManager cronJobManager;
-  private final JobFilter jobFilter;
   private final Amount<Long, Time> killTaskInitialBackoff;
   private final Amount<Long, Time> killTaskMaxBackoff;
 
@@ -186,25 +181,21 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   SchedulerThriftInterface(
       Storage storage,
       SchedulerCore schedulerCore,
-      StateManager stateManager,
       LockManager lockManager,
       CapabilityValidator sessionValidator,
       StorageBackup backup,
       Recovery recovery,
       CronJobManager cronJobManager,
-      JobFilter jobFilter,
       MaintenanceController maintenance) {
 
     this(storage,
         schedulerCore,
-        stateManager,
         lockManager,
         sessionValidator,
         backup,
         recovery,
         maintenance,
         cronJobManager,
-        jobFilter,
         KILL_TASK_INITIAL_BACKOFF.get(),
         KILL_TASK_MAX_BACKOFF.get());
   }
@@ -213,27 +204,23 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   SchedulerThriftInterface(
       Storage storage,
       SchedulerCore schedulerCore,
-      StateManager stateManager,
       LockManager lockManager,
       CapabilityValidator sessionValidator,
       StorageBackup backup,
       Recovery recovery,
       MaintenanceController maintenance,
       CronJobManager cronJobManager,
-      JobFilter jobFilter,
       Amount<Long, Time> initialBackoff,
       Amount<Long, Time> maxBackoff) {
 
     this.storage = checkNotNull(storage);
     this.schedulerCore = checkNotNull(schedulerCore);
-    this.stateManager = checkNotNull(stateManager);
     this.lockManager = checkNotNull(lockManager);
     this.sessionValidator = checkNotNull(sessionValidator);
     this.backup = checkNotNull(backup);
     this.recovery = checkNotNull(recovery);
     this.maintenance = checkNotNull(maintenance);
     this.cronJobManager = checkNotNull(cronJobManager);
-    this.jobFilter = checkNotNull(jobFilter);
     this.killTaskInitialBackoff = checkNotNull(initialBackoff);
     this.killTaskMaxBackoff = checkNotNull(maxBackoff);
   }
@@ -257,11 +244,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     try {
+      ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
+
       lockManager.validateIfLocked(
           ILockKey.build(LockKey.job(jobKey.newBuilder())),
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-      ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
       schedulerCore.createJob(parsed);
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
@@ -324,11 +312,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       ParsedConfiguration parsed =
           ParsedConfiguration.fromUnparsed(IJobConfiguration.build(description));
 
+      // TODO(maximk): Consider moving job validation logic into a dedicated RPC. MESOS-4476.
       if (validation != null && validation == JobConfigValidation.RUN_FILTERS) {
-        JobFilter.JobFilterResult filterResult = jobFilter.filter(parsed.getJobConfig());
-        if (!filterResult.isPass()) {
-          return response.setResponseCode(INVALID_REQUEST).setMessage(filterResult.getReason());
-        }
+        schedulerCore.validateJobResources(parsed);
       }
 
       PopulateJobResult result = new PopulateJobResult()
@@ -336,7 +322,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       response.setResult(Result.populateJobResult(result))
           .setResponseCode(OK)
           .setMessage("Tasks populated");
-    } catch (TaskDescriptionException e) {
+    } catch (TaskDescriptionException | ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST)
           .setMessage("Invalid configuration: " + e.getMessage());
     }
@@ -1036,7 +1022,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         .setResult(Result.getVersionResult(CURRENT_API_VERSION));
   }
 
-
   @Override
   public Response addInstances(
       AddInstancesConfig config,
@@ -1049,35 +1034,25 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(config.getKey()));
 
     Response resp = new Response();
-    ITaskConfig task;
-    try {
-      task = ConfigurationManager.validateAndPopulate(ITaskConfig.build(config.getTaskConfig()));
-    } catch (TaskDescriptionException e) {
-      return resp.setResponseCode(ERROR).setMessage(e.getMessage());
-    }
-
-    if (cronJobManager.hasJob(jobKey)) {
-      return resp.setResponseCode(INVALID_REQUEST).setMessage("Cron jobs are not supported here.");
-    }
-
-    JobFilter.JobFilterResult filterResult = jobFilter.filter(task, config.getInstanceIdsSize());
-    if (!filterResult.isPass()) {
-      return resp.setResponseCode(INVALID_REQUEST).setMessage(filterResult.getReason());
-    }
-
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
+      ITaskConfig task = ConfigurationManager.validateAndPopulate(
+          ITaskConfig.build(config.getTaskConfig()));
+
+      if (cronJobManager.hasJob(jobKey)) {
+        return resp.setResponseCode(INVALID_REQUEST)
+            .setMessage("Cron jobs are not supported here.");
+      }
+
       lockManager.validateIfLocked(
           ILockKey.build(LockKey.job(jobKey.newBuilder())),
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-      stateManager.addInstances(jobKey, ImmutableSet.copyOf(config.getInstanceIds()), task);
+      schedulerCore.addInstances(jobKey, ImmutableSet.copyOf(config.getInstanceIds()), task);
       return resp.setResponseCode(OK).setMessage("Successfully added instances.");
     } catch (AuthFailedException e) {
       return resp.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
-    } catch (LockException e) {
-      return resp.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    } catch (InstanceException e) {
+    } catch (TaskDescriptionException | LockException | ScheduleException e) {
       return resp.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
   }

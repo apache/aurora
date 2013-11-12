@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ShardUpdateResult;
@@ -29,6 +30,7 @@ import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescr
 import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Scheduling core, stores scheduler state and makes decisions about which tasks to schedule when
@@ -50,6 +52,27 @@ public interface SchedulerCore {
    */
   void createJob(ParsedConfiguration parsedConfiguration)
       throws ScheduleException, TaskDescriptionException;
+
+  /**
+   * Adds new instances specified by the instances set.
+   * <p>
+   * Provided instance IDs should be disjoint from the instance IDs active in the job.
+   *
+   * @param jobKey IJobKey identifying the parent job.
+   * @param instanceIds Set of instance IDs to be added to the job.
+   * @param config ITaskConfig to use with new instances.
+   * @throws ScheduleException If any of the existing instance IDs already exist.
+   */
+  void addInstances(IJobKey jobKey, ImmutableSet<Integer> instanceIds, ITaskConfig config)
+      throws ScheduleException;
+
+  /**
+   * Validates the new job configuration passes resource filters.
+   *
+   * @param parsedConfiguration Job configuration to validate.
+   * @throws ScheduleException If job resources do not pass filters.
+   */
+  void validateJobResources(ParsedConfiguration parsedConfiguration) throws ScheduleException;
 
   /**
    * Starts a cron job immediately.
