@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+set -e
+
+PANTS_ROOT=$(dirname "$0")
+PANTS_VERSION=$(cat "$PANTS_ROOT/.pantsversion")
+VIRTUALENV_VERSION=1.10.1
+
+if [[ -e "$PANTS_ROOT/pants.pex" ]]; then
+  cat <<EOF | PANTS_ROOT="$PANTS_ROOT" PANTS_VERSION=$PANTS_VERSION python
+from contextlib import closing
+import json
+import os
+import sys
+import zipfile
+
+with closing(zipfile.ZipFile(os.path.join(os.environ['PANTS_ROOT'], 'pants.pex'))) as zf:
+  pex_info = json.loads(zf.read('PEX-INFO'))
+
+for requirement, _, _ in pex_info['requirements']:
+  if '==' in requirement:
+    req, version = requirement.split('==', 2)
+    if req == 'twitter.pants' and version == os.environ['PANTS_VERSION']:
+      sys.exit(0)
+
+sys.exit(1)
+EOF
+
+  if [ $? -eq 0 ]; then
+    exec "$PANTS_ROOT/pants.pex" "$@"
+  fi
+fi
+
+PANTS_TEMP=$(mktemp -d -t pants)
+
+if which python2.7 >/dev/null; then
+  PY=$(which python2.7)
+elif which python2.6 >/dev/null; then
+  PY=$(which python2.6)
+elif which python3 >/dev/null; then
+  PY=$(which python3)
+else
+  echo 'No python interpreter found on the path.  Python will not work!' 1>&2
+  exit 1
+fi
+
+echo 'Using '$PY 1>&2
+
+pushd "$PANTS_TEMP"
+
+curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-$VIRTUALENV_VERSION.tar.gz
+tar -zxf virtualenv-$VIRTUALENV_VERSION.tar.gz
+python virtualenv-$VIRTUALENV_VERSION/virtualenv.py tcp
+source tcp/bin/activate
+
+pip install twitter.common.python==0.2.0
+
+cat <<EOF | \
+  PYTHON_VERBOSE=1 \
+  PEX_VERBOSE=1 \
+  PANTS_VERSION=$PANTS_VERSION python
+import os
+
+from twitter.common.python.fetcher import Fetcher, PyPIFetcher
+from twitter.common.python.http import Crawler
+from twitter.common.python.obtainer import Obtainer
+from twitter.common.python.pex_builder import PEXBuilder
+from twitter.common.python.resolver import Resolver
+from twitter.common.python.translator import Translator
+
+pb = PEXBuilder()
+resolver = Resolver(crawler=Crawler(), fetchers=[PyPIFetcher()])
+req = 'twitter.pants==' + os.environ['PANTS_VERSION']
+pb.add_requirement(req)
+for dist in resolver.resolve(req):
+  pb.add_distribution(dist)
+pb.info.entry_point = 'twitter.pants.bin.pants_exe:main'
+pb.build('dist/pants.pex')
+EOF
+
+deactivate
+
+popd
+
+cp -f -- "$PANTS_TEMP/dist/pants.pex" "$PANTS_ROOT"
+rm -rf "$PANTS_TEMP"
+
+exec "$PANTS_ROOT/pants.pex" "$@"

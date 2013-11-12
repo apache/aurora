@@ -1,8 +1,13 @@
-*.ipr
 *.iml
+*.ipr
 *.iws
+*.pyc
+*~
 .gradle/
-build/
-out/
+.pants.d/
 .reviewboardrc
+build/
+dist/
 gradle-app.setting
+out/
+pants.pex
