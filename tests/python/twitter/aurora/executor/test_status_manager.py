@@ -1,3 +1,4 @@
+import pytest
 import socket
 import threading
 import time
@@ -178,6 +179,8 @@ class TestStatusManager(unittest.TestCase):
     assert self.driver.updates[0].state == mesos_pb.TASK_LOST
     assert self.runner.cleaned
 
+  # AURORA-23
+  @pytest.mark.skipif("True")
   def test_unhealthy_task_overridden(self):
     class FastStatusManager(StatusManager):
       ESCALATION_WAIT = Amount(500, Time.MILLISECONDS)
