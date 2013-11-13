@@ -12,6 +12,7 @@ from twitter.aurora.client.commands.util import (
     create_simple_success_response
 )
 
+from gen.twitter.aurora.constants import ACTIVE_STATES
 from gen.twitter.aurora.ttypes import (
     Identity,
     ScheduleStatus,
@@ -157,8 +158,13 @@ jobs = [HELLO_WORLD]
   def get_expected_task_query(cls, shards=None):
     """Helper to create the query that will be a parameter to job kill."""
     instance_ids = frozenset(shards) if shards is not None else None
-    return TaskQuery(taskIds=None, jobName=cls.TEST_JOB, environment=cls.TEST_ENV,
-        instanceIds=instance_ids, owner=Identity(role=cls.TEST_ROLE, user=None))
+    return TaskQuery(
+        taskIds=None,
+        jobName=cls.TEST_JOB,
+        environment=cls.TEST_ENV,
+        instanceIds=instance_ids,
+        statuses=ACTIVE_STATES,
+        owner=Identity(role=cls.TEST_ROLE, user=None))
 
   def test_kill_job_api_level(self):
     """Test kill client-side API logic."""
