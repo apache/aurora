@@ -1,29 +1,31 @@
 import json
 import os
 import socket
-import sys
 import threading
 import time
+import traceback
 
 from twitter.common import log
 from twitter.common.concurrent import deadline, defer, Timeout
-from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import Observable
 from twitter.common.quantity import Amount, Time
 
 from twitter.aurora.common_internal.clusters import TWITTER_CLUSTERS, TwitterCluster
 from twitter.aurora.common.http_signaler import HttpSignaler
-from twitter.aurora.config import PortResolver
-from twitter.aurora.config.schema.base import MesosJob, MesosTaskInstance
-from twitter.aurora.config.thrift import task_instance_from_job, resolve_thermos_config
+from twitter.aurora.config.schema.base import MesosJob
+from twitter.aurora.config.thrift import resolve_thermos_config
 from twitter.thermos.common.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
 
 from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
-from gen.twitter.aurora.ttypes import AssignedTask
 
 from .common.health_checker import HealthCheckerThread
 from .common.kill_manager import KillManager
+from .common.task_info import (
+    assigned_task_from_mesos_task,
+    mesos_task_instance_from_assigned_task,
+    resolve_ports,
+)
 from .common_internal.discovery_manager import DiscoveryManager
 from .common_internal.resource_checkpoints import ResourceCheckpointer
 from .common_internal.resource_manager import ResourceManager
@@ -33,9 +35,6 @@ from .status_manager import StatusManager
 from .task_runner_wrapper import TaskRunnerWrapper
 
 import mesos_pb2 as mesos_pb
-from pystachio import Ref
-from thrift.TSerialization import deserialize as thrift_deserialize
-from thrift.Thrift import TException
 
 
 class ThermosExecutor(Observable, ThermosExecutorBase):
@@ -55,56 +54,6 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     # To catch killTasks sent while the runner initialization is occurring
     self._abort_runner = threading.Event()
     self.launched = threading.Event()
-
-  @staticmethod
-  def deserialize_assigned_task(task):
-    """Deserialize task from a launchTask task protocol buffer.
-
-       Returns AssignedTask
-    """
-    try:
-      assigned_task = thrift_deserialize(AssignedTask(), task.data)
-    except (EOFError, TException) as e:
-      raise ValueError('Could not deserialize task! %s' % e)
-    return assigned_task
-
-  @staticmethod
-  def deserialize_thermos_task(assigned_task):
-    """Deserialize MesosTaskInstance from a AssignedTask thrift."""
-    thermos_task = resolve_thermos_config(assigned_task.task)
-    if not thermos_task:
-      raise ValueError('Task did not have a thermosConfig!')
-    try:
-      json_blob = json.loads(thermos_task)
-    except Exception as e:
-      raise ValueError('Could not deserialize thermosConfig JSON! %s' % e)
-    # As part of the transition for MESOS-2133, we can send either a MesosTaskInstance
-    # or we can be sending a MesosJob.  So handle both possible cases.  Once everyone
-    # is using MesosJob, then we can begin to leverage additional information that
-    # becomes available such as cluster.
-    if 'instance' in json_blob:
-      return MesosTaskInstance.json_loads(thermos_task)
-    else:
-      mti, refs = task_instance_from_job(MesosJob.json_loads(thermos_task),
-          assigned_task.instanceId)
-      for ref in refs:
-        # If the ref is {{thermos.task_id}} or a subscope of
-        # {{thermos.ports}}, it currently gets bound by the Thermos Runner,
-        # so we must leave them unbound.
-        #
-        # {{thermos.user}} is a legacy binding which we can safely ignore.
-        #
-        # TODO(wickman) These should be rewritten by the mesos client to use
-        # %%style%% replacements in order to allow us to better type-check configs
-        # client-side.
-        if ref == Ref.from_address('thermos.task_id'):
-          continue
-        if Ref.subscope(Ref.from_address('thermos.ports'), ref):
-          continue
-        if ref == Ref.from_address('thermos.user'):
-          continue
-        raise ValueError('Unexpected unbound refs: %s' % ' '.join(map(str, refs)))
-      return mti
 
   @classmethod
   def extract_ensemble(cls, assigned_task, default=TwitterCluster.DEFAULT_ENSEMBLE):
@@ -241,21 +190,6 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
 
     self._manager.start()
 
-  @classmethod
-  def resolve_ports(cls, mesos_task, portmap):
-    """Given a mesos task and the portmap of resolved ports from the scheduler,
-       create a fully resolved map of port name => port number for the thermos
-       runner and discovery manager."""
-    task_portmap = mesos_task.announce().portmap().get() if mesos_task.has_announce() else {}
-    task_portmap.update(portmap)
-    task_portmap = PortResolver.resolve(task_portmap)
-
-    for name, port in task_portmap.items():
-      if not isinstance(port, int):
-        log.warning('Task has unmapped port: %s => %s' % (name, port))
-
-    return dict((name, port) for (name, port) in task_portmap.items() if isinstance(port, int))
-
   """ Mesos Executor API methods follow """
 
   def launchTask(self, driver, task):
@@ -279,10 +213,11 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     self._task_id = task.task_id.value
 
     try:
-      assigned_task = self.deserialize_assigned_task(task)
-      mesos_task = self.deserialize_thermos_task(assigned_task)
+      assigned_task = assigned_task_from_mesos_task(task)
+      mesos_task = mesos_task_instance_from_assigned_task(assigned_task)
     except Exception as e:
-      log.fatal('Could not deserialize AssignedTask: %s' % e)
+      log.fatal('Could not deserialize AssignedTask')
+      log.fatal(traceback.format_exc())
       self.send_update(driver, self._task_id, 'FAILED', "Could not deserialize task: %s" % e)
       defer(driver.stop, delay=self.STOP_WAIT)
       return
@@ -290,7 +225,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     self.send_update(driver, self._task_id, 'STARTING', 'Initializing sandbox.')
 
     # Fully resolve the portmap
-    portmap = self.resolve_ports(mesos_task, assigned_task.assignedPorts)
+    portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)
 
     # start the process on a separate thread and give the message processing thread back
     # to the driver

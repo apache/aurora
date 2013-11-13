@@ -43,3 +43,15 @@ python_library(
     pants('src/python/twitter/common_internal/appapp')
   ]
 )
+
+python_library(
+  name = 'task_info',
+  sources = ['task_info.py'],
+  dependencies = [
+    pants('3rdparty/python:pystachio'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/python/twitter/aurora/config'),
+    pants('src/python/twitter/aurora/config/schema'),
+    pants('src/python/twitter/common/log'),
+  ]
+)

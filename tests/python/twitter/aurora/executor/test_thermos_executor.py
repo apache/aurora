@@ -1,8 +1,6 @@
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from collections import defaultdict
-import functools
 import getpass
-import json
 import os
 import pytest
 import signal
@@ -16,7 +14,7 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.log.options import LogOptions
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
-from twitter.common.quantity import Amount, Time, Data
+from twitter.common.quantity import Amount, Time
 
 from twitter.aurora.common_internal.clusters import TwitterCluster, TWITTER_CLUSTERS
 from twitter.aurora.config.schema.base import (
@@ -41,7 +39,6 @@ from gen.twitter.aurora.ttypes import (
   AssignedTask,
   ExecutorConfig,
   TaskConfig)
-from gen.twitter.thermos.ttypes import TaskState
 
 from thrift.TSerialization import serialize
 import mesos_pb2 as mesos_pb
@@ -167,31 +164,6 @@ MESOS_JOB = MesosJob(
 )
 
 
-def test_deserialize_thermos_task_old():
-  """TODO(maximk): decomission this test once migration to thermosConfigData is done."""
-  assigned_task = AssignedTask(
-      instanceId=0,
-      task=TaskConfig(thermosConfig=MESOS_JOB(task=HELLO_WORLD).json_dumps()))
-  assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
-
-  assigned_task = AssignedTask(
-      instanceId=0,
-      task=TaskConfig(thermosConfig=HELLO_WORLD_MTI.json_dumps()))
-  assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
-
-def test_deserialize_thermos_task():
-  assigned_task = AssignedTask(
-      instanceId=0,
-      task=TaskConfig(executorConfig=ExecutorConfig(name='thermos',
-                      data=MESOS_JOB(task=HELLO_WORLD).json_dumps())))
-  assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
-
-  assigned_task = AssignedTask(
-      instanceId=0,
-      task=TaskConfig(executorConfig=ExecutorConfig(name='thermos',
-                      data=HELLO_WORLD_MTI.json_dumps())))
-  assert ThermosExecutor.deserialize_thermos_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
-
 def test_extract_ensemble():
   def make_assigned_task(thermos_config):
     return AssignedTask(instanceId=0, task=TaskConfig(thermosConfig=thermos_config.json_dumps()))
@@ -279,9 +251,9 @@ class TestThermosExecutor(object):
     LogOptions.set_log_dir(cls.LOG_DIR)
     LogOptions.set_disk_log_level('DEBUG')
     log.init('executor_logger')
-    if not TestThermosExecutor.PANTS_BUILT:
+    if not cls.PANTS_BUILT:
       assert subprocess.call(["./pants", "src/python/twitter/aurora/executor:thermos_runner"]) == 0
-      PANTS_BUILD = True
+      cls.PANTS_BUILT = True
 
   @classmethod
   def teardown_class(cls):

@@ -3,6 +3,7 @@ python_test_suite(
   dependencies = [
     pants(':directory_sandbox'),
     pants(':health_checker'),
+    pants(':task_info'),
   ]
 )
 
@@ -23,5 +24,15 @@ python_tests(
     pants('3rdparty/python:mox'),
     pants('src/python/twitter/aurora/executor/common:health_checker'),
     pants('src/python/twitter/common/testing'),
+  ]
+)
+
+python_tests(
+  name = 'task_info',
+  sources = [ 'test_task_info.py' ],
+  dependencies = [
+    pants('src/python/twitter/aurora/executor/common:task_info'),
+    pants('src/python/twitter/aurora/config/schema'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
