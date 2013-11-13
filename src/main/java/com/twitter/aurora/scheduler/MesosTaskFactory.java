@@ -64,8 +64,7 @@ public interface MesosTaskFactory {
    */
   TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException;
 
-  // TODO(wfarner): Reduce visibility of this class and instantiate it in a module only.
-  public static class ExecutorConfig {
+  static class ExecutorConfig {
     private final String executorPath;
 
     public ExecutorConfig(String executorPath) {
