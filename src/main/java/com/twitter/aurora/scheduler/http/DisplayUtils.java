@@ -21,6 +21,7 @@ import com.google.common.collect.Ordering;
 import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import com.twitter.aurora.scheduler.http.SchedulerzHome.Role;
 import com.twitter.aurora.scheduler.http.SchedulerzRole.Job;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 
@@ -50,7 +51,7 @@ public final class DisplayUtils {
         }
       });
 
-  static String getJobDashboardUrl(String role, String env, String jobName) {
-    return VIZ_JOB_URL_PREFIX.get() + MesosTaskFactoryImpl.getJobSourceName(role, env, jobName);
+  static String getJobDashboardUrl(IJobKey jobKey) {
+    return VIZ_JOB_URL_PREFIX.get() + MesosTaskFactoryImpl.getJobSourceName(jobKey);
   }
 }

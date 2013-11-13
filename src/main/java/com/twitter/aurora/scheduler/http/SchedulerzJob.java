@@ -61,6 +61,7 @@ import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IConstraint;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConstraint;
@@ -358,8 +359,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
       @Override public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
         template.setAttribute(ADMIN_VIEW_PARAM, adminView != null);
+        IJobKey jobKey = JobKeys.from(role, environment, job);
 
-        boolean isCron = cronJobManager.hasJob(JobKeys.from(role, environment, job));
+        boolean isCron = cronJobManager.hasJob(jobKey);
         template.setAttribute("is_cron", isCron);
 
         ScheduleStatus statusFilter = null;
@@ -377,7 +379,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         template.setAttribute("role", role);
         template.setAttribute("environment", environment);
         template.setAttribute("job", job);
-        template.setAttribute("statsUrl", DisplayUtils.getJobDashboardUrl(role, environment, job));
+        template.setAttribute("statsUrl", DisplayUtils.getJobDashboardUrl(jobKey));
         boolean hasMore = false;
 
         Query.Builder builder = Query.jobScoped(JobKeys.from(role, environment, job));

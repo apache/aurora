@@ -42,6 +42,7 @@ import com.twitter.aurora.scheduler.base.SchedulerException;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.quantity.Data;
 
@@ -98,13 +99,12 @@ public interface MesosTaskFactory {
       return ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + taskId).build();
     }
 
-    // TODO(wfarner): Use JobKey here.
-    public static String getJobSourceName(String role, String environment, String jobName) {
-      return String.format("%s.%s.%s", role, environment, jobName);
+    public static String getJobSourceName(IJobKey jobkey) {
+      return String.format("%s.%s.%s", jobkey.getRole(), jobkey.getEnvironment(), jobkey.getName());
     }
 
     public static String getJobSourceName(ITaskConfig task) {
-      return getJobSourceName(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
+      return getJobSourceName(JobKeys.from(task));
     }
 
     public static String getInstanceSourceName(ITaskConfig task, int instanceId) {
