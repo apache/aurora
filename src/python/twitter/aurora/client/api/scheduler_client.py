@@ -17,7 +17,7 @@ from gen.twitter.aurora.constants import CURRENT_API_VERSION
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
 
-from pystachio import Default, Integer, String
+from pystachio import Boolean, Default, Integer, String
 
 
 class SchedulerClientTrait(Cluster.Trait):
@@ -27,6 +27,7 @@ class SchedulerClientTrait(Cluster.Trait):
   scheduler_uri     = String
   proxy_url         = String
   auth_mechanism    = Default(String, 'UNAUTHENTICATED')
+  use_thrift_ssl    = Default(Boolean, False)
 
 
 class SchedulerClient(object):
@@ -44,14 +45,15 @@ class SchedulerClient(object):
       raise TypeError('"cluster" must be an instance of Cluster, got %s' % type(cluster))
     cluster = cluster.with_trait(SchedulerClientTrait)
     if cluster.zk:
-      return ZookeeperSchedulerClient(cluster, port=cluster.zk_port, ssl=True, **kwargs)
+      return ZookeeperSchedulerClient(
+          cluster, port=cluster.zk_port, ssl=cluster.use_thrift_ssl, **kwargs)
     elif cluster.scheduler_uri:
       try:
         host, port = cluster.scheduler_uri.split(':', 2)
         port = int(port)
       except ValueError:
         raise ValueError('Malformed Cluster scheduler_uri: %s' % cluster.scheduler_uri)
-      return DirectSchedulerClient(host, port, ssl=True)
+      return DirectSchedulerClient(host, port, ssl=cluster.use_thrift_ssl)
     else:
       raise ValueError('"cluster" does not specify zk or scheduler_uri')
 
