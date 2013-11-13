@@ -27,19 +27,38 @@ app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
                help="the path where we will store workflow logs and checkpoints")
 
 
-class TaskRunnerWrapper(object):
+# TODO(wickman) Create a TaskRunner interface with the following methods:
+#   .start
+#   .stop
+#   .health_interface (property)
+
+
+class ThermosTaskRunner(object):
   PEX_NAME = 'thermos_runner.pex'
   POLL_INTERVAL = Amount(500, Time.MILLISECONDS)
+  MAX_WAIT = Amount(1, Time.MINUTES)
 
-  class TaskError(Exception):
-    pass
+  class Error(Exception): pass
+  class TaskError(Error): pass
 
-  def __init__(self, task_id, mesos_task, role, mesos_ports, runner_pex, sandbox,
-               checkpoint_root=None, artifact_dir=None, clock=time):
+  def __init__(self,
+               task_id,
+               mesos_task,
+               role,
+               mesos_ports,
+               sandbox,
+               checkpoint_root=None,
+               artifact_dir=None,
+               clock=time):
     """
-      :task_id     => task_id assigned by scheduler
-      :mesos_task  => twitter.aurora.config.schema.MesosTaskInstance object
-      :mesos_ports => { name => port } dictionary
+      task_id          task_id assigned by scheduler
+      mesos_task       twitter.aurora.config.schema.MesosTaskInstance object
+      role             role to run the task under
+      mesos_ports      { name => port } dictionary
+      sandbox          the sandbox object
+      checkpoint_root  the checkpoint root for the thermos runner
+      artifact_dir     scratch space for the thermos runner (basically cwd of thermos.pex)
+      clock            clock
     """
     self._popen = None
     self._monitor = None
@@ -48,18 +67,15 @@ class TaskRunnerWrapper(object):
     self._mesos_task = mesos_task
     self._task = mesos_task.task()
     self._ports = mesos_ports
-    self._runner_pex = runner_pex
-    if not os.path.exists(self._runner_pex):
-      raise self.TaskError('Specified runner pex:%s does not exist!' % self._runner_pex)
-    self._sandbox = sandbox
-    if not isinstance(self._sandbox, SandboxInterface):
-      raise ValueError('sandbox must be derived from SandboxInterface!')
+    self._root = sandbox.root
     self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
-    self._enable_chroot = False
+    self._enable_chroot = sandbox.chrooted
     self._role = role
     self._clock = clock
     self._artifact_dir = artifact_dir or tempfile.mkdtemp()
     self._kill_signal = threading.Event()
+    self.forking = threading.Event()
+    self.forked = threading.Event()
 
     try:
       with open(os.path.join(self._artifact_dir, 'task.json'), 'w') as fp:
@@ -69,77 +85,26 @@ class TaskRunnerWrapper(object):
       raise self.TaskError('Failed to load task: %s' % e)
 
   @property
-  def pid(self):
-    return self._popen.pid if self._popen else None
-
-  @property
   def artifact_dir(self):
     return self._artifact_dir
 
   @property
-  def sandbox(self):
-    return self._sandbox
-
-  def initialize(self):
-    """
-      Initialize the sandbox for the task runner. Depending on the implementation, this may take
-      some time to complete.
-    """
-    try:
-      log.info('Creating sandbox.')
-      self._sandbox.create(self._mesos_task)
-    except Exception as e:
-      log.fatal('Could not construct sandbox: %s' % e)
-      raise self.TaskError('Could not construct sandbox: %s' % e)
-
-  def start(self):
-    """
-      Fork the task runner.
-    """
-    if not self.is_initialized():
-      raise self.TaskError('Cannot start task runner before initialization')
-    chmod_plus_x(self._runner_pex)
-    self._monitor = TaskMonitor(TaskPath(root=self._checkpoint_root), self._task_id)
-
-    params = dict(log_dir=LogOptions.log_dir(),
-                  log_to_disk="DEBUG",
-                  checkpoint_root=self._checkpoint_root,
-                  sandbox=self._sandbox.root,
-                  task_id=self._task_id,
-                  thermos_json=self._task_filename)
-
-    if getpass.getuser() == 'root':
-      params.update(setuid=self._role)
-
-    cmdline_args = [self._runner_pex]
-    cmdline_args.extend('--%s=%s' % (flag, value) for flag, value in params.items())
-    if self._enable_chroot:
-      cmdline_args.extend(['--enable_chroot'])
-    for name, port in self._ports.items():
-      cmdline_args.extend(['--port=%s:%s' % (name, port)])
-    log.info('Forking off runner with cmdline: %s' % ' '.join(cmdline_args))
-    try:
-      self._popen = subprocess.Popen(cmdline_args)
-    except OSError as e:
-      raise self.TaskError(e)
-
-  def state(self):
-    return self._monitor.get_state() if self._monitor else None
+  def runner_pex(self):
+    return self.PEX_NAME
 
   def task_state(self):
     return self._monitor.task_state() if self._monitor else None
 
-  def is_initialized(self):
-    return self._sandbox.exists()
-
+  @property
   def is_started(self):
     return self._monitor and (self._monitor.active or self._monitor.finished)
 
+  @property
   def is_alive(self):
     """
       Is the process underlying the Thermos task runner alive?
     """
-    if not self.is_started():
+    if not self._popen:
       return False
     if self._dead.is_set():
       return False
@@ -160,11 +125,6 @@ class TaskRunnerWrapper(object):
     self._dead.set()
     return False
 
-  def cleanup(self):
-    # For subclasses to implement.  Will be called by the status manager on
-    # runner termination.
-    pass
-
   def terminate_runner(self, as_loss=False):
     """
       Terminate the underlying runner process, if it exists.
@@ -173,7 +133,7 @@ class TaskRunnerWrapper(object):
       log.warning('Duplicate kill/lose signal received, ignoring.')
       return
     self._kill_signal.set()
-    if self.is_alive():
+    if self.is_alive:
       sig = 'SIGUSR2' if as_loss else 'SIGUSR1'
       log.info('Runner is alive, sending %s' % sig)
       try:
@@ -200,3 +160,71 @@ class TaskRunnerWrapper(object):
         log.error('Could not instantiate runner!')
     except TaskRunner.Error as e:
       log.error('Could not quitquitquit runner: %s' % e)
+
+  # --- public interface
+
+  def start(self, timeout=MAX_WAIT):
+    """Fork the task runner and return once the underlying task is running, up to timeout."""
+    self.forking.set()
+
+    chmod_plus_x(self.runner_pex)
+    self._monitor = TaskMonitor(TaskPath(root=self._checkpoint_root), self._task_id)
+
+    params = dict(log_dir=LogOptions.log_dir(),
+                  log_to_disk="DEBUG",
+                  checkpoint_root=self._checkpoint_root,
+                  sandbox=self._root,
+                  task_id=self._task_id,
+                  thermos_json=self._task_filename)
+
+    if getpass.getuser() == 'root':
+      params.update(setuid=self._role)
+
+    cmdline_args = [self.runner_pex]
+    cmdline_args.extend('--%s=%s' % (flag, value) for flag, value in params.items())
+    if self._enable_chroot:
+      cmdline_args.extend(['--enable_chroot'])
+    for name, port in self._ports.items():
+      cmdline_args.extend(['--port=%s:%s' % (name, port)])
+    log.info('Forking off runner with cmdline: %s' % ' '.join(cmdline_args))
+
+    try:
+      self._popen = subprocess.Popen(cmdline_args)
+    except OSError as e:
+      raise self.TaskError(e)
+
+    self.forked.set()
+
+    log.debug('Waiting for task to start.')
+
+    waited = Amount(0, Time.SECONDS)
+    while not self.is_started and waited < timeout:
+      log.debug('  - sleeping...')
+      time.sleep(self.POLL_INTERVAL.as_(Time.SECONDS))
+      waited += self.POLL_INTERVAL
+
+    if not self.is_started:
+      raise self.TaskError('Task did not start within deadline.')
+
+  def stop(self, timeout=MAX_WAIT):
+    """Stop the runner.  If it's already completed, no-op.  If it's still running, issue a kill."""
+    if not self.forking.is_set():
+      raise self.TaskError('Failed to call TaskRunner.start.')
+
+    self.kill()
+
+    waited = Amount(0, Time.SECONDS)
+    while self.is_alive and waited < timeout / 2:
+      time.sleep(self.POLL_INTERVAL.as_(Time.SECONDS))
+      waited += self.POLL_INTERVAL
+
+    if not self.is_alive:
+      return
+
+    self.quitquitquit()
+    while not self._monitor.finished and waited < timeout:
+      time.sleep(self.POLL_INTERVAL.as_(Time.SECONDS))
+      waited += self.POLL_INTERVAL
+
+    if not self._monitor.finished:
+      raise self.TaskError('Task did not stop within deadline.')

@@ -54,6 +54,7 @@ python_tests(name = 'thermos_executor',
   sources = ['test_thermos_executor.py'],
   timeout = Amount(5, Time.MINUTES),
   dependencies = [
+    pants('aurora/twitterdeps/src/python/twitter/thermos/common'),
     pants('aurora/twitterdeps/src/python/twitter/thermos/core'),
     pants('aurora/twitterdeps/src/python/twitter/thermos/monitoring'),
     pants('src/python/twitter/aurora/config:schema'),

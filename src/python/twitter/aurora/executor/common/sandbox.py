@@ -1,4 +1,5 @@
 from abc import abstractmethod, abstractproperty
+import getpass
 import grp
 import os
 import pwd
@@ -17,6 +18,10 @@ class SandboxInterface(Interface):
   def root(self):
     """Return the root path of the sandbox."""
 
+  @abstractproperty
+  def chrooted(self):
+    """Returns whether or not the sandbox is a chroot."""
+
   @abstractmethod
   def exists(self):
     """Returns true if the sandbox appears to exist."""
@@ -30,27 +35,35 @@ class SandboxInterface(Interface):
     """Destroy the sandbox."""
 
 
+class SandboxProvider(Interface):
+  @abstractmethod
+  def from_assigned_task(self, assigned_task):
+    """Return the appropriate Sandbox implementation from an AssignedTask."""
+
+
 class DirectorySandbox(SandboxInterface):
   """ Basic sandbox implementation using a directory on the filesystem """
-  def __init__(self, root):
+  def __init__(self, root, user=getpass.getuser()):
     self._root = root
+    self._user = user
 
   @property
   def root(self):
     return self._root
 
+  @property
+  def chrooted(self):
+    return False
+
   def exists(self):
     return os.path.exists(self.root)
 
-  def create(self, mesos_task):
-    if mesos_task.has_layout():
-      log.warning('DirectorySandbox got task with layout! %s' % mesos_task.layout())
+  def create(self):
     log.debug('DirectorySandbox: mkdir %s' % self.root)
     safe_mkdir(self.root)
-    user = mesos_task.role().get()
-    pwent = pwd.getpwnam(user)
+    pwent = pwd.getpwnam(self._user)
     grent = grp.getgrgid(pwent.pw_gid)
-    log.debug('DirectorySandbox: chown %s:%s %s' % (user, grent.gr_name, self.root))
+    log.debug('DirectorySandbox: chown %s:%s %s' % (self._user, grent.gr_name, self.root))
     os.chown(self.root, pwent.pw_uid, pwent.pw_gid)
     log.debug('DirectorySandbox: chmod 700 %s' % self.root)
     os.chmod(self.root, 0700)

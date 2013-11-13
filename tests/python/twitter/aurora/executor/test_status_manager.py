@@ -109,15 +109,11 @@ class MockRunner(object):
     self._task_state = TaskState.ACTIVE
     self._quit_state = TaskState.FAILED
     self._is_alive = True
-    self.cleaned = False
     self.qqq = threading.Event()
     self.killed = threading.Event()
 
   def kill(self):
     self.killed.set()
-
-  def cleanup(self):
-    self.cleaned = True
 
   def set_dead(self):
     self._is_alive = False
@@ -132,6 +128,7 @@ class MockRunner(object):
     self._task_state = self._quit_state
     self.qqq.set()
 
+  @property
   def is_alive(self):
     return self._is_alive
 
@@ -161,7 +158,6 @@ class TestStatusManager(unittest.TestCase):
     assert self.driver.stop_event.is_set()
     assert len(self.driver.updates) == 1
     assert self.driver.updates[0].state == mesos_pb.TASK_FAILED
-    assert self.runner.cleaned
 
   def test_task_goes_lost(self):
     class FastStatusManager(StatusManager):
@@ -177,7 +173,6 @@ class TestStatusManager(unittest.TestCase):
     assert self.driver.stop_event.is_set()
     assert len(self.driver.updates) == 1
     assert self.driver.updates[0].state == mesos_pb.TASK_LOST
-    assert self.runner.cleaned
 
   # AURORA-23
   @pytest.mark.skipif("True")
@@ -207,4 +202,3 @@ class TestStatusManager(unittest.TestCase):
     assert len(self.driver.updates) == 1
     assert self.driver.updates[0].state == mesos_pb.TASK_FAILED
     assert self.driver.updates[0].message.startswith('Failed health check!')
-    assert self.runner.cleaned

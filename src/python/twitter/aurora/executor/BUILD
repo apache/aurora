@@ -1,6 +1,6 @@
 python_library(
-  name = 'task_runner_wrapper',
-  sources = ['task_runner_wrapper.py'],
+  name = 'thermos_task_runner',
+  sources = ['thermos_task_runner.py'],
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/thermos/common'),
     pants('aurora/twitterdeps/src/python/twitter/thermos/config'),
@@ -80,8 +80,8 @@ python_library(
     pants('3rdparty/python:pystachio'),
     pants(':executor_detector'),
     pants(':status_manager'),
-    pants(':task_runner_wrapper'),
     pants(':thermos_executor_base'),
+    pants(':thermos_task_runner'),
     pants('src/python/twitter/aurora/common:http_signaler'),
     pants('src/python/twitter/aurora/common_internal:clusters'),
     pants('src/python/twitter/aurora/config'),
@@ -90,7 +90,6 @@ python_library(
     pants('src/python/twitter/aurora/executor/common:task_info'),
     pants('src/python/twitter/aurora/executor/common_internal:resource_checkpoints'),
     pants('src/python/twitter/aurora/executor/common_internal:resource_manager'),
-    pants('src/python/twitter/aurora:mesos-core'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/log'),

@@ -13,6 +13,16 @@ from .executor_base import ThermosExecutorBase
 import mesos_pb2 as mesos_pb
 
 
+# TODO(wickman)
+# This needs to be merged back into ThermosExecutor.
+#
+# We should create a ChainedHealthInterface that takes all other health interfaces and
+# proxies all(health_interface.healthy for health_interface in health_interfaces)
+#
+# Then HealthMonitor(health_interface, event) => event.signal when health_interface is unhealthy
+#
+# event.signal initiates teardown which lives entirely within ThermosExecutor
+#
 class StatusManager(ExceptionalThread):
   """
     An agent that periodically checks the health of a task via HealthInterfaces that
@@ -57,7 +67,7 @@ class StatusManager(ExceptionalThread):
 
     failure_reason = None
 
-    while self._runner.is_alive() and failure_reason is None:
+    while self._runner.is_alive and failure_reason is None:
       for checker in self._health_checkers:
         if not checker.healthy:
           self._stop_health_checkers()
@@ -77,17 +87,14 @@ class StatusManager(ExceptionalThread):
     # pass 1
     self._signaler.quitquitquit()
     self._clock.sleep(self.ESCALATION_WAIT.as_(Time.SECONDS))
-    if not self._runner.is_alive():
+    if not self._runner.is_alive:
       return True
 
     # pass 2
     self._signaler.abortabortabort()
     self._clock.sleep(self.ESCALATION_WAIT.as_(Time.SECONDS))
-    if not self._runner.is_alive():
+    if not self._runner.is_alive:
       return True
-
-  def _terminate_runner(self):
-    self._runner.kill()
 
   def _wait_for_rebind(self):
     # TODO(wickman) MESOS-438
@@ -116,7 +123,7 @@ class StatusManager(ExceptionalThread):
 
   def terminate(self, failure_reason=None):
     if not self._terminate_http():
-      self._terminate_runner()
+      self._runner.kill()
 
     self._wait_for_rebind()
 
@@ -165,7 +172,6 @@ class StatusManager(ExceptionalThread):
 
     # the executor is ephemeral and we just submitted a terminal task state, so shutdown
     log.info('Stopping executor.')
-    self._runner.cleanup()
 
     # TODO(wickman) Remove this once external MESOS-243 is resolved.
     log.info('Sleeping briefly to mitigate https://issues.apache.org/jira/browse/MESOS-243')
