@@ -11,7 +11,7 @@ import sys
 
 from twitter.common import app, log
 
-from twitter.aurora.client import binding_helpers
+from twitter.aurora.client import binding_helper
 from twitter.aurora.client.base import deprecation_warning, die
 from twitter.aurora.config import AuroraConfig
 from twitter.thermos.config.schema_helpers import Tasks
@@ -19,9 +19,6 @@ from twitter.thermos.config.schema_helpers import Tasks
 from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
 
 from pystachio import Empty, Ref
-
-
-binding_helpers.register_all()
 
 
 APPAPP_DEPRECATION_WARNING = """
@@ -189,7 +186,7 @@ class AnnotatedAuroraConfig(AuroraConfig):
   @classmethod
   def plugins(cls):
     return (inject_hooks,
-            functools.partial(binding_helpers.apply_all),
+            functools.partial(binding_helper.apply_all),
             functools.partial(populate_namespaces),
             validate_config)
 

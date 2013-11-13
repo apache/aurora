@@ -4,13 +4,13 @@ from twitter.common.contextutil import temporary_file
 
 from twitter.aurora.config import AuroraConfig, PortResolver
 from twitter.aurora.config.schema.base import (
-  Announcer,
-  Empty,
-  Integer,
-  Job,
-  Process,
-  Resources,
-  Task,
+    Announcer,
+    Empty,
+    Integer,
+    Job,
+    Process,
+    Resources,
+    Task,
 )
 
 from gen.twitter.aurora.ttypes import Identity

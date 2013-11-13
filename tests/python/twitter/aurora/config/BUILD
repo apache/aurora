@@ -4,7 +4,6 @@ python_test_suite(name = 'all',
     pants(':test_constraint_parsing'),
     pants(':test_loader'),
     pants(':test_thrift'),
-    pants('tests/python/twitter/aurora/config/schema:all_internal'),
   ]
 )
 

@@ -8,10 +8,7 @@ from pystachio.config import Config as PystachioConfig
 
 
 class AuroraConfigLoader(PystachioConfig):
-  # TODO(wickman) Kill this once we've standardized on the src/aurora tree
-  # or an aurora configuration repository.
-  SCHEMA_ROOT = 'twitter.aurora.config.schema'
-  SCHEMA_MODULES = [base_schema]
+  SCHEMA_MODULES = []
 
   @classmethod
   def assembled_schema(cls, schema_modules):
@@ -21,17 +18,29 @@ class AuroraConfigLoader(PystachioConfig):
 
   @classmethod
   def register_schema(cls, schema_module):
+    """Register the schema defined in schema_module, equivalent to doing
+
+         from schema_module.__name__ import *
+
+       before all pystachio configurations are evaluated.
+    """
     cls.SCHEMA_MODULES.append(schema_module)
     cls.DEFAULT_SCHEMA = cls.assembled_schema(cls.SCHEMA_MODULES)
 
   @classmethod
-  def register_all_schemas(cls):
-    module_root = __import__(cls.SCHEMA_ROOT, fromlist=[cls.SCHEMA_ROOT])
-    for _, submodule, is_package in pkgutil.iter_modules(module_root.__path__):
+  def register_schemas_from(cls, package):
+    """Register schemas from all modules in a particular package."""
+    for _, submodule, is_package in pkgutil.iter_modules(package.__path__):
       if is_package:
         continue
-      cls.register_schema(__import__('%s.%s' % (cls.SCHEMA_ROOT, submodule),
-          fromlist=[cls.SCHEMA_ROOT]))
+      cls.register_schema(
+          __import__('%s.%s' % (package.__name__, submodule), fromlist=[package.__name__]))
+
+  @classmethod
+  def flush_schemas(cls):
+    """Flush all schemas from AuroraConfigLoader.  Intended for test use only."""
+    cls.SCHEMA_MODULES = []
+    cls.register_schema(base_schema)
 
   @classmethod
   def load(cls, loadable):
@@ -51,4 +60,4 @@ class AuroraConfigLoader(PystachioConfig):
     return base_schema.Job(json.loads(string))
 
 
-AuroraConfigLoader.register_all_schemas()
+AuroraConfigLoader.flush_schemas()

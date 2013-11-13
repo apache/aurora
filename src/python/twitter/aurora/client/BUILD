@@ -17,12 +17,20 @@ python_library(
 )
 
 python_library(
+  name = 'binding_helper',
+  sources = ['binding_helper.py'],
+  dependencies = [
+    pants('src/python/twitter/common/lang'),
+  ]
+)
+
+python_library(
   name = 'config',
   sources = ['config.py'],
   dependencies = [
     pants('3rdparty/python:pystachio'),
     pants(':base'),
-    pants('src/python/twitter/aurora/client/binding_helpers'),
+    pants(':binding_helper'),
     pants('src/python/twitter/aurora/config'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
