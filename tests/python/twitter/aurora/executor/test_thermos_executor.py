@@ -14,9 +14,9 @@ from twitter.aurora.config.schema.base import (
     MB,
     MesosJob,
     MesosTaskInstance,
-    Task,
     Process,
     Resources,
+    Task,
 )
 from twitter.aurora.executor.common.executor_timeout import ExecutorTimeout
 from twitter.aurora.executor.common.sandbox import DirectorySandbox, SandboxProvider
@@ -35,8 +35,8 @@ from twitter.thermos.monitoring.monitor import TaskMonitor
 
 from gen.twitter.aurora.ttypes import (
   AssignedTask,
-  ExecutorConfig,
-  TaskConfig)
+  TaskConfig,
+)
 
 from thrift.TSerialization import serialize
 import mesos_pb2 as mesos_pb
@@ -159,21 +159,6 @@ MESOS_JOB = MesosJob(
   instances = 1,
   role = getpass.getuser(),
 )
-
-
-def test_extract_ensemble():
-  def make_assigned_task(thermos_config):
-    return AssignedTask(instanceId=0, task=TaskConfig(thermosConfig=thermos_config.json_dumps()))
-
-  assigned_task = make_assigned_task(MESOS_JOB(task=HELLO_WORLD, cluster='unknown'))
-  assert ThermosExecutor.extract_ensemble(assigned_task) == TwitterCluster.DEFAULT_ENSEMBLE
-
-  assigned_task = make_assigned_task(MESOS_JOB(task=HELLO_WORLD, cluster='smf1-test'))
-  assert ThermosExecutor.extract_ensemble(assigned_task) == (
-      TWITTER_CLUSTERS['smf1-test'].zk)
-
-  assigned_task = make_assigned_task(HELLO_WORLD_MTI)
-  assert ThermosExecutor.extract_ensemble(assigned_task) == TwitterCluster.DEFAULT_ENSEMBLE
 
 
 def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False):

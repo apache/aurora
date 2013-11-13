@@ -1,6 +1,6 @@
 import threading
 
-from .health_interface import FailureReason, FailureState, HealthInterface
+from .health_interface import ExitReason, ExitState, HealthInterface
 
 
 class KillManager(HealthInterface):
@@ -16,8 +16,8 @@ class KillManager(HealthInterface):
     return not self._killed
 
   @property
-  def failure_reason(self):
-    return FailureReason(self._reason, status=FailureState.KILLED)
+  def exit_reason(self):
+    return ExitReason(self._reason, ExitState.KILLED)
 
   def kill(self, reason):
     self._reason = reason

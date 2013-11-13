@@ -7,7 +7,7 @@ from twitter.common.quantity import Amount, Time
 
 from gen.twitter.thermos.ttypes import TaskState
 
-from .common.health_interface import FailureState
+from .common.health_interface import ExitState
 from .executor_base import ThermosExecutorBase
 
 import mesos_pb2 as mesos_pb
@@ -65,20 +65,20 @@ class StatusManager(ExceptionalThread):
   def run(self):
     self._start_health_checkers()
 
-    failure_reason = None
+    exit_reason = None
 
-    while self._runner.is_alive and failure_reason is None:
+    while self._runner.is_alive and exit_reason is None:
       for checker in self._health_checkers:
         if not checker.healthy:
           self._stop_health_checkers()
-          failure_reason = checker.failure_reason
-          log.info('Got %s from %s' % (failure_reason, checker.__class__.__name__))
+          exit_reason = checker.exit_reason
+          log.info('Got %s from %s' % (exit_reason, checker.__class__.__name__))
           break
       else:
         self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
 
     log.info('Executor polling thread detected termination condition.')
-    self.terminate(failure_reason)
+    self.terminate(exit_reason)
 
   def _terminate_http(self):
     if not self._signaler:
@@ -121,7 +121,7 @@ class StatusManager(ExceptionalThread):
       self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
       wait_limit -= self.POLL_WAIT
 
-  def terminate(self, failure_reason=None):
+  def terminate(self, exit_reason=None):
     if not self._terminate_http():
       self._runner.kill()
 
@@ -130,7 +130,7 @@ class StatusManager(ExceptionalThread):
     last_state = self._runner.task_state()
     log.info("State we've accepted: Thermos(%s) / Failure: %s" % (
         TaskState._VALUES_TO_NAMES.get(last_state, 'unknown'),
-        failure_reason))
+        exit_reason))
 
     finish_state = None
     if last_state == TaskState.ACTIVE:
@@ -147,23 +147,30 @@ class StatusManager(ExceptionalThread):
         log.error("Unknown task state = %r!" % last_state)
         finish_state = mesos_pb.TASK_FAILED
 
-    def translate_failure_status(status):
-      if status == FailureState.FAILED:
+    # See comment in executor/common/health_interface.py.  This translates
+    # from ExitStatus to TaskStatus to reduce dependency overhead.
+    def translate_exit_state(status):
+      if status == ExitState.FAILED:
         return mesos_pb.TASK_FAILED
-      elif status == FailureState.KILLED:
+      elif status == ExitState.KILLED:
         return mesos_pb.TASK_KILLED
-      return mesos_pb.TASK_FAILED
+      elif status == ExitState.FINISHED:
+        return mesos_pb.TASK_FINISHED
+      elif status == ExitState.LOST:
+        return mesos_pb.TASK_LOST
+      log.error('Unknown exit state, defaulting to TASK_FINISHED.')
+      return mesos_pb.TASK_FINISHED
 
     # TODO(wickman) This should be using ExecutorBase.send_status -- or the
     # sending of status should be decoupled from the status_manager.
     update = mesos_pb.TaskStatus()
     update.task_id.value = self._task_id
-    if failure_reason is not None:
-      update.state = translate_failure_status(failure_reason.status)
+    if exit_reason is not None:
+      update.state = translate_exit_state(exit_reason.status)
     else:
       update.state = finish_state
-    if failure_reason and failure_reason.reason:
-      update.message = failure_reason.reason
+    if exit_reason and exit_reason.reason:
+      update.message = exit_reason.reason
     task_state = mesos_pb._TASKSTATE.values_by_number.get(update.state)
     log.info('Sending terminal state update: %s' % (task_state.name if task_state else 'UNKNOWN'))
     self._driver.sendStatusUpdate(update)

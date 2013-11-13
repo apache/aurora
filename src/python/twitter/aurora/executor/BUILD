@@ -80,9 +80,6 @@ python_library(
     pants(':thermos_executor_base'),
     pants(':thermos_task_runner'),
     pants('src/python/twitter/aurora/common:http_signaler'),
-    pants('src/python/twitter/aurora/common_internal:clusters'),
-    pants('src/python/twitter/aurora/config'),
-    pants('src/python/twitter/aurora/config:schema'),
     pants('src/python/twitter/aurora/executor/common:kill_manager'),
     pants('src/python/twitter/aurora/executor/common:task_info'),
     pants('src/python/twitter/aurora/executor/common_internal:resource_checkpoints'),
@@ -91,7 +88,6 @@ python_library(
     pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 

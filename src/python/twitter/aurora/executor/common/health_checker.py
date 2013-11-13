@@ -4,7 +4,7 @@ import time
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 
-from .health_interface import HealthInterface, FailureReason
+from .health_interface import ExitReason, ExitState, HealthInterface
 
 
 class HealthCheckerThread(HealthInterface, ExceptionalThread):
@@ -42,9 +42,9 @@ class HealthCheckerThread(HealthInterface, ExceptionalThread):
     return self._healthy
 
   @property
-  def failure_reason(self):
+  def exit_reason(self):
     if not self.healthy:
-      return FailureReason('Failed health check! %s' % self._reason)
+      return ExitReason('Failed health check! %s' % self._reason, ExitState.FAILED)
 
   def run(self):
     log.debug('Health checker thread started.')

@@ -1,23 +1,14 @@
-import json
 import os
-import socket
 import threading
-import time
 import traceback
 
+from twitter.aurora.common.http_signaler import HttpSignaler
 from twitter.common import log
 from twitter.common.concurrent import deadline, defer, Timeout
 from twitter.common.metrics import Observable
 from twitter.common.quantity import Amount, Time
-
-from twitter.aurora.common_internal.clusters import TWITTER_CLUSTERS, TwitterCluster
-from twitter.aurora.common.http_signaler import HttpSignaler
-from twitter.aurora.config.schema.base import MesosJob
-from twitter.aurora.config.thrift import resolve_thermos_config
 from twitter.thermos.common.path import TaskPath
 from twitter.thermos.monitoring.monitor import TaskMonitor
-
-from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
 
 from .common.health_checker import HealthCheckerThread
 from .common.kill_manager import KillManager
@@ -72,20 +63,6 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     self.sandbox_initialized = threading.Event()
     self.sandbox_created = threading.Event()
     self.launched = threading.Event()
-
-  @classmethod
-  def extract_ensemble(cls, assigned_task, default=TwitterCluster.DEFAULT_ENSEMBLE):
-    thermos_task = resolve_thermos_config(assigned_task.task)
-    if 'instance' in json.loads(thermos_task):
-      # Received MesosTaskInstance
-      return default
-    else:
-      job = MesosJob.json_loads(thermos_task)
-      try:
-        cluster = TWITTER_CLUSTERS[job.cluster().get()]
-        return cluster.zk
-      except (AttributeError, KeyError):
-        return default
 
   @property
   def runner(self):
@@ -218,17 +195,8 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     #    <attempt graceful shutdown via quitquitquit/abortabortabort if health port>
     #    <call runner.stop>
     #
-    if mesos_task.has_announce():
-      discovery_manager = DiscoveryManager(
-          mesos_task.role().get(),
-          mesos_task.environment().get() if mesos_task.has_environment() else DEFAULT_ENVIRONMENT,
-          assigned_task.task.jobName,
-          socket.gethostname(),
-          mesos_task.announce().primary_port().get(),
-          portmap,
-          assigned_task.instanceId)
-          # TODO(wickman) Possibly return this code once we've hashed out MESOS-2753
-          # ensemble=self.extract_ensemble(assigned_task))
+    discovery_manager = DiscoveryManager.from_assigned_task(assigned_task)
+    if discovery_manager:
       health_checkers.append(discovery_manager)
       self.metrics.register_observable('discovery_manager', discovery_manager)
 
