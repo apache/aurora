@@ -93,7 +93,7 @@ import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.configuration.SanitizedConfiguration;
 import com.twitter.aurora.scheduler.quota.Quotas;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.state.LockManager;
@@ -244,16 +244,16 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     try {
-      ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
+      SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
 
       lockManager.validateIfLocked(
           ILockKey.build(LockKey.job(jobKey.newBuilder())),
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-      schedulerCore.createJob(parsed);
+      schedulerCore.createJob(sanitized);
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
-              parsed.getJobConfig().getInstanceCount(), JobKeys.toPath(job)));
+              sanitized.getJobConfig().getInstanceCount(), JobKeys.toPath(job)));
     } catch (LockException | TaskDescriptionException | ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
@@ -284,13 +284,13 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ILockKey.build(LockKey.job(jobKey.newBuilder())),
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-      ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(job);
+      SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
 
       if (!cronJobManager.hasJob(jobKey)) {
         return response.setResponseCode(INVALID_REQUEST).setMessage(
             "No cron template found for the given key: " + jobKey);
       }
-      cronJobManager.updateJob(parsed);
+      cronJobManager.updateJob(sanitized);
       return response.setResponseCode(OK).setMessage("Replaced template for: " + jobKey);
 
     } catch (LockException e) {
@@ -309,16 +309,16 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     Response response = new Response();
     try {
-      ParsedConfiguration parsed =
-          ParsedConfiguration.fromUnparsed(IJobConfiguration.build(description));
+      SanitizedConfiguration sanitized =
+          SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(description));
 
       // TODO(maximk): Consider moving job validation logic into a dedicated RPC. MESOS-4476.
       if (validation != null && validation == JobConfigValidation.RUN_FILTERS) {
-        schedulerCore.validateJobResources(parsed);
+        schedulerCore.validateJobResources(sanitized);
       }
 
       PopulateJobResult result = new PopulateJobResult()
-          .setPopulated(ITaskConfig.toBuildersSet(parsed.getTaskConfigs().values()));
+          .setPopulated(ITaskConfig.toBuildersSet(sanitized.getTaskConfigs().values()));
       response.setResult(Result.populateJobResult(result))
           .setResponseCode(OK)
           .setMessage("Tasks populated");
@@ -555,7 +555,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     try {
       Optional<String> token =
-          schedulerCore.initiateJobUpdate(ParsedConfiguration.fromUnparsed(job));
+          schedulerCore.initiateJobUpdate(SanitizedConfiguration.fromUnsanitized(job));
 
       StartUpdateResult result = new StartUpdateResult()
           .setRollingUpdateRequired(token.isPresent());

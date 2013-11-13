@@ -27,7 +27,7 @@ import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.configuration.SanitizedConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
@@ -46,11 +46,11 @@ public interface SchedulerCore {
   /**
    * Creates a new job, whose tasks will become candidates for scheduling.
    *
-   * @param parsedConfiguration The configuration of the job to create tasks for.
+   * @param sanitizedConfiguration The configuration of the job to create tasks for.
    * @throws ScheduleException If there was an error scheduling a cron job.
    * @throws TaskDescriptionException If an invalid task description was given.
    */
-  void createJob(ParsedConfiguration parsedConfiguration)
+  void createJob(SanitizedConfiguration sanitizedConfiguration)
       throws ScheduleException, TaskDescriptionException;
 
   /**
@@ -69,10 +69,10 @@ public interface SchedulerCore {
   /**
    * Validates the new job configuration passes resource filters.
    *
-   * @param parsedConfiguration Job configuration to validate.
+   * @param sanitizedConfiguration Job configuration to validate.
    * @throws ScheduleException If job resources do not pass filters.
    */
-  void validateJobResources(ParsedConfiguration parsedConfiguration) throws ScheduleException;
+  void validateJobResources(SanitizedConfiguration sanitizedConfiguration) throws ScheduleException;
 
   /**
    * Starts a cron job immediately.
@@ -86,7 +86,7 @@ public interface SchedulerCore {
   /**
    * Registers an update for a job.
    *
-   * @param parsedConfiguration Updated job configuration.
+   * @param sanitizedConfiguration Updated job configuration.
    * @throws ScheduleException If there was an error in scheduling an update when no active tasks
    *                           are found for a job or an update for the job is already in progress.
    * @return A unique update token if an update must be coordinated through
@@ -94,7 +94,7 @@ public interface SchedulerCore {
    *         {@link #finishUpdate(IJobKey, String, Optional, UpdateResult)}, or an absent value if
    * the update was completed in-place and no further action is necessary.
    */
-  Optional<String> initiateJobUpdate(ParsedConfiguration parsedConfiguration)
+  Optional<String> initiateJobUpdate(SanitizedConfiguration sanitizedConfiguration)
       throws ScheduleException;
 
   /**
@@ -105,7 +105,7 @@ public interface SchedulerCore {
    * @param invokingUser Name of the invoking user for auditing purposes.
    * @param shards Shards to be updated.
    * @param updateToken A unique string identifying the update, must be provided from
-   *                    {@link #initiateJobUpdate(ParsedConfiguration)}.
+   *                    {@link #initiateJobUpdate(SanitizedConfiguration)}.
    * @throws ScheduleException If there was an error in updating the state to UPDATING.
    * @return The action taken on each of the shards.
    */
@@ -123,7 +123,7 @@ public interface SchedulerCore {
    * @param invokingUser Name of the invoking user for auditing purposes.
    * @param shards Shards to be updated.
    * @param updateToken A unique string identifying the update, must be provided from
-   *                    {@link #initiateJobUpdate(ParsedConfiguration)}
+   *                    {@link #initiateJobUpdate(SanitizedConfiguration)}
    * @throws ScheduleException If there was an error in updating the state to ROLLBACK.
    * @return The action taken on each of the shards.
    */
@@ -139,7 +139,7 @@ public interface SchedulerCore {
    * @param jobKey The job being updated.
    * @param invokingUser Name of the invoking user for auditing purposes.
    * @param updateToken The update token provided from
-   *                    {@link #initiateJobUpdate(ParsedConfiguration)},
+   *                    {@link #initiateJobUpdate(SanitizedConfiguration)},
    *                    or not present if the update is being forcibly terminated.
    * @param result {@code true} if the update was successful, {@code false} otherwise.
    * @throws ScheduleException If an update for the job does not exist or if the update token is

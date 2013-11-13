@@ -50,7 +50,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.configuration.SanitizedConfiguration;
 import com.twitter.aurora.scheduler.cron.CronException;
 import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -110,8 +110,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   // Prevents runs from dogpiling while waiting for a run to transition out of the KILLING state.
   // This is necessary because killing a job (if dictated by cron collision policy) is an
   // asynchronous operation.
-  private final Map<IJobKey, ParsedConfiguration> pendingRuns =
-      Collections.synchronizedMap(Maps.<IJobKey, ParsedConfiguration>newHashMap());
+  private final Map<IJobKey, SanitizedConfiguration> pendingRuns =
+      Collections.synchronizedMap(Maps.<IJobKey, SanitizedConfiguration>newHashMap());
 
   private final StateManager stateManager;
   private final Storage storage;
@@ -189,7 +189,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
 
     for (IJobConfiguration job : crons) {
       try {
-        mapScheduledJob(job, scheduleJob(ParsedConfiguration.fromUnparsed(job)));
+        mapScheduledJob(job, scheduleJob(SanitizedConfiguration.fromUnsanitized(job)));
       } catch (ScheduleException | TaskDescriptionException e) {
         logLaunchFailure(job, e);
       }
@@ -212,10 +212,10 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     Optional<IJobConfiguration> jobConfig = fetchJob(jobKey);
     checkArgument(jobConfig.isPresent(), "No such cron job " + JobKeys.toPath(jobKey));
 
-    cronTriggered(ParsedConfiguration.fromUnparsed(jobConfig.get()));
+    cronTriggered(SanitizedConfiguration.fromUnsanitized(jobConfig.get()));
   }
 
-  private void delayedRun(final Query.Builder query, final ParsedConfiguration config) {
+  private void delayedRun(final Query.Builder query, final SanitizedConfiguration config) {
     IJobConfiguration job = config.getJobConfig();
     final String jobPath = JobKeys.toPath(job);
     final IJobKey jobKey = job.getKey();
@@ -238,7 +238,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
         @Override public Boolean get() {
           if (!hasTasks(query)) {
             LOG.info("Initiating delayed launch of cron " + jobKey);
-            ParsedConfiguration config = pendingRuns.remove(jobKey);
+            SanitizedConfiguration config = pendingRuns.remove(jobKey);
             checkNotNull(config, "Failed to fetch job for delayed run of " + jobKey);
             LOG.info("Launching " + config.getTaskConfigs().size() + " tasks.");
             stateManager.insertPendingTasks(config.getTaskConfigs());
@@ -269,7 +269,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
    * @param config The config of the job to be triggered.
    */
   @VisibleForTesting
-  void cronTriggered(ParsedConfiguration config) {
+  void cronTriggered(SanitizedConfiguration config) {
     IJobConfiguration job = config.getJobConfig();
     LOG.info(String.format("Cron triggered for %s at %s with policy %s",
         JobKeys.toPath(job), new Date(), job.getCronCollisionPolicy()));
@@ -342,7 +342,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
    * @param config New job configuration to update to.
    * @throws ScheduleException If non-cron job confuration provided.
    */
-  public void updateJob(ParsedConfiguration config) throws ScheduleException {
+  public void updateJob(SanitizedConfiguration config) throws ScheduleException {
     IJobConfiguration job = config.getJobConfig();
     if (!hasCronSchedule(job)) {
       throw new ScheduleException("A cron job may not be updated to a non-cron job.");
@@ -364,7 +364,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   @Override
-  public boolean receiveJob(ParsedConfiguration config) throws ScheduleException {
+  public boolean receiveJob(SanitizedConfiguration config) throws ScheduleException {
     final IJobConfiguration job = config.getJobConfig();
     if (!hasCronSchedule(job)) {
       return false;
@@ -381,7 +381,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     return true;
   }
 
-  private String scheduleJob(final ParsedConfiguration config) throws ScheduleException {
+  private String scheduleJob(final SanitizedConfiguration config) throws ScheduleException {
     final IJobConfiguration job = config.getJobConfig();
     final String jobPath = JobKeys.toPath(job);
     if (!hasCronSchedule(job)) {

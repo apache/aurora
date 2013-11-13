@@ -42,7 +42,7 @@ import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.configuration.SanitizedConfiguration;
 import com.twitter.aurora.scheduler.state.StateManagerImpl.UpdateException;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -133,10 +133,10 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void createJob(ParsedConfiguration parsedConfiguration)
+  public synchronized void createJob(SanitizedConfiguration sanitizedConfiguration)
       throws ScheduleException {
 
-    IJobConfiguration job = parsedConfiguration.getJobConfig();
+    IJobConfiguration job = sanitizedConfiguration.getJobConfig();
     if (hasActiveJob(job)) {
       throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
     }
@@ -145,7 +145,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
     boolean accepted = false;
     for (final JobManager manager : jobManagers) {
-      if (manager.receiveJob(parsedConfiguration)) {
+      if (manager.receiveJob(sanitizedConfiguration)) {
         LOG.info("Job accepted by manager: " + manager.getUniqueKey());
         accepted = true;
         break;
@@ -194,10 +194,10 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public void validateJobResources(ParsedConfiguration parsedConfiguration)
+  public void validateJobResources(SanitizedConfiguration sanitizedConfiguration)
       throws ScheduleException {
 
-    IJobConfiguration job = parsedConfiguration.getJobConfig();
+    IJobConfiguration job = sanitizedConfiguration.getJobConfig();
     runJobFilters(job.getKey(), job.getTaskConfig(), job.getInstanceCount(), false);
   }
 
@@ -343,12 +343,12 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized Optional<String> initiateJobUpdate(
-      final ParsedConfiguration parsedConfiguration) throws ScheduleException {
+      final SanitizedConfiguration sanitizedConfiguration) throws ScheduleException {
 
-    final IJobConfiguration job = parsedConfiguration.getJobConfig();
+    final IJobConfiguration job = sanitizedConfiguration.getJobConfig();
     final IJobKey jobKey = job.getKey();
     if (cronScheduler.hasJob(jobKey)) {
-      cronScheduler.updateJob(parsedConfiguration);
+      cronScheduler.updateJob(sanitizedConfiguration);
       return Optional.absent();
     }
 
@@ -368,7 +368,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
         try {
           return Optional.of(
-              stateManager.registerUpdate(jobKey, parsedConfiguration.getTaskConfigs()));
+              stateManager.registerUpdate(jobKey, sanitizedConfiguration.getTaskConfigs()));
         } catch (UpdateException e) {
           LOG.log(Level.INFO, "Failed to start update.", e);
           throw new ScheduleException(e.getMessage(), e);

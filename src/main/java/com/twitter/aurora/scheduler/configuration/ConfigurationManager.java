@@ -231,7 +231,7 @@ public final class ConfigurationManager {
   /**
    * Check validity of and populates defaults in a job configuration.  This will return a deep copy
    * of the provided job configuration with default configuration values applied, and configuration
-   * map values parsed and applied to their respective struct fields.
+   * map values sanitized and applied to their respective struct fields.
    *
    * @param job Job to validate and populate.
    * @return A deep copy of {@code job} that has been populated.
@@ -292,7 +292,7 @@ public final class ConfigurationManager {
   /**
    * Check validity of and populates defaults in a task configuration.  This will return a deep copy
    * of the provided task configuration with default configuration values applied, and configuration
-   * map values parsed and applied to their respective struct fields.
+   * map values sanitized and applied to their respective struct fields.
    *
    *
    * @param config Task config to validate and populate.

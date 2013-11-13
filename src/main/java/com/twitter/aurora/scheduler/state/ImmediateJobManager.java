@@ -20,7 +20,7 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.configuration.SanitizedConfiguration;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
@@ -48,7 +48,7 @@ class ImmediateJobManager extends JobManager {
   }
 
   @Override
-  public boolean receiveJob(ParsedConfiguration config) {
+  public boolean receiveJob(SanitizedConfiguration config) {
     LOG.info("Launching " + config.getTaskConfigs().size() + " tasks.");
     stateManager.insertPendingTasks(config.getTaskConfigs());
     return true;

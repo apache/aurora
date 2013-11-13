@@ -69,7 +69,7 @@ import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
-import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.configuration.SanitizedConfiguration;
 import com.twitter.aurora.scheduler.state.CronJobManager;
 import com.twitter.aurora.scheduler.state.LockManager;
 import com.twitter.aurora.scheduler.state.LockManager.LockException;
@@ -180,7 +180,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testPopulateJobConfig() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
-    scheduler.validateJobResources(anyObject(ParsedConfiguration.class));
+    scheduler.validateJobResources(anyObject(SanitizedConfiguration.class));
     control.replay();
 
     Response response = thrift.populateJobConfig(job.newBuilder(), JobConfigValidation.RUN_FILTERS);
@@ -198,7 +198,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testPopulateJobConfigFailFilter() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
-    scheduler.validateJobResources(anyObject(ParsedConfiguration.class));
+    scheduler.validateJobResources(anyObject(SanitizedConfiguration.class));
     expectLastCall().andThrow(new ScheduleException("err"));
     control.replay();
 
@@ -210,7 +210,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testCreateJobNoLock() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
     expectAuth(ROLE, true);
-    scheduler.createJob(ParsedConfiguration.fromUnparsed(job));
+    scheduler.createJob(SanitizedConfiguration.fromUnsanitized(job));
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
 
     control.replay();
@@ -223,7 +223,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testCreateJobWithLock() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
     expectAuth(ROLE, true);
-    scheduler.createJob(ParsedConfiguration.fromUnparsed(job));
+    scheduler.createJob(SanitizedConfiguration.fromUnsanitized(job));
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
 
     control.replay();
@@ -250,7 +250,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
-    scheduler.createJob(ParsedConfiguration.fromUnparsed(job));
+    scheduler.createJob(SanitizedConfiguration.fromUnsanitized(job));
     expectLastCall().andThrow(new ScheduleException("fail"));
     control.replay();
 
@@ -276,10 +276,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration job = makeJob();
     job.setInstanceCount(2);
     expectAuth(ROLE, true);
-    ParsedConfiguration parsed = ParsedConfiguration.fromUnparsed(IJobConfiguration.build(job));
+    SanitizedConfiguration sanitized =
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(job));
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
-    assertEquals(2, parsed.getTaskConfigs().size());
-    scheduler.createJob(parsed);
+    assertEquals(2, sanitized.getTaskConfigs().size());
+    scheduler.createJob(sanitized);
     control.replay();
 
     Response response = thrift.createJob(job, DEFAULT_LOCK, SESSION);
@@ -492,7 +493,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAuth(ROLE, true);
     expect(scheduler.initiateJobUpdate(
-        ParsedConfiguration.fromUnparsed(IJobConfiguration.build(job))))
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(job))))
         .andReturn(Optional.of(token));
 
     control.replay();
@@ -509,7 +510,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAuth(ROLE, true);
     expect(scheduler.initiateJobUpdate(
-        ParsedConfiguration.fromUnparsed(IJobConfiguration.build(job))))
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(job))))
         .andReturn(Optional.<String>absent());
 
     control.replay();
@@ -632,8 +633,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAuth(ROLE, true);
 
-    JobConfiguration parsed = job.deepCopy();
-    parsed.getTaskConfig()
+    JobConfiguration sanitized = job.deepCopy();
+    sanitized.getTaskConfig()
         .setNumCpus(1.0)
         .setPriority(0)
         .setRamMb(1024)
@@ -648,7 +649,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setMaxTaskFailures(1)
         .setEnvironment(DEFAULT_ENVIRONMENT);
 
-    scheduler.createJob(new ParsedConfiguration(IJobConfiguration.build(parsed)));
+    scheduler.createJob(new SanitizedConfiguration(IJobConfiguration.build(sanitized)));
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
 
     control.replay();
@@ -661,7 +662,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
-    cronJobManager.updateJob(anyObject(ParsedConfiguration.class));
+    cronJobManager.updateJob(anyObject(SanitizedConfiguration.class));
     control.replay();
 
     assertEquals(

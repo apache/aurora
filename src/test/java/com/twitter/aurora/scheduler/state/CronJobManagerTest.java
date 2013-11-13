@@ -41,7 +41,7 @@ import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
-import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.configuration.SanitizedConfiguration;
 import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
@@ -82,7 +82,7 @@ public class CronJobManagerTest extends EasyMockTest {
   private ShutdownRegistry shutdownRegistry;
   private CronJobManager cron;
   private IJobConfiguration job;
-  private ParsedConfiguration parsedConfiguration;
+  private SanitizedConfiguration sanitizedConfiguration;
 
   @Before
   public void setUp() throws Exception {
@@ -103,7 +103,7 @@ public class CronJobManagerTest extends EasyMockTest {
         delayExecutor);
     cron.schedulerCore = scheduler;
     job = makeJob();
-    parsedConfiguration = ParsedConfiguration.fromUnparsed(job);
+    sanitizedConfiguration = SanitizedConfiguration.fromUnsanitized(job);
   }
 
   private void expectJobAccepted(IJobConfiguration savedJob) throws Exception {
@@ -114,12 +114,12 @@ public class CronJobManagerTest extends EasyMockTest {
   }
 
   private void expectJobAccepted() throws Exception {
-    expectJobAccepted(parsedConfiguration.getJobConfig());
+    expectJobAccepted(sanitizedConfiguration.getJobConfig());
   }
 
   private IExpectationSetters<?> expectJobFetch() {
     return expect(storageUtil.jobStore.fetchJob(CronJobManager.MANAGER_KEY, job.getKey()))
-        .andReturn(Optional.of(parsedConfiguration.getJobConfig()));
+        .andReturn(Optional.of(sanitizedConfiguration.getJobConfig()));
   }
 
   private IExpectationSetters<?> expectActiveTaskFetch(IScheduledTask... activeTasks) {
@@ -158,11 +158,11 @@ public class CronJobManagerTest extends EasyMockTest {
     expectActiveTaskFetch();
 
     // Job is executed immediately since there are no existing tasks to kill.
-    stateManager.insertPendingTasks(parsedConfiguration.getTaskConfigs());
+    stateManager.insertPendingTasks(sanitizedConfiguration.getTaskConfigs());
 
     control.replay();
 
-    cron.receiveJob(parsedConfiguration);
+    cron.receiveJob(sanitizedConfiguration);
     cron.startJobNow(job.getKey());
   }
 
@@ -186,11 +186,11 @@ public class CronJobManagerTest extends EasyMockTest {
     // Simulate the live task disappearing.
     expectActiveTaskFetch();
 
-    stateManager.insertPendingTasks(parsedConfiguration.getTaskConfigs());
+    stateManager.insertPendingTasks(sanitizedConfiguration.getTaskConfigs());
 
     control.replay();
 
-    cron.receiveJob(parsedConfiguration);
+    cron.receiveJob(sanitizedConfiguration);
     cron.startJobNow(job.getKey());
     delayLaunchCapture.getValue().run();
   }
@@ -223,12 +223,12 @@ public class CronJobManagerTest extends EasyMockTest {
     expectActiveTaskFetch(TASK).times(2);
     expectActiveTaskFetch();
 
-    stateManager.insertPendingTasks(parsedConfiguration.getTaskConfigs());
+    stateManager.insertPendingTasks(sanitizedConfiguration.getTaskConfigs());
     expectLastCall().times(2);
 
     control.replay();
 
-    cron.receiveJob(parsedConfiguration);
+    cron.receiveJob(sanitizedConfiguration);
     cron.startJobNow(job.getKey());
     delayLaunchCapture.getValue().run();
 
@@ -260,11 +260,11 @@ public class CronJobManagerTest extends EasyMockTest {
     // Simulate the live task disappearing.
     expectActiveTaskFetch();
 
-    stateManager.insertPendingTasks(parsedConfiguration.getTaskConfigs());
+    stateManager.insertPendingTasks(sanitizedConfiguration.getTaskConfigs());
 
     control.replay();
 
-    cron.receiveJob(parsedConfiguration);
+    cron.receiveJob(sanitizedConfiguration);
 
     // Attempt to trick the cron manager into launching multiple times, or launching multiple
     // pollers.
@@ -276,7 +276,7 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testUpdate() throws Exception {
-    ParsedConfiguration updated = new ParsedConfiguration(
+    SanitizedConfiguration updated = new SanitizedConfiguration(
         IJobConfiguration.build(job.newBuilder().setCronSchedule("1 2 3 4 5")));
 
     expectJobAccepted();
@@ -285,7 +285,7 @@ public class CronJobManagerTest extends EasyMockTest {
 
     control.replay();
 
-    cron.receiveJob(parsedConfiguration);
+    cron.receiveJob(sanitizedConfiguration);
     cron.updateJob(updated);
   }
 
@@ -294,19 +294,19 @@ public class CronJobManagerTest extends EasyMockTest {
     IScheduledTask scheduledTask = IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.RUNNING)
         .setAssignedTask(new AssignedTask().setTask(defaultTask())));
-    parsedConfiguration = ParsedConfiguration.fromUnparsed(
+    sanitizedConfiguration = SanitizedConfiguration.fromUnsanitized(
         IJobConfiguration.build(job.newBuilder().setCronCollisionPolicy(RUN_OVERLAP)));
     expectJobAccepted();
     expectJobFetch();
     expectActiveTaskFetch(scheduledTask);
 
     Map<Integer, ITaskConfig> newConfig =
-        ImmutableMap.of(1, parsedConfiguration.getJobConfig().getTaskConfig());
+        ImmutableMap.of(1, sanitizedConfiguration.getJobConfig().getTaskConfig());
     stateManager.insertPendingTasks(newConfig);
 
     control.replay();
 
-    cron.receiveJob(parsedConfiguration);
+    cron.receiveJob(sanitizedConfiguration);
     cron.startJobNow(job.getKey());
   }
 
@@ -321,18 +321,18 @@ public class CronJobManagerTest extends EasyMockTest {
 
     control.replay();
 
-    cron.receiveJob(parsedConfiguration);
+    cron.receiveJob(sanitizedConfiguration);
 
     IJobConfiguration failedUpdate =
         IJobConfiguration.build(updated.newBuilder().setCronSchedule(null));
     try {
-      cron.updateJob(new ParsedConfiguration(failedUpdate));
+      cron.updateJob(new SanitizedConfiguration(failedUpdate));
       fail();
     } catch (ScheduleException e) {
       // Expected.
     }
 
-    cron.updateJob(new ParsedConfiguration(updated));
+    cron.updateJob(new SanitizedConfiguration(updated));
   }
 
   private IJobConfiguration makeJob() {

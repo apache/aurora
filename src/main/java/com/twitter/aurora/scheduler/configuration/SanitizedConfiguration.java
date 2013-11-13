@@ -30,45 +30,44 @@ import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
- * Wrapper for a configuration that has been fully-parsed and populated with defaults.
- * TODO(wfarner): Rename this to SanitizedConfiguration.
+ * Wrapper for a configuration that has been fully-sanitized and populated with defaults.
  */
-public final class ParsedConfiguration {
+public final class SanitizedConfiguration {
 
-  private final IJobConfiguration parsed;
+  private final IJobConfiguration sanitized;
   private final Map<Integer, ITaskConfig> tasks;
 
   /**
-   * Constructs a ParsedConfiguration object and populates the set of {@link ITaskConfig}s for
+   * Constructs a SanitizedConfiguration object and populates the set of {@link ITaskConfig}s for
    * the provided config.
    *
-   * @param parsed A parsed configuration..
+   * @param sanitized A sanitized configuration.
    */
   @VisibleForTesting
-  public ParsedConfiguration(IJobConfiguration parsed) {
-    this.parsed = parsed;
+  public SanitizedConfiguration(IJobConfiguration sanitized) {
+    this.sanitized = sanitized;
     this.tasks = Maps.toMap(
         ContiguousSet.create(
-            Range.closedOpen(0, parsed.getInstanceCount()),
+            Range.closedOpen(0, sanitized.getInstanceCount()),
             DiscreteDomain.integers()),
-        Functions.constant(parsed.getTaskConfig()));
+        Functions.constant(sanitized.getTaskConfig()));
   }
 
   /**
-   * Wraps an unparsed job configuration.
+   * Wraps an unsanitized job configuration.
    *
-   * @param unparsed Unparsed configuration to parse/populate and wrap.
-   * @return A wrapper containing the parsed configuration.
+   * @param unsanitized Unsanitized configuration to sanitize/populate and wrap.
+   * @return A wrapper containing the sanitized configuration.
    * @throws TaskDescriptionException If the configuration is invalid.
    */
-  public static ParsedConfiguration fromUnparsed(IJobConfiguration unparsed)
+  public static SanitizedConfiguration fromUnsanitized(IJobConfiguration unsanitized)
       throws TaskDescriptionException {
 
-    return new ParsedConfiguration(ConfigurationManager.validateAndPopulate(unparsed));
+    return new SanitizedConfiguration(ConfigurationManager.validateAndPopulate(unsanitized));
   }
 
   public IJobConfiguration getJobConfig() {
-    return parsed;
+    return sanitized;
   }
 
   // TODO(William Farner): Rework this API now that all configs are identical.
@@ -78,22 +77,22 @@ public final class ParsedConfiguration {
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof ParsedConfiguration)) {
+    if (!(o instanceof SanitizedConfiguration)) {
       return false;
     }
 
-    ParsedConfiguration other = (ParsedConfiguration) o;
+    SanitizedConfiguration other = (SanitizedConfiguration) o;
 
-    return Objects.equal(parsed, other.parsed);
+    return Objects.equal(sanitized, other.sanitized);
   }
 
   @Override
   public int hashCode() {
-    return parsed.hashCode();
+    return sanitized.hashCode();
   }
 
   @Override
   public String toString() {
-    return parsed.toString();
+    return sanitized.toString();
   }
 }

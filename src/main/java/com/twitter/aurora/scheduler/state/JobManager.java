@@ -20,7 +20,7 @@ import java.util.Collections;
 import javax.inject.Inject;
 
 import com.twitter.aurora.scheduler.base.ScheduleException;
-import com.twitter.aurora.scheduler.configuration.ParsedConfiguration;
+import com.twitter.aurora.scheduler.configuration.SanitizedConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 
@@ -52,7 +52,7 @@ public abstract class JobManager {
    * @return {@code true} If the manager accepted the job, {@code false} otherwise.
    * @throws ScheduleException If there is a problem with scheduling the job.
    */
-  public abstract boolean receiveJob(ParsedConfiguration config) throws ScheduleException;
+  public abstract boolean receiveJob(SanitizedConfiguration config) throws ScheduleException;
 
   /**
    * Fetches the configured jobs that this manager is storing.
