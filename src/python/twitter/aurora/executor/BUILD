@@ -65,10 +65,7 @@ python_library(
   dependencies = [
     pants('aurora/twitterdeps/src/thrift/com/twitter/thermos:py-thrift'),
     pants('src/python/twitter/aurora:mesos-core'),
-    pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/app/modules:exceptions'),
     pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

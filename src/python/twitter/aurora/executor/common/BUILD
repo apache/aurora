@@ -40,7 +40,6 @@ python_library(
   dependencies = [
     pants('src/python/twitter/common/dirutil'),
     pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common_internal/appapp')
   ]
 )
 
