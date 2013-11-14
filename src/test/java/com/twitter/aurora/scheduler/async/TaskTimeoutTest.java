@@ -15,11 +15,15 @@
  */
 package com.twitter.aurora.scheduler.async;
 
+import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
@@ -41,7 +45,7 @@ import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -69,12 +73,17 @@ public class TaskTimeoutTest extends EasyMockTest {
   private static final String TASK_ID = "task_id";
   private static final long TIMEOUT_MS = Amount.of(1L, Time.MINUTES).as(Time.MILLISECONDS);
 
+  private AtomicLong timedOutTaskCounter;
+  private Capture<Supplier<Number>> stateCountCapture;
+  private Map<ScheduleStatus, Capture<Supplier<Number>>> stateCaptures;
+
   private StorageTestUtil storageUtil;
   private ScheduledExecutorService executor;
   private ScheduledFuture<?> future;
   private StateManager stateManager;
   private FakeClock clock;
   private TaskTimeout timeout;
+  private StatsProvider statsProvider;
 
   @Before
   public void setUp() {
@@ -84,22 +93,45 @@ public class TaskTimeoutTest extends EasyMockTest {
     future = createMock(new Clazz<ScheduledFuture<?>>() { });
     stateManager = createMock(StateManager.class);
     clock = new FakeClock();
+    statsProvider = createMock(StatsProvider.class);
+    expectStatsProvider();
+  }
+
+  @After
+  public void verifyTasksDepleted() {
+    // Verify there is no memory leak.
+    assertEquals(0, stateCountCapture.getValue().get().intValue());
+  }
+
+  private void expectStatsProvider() {
+    timedOutTaskCounter = new AtomicLong();
+    expect(statsProvider.makeCounter(TaskTimeout.TIMED_OUT_TASKS_COUNTER))
+        .andReturn(timedOutTaskCounter);
+
+    stateCountCapture = createCapture();
+    expect(statsProvider.makeGauge(
+        eq(TaskTimeout.TRANSIENT_COUNT_STAT_NAME),
+        EasyMock.capture(stateCountCapture))).andReturn(null);
+
+    stateCaptures = Maps.newHashMap();
+    for (ScheduleStatus status : TaskTimeout.TRANSIENT_STATES) {
+      Capture<Supplier<Number>> statusCapture = createCapture();
+      expect(statsProvider.makeGauge(
+          eq(TaskTimeout.waitingTimeStatName(status)),
+          EasyMock.capture(statusCapture))).andReturn(null);
+      stateCaptures.put(status, statusCapture);
+    }
+  }
+
+  private void replayAndCreate() {
+    control.replay();
     timeout = new TaskTimeout(
         storageUtil.storage,
         executor,
         stateManager,
         clock,
-        Amount.of(TIMEOUT_MS, Time.MILLISECONDS));
-  }
-
-  @After
-  public void verifyTasksDepleted() {
-    try {
-      // Verify there is no memory leak.
-      assertEquals(0, Stats.getVariable(TaskTimeout.TRANSIENT_COUNT_STAT_NAME).read());
-    } finally {
-      Stats.flush();
-    }
+        Amount.of(TIMEOUT_MS, Time.MILLISECONDS),
+        statsProvider);
   }
 
   private Capture<Runnable> expectTaskWatch(long expireMs) {
@@ -138,7 +170,7 @@ public class TaskTimeoutTest extends EasyMockTest {
     expectTaskWatch();
     expectCancel();
 
-    control.replay();
+    replayAndCreate();
 
     changeState(INIT, PENDING);
     changeState(PENDING, ASSIGNED);
@@ -156,7 +188,7 @@ public class TaskTimeoutTest extends EasyMockTest {
     Query.Builder query = Query.taskScoped(TASK_ID).byStatus(KILLING);
     expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(1);
 
-    control.replay();
+    replayAndCreate();
 
     changeState(PENDING, ASSIGNED);
     changeState(ASSIGNED, KILLING);
@@ -169,12 +201,12 @@ public class TaskTimeoutTest extends EasyMockTest {
     Query.Builder query = Query.taskScoped(TASK_ID).byStatus(ASSIGNED);
     expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(1);
 
-    control.replay();
+    replayAndCreate();
 
     changeState(INIT, PENDING);
     changeState(PENDING, ASSIGNED);
     assignedTimeout.getValue().run();
-    checkStat(TaskTimeout.TIMED_OUT_TASKS_COUNTER, 1);
+    assertEquals(timedOutTaskCounter.intValue(), 1);
   }
 
   @Test
@@ -183,12 +215,12 @@ public class TaskTimeoutTest extends EasyMockTest {
     Query.Builder query = Query.taskScoped(TASK_ID).byStatus(UPDATING);
     expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(0);
 
-    control.replay();
+    replayAndCreate();
 
     changeState(INIT, PENDING);
     changeState(PENDING, UPDATING);
     assignedTimeout.getValue().run();
-    checkStat(TaskTimeout.TIMED_OUT_TASKS_COUNTER, 0);
+    assertEquals(timedOutTaskCounter.intValue(), 0);
   }
 
   private static IScheduledTask makeTask(
@@ -218,7 +250,7 @@ public class TaskTimeoutTest extends EasyMockTest {
     expectTaskWatch(TIMEOUT_MS);
     expectCancel().times(3);
 
-    control.replay();
+    replayAndCreate();
 
     timeout.storageStarted(new StorageStarted());
     changeState("a", ASSIGNED, RUNNING);
@@ -233,7 +265,7 @@ public class TaskTimeoutTest extends EasyMockTest {
     expectTaskWatch();
     expectCancel();
 
-    control.replay();
+    replayAndCreate();
 
     timeout.storageStarted(new StorageStarted());
     timeout.storageStarted(new StorageStarted());
@@ -241,11 +273,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   }
 
   private void checkOutstandingTimer(ScheduleStatus status, long expectedValue) {
-    checkStat(TaskTimeout.waitingTimeStatName(status), expectedValue);
-  }
-
-  private void checkStat(String name, long expectedValue) {
-    long value = (Long) Stats.getVariable(name).read();
+    long value = stateCaptures.get(status).getValue().get().longValue();
     assertEquals(expectedValue, value);
   }
 
@@ -257,7 +285,7 @@ public class TaskTimeoutTest extends EasyMockTest {
     expectTaskWatch();
     expectCancel().times(2);
 
-    control.replay();
+    replayAndCreate();
 
     checkOutstandingTimer(ASSIGNED, 0);
     checkOutstandingTimer(PREEMPTING, 0);

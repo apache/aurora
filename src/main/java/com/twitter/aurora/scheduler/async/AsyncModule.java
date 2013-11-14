@@ -36,6 +36,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
@@ -118,6 +119,7 @@ public class AsyncModule extends AbstractModule {
         bind(ScheduledExecutorService.class).toInstance(executor);
 
         bind(TaskTimeout.class).in(Singleton.class);
+        requireBinding(StatsProvider.class);
         expose(TaskTimeout.class);
       }
     });

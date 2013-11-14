@@ -31,6 +31,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
+import com.google.common.base.Supplier;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
@@ -47,8 +48,7 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatImpl;
-import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -56,8 +56,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Observes task transitions and identifies tasks that are 'stuck' in a transient state.  Stuck
  * tasks will be transitioned to the LOST state.
- * <p>
- * TODO(William Farner): Convert this test to use StatsProvider.
  */
 class TaskTimeout implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(TaskTimeout.class.getName());
@@ -65,12 +63,14 @@ class TaskTimeout implements EventSubscriber {
   @VisibleForTesting
   static final String TIMED_OUT_TASKS_COUNTER = "timed_out_tasks";
 
-  private final AtomicLong timedOutTasks = Stats.exportLong(TIMED_OUT_TASKS_COUNTER);
+  @VisibleForTesting
+  static final String TRANSIENT_COUNT_STAT_NAME = "transient_states";
 
   @VisibleForTesting
   static final Optional<String> TIMEOUT_MESSAGE = Optional.of("Task timed out");
 
-  private static final Set<ScheduleStatus> TRANSIENT_STATES = EnumSet.of(
+  @VisibleForTesting
+  static final Set<ScheduleStatus> TRANSIENT_STATES = EnumSet.of(
       ScheduleStatus.ASSIGNED,
       ScheduleStatus.PREEMPTING,
       ScheduleStatus.RESTARTING,
@@ -118,6 +118,7 @@ class TaskTimeout implements EventSubscriber {
   private final StateManager stateManager;
   private final long timeoutMillis;
   private final Clock clock;
+  private final AtomicLong timedOutTasks;
 
   @Inject
   TaskTimeout(
@@ -125,15 +126,17 @@ class TaskTimeout implements EventSubscriber {
       ScheduledExecutorService executor,
       StateManager stateManager,
       final Clock clock,
-      Amount<Long, Time> timeout) {
+      Amount<Long, Time> timeout,
+      StatsProvider statsProvider) {
 
     this.storage = checkNotNull(storage);
     this.executor = checkNotNull(executor);
     this.stateManager = checkNotNull(stateManager);
     this.timeoutMillis = timeout.as(Time.MILLISECONDS);
     this.clock = checkNotNull(clock);
+    this.timedOutTasks = statsProvider.makeCounter(TIMED_OUT_TASKS_COUNTER);
 
-    exportStats();
+    exportStats(statsProvider);
   }
 
   private void registerTimeout(TimeoutKey key) {
@@ -235,24 +238,26 @@ class TaskTimeout implements EventSubscriber {
       Ordering.natural().onResultOf(CONTEXT_TIMESTAMP);
 
   @VisibleForTesting
-  static final String TRANSIENT_COUNT_STAT_NAME = "transient_states";
-
-  @VisibleForTesting
   static String waitingTimeStatName(ScheduleStatus status) {
     return "scheduler_max_" + status + "_waiting_ms";
   }
 
-  private void exportStats() {
-    Stats.exportSize(TRANSIENT_COUNT_STAT_NAME, futures);
+  private void exportStats(StatsProvider statsProvider) {
+    statsProvider.makeGauge(TRANSIENT_COUNT_STAT_NAME, new Supplier<Number>() {
+      @Override public Number get() {
+          return futures.size();
+        }
+    });
+
     for (final ScheduleStatus status : TRANSIENT_STATES) {
-      Stats.export(new StatImpl<Long>(waitingTimeStatName(status)) {
+      statsProvider.makeGauge(waitingTimeStatName(status), new Supplier<Number>() {
         private final Predicate<TimeoutKey> statusMatcher = new Predicate<TimeoutKey>() {
           @Override public boolean apply(TimeoutKey key) {
             return key.status == status;
           }
         };
 
-        @Override public Long read() {
+        @Override public Number get() {
           Iterable<Context> matches = Maps.filterKeys(futures, statusMatcher).values();
           if (Iterables.isEmpty(matches)) {
             return 0L;
