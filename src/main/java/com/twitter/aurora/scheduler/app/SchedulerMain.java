@@ -219,7 +219,6 @@ public class SchedulerMain extends AbstractApplication {
           bind(DriverFactory.class).to(DriverFactoryImpl.class);
           bind(DriverFactoryImpl.class).in(Singleton.class);
           bind(Boolean.class).annotatedWith(ShutdownOnDriverExit.class).toInstance(true);
-          install(new BackupModule(SnapshotStoreImpl.class));
           install(new MesosLogStreamModule(zkClientConfig));
         }
       };
@@ -247,6 +246,7 @@ public class SchedulerMain extends AbstractApplication {
 
     return ImmutableList.<Module>builder()
         .addAll(getModules(CLUSTER_NAME.get(), SERVERSET_PATH.get()))
+        .add(new BackupModule(SnapshotStoreImpl.class))
         .add(new ZooKeeperClientModule(zkClientConfig))
         .add(configModule)
         .add(additional)
