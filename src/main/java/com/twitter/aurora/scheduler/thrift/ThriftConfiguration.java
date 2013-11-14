@@ -18,17 +18,19 @@ package com.twitter.aurora.scheduler.thrift;
 import java.io.IOException;
 import java.io.InputStream;
 
+import com.google.common.base.Optional;
+
 /**
  * Container for thrift server configuration options.
  */
 public interface ThriftConfiguration {
   /**
-   * Gets a stream for the thrift socket SSL key.
+   * Gets a stream for the thrift socket SSL key if this server is configured to use SSL.
    *
-   * @return A stream that contains the SSL key data.
+   * @return A stream that contains the SSL key data if SSL is enabled, absent otherwise.
    * @throws IOException If the stream could not be opened.
    */
-  InputStream getSslKeyStream() throws IOException;
+  Optional<? extends InputStream> getSslKeyStream() throws IOException;
 
   /**
    * Gets the port that the thrift server should listen on.

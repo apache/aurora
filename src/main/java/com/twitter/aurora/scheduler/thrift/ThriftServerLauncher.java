@@ -16,6 +16,8 @@
 package com.twitter.aurora.scheduler.thrift;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.ServerSocket;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.util.logging.Logger;
@@ -25,6 +27,8 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
+
+import com.google.common.base.Optional;
 
 import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.AuroraAdmin.Iface;
@@ -65,33 +69,11 @@ class ThriftServerLauncher implements ServiceRunner {
 
   @Override
   public LocalService launch() {
-    // TODO(wickman): Add helper to science thrift to perform this keyfile import.
-    SSLServerSocket serverSocket;
-    try {
-      KeyStore ks = KeyStore.getInstance("JKS");
-      ks.load(configuration.getSslKeyStream(), SSL_KEYFILE_PASSWORD.toCharArray());
-
-      KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-      kmf.init(ks, SSL_KEYFILE_PASSWORD.toCharArray());
-
-      SSLContext ctx = SSLContext.getInstance("TLS");
-      ctx.init(kmf.getKeyManagers(), null, null);
-
-      SSLServerSocketFactory ssf = ctx.getServerSocketFactory();
-      serverSocket = (SSLServerSocket) ssf.createServerSocket(configuration.getServingPort());
-      serverSocket.setEnabledCipherSuites(serverSocket.getSupportedCipherSuites());
-      serverSocket.setNeedClientAuth(false);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to read key file.", e);
-    } catch (GeneralSecurityException e) {
-      throw new RuntimeException("SSL setup failed.", e);
-    }
-
     ServerSetup setup = new ServerSetup(
         0,  // TODO(John Sirois): unused, fix ServerSetup constructors
         new AuroraAdmin.Processor(schedulerThriftInterface),
         ThriftServer.BINARY_PROTOCOL.get());
-    setup.setSocket(serverSocket);
+    setup.setSocket(getServerSocket());
     schedulerThriftServer.start(setup);
 
     Command shutdown = new Command() {
@@ -102,5 +84,36 @@ class ThriftServerLauncher implements ServiceRunner {
     };
 
     return LocalService.primaryService(schedulerThriftServer.getListeningPort(), shutdown);
+  }
+
+  private ServerSocket getServerSocket() {
+    try {
+      Optional<? extends InputStream> sslKeyStream = configuration.getSslKeyStream();
+      if (!sslKeyStream.isPresent()) {
+        LOG.warning("Running Thrift Server without SSL.");
+        return new ServerSocket(configuration.getServingPort());
+      } else {
+        // TODO(Kevin Sweeney): Add helper to perform this keyfile import.
+        KeyStore ks = KeyStore.getInstance("JKS");
+        ks.load(sslKeyStream.get(), SSL_KEYFILE_PASSWORD.toCharArray());
+
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
+        kmf.init(ks, SSL_KEYFILE_PASSWORD.toCharArray());
+
+        SSLContext ctx = SSLContext.getInstance("TLS");
+        ctx.init(kmf.getKeyManagers(), null, null);
+
+        SSLServerSocketFactory ssf = ctx.getServerSocketFactory();
+        SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(
+            configuration.getServingPort());
+        serverSocket.setEnabledCipherSuites(serverSocket.getSupportedCipherSuites());
+        serverSocket.setNeedClientAuth(false);
+        return serverSocket;
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to read key file.", e);
+    } catch (GeneralSecurityException e) {
+      throw new RuntimeException("SSL setup failed.", e);
+    }
   }
 }

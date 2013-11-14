@@ -64,7 +64,6 @@ import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.CanRead;
 import com.twitter.common.args.constraints.Exists;
 import com.twitter.common.args.constraints.IsDirectory;
 import com.twitter.common.args.constraints.NotEmpty;
@@ -97,8 +96,6 @@ public class SchedulerMain extends AbstractApplication {
   @CmdLine(name = "serverset_path", help = "ZooKeeper ServerSet path to register at.")
   private static final Arg<String> SERVERSET_PATH = Arg.create();
 
-  @CanRead
-  @NotNull
   @CmdLine(name = "mesos_ssl_keyfile",
       help = "JKS keyfile for operating the Mesos Thrift-over-SSL interface.")
   private static final Arg<File> MESOS_SSL_KEY_FILE = Arg.create();
@@ -243,8 +240,12 @@ public class SchedulerMain extends AbstractApplication {
     Module configModule = new AbstractModule() {
       @Override protected void configure() {
         bind(ThriftConfiguration.class).toInstance(new ThriftConfiguration() {
-          @Override public InputStream getSslKeyStream() throws FileNotFoundException {
-            return new FileInputStream(MESOS_SSL_KEY_FILE.get());
+          @Override public Optional<InputStream> getSslKeyStream() throws FileNotFoundException {
+            if (MESOS_SSL_KEY_FILE.hasAppliedValue()) {
+              return Optional.<InputStream>of(new FileInputStream(MESOS_SSL_KEY_FILE.get()));
+            } else {
+              return Optional.absent();
+            }
           }
 
           @Override public int getServingPort() {

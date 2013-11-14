@@ -170,9 +170,12 @@ public class SchedulerIT extends BaseZooKeeperTest {
         bind(Log.class).toInstance(log);
         bind(ThriftConfiguration.class).toInstance(
             new ThriftConfiguration() {
-              @Override public InputStream getSslKeyStream() throws IOException {
-                return com.google.common.io.Resources.getResource(getClass(), "AuroraTestKeyStore")
-                    .openStream();
+              @Override public Optional<? extends InputStream> getSslKeyStream()
+                  throws IOException {
+
+                return Optional.of(
+                    com.google.common.io.Resources.getResource(getClass(), "AuroraTestKeyStore")
+                        .openStream());
               }
 
               @Override public int getServingPort() {
