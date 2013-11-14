@@ -16,6 +16,9 @@
 package com.twitter.aurora.scheduler.log.mesos;
 
 import java.io.File;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.inject.Singleton;
 
@@ -31,6 +34,8 @@ import org.apache.zookeeper.common.PathUtils;
 
 import com.twitter.aurora.codec.ThriftBinaryCodec;
 import com.twitter.aurora.gen.storage.LogEntry;
+import com.twitter.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
+import com.twitter.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.net.InetSocketAddressHelper;
@@ -143,6 +148,50 @@ public class MesosLogStreamModule extends PrivateModule {
     Amount<Long, Time> electionTimeout = COORDINATOR_ELECTION_TIMEOUT.get();
     return new Log.Writer(log, electionTimeout.getValue(), electionTimeout.getUnit().getTimeUnit(),
         COORDINATOR_ELECTION_RETRIES.get());
+  }
+
+  @Provides
+  LogInterface provideLogInterface(final Log log) {
+    return new LogInterface() {
+      @Override public Log.Position position(byte[] identity) {
+        return log.position(identity);
+      }
+    };
+  }
+
+  @Provides
+  ReaderInterface provideReaderInterface(final Log.Reader reader) {
+    return new ReaderInterface() {
+      @Override
+      public List<Log.Entry> read(Log.Position from, Log.Position to, long timeout, TimeUnit unit)
+          throws TimeoutException, Log.OperationFailedException {
+
+        return reader.read(from, to, timeout, unit);
+      }
+
+      @Override public Log.Position beginning() {
+        return reader.beginning();
+      }
+
+      @Override public Log.Position ending() {
+        return reader.ending();
+      }
+    };
+  }
+
+  @Provides
+  WriterInterface provideWriterInterface(final Log.Writer writer) {
+    return new WriterInterface() {
+      @Override public Log.Position append(byte[] data, long timeout, TimeUnit unit)
+          throws TimeoutException, Log.WriterFailedException {
+        return writer.append(data, timeout, unit);
+      }
+
+      @Override public Log.Position truncate(Log.Position to, long timeout, TimeUnit unit)
+          throws TimeoutException, Log.WriterFailedException {
+        return writer.truncate(to, timeout, unit);
+      }
+    };
   }
 
   @Provides

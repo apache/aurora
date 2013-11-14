@@ -29,6 +29,7 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 import javax.inject.Provider;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.UnmodifiableIterator;
@@ -37,6 +38,8 @@ import com.google.inject.BindingAnnotation;
 
 import org.apache.mesos.Log;
 
+import com.twitter.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
+import com.twitter.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
 import com.twitter.common.base.Function;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -80,12 +83,12 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
   @Target({ PARAMETER, METHOD })
   public @interface WriteTimeout { }
 
-  private final Provider<Log> logFactory;
+  private final Provider<LogInterface> logFactory;
 
-  private final Provider<Log.Reader> readerFactory;
+  private final Provider<ReaderInterface> readerFactory;
   private final Amount<Long, Time> readTimeout;
 
-  private final Provider<Log.Writer> writerFactory;
+  private final Provider<WriterInterface> writerFactory;
   private final Amount<Long, Time> writeTimeout;
 
   private final byte[] noopEntry;
@@ -102,10 +105,10 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
    */
   @Inject
   public MesosLog(
-      Provider<Log> logFactory,
-      Provider<Log.Reader> readerFactory,
+      Provider<LogInterface> logFactory,
+      Provider<ReaderInterface> readerFactory,
       @ReadTimeout Amount<Long, Time> readTimeout,
-      Provider<Log.Writer> writerFactory,
+      Provider<WriterInterface> writerFactory,
       @WriteTimeout Amount<Long, Time> writeTimeout,
       @NoopEntry byte[] noopEntry) {
 
@@ -126,14 +129,16 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
         logFactory.get(), readerFactory.get(), readTimeout, writerFactory, writeTimeout, noopEntry);
   }
 
-  private static class LogStream implements com.twitter.aurora.scheduler.log.Log.Stream {
-    private static final class OpStats {
+  @VisibleForTesting
+  static class LogStream implements com.twitter.aurora.scheduler.log.Log.Stream {
+    @VisibleForTesting
+    static final class OpStats {
       private final String opName;
       private final SlidingStats timing;
       private final AtomicLong timeouts;
       private final AtomicLong failures;
 
-      private OpStats(String opName) {
+      OpStats(String opName) {
         this.opName = MorePreconditions.checkNotBlank(opName);
         timing = new SlidingStats("scheduler_log_native_" + opName, "nanos");
         timeouts = exportLongStat("scheduler_log_native_%s_timeouts", opName);
@@ -158,22 +163,22 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
     private final AtomicLong entriesSkipped =
         Stats.exportLong("scheduler_log_native_native_entries_skipped");
 
-    private final Log log;
+    private final LogInterface log;
 
-    private final Log.Reader reader;
+    private final ReaderInterface reader;
     private final long readTimeout;
     private final TimeUnit readTimeUnit;
 
-    private final Provider<Log.Writer> writerFactory;
+    private final Provider<WriterInterface> writerFactory;
     private final long writeTimeout;
     private final TimeUnit writeTimeUnit;
 
     private final byte[] noopEntry;
 
-    private Log.Writer writer;
+    private WriterInterface writer;
 
-    LogStream(Log log, Log.Reader reader, Amount<Long, Time> readTimeout,
-        Provider<Log.Writer> writerFactory, Amount<Long, Time> writeTimeout,
+    LogStream(LogInterface log, ReaderInterface reader, Amount<Long, Time> readTimeout,
+        Provider<WriterInterface> writerFactory, Amount<Long, Time> writeTimeout,
         byte[] noopEntry) {
 
       this.log = log;
@@ -274,7 +279,7 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
       Preconditions.checkNotNull(contents);
 
       Log.Position position = mutate(append, new Mutation<Log.Position>() {
-        @Override public Log.Position apply(Log.Writer logWriter)
+        @Override public Log.Position apply(WriterInterface logWriter)
             throws TimeoutException, Log.WriterFailedException {
           return logWriter.append(contents, writeTimeout, writeTimeUnit);
         }
@@ -291,7 +296,7 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
 
       final Log.Position before = ((LogPosition) position).unwrap();
       mutate(truncate, new Mutation<Void>() {
-        @Override public Void apply(Log.Writer logWriter)
+        @Override public Void apply(WriterInterface logWriter)
             throws TimeoutException, Log.WriterFailedException {
           logWriter.truncate(before, writeTimeout, writeTimeUnit);
           return null;
@@ -299,11 +304,13 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
       });
     }
 
-    private interface Mutation<T> {
-      T apply(Log.Writer writer) throws TimeoutException, Log.WriterFailedException;
+    @VisibleForTesting
+    interface Mutation<T> {
+      T apply(WriterInterface writer) throws TimeoutException, Log.WriterFailedException;
     }
 
-    private synchronized <T> T mutate(OpStats stats, Mutation<T> mutation) {
+    @VisibleForTesting
+    synchronized <T> T mutate(OpStats stats, Mutation<T> mutation) {
       long start = System.nanoTime();
       if (writer == null) {
         writer = writerFactory.get();
