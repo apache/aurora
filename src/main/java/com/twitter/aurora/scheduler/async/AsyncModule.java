@@ -154,7 +154,7 @@ public class AsyncModule extends AbstractModule {
     binder().install(new PrivateModule() {
       @Override protected void configure() {
         // TODO(ksweeney): Create a configuration validator module so this can be injected.
-        // TODO(William Farner): Revert this once large task counts is cheap (MESOS-2329).
+        // TODO(William Farner): Revert this once large task counts is cheap ala hierarchichal store
         bind(Integer.class).annotatedWith(PruneThreshold.class).toInstance(100);
         bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PruneThreshold.class)
             .toInstance(HISTORY_PRUNE_THRESHOLD.get());

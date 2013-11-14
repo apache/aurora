@@ -329,7 +329,6 @@ public final class ConfigurationManager {
           "Environment contains illegal characters: " + config.getEnvironment());
     }
 
-    // TODO(maximk): Remove thermosConfig during the MESOS-2635 cleanup stage
     if (!builder.isSetThermosConfig() && !builder.isSetExecutorConfig()) {
       throw new TaskDescriptionException("Configuration may not be null");
     }
