@@ -272,7 +272,6 @@ public class IsolatedSchedulerModule extends AbstractModule {
               .setDiskMb(1024)
               .setRamMb(1024)
               .setPackages(ImmutableSet.of(new Package(owner.getRole(), "package", 15)))
-              // TODO(maximk): Dump thermosConfig during the MESOS-2635 cleanup stage
               .setThermosConfig("opaque".getBytes())
               .setExecutorConfig(new ExecutorConfig("aurora", "opaque")));
     }

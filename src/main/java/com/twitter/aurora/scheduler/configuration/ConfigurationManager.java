@@ -329,7 +329,7 @@ public final class ConfigurationManager {
           "Environment contains illegal characters: " + config.getEnvironment());
     }
 
-    if (!builder.isSetThermosConfig() && !builder.isSetExecutorConfig()) {
+    if (!builder.isSetExecutorConfig()) {
       throw new TaskDescriptionException("Configuration may not be null");
     }
 

@@ -259,6 +259,18 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testCreateJobFailsNoExecutorConfig() throws Exception {
+    JobConfiguration job = makeJob();
+    job.getTaskConfig().unsetExecutorConfig();
+    expectAuth(ROLE, true);
+    control.replay();
+
+    Response response = thrift.createJob(job, LOCK.newBuilder(), SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+    assertTrue(response.getMessage().contains("Configuration"));
+  }
+
+  @Test
   public void testCreateHomogeneousJobNoShards() throws Exception {
     JobConfiguration job = makeJob();
     job.setInstanceCount(0);

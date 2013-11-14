@@ -121,7 +121,6 @@ public final class StorageBackfill {
       AtomicLong oldSet,
       AtomicLong newSet,
       AtomicLong inconsistent) {
-    // TODO(maximk): remove this as part of MESOS-2635 cleanup
     boolean oldFieldSet = taskConfig.isSetThermosConfig();
     boolean newFieldSet = taskConfig.isSetExecutorConfig();
     if (oldFieldSet && newFieldSet) {
@@ -148,7 +147,6 @@ public final class StorageBackfill {
   }
 
   private static void convertToExecutorConfig(ScheduledTask task) {
-    // TODO(maximk): remove this as part of MESOS-2635 cleanup
     mutateTaskConfig(
         task.getAssignedTask().getTask(),
         BOTH_CONFIGS_SET,
@@ -158,7 +156,6 @@ public final class StorageBackfill {
   }
 
   private static void convertToExecutorConfig(JobStore.Mutable jobStore) {
-    // TODO(maximk): remove this as part of MESOS-2635 cleanup
     for (String id : jobStore.fetchManagerIds()) {
       for (JobConfiguration job : IJobConfiguration.toBuildersList(jobStore.fetchJobs(id))) {
         mutateTaskConfig(
