@@ -175,8 +175,6 @@ public interface Storage {
    * Executes the unit of read-only {@code work}.  All data in the stores may be expected to be
    * consistent, as the invocation is mutually exclusive of any writes.
    *
-   * <p>TODO(John Sirois): Audit usages and handle StorageException appropriately.
-   *
    * @param work The unit of work to execute.
    * @param <T> The type of result this unit of work produces.
    * @param <E> The type of exception this unit of work can throw.

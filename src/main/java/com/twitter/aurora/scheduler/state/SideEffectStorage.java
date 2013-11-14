@@ -26,6 +26,8 @@ import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
+import com.twitter.aurora.scheduler.storage.Storage.StorageException;
+import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.common.base.Closure;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -84,6 +86,10 @@ class SideEffectStorage {
    */
   <T, E extends Exception> T write(SideEffectWork<T, E> work) throws E {
     return storage.write(executeSideEffectsAfter(work));
+  }
+
+  <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
+    return storage.consistentRead(work);
   }
 
   /**

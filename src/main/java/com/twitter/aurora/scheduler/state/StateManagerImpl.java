@@ -64,7 +64,6 @@ import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.state.SideEffectStorage.SideEffectWork;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import com.twitter.aurora.scheduler.storage.Storage.StorageException;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.TaskStore;
@@ -110,12 +109,6 @@ public class StateManagerImpl implements StateManager {
   }
 
   private final TaskIdGenerator taskIdGenerator;
-
-  // TODO(William Farner): Eliminate this and update all callers to use Storage directly.
-  interface ReadOnlyStorage {
-    <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E;
-  }
-  private final ReadOnlyStorage readOnlyStorage;
 
   // Work queue to receive state machine side effect work.
   // Items are sorted to place DELETE entries last.  This is to ensure that within an operation,
@@ -196,12 +189,6 @@ public class StateManagerImpl implements StateManager {
     };
 
     this.storage = new SideEffectStorage(storage, finalizer, taskEventSink);
-    readOnlyStorage = new ReadOnlyStorage() {
-      @Override public <T, E extends Exception> T consistentRead(Work<T, E> work)
-          throws StorageException, E {
-        return storage.consistentRead(work);
-      }
-    };
 
     this.driver = checkNotNull(driver);
     this.taskIdGenerator = checkNotNull(taskIdGenerator);
@@ -716,7 +703,7 @@ public class StateManagerImpl implements StateManager {
   private Supplier<Boolean> taskUpdateChecker(final IJobKey jobKey) {
     return new Supplier<Boolean>() {
       @Override public Boolean get() {
-        return readOnlyStorage.consistentRead(new Work.Quiet<Boolean>() {
+        return storage.consistentRead(new Work.Quiet<Boolean>() {
           @Override public Boolean apply(StoreProvider storeProvider) {
             return storeProvider.getUpdateStore().fetchJobUpdateConfig(jobKey).isPresent();
           }
@@ -863,7 +850,7 @@ public class StateManagerImpl implements StateManager {
   }
 
   private Map<String, TaskStateMachine> getStateMachines(final Set<String> taskIds) {
-    return readOnlyStorage.consistentRead(new Work.Quiet<Map<String, TaskStateMachine>>() {
+    return storage.consistentRead(new Work.Quiet<Map<String, TaskStateMachine>>() {
       @Override public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
         Map<String, IScheduledTask> existingTasks = Maps.uniqueIndex(
             storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskIds)),
