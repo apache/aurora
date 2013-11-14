@@ -60,10 +60,9 @@ public class AopModule extends AbstractModule {
       help = "Allow new jobs to be created, if false all job creation requests will be denied.")
   private static final Arg<Boolean> ENABLE_JOB_CREATION = Arg.create(true);
 
-  // TODO(wfarner): Consider implementing the equivalent of Matchers.and() so we can specify
-  // the type here as well.
   private static final Matcher<? super Class<?>> THRIFT_IFACE_MATCHER =
-      Matchers.annotatedWith(DecoratedThrift.class);
+      Matchers.subclassesOf(AuroraAdmin.Iface.class)
+          .and(Matchers.annotatedWith(DecoratedThrift.class));
 
   private final Map<String, Boolean> toggledMethods;
 
