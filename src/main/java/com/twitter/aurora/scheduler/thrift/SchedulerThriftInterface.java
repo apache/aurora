@@ -82,7 +82,6 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduleStatusResult;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.StartMaintenanceResult;
-import com.twitter.aurora.gen.StartUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
@@ -536,43 +535,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response startUpdate(JobConfiguration mutableJob, SessionKey session) {
-    IJobConfiguration job = IJobConfiguration.build(mutableJob);
-    checkNotNull(job);
-    checkNotNull(session);
-
     Response response = new Response();
-
-    if (!JobKeys.isValid(job.getKey())) {
-      return response.setResponseCode(INVALID_REQUEST)
-          .setMessage("Invalid job key: " + job.getKey());
-    }
-
-    try {
-      sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
-    } catch (AuthFailedException e) {
-      return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
-    }
-
-    try {
-      Optional<String> token =
-          schedulerCore.initiateJobUpdate(SanitizedConfiguration.fromUnsanitized(job));
-
-      StartUpdateResult result = new StartUpdateResult()
-          .setRollingUpdateRequired(token.isPresent());
-
-      response.setResult(Result.startUpdateResult(result))
-        .setResponseCode(OK);
-
-      if (token.isPresent()) {
-        result.setUpdateToken(token.get());
-        response.setMessage("Update successfully started.");
-      } else {
-        response.setMessage("Job successfully updated.");
-      }
-    } catch (ScheduleException | TaskDescriptionException e) {
-      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    }
-
+    response.setMessage("This client version is deprecated. Please, sync Aurora client "
+        + "to the latest version and retry your action. See: go/getaurora for more details.");
+    response.setResponseCode(ERROR);
     return response;
   }
 

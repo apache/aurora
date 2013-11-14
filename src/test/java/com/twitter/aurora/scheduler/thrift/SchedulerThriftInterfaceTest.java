@@ -60,7 +60,6 @@ import com.twitter.aurora.gen.RewriteConfigsRequest;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.StartUpdateResult;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.gen.TaskQuery;
@@ -96,7 +95,6 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import static com.twitter.aurora.auth.CapabilityValidator.Capability.ROOT;
@@ -500,36 +498,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdate() throws Exception {
-    JobConfiguration job = makeJob();
-    String token = "token";
-
-    expectAuth(ROLE, true);
-    expect(scheduler.initiateJobUpdate(
-        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(job))))
-        .andReturn(Optional.of(token));
-
     control.replay();
-    Response resp = thrift.startUpdate(job, SESSION);
-    StartUpdateResult result = resp.getResult().getStartUpdateResult();
-    assertEquals(OK, resp.getResponseCode());
-    assertEquals(token, result.getUpdateToken());
-    assertTrue(result.isRollingUpdateRequired());
-  }
-
-  @Test
-  public void testStartCronUpdate() throws Exception {
-    JobConfiguration job = makeJob();
-
-    expectAuth(ROLE, true);
-    expect(scheduler.initiateJobUpdate(
-        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(job))))
-        .andReturn(Optional.<String>absent());
-
-    control.replay();
-    Response resp = thrift.startUpdate(job, SESSION);
-    StartUpdateResult result = resp.getResult().getStartUpdateResult();
-    assertEquals(OK, resp.getResponseCode());
-    assertFalse(result.isRollingUpdateRequired());
+    Response resp = thrift.startUpdate(null, null);
+    assertEquals(ERROR, resp.getResponseCode());
   }
 
   @Test
