@@ -87,7 +87,6 @@ public class AopModule extends AbstractModule {
   protected void configure() {
     requireBinding(CapabilityValidator.class);
 
-    // TODO(Sathya): Consider adding an interceptor to validate session key.
     // Layer ordering:
     // Log -> CapabilityValidator -> FeatureToggle -> StatsExporter -> APIVersion ->
     // SchedulerThriftInterface

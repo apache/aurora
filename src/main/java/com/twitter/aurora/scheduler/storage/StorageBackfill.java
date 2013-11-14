@@ -44,7 +44,6 @@ import com.twitter.common.util.Clock;
 
 /**
  * Utility class to contain and perform storage backfill operations.
- * TODO(Sathya): Add test coverage for this class.
  */
 public final class StorageBackfill {
 
