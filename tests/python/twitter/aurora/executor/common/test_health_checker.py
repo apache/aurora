@@ -33,14 +33,14 @@ class TestHealthChecker(unittest.TestCase):
     hct = HealthCheckerThread(self._checker, interval_secs=5, clock=self._clock)
     hct.start()
     thread_yield()
-    assert hct.healthy
+    assert hct.status is None
     self._clock.tick(6)
-    assert hct.healthy
+    assert hct.status is None
     self._clock.tick(3)
-    assert hct.healthy
+    assert hct.status is None
     self._clock.tick(5)
     thread_yield()
-    assert not hct.healthy
+    assert hct.status is not None
     hct.stop()
     self.verify()
 
@@ -53,7 +53,7 @@ class TestHealthChecker(unittest.TestCase):
       initial_interval_secs=0,
       clock=self._clock)
     hct.start()
-    assert not hct.healthy
+    assert hct.status is not None
     hct.stop()
     self.verify()
 
@@ -75,19 +75,19 @@ class TestHealthChecker(unittest.TestCase):
 
     # 2 consecutive health check failures followed by a successful health check.
     self._clock.tick(initial_interval_secs)
-    assert hct.healthy
+    assert hct.status is None
     self._clock.tick(interval_secs)
-    assert hct.healthy
+    assert hct.status is None
     self._clock.tick(interval_secs)
-    assert hct.healthy
+    assert hct.status is None
 
     # 3 consecutive health check failures.
     self._clock.tick(interval_secs)
-    assert hct.healthy
+    assert hct.status is None
     self._clock.tick(interval_secs)
-    assert hct.healthy
+    assert hct.status is None
     self._clock.tick(interval_secs)
     thread_yield()
-    assert not hct.healthy
+    assert hct.status is not None
     hct.stop()
     self.verify()

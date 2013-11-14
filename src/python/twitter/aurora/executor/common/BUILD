@@ -1,6 +1,6 @@
 python_library(
-  name = 'health_interface',
-  sources = ['health_interface.py'],
+  name = 'status_checker',
+  sources = ['status_checker.py'],
   dependencies = [
     pants('src/python/twitter/common/metrics'),
   ]
@@ -10,7 +10,7 @@ python_library(
   name = 'health_checker',
   sources = ['health_checker.py'],
   dependencies = [
-    pants(':health_interface'),
+    pants(':status_checker'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/exceptions'),
   ]
@@ -30,7 +30,7 @@ python_library(
   name = 'kill_manager',
   sources = ['kill_manager.py'],
   dependencies = [
-    pants('src/python/twitter/aurora/executor/common:health_interface'),
+    pants(':status_checker'),
   ]
 )
 

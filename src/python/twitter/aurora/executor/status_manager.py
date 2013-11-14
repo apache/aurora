@@ -7,28 +7,18 @@ from twitter.common.quantity import Amount, Time
 
 from gen.twitter.thermos.ttypes import TaskState
 
-from .common.health_interface import ExitState
+from .common.status_checker import ExitState
 from .executor_base import ThermosExecutorBase
 
 import mesos_pb2 as mesos_pb
 
 
-# TODO(wickman)
-# This needs to be merged back into ThermosExecutor.
-#
-# We should create a ChainedHealthInterface that takes all other health interfaces and
-# proxies all(health_interface.healthy for health_interface in health_interfaces)
-#
-# Then HealthMonitor(health_interface, event) => event.signal when health_interface is unhealthy
-#
-# event.signal initiates teardown which lives entirely within ThermosExecutor
-#
 class StatusManager(ExceptionalThread):
   """
-    An agent that periodically checks the health of a task via HealthInterfaces that
+    An agent that periodically checks the health of a task via StatusCheckers that
     provide HTTP health checking, resource consumption, etc.
 
-    If any of the health managers return a false health check, the Status Manager is
+    If any of the status interfaces return a status, the Status Manager is
     responsible for enforcing the "graceful" shutdown cycle via /quitquitquit and
     /abortabortabort.
   """
@@ -38,41 +28,42 @@ class StatusManager(ExceptionalThread):
   ESCALATION_WAIT = Amount(5, Time.SECONDS)
   PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
 
-  def __init__(self, runner, driver, task_id, health_checkers=(), signaler=None, clock=time):
+  def __init__(self, runner, driver, task_id, status_checkers=(), signaler=None, clock=time):
     self._driver = driver
     self._runner = runner
     self._task_id = task_id
     self._clock = clock
-    self._unhealthy_event = threading.Event()
+    self._status_event = threading.Event()
     self._signaler = signaler
-    self._health_checkers = health_checkers
+    self._status_checkers = status_checkers
     super(StatusManager, self).__init__()
     self.daemon = True
 
-  def _start_health_checkers(self):
-    for checker in self._health_checkers:
-      log.debug("Starting checker: %s" % checker.__class__.__name__)
-      checker.start()
+  def _start_status_checkers(self):
+    for interface in self._status_checkers:
+      log.debug("Starting status interface: %s" % interface.__class__.__name__)
+      interface.start()
 
-  def _stop_health_checkers(self):
-    if self._unhealthy_event.is_set():
+  def _stop_status_checkers(self):
+    if self._status_event.is_set():
       return
-    self._unhealthy_event.set()
-    for checker in self._health_checkers:
-      log.debug('Terminating %s' % checker)
-      checker.stop()
+    self._status_event.set()
+    for interface in self._status_checkers:
+      log.debug('Terminating %s' % interface)
+      interface.stop()
 
   def run(self):
-    self._start_health_checkers()
+    self._start_status_checkers()
 
     exit_reason = None
 
     while self._runner.is_alive and exit_reason is None:
-      for checker in self._health_checkers:
-        if not checker.healthy:
-          self._stop_health_checkers()
-          exit_reason = checker.exit_reason
-          log.info('Got %s from %s' % (exit_reason, checker.__class__.__name__))
+      for interface in self._status_checkers:
+        interface_status = interface.status
+        if interface_status is not None:
+          self._stop_status_checkers()
+          exit_reason = interface_status
+          log.info('Got %s from %s' % (exit_reason, interface.__class__.__name__))
           break
       else:
         self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
@@ -147,7 +138,7 @@ class StatusManager(ExceptionalThread):
         log.error("Unknown task state = %r!" % last_state)
         finish_state = mesos_pb.TASK_FAILED
 
-    # See comment in executor/common/health_interface.py.  This translates
+    # See comment in executor/common/status_checker.py.  This translates
     # from ExitStatus to TaskStatus to reduce dependency overhead.
     def translate_exit_state(status):
       if status == ExitState.FAILED:
@@ -175,7 +166,7 @@ class StatusManager(ExceptionalThread):
     log.info('Sending terminal state update: %s' % (task_state.name if task_state else 'UNKNOWN'))
     self._driver.sendStatusUpdate(update)
 
-    self._stop_health_checkers()
+    self._stop_status_checkers()
 
     # the executor is ephemeral and we just submitted a terminal task state, so shutdown
     log.info('Stopping executor.')

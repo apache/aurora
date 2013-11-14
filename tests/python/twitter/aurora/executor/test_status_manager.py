@@ -1,21 +1,20 @@
-import pytest
 import socket
 import threading
 import time
-import tornado.ioloop
-import tornado.web
 import unittest
 
-import mesos_pb2 as mesos_pb
-
+from twitter.aurora.common.http_signaler import HttpSignaler
+from twitter.aurora.executor.common.health_checker import HealthCheckerThread
+from twitter.aurora.executor.status_manager import StatusManager
 from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
 
-from twitter.aurora.common.http_signaler import HttpSignaler
-from twitter.aurora.executor.status_manager import StatusManager
-from twitter.aurora.executor.common.health_checker import HealthCheckerThread
-
 from gen.twitter.thermos.ttypes import TaskState
+
+import mesos_pb2 as mesos_pb
+import pytest
+import tornado.ioloop
+import tornado.web
 
 
 def thread_yield():
@@ -182,7 +181,7 @@ class TestStatusManager(unittest.TestCase):
     signaler = HttpSignaler(self.http.port)
     checker = HealthCheckerThread(signaler.health, interval_secs=0.5)
     monitor = FastStatusManager(self.runner, self.driver, 'abc', signaler=signaler,
-        health_checkers=[checker])
+        status_checkers=[checker])
     monitor.start()
 
     self.http.health.value = 'bad'

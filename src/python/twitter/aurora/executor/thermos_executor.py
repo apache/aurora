@@ -146,7 +146,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     return True
 
   def _start_status_manager(self, driver, assigned_task, mesos_task, portmap):
-    health_checkers = []
+    status_checkers = []
 
     http_signaler = None
     if portmap.get('health'):
@@ -159,7 +159,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
           interval_secs=health_check_config.get('interval_secs'),
           initial_interval_secs=health_check_config.get('initial_interval_secs'),
           max_consecutive_failures=health_check_config.get('max_consecutive_failures'))
-      health_checkers.append(health_checker)
+      status_checkers.append(health_checker)
       self.metrics.register_observable('health_checker', health_checker)
 
     task_path = TaskPath(root=self._runner._checkpoint_root, task_id=self._task_id)
@@ -168,7 +168,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
         TaskMonitor(task_path, self._task_id),
         self._sandbox.root,
     )
-    health_checkers.append(resource_manager)
+    status_checkers.append(resource_manager)
     self.metrics.register_observable('resource_manager', resource_manager)
 
     ResourceCheckpointer(
@@ -197,10 +197,10 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     #
     discovery_manager = DiscoveryManager.from_assigned_task(assigned_task)
     if discovery_manager:
-      health_checkers.append(discovery_manager)
+      status_checkers.append(discovery_manager)
       self.metrics.register_observable('discovery_manager', discovery_manager)
 
-    health_checkers.append(self._kill_manager)
+    status_checkers.append(self._kill_manager)
     self.metrics.register_observable('kill_manager', self._kill_manager)
 
     self._manager = self._manager_class(
@@ -208,7 +208,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
         driver,
         self._task_id,
         signaler=http_signaler,
-        health_checkers=health_checkers)
+        status_checkers=status_checkers)
 
     self._manager.start()
 

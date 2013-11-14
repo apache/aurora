@@ -108,7 +108,7 @@ class InstanceWatcherHealthCheck(HealthCheck):
   """Makes the decision: if a task has health port, then use Status+HTTP, else use only status.
      Caveat: Only works if either ALL tasks have a health port or none of them have a health port.
   """
-  # TODO(atollenaere) Refactor the code to use the executor HealthInterface/HealthChecker instead
+  # TODO(atollenaere) Refactor the code to use the executor StatusChecker/HealthChecker instead
 
   def __init__(self, http_signaler_factory=HttpSignaler):
     self._has_health_port = False

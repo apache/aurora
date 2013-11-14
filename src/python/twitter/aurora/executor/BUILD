@@ -35,7 +35,7 @@ python_library(
 )
 
 python_library(
-  name = 'health_interfaces',
+  name = 'status_checkers',
   dependencies = [
     pants('src/python/twitter/aurora/executor/common:health_checker'),
     pants('src/python/twitter/aurora/executor/common:kill_manager'),
@@ -48,7 +48,7 @@ python_library(
   name = 'status_manager',
   sources = ['status_manager.py'],
   dependencies = [
-    pants(':health_interfaces'),
+    pants(':status_checkers'),
     pants(':thermos_executor_base'),
     pants('aurora/twitterdeps/src/thrift/com/twitter/thermos:py-thrift'),
     pants('src/python/twitter/aurora:mesos-core'),

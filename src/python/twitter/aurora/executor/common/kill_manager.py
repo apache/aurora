@@ -1,9 +1,9 @@
 import threading
 
-from .health_interface import ExitReason, ExitState, HealthInterface
+from .status_checker import ExitState, StatusChecker, StatusResult
 
 
-class KillManager(HealthInterface):
+class KillManager(StatusChecker):
   """
     A health interface that provides a kill-switch for a task monitored by the status manager.
   """
@@ -12,12 +12,9 @@ class KillManager(HealthInterface):
     self._reason = None
 
   @property
-  def healthy(self):
-    return not self._killed
-
-  @property
-  def exit_reason(self):
-    return ExitReason(self._reason, ExitState.KILLED)
+  def status(self):
+    if self._killed:
+      return StatusResult(self._reason, ExitState.KILLED)
 
   def kill(self, reason):
     self._reason = reason

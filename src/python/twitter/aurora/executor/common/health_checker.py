@@ -4,11 +4,11 @@ import time
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 
-from .health_interface import ExitReason, ExitState, HealthInterface
+from .status_checker import ExitState, StatusChecker, StatusResult
 
 
-class HealthCheckerThread(HealthInterface, ExceptionalThread):
-  """Generic, HealthInterface-conforming thread for arbitrary periodic health checks
+class HealthCheckerThread(StatusChecker, ExceptionalThread):
+  """Generic, StatusChecker-conforming thread for arbitrary periodic health checks
 
     health_checker should be a callable returning a tuple of (boolean, reason), indicating
     respectively the health of the service and the reason for its failure (or None if the service is
@@ -38,13 +38,9 @@ class HealthCheckerThread(HealthInterface, ExceptionalThread):
     self.daemon = True
 
   @property
-  def healthy(self):
-    return self._healthy
-
-  @property
-  def exit_reason(self):
-    if not self.healthy:
-      return ExitReason('Failed health check! %s' % self._reason, ExitState.FAILED)
+  def status(self):
+    if not self._healthy:
+      return StatusResult('Failed health check! %s' % self._reason, ExitState.FAILED)
 
   def run(self):
     log.debug('Health checker thread started.')
@@ -68,7 +64,7 @@ class HealthCheckerThread(HealthInterface, ExceptionalThread):
       self._current_consecutive_failures = 0
 
   def start(self):
-    HealthInterface.start(self)
+    StatusChecker.start(self)
     ExceptionalThread.start(self)
 
   def stop(self):

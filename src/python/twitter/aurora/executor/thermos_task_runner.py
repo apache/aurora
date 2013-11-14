@@ -8,18 +8,15 @@ import threading
 import time
 
 from twitter.common import app, log
-from twitter.common.log.options import LogOptions
 from twitter.common.dirutil import chmod_plus_x
+from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
-
 from twitter.thermos.common.path import TaskPath
 from twitter.thermos.config.loader import ThermosTaskWrapper
 from twitter.thermos.core.runner import TaskRunner
 from twitter.thermos.monitoring.monitor import TaskMonitor
 
 from .common.sandbox import SandboxInterface
-
-from gen.twitter.thermos.ttypes import TaskState
 
 
 app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
@@ -30,7 +27,7 @@ app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
 # TODO(wickman) Create a TaskRunner interface with the following methods:
 #   .start
 #   .stop
-#   .health_interface (property)
+#   .status_checker (property)
 
 
 class ThermosTaskRunner(object):
