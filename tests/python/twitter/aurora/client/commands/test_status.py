@@ -4,11 +4,7 @@ import unittest
 from twitter.aurora.common.cluster import Cluster
 from twitter.aurora.common.clusters import Clusters
 from twitter.aurora.client.commands.core import status
-from twitter.aurora.client.commands.util import (
-    create_blank_response,
-    create_mock_api,
-    create_simple_success_response
-)
+from twitter.aurora.client.commands.util import AuroraClientCommandTest
 
 from gen.twitter.aurora.ttypes import (
     AssignedTask,
@@ -25,18 +21,7 @@ from gen.twitter.aurora.ttypes import (
 from mock import Mock, patch
 
 
-class TestListJobs(unittest.TestCase):
-  TEST_ROLE = 'mchucarroll'
-  TEST_ENV = 'test'
-  TEST_CLUSTER = 'smfd'
-
-  TEST_CLUSTERS = Clusters([Cluster(
-    name='smfd',
-    packer_copy_command='copying {{package}}',
-    zk='zookeeper.example.com',
-    scheduler_zk_path='/foo/bar',
-    auth_mechanism='UNAUTHENTICATED')])
-
+class TestListJobs(AuroraClientCommandTest):
   @classmethod
   def setup_mock_options(cls):
     """set up to get a mock options object."""
@@ -76,20 +61,20 @@ class TestListJobs(unittest.TestCase):
 
   @classmethod
   def create_status_response(cls):
-    resp = create_simple_success_response()
+    resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_tasks())
     return resp
 
   @classmethod
   def create_failed_status_response(cls):
-    return create_blank_response(ResponseCode.INVALID_REQUEST, 'No tasks found for query')
+    return cls.create_blank_response(ResponseCode.INVALID_REQUEST, 'No tasks found for query')
 
   def test_successful_status(self):
     """Test the status command."""
     # Calls api.check_status, which calls scheduler.getJobs
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = create_mock_api()
+    (mock_api, mock_scheduler) = self.create_mock_api()
     mock_scheduler.getTasksStatus.return_value = self.create_status_response()
     with contextlib.nested(
         patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
@@ -98,7 +83,7 @@ class TestListJobs(unittest.TestCase):
             mock_scheduler_proxy_class,
             mock_clusters,
             options):
-      status(['smfd/mchucarroll/test/hello'], mock_options)
+      status(['west/mchucarroll/test/hello'], mock_options)
 
       # The status command sends a getTasksStatus query to the scheduler,
       # and then prints the result.
@@ -109,7 +94,7 @@ class TestListJobs(unittest.TestCase):
     """Test the status command when the user asks the status of a job that doesn't exist."""
     # Calls api.check_status, which calls scheduler.getJobs
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = create_mock_api()
+    (mock_api, mock_scheduler) = self.create_mock_api()
     mock_scheduler.getTasksStatus.return_value = self.create_failed_status_response()
     with contextlib.nested(
         patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
@@ -118,7 +103,7 @@ class TestListJobs(unittest.TestCase):
             mock_scheduler_proxy_class,
             mock_clusters,
             options):
-      self.assertRaises(SystemExit, status, ['smfd/mchucarroll/test/hello'], mock_options)
+      self.assertRaises(SystemExit, status, ['west/mchucarroll/test/hello'], mock_options)
 
       mock_scheduler.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll')))

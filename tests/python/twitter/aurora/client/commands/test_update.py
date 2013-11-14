@@ -1,14 +1,11 @@
 import contextlib
+import functools
 import unittest
 
 from twitter.aurora.common.cluster import Cluster
 from twitter.aurora.common.clusters import Clusters
 from twitter.aurora.client.commands.core import update
-from twitter.aurora.client.commands.util import (
-    create_blank_response,
-    create_mock_api,
-    create_simple_success_response
-)
+from twitter.aurora.client.commands.util import AuroraClientCommandTest
 from twitter.aurora.client.api.updater import Updater
 from twitter.aurora.client.api.health_check import InstanceWatcherHealthCheck, Retriable
 from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
@@ -34,62 +31,12 @@ from gen.twitter.aurora.ttypes import (
 from mock import Mock, patch
 
 
-FAKE_TIME = 42131
-
-
-def fake_time():
-  global FAKE_TIME
-  FAKE_TIME += 2
-  return FAKE_TIME
-
-
-class TestUpdateCommand(unittest.TestCase):
-  CONFIG_BASE = """
-HELLO_WORLD = Job(
-  name = '%(job)s',
-  role = '%(role)s',
-  cluster = '%(cluster)s',
-  environment = '%(env)s',
-  instances = 20,
-  %(inner)s
-  update_config = UpdateConfig(
-    batch_size = 5,
-    restart_threshold = 30,
-    watch_secs = 10,
-    max_per_shard_failures = 2,
-  ),
-  task = Task(
-    name = 'test',
-    processes = [Process(name = 'hello_world', cmdline = 'echo {{thermos.ports[http]}}')],
-    resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
-  )
-)
-jobs = [HELLO_WORLD]
-"""
-
-  TEST_ROLE = 'mchucarroll'
-  TEST_ENV = 'test'
-  TEST_JOB = 'hello'
-  TEST_CLUSTER = 'west'
-  TEST_JOBSPEC = 'west/mchucarroll/test/hello'
-
-  TEST_CLUSTERS = Clusters([Cluster(
-    name='west',
-    packer_copy_command='copying {{package}}',
-    zk='zookeeper.example.com',
-    scheduler_zk_path='/foo/bar',
-    auth_mechanism='UNAUTHENTICATED')])
+class TestUpdateCommand(AuroraClientCommandTest):
 
   QUERY_STATUSES = frozenset([ScheduleStatus.PENDING, ScheduleStatus.STARTING,
       ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.ASSIGNED,
       ScheduleStatus.RESTARTING, ScheduleStatus.PREEMPTING, ScheduleStatus.UPDATING,
       ScheduleStatus.ROLLBACK])
-
-  @classmethod
-  def get_config(cls, cluster, role, env, job, filler=''):
-    """Create a config from the template"""
-    return cls.CONFIG_BASE % {'job': job, 'role': role, 'env': env, 'cluster': cluster,
-        'inner': filler}
 
   @classmethod
   def setup_mock_options(cls):
@@ -114,7 +61,7 @@ jobs = [HELLO_WORLD]
   # that the client makes the right API calls.
   def test_update_command_line_succeeds(self):
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = create_mock_api()
+    (mock_api, mock_scheduler) = self.create_mock_api()
     with contextlib.nested(
         patch('twitter.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options),
@@ -122,10 +69,10 @@ jobs = [HELLO_WORLD]
     ) as (make_client,
           options,
           test_clusters):
-      mock_api.update_job.return_value = create_simple_success_response()
+      mock_api.update_job.return_value = self.create_simple_success_response()
 
       with temporary_file() as fp:
-        fp.write(self.get_config(self.TEST_CLUSTER, self.TEST_ROLE, self.TEST_ENV, self.TEST_JOB))
+        fp.write(self.get_valid_config())
         fp.flush()
         update([self.TEST_JOBSPEC, fp.name])
 
@@ -137,7 +84,7 @@ jobs = [HELLO_WORLD]
 
   def test_update_invalid_config(self):
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = create_mock_api()
+    (mock_api, mock_scheduler) = self.create_mock_api()
     # Set up the context to capture the make_client and get_options calls.
     with contextlib.nested(
         patch('twitter.aurora.client.commands.core.make_client', return_value=mock_api),
@@ -147,8 +94,7 @@ jobs = [HELLO_WORLD]
           options,
           test_clusters):
       with temporary_file() as fp:
-        fp.write(self.get_config(self.TEST_CLUSTER, self.TEST_ROLE, self.TEST_ENV, self.TEST_JOB,
-            'invalid_field=False,'))
+        fp.write(self.get_invalid_config('invalid_field=False,'))
         fp.flush()
         self.assertRaises(AttributeError, update, ([self.TEST_JOBSPEC, fp.name]))
 
@@ -174,19 +120,19 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def setup_add_tasks(cls, api):
-    add_response = create_blank_response(ResponseCode.OK, 'OK')
+    add_response = cls.create_simple_success_response()
     api.addInstances.return_value = add_response
     return add_response
 
   @classmethod
   def setup_kill_tasks(cls, api):
-    kill_response = create_blank_response(ResponseCode.OK, 'OK')
+    kill_response = cls.create_simple_success_response()
     api.killTasks.return_value = kill_response
     return kill_response
 
   @classmethod
   def setup_populate_job_config(cls, api):
-    populate = create_blank_response(ResponseCode.OK, 'OK')
+    populate = cls.create_simple_success_response()
     populate.result.populateJobResult = Mock(spec=PopulateJobResult)
     api.populateJobConfig.return_value = populate
     configs = []
@@ -199,7 +145,7 @@ jobs = [HELLO_WORLD]
   @classmethod
   def create_acquire_lock_response(cls, code, msg, token, rolling):
     """Set up the response to a startUpdate API call."""
-    start_update_response = create_blank_response(code, msg)
+    start_update_response = cls.create_blank_response(code, msg)
     start_update_response.result.acquireLockResult = Mock(spec=AcquireLockResult)
     start_update_response.result.acquireLockResult.lock = "foo"
     start_update_response.result.acquireLockResult.updateToken = 'token'
@@ -208,13 +154,13 @@ jobs = [HELLO_WORLD]
   @classmethod
   def setup_release_lock_response(cls, api):
     """Set up the response to a startUpdate API call."""
-    release_lock_response = create_blank_response(ResponseCode.OK, 'OK')
+    release_lock_response = cls.create_simple_success_response()
     api.releaseLock.return_value = release_lock_response
     return release_lock_response
 
   @classmethod
   def setup_get_tasks_status_calls(cls, scheduler):
-    status_response = create_blank_response(ResponseCode.OK, 'OK')
+    status_response = cls.create_simple_success_response()
     scheduler.getTasksStatus.return_value = status_response
     schedule_status = Mock(spec=ScheduleStatusResult)
     status_response.result.scheduleStatusResult = schedule_status
@@ -246,7 +192,7 @@ jobs = [HELLO_WORLD]
     # Test the client-side updater logic in its simplest case: everything succeeds, and no rolling
     # updates.
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = create_mock_api()
+    (mock_api, mock_scheduler) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
 
     with contextlib.nested(
@@ -255,14 +201,14 @@ jobs = [HELLO_WORLD]
         patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
             return_value=mock_health_check),
-        patch('time.time', side_effect=fake_time),
+        patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('time.sleep', return_value=None)
 
     ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
           time_patch, sleep_patch):
       self.setup_mock_scheduler_for_simple_update(mock_api)
       with temporary_file() as fp:
-        fp.write(self.get_config(self.TEST_CLUSTER, self.TEST_ROLE, self.TEST_ENV, self.TEST_JOB))
+        fp.write(self.get_valid_config())
         fp.flush()
         update(['west/mchucarroll/test/hello', fp.name])
 

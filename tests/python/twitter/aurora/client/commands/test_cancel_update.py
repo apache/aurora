@@ -4,10 +4,7 @@ import unittest
 from twitter.aurora.common.cluster import Cluster
 from twitter.aurora.common.clusters import Clusters
 from twitter.aurora.client.commands.core import cancel_update
-from twitter.aurora.client.commands.util import (
-    create_mock_api_factory,
-    create_simple_success_response
-)
+from twitter.aurora.client.commands.util import AuroraClientCommandTest
 from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from twitter.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.common.contextutil import temporary_file
@@ -23,45 +20,7 @@ from gen.twitter.aurora.ttypes import (
 from mock import Mock, patch
 
 
-class TestClientCancelUpdateCommand(unittest.TestCase):
-  # Configuration to use
-  CONFIG_BASE = """
-HELLO_WORLD = Job(
-  name = '%s',
-  role = '%s',
-  cluster = '%s',
-  environment = '%s',
-  instances = 2,
-  %s
-  task = Task(
-    name = 'test',
-    processes = [Process(name = 'hello_world', cmdline = 'echo {{thermos.ports[http]}}')],
-    resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
-  )
-)
-jobs = [HELLO_WORLD]
-"""
-
-  TEST_ROLE = 'mchucarroll'
-  TEST_ENV = 'test'
-  TEST_JOB = 'hello'
-  TEST_CLUSTER = 'west'
-
-  TEST_CLUSTERS = Clusters([Cluster(
-    name='west',
-    packer_copy_command='copying {{package}}',
-    zk='zookeeper.example.com',
-    scheduler_zk_path='/foo/bar',
-    auth_mechanism='UNAUTHENTICATED')])
-
-  @classmethod
-  def get_valid_config(cls):
-    return cls.CONFIG_BASE % (cls.TEST_JOB, cls.TEST_ROLE, cls.TEST_CLUSTER, cls.TEST_ENV, '')
-
-  @classmethod
-  def get_invalid_config(cls, bad_clause):
-    return cls.CONFIG_BASE % (cls.TEST_JOB, cls.TEST_ROLE, cls.TEST_CLUSTER, cls.TEST_ENV,
-        bad_clause)
+class TestClientCancelUpdateCommand(AuroraClientCommandTest):
 
   @classmethod
   def setup_mock_options(cls):
@@ -75,13 +34,13 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def setup_mock_api_factory(cls):
-    mock_api_factory, mock_api = create_mock_api_factory()
+    mock_api_factory, mock_api = cls.create_mock_api_factory()
     mock_api_factory.return_value.cancel_update.return_value = cls.get_cancel_update_response()
     return mock_api_factory
 
   @classmethod
   def create_mock_status_query_result(cls, scheduleStatus):
-    mock_query_result = create_simple_success_response()
+    mock_query_result = cls.create_simple_success_response()
     mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     if scheduleStatus == ScheduleStatus.INIT:
       # status query result for before job is launched.
@@ -99,7 +58,7 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def get_cancel_update_response(cls):
-    return create_simple_success_response()
+    return cls.create_simple_success_response()
 
   @classmethod
   def assert_cancel_update_called(cls, mock_api):
@@ -156,7 +115,7 @@ jobs = [HELLO_WORLD]
   @classmethod
   def get_release_lock_response(cls):
     """Set up the response to a startUpdate API call."""
-    return create_simple_success_response()
+    return cls.create_simple_success_response()
 
   def test_cancel_update_api_level(self):
     """Test kill client-side API logic."""

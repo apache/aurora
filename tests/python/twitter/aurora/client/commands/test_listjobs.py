@@ -4,10 +4,7 @@ import unittest
 from twitter.aurora.common.cluster import Cluster
 from twitter.aurora.common.clusters import Clusters
 from twitter.aurora.client.commands.core import list_jobs
-from twitter.aurora.client.commands.util import (
-    create_mock_api,
-    create_simple_success_response
-)
+from twitter.aurora.client.commands.util import AuroraClientCommandTest
 
 from gen.twitter.aurora.ttypes import (
     GetJobsResult,
@@ -17,17 +14,7 @@ from gen.twitter.aurora.ttypes import (
 from mock import Mock, patch
 
 
-class TestListJobs(unittest.TestCase):
-  TEST_ROLE = 'mchucarroll'
-  TEST_ENV = 'test'
-  TEST_CLUSTER = 'smfd'
-
-  TEST_CLUSTERS = Clusters([Cluster(
-    name='smfd',
-    packer_copy_command='copying {{package}}',
-    zk='zookeeper.example.com',
-    scheduler_zk_path='/foo/bar',
-    auth_mechanism='UNAUTHENTICATED')])
+class TestListJobs(AuroraClientCommandTest):
 
   @classmethod
   def setup_mock_options(cls):
@@ -48,7 +35,7 @@ class TestListJobs(unittest.TestCase):
 
   @classmethod
   def create_listjobs_response(cls):
-    resp = create_simple_success_response()
+    resp = cls.create_simple_success_response()
     resp.result.getJobsResult = Mock(spec=GetJobsResult)
     resp.result.getJobsResult.configs = set(cls.create_mock_jobs())
     return resp
@@ -56,7 +43,7 @@ class TestListJobs(unittest.TestCase):
   def test_successful_listjobs(self):
     """Test the list_jobs command."""
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = create_mock_api()
+    (mock_api, mock_scheduler) = self.create_mock_api()
     mock_scheduler.getJobs.return_value = self.create_listjobs_response()
     with contextlib.nested(
         patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
@@ -65,14 +52,14 @@ class TestListJobs(unittest.TestCase):
             mock_scheduler_proxy_class,
             mock_clusters,
             options):
-      list_jobs(['smfd/mchucarroll'])
+      list_jobs(['west/mchucarroll'])
 
       mock_scheduler.getJobs.assert_called_with(self.TEST_ROLE)
 
   def test_listjobs_badcluster(self):
     """Test the list_jobs command when the user provides an invalid cluster."""
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = create_mock_api()
+    (mock_api, mock_scheduler) = self.create_mock_api()
     mock_scheduler.getJobs.return_value = self.create_listjobs_response()
     with contextlib.nested(
         patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),

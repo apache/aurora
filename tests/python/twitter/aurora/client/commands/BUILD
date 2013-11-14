@@ -10,6 +10,7 @@ python_tests(
     'test_create.py',
     'test_kill.py',
     'test_listjobs.py',
+    'test_restart.py',
     'test_status.py',
     'test_update.py'
   ],

@@ -7,10 +7,7 @@ from twitter.aurora.client.commands.core import kill
 from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from twitter.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.common.contextutil import temporary_file
-from twitter.aurora.client.commands.util import (
-    create_mock_api_factory,
-    create_simple_success_response
-)
+from twitter.aurora.client.commands.util import AuroraClientCommandTest
 
 from gen.twitter.aurora.constants import ACTIVE_STATES
 from gen.twitter.aurora.ttypes import (
@@ -23,45 +20,7 @@ from gen.twitter.aurora.ttypes import (
 from mock import Mock, patch
 
 
-class TestClientKllCommand(unittest.TestCase):
-  # Configuration to use
-  CONFIG_BASE = """
-HELLO_WORLD = Job(
-  name = '%s',
-  role = '%s',
-  cluster = '%s',
-  environment = '%s',
-  instances = 2,
-  %s
-  task = Task(
-    name = 'test',
-    processes = [Process(name = 'hello_world', cmdline = 'echo {{thermos.ports[http]}}')],
-    resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
-  )
-)
-jobs = [HELLO_WORLD]
-"""
-
-  TEST_ROLE = 'mchucarroll'
-  TEST_ENV = 'test'
-  TEST_JOB = 'hello'
-  TEST_CLUSTER = 'smfd'
-
-  TEST_CLUSTERS = Clusters([Cluster(
-    name='smfd',
-    packer_copy_command='copying {{package}}',
-    zk='zookeeper.example.com',
-    scheduler_zk_path='/foo/bar',
-    auth_mechanism='UNAUTHENTICATED')])
-
-  @classmethod
-  def get_valid_config(cls):
-    return cls.CONFIG_BASE % (cls.TEST_JOB, cls.TEST_ROLE, cls.TEST_CLUSTER, cls.TEST_ENV, '')
-
-  @classmethod
-  def get_invalid_config(cls, bad_clause):
-    return cls.CONFIG_BASE % (cls.TEST_JOB, cls.TEST_ROLE, cls.TEST_CLUSTER, cls.TEST_ENV,
-        bad_clause)
+class TestClientKllCommand(AuroraClientCommandTest):
 
   @classmethod
   def setup_mock_options(cls):
@@ -75,7 +34,7 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def setup_mock_api_factory(cls):
-    mock_api_factory, mock_api = create_mock_api_factory()
+    mock_api_factory, mock_api = cls.create_mock_api_factory()
     mock_api_factory.return_value.kill_job.return_value = cls.get_kill_job_response()
     return mock_api_factory
 
@@ -100,7 +59,7 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def get_kill_job_response(cls):
-    return create_simple_success_response()
+    return cls.create_simple_success_response()
 
   @classmethod
   def assert_kill_job_called(cls, mock_api):
@@ -130,7 +89,7 @@ jobs = [HELLO_WORLD]
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        kill(['smfd/mchucarroll/test/hello', fp.name], mock_options)
+        kill(['west/mchucarroll/test/hello', fp.name], mock_options)
 
       # Now check that the right API calls got made.
       self.assert_kill_job_called(mock_api)
@@ -188,7 +147,7 @@ jobs = [HELLO_WORLD]
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        kill(['smfd/mchucarroll/test/hello', fp.name], mock_options)
+        kill(['west/mchucarroll/test/hello', fp.name], mock_options)
 
       # Now check that the right API calls got made.
       self.assert_scheduler_called(mock_api)
@@ -218,7 +177,7 @@ jobs = [HELLO_WORLD]
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        kill(['smfd/mchucarroll/test/hello', fp.name], mock_options)
+        kill(['west/mchucarroll/test/hello', fp.name], mock_options)
 
       # Now check that the right API calls got made.
       self.assert_scheduler_called(mock_api)

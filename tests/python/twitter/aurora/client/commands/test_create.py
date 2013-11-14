@@ -3,10 +3,7 @@ import unittest
 
 
 from twitter.aurora.client.commands.core import create
-from twitter.aurora.client.commands.util import (
-    create_blank_response,
-    create_simple_success_response
-)
+from twitter.aurora.client.commands.util import AuroraClientCommandTest
 from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from twitter.aurora.config import AuroraConfig
 from twitter.common import app
@@ -29,39 +26,7 @@ from mock import Mock, patch
 from pystachio.config import Config
 
 
-class TestClientCreateCommand(unittest.TestCase):
-  # Configuration to use
-  CONFIG_BASE = """
-HELLO_WORLD = Job(
-  name = '%s',
-  role = '%s',
-  cluster = '%s',
-  environment = '%s',
-  instances = 2,
-  %s
-  task = Task(
-    name = 'test',
-    processes = [Process(name = 'hello_world', cmdline = 'echo {{thermos.ports[http]}}')],
-    resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
-  )
-)
-jobs = [HELLO_WORLD]
-"""
-
-  TEST_ROLE = 'mchucarroll'
-  TEST_ENV = 'test'
-  TEST_JOB = 'hello'
-  TEST_CLUSTER = 'smfd'
-
-  @classmethod
-  def get_valid_config(cls):
-    return cls.CONFIG_BASE % (cls.TEST_JOB, cls.TEST_ROLE, cls.TEST_CLUSTER, cls.TEST_ENV, '')
-
-  @classmethod
-  def get_invalid_config(cls, bad_clause):
-    return cls.CONFIG_BASE % (cls.TEST_JOB, cls.TEST_ROLE, cls.TEST_CLUSTER, cls.TEST_ENV,
-        bad_clause)
-
+class TestClientCreateCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_options(cls):
     """set up to get a mock options object."""
@@ -96,7 +61,7 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def create_mock_status_query_result(cls, scheduleStatus):
-    mock_query_result = create_simple_success_response()
+    mock_query_result = cls.create_simple_success_response()
     mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     if scheduleStatus == ScheduleStatus.INIT:
       # status query result for before job is launched.
@@ -115,11 +80,11 @@ jobs = [HELLO_WORLD]
   @classmethod
   def get_createjob_response(cls):
     # Then, we call api.create_job(config)
-    return create_simple_success_response()
+    return cls.create_simple_success_response()
 
   @classmethod
   def get_failed_createjob_response(cls):
-    return create_blank_response(ResponseCode.ERROR, 'Create job failed')
+    return cls.create_error_response()
 
   @classmethod
   def assert_create_job_called(cls, mock_api):
@@ -172,14 +137,14 @@ jobs = [HELLO_WORLD]
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        create(['smfd/mchucarroll/test/hello', fp.name])
+        create(['west/mchucarroll/test/hello', fp.name])
 
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       self.assert_create_job_called(mock_api)
       self.assert_scheduler_called(mock_api, mock_query, 2)
       # make_client should have been called once.
-      make_client.assert_called_with('smfd')
+      make_client.assert_called_with('west')
 
   def test_create_job_wait_until_finished(self):
     """Run a test of the "create" command against a mocked-out API:
@@ -206,14 +171,14 @@ jobs = [HELLO_WORLD]
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        create(['smfd/mchucarroll/test/hello', fp.name])
+        create(['west/mchucarroll/test/hello', fp.name])
 
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       self.assert_create_job_called(mock_api)
       self.assert_scheduler_called(mock_api, mock_query, 4)
       # make_client should have been called once.
-      make_client.assert_called_with('smfd')
+      make_client.assert_called_with('west')
 
   def test_create_job_failed(self):
     """Run a test of the "create" command against a mocked-out API:
@@ -235,7 +200,7 @@ jobs = [HELLO_WORLD]
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        self.assertRaises(SystemExit, create, (['smfd/mchucarroll/test/hello', fp.name]))
+        self.assertRaises(SystemExit, create, (['west/mchucarroll/test/hello', fp.name]))
 
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
@@ -247,7 +212,7 @@ jobs = [HELLO_WORLD]
       assert mock_scheduler.getTasksStatus.call_count == 1
       mock_scheduler.getTasksStatus.assert_called_with(mock_query)
       # make_client should have been called once.
-      make_client.assert_called_with('smfd')
+      make_client.assert_called_with('west')
 
   def test_delayed_job(self):
     """Run a test of the "create" command against a mocked-out API:
@@ -274,13 +239,13 @@ jobs = [HELLO_WORLD]
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        create(['smfd/mchucarroll/test/hello', fp.name])
+        create(['west/mchucarroll/test/hello', fp.name])
 
       # Now check that the right API calls got made.
       self.assert_create_job_called(mock_api)
       self.assert_scheduler_called(mock_api, mock_query, 4)
       # make_client should have been called once.
-      make_client.assert_called_with('smfd')
+      make_client.assert_called_with('west')
 
   def test_create_job_failed_invalid_config(self):
     """Run a test of the "create" command against a mocked-out API, with a configuration
@@ -294,7 +259,7 @@ jobs = [HELLO_WORLD]
       with temporary_file() as fp:
         fp.write(self.get_invalid_config('invalid_clause=oops'))
         fp.flush()
-        self.assertRaises(Config.InvalidConfigError, create, (['smfd/mchucarroll/test/hello',
+        self.assertRaises(Config.InvalidConfigError, create, (['west/mchucarroll/test/hello',
             fp.name]))
 
       # Now check that the right API calls got made.
@@ -320,7 +285,7 @@ jobs = [HELLO_WORLD]
       with temporary_file() as fp:
         fp.write(self.get_invalid_config('invalid_clause=\'oops\','))
         fp.flush()
-        self.assertRaises(AttributeError, create, (['smfd/mchucarroll/test/hello', fp.name]))
+        self.assertRaises(AttributeError, create, (['west/mchucarroll/test/hello', fp.name]))
 
       # Now check that the right API calls got made.
       # Check that create_job was not called.
