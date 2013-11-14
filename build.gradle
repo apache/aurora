@@ -27,7 +27,7 @@ publishing {
     maven(MavenPublication) {
       groupId 'com.twitter.aurora'
       artifactId 'twitter-aurora'
-      version '0.0.6'
+      version '0.0.7'
 
       from components.java
 
