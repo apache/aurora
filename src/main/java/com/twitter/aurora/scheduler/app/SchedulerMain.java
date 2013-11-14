@@ -64,8 +64,6 @@ import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.Exists;
-import com.twitter.common.args.constraints.IsDirectory;
 import com.twitter.common.args.constraints.NotEmpty;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.inject.Bindings;
@@ -107,12 +105,6 @@ public class SchedulerMain extends AbstractApplication {
   @NotNull
   @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
   private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
-
-  @NotNull
-  @Exists
-  @IsDirectory
-  @CmdLine(name = "backup_dir", help = "Directory to store backups under.")
-  private static final Arg<File> BACKUP_DIR = Arg.create();
 
   @CmdLine(name = "auth_module",
       help = "A Guice module to provide auth bindings. NOTE: The default is unsecure.")
@@ -202,16 +194,11 @@ public class SchedulerMain extends AbstractApplication {
         getFlaggedModule(QUOTA_MODULE, QUOTA_MODULE_CLASSES));
   }
 
-  static Iterable<? extends Module> getModules(
-      String clusterName,
-      String serverSetPath,
-      File backupDir) {
-
+  static Iterable<? extends Module> getModules(String clusterName, String serverSetPath) {
     return ImmutableList.<Module>builder()
         .addAll(getFlaggedModules())
         .addAll(getSystemModules())
         .add(new AppModule(clusterName, serverSetPath))
-        .add(new BackupModule(backupDir, SnapshotStoreImpl.class))
         .add(new LogStorageModule())
         .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
         .add(new ThriftModule())
@@ -226,12 +213,13 @@ public class SchedulerMain extends AbstractApplication {
     if (ISOLATED_SCHEDULER.get()) {
       additional = new IsolatedSchedulerModule();
     } else {
-      // TODO(William Farner): Push these bindings down into a "production" module.
+      // TODO(Kevin Sweeney): Push these bindings down into a "production" module.
       additional = new AbstractModule() {
         @Override protected void configure() {
           bind(DriverFactory.class).to(DriverFactoryImpl.class);
           bind(DriverFactoryImpl.class).in(Singleton.class);
           bind(Boolean.class).annotatedWith(ShutdownOnDriverExit.class).toInstance(true);
+          install(new BackupModule(SnapshotStoreImpl.class));
           install(new MesosLogStreamModule(zkClientConfig));
         }
       };
@@ -258,7 +246,7 @@ public class SchedulerMain extends AbstractApplication {
     };
 
     return ImmutableList.<Module>builder()
-        .addAll(getModules(CLUSTER_NAME.get(), SERVERSET_PATH.get(), BACKUP_DIR.get()))
+        .addAll(getModules(CLUSTER_NAME.get(), SERVERSET_PATH.get()))
         .add(new ZooKeeperClientModule(zkClientConfig))
         .add(configModule)
         .add(additional)

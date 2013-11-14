@@ -77,8 +77,10 @@ import com.twitter.aurora.scheduler.log.Log;
 import com.twitter.aurora.scheduler.log.Log.Entry;
 import com.twitter.aurora.scheduler.log.Log.Position;
 import com.twitter.aurora.scheduler.log.Log.Stream;
+import com.twitter.aurora.scheduler.storage.backup.BackupModule;
 import com.twitter.aurora.scheduler.storage.log.LogManager.StreamManager.EntrySerializer;
 import com.twitter.aurora.scheduler.storage.log.LogStorageModule;
+import com.twitter.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import com.twitter.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import com.twitter.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import com.twitter.aurora.scheduler.thrift.ThriftConfiguration;
@@ -185,6 +187,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         );
         bind(ExecutorConfig.class).toInstance(new ExecutorConfig("/executor/thermos"));
         bind(Boolean.class).annotatedWith(ShutdownOnDriverExit.class).toInstance(false);
+        install(new BackupModule(backupDir, SnapshotStoreImpl.class));
       }
     };
 
@@ -193,7 +196,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         .withCredentials(ZooKeeperClient.digestCredentials("mesos", "mesos"));
     injector = Guice.createInjector(
         ImmutableList.<Module>builder()
-            .addAll(SchedulerMain.getModules(CLUSTER_NAME, SERVERSET_PATH, backupDir))
+            .addAll(SchedulerMain.getModules(CLUSTER_NAME, SERVERSET_PATH))
             .add(new LifecycleModule())
             .add(new AppLauncherModule())
             .add(new ZooKeeperClientModule(zkClientConfig))
