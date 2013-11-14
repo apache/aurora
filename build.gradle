@@ -5,14 +5,17 @@ apply plugin: 'java'
 apply plugin: 'maven-publish'
 
 compileJava {
+  sourceCompatibility = 1.7
+  targetCompatibility = 1.7
+}
+
+tasks.withType(Compile) {
   options.compilerArgs << '-Werror'
   options.compilerArgs << '-Xlint:all'
   // Don't fail for annotations not claimed by annotation processors.
   options.compilerArgs << '-Xlint:-processing'
   // Don't fail for serialVersionUID warnings.
   options.compilerArgs << '-Xlint:-serial'
-  sourceCompatibility = 1.7
-  targetCompatibility = 1.7
 }
 
 task sourceJar(type: Jar) {

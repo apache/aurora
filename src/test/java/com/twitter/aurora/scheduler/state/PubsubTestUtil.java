@@ -58,9 +58,10 @@ final class PubsubTestUtil {
     // TODO(wfarner): Make it easier to write a unit test wired for pubsub events.
     // In this case, a trade-off was made to avoid installing several distant modules and providing
     // required bindings that seem unrelated from this code.
+    @SuppressWarnings("rawtypes")
     Set<ExceptionalCommand> startupCommands = injector.getInstance(
         Key.get(new TypeLiteral<Set<ExceptionalCommand>>() { }, StartupStage.class));
-    for (ExceptionalCommand command : startupCommands) {
+    for (ExceptionalCommand<?> command : startupCommands) {
       command.execute();
     }
     return injector.getInstance(Key.get(new TypeLiteral<Closure<PubsubEvent>>() { }));

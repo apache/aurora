@@ -30,7 +30,7 @@ public class MesosLogTest extends EasyMockTest {
   private ReaderInterface reader;
   private Provider<WriterInterface> writerFactory;
   private MesosLog.LogStream logStream;
-  private MesosLog.LogStream.Mutation dummyMutation;
+  private MesosLog.LogStream.Mutation<String> dummyMutation;
   private MesosLog.LogStream.OpStats stats;
 
   @Before
@@ -39,7 +39,7 @@ public class MesosLogTest extends EasyMockTest {
     reader = createMock(ReaderInterface.class);
     writerFactory = Providers.of(createMock(WriterInterface.class));
 
-    dummyMutation = createMock(MesosLog.LogStream.Mutation.class);
+    dummyMutation = createMock(new Clazz<MesosLog.LogStream.Mutation<String>>() { });
     stats = new MesosLog.LogStream.OpStats("test");
     logStream = new MesosLog.LogStream(logInterface, reader, READ_TIMEOUT,
         writerFactory, WRITE_TIMEOUT, DUMMY_CONTENT);
