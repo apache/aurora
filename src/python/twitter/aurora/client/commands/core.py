@@ -222,7 +222,13 @@ def diff(job_spec, config_file):
     dump_tasks(local_tasks, local)
     with NamedTemporaryFile() as remote:
       dump_tasks(remote_tasks, remote)
-      return subprocess.call([diff_program, remote.name, local.name])
+      result = subprocess.call([diff_program, remote.name, local.name])
+      # Unlike most commands, diff doesn't return zero on success; it returns
+      # 1 when a successful diff is non-empty.
+      if result != 0 and result != 1:
+        return result
+      else:
+        return 0
 
 
 @app.command(name='open')
