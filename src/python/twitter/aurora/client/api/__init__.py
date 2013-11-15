@@ -4,7 +4,7 @@ from twitter.aurora.common import AuroraJobKey
 from twitter.aurora.common.auth import make_session_key
 from twitter.aurora.common.cluster import Cluster
 
-from gen.twitter.aurora.constants import ACTIVE_STATES, LIVE_STATES
+from gen.twitter.aurora.constants import LIVE_STATES
 from gen.twitter.aurora.ttypes import (
     Response,
     Identity,
@@ -69,7 +69,6 @@ class AuroraClientAPI(object):
     # user.
     # TODO(wfarner): Refactor this when Identity is removed from TaskQuery.
     query = job_key.to_thrift_query()
-    query.statuses = ACTIVE_STATES
     if instances is not None:
       log.info("Instances to be killed: %s" % instances)
       query.instanceIds = frozenset([int(s) for s in instances])

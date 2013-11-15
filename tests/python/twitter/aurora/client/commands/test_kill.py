@@ -9,7 +9,6 @@ from twitter.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.common.contextutil import temporary_file
 from twitter.aurora.client.commands.util import AuroraClientCommandTest
 
-from gen.twitter.aurora.constants import ACTIVE_STATES
 from gen.twitter.aurora.ttypes import (
     Identity,
     ScheduleStatus,
@@ -117,13 +116,8 @@ class TestClientKllCommand(AuroraClientCommandTest):
   def get_expected_task_query(cls, shards=None):
     """Helper to create the query that will be a parameter to job kill."""
     instance_ids = frozenset(shards) if shards is not None else None
-    return TaskQuery(
-        taskIds=None,
-        jobName=cls.TEST_JOB,
-        environment=cls.TEST_ENV,
-        instanceIds=instance_ids,
-        statuses=ACTIVE_STATES,
-        owner=Identity(role=cls.TEST_ROLE, user=None))
+    return TaskQuery(taskIds=None, jobName=cls.TEST_JOB, environment=cls.TEST_ENV,
+        instanceIds=instance_ids, owner=Identity(role=cls.TEST_ROLE, user=None))
 
   def test_kill_job_api_level(self):
     """Test kill client-side API logic."""
