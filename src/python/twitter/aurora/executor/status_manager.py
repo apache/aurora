@@ -1,16 +1,10 @@
-import threading
 import time
 
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
 
-from gen.twitter.thermos.ttypes import TaskState
-
-from .common.status_checker import ExitState
-from .executor_base import ThermosExecutorBase
-
-import mesos_pb2 as mesos_pb
+from .common.status_checker import StatusChecker
 
 
 class StatusManager(ExceptionalThread):
@@ -18,161 +12,28 @@ class StatusManager(ExceptionalThread):
     An agent that periodically checks the health of a task via StatusCheckers that
     provide HTTP health checking, resource consumption, etc.
 
-    If any of the status interfaces return a status, the Status Manager is
-    responsible for enforcing the "graceful" shutdown cycle via /quitquitquit and
-    /abortabortabort.
+    If any of the status interfaces return a status, the Status Manager
+    invokes the user-supplied callback with the status.
   """
-
   POLL_WAIT = Amount(500, Time.MILLISECONDS)
-  WAIT_LIMIT = Amount(1, Time.MINUTES)
-  ESCALATION_WAIT = Amount(5, Time.SECONDS)
-  PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
 
-  def __init__(self, runner, driver, task_id, status_checkers=(), signaler=None,
-               clock=time):
-    self._driver = driver
-    self._runner = runner
-    self._task_id = task_id
+  def __init__(self, status_checker, callback, clock=time):
+    if not isinstance(status_checker, StatusChecker):
+      raise TypeError('status_checker must be a StatusChecker, got %s' % type(status_checker))
+    if not callable(callback):
+      raise TypeError('callback needs to be callable!')
+    self._status_checker = status_checker
+    self._callback = callback
     self._clock = clock
-    self._status_event = threading.Event()
-    self._signaler = signaler
-    self._status_checkers = status_checkers
     super(StatusManager, self).__init__()
     self.daemon = True
 
-  def _start_status_checkers(self):
-    for interface in self._status_checkers:
-      log.debug("Starting status interface: %s" % interface.__class__.__name__)
-      interface.start()
-
-  def _stop_status_checkers(self):
-    if self._status_event.is_set():
-      return
-    self._status_event.set()
-    for interface in self._status_checkers:
-      log.debug('Terminating %s' % interface)
-      interface.stop()
-
   def run(self):
-    self._start_status_checkers()
-
-    exit_reason = None
-
-    while self._runner.is_alive and exit_reason is None:
-      for interface in self._status_checkers:
-        interface_status = interface.status
-        if interface_status is not None:
-          self._stop_status_checkers()
-          exit_reason = interface_status
-          log.info('Got %s from %s' % (exit_reason, interface.__class__.__name__))
-          break
+    while True:
+      status_result = self._status_checker.status
+      if status_result is not None:
+        log.info('Status manager got %s' % status_result)
+        self._callback(status_result)
+        break
       else:
         self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
-
-    log.info('Executor polling thread detected termination condition.')
-    self.terminate(exit_reason)
-
-  def _terminate_http(self):
-    if not self._signaler:
-      return
-
-    # pass 1
-    self._signaler.quitquitquit()
-    self._clock.sleep(self.ESCALATION_WAIT.as_(Time.SECONDS))
-    if not self._runner.is_alive:
-      return True
-
-    # pass 2
-    self._signaler.abortabortabort()
-    self._clock.sleep(self.ESCALATION_WAIT.as_(Time.SECONDS))
-    if not self._runner.is_alive:
-      return True
-
-  def _wait_for_rebind(self):
-    # TODO(wickman) MESOS-438
-    #
-    # There is a legit race condition here.  If we catch the is_alive latch
-    # down at exactly the right time, there are no proper waits to wait for
-    # rebinding to the executor by a third party killing process.
-    #
-    # While kills in production should be rare, we should monitor the
-    # task_state for 60 seconds until it is in a terminal state. If it never
-    # reaches a terminal state, then we could either:
-    #    1) issue the kills ourself and send a LOST message
-    # or 2) send a rebind_task call to the executor and have it attempt to
-    #       re-take control of the executor.  perhaps with a max bind
-    #       limit before going with route #1.
-    wait_limit = self.WAIT_LIMIT
-    while wait_limit > Amount(0, Time.SECONDS):
-      current_state = self._runner.task_state()
-      log.info('Waiting for terminal state, current state: %s' %
-        TaskState._VALUES_TO_NAMES.get(current_state, '(unknown)'))
-      if ThermosExecutorBase.thermos_status_is_terminal(current_state):
-        log.info('Terminal reached, breaking')
-        break
-      self._clock.sleep(self.POLL_WAIT.as_(Time.SECONDS))
-      wait_limit -= self.POLL_WAIT
-
-  def terminate(self, exit_reason=None):
-    if not self._terminate_http():
-      self._runner.kill()
-
-    self._wait_for_rebind()
-
-    last_state = self._runner.task_state()
-    log.info("State we've accepted: Thermos(%s) / Failure: %s" % (
-        TaskState._VALUES_TO_NAMES.get(last_state, 'unknown'),
-        exit_reason))
-
-    finish_state = None
-    if last_state == TaskState.ACTIVE:
-      log.error("Runner is dead but task state unexpectedly ACTIVE!")
-      # TODO(wickman) This is a potentially dangerous operation.
-      # If the status_manager caught the is_alive latch on down, then we should be
-      # safe because the task_runner_wrapper will have the same view and won't block.
-      self._runner.quitquitquit()
-      finish_state = mesos_pb.TASK_LOST
-    else:
-      try:
-        finish_state = ThermosExecutorBase.THERMOS_TO_MESOS_STATES[last_state]
-      except KeyError:
-        log.error("Unknown task state = %r!" % last_state)
-        finish_state = mesos_pb.TASK_FAILED
-
-    # See comment in executor/common/status_checker.py.  This translates
-    # from ExitStatus to TaskStatus to reduce dependency overhead.
-    def translate_exit_state(status):
-      if status == ExitState.FAILED:
-        return mesos_pb.TASK_FAILED
-      elif status == ExitState.KILLED:
-        return mesos_pb.TASK_KILLED
-      elif status == ExitState.FINISHED:
-        return mesos_pb.TASK_FINISHED
-      elif status == ExitState.LOST:
-        return mesos_pb.TASK_LOST
-      log.error('Unknown exit state, defaulting to TASK_FINISHED.')
-      return mesos_pb.TASK_FINISHED
-
-    # TODO(wickman) This should be using ExecutorBase.send_status -- or the
-    # sending of status should be decoupled from the status_manager.
-    update = mesos_pb.TaskStatus()
-    update.task_id.value = self._task_id
-    if exit_reason is not None:
-      update.state = translate_exit_state(exit_reason.status)
-    else:
-      update.state = finish_state
-    if exit_reason and exit_reason.reason:
-      update.message = exit_reason.reason
-    task_state = mesos_pb._TASKSTATE.values_by_number.get(update.state)
-    log.info('Sending terminal state update: %s' % (task_state.name if task_state else 'UNKNOWN'))
-    self._driver.sendStatusUpdate(update)
-
-    self._stop_status_checkers()
-
-    # the executor is ephemeral and we just submitted a terminal task state, so shutdown
-    log.info('Stopping executor.')
-
-    # TODO(wickman) Remove this once external MESOS-243 is resolved.
-    log.info('Sleeping briefly to mitigate https://issues.apache.org/jira/browse/MESOS-243')
-    self._clock.sleep(self.PERSISTENCE_WAIT.as_(Time.SECONDS))
-    self._driver.stop()

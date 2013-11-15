@@ -49,25 +49,12 @@ if 'THERMOS_DEBUG' in os.environ:
   log.init('executor_logger')
 
 
-class TestStatusManager(StatusManager):
-  # this should be greater than TaskRunner.COORDINATOR_INTERVAL_SLEEP (currently 1s) in order to
-  # wait until the task cleanly transitions past the CLEANING stage
-  WAIT_LIMIT = Amount(1100, Time.MILLISECONDS)
-  # time between escalations in the qqq/aaa path
-  ESCALATION_WAIT = Amount(1, Time.MILLISECONDS)
-  # only necessary with real Mesos driver
-  PERSISTENCE_WAIT = Amount(0, Time.SECONDS)
-
-
 class FastThermosExecutor(ThermosExecutor):
   STOP_WAIT = Amount(0, Time.SECONDS)
 
 
-def alternate_root_task_runner(base_class, checkpoint_root):
-  class AlternateRunner(base_class):
-    def __init__(self, *args, **kw):
-      super(AlternateRunner, self).__init__(*args, checkpoint_root=checkpoint_root, **kw)
-  return AlternateRunner
+class FastStatusManager(StatusManager):
+  POLL_WAIT = Amount(10, Time.MILLISECONDS)
 
 
 class DefaultTestSandboxProvider(SandboxProvider):
@@ -113,6 +100,13 @@ class SlowSandbox(DirectorySandbox):
 class SlowSandboxProvider(SandboxProvider):
   def from_assigned_task(self, assigned_task):
     return SlowSandbox(safe_mkdtemp())
+
+
+def alternate_root_task_runner(base_class, checkpoint_root):
+  class AlternateRunner(base_class):
+    def __init__(self, *args, **kw):
+      super(AlternateRunner, self).__init__(*args, checkpoint_root=checkpoint_root, **kw)
+  return AlternateRunner
 
 
 class ProxyDriver(object):
@@ -163,7 +157,7 @@ MESOS_JOB = MesosJob(
 
 def make_runner(proxy_driver, checkpoint_root, task, ports={}, fast_status=False):
   runner_class = alternate_root_task_runner(TestTaskRunner, checkpoint_root)
-  manager_class = TestStatusManager if fast_status else StatusManager
+  manager_class = FastStatusManager if fast_status else StatusManager
   te = FastThermosExecutor(
       runner_class=runner_class,
       manager_class=manager_class,
@@ -256,11 +250,7 @@ class TestThermosExecutor(object):
           sandbox_provider=DefaultTestSandboxProvider)
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
       te.runner_started.wait()
-      while te._runner.is_alive:
-        time.sleep(0.1)
-      while te._manager is None:
-        time.sleep(0.1)
-      te._manager.join()
+      te.terminated.wait()
       tm = TaskMonitor(TaskPath(root=tempdir), task_id=HELLO_WORLD_TASK_ID)
       runner_state = tm.get_state()
 
@@ -284,11 +274,9 @@ class TestThermosExecutor(object):
           sandbox_provider=DefaultTestSandboxProvider)
       te.launchTask(proxy_driver, make_task(MESOS_JOB(task=HELLO_WORLD), instanceId=0))
       te.runner_started.wait()
-      while te._runner.is_alive:
+      while te._status_manager is None:
         time.sleep(0.1)
-      while te._manager is None:
-        time.sleep(0.1)
-      te._manager.join()
+      te.terminated.wait()
       tm = TaskMonitor(TaskPath(root=tempdir), task_id=HELLO_WORLD_TASK_ID)
       runner_state = tm.get_state()
 
@@ -309,8 +297,9 @@ class TestThermosExecutor(object):
       while executor._runner is None or executor._runner._popen is None or (
           executor._runner._popen.pid is None):
         time.sleep(0.1)
+      log.info('test_thermos_executor killing runner.pid %s' % executor._runner._popen.pid)
       os.kill(executor._runner._popen.pid, signal.SIGKILL)
-      executor._manager.join()
+      executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
@@ -322,7 +311,7 @@ class TestThermosExecutor(object):
     with temporary_dir() as checkpoint_root:
       runner, executor = make_runner(proxy_driver, checkpoint_root, SLEEP60_MTI)
       runner.kill(force=True, preemption_wait=Amount(1, Time.SECONDS))
-      executor._manager.join()
+      executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
@@ -336,7 +325,7 @@ class TestThermosExecutor(object):
       # send two, expect at most one delivered
       executor.killTask(proxy_driver, mesos_pb.TaskID(value='sleep60-001'))
       executor.killTask(proxy_driver, mesos_pb.TaskID(value='sleep60-001'))
-      executor._manager.join()
+      executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
@@ -348,7 +337,7 @@ class TestThermosExecutor(object):
     with temporary_dir() as checkpoint_root:
       _, executor = make_runner(proxy_driver, checkpoint_root, SLEEP60_MTI)
       executor.shutdown(proxy_driver)
-      executor._manager.join()
+      executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
@@ -360,7 +349,7 @@ class TestThermosExecutor(object):
     with temporary_dir() as checkpoint_root:
       runner, executor = make_runner(proxy_driver, checkpoint_root, SLEEP60_MTI)
       runner.lose(force=True)
-      executor._manager.join()
+      executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
@@ -376,14 +365,12 @@ class TestThermosExecutor(object):
                                   MESOS_JOB(task=SLEEP60, health_check_config=health_check_config),
                                   ports={'health': port},
                                   fast_status=True)
-        executor._manager.join()
+        executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
 
-  # Flaky test, c.f. https://jira.twitter.biz/browse/MESOS-3832
-  @pytest.mark.skipif("True")
   def test_task_health_ok(self):
     proxy_driver = ProxyDriver()
     with SignalServer(HealthyHandler) as port:
@@ -394,7 +381,8 @@ class TestThermosExecutor(object):
                                   MESOS_JOB(task=SLEEP2, health_check_config=health_check_config),
                                   ports={'health': port},
                                   fast_status=True)
-        executor._manager.join()
+        executor.terminated.wait()
+
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_FINISHED
@@ -483,6 +471,23 @@ class TestThermosExecutor(object):
       updates = proxy_driver.method_calls['sendStatusUpdate']
       assert len(updates) == 2
       assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+
+  def test_launchTask_deserialization_fail(self):
+    proxy_driver = ProxyDriver()
+
+    task_info = mesos_pb.TaskInfo()
+    task_info.name = task_info.task_id.value = 'broken'
+    task_info.data = serialize(AssignedTask(task=TaskConfig(thermosConfig='garbage')))
+
+    te = ThermosExecutor(
+        runner_class=TestTaskRunner,
+        manager_class=StatusManager,
+        sandbox_provider=DefaultTestSandboxProvider)
+    te.launchTask(proxy_driver, task_info)
+
+    updates = proxy_driver.method_calls['sendStatusUpdate']
+    assert len(updates) == 1
+    assert updates[0][0][0].state == mesos_pb.TASK_FAILED
 
 
 def test_waiting_executor():

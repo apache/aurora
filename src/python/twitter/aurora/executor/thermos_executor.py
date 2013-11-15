@@ -1,5 +1,6 @@
 import os
 import threading
+import time
 import traceback
 
 from twitter.aurora.common.http_signaler import HttpSignaler
@@ -13,6 +14,7 @@ from twitter.thermos.monitoring.monitor import TaskMonitor
 from .common.health_checker import HealthCheckerThread
 from .common.kill_manager import KillManager
 from .common.sandbox import DirectorySandbox, SandboxProvider
+from .common.status_checker import ChainedStatusChecker, ExitState
 from .common.task_info import (
     assigned_task_from_mesos_task,
     mesos_task_instance_from_assigned_task,
@@ -24,7 +26,9 @@ from .common_internal.resource_manager import ResourceManager
 from .executor_base import ThermosExecutorBase
 from .executor_detector import ExecutorDetector
 from .status_manager import StatusManager
-from .thermos_task_runner import ThermosTaskRunner
+from .thermos_task_runner import TaskRunner
+
+import mesos_pb2 as mesos_pb
 
 
 class DefaultSandboxProvider(SandboxProvider):
@@ -38,20 +42,25 @@ class DefaultSandboxProvider(SandboxProvider):
 
 
 class ThermosExecutor(Observable, ThermosExecutorBase):
-  STOP_WAIT = Amount(5, Time.SECONDS)
+  PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
   SANDBOX_INITIALIZATION_TIMEOUT = Amount(10, Time.MINUTES)
+  START_TIMEOUT = Amount(2, Time.MINUTES)
+  STOP_TIMEOUT = Amount(2, Time.MINUTES)
+  STOP_WAIT = Amount(5, Time.SECONDS)
 
   def __init__(self,
                runner_class,
                manager_class=StatusManager,
-               sandbox_provider=DefaultSandboxProvider):
+               sandbox_provider=DefaultSandboxProvider,
+               clock=time):
 
     ThermosExecutorBase.__init__(self)
-    if not issubclass(runner_class, ThermosTaskRunner):
-      raise TypeError('runner_class must be a subclass of ThermosTaskRunner.')
+    if not issubclass(runner_class, TaskRunner):
+      raise TypeError('runner_class must be a TaskRunner subclass, got %s' % runner_class)
     self._runner = None
+    self._clock = clock
     self._task_id = None
-    self._manager = None
+    self._status_manager = None
     self._runner_class = runner_class
     self._manager_class = manager_class
     self._sandbox = None
@@ -62,6 +71,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     self.runner_started = threading.Event()
     self.sandbox_initialized = threading.Event()
     self.sandbox_created = threading.Event()
+    self.terminated = threading.Event()
     self.launched = threading.Event()
 
   @property
@@ -83,7 +93,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
         - Set up ResourceCheckpointer
         - Set up StatusManager, and attach HealthCheckers
     """
-    self.send_update(driver, self._task_id, 'STARTING', 'Initializing sandbox.')
+    self.send_update(driver, self._task_id, mesos_pb.TASK_STARTING, 'Initializing sandbox.')
 
     if not self._initialize_sandbox(driver, assigned_task):
       return
@@ -99,15 +109,15 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
           mesos_task,
           mesos_task.role().get(),
           portmap,
-          self._sandbox)  # XXX
+          self._sandbox)
     except self._runner_class.TaskError as e:
-      self._die(driver, 'FAILED', str(e))
+      self._die(driver, mesos_pb.TASK_FAILED, str(e))
       return
 
     if not self._start_runner(driver, assigned_task, mesos_task, portmap):
       return
 
-    self.send_update(driver, self._task_id, 'RUNNING')
+    self.send_update(driver, self._task_id, mesos_pb.TASK_RUNNING)
 
     self._start_status_manager(driver, assigned_task, mesos_task, portmap)
 
@@ -118,26 +128,25 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
       deadline(self._sandbox.create, timeout=self.SANDBOX_INITIALIZATION_TIMEOUT,
                daemon=True, propagate=True)
     except Timeout:
-      self._die(driver, 'FAILED', 'Timed out waiting for sandbox to initialize!')
+      self._die(driver, mesos_pb.TASK_FAILED, 'Timed out waiting for sandbox to initialize!')
       return
     except self._sandbox.Error as e:
-      self._die(driver, 'FAILED', 'Failed to initialize sandbox: %s' % e)
+      self._die(driver, mesos_pb.TASK_FAILED, 'Failed to initialize sandbox: %s' % e)
       return
     self.sandbox_created.set()
     return True
 
   def _start_runner(self, driver, assigned_task, mesos_task, portmap):
     if self.runner_aborted.is_set():
-      self._die(driver, 'KILLED', 'Task killed during initialization.')
+      self._die(driver, mesos_pb.TASK_KILLED, 'Task killed during initialization.')
 
     try:
-      deadline(self._runner.start, timeout=Amount(1, Time.MINUTES), propagate=True)
+      deadline(self._runner.start, timeout=self.START_TIMEOUT, propagate=True)
     except self._runner.TaskError as e:
-      self._die(driver, 'FAILED', 'Task initialization failed: %s' % e)
+      self._die(driver, mesos_pb.TASK_FAILED, 'Task initialization failed: %s' % e)
       return False
     except Timeout:
-      self._runner.lose()
-      self._die(driver, 'LOST', 'Timed out waiting for task to start!')
+      self._die(driver, mesos_pb.TASK_LOST, 'Timed out waiting for task to start!')
       return False
 
     self.runner_started.set()
@@ -146,9 +155,9 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     return True
 
   def _start_status_manager(self, driver, assigned_task, mesos_task, portmap):
-    status_checkers = []
+    status_checkers = [self._kill_manager]
+    self.metrics.register_observable('kill_manager', self._kill_manager)
 
-    http_signaler = None
     if portmap.get('health'):
       health_check_config = mesos_task.health_check_config().get()
       http_signaler = HttpSignaler(
@@ -176,41 +185,18 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
         os.path.join(self._runner.artifact_dir, ExecutorDetector.RESOURCE_PATH),
         recordio=True).start()
 
-    # TODO(wickman) Stack the health interfaces as such:
-    #
-    # Liveness health interface
-    # Kill manager health interface
-    # <all other health interfaces>
-    #
-    # ThermosExecutor(
-    #    task_runner,       # ThermosTaskRunner
-    #    sandbox_provider,  # DirectorySandboxProvider
-    #    plugins,           # [HttpHealthChecker, ResourceManager, DiscoveryManager]
-    # )
-    #
-    # Status manager becomes something that just issues a callback when unhealthy:
-    # status_manager = StatusManager(plugins, callback=self.terminate)
-    #
-    # def terminate(self):
-    #    <attempt graceful shutdown via quitquitquit/abortabortabort if health port>
-    #    <call runner.stop>
-    #
     discovery_manager = DiscoveryManager.from_assigned_task(assigned_task)
     if discovery_manager:
       status_checkers.append(discovery_manager)
       self.metrics.register_observable('discovery_manager', discovery_manager)
 
-    status_checkers.append(self._kill_manager)
-    self.metrics.register_observable('kill_manager', self._kill_manager)
+    self._chained_checker = ChainedStatusChecker(status_checkers)
+    self._chained_checker.start()
 
-    self._manager = self._manager_class(
-        self._runner,
-        driver,
-        self._task_id,
-        signaler=http_signaler,
-        status_checkers=status_checkers)
-
-    self._manager.start()
+    # chain the runner to the other checkers, but do not chain .start()/.stop()
+    complete_checker = ChainedStatusChecker([self._runner, self._chained_checker])
+    self._status_manager = self._manager_class(complete_checker, self._shutdown, clock=self._clock)
+    self._status_manager.start()
 
   def _signal_kill_manager(self, driver, task_id, reason):
     if self._task_id is None:
@@ -226,6 +212,46 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     self.log('Activating kill manager.')
     self._kill_manager.kill(reason)
 
+  @classmethod
+  def translate_exit_state_to_mesos(cls, exit_state):
+    # Put into executor_base?
+    if exit_state == ExitState.FAILED:
+      return mesos_pb.TASK_FAILED
+    elif exit_state == ExitState.KILLED:
+      return mesos_pb.TASK_KILLED
+    elif exit_state == ExitState.FINISHED:
+      return mesos_pb.TASK_FINISHED
+    elif exit_state == ExitState.LOST:
+      return mesos_pb.TASK_LOST
+    log.error('Unknown exit state, defaulting to TASK_FINISHED.')
+    return mesos_pb.TASK_FINISHED
+
+  def _shutdown(self, status_result):
+    runner_status = self._runner.status
+
+    try:
+      deadline(self._runner.stop, timeout=self.STOP_TIMEOUT)
+    except Timeout:
+      log.error('Failed to stop runner within deadline.')
+
+    try:
+      deadline(self._chained_checker.stop, timeout=self.STOP_TIMEOUT)
+    except Timeout:
+      log.error('Failed to stop all checkers within deadline.')
+
+    # If the runner was alive when _shutdown was called, defer to the status_result,
+    # otherwise the runner's terminal state is the preferred state.
+    exit_status = runner_status or status_result
+
+    self.send_update(
+        self._driver,
+        self._task_id,
+        self.translate_exit_state_to_mesos(exit_status.status),
+        status_result.reason)
+
+    self.terminated.set()
+    defer(self._driver.stop, delay=self.PERSISTENCE_WAIT)
+
   """ Mesos Executor API methods follow """
 
   def launchTask(self, driver, task):
@@ -237,11 +263,13 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     self.launched.set()
     self.log('launchTask got task: %s:%s' % (task.name, task.task_id.value))
 
+    # TODO(wickman)  Update the tests to call registered(), then remove this line and issue
+    # an assert if self._driver is not populated.
+    self._driver = driver
+
     if self._runner:
-      # XXX(wickman) This looks like it's sending LOST for the wrong task?
-      # TODO(wickman) Send LOST immediately for both tasks?
-      log.error('Error!  Already running a task! %s' % self._task_id)
-      self.send_update(driver, task.task_id.value, 'LOST',
+      log.error('Already running a task! %s' % self._task_id)
+      self.send_update(driver, task.task_id.value, mesos_pb.TASK_LOST,
           "Task already running on this executor: %s" % self._task_id)
       return
 
@@ -254,7 +282,8 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     except Exception as e:
       log.fatal('Could not deserialize AssignedTask')
       log.fatal(traceback.format_exc())
-      self.send_update(driver, self._task_id, 'FAILED', "Could not deserialize task: %s" % e)
+      self.send_update(
+          driver, self._task_id, mesos_pb.TASK_FAILED, "Could not deserialize task: %s" % e)
       defer(driver.stop, delay=self.STOP_WAIT)
       return
 

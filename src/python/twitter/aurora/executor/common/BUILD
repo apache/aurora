@@ -2,6 +2,8 @@ python_library(
   name = 'status_checker',
   sources = ['status_checker.py'],
   dependencies = [
+    pants('src/python/twitter/common/lang'),
+    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/metrics'),
   ]
 )

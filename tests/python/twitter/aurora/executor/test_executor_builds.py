@@ -3,7 +3,7 @@ import subprocess
 
 def build_and_execute_pex_target(target, binary):
   assert subprocess.call(["./pants", target]) == 0
-  
+
   # TODO(wickman) Should we extract distdir from pants.ini?
   po = subprocess.Popen([binary, "--help"], stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
   so, se = po.communicate()

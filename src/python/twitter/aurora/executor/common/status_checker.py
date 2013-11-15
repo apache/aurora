@@ -1,5 +1,6 @@
 from abc import abstractproperty
 
+from twitter.common import log
 from twitter.common.lang import Interface
 from twitter.common.metrics import NamedGauge, Observable
 
@@ -51,14 +52,18 @@ class StatusResult(object):
 
 
 class StatusChecker(Observable, Interface):
+  """Interface to pluggable status checkers for the Aurora Executor."""
+
   @abstractproperty
   def status(self):
     """Return None under normal operations.  Return StatusResult to indicate status proposal."""
 
   def start(self):
+    """Invoked once the task has been started."""
     self.metrics.register(NamedGauge('enabled', 1))
 
   def stop(self):
+    """Invoked once a non-None status has been reported."""
     pass
 
 
@@ -80,8 +85,10 @@ class ChainedStatusChecker(StatusChecker):
   def status(self):
     if self._status is None:
       for status_checker in self._status_checkers:
+        log.debug('Checking status from %s' % status_checker.__class__.__name__)
         status_checker_status = status_checker.status
         if status_checker_status is not None:
+          log.info('%s reported %s' % (status_checker.__class__.__name__, status_checker_status))
           if not isinstance(status_checker_status, StatusResult):
             raise TypeError('StatusChecker returned something other than a StatusResult: got %s' %
                 type(status_checker_status))

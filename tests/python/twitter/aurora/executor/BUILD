@@ -4,8 +4,8 @@ python_test_suite(name = 'all',
     pants(':executor_detector'),
     pants(':executor_vars'),
     pants(':gc_executor'),
-    pants(':status_manager'),
     pants(':thermos_executor'),
+    pants(':thermos_task_runner'),
     pants('tests/python/twitter/aurora/executor/common:all'),
     pants('tests/python/twitter/aurora/executor/common_internal:all'),
   ]
@@ -40,16 +40,6 @@ python_tests(name = 'executor_detector',
   ]
 )
 
-python_tests(name = 'status_manager',
-  sources = [ 'test_status_manager.py' ],
-  dependencies = [
-    pants('src/python/twitter/aurora/common:http_signaler'),
-    pants('src/python/twitter/aurora/executor:status_manager'),
-    pants('src/python/twitter/common/testing'),
-    python_requirement('tornado'),
-  ]
-)
-
 python_tests(name = 'thermos_executor',
   sources = ['test_thermos_executor.py'],
   timeout = Amount(5, Time.MINUTES),
@@ -59,12 +49,27 @@ python_tests(name = 'thermos_executor',
     pants('aurora/twitterdeps/src/python/twitter/thermos/monitoring'),
     pants('src/python/twitter/aurora/config:schema'),
     pants('src/python/twitter/aurora/executor/common:executor_timeout'),
+    pants('src/python/twitter/aurora/executor/common:sandbox'),
     pants('src/python/twitter/aurora/executor:thermos_executor'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/exceptions'),
     pants('src/python/twitter/common/quantity'),
     pants('src/python/twitter/pants:pants-lib'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
+  ]
+)
+
+python_tests(name = 'thermos_task_runner',
+  sources = ['test_thermos_task_runner.py'],
+  dependencies = [
+    pants('src/python/twitter/aurora/config:schema'),
+    pants('src/python/twitter/aurora/executor/common:sandbox'),
+    pants('src/python/twitter/aurora/executor/common:status_checker'),
+    pants('src/python/twitter/aurora/executor:thermos_task_runner'),
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/python/twitter/common/dirutil'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/quantity'),
   ]
 )
 

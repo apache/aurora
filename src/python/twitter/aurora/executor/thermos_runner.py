@@ -90,7 +90,7 @@ def main(args, opts):
   except TaskRunner.StateError:
     app.error('Task appears to already be in a terminal state.')
   except TaskRunner.PermissionError:
-    app.error('Could not get permission to perform %s!' % opts.action)
+    app.error('Could not get permission to take control of %s!' % opts.task_id)
   except KeyboardInterrupt:
     runner_teardown(task_runner)
 
