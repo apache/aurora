@@ -1,10 +1,10 @@
 python_test_suite(
   name = 'all',
-  dependencies = [ pants(':commands') ]
+  dependencies = [ pants(':core'), pants(':run'), pants(':ssh') ]
 )
 
 python_tests(
-  name='commands',
+  name='core',
   sources = [
     'test_cancel_update.py',
     'test_create.py',
@@ -17,6 +17,32 @@ python_tests(
   dependencies = [
     pants('3rdparty/python:mock'),
     pants('src/python/twitter/aurora/client/commands:core'),
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants(':util')
+  ])
+
+python_tests(
+  name='ssh',
+  sources = [
+    'test_ssh.py',
+  ],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/client/commands:ssh'),
+    pants('src/python/twitter/common/contextutil'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants(':util')
+  ])
+
+python_tests(
+  name='run',
+  sources = [
+    'test_run.py',
+  ],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/client/commands:run'),
     pants('src/python/twitter/common/contextutil'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants(':util')
