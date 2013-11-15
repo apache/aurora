@@ -64,6 +64,8 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
   # running forever
   MAXIMUM_EXECUTOR_LIFETIME = Amount(1, Time.DAYS)
 
+  PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
+
   def __init__(self,
                checkpoint_root,
                verbose=True,
@@ -441,6 +443,9 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
       else:
         self.send_update(self._driver, prev_task_id, 'FINISHED',
                          'Garbage collection skipped - GC executor shutting down')
+        # TODO(jon) Remove this once external MESOS-243 is resolved.
+        self.log('Sleeping briefly to mitigate https://issues.apache.org/jira/browse/MESOS-243')
+        self._clock.sleep(self.PERSISTENCE_WAIT.as_(Time.SECONDS))
 
       self._driver.stop()
 

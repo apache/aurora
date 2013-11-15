@@ -28,7 +28,8 @@ class StatusManager(ExceptionalThread):
   ESCALATION_WAIT = Amount(5, Time.SECONDS)
   PERSISTENCE_WAIT = Amount(5, Time.SECONDS)
 
-  def __init__(self, runner, driver, task_id, status_checkers=(), signaler=None, clock=time):
+  def __init__(self, runner, driver, task_id, status_checkers=(), signaler=None,
+               clock=time):
     self._driver = driver
     self._runner = runner
     self._task_id = task_id

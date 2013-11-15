@@ -478,6 +478,7 @@ def test_gc_shutdown_queued():
     thread_yield()
     assert len(executor._gc_task_queue) == 1
     executor.shutdown(proxy_driver)
+    executor._clock.tick(executor.PERSISTENCE_WAIT.as_(Time.SECONDS))
     assert executor._stop_event.is_set()
   proxy_driver.stopped.wait(timeout=1.0)
   assert proxy_driver.stopped.is_set()
