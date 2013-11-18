@@ -22,7 +22,7 @@ tests use
 
 Creating a bundle for deployment
 --------------------------------
-Gradle can create a zip file containing Aurora, all of its dependencies, and a launch script with 
+Gradle can create a zip file containing Aurora, all of its dependencies, and a launch script with
 
     ./gradlew distZip
 
@@ -30,8 +30,8 @@ or a tar file containing the same files with
 
     ./gradlew distTar
 
-The output file will be written to `build/distributions/aurora-scheduler.zip` or
-`build/distributions/aurora-scheduler.tar`.
+The output file will be written to `dist/distributions/aurora-scheduler.zip` or
+`dist/distributions/aurora-scheduler.tar`.
 
 Developing Aurora Java code
 ===========================

@@ -6,7 +6,6 @@
 .gradle/
 .pants.d/
 .reviewboardrc
-build/
 dist/
 gradle-app.setting
 out/
