@@ -3,15 +3,11 @@ import threading
 import time
 import traceback
 
-from twitter.aurora.common.http_signaler import HttpSignaler
 from twitter.common import log
 from twitter.common.concurrent import deadline, defer, Timeout
 from twitter.common.metrics import Observable
 from twitter.common.quantity import Amount, Time
-from twitter.thermos.common.path import TaskPath
-from twitter.thermos.monitoring.monitor import TaskMonitor
 
-from .common.health_checker import HealthCheckerThread
 from .common.kill_manager import KillManager
 from .common.sandbox import DirectorySandbox, SandboxProvider
 from .common.status_checker import ChainedStatusChecker, ExitState
@@ -25,11 +21,7 @@ from .common.task_runner import (
     TaskRunner,
     TaskRunnerProvider,
 )
-from .common_internal.discovery_manager import DiscoveryManager
-from .common_internal.resource_checkpoints import ResourceCheckpointer
-from .common_internal.resource_manager import ResourceManager
 from .executor_base import ThermosExecutorBase
-from .executor_detector import ExecutorDetector
 from .status_manager import StatusManager
 
 import mesos_pb2 as mesos_pb
@@ -56,6 +48,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
                runner_provider,
                status_manager_class=StatusManager,
                sandbox_provider=DefaultSandboxProvider,
+               status_providers=(),
                clock=time):
 
     ThermosExecutorBase.__init__(self)
@@ -66,6 +59,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     self._runner_provider = runner_provider
     self._clock = clock
     self._task_id = None
+    self._status_providers = status_providers
     self._status_manager = None
     self._status_manager_class = status_manager_class
     self._sandbox = None
@@ -162,37 +156,12 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     status_checkers = [self._kill_manager]
     self.metrics.register_observable('kill_manager', self._kill_manager)
 
-    if portmap.get('health'):
-      health_check_config = mesos_task.health_check_config().get()
-      http_signaler = HttpSignaler(
-          portmap.get('health'),
-          timeout_secs=health_check_config.get('timeout_secs'))
-      health_checker = HealthCheckerThread(
-          http_signaler.health,
-          interval_secs=health_check_config.get('interval_secs'),
-          initial_interval_secs=health_check_config.get('initial_interval_secs'),
-          max_consecutive_failures=health_check_config.get('max_consecutive_failures'))
-      status_checkers.append(health_checker)
-      self.metrics.register_observable('health_checker', health_checker)
-
-    task_path = TaskPath(root=self._runner._checkpoint_root, task_id=self._task_id)
-    resource_manager = ResourceManager(
-        mesos_task.task().resources(),
-        TaskMonitor(task_path, self._task_id),
-        self._sandbox.root,
-    )
-    status_checkers.append(resource_manager)
-    self.metrics.register_observable('resource_manager', resource_manager)
-
-    ResourceCheckpointer(
-        lambda: resource_manager.sample,
-        os.path.join(self._runner.artifact_dir, ExecutorDetector.RESOURCE_PATH),
-        recordio=True).start()
-
-    discovery_manager = DiscoveryManager.from_assigned_task(assigned_task)
-    if discovery_manager:
-      status_checkers.append(discovery_manager)
-      self.metrics.register_observable('discovery_manager', discovery_manager)
+    for status_provider in self._status_providers:
+      status_checker = status_provider.from_assigned_task(assigned_task, self._sandbox)
+      if status_checker is None:
+        continue
+      status_checkers.append(status_checker)
+      # self.metrics.register_observable()
 
     self._chained_checker = ChainedStatusChecker(status_checkers)
     self._chained_checker.start()

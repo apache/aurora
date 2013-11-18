@@ -8,7 +8,6 @@ import tempfile
 import threading
 import time
 
-from twitter.aurora.common_internal.clusters import TwitterCluster, TWITTER_CLUSTERS
 from twitter.aurora.config.schema.base import (
     HealthCheckConfig,
     MB,
@@ -19,6 +18,7 @@ from twitter.aurora.config.schema.base import (
     Task,
 )
 from twitter.aurora.executor.common.executor_timeout import ExecutorTimeout
+from twitter.aurora.executor.common.health_checker import HealthCheckerProvider
 from twitter.aurora.executor.common.sandbox import DirectorySandbox, SandboxProvider
 from twitter.aurora.executor.common.task_runner import TaskError
 from twitter.aurora.executor.status_manager import StatusManager
@@ -45,7 +45,6 @@ from gen.twitter.aurora.ttypes import (
 
 from thrift.TSerialization import serialize
 import mesos_pb2 as mesos_pb
-import pytest
 
 
 if 'THERMOS_DEBUG' in os.environ:
@@ -167,7 +166,8 @@ def make_executor(
     task,
     ports={},
     fast_status=False,
-    runner_class=ThermosTaskRunner):
+    runner_class=ThermosTaskRunner,
+    status_providers=()):
 
   status_manager_class = FastStatusManager if fast_status else StatusManager
   runner_provider = make_provider(checkpoint_root, runner_class)
@@ -175,6 +175,7 @@ def make_executor(
       runner_provider=runner_provider,
       status_manager_class=status_manager_class,
       sandbox_provider=DefaultTestSandboxProvider,
+      status_providers=status_providers,
   )
 
   ExecutorTimeout(te.launched, proxy_driver, timeout=Amount(100, Time.MILLISECONDS)).start()
@@ -373,10 +374,11 @@ class TestThermosExecutor(object):
       with temporary_dir() as checkpoint_root:
         health_check_config = HealthCheckConfig(initial_interval_secs=0.1, interval_secs=0.1)
         _, executor = make_executor(proxy_driver,
-                                   checkpoint_root,
-                                   MESOS_JOB(task=SLEEP60, health_check_config=health_check_config),
-                                   ports={'health': port},
-                                   fast_status=True)
+                                    checkpoint_root,
+                                    MESOS_JOB(task=SLEEP60, health_check_config=health_check_config),
+                                    ports={'health': port},
+                                    fast_status=True,
+                                    status_providers=(HealthCheckerProvider(),))
         executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
@@ -392,7 +394,8 @@ class TestThermosExecutor(object):
                                     checkpoint_root,
                                     MESOS_JOB(task=SLEEP2, health_check_config=health_check_config),
                                     ports={'health': port},
-                                    fast_status=True)
+                                    fast_status=True,
+                                    status_providers=(HealthCheckerProvider(),))
         executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']

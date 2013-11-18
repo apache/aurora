@@ -22,8 +22,10 @@ python_library(
   sources = ['health_checker.py'],
   dependencies = [
     pants(':status_checker'),
+    pants(':task_info'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/exceptions'),
+    pants('src/python/twitter/aurora/common:http_signaler'),
   ]
 )
 

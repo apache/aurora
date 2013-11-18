@@ -8,24 +8,22 @@ import threading
 import time
 import unittest
 
-from twitter.aurora.executor.common_internal.appapp_sandbox import AppAppSandbox
-from twitter.aurora.executor.executor_detector import ExecutorDetector
 from twitter.aurora.executor.gc_executor import ThermosGCExecutor
 from twitter.common.concurrent import deadline, Timeout
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
-from twitter.common.quantity import Amount, Time, Data
+from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
+from twitter.thermos.common.path import TaskPath
 from twitter.thermos.config.schema import SimpleTask
 from twitter.thermos.core.runner import TaskRunner
 
 from gen.twitter.aurora.comm.ttypes import AdjustRetainedTasks, SchedulerMessage
-from gen.twitter.aurora.constants import ACTIVE_STATES, LIVE_STATES, TERMINAL_STATES
+from gen.twitter.aurora.constants import LIVE_STATES, TERMINAL_STATES
 from gen.twitter.aurora.ttypes import ScheduleStatus
 from gen.twitter.thermos.ttypes import ProcessState, TaskState
 
 import mock
-import mox
 from thrift.TSerialization import serialize as thrift_serialize
 from thrift.TSerialization import deserialize as thrift_deserialize
 import mesos_pb2 as mesos
@@ -544,8 +542,8 @@ def test_gc_lifetime():
     assert not executor._stop_event.is_set()
 
 
-APPAPP_SANDBOX = 'twitter.aurora.executor.gc_executor.AppAppSandbox'
 DIRECTORY_SANDBOX = 'twitter.aurora.executor.gc_executor.DirectorySandbox'
+
 
 class TestRealGC(unittest.TestCase):
   """
@@ -570,7 +568,7 @@ class TestRealGC(unittest.TestCase):
     if finished:
       tr.kill()
     if corrupt:
-      cpkt_file = TaskPath(root=root, tr=tr.task_id).getpath('runner_checkpoint')
+      ckpt_file = TaskPath(root=root, tr=tr.task_id).getpath('runner_checkpoint')
       with open(ckpt_file, 'w') as f:
         f.write("definitely not a valid checkpoint stream")
     return tr.task_id
@@ -609,54 +607,24 @@ class TestRealGC(unittest.TestCase):
     pass
 
   def test_gc_task_no_sandbox(self):
-    with mock.patch(APPAPP_SANDBOX) as appapp_mock:
-      with mock.patch(DIRECTORY_SANDBOX) as directory_mock:
-        appapp_sandbox = appapp_mock.return_value
-        directory_sandbox = directory_mock.return_value
-        appapp_sandbox.exists.return_value = directory_sandbox.exists.return_value = False
-        with temporary_dir() as root:
-          task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
-          gcs = self.run_gc(root, task_id)
-          appapp_sandbox.exists.assert_called_with()
-          directory_sandbox.exists.assert_called_with()
-          assert len(gcs) == 1
-
-  def test_gc_task_appapp_sandbox(self):
-    with mock.patch(APPAPP_SANDBOX) as appapp_mock:
-      appapp_sandbox = appapp_mock.return_value
-      appapp_sandbox.exists.return_value = True
+    with mock.patch(DIRECTORY_SANDBOX) as directory_mock:
+      directory_sandbox = directory_mock.return_value
       with temporary_dir() as root:
         task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
         gcs = self.run_gc(root, task_id)
-        appapp_sandbox.exists.assert_called_with()
-        appapp_sandbox.destroy.assert_called_with()
-        assert len(gcs) == 1
-
-  def test_gc_task_appapp_sandbox_quiet_failure(self):
-    with mock.patch(APPAPP_SANDBOX) as appapp_mock:
-      appapp_sandbox = appapp_mock.return_value
-      appapp_sandbox.exists.return_value = True
-      appapp_sandbox.destroy.side_effect = AppAppSandbox.DeletionError()
-      with temporary_dir() as root:
-        task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
-        gcs = self.run_gc(root, task_id)
-        appapp_sandbox.exists.assert_called_with()
-        appapp_sandbox.destroy.assert_called_with()
+        directory_sandbox.exists.assert_called_with()
         assert len(gcs) == 1
 
   def test_gc_task_directory_sandbox(self):
-    with mock.patch(APPAPP_SANDBOX) as appapp_mock:
-      with mock.patch(DIRECTORY_SANDBOX) as directory_mock:
-        appapp_sandbox = appapp_mock.return_value
-        appapp_sandbox.exists.return_value = False
-        directory_sandbox = directory_mock.return_value
-        directory_sandbox.exists.return_value = True
-        with temporary_dir() as root:
-          task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
-          gcs = self.run_gc(root, task_id)
-          directory_sandbox.exists.assert_called_with()
-          directory_sandbox.destroy.assert_called_with()
-          assert len(gcs) == 1
+    with mock.patch(DIRECTORY_SANDBOX) as directory_mock:
+      directory_sandbox = directory_mock.return_value
+      directory_sandbox.exists.return_value = True
+      with temporary_dir() as root:
+        task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
+        gcs = self.run_gc(root, task_id)
+        directory_sandbox.exists.assert_called_with()
+        directory_sandbox.destroy.assert_called_with()
+        assert len(gcs) == 1
 
   def test_gc_ignore_retained_task(self):
     with temporary_dir() as root:

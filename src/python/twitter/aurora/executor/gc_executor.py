@@ -29,7 +29,6 @@ from gen.twitter.aurora.comm.ttypes import (
 from gen.twitter.aurora.ttypes import ScheduleStatus
 
 from .common.sandbox import DirectorySandbox, SandboxInterface
-from .common_internal.appapp_sandbox import AppAppSandbox
 from .executor_base import ThermosExecutorBase
 from .executor_detector import ExecutorDetector
 
@@ -323,21 +322,14 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
     return updates
 
   def _erase_sandbox(self, task_id):
-    appapp_sandbox = AppAppSandbox(task_id)
-    if appapp_sandbox.exists():
-      self.log('Destroying AppAppSandbox for %s' % task_id)
-      try:
-        appapp_sandbox.destroy()
-      except SandboxInterface.DeletionError as err:
-        self.log('Error destroying AppAppSandbox: %s' % err)
+    # TODO(wickman) Only mesos should be in the business of garbage collecting sandboxes.
+    header_sandbox = self.get_sandbox(task_id)
+    directory_sandbox = DirectorySandbox(header_sandbox) if header_sandbox else None
+    if directory_sandbox and directory_sandbox.exists():
+      self.log('Destroying DirectorySandbox for %s' % task_id)
+      directory_sandbox.destroy()
     else:
-      header_sandbox = self.get_sandbox(task_id)
-      directory_sandbox = DirectorySandbox(header_sandbox) if header_sandbox else None
-      if directory_sandbox and directory_sandbox.exists():
-        self.log('Destroying DirectorySandbox for %s' % task_id)
-        directory_sandbox.destroy()
-      else:
-        self.log('Found no sandboxes for %s' % task_id)
+      self.log('Found no sandboxes for %s' % task_id)
 
   def _gc(self, task_id):
     """Erase the sandbox, logs and metadata of the given task."""

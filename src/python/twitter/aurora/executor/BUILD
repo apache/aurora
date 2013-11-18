@@ -38,25 +38,11 @@ python_library(
 )
 
 python_library(
-  name = 'status_checkers',
-  dependencies = [
-    pants('src/python/twitter/aurora/executor/common:health_checker'),
-    pants('src/python/twitter/aurora/executor/common:kill_manager'),
-    pants('src/python/twitter/aurora/executor/common_internal:resource_manager'),
-    pants('src/python/twitter/aurora/executor/common_internal:discovery_manager'),
-  ]
-)
-
-python_library(
   name = 'status_manager',
   sources = ['status_manager.py'],
   dependencies = [
-    pants(':status_checkers'),
-    pants(':thermos_executor_base'),
-    pants('aurora/twitterdeps/src/thrift/com/twitter/thermos:py-thrift'),
-    pants('src/python/twitter/aurora:mesos-core'),
+    pants('src/python/twitter/aurora/executor/common:status_checker'),
     pants('src/python/twitter/common/exceptions'),
-    pants('src/python/twitter/common/lang'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
   ]
@@ -78,17 +64,13 @@ python_library(
   sources = ['thermos_executor.py'],
   dependencies = [
     pants('3rdparty/python:pystachio'),
-    pants(':executor_detector'),
     pants(':status_manager'),
     pants(':thermos_executor_base'),
     pants('src/python/twitter/aurora:mesos-core'),
-    pants('src/python/twitter/aurora/common:http_signaler'),
     pants('src/python/twitter/aurora/executor/common:kill_manager'),
     pants('src/python/twitter/aurora/executor/common:sandbox'),
     pants('src/python/twitter/aurora/executor/common:task_info'),
     pants('src/python/twitter/aurora/executor/common:task_runner'),
-    pants('src/python/twitter/aurora/executor/common_internal:resource_checkpoints'),
-    pants('src/python/twitter/aurora/executor/common_internal:resource_manager'),
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
@@ -119,10 +101,8 @@ python_library(
     pants('aurora/twitterdeps/src/python/twitter/thermos/common'),
     pants('aurora/twitterdeps/src/python/twitter/thermos/core'),
     pants('aurora/twitterdeps/src/python/twitter/thermos/monitoring'),
-    pants('src/python/twitter/aurora/common_internal:clusters'),
     pants('src/python/twitter/aurora/config:schema'),
     pants('src/python/twitter/aurora/executor/common:sandbox'),
-    pants('src/python/twitter/aurora/executor/common_internal:appapp_sandbox'),
     pants('src/python/twitter/aurora:mesos-core'),
     pants('src/python/twitter/common/collections'),
     pants('src/python/twitter/common/exceptions'),

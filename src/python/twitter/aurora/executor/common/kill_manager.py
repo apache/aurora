@@ -1,5 +1,3 @@
-import threading
-
 from .status_checker import ExitState, StatusChecker, StatusResult
 
 

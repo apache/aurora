@@ -69,7 +69,7 @@ class StatusChecker(Observable, Interface):
 
 class StatusCheckerProvider(Interface):
   @abstractmethod
-  def from_assigned_task(self, assigned_task):
+  def from_assigned_task(self, assigned_task, sandbox):
     pass
 
 

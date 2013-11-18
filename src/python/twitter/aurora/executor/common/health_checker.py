@@ -1,10 +1,17 @@
 import threading
 import time
 
+from twitter.aurora.common.http_signaler import HttpSignaler
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 
-from .status_checker import ExitState, StatusChecker, StatusResult
+from .status_checker import (
+    ExitState,
+    StatusChecker,
+    StatusCheckerProvider,
+    StatusResult,
+)
+from .task_info import mesos_task_instance_from_assigned_task, resolve_ports
 
 
 class HealthCheckerThread(StatusChecker, ExceptionalThread):
@@ -70,3 +77,23 @@ class HealthCheckerThread(StatusChecker, ExceptionalThread):
   def stop(self):
     log.debug('Health checker thread stopped.')
     self._dead.set()
+
+
+class HealthCheckerProvider(StatusCheckerProvider):
+  def from_assigned_task(self, assigned_task, _):
+    mesos_task = mesos_task_instance_from_assigned_task(assigned_task)
+    portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)
+
+    if 'health' not in portmap:
+      return None
+
+    health_check_config = mesos_task.health_check_config().get()
+    http_signaler = HttpSignaler(
+        portmap['health'],
+        timeout_secs=health_check_config.get('timeout_secs'))
+    health_checker = HealthCheckerThread(
+        http_signaler.health,
+        interval_secs=health_check_config.get('interval_secs'),
+        initial_interval_secs=health_check_config.get('initial_interval_secs'),
+        max_consecutive_failures=health_check_config.get('max_consecutive_failures'))
+    return health_checker

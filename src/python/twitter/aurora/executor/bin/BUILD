@@ -5,6 +5,7 @@ python_binary(
   always_write_cache = True,
   dependencies = [
     pants('src/python/twitter/aurora/executor/common:executor_timeout'),
+    pants('src/python/twitter/aurora/executor/common:health_checker'),
     pants('src/python/twitter/aurora/executor/common:sandbox'),
     pants('src/python/twitter/aurora/executor:executor_detector'),
     pants('src/python/twitter/aurora/executor:executor_vars'),

@@ -13,7 +13,6 @@ python_tests(
   sources = ['test_directory_sandbox.py'],
   dependencies = [
     pants('3rdparty/python:mock'),
-    pants('src/python/twitter/aurora/config:schema'),
     pants('src/python/twitter/aurora/executor/common:sandbox'),
     pants('src/python/twitter/common/contextutil'),
   ],

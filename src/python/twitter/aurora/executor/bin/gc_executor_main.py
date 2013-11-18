@@ -5,8 +5,6 @@ slave.
 
 """
 
-import os
-
 from twitter.aurora.executor.executor_detector import ExecutorDetector
 from twitter.aurora.executor.gc_executor import ThermosGCExecutor
 from twitter.common import app, log

@@ -11,8 +11,9 @@ from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
 from twitter.aurora.executor.common.executor_timeout import ExecutorTimeout
-from twitter.aurora.executor.thermos_task_runner import DefaultThermosTaskRunnerProvider
+from twitter.aurora.executor.common.health_checker import HealthCheckerProvider
 from twitter.aurora.executor.thermos_executor import ThermosExecutor
+from twitter.aurora.executor.thermos_task_runner import DefaultThermosTaskRunnerProvider
 
 import mesos
 
@@ -23,11 +24,12 @@ import mesos
 def dump_runner_pex():
   import pkg_resources
   import twitter.aurora.executor.resources
-  runner_pex = os.path.join(os.path.realpath('.'), 'thermos_runner.pex')
+  pex_name = 'thermos_runner.pex'
+  runner_pex = os.path.join(os.path.realpath('.'), pex_name)
   with open(runner_pex, 'w') as fp:
     # TODO(wickman) Use shutil.copyfileobj to reduce memory footprint here.
     fp.write(pkg_resources.resource_stream(
-        twitter.aurora.executor.resources.__name__, 'thermos_runner.pex').read())
+        twitter.aurora.executor.resources.__name__, pex_name).read())
   return runner_pex
 
 
@@ -38,7 +40,10 @@ def main():
   )
 
   # Create executor stub
-  thermos_executor = ThermosExecutor(runner_provider=runner_provider)
+  thermos_executor = ThermosExecutor(
+      runner_provider=runner_provider,
+      status_providers=(HealthCheckerProvider(),),
+  )
 
   # Create driver stub
   driver = mesos.MesosExecutorDriver(thermos_executor)

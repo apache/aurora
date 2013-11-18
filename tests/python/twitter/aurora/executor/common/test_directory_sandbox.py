@@ -1,7 +1,5 @@
 import os
-import pwd
 
-from twitter.aurora.config.schema.base import Task, Resources, MesosTaskInstance
 from twitter.aurora.executor.common.sandbox import DirectorySandbox
 from twitter.common.contextutil import temporary_dir
 
