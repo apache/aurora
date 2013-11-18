@@ -8,9 +8,11 @@ python_library(
     pants('aurora/twitterdeps/src/python/twitter/thermos/monitoring'),
     pants('src/python/twitter/aurora/common:http_signaler'),
     pants('src/python/twitter/aurora/executor/common:status_checker'),
-    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/aurora/executor/common:task_info'),
+    pants('src/python/twitter/aurora/executor/common:task_runner'),
     pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/common/http'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/quantity'),
   ]
 )
 
@@ -79,16 +81,15 @@ python_library(
     pants(':executor_detector'),
     pants(':status_manager'),
     pants(':thermos_executor_base'),
-    pants(':thermos_task_runner'),
     pants('src/python/twitter/aurora:mesos-core'),
     pants('src/python/twitter/aurora/common:http_signaler'),
     pants('src/python/twitter/aurora/executor/common:kill_manager'),
     pants('src/python/twitter/aurora/executor/common:sandbox'),
     pants('src/python/twitter/aurora/executor/common:task_info'),
+    pants('src/python/twitter/aurora/executor/common:task_runner'),
     pants('src/python/twitter/aurora/executor/common_internal:resource_checkpoints'),
     pants('src/python/twitter/aurora/executor/common_internal:resource_manager'),
     pants('src/python/twitter/common/app'),
-    pants('src/python/twitter/common/concurrent'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
   ]

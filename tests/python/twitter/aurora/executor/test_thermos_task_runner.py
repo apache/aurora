@@ -63,14 +63,12 @@ class TestThermosTaskRunnerIntegration(object):
       sandbox = DirectorySandbox(td1)
       checkpoint_root = td2
 
-      class TestThermosTaskRunner(runner_class):
-        PEX_NAME = os.path.join('dist', 'thermos_runner.pex')
-
-      task_runner = TestThermosTaskRunner(
+      task_runner = ThermosTaskRunner(
+          runner_pex=os.path.join('dist', 'thermos_runner.pex'),
           task_id='hello_world',
-          mesos_task=TASK.bind(**bindings),
+          task=TASK.bind(**bindings).task(),
           role=getpass.getuser(),
-          mesos_ports={},
+          portmap={},
           sandbox=sandbox,
           checkpoint_root=checkpoint_root,
       )

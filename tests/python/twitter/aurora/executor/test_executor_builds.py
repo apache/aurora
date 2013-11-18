@@ -8,14 +8,18 @@ def build_and_execute_pex_target(target, binary):
   po = subprocess.Popen([binary, "--help"], stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
   so, se = po.communicate()
   assert po.returncode == 1  # sigh
-  assert so.startswith('Options')
+  assert so.startswith('Options'), 'Unexpected build output: %s' % so
 
 
 def test_thermos_executor_build():
+  build_and_execute_pex_target('src/python/twitter/aurora/executor/bin:thermos_executor',
+                               'dist/thermos_executor.pex')
   build_and_execute_pex_target('src/python/twitter/aurora/executor/bin_internal:thermos_executor',
                                'dist/thermos_executor.pex')
 
 def test_gc_executor_build():
+  build_and_execute_pex_target('src/python/twitter/aurora/executor/bin:gc_executor',
+                               'dist/gc_executor.pex')
   build_and_execute_pex_target('src/python/twitter/aurora/executor/bin_internal:gc_executor',
                                'dist/gc_executor.pex')
 

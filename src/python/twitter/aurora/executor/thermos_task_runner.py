@@ -3,14 +3,12 @@ import getpass
 import os
 import signal
 import subprocess
-import tempfile
 import threading
 import time
 
 from twitter.aurora.common.http_signaler import HttpSignaler
-from twitter.common import app, log
-from twitter.common.concurrent import deadline, Timeout
-from twitter.common.dirutil import chmod_plus_x
+from twitter.common import log
+from twitter.common.dirutil import chmod_plus_x, safe_mkdtemp
 from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
 from twitter.thermos.common.path import TaskPath
@@ -20,17 +18,16 @@ from twitter.thermos.monitoring.monitor import TaskMonitor
 
 from gen.twitter.thermos.ttypes import TaskState
 
-from .common.status_checker import ExitState, StatusChecker, StatusResult
-
-
-app.add_option("--checkpoint_root", dest="checkpoint_root", metavar="PATH",
-               default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
-               help="the path where we will store workflow logs and checkpoints")
-
-
-class TaskRunner(StatusChecker):
-  # For now, TaskRunner should just maintain the StatusChecker API.
-  pass
+from .common.status_checker import ExitState, StatusResult
+from .common.task_info import (
+    mesos_task_instance_from_assigned_task,
+    resolve_ports,
+)
+from .common.task_runner import (
+    TaskError,
+    TaskRunner,
+    TaskRunnerProvider,
+)
 
 
 class ThermosTaskRunner(TaskRunner):
@@ -42,52 +39,48 @@ class ThermosTaskRunner(TaskRunner):
       TaskState.LOST: StatusResult('Task lost.', ExitState.LOST),
       TaskState.SUCCESS: StatusResult('Task finished.', ExitState.FINISHED),
   }
-  SYNC_WAIT = Amount(10, Time.SECONDS)
   MAX_WAIT = Amount(1, Time.MINUTES)
   PEX_NAME = 'thermos_runner.pex'
   POLL_INTERVAL = Amount(500, Time.MILLISECONDS)
   THERMOS_PREEMPTION_WAIT = Amount(1, Time.MINUTES)
 
-  class Error(Exception): pass
-  class TaskError(Error): pass
-
-  @classmethod
-  def from_assigned_task(cls, assigned_task, sandbox):
-    pass
-
   def __init__(self,
+               runner_pex,
                task_id,
-               mesos_task,
+               task,
                role,
-               mesos_ports,
+               portmap,
                sandbox,
                checkpoint_root=None,
                artifact_dir=None,
                clock=time):
     """
+      runner_pex       location of the thermos_runner pex that this task runner should use
       task_id          task_id assigned by scheduler
-      mesos_task       twitter.aurora.config.schema.MesosTaskInstance object
+      task             thermos pystachio Task object
       role             role to run the task under
-      mesos_ports      { name => port } dictionary
+      portmap          { name => port } dictionary
       sandbox          the sandbox object
       checkpoint_root  the checkpoint root for the thermos runner
       artifact_dir     scratch space for the thermos runner (basically cwd of thermos.pex)
       clock            clock
     """
+    self._runner_pex = runner_pex
+    self._task_id = task_id
+    self._task = task
     self._popen = None
     self._monitor = None
-    self._dead = threading.Event()
-    self._task_id = task_id
-    self._mesos_task = mesos_task
-    self._task = mesos_task.task()
     self._status = None
-    self._ports = mesos_ports
+    self._ports = portmap
     self._root = sandbox.root
-    self._checkpoint_root = checkpoint_root or app.get_options().checkpoint_root
+    self._checkpoint_root = checkpoint_root or TaskPath.DEFAULT_CHECKPOINT_ROOT
     self._enable_chroot = sandbox.chrooted
     self._role = role
     self._clock = clock
-    self._artifact_dir = artifact_dir or tempfile.mkdtemp()
+    self._artifact_dir = artifact_dir or safe_mkdtemp()
+
+    # wait events
+    self._dead = threading.Event()
     self._kill_signal = threading.Event()
     self.forking = threading.Event()
     self.forked = threading.Event()
@@ -97,16 +90,13 @@ class ThermosTaskRunner(TaskRunner):
         self._task_filename = fp.name
         ThermosTaskWrapper(self._task).to_file(self._task_filename)
     except ThermosTaskWrapper.InvalidTask as e:
-      raise self.TaskError('Failed to load task: %s' % e)
+      raise TaskError('Failed to load task: %s' % e)
 
   def _terminate_http(self):
     if 'health' not in self._ports:
       return
 
-    health_check_config = self._mesos_task.health_check_config().get()
-    http_signaler = HttpSignaler(
-      self._ports['health'],
-      timeout_secs=health_check_config.get('timeout_secs'))
+    http_signaler = HttpSignaler(self._ports['health'])
 
     # pass 1
     http_signaler.quitquitquit()
@@ -123,10 +113,6 @@ class ThermosTaskRunner(TaskRunner):
   @property
   def artifact_dir(self):
     return self._artifact_dir
-
-  @property
-  def runner_pex(self):
-    return self.PEX_NAME
 
   def task_state(self):
     return self._monitor.task_state() if self._monitor else None
@@ -216,7 +202,7 @@ class ThermosTaskRunner(TaskRunner):
     if getpass.getuser() == 'root':
       params.update(setuid=self._role)
 
-    cmdline_args = [self.runner_pex]
+    cmdline_args = [self._runner_pex]
     cmdline_args.extend('--%s=%s' % (flag, value) for flag, value in params.items())
     if self._enable_chroot:
       cmdline_args.extend(['--enable_chroot'])
@@ -225,12 +211,15 @@ class ThermosTaskRunner(TaskRunner):
     return cmdline_args
 
   # --- public interface
-
   def start(self, timeout=MAX_WAIT):
     """Fork the task runner and return once the underlying task is running, up to timeout."""
     self.forking.set()
 
-    chmod_plus_x(self.runner_pex)
+    try:
+      chmod_plus_x(self._runner_pex)
+    except OSError as e:
+      if e.errno != errno.EPERM:
+        raise TaskError('Failed to chmod +x runner: %s' % e)
 
     self._monitor = TaskMonitor(TaskPath(root=self._checkpoint_root), self._task_id)
 
@@ -240,7 +229,7 @@ class ThermosTaskRunner(TaskRunner):
     try:
       self._popen = subprocess.Popen(cmdline_args)
     except OSError as e:
-      raise self.TaskError(e)
+      raise TaskError(e)
 
     self.forked.set()
 
@@ -258,14 +247,14 @@ class ThermosTaskRunner(TaskRunner):
     if not is_started():
       log.error('Task did not start with in deadline, forcing loss.')
       self.lose()
-      raise self.TaskError('Task did not start within deadline.')
+      raise TaskError('Task did not start within deadline.')
 
   def stop(self, timeout=MAX_WAIT):
     """Stop the runner.  If it's already completed, no-op.  If it's still running, issue a kill."""
     log.info('ThermosTaskRunner is shutting down.')
 
     if not self.forking.is_set():
-      raise self.TaskError('Failed to call TaskRunner.start.')
+      raise TaskError('Failed to call TaskRunner.start.')
 
     log.info('Invoking runner HTTP teardown.')
     self._terminate_http()
@@ -289,7 +278,7 @@ class ThermosTaskRunner(TaskRunner):
       waited += self.POLL_INTERVAL
 
     if not self._monitor.finished:
-      raise self.TaskError('Task did not stop within deadline.')
+      raise TaskError('Task did not stop within deadline.')
 
   @property
   def status(self):
@@ -298,3 +287,45 @@ class ThermosTaskRunner(TaskRunner):
     if self._status is None:
       self._status = self.compute_status()
     return self._status
+
+
+class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
+  def __init__(self,
+               pex_location,
+               checkpoint_root=None,
+               artifact_dir=None,
+               task_runner_class=ThermosTaskRunner,
+               max_wait=Amount(1, Time.MINUTES),
+               preemption_wait=Amount(1, Time.MINUTES),
+               poll_interval=Amount(500, Time.MILLISECONDS),
+               clock=time):
+    self._artifact_dir = artifact_dir or safe_mkdtemp()
+    self._checkpoint_root = checkpoint_root
+    self._clock = clock
+    self._max_wait = max_wait
+    self._pex_location = pex_location
+    self._poll_interval = poll_interval
+    self._preemption_wait = preemption_wait
+    self._task_runner_class = task_runner_class
+
+  def from_assigned_task(self, assigned_task, sandbox):
+    task_id = assigned_task.taskId
+    role = assigned_task.task.owner.role
+    mesos_task = mesos_task_instance_from_assigned_task(assigned_task)
+    mesos_ports = resolve_ports(mesos_task, assigned_task.assignedPorts)
+
+    class ProvidedThermosTaskRunner(self._task_runner_class):
+      MAX_WAIT = self._max_wait
+      POLL_INTERVAL = self._poll_interval
+      THERMOS_PREEMPTION_WAIT = self._preemption_wait
+
+    return ProvidedThermosTaskRunner(
+        self._pex_location,
+        task_id,
+        mesos_task.task(),
+        role,
+        mesos_ports,
+        sandbox,
+        checkpoint_root=self._checkpoint_root,
+        artifact_dir=self._artifact_dir,
+        clock=self._clock)

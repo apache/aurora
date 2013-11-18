@@ -20,13 +20,17 @@ from .common.task_info import (
     mesos_task_instance_from_assigned_task,
     resolve_ports,
 )
+from .common.task_runner import (
+    TaskError,
+    TaskRunner,
+    TaskRunnerProvider,
+)
 from .common_internal.discovery_manager import DiscoveryManager
 from .common_internal.resource_checkpoints import ResourceCheckpointer
 from .common_internal.resource_manager import ResourceManager
 from .executor_base import ThermosExecutorBase
 from .executor_detector import ExecutorDetector
 from .status_manager import StatusManager
-from .thermos_task_runner import TaskRunner
 
 import mesos_pb2 as mesos_pb
 
@@ -49,20 +53,21 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
   STOP_WAIT = Amount(5, Time.SECONDS)
 
   def __init__(self,
-               runner_class,
-               manager_class=StatusManager,
+               runner_provider,
+               status_manager_class=StatusManager,
                sandbox_provider=DefaultSandboxProvider,
                clock=time):
 
     ThermosExecutorBase.__init__(self)
-    if not issubclass(runner_class, TaskRunner):
-      raise TypeError('runner_class must be a TaskRunner subclass, got %s' % runner_class)
+    if not isinstance(runner_provider, TaskRunnerProvider):
+      raise TypeError('runner_provider must be a TaskRunnerProvider, got %s' %
+          type(runner_provider))
     self._runner = None
+    self._runner_provider = runner_provider
     self._clock = clock
     self._task_id = None
     self._status_manager = None
-    self._runner_class = runner_class
-    self._manager_class = manager_class
+    self._status_manager_class = status_manager_class
     self._sandbox = None
     self._sandbox_provider = sandbox_provider()
     self._kill_manager = KillManager()
@@ -104,14 +109,13 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
     # start the process on a separate thread and give the message processing thread back
     # to the driver
     try:
-      self._runner = self._runner_class(
-          self._task_id,
-          mesos_task,
-          mesos_task.role().get(),
-          portmap,
-          self._sandbox)
-    except self._runner_class.TaskError as e:
+      self._runner = self._runner_provider.from_assigned_task(assigned_task, self._sandbox)
+    except TaskError as e:
       self._die(driver, mesos_pb.TASK_FAILED, str(e))
+      return
+
+    if not isinstance(self._runner, TaskRunner):
+      self._die(driver, mesos_pb.TASK_FAILED, 'Unrecognized task!')
       return
 
     if not self._start_runner(driver, assigned_task, mesos_task, portmap):
@@ -142,7 +146,7 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
 
     try:
       deadline(self._runner.start, timeout=self.START_TIMEOUT, propagate=True)
-    except self._runner.TaskError as e:
+    except TaskError as e:
       self._die(driver, mesos_pb.TASK_FAILED, 'Task initialization failed: %s' % e)
       return False
     except Timeout:
@@ -195,7 +199,8 @@ class ThermosExecutor(Observable, ThermosExecutorBase):
 
     # chain the runner to the other checkers, but do not chain .start()/.stop()
     complete_checker = ChainedStatusChecker([self._runner, self._chained_checker])
-    self._status_manager = self._manager_class(complete_checker, self._shutdown, clock=self._clock)
+    self._status_manager = self._status_manager_class(
+        complete_checker, self._shutdown, clock=self._clock)
     self._status_manager.start()
 
   def _signal_kill_manager(self, driver, task_id, reason):

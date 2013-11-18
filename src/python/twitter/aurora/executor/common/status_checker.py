@@ -1,4 +1,4 @@
-from abc import abstractproperty
+from abc import abstractmethod, abstractproperty
 
 from twitter.common import log
 from twitter.common.lang import Interface
@@ -64,6 +64,12 @@ class StatusChecker(Observable, Interface):
 
   def stop(self):
     """Invoked once a non-None status has been reported."""
+    pass
+
+
+class StatusCheckerProvider(Interface):
+  @abstractmethod
+  def from_assigned_task(self, assigned_task):
     pass
 
 

@@ -9,6 +9,15 @@ python_library(
 )
 
 python_library(
+  name = 'task_runner',
+  sources = ['task_runner.py'],
+  dependencies = [
+    pants(':status_checker'),
+    pants('src/python/twitter/common/lang'),
+  ]
+)
+
+python_library(
   name = 'health_checker',
   sources = ['health_checker.py'],
   dependencies = [
