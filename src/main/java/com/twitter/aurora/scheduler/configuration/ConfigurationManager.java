@@ -44,8 +44,6 @@ import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConstraint;
 import com.twitter.aurora.scheduler.storage.entities.IValueConstraint;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 
@@ -64,10 +62,6 @@ public final class ConfigurationManager {
 
   @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
   @VisibleForTesting public static final String RACK_CONSTRAINT = "rack";
-
-  @CmdLine(name = "require_contact_email",
-      help = "If true, reject jobs that do not specify a contact email address.")
-  public static final Arg<Boolean> REQUIRE_CONTACT_EMAIL = Arg.create(true);
 
   private static final Pattern GOOD_IDENTIFIER = Pattern.compile(GOOD_IDENTIFIER_PATTERN_JVM);
 
@@ -315,13 +309,6 @@ public final class ConfigurationManager {
     if (!isGoodIdentifier(config.getJobName())) {
       throw new TaskDescriptionException(
           "Job name contains illegal characters: " + config.getJobName());
-    }
-
-    if (REQUIRE_CONTACT_EMAIL.get()
-        && (!config.isSetContactEmail()
-        || !config.getContactEmail().matches("[^@]+@twitter.com"))) {
-      throw new TaskDescriptionException(
-          "A valid twitter.com contact email address is required.");
     }
 
     if (!isGoodIdentifier(config.getEnvironment())) {
