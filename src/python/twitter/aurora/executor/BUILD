@@ -77,17 +77,15 @@ python_library(
   ]
 )
 
-python_binary(
+python_library(
   name = 'thermos_runner',
-  source = 'thermos_runner.py',
+  sources = ['thermos_runner.py'],
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/thermos/common:planner'),
     pants('aurora/twitterdeps/src/python/twitter/thermos/config:schema'),
     pants('aurora/twitterdeps/src/python/twitter/thermos/core'),
-    pants('src/python/twitter/common/app/modules:exceptions'),
-    pants('src/python/twitter/common_internal/app/modules:chickadee_handler'),
   ],
 )
 

@@ -32,3 +32,14 @@ python_binary(
     pants('src/python/twitter/aurora/executor:gc_executor'),
   ]
 )
+
+python_binary(
+  name = 'thermos_runner',
+  source = 'thermos_runner_main.py',
+  entry_point = 'twitter.aurora.executor.bin.thermos_runner_main:proxy_main',
+  dependencies = [
+    pants('aurora/twitterdeps/src/python/twitter/common/app'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('src/python/twitter/aurora/executor:thermos_runner'),
+  ],
+)
