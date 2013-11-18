@@ -35,8 +35,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
   QUERY_STATUSES = frozenset([ScheduleStatus.PENDING, ScheduleStatus.STARTING,
       ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.ASSIGNED,
-      ScheduleStatus.RESTARTING, ScheduleStatus.PREEMPTING, ScheduleStatus.UPDATING,
-      ScheduleStatus.ROLLBACK])
+      ScheduleStatus.RESTARTING, ScheduleStatus.PREEMPTING])
 
   @classmethod
   def setup_mock_options(cls):

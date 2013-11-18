@@ -28,16 +28,6 @@ struct SaveAcceptedJob {
   2: api.JobConfiguration jobConfig
 }
 
-struct SaveJobUpdate {
-  5: api.JobKey jobKey
-  3: string updateToken
-  4: set<api.TaskUpdateConfiguration> configs
-}
-
-struct RemoveJobUpdate {
-  3: api.JobKey jobKey
-}
-
 struct SaveLock {
   1: api.Lock lock
 }
@@ -79,8 +69,6 @@ struct SaveHostAttributes {
 union Op {
   1: SaveFrameworkId saveFrameworkId
   2: SaveAcceptedJob saveAcceptedJob
-  3: SaveJobUpdate saveJobUpdate
-  4: RemoveJobUpdate removeJobUpdate
   5: RemoveJob removeJob
   6: SaveTasks saveTasks
   7: RemoveTasks removeTasks
@@ -139,7 +127,6 @@ struct Snapshot {
   4: set<api.ScheduledTask> tasks
   5: set<StoredJob> jobs
   6: SchedulerMetadata schedulerMetadata
-  7: set<api.JobUpdateConfiguration> updateConfigurations
   8: set<QuotaConfiguration> quotaConfigurations
   9: set<api.Lock> locks
 }

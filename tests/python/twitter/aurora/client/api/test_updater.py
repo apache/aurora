@@ -28,10 +28,8 @@ from gen.twitter.aurora.ttypes import (
   Result,
   ScheduleStatusResult,
   ScheduledTask,
-  ShardUpdateResult,
   TaskConfig,
   TaskQuery,
-  UpdateResult,
 )
 
 from mox import MockObject, Replay, Verify

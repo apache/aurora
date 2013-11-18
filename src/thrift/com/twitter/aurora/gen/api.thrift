@@ -215,38 +215,6 @@ struct PopulateJobResult {
   1: set<TaskConfig> populated
 }
 
-struct StartUpdateResult {
-  // A unique token to identify the update session.  Must be provided for any subsequent calls to
-  // update-related functions.
-  1: optional string updateToken
-
-  // If false, indicates that the update was complete and no additional calls are required for this
-  // update.
-  // If true, the update is staged and may proceed with subsequent calls to updateShards,
-  // rollbackShards, and finishUpdate.
-  2: bool rollingUpdateRequired
-}
-
-enum ShardUpdateResult {
-  ADDED      = 0,  // A task for the shard was created.
-  RESTARTING = 1,  // The task is beginning an update or rollback and is restarting.
-  UNCHANGED  = 2   // The task was unchanged and no action was necessary.
-}
-
-struct UpdateShardsResult {
-  1: optional map<i32, ShardUpdateResult> shards
-}
-
-enum UpdateResult {
-  SUCCESS   = 0,
-  FAILED    = 1,
-  TERMINATE = 2
-}
-
-struct RollbackShardsResult {
-  1: optional map<i32, ShardUpdateResult> shards
-}
-
 struct GetQuotaResult {
   1: Quota quota
 }
@@ -276,10 +244,6 @@ enum ScheduleStatus {
   PREEMPTING       = 13,
   // The task is being restarted in response to a user request.
   RESTARTING       = 12,
-  // The task is being updated in response to a user request.
-  UPDATING         = 14,
-  // The task is rolling back as part of an update.
-  ROLLBACK         = 15,
   // The task terminated with a non-zero exit code.
   FAILED           = 4,
   // Execution of the task was terminated by the system.
@@ -301,16 +265,12 @@ const set<ScheduleStatus> ACTIVE_STATES = [ScheduleStatus.PENDING,
                                            ScheduleStatus.RUNNING,
                                            ScheduleStatus.KILLING,
                                            ScheduleStatus.RESTARTING,
-                                           ScheduleStatus.UPDATING,
-                                           ScheduleStatus.ROLLBACK,
                                            ScheduleStatus.PREEMPTING]
 
 // States that a task may be in while in an active sandbox.
 const set<ScheduleStatus> LIVE_STATES = [ScheduleStatus.RUNNING,
                                          ScheduleStatus.KILLING,
                                          ScheduleStatus.RESTARTING,
-                                         ScheduleStatus.UPDATING,
-                                         ScheduleStatus.ROLLBACK,
                                          ScheduleStatus.PREEMPTING]
 
 // States a completed task may be in.
@@ -370,21 +330,6 @@ struct ScheduledTask {
                                  // and ancestor ID of the previous task's task ID.
 }
 
-// Configuration for an update to a single shard in a job.
-struct TaskUpdateConfiguration {
-  1: TaskConfig oldConfig  // Task configuration before the update, may be null
-                           // if the job is adding shards.
-  2: TaskConfig newConfig  // Task configuration after the update, may be null
-                           // if the job is removing shards.
-}
-
-// Configuration for an update to an entire job.
-struct JobUpdateConfiguration {
-  5: JobKey jobKey
-  3: string updateToken
-  4: set<TaskUpdateConfiguration> configs
-}
-
 struct ScheduleStatusResult {
   1: list<ScheduledTask> tasks
 }
@@ -438,10 +383,6 @@ struct EndMaintenanceResult {
   1: set<HostStatus> statuses
 }
 
-struct GetJobUpdatesResult {
-  1: set<JobUpdateConfiguration> jobUpdates
-}
-
 // Specifies validation level for the populateJobConfig.
 enum JobConfigValidation {
   NONE              = 0   // No additional job config validation would be performed (only parsing).
@@ -450,7 +391,6 @@ enum JobConfigValidation {
 
 union Result {
   1: PopulateJobResult populateJobResult
-  2: StartUpdateResult startUpdateResult
   3: ScheduleStatusResult scheduleStatusResult
   4: GetJobsResult getJobsResult
   5: GetQuotaResult getQuotaResult
@@ -460,9 +400,6 @@ union Result {
   9: QueryRecoveryResult queryRecoveryResult
   10: MaintenanceStatusResult maintenanceStatusResult
   11: EndMaintenanceResult endMaintenanceResult
-  12: GetJobUpdatesResult getJobUpdatesResult
-  13: UpdateShardsResult updateShardsResult
-  14: RollbackShardsResult rollbackShardsResult
   15: APIVersion getVersionResult
   16: AcquireLockResult acquireLockResult
 }
@@ -489,34 +426,6 @@ service AuroraSchedulerManager {
   // Starts a cron job immediately.  The request will be denied if the specified job does not
   // exist for the role account, or the job is not a cron job.
   Response startCronJob(4: JobKey job, 3: SessionKey session)
-
-  // Starts a new update.
-  Response startUpdate(1: JobConfiguration updatedConfig, 2: SessionKey session)
-
-  // Sends a request to update the set of shards specified.
-  // A call to startUpdate must be successfully completed before a call can be made to updateShards.
-  // The updateToken must be the one received from startUpdate.
-  Response updateShards(
-      6: JobKey job,
-      3: set<i32> shardIds,
-      4: string updateToken,
-      5: SessionKey session)
-
-  // Sends a request to rollback the shards that failed to update.
-  // Update must be a failure before a call can be made to rollbackShards.
-  // The updateToken must be the one received from startUpdate.
-  Response rollbackShards(
-      6: JobKey job,
-      3: set<i32> shardIds,
-      4: string updateToken,
-      5: SessionKey session)
-
-  // Completes the update process, indicating to the scheduler the result of the update.
-  Response finishUpdate(
-      6: JobKey job,
-      3: UpdateResult updateResult,
-      4: string updateToken,
-      5: SessionKey session)
 
   // Restarts a batch of shards.
   Response restartShards(5: JobKey job, 3: set<i32> shardIds, 6: Lock lock 4: SessionKey session)
@@ -622,9 +531,6 @@ service AuroraAdmin extends AuroraSchedulerManager {
 
   // Set the given hosts back into serving mode.
   Response endMaintenance(1: Hosts hosts, 2: SessionKey session)
-
-  // Retrieves all in-flight user job updates.
-  Response getJobUpdates(1: SessionKey session)
 
   // Start a storage snapshot and block until it completes.
   Response snapshot(1: SessionKey session)

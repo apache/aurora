@@ -107,7 +107,7 @@ class TestRunCommand(AuroraClientCommandTest):
       mock_scheduler.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll'),
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING, ScheduleStatus.UPDATING, ScheduleStatus.ROLLBACK])))
+              ScheduleStatus.PREEMPTING])))
 
       # The mock status call returns 3 three ScheduledTasks, so three commands should have been run
       assert mock_subprocess.call_count == 3

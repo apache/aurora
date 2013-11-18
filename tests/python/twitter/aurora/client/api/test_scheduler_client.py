@@ -89,35 +89,6 @@ class TestSchedulerProxyInjection(unittest.TestCase):
 
     self.make_scheduler_proxy().populateJobConfig(JobConfiguration())
 
-  def test_startUpdate(self):
-    self.mock_thrift_client.startUpdate(IsA(JobConfiguration), IsA(SessionKey))
-
-    self.mox.ReplayAll()
-
-    self.make_scheduler_proxy().startUpdate(JobConfiguration())
-
-  def test_updateShards(self):
-    self.mock_thrift_client.updateShards(IsA(JobKey), IgnoreArg(), IgnoreArg(), IsA(SessionKey))
-
-    self.mox.ReplayAll()
-
-    self.make_scheduler_proxy().updateShards(JOB_KEY, set([0]), 'tok')
-
-  def test_rollbackShards(self):
-    self.mock_thrift_client.rollbackShards(IsA(JobKey), IgnoreArg(), IgnoreArg(), IsA(SessionKey))
-
-    self.mox.ReplayAll()
-
-    self.make_scheduler_proxy().rollbackShards(JOB_KEY, set([0]), 'tok')
-
-  def test_finishUpdate(self):
-    self.mock_thrift_client.finishUpdate(
-        IsA(JobKey), IsA(UpdateResult), IgnoreArg(), IsA(SessionKey))
-
-    self.mox.ReplayAll()
-
-    self.make_scheduler_proxy().finishUpdate(JOB_KEY, UpdateResult(), 'tok')
-
   def test_restartShards(self):
     self.mock_thrift_client.restartShards(IsA(JobKey), IgnoreArg(), IsA(SessionKey))
 
@@ -273,13 +244,6 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mox.ReplayAll()
 
     self.make_scheduler_proxy().unloadRecovery()
-
-  def test_getJobUpdates(self):
-    self.mock_thrift_client.getJobUpdates(IsA(SessionKey))
-
-    self.mox.ReplayAll()
-
-    self.make_scheduler_proxy().getJobUpdates()
 
   def test_snapshot(self):
     self.mock_thrift_client.snapshot(IsA(SessionKey))

@@ -14,9 +14,7 @@ from gen.twitter.aurora.ttypes import (
     LockValidation,
     Response,
     ResponseCode,
-    ShardUpdateResult,
     TaskQuery,
-    UpdateResult,
 )
 from .updater_util import FailureThreshold, UpdaterConfig
 from .instance_watcher import InstanceWatcher

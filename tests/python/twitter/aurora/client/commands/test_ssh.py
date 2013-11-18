@@ -98,7 +98,7 @@ class TestSshCommand(AuroraClientCommandTest):
       mock_scheduler.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll'), instanceIds=set([1]),
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING, ScheduleStatus.UPDATING, ScheduleStatus.ROLLBACK])))
+              ScheduleStatus.PREEMPTING])))
       mock_subprocess.assert_called_with(['ssh', '-t', 'mchucarroll@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])
