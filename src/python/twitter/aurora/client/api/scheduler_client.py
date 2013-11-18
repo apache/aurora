@@ -2,21 +2,19 @@ import functools
 import threading
 import time
 
+from twitter.aurora.common.auth import make_session_key, SessionKeyError
+from twitter.aurora.common.cluster import Cluster
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
 from twitter.common.rpc.transports.tsslsocket import DelayedHandshakeTSSLSocket
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset import ServerSet
 
-from twitter.aurora.common.auth import make_session_key, SessionKeyError
-from twitter.aurora.common.cluster import Cluster
-
 from gen.twitter.aurora import AuroraAdmin
 from gen.twitter.aurora.constants import CURRENT_API_VERSION
 
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
-
 from pystachio import Boolean, Default, Integer, String
 
 
