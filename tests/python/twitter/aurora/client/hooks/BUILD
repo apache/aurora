@@ -2,7 +2,6 @@ python_test_suite(name = 'all',
   dependencies = [
     pants(':hooked_api'),
     pants(':non_hooked_api'),
-    pants('tests/python/twitter/aurora/client/hooks/internal:all'),
   ],
 )
 

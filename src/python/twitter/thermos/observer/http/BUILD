@@ -26,8 +26,8 @@ python_library(
   sources = ['file_browser.py'],
   dependencies = [
     pants(':templating'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('src/python/twitter/common/http'),
-    pants('src/python/twitter/common/log'),
     pants('src/python/twitter/thermos:bottle'),
     pants('src/python/twitter/thermos:mako'),
   ]
@@ -41,7 +41,7 @@ python_library(
     pants(':json'),
     pants(':static_assets'),
     pants(':templating'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('src/python/twitter/common/http'),
-    pants('src/python/twitter/common/log'),
   ]
 )

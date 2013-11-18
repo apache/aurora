@@ -29,8 +29,8 @@ python_tests(
   sources = ['test_clusters.py'],
   dependencies = [
     pants('3rdparty/python:pyyaml'),
+    pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
     pants('src/python/twitter/aurora/common:clusters'),
-    pants('src/python/twitter/common/contextutil'),
   ]
 )
 
@@ -38,10 +38,10 @@ python_tests(
   name = 'test_cluster_option',
   sources = ['test_cluster_option.py'],
   dependencies = [
+    pants('aurora/twitterdeps/src/python/twitter/common/options'),
     pants('src/python/twitter/aurora/common:cluster'),
-    pants('src/python/twitter/aurora/common:clusters'),
     pants('src/python/twitter/aurora/common:cluster_option'),
-    pants('src/python/twitter/common/options'),
+    pants('src/python/twitter/aurora/common:clusters'),
   ]
 )
 

@@ -2,9 +2,9 @@ python_library(
   name = 'status_checker',
   sources = ['status_checker.py'],
   dependencies = [
-    pants('src/python/twitter/common/lang'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/metrics'),
+    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/metrics'),
   ]
 )
 
@@ -13,7 +13,7 @@ python_library(
   sources = ['task_runner.py'],
   dependencies = [
     pants(':status_checker'),
-    pants('src/python/twitter/common/lang'),
+    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
   ]
 )
 
@@ -23,8 +23,8 @@ python_library(
   dependencies = [
     pants(':status_checker'),
     pants(':task_info'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/exceptions'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
     pants('src/python/twitter/aurora/common:http_signaler'),
   ]
 )
@@ -33,9 +33,9 @@ python_library(
   name = 'executor_timeout',
   sources = ['executor_timeout.py'],
   dependencies = [
-    pants('src/python/twitter/common/exceptions'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/quantity'),
+    pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
   ]
 )
 
@@ -51,8 +51,8 @@ python_library(
   name = 'sandbox',
   sources = ['sandbox.py'],
   dependencies = [
-    pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/dirutil'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
   ]
 )
 
@@ -61,9 +61,9 @@ python_library(
   sources = ['task_info.py'],
   dependencies = [
     pants('3rdparty/python:pystachio'),
-    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('src/python/twitter/aurora/config'),
     pants('src/python/twitter/aurora/config/schema'),
-    pants('src/python/twitter/common/log'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

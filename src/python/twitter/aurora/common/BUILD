@@ -14,7 +14,7 @@ python_library(
   name = 'aurora_job_key',
   sources = ['aurora_job_key.py'],
   dependencies = [
-    pants('src/python/twitter/common/lang'),
+    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
@@ -33,7 +33,7 @@ python_library(
   dependencies = [
     pants(':cluster'),
     pants('3rdparty/python:pystachio'),
-    pants('src/python/twitter/common/collections'),
+    pants('aurora/twitterdeps/src/python/twitter/common/collections'),
   ]
 )
 
@@ -41,7 +41,7 @@ python_library(
   name = 'cluster_option',
   sources = ['cluster_option.py'],
   dependencies = [
-    pants('src/python/twitter/common/lang'),
+    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
   ]
 )
 
@@ -50,7 +50,7 @@ python_library(
   sources = ['http_signaler.py'],
   dependencies = [
     pants('3rdparty/python:socksipy-branch'),  # TODO(wickman) MESOS-3710
-    pants('src/python/twitter/common/lang'),
-    pants('src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
   ]
 )

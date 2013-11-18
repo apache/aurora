@@ -8,9 +8,9 @@ python_library(
   ),
   dependencies = [
     pants('3rdparty/python:pystachio'),
+    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
     pants('src/python/twitter/aurora/common'),
     pants('src/python/twitter/aurora/config/schema'),
-    pants('src/python/twitter/common/lang'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

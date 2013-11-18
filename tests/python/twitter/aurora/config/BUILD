@@ -10,16 +10,16 @@ python_test_suite(name = 'all',
 python_tests(name = 'test_base',
   sources = ['test_base.py'],
   dependencies = [
+    pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
     pants('src/python/twitter/aurora/config'),
-    pants('src/python/twitter/common/contextutil'),
   ]
 )
 
 python_tests(name = 'test_loader',
   sources = ['test_loader.py'],
   dependencies = [
+    pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
     pants('src/python/twitter/aurora/config'),
-    pants('src/python/twitter/common/contextutil'),
   ],
   coverage = [
     'twitter.aurora.config',

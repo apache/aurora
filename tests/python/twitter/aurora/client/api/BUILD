@@ -14,8 +14,8 @@ python_tests(
   sources = ['test_disambiguator.py'],
   dependencies = [
     pants('3rdparty/python:mox'),
+    pants('aurora/twitterdeps/src/python/twitter/common/app'),
     pants('src/python/twitter/aurora/client/api:disambiguator'),
-    pants('src/python/twitter/common/app'),
   ],
 )
 

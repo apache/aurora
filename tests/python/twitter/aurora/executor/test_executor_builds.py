@@ -14,19 +14,8 @@ def build_and_execute_pex_target(target, binary):
 def test_thermos_executor_build():
   build_and_execute_pex_target('src/python/twitter/aurora/executor/bin:thermos_executor',
                                'dist/thermos_executor.pex')
-  build_and_execute_pex_target('src/python/twitter/aurora/executor/bin_internal:thermos_executor',
-                               'dist/thermos_executor.pex')
+
 
 def test_gc_executor_build():
   build_and_execute_pex_target('src/python/twitter/aurora/executor/bin:gc_executor',
                                'dist/gc_executor.pex')
-  build_and_execute_pex_target('src/python/twitter/aurora/executor/bin_internal:gc_executor',
-                               'dist/gc_executor.pex')
-
-def test_angrybird_executor_build():
-  build_and_execute_pex_target('src/python/twitter/aurora/executor/bin_internal:angrybird_executor',
-                               'dist/angrybird_executor.pex')
-
-def test_angrybird_gc_executor_build():
-  build_and_execute_pex_target('src/python/twitter/aurora/executor/bin_internal:angrybird_gc_executor',
-                               'dist/angrybird_gc_executor.pex')

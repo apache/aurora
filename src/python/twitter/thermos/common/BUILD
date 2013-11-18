@@ -2,8 +2,8 @@ python_library(
   name = 'ckpt',
   sources = ['ckpt.py'],
   dependencies = [
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/recordio:recordio-thrift'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift')
   ]
 )

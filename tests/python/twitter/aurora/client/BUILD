@@ -3,10 +3,7 @@ python_test_suite(name = 'all',
     pants(':binding_helper'),
     pants(':config'),
     pants('tests/python/twitter/aurora/client/api:all'),
-    pants('tests/python/twitter/aurora/client/api_internal:all'),
-    pants('tests/python/twitter/aurora/client/binding_helpers:all'),
     pants('tests/python/twitter/aurora/client/commands:all'),
-    pants('tests/python/twitter/aurora/client/commands_internal:all'),
     pants('tests/python/twitter/aurora/client/hooks:all'),
   ],
 )
@@ -16,9 +13,9 @@ python_tests(
   sources = ['test_binding_helper.py'],
   dependencies = [
     pants('3rdparty/python:pystachio'),
+    pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
     pants('src/python/twitter/aurora/client:binding_helper'),
     pants('src/python/twitter/aurora/config'),
-    pants('src/python/twitter/common/contextutil'),
   ],
 )
 

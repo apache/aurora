@@ -2,8 +2,8 @@ python_library(
   name = 'auth',
   sources = globs('*.py'),
   dependencies = [
-    pants('src/python/twitter/common/lang'),
-    pants('src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

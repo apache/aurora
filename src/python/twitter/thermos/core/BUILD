@@ -3,10 +3,10 @@ python_library(
   sources = ['helper.py'],
   dependencies = [
     pants('src/python/twitter/thermos:psutil'),
-    pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/common/recordio:recordio-thrift'),
+    pants('aurora/twitterdeps/src/python/twitter/common/dirutil'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
+    pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
     pants('src/python/twitter/thermos/common:ckpt'),
     pants('src/python/twitter/thermos/common:path'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
@@ -18,7 +18,7 @@ python_library(
   sources = ['inspector.py'],
   dependencies = [
     pants(':muxer'),
-    pants('src/python/twitter/common/recordio:recordio-thrift'),
+    pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
     pants('src/python/twitter/thermos/common:ckpt'),
     pants('src/python/twitter/thermos/common:path'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
@@ -29,8 +29,8 @@ python_library(
   name = 'muxer',
   sources = ['muxer.py'],
   dependencies = [
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/recordio:recordio-thrift'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]
 )
@@ -39,11 +39,11 @@ python_library(
   name = 'process',
   sources = ['process.py'],
   dependencies = [
-    pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/common/lang'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/common/recordio:recordio-thrift'),
+    pants('aurora/twitterdeps/src/python/twitter/common/dirutil'),
+    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
+    pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
     pants('src/thrift/com/twitter/thermos:py-thrift'),
   ]
 )
@@ -55,10 +55,10 @@ python_library(
     pants(':helper'),
     pants(':muxer'),
     pants(':process'),
-    pants('src/python/twitter/common/dirutil'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/common/recordio:recordio-thrift'),
+    pants('aurora/twitterdeps/src/python/twitter/common/dirutil'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
+    pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
     pants('src/python/twitter/thermos:psutil'),
     pants('src/python/twitter/thermos/common:ckpt'),
     pants('src/python/twitter/thermos/common:path'),
