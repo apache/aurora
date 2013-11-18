@@ -6,7 +6,6 @@ python_library(
     pants('src/python/twitter/aurora/client:base'),
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/quantity'),
-    pants('src/python/twitter/servermaint:batching'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

@@ -2,8 +2,24 @@ python_library(
   name = 'all',
   dependencies = [
     pants(':core'),
+    pants(':help'),
     pants(':run'),
     pants(':ssh'),
+  ]
+)
+
+python_library(
+  name = 'admin',
+  sources = ['admin.py'],
+  dependencies = [
+    pants('src/python/twitter/aurora/admin:mesos_maintenance'),
+    pants('src/python/twitter/aurora/client/api'),
+    pants('src/python/twitter/aurora/client:base'),
+    pants('src/python/twitter/aurora/common:clusters'),
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/common/quantity'),
+    pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
 
@@ -25,6 +41,15 @@ python_library(
     pants('src/python/twitter/common/log'),
     pants('src/python/twitter/common/python'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
+  ]
+)
+
+python_library(
+  name = 'help',
+  sources = ['help.py'],
+  dependencies = [
+    pants('src/python/twitter/aurora/client:base'),
+    pants('src/python/twitter/common/app'),
   ]
 )
 

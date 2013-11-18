@@ -8,12 +8,14 @@ from twitter.common.log.options import LogOptions
 # composition.
 from twitter.aurora.client.commands import (
     core,
+    help,
     run,
     ssh,
 )
 from twitter.aurora.client.options import add_verbosity_options
 
 app.register_commands_from(core, run, ssh)
+app.register_commands_from(help)
 add_verbosity_options()
 
 

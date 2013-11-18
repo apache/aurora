@@ -63,7 +63,7 @@ class TestThermosTaskRunnerIntegration(object):
       sandbox = DirectorySandbox(td1)
       checkpoint_root = td2
 
-      task_runner = ThermosTaskRunner(
+      task_runner = runner_class(
           runner_pex=os.path.join('dist', 'thermos_runner.pex'),
           task_id='hello_world',
           task=TASK.bind(**bindings).task(),

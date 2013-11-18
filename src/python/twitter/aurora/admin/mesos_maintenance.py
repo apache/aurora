@@ -1,3 +1,4 @@
+from collections import defaultdict
 import time
 
 from twitter.common import log
@@ -5,9 +6,12 @@ from twitter.common.quantity import Amount, Time
 
 from twitter.aurora.client.api import AuroraClientAPI
 from twitter.aurora.client.base import check_and_log_response
-from twitter.servermaint.batching import Batching
 
 from gen.twitter.aurora.ttypes import Hosts, MaintenanceMode
+
+
+def group_by_host(hostname):
+  return hostname
 
 
 class MesosMaintenance(object):
@@ -15,7 +19,31 @@ class MesosMaintenance(object):
   maintenance.
   """
 
+  DEFAULT_GROUPING = 'by_host'
+  GROUPING_FUNCTIONS = {
+    'by_host': group_by_host,
+  }
   START_MAINTENANCE_DELAY = Amount(30, Time.SECONDS)
+
+  @classmethod
+  def group_hosts(cls, hostnames, grouping_function=DEFAULT_GROUPING):
+    try:
+      grouping_function = cls.GROUPING_FUNCTIONS[grouping_function]
+    except KeyError:
+      raise ValueError('Unknown grouping function %s!' % grouping_function)
+    groups = defaultdict(set)
+    for hostname in hostnames:
+      groups[grouping_function(hostname)].add(hostname)
+    return groups
+
+  @classmethod
+  def iter_batches(cls, hostnames, batch_size, grouping_function=DEFAULT_GROUPING):
+    if batch_size <= 0:
+      raise ValueError('Batch size must be > 0!')
+    groups = cls.group_hosts(hostnames, grouping_function)
+    groups = sorted(groups.items(), key=lambda v: v[0])
+    for k in range(0, len(groups), batch_size):
+      yield Hosts(set.union(*(hostset for (key, hostset) in groups[k:k+batch_size])))
 
   def __init__(self, cluster, verbosity):
     self._client = AuroraClientAPI(cluster, verbosity == 'verbose')
@@ -59,7 +87,8 @@ class MesosMaintenance(object):
     """Put a list of hosts into maintenance mode, to de-prioritize scheduling."""
     check_and_log_response(self._client.start_maintenance(Hosts(set(hosts))))
 
-  def perform_maintenance(self, hosts, batch_size=0, callback=None):
+  def perform_maintenance(self, hosts, batch_size=1, grouping_function=DEFAULT_GROUPING,
+                          callback=None):
     """The wrap a callback in between sending hosts into maintenance mode and back.
 
     Walk through the process of putting hosts into maintenance, draining them of tasks,
@@ -68,17 +97,12 @@ class MesosMaintenance(object):
     """
     self._complete_maintenance(Hosts(set(hosts)))
     self.start_maintenance(hosts)
-    batcher = Batching()
-    if batch_size > 0:
-      hosts = batcher.batch_hosts_by_size(hosts, batch_size)
-    else:
-      hosts = batcher.batch_hosts_by_rack(hosts)
-    for batch in hosts:
-      drainable_hosts = Hosts(set(batch))
-      self._drain_hosts(drainable_hosts)
+
+    for hosts in self.iter_batches(hosts, batch_size, grouping_function):
+      self._drain_hosts(hosts)
       if callback:
-        self._operate_on_hosts(drainable_hosts, callback)
-      self._complete_maintenance(drainable_hosts)
+        self._operate_on_hosts(hosts, callback)
+      self._complete_maintenance(hosts)
 
   def check_status(self, hosts):
     resp = self._client.maintenance_status(Hosts(set(hosts)))

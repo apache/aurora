@@ -1,6 +1,6 @@
-python_library(
-  name = 'aurora_client_source',
-  sources = ['aurora_client.py'],
+python_binary(
+  name = 'aurora_client',
+  source = 'aurora_client.py',
   dependencies = [
     pants('src/python/twitter/common/app'),
     pants('src/python/twitter/common/log'),
@@ -10,9 +10,14 @@ python_library(
 )
 
 python_binary(
-  name = 'aurora_client',
-  entry_point = 'twitter.aurora.client.bin.aurora_client',
+  name = 'aurora_admin',
+  source = 'aurora_admin.py',
   dependencies = [
-    pants(':aurora_client_source'),
+    pants('src/python/twitter/common/app'),
+    pants('src/python/twitter/common/log'),
+    pants('src/python/twitter/aurora/client:base'),
+    pants('src/python/twitter/aurora/client:options'),
+    pants('src/python/twitter/aurora/client/commands:admin'),
+    pants('src/python/twitter/aurora/client/commands:help'),
   ]
 )
