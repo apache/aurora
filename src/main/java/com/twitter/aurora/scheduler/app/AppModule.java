@@ -55,8 +55,14 @@ import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.ServerSetImpl;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.ZooKeeperClient;
+import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
+import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import com.twitter.thrift.ServiceInstance;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * Binding module for the aurora scheduler application.
@@ -66,10 +72,12 @@ class AppModule extends AbstractModule {
 
   private final String clusterName;
   private final String serverSetPath;
+  private final ClientConfig zkClientConfig;
 
-  AppModule(String clusterName, String serverSetPath) {
-    this.clusterName = clusterName;
-    this.serverSetPath = serverSetPath;
+  AppModule(String clusterName, String serverSetPath, ClientConfig zkClientConfig) {
+    this.clusterName = checkNotBlank(clusterName);
+    this.serverSetPath = checkNotBlank(serverSetPath);
+    this.zkClientConfig = checkNotNull(zkClientConfig);
   }
 
   @Override
@@ -138,12 +146,21 @@ class AppModule extends AbstractModule {
     }
   }
 
-  private static final List<ACL> ZOOKEEPER_ACL = ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL;
+  @Provides
+  @Singleton
+  List<ACL> provideAcls() {
+    if (zkClientConfig.credentials == Credentials.NONE) {
+      LOG.warning("Running without ZooKeeper digest credentials. ZooKeeper ACLs are disabled.");
+      return ZooKeeperUtils.OPEN_ACL_UNSAFE;
+    } else {
+      return ZooKeeperUtils.EVERYONE_READ_CREATOR_ALL;
+    }
+  }
 
   @Provides
   @Singleton
-  ServerSet provideServerSet(ZooKeeperClient client) {
-    return new ServerSetImpl(client, ZOOKEEPER_ACL, serverSetPath);
+  ServerSet provideServerSet(ZooKeeperClient client, List<ACL> zooKeeperAcls) {
+    return new ServerSetImpl(client, zooKeeperAcls, serverSetPath);
   }
 
   @Provides
@@ -155,9 +172,13 @@ class AppModule extends AbstractModule {
 
   @Provides
   @Singleton
-  SingletonService provideSingletonService(ZooKeeperClient client, ServerSet serverSet) {
+  SingletonService provideSingletonService(
+      ZooKeeperClient client,
+      ServerSet serverSet,
+      List<ACL> zookeeperAcls) {
+
     return new SingletonService(
         serverSet,
-        SingletonService.createSingletonCandidate(client, serverSetPath, ZOOKEEPER_ACL));
+        SingletonService.createSingletonCandidate(client, serverSetPath, zookeeperAcls));
   }
 }

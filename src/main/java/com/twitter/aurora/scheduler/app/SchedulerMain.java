@@ -194,11 +194,15 @@ public class SchedulerMain extends AbstractApplication {
         getFlaggedModule(QUOTA_MODULE, QUOTA_MODULE_CLASSES));
   }
 
-  static Iterable<? extends Module> getModules(String clusterName, String serverSetPath) {
+  static Iterable<? extends Module> getModules(
+      String clusterName,
+      String serverSetPath,
+      ClientConfig zkClientConfig) {
+
     return ImmutableList.<Module>builder()
         .addAll(getFlaggedModules())
         .addAll(getSystemModules())
-        .add(new AppModule(clusterName, serverSetPath))
+        .add(new AppModule(clusterName, serverSetPath, zkClientConfig))
         .add(new LogStorageModule())
         .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
         .add(new ThriftModule())
@@ -245,8 +249,8 @@ public class SchedulerMain extends AbstractApplication {
     };
 
     return ImmutableList.<Module>builder()
-        .addAll(getModules(CLUSTER_NAME.get(), SERVERSET_PATH.get()))
         .add(new BackupModule(SnapshotStoreImpl.class))
+        .addAll(getModules(CLUSTER_NAME.get(), SERVERSET_PATH.get(), zkClientConfig))
         .add(new ZooKeeperClientModule(zkClientConfig))
         .add(configModule)
         .add(additional)
