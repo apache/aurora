@@ -22,12 +22,12 @@ import javax.inject.Inject;
 import com.google.common.base.Optional;
 
 import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.scheduler.storage.LockStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
-import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.aurora.scheduler.storage.entities.ILock;
 import com.twitter.aurora.scheduler.storage.entities.ILockKey;
 import com.twitter.common.util.Clock;
@@ -56,8 +56,8 @@ class LockManagerImpl implements LockManager {
       @Override public ILock apply(Storage.MutableStoreProvider storeProvider)
           throws LockException {
 
-        UpdateStore.Mutable updateStore = storeProvider.getUpdateStore();
-        Optional<ILock> existingLock = updateStore.fetchLock(lockKey);
+        LockStore.Mutable lockStore = storeProvider.getLockStore();
+        Optional<ILock> existingLock = lockStore.fetchLock(lockKey);
 
         if (existingLock.isPresent()) {
           throw new LockException(String.format(
@@ -73,7 +73,7 @@ class LockManagerImpl implements LockManager {
             .setTimestampMs(clock.nowMillis())
             .setUser(user));
 
-        updateStore.saveLock(lock);
+        lockStore.saveLock(lock);
         return lock;
       }
     });
@@ -83,7 +83,7 @@ class LockManagerImpl implements LockManager {
   public void releaseLock(final ILock lock) {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getUpdateStore().removeLock(lock.getKey());
+        storeProvider.getLockStore().removeLock(lock.getKey());
       }
     });
   }
@@ -94,7 +94,7 @@ class LockManagerImpl implements LockManager {
 
     Optional<ILock> stored = storage.consistentRead(new Work.Quiet<Optional<ILock>>() {
       @Override public Optional<ILock> apply(StoreProvider storeProvider) {
-        return storeProvider.getUpdateStore().fetchLock(context);
+        return storeProvider.getLockStore().fetchLock(context);
       }
     });
 

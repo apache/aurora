@@ -27,7 +27,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
@@ -77,11 +76,9 @@ class TaskStateMachine {
   private static final State PENDING = State.create(ScheduleStatus.PENDING);
   private static final State PREEMPTING = State.create(ScheduleStatus.PREEMPTING);
   private static final State RESTARTING = State.create(ScheduleStatus.RESTARTING);
-  private static final State ROLLBACK = State.create(ScheduleStatus.ROLLBACK);
   private static final State RUNNING = State.create(ScheduleStatus.RUNNING);
   private static final State STARTING = State.create(ScheduleStatus.STARTING);
   private static final State UNKNOWN = State.create(ScheduleStatus.UNKNOWN);
-  private static final State UPDATING = State.create(ScheduleStatus.UPDATING);
 
   @VisibleForTesting
   static final Supplier<String> LOCAL_HOST_SUPPLIER = Suppliers.memoize(
@@ -184,7 +181,6 @@ class TaskStateMachine {
    *
    * @param taskId ID of the task managed by this state machine.
    * @param task Read-only task that this state machine manages.
-   * @param isJobUpdating Supplier to test whether the task's job is currently in a rolling update.
    * @param workSink Work sink to receive transition response actions
    * @param clock Clock to use for reading the current time.
    * @param initialState The state to begin the state machine at.  All legal transitions will be
@@ -194,7 +190,6 @@ class TaskStateMachine {
   public TaskStateMachine(
       final String taskId,
       final IScheduledTask task,
-      final Supplier<Boolean> isJobUpdating,
       final WorkSink workSink,
       final Clock clock,
       final ScheduleStatus initialState) {
@@ -212,14 +207,6 @@ class TaskStateMachine {
         /* Remove a terminated task that is remotely removed. */
         Closures.filter(Transition.to(UNKNOWN), addWorkClosure(WorkCommand.DELETE)));
 
-    final Command initiateUpdateSequence = new Command() {
-      @Override public void execute() throws IllegalStateException {
-        Preconditions.checkState(isJobUpdating.get(),
-            "No active update found for task " + taskId + ", which is trying to update/rollback.");
-        addWork(WorkCommand.KILL);
-      }
-    };
-
     final Closure<Transition<State>> manageRestartingTask = new Closure<Transition<State>>() {
       @SuppressWarnings("fallthrough")
       @Override public void execute(Transition<State> transition) {
@@ -228,11 +215,6 @@ class TaskStateMachine {
           case STARTING:
           case RUNNING:
             addWork(WorkCommand.KILL);
-            break;
-
-          case UPDATING:
-          case ROLLBACK:
-            initiateUpdateSequence.execute();
             break;
 
           case LOST:
@@ -290,22 +272,12 @@ class TaskStateMachine {
                 .to(PENDING, UNKNOWN))
         .addState(
             Rule.from(PENDING)
-                .to(ASSIGNED, UPDATING, ROLLBACK, KILLING)
+                .to(ASSIGNED, KILLING)
                 .withCallback(
                     new Closure<Transition<State>>() {
                       @Override public void execute(Transition<State> transition) {
                         switch (transition.getTo().getState()) {
                           case KILLING:
-                            addWork(WorkCommand.DELETE);
-                            break;
-
-                          case UPDATING:
-                            addWork(WorkCommand.UPDATE);
-                            addWork(WorkCommand.DELETE);
-                            break;
-
-                          case ROLLBACK:
-                            addWork(WorkCommand.ROLLBACK);
                             addWork(WorkCommand.DELETE);
                             break;
 
@@ -317,7 +289,7 @@ class TaskStateMachine {
                 ))
         .addState(
             Rule.from(ASSIGNED)
-                .to(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, UPDATING, ROLLBACK, KILLED,
+                .to(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, KILLED,
                     KILLING, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<State>>() {
@@ -338,11 +310,6 @@ class TaskStateMachine {
 
                           case RESTARTING:
                             addWork(WorkCommand.KILL);
-                            break;
-
-                          case UPDATING:
-                          case ROLLBACK:
-                            initiateUpdateSequence.execute();
                             break;
 
                           case KILLED:
@@ -367,8 +334,7 @@ class TaskStateMachine {
                 ))
         .addState(
             Rule.from(STARTING)
-                .to(RUNNING, FINISHED, FAILED, RESTARTING, UPDATING, KILLING, KILLED,
-                    ROLLBACK, LOST, PREEMPTING)
+                .to(RUNNING, FINISHED, FAILED, RESTARTING, KILLING, KILLED, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<State>>() {
                       @SuppressWarnings("fallthrough")
@@ -380,11 +346,6 @@ class TaskStateMachine {
 
                           case RESTARTING:
                             addWork(WorkCommand.KILL);
-                            break;
-
-                          case UPDATING:
-                          case ROLLBACK:
-                            initiateUpdateSequence.execute();
                             break;
 
                           case PREEMPTING:
@@ -421,8 +382,7 @@ class TaskStateMachine {
                 ))
         .addState(
             Rule.from(RUNNING)
-                .to(FINISHED, RESTARTING, UPDATING, FAILED, KILLING, KILLED, ROLLBACK,
-                    LOST, PREEMPTING)
+                .to(FINISHED, RESTARTING, FAILED, KILLING, KILLED, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<State>>() {
                       @SuppressWarnings("fallthrough")
@@ -438,11 +398,6 @@ class TaskStateMachine {
 
                           case RESTARTING:
                             addWork(WorkCommand.KILL);
-                            break;
-
-                          case UPDATING:
-                          case ROLLBACK:
-                            initiateUpdateSequence.execute();
                             break;
 
                           case FAILED:
@@ -481,16 +436,8 @@ class TaskStateMachine {
                 .withCallback(manageRestartingTask))
         .addState(
             Rule.from(RESTARTING)
-                .to(FINISHED, FAILED, UPDATING, ROLLBACK, KILLING, KILLED, LOST)
+                .to(FINISHED, FAILED, KILLING, KILLED, LOST)
                 .withCallback(manageRestartingTask))
-        .addState(
-            Rule.from(UPDATING)
-                .to(ROLLBACK, FINISHED, FAILED, KILLING, KILLED, LOST, UNKNOWN)
-                .withCallback(manageUpdatingTask(false)))
-        .addState(
-            Rule.from(ROLLBACK)
-                .to(UPDATING, FINISHED, FAILED, KILLING, KILLED, LOST)
-                .withCallback(manageUpdatingTask(true)))
         .addState(
             Rule.from(FAILED)
                 .to(UNKNOWN)
@@ -542,43 +489,6 @@ class TaskStateMachine {
         // (or for that matter, almost any user-initiated state transition) is awkward.
         .throwOnBadTransition(false)
         .build();
-  }
-
-  private Closure<Transition<State>> manageUpdatingTask(final boolean rollback) {
-    return new Closure<Transition<State>>() {
-      @SuppressWarnings("fallthrough")
-      @Override public void execute(Transition<State> transition) {
-        switch (transition.getTo().getState()) {
-          case ASSIGNED:
-          case STARTING:
-          case KILLING:
-          case UPDATING:
-          case ROLLBACK:
-          case RUNNING:
-            addWork(WorkCommand.KILL);
-            break;
-
-          case LOST:
-            addWork(WorkCommand.KILL);
-            // fall through
-          case FINISHED:
-          case FAILED:
-          case KILLED:
-            addWork(rollback ? WorkCommand.ROLLBACK : WorkCommand.UPDATE);
-            break;
-
-          case UNKNOWN:
-            // TODO(wfarner): DELETE isn't the best thing to do here, since we lose track of the
-            // task, but moving to LOST will cause it to be rescheduled.  Need to rethink.
-            addWork(WorkCommand.DELETE);
-            addWork(rollback ? WorkCommand.ROLLBACK : WorkCommand.UPDATE);
-            break;
-
-          default:
-            // No-op.
-        }
-      }
-    };
   }
 
   private Closure<Transition<State>> addWorkClosure(final WorkCommand work) {

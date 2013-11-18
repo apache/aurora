@@ -279,11 +279,9 @@ public class SchedulerzRole extends JerseyTemplateServlet {
                 case ASSIGNED:
                 case STARTING:
                 case RESTARTING:
-                case UPDATING:
                 case RUNNING:
                 case KILLING:
                 case PREEMPTING:
-                case ROLLBACK:
                   job.activeTaskCount++;
                   break;
 

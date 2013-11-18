@@ -16,13 +16,11 @@
 package com.twitter.aurora.scheduler.state;
 
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
@@ -33,10 +31,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -48,16 +42,10 @@ import com.google.common.util.concurrent.Atomics;
 import org.apache.mesos.Protos.SlaveID;
 
 import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.ShardUpdateResult;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskUpdateConfiguration;
-import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.TaskIdGenerator;
-import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
@@ -68,9 +56,7 @@ import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
-import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
@@ -81,14 +67,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
 
 import static com.twitter.aurora.gen.ScheduleStatus.INIT;
-import static com.twitter.aurora.gen.ScheduleStatus.KILLING;
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
-import static com.twitter.aurora.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.aurora.gen.ScheduleStatus.UNKNOWN;
-import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
-import static com.twitter.aurora.scheduler.base.TaskInstances.GET_NEW_CONFIG;
-import static com.twitter.aurora.scheduler.base.TaskInstances.GET_ORIGINAL_CONFIG;
-import static com.twitter.aurora.scheduler.base.Tasks.SCHEDULED_TO_INSTANCE_ID;
 import static com.twitter.aurora.scheduler.state.SideEffectStorage.OperationFinalizer;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
@@ -215,187 +195,6 @@ public class StateManagerImpl implements StateManager {
     });
   }
 
-  /**
-   * Thrown when an update fails.
-   */
-  static class UpdateException extends Exception {
-    public UpdateException(String msg) {
-      super(msg);
-    }
-  }
-
-  private static Function<ITaskConfig, ITaskConfig> includeDeprecatedInstance(final int id) {
-    return new Function<ITaskConfig, ITaskConfig>() {
-      @Override public ITaskConfig apply(ITaskConfig task) {
-        return ITaskConfig.build(task.newBuilder().setInstanceIdDEPRECATED(id));
-      }
-    };
-  }
-
-  private static final Function<IAssignedTask, ITaskConfig> TO_INFO_WITH_DEPRECATED_INSTANCE_ID =
-      new Function<IAssignedTask, ITaskConfig>() {
-        @Override public ITaskConfig apply(IAssignedTask task) {
-          return ITaskConfig.build(
-              task.getTask().newBuilder().setInstanceIdDEPRECATED(task.getInstanceId()));
-        }
-      };
-
-  /**
-   * Registers a new update.
-   *
-   * @param jobKey Job to register an update for.
-   * @param updatedTasks Updated Task information to be registered.
-   * @throws UpdateException If no active tasks are found for the job, or if an update for the job
-   *     is already in progress.
-   * @return A unique string identifying the update.
-   */
-  String registerUpdate(final IJobKey jobKey, final Map<Integer, ITaskConfig> updatedTasks)
-      throws UpdateException {
-
-    checkNotNull(jobKey);
-    checkNotBlank(updatedTasks.values());
-
-    return storage.write(storage.new SideEffectWork<String, UpdateException>() {
-      @Override public String apply(MutableStoreProvider storeProvider) throws UpdateException {
-        assertNotUpdatingOrRollingBack(jobKey, storeProvider.getTaskStore());
-
-        Set<IAssignedTask> existingTasks = ImmutableSet.copyOf(Iterables.transform(
-            storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()),
-            Tasks.SCHEDULED_TO_ASSIGNED));
-
-        if (existingTasks.isEmpty()) {
-          throw new UpdateException("No active tasks found for job " + JobKeys.toPath(jobKey));
-        }
-
-        UpdateStore.Mutable updateStore = storeProvider.getUpdateStore();
-        if (updateStore.fetchJobUpdateConfig(jobKey).isPresent()) {
-          throw new UpdateException("Update already in progress for " + jobKey);
-        }
-
-        Map<Integer, IAssignedTask> existingInstances = Maps.uniqueIndex(existingTasks,
-            Tasks.ASSIGNED_TO_INSTANCE_ID);
-
-        ImmutableSet.Builder<TaskUpdateConfiguration> shardConfigBuilder = ImmutableSet.builder();
-        for (int instance : Sets.union(existingInstances.keySet(), updatedTasks.keySet())) {
-          // It's important to include the deprecated instance ID here since that information is
-          // otherwise lost when storing a TaskUpdateConfiguration.  This will disappear once
-          // the update routine is fully-coordinated by the client.
-          shardConfigBuilder.add(
-              new TaskUpdateConfiguration(
-                  Optional.fromNullable(existingInstances.get(instance))
-                      .transform(Tasks.ASSIGNED_TO_INFO)
-                      .transform(includeDeprecatedInstance(instance))
-                      .transform(ITaskConfig.TO_BUILDER)
-                      .orNull(),
-                  Optional.fromNullable(updatedTasks.get(instance))
-                      .transform(includeDeprecatedInstance(instance))
-                      .transform(ITaskConfig.TO_BUILDER)
-                      .orNull()));
-        }
-
-        String updateToken = UUID.randomUUID().toString();
-        updateStore.saveJobUpdateConfig(
-            new JobUpdateConfiguration()
-                .setJobKey(jobKey.newBuilder())
-                .setUpdateToken(updateToken)
-                .setConfigs(shardConfigBuilder.build()));
-        return updateToken;
-      }
-    });
-  }
-
-  private static final Set<ScheduleStatus> UPDATE_IN_PROGRESS = EnumSet.of(UPDATING, ROLLBACK);
-  private static void assertNotUpdatingOrRollingBack(IJobKey jobKey, TaskStore taskStore)
-      throws UpdateException {
-
-    Query.Builder query = Query.jobScoped(jobKey).byStatus(UPDATE_IN_PROGRESS);
-    if (!taskStore.fetchTasks(query).isEmpty()) {
-      throw new UpdateException("Unable to proceed until UPDATING and ROLLBACK tasks complete.");
-    }
-  }
-
-  /**
-   * Completes an in-progress update.
-   *
-   * @param jobKey The job key.
-   * @param invokingUser User invoking the command for auditing purposes.
-   * @param updateToken Token associated with the update.  If present, the token must match the
-   *     the stored token for the update.
-   * @param result The result of the update.
-   * @param throwIfMissing If {@code true}, this throws UpdateException when the update is missing.
-   * @return {@code true} if the update was finished, false if nonexistent.
-   * @throws UpdateException If an update is not in-progress for the job, or the non-null token
-   *     does not match the stored token.
-   */
-  boolean finishUpdate(
-      final IJobKey jobKey,
-      final String invokingUser,
-      final Optional<String> updateToken,
-      final UpdateResult result,
-      final boolean throwIfMissing) throws UpdateException {
-
-    checkNotNull(jobKey);
-    checkNotBlank(invokingUser);
-
-    return storage.write(storage.new SideEffectWork<Boolean, UpdateException>() {
-      @Override public Boolean apply(MutableStoreProvider storeProvider) throws UpdateException {
-        assertNotUpdatingOrRollingBack(jobKey, storeProvider.getTaskStore());
-
-        UpdateStore.Mutable updateStore = storeProvider.getUpdateStore();
-
-        // Since we store all shards in a job with the same token, we can just check shard 0,
-        // which is always guaranteed to exist for a job.
-        Optional<JobUpdateConfiguration> jobConfig = updateStore.fetchJobUpdateConfig(jobKey);
-        if (!jobConfig.isPresent()) {
-          if (throwIfMissing) {
-            throw new UpdateException("Update does not exist for " + JobKeys.toPath(jobKey));
-          }
-          return false;
-        }
-
-        if (updateToken.isPresent()
-            && !updateToken.get().equals(jobConfig.get().getUpdateToken())) {
-          throw new UpdateException("Invalid update token for " + JobKeys.toPath(jobKey));
-        }
-
-        if (EnumSet.of(UpdateResult.SUCCESS, UpdateResult.FAILED).contains(result)) {
-          // Kill any shards that were removed during the update or rollback.
-          Function<TaskUpdateConfiguration, ITaskConfig> removedSelector =
-              (result == UpdateResult.SUCCESS) ? GET_NEW_CONFIG : GET_ORIGINAL_CONFIG;
-          for (Integer shard : fetchRemovedShards(jobConfig.get(), removedSelector)) {
-            changeState(
-                Query.instanceScoped(jobKey, shard).active(),
-                KILLING,
-                Optional.of("Removed during update by " + invokingUser));
-          }
-        }
-
-        updateStore.removeShardUpdateConfigs(jobKey);
-        return true;
-      }
-    });
-  }
-
-  private static final Function<TaskUpdateConfiguration, Integer> GET_INSTANCE_ID =
-      new Function<TaskUpdateConfiguration, Integer>() {
-        @Override public Integer apply(TaskUpdateConfiguration config) {
-          TaskConfig task = (config.getOldConfig() != null)
-              ? config.getOldConfig()
-              : config.getNewConfig();
-          return task.getInstanceIdDEPRECATED();
-        }
-      };
-
-  private Set<Integer> fetchRemovedShards(
-      JobUpdateConfiguration jobConfig,
-      Function<TaskUpdateConfiguration, ITaskConfig> configSelector) {
-
-    return FluentIterable.from(jobConfig.getConfigs())
-        .filter(Predicates.compose(Predicates.isNull(), configSelector))
-        .transform(GET_INSTANCE_ID)
-        .toSet();
-  }
-
   @Override
   public int changeState(
       Query.Builder query,
@@ -424,185 +223,6 @@ public class StateManagerImpl implements StateManager {
     changeState(Query.taskScoped(taskId), mutation);
 
     return mutation.getAssignedTask();
-  }
-
-  @VisibleForTesting
-  static void putResults(
-      ImmutableMap.Builder<Integer, ShardUpdateResult> builder,
-      ShardUpdateResult result,
-      Iterable<Integer> shardIds) {
-
-    for (int shardId : shardIds) {
-      builder.put(shardId, result);
-    }
-  }
-
-  private static final Predicate<IScheduledTask> NOT_UPDATING = new Predicate<IScheduledTask>() {
-    @Override public boolean apply(IScheduledTask task) {
-      return task.getStatus() != UPDATING && task.getStatus() != ROLLBACK;
-    }
-  };
-
-  private Set<Integer> getChangedShards(
-      Set<IScheduledTask> tasksWithoutInstanceId,
-      Set<ITaskConfig> compareToWithDeprecatedInstanceId) {
-
-    Set<ITaskConfig> existingTasks = FluentIterable.from(tasksWithoutInstanceId)
-        .transform(Tasks.SCHEDULED_TO_ASSIGNED)
-        .transform(TO_INFO_WITH_DEPRECATED_INSTANCE_ID)
-        .toSet();
-    Set<ITaskConfig> changedTasks =
-        Sets.difference(compareToWithDeprecatedInstanceId, existingTasks);
-    return FluentIterable.from(changedTasks)
-        .transform(Tasks.INFO_TO_INSTANCE_ID_DEPRECATED)
-        .toSet();
-  }
-
-  Map<Integer, ShardUpdateResult> modifyShards(
-      final IJobKey jobKey,
-      final String invokingUser,
-      final Set<Integer> shards,
-      final String updateToken,
-      boolean updating) throws UpdateException {
-
-    final Function<TaskUpdateConfiguration, ITaskConfig> configSelector = updating
-        ? GET_NEW_CONFIG
-        : GET_ORIGINAL_CONFIG;
-    final ScheduleStatus modifyingState;
-    final String auditMessage;
-    if (updating) {
-      modifyingState = UPDATING;
-      auditMessage = "Updated by " + invokingUser;
-    } else {
-      modifyingState = ROLLBACK;
-      auditMessage = "Rolled back by " + invokingUser;
-    }
-
-    return storage.write(
-        storage.new SideEffectWork<Map<Integer, ShardUpdateResult>, UpdateException>() {
-          @Override public Map<Integer, ShardUpdateResult> apply(MutableStoreProvider store)
-              throws UpdateException {
-
-            ImmutableMap.Builder<Integer, ShardUpdateResult> result = ImmutableMap.builder();
-
-            Optional<JobUpdateConfiguration> updateConfig =
-                store.getUpdateStore().fetchJobUpdateConfig(jobKey);
-            if (!updateConfig.isPresent()) {
-              throw new UpdateException("No active update found for " + JobKeys.toPath(jobKey));
-            }
-
-            if (!updateConfig.get().getUpdateToken().equals(updateToken)) {
-              throw new UpdateException("Invalid update token for " + jobKey);
-            }
-
-            Query.Builder query = Query.instanceScoped(jobKey, shards).active();
-            Set<IScheduledTask> tasks = store.getTaskStore().fetchTasks(query);
-
-            // Extract any shard IDs that are being added as a part of this stage in the update.
-            Set<Integer> newShardIds = Sets.difference(shards,
-                ImmutableSet.copyOf(Iterables.transform(tasks, SCHEDULED_TO_INSTANCE_ID)));
-
-            if (!newShardIds.isEmpty()) {
-              Set<ITaskConfig> newTasks = fetchTaskUpdateConfigs(
-                  updateConfig.get(),
-                  newShardIds,
-                  configSelector);
-              Set<Integer> unrecognizedShards = Sets.difference(
-                  newShardIds,
-                  ImmutableSet.copyOf(
-                      Iterables.transform(newTasks, Tasks.INFO_TO_INSTANCE_ID_DEPRECATED)));
-              if (!unrecognizedShards.isEmpty()) {
-                throw new UpdateException(
-                    "Cannot update unrecognized shards " + unrecognizedShards);
-              }
-
-              // Create new tasks, so they will be moved into the PENDING state.
-              insertPendingTasks(Maps.uniqueIndex(newTasks, Tasks.INFO_TO_INSTANCE_ID_DEPRECATED));
-              putResults(result, ShardUpdateResult.ADDED, newShardIds);
-            }
-
-            Set<Integer> updateShardIds = Sets.difference(shards, newShardIds);
-            if (!updateShardIds.isEmpty()) {
-              Set<ITaskConfig> targetConfigs = fetchTaskUpdateConfigs(
-                  updateConfig.get(),
-                  updateShardIds,
-                  configSelector);
-              // Filter tasks in UPDATING/ROLLBACK to obtain the changed shards. This is done so
-              // that these tasks are either rolled back or updated. If not, when a task in UPDATING
-              // is later KILLED and a new shard is created with the updated configuration it
-              // appears as if the rollback completed successfully.
-              Set<IScheduledTask> notUpdating = FluentIterable.from(tasks)
-                  .filter(NOT_UPDATING)
-                  .toSet();
-              Set<Integer> changedShards = getChangedShards(notUpdating, targetConfigs);
-              if (!changedShards.isEmpty()) {
-                // Initiate update on the existing shards.
-                // TODO(William Farner): The additional query could be avoided here.
-                //                       Consider allowing state changes on tasks by task ID.
-                changeState(
-                    Query.instanceScoped(jobKey, changedShards).active(),
-                    modifyingState,
-                    Optional.of(auditMessage));
-                putResults(result, ShardUpdateResult.RESTARTING, changedShards);
-              }
-              putResults(
-                  result,
-                  ShardUpdateResult.UNCHANGED,
-                  Sets.difference(updateShardIds, changedShards));
-            }
-
-            return result.build();
-          }
-        });
-  }
-
-  private Optional<TaskUpdateConfiguration> fetchShardUpdateConfig(
-      UpdateStore updateStore, IJobKey jobKey, int shard) {
-
-    Optional<JobUpdateConfiguration> optional = updateStore.fetchJobUpdateConfig(jobKey);
-    if (optional.isPresent()) {
-      Set<TaskUpdateConfiguration> matches =
-          fetchShardUpdateConfigs(optional.get(), ImmutableSet.of(shard));
-      return Optional.fromNullable(Iterables.getOnlyElement(matches, null));
-    } else {
-      return Optional.absent();
-    }
-  }
-
-  private static final Function<TaskUpdateConfiguration, Integer> GET_SHARD =
-      new Function<TaskUpdateConfiguration, Integer>() {
-        @Override public Integer apply(TaskUpdateConfiguration config) {
-          return config.isSetOldConfig()
-              ? config.getOldConfig().getInstanceIdDEPRECATED()
-              : config.getNewConfig().getInstanceIdDEPRECATED();
-        }
-      };
-
-  private Set<TaskUpdateConfiguration> fetchShardUpdateConfigs(
-      JobUpdateConfiguration config,
-      Set<Integer> shards) {
-
-    return ImmutableSet.copyOf(Iterables.filter(config.getConfigs(),
-        Predicates.compose(Predicates.in(shards), GET_SHARD)));
-  }
-
-  /**
-   * Fetches the task configurations for shards in the context of an in-progress job update.
-   *
-   * @param shards Shards within a job to fetch.
-   * @return The task information of the shard.
-   */
-  private Set<ITaskConfig> fetchTaskUpdateConfigs(
-      JobUpdateConfiguration config,
-      final Set<Integer> shards,
-      final Function<TaskUpdateConfiguration, ITaskConfig> configSelector) {
-
-    checkNotNull(config);
-    checkNotBlank(shards);
-    return FluentIterable.from(fetchShardUpdateConfigs(config, shards))
-        .transform(configSelector)
-        .filter(Predicates.notNull())
-        .toSet();
   }
 
   private int changeStateInWriteOperation(
@@ -699,19 +319,6 @@ public class StateManagerImpl implements StateManager {
     };
   }
 
-  // Supplier that checks if there is an active update for a job.
-  private Supplier<Boolean> taskUpdateChecker(final IJobKey jobKey) {
-    return new Supplier<Boolean>() {
-      @Override public Boolean get() {
-        return storage.consistentRead(new Work.Quiet<Boolean>() {
-          @Override public Boolean apply(StoreProvider storeProvider) {
-            return storeProvider.getUpdateStore().fetchJobUpdateConfig(jobKey).isPresent();
-          }
-        });
-      }
-    };
-  }
-
   private void processWorkQueueInWriteOperation(
       SideEffectWork<?, ?> sideEffectWork,
       MutableStoreProvider storeProvider) {
@@ -752,11 +359,6 @@ public class StateManagerImpl implements StateManager {
                     taskInfo.getOwner().getRole(),
                     taskInfo.getJobName(),
                     task.getAssignedTask().getInstanceId()));
-            break;
-
-          case UPDATE:
-          case ROLLBACK:
-            maybeRescheduleForUpdate(storeProvider, taskId, work.command == WorkCommand.ROLLBACK);
             break;
 
           case UPDATE_STATE:
@@ -804,51 +406,6 @@ public class StateManagerImpl implements StateManager {
     });
   }
 
-  private void maybeRescheduleForUpdate(
-      MutableStoreProvider storeProvider,
-      String taskId,
-      boolean rollingBack) {
-
-    TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
-
-    IAssignedTask oldConfig =
-        Iterables.getOnlyElement(taskStore.fetchTasks(Query.taskScoped(taskId))).getAssignedTask();
-
-    Optional<TaskUpdateConfiguration> optional = fetchShardUpdateConfig(
-        storeProvider.getUpdateStore(),
-        Tasks.ASSIGNED_TO_JOB_KEY.apply(oldConfig),
-        oldConfig.getInstanceId());
-
-    // TODO(Sathya): Figure out a way to handle race condition when finish update is called
-    //     before ROLLBACK
-
-    if (!optional.isPresent()) {
-      LOG.warning("No update configuration found for key "
-          + JobKeys.toPath(Tasks.ASSIGNED_TO_JOB_KEY.apply(oldConfig))
-          + " shard " + oldConfig.getInstanceId() + " : Assuming update has finished.");
-      return;
-    }
-
-    TaskUpdateConfiguration updateConfig = optional.get();
-    TaskConfig newConfig =
-        rollingBack ? updateConfig.getOldConfig() : updateConfig.getNewConfig();
-    if (newConfig == null) {
-      // The updated configuration removed the shard, nothing to reschedule.
-      return;
-    }
-
-    Map.Entry<Integer, ITaskConfig> configEntry = Iterables.getOnlyElement(ImmutableMap.of(
-        newConfig.getInstanceIdDEPRECATED(), ITaskConfig.build(newConfig)).entrySet());
-    IScheduledTask newTask =
-        IScheduledTask.build(taskCreator.apply(configEntry).newBuilder()
-            .setAncestorId(taskId));
-    taskStore.saveTasks(ImmutableSet.of(newTask));
-    createStateMachine(newTask)
-        .updateState(
-            PENDING,
-            Optional.of("Rescheduled after " + (rollingBack ? "rollback." : "update.")));
-  }
-
   private Map<String, TaskStateMachine> getStateMachines(final Set<String> taskIds) {
     return storage.consistentRead(new Work.Quiet<Map<String, TaskStateMachine>>() {
       @Override public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
@@ -879,8 +436,6 @@ public class StateManagerImpl implements StateManager {
     TaskStateMachine stateMachine = new TaskStateMachine(
         taskId,
         null,
-        // Since the task doesn't exist, its job cannot be updating.
-        Suppliers.ofInstance(false),
         workSink,
         clock,
         INIT);
@@ -896,7 +451,6 @@ public class StateManagerImpl implements StateManager {
     return new TaskStateMachine(
         Tasks.id(task),
         task,
-        taskUpdateChecker(Tasks.SCHEDULED_TO_JOB_KEY.apply(task)),
         workSink,
         clock,
         initialState);

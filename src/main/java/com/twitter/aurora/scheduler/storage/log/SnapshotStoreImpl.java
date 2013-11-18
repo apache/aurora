@@ -25,7 +25,6 @@ import javax.inject.Inject;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.storage.QuotaConfiguration;
 import com.twitter.aurora.gen.storage.SchedulerMetadata;
@@ -141,27 +140,6 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       },
       new SnapshotField() {
         @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
-          ImmutableSet.Builder<JobUpdateConfiguration> updates = ImmutableSet.builder();
-
-          for (String updatingRole : store.getUpdateStore().fetchUpdatingRoles()) {
-            updates.addAll(store.getUpdateStore().fetchUpdateConfigs(updatingRole));
-          }
-
-          snapshot.setUpdateConfigurations(updates.build());
-        }
-
-        @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
-          store.getUpdateStore().deleteShardUpdateConfigs();
-
-          if (snapshot.isSetUpdateConfigurations()) {
-            for (JobUpdateConfiguration config : snapshot.getUpdateConfigurations()) {
-              store.getUpdateStore().saveJobUpdateConfig(config);
-            }
-          }
-        }
-      },
-      new SnapshotField() {
-        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<QuotaConfiguration> quotas = ImmutableSet.builder();
           for (Map.Entry<String, IQuota> entry : store.getQuotaStore().fetchQuotas().entrySet()) {
             quotas.add(new QuotaConfiguration(entry.getKey(), entry.getValue().newBuilder()));
@@ -182,15 +160,15 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
       },
       new SnapshotField() {
         @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
-          snapshot.setLocks(ILock.toBuildersSet(store.getUpdateStore().fetchLocks()));
+          snapshot.setLocks(ILock.toBuildersSet(store.getLockStore().fetchLocks()));
         }
 
         @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
-          store.getUpdateStore().deleteLocks();
+          store.getLockStore().deleteLocks();
 
           if (snapshot.isSetLocks()) {
             for (Lock lock : snapshot.getLocks()) {
-              store.getUpdateStore().saveLock(ILock.build(lock));
+              store.getLockStore().saveLock(ILock.build(lock));
             }
           }
         }

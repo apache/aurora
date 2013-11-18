@@ -18,7 +18,6 @@ package com.twitter.aurora.scheduler.state;
 import java.util.Set;
 
 import com.google.common.base.Function;
-import com.google.common.base.Supplier;
 
 import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
@@ -38,7 +37,6 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
 import static org.easymock.EasyMock.eq;
-import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
@@ -54,28 +52,23 @@ import static com.twitter.aurora.gen.ScheduleStatus.KILLING;
 import static com.twitter.aurora.gen.ScheduleStatus.LOST;
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 import static com.twitter.aurora.gen.ScheduleStatus.RESTARTING;
-import static com.twitter.aurora.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
 import static com.twitter.aurora.gen.ScheduleStatus.STARTING;
 import static com.twitter.aurora.gen.ScheduleStatus.UNKNOWN;
-import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
 import static com.twitter.aurora.scheduler.state.WorkCommand.DELETE;
 import static com.twitter.aurora.scheduler.state.WorkCommand.INCREMENT_FAILURES;
 import static com.twitter.aurora.scheduler.state.WorkCommand.KILL;
 import static com.twitter.aurora.scheduler.state.WorkCommand.RESCHEDULE;
-import static com.twitter.aurora.scheduler.state.WorkCommand.UPDATE;
 import static com.twitter.aurora.scheduler.state.WorkCommand.UPDATE_STATE;
 
 public class TaskStateMachineTest extends EasyMockTest {
 
-  private Supplier<Boolean> isJobUpdating;
   private WorkSink workSink;
   private FakeClock clock;
   private TaskStateMachine stateMachine;
 
   @Before
   public void setUp() {
-    isJobUpdating = createMock(new Clazz<Supplier<Boolean>>() { });
     workSink = createMock(WorkSink.class);
     clock = new FakeClock();
     stateMachine = makeStateMachine("test", makeTask(false));
@@ -85,7 +78,6 @@ public class TaskStateMachineTest extends EasyMockTest {
     return new TaskStateMachine(
         taskId,
         IScheduledTask.build(builder),
-        isJobUpdating,
         workSink,
         clock,
         INIT);
@@ -313,71 +305,6 @@ public class TaskStateMachineTest extends EasyMockTest {
     control.replay();
 
     transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
-  }
-
-  @Test
-  public void testUpdate() {
-    expectWork(UPDATE_STATE).times(6);
-    expect(isJobUpdating.get()).andReturn(true);
-    expectWork(UPDATE);
-    expectWork(KILL);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, KILLED);
-  }
-
-  @Test
-  public void testUpdateRestartingTask() {
-    stateMachine = makeStateMachine("test", makeTask(true));
-    expectWork(UPDATE_STATE).times(7);
-    expect(isJobUpdating.get()).andReturn(true);
-    expectWork(UPDATE);
-    expectWork(KILL).times(2);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, UPDATING, FINISHED);
-  }
-
-  @Test
-  public void testRollbackRestartingTask() {
-    stateMachine = makeStateMachine("test", makeTask(true));
-    expectWork(UPDATE_STATE).times(7);
-    expect(isJobUpdating.get()).andReturn(true);
-    expectWork(WorkCommand.ROLLBACK);
-    expectWork(KILL).times(2);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, ROLLBACK, FINISHED);
-  }
-
-  @Test
-  public void testRollback() {
-    expectWork(UPDATE_STATE).times(7);
-    expect(isJobUpdating.get()).andReturn(true);
-    expectWork(WorkCommand.ROLLBACK);
-    expectWork(KILL).times(2);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING, ROLLBACK, KILLED);
-  }
-
-  @Test
-  public void testIllegalUpdate() {
-    expectWork(UPDATE_STATE).times(4);
-    expect(isJobUpdating.get()).andReturn(false);
-
-    control.replay();
-
-    try {
-      transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, UPDATING);
-      fail("Call should have failed.");
-    } catch (IllegalStateException e) {
-    //Expected
-    }
   }
 
   @Test

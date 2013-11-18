@@ -23,12 +23,12 @@ import com.google.common.annotations.VisibleForTesting;
 
 import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.JobStore;
+import com.twitter.aurora.scheduler.storage.LockStore;
 import com.twitter.aurora.scheduler.storage.QuotaStore;
 import com.twitter.aurora.scheduler.storage.ReadWriteLockManager;
 import com.twitter.aurora.scheduler.storage.SchedulerStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.TaskStore;
-import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
 
@@ -56,7 +56,7 @@ public class MemStorage implements Storage {
       final SchedulerStore.Mutable schedulerStore,
       final JobStore.Mutable jobStore,
       final TaskStore.Mutable taskStore,
-      final UpdateStore.Mutable updateStore,
+      final LockStore.Mutable lockStore,
       final QuotaStore.Mutable quotaStore,
       final AttributeStore.Mutable attributeStore) {
 
@@ -77,8 +77,8 @@ public class MemStorage implements Storage {
         return taskStore;
       }
 
-      @Override public UpdateStore.Mutable getUpdateStore() {
-        return updateStore;
+      @Override public LockStore.Mutable getLockStore() {
+        return lockStore;
       }
 
       @Override public QuotaStore.Mutable getQuotaStore() {
@@ -100,7 +100,7 @@ public class MemStorage implements Storage {
         new MemSchedulerStore(),
         new MemJobStore(),
         new MemTaskStore(),
-        new MemUpdateStore(),
+        new MemLockStore(),
         new MemQuotaStore(),
         new MemAttributeStore());
   }

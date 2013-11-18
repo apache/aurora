@@ -19,40 +19,13 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 
-import com.twitter.aurora.gen.JobUpdateConfiguration;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.ILock;
 import com.twitter.aurora.scheduler.storage.entities.ILockKey;
 
 /**
- * Stores all update configurations for on-going updates.
- * Includes the old configuration and the updated configuration for the tasks in a job.
+ * Stores all lock-related data and defines methods for saving, deleting and fetching locks.
  */
-public interface UpdateStore {
-
-  /**
-   * Fetches the update configuration (if present) for the given job key.
-   *
-   * @param jobKey Job to fetch update configuration for.
-   * @return Optional job update configuration.
-   */
-  Optional<JobUpdateConfiguration> fetchJobUpdateConfig(IJobKey jobKey);
-
-  /**
-   * Fetches all active shard update configurations for a role.
-   *
-   * @param role Role to fetch update configs for.
-   * @return A multimap from job name to shard configurations.
-   */
-  Set<JobUpdateConfiguration> fetchUpdateConfigs(String role);
-
-  /**
-   * Fetches all roles with update records.
-   *
-   * @return Updating roles.
-   */
-  Set<String> fetchUpdatingRoles();
-
+public interface LockStore {
   /**
    * Fetches all locks available in the store.
    *
@@ -68,27 +41,7 @@ public interface UpdateStore {
    */
   Optional<ILock> fetchLock(ILockKey lockKey);
 
-  public interface Mutable extends UpdateStore {
-
-    /**
-     * Saves a job update configuration.
-     *
-     * @param updateConfiguration Configuration to store.
-     */
-    void saveJobUpdateConfig(JobUpdateConfiguration updateConfiguration);
-
-    /**
-     * Removes the update configuration for the job.
-     *
-     * @param jobKey Key of the job.
-     */
-    void removeShardUpdateConfigs(IJobKey jobKey);
-
-    /**
-     * Deletes all update configurations.
-     */
-    void deleteShardUpdateConfigs();
-
+  public interface Mutable extends LockStore {
     /**
      * Saves a new lock or overwrites the existing one with same LockKey.
      *

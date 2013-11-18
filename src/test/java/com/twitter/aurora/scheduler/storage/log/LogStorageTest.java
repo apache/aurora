@@ -40,19 +40,16 @@ import com.twitter.aurora.gen.Attribute;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.gen.storage.Constants;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
-import com.twitter.aurora.gen.storage.RemoveJobUpdate;
 import com.twitter.aurora.gen.storage.RemoveLock;
 import com.twitter.aurora.gen.storage.RemoveQuota;
 import com.twitter.aurora.gen.storage.RemoveTasks;
@@ -60,7 +57,6 @@ import com.twitter.aurora.gen.storage.RewriteTask;
 import com.twitter.aurora.gen.storage.SaveAcceptedJob;
 import com.twitter.aurora.gen.storage.SaveFrameworkId;
 import com.twitter.aurora.gen.storage.SaveHostAttributes;
-import com.twitter.aurora.gen.storage.SaveJobUpdate;
 import com.twitter.aurora.gen.storage.SaveLock;
 import com.twitter.aurora.gen.storage.SaveQuota;
 import com.twitter.aurora.gen.storage.SaveTasks;
@@ -138,7 +134,7 @@ public class LogStorageTest extends EasyMockTest {
             storageUtil.schedulerStore,
             storageUtil.jobStore,
             storageUtil.taskStore,
-            storageUtil.updateStore,
+            storageUtil.lockStore,
             storageUtil.quotaStore,
             storageUtil.attributeStore);
 
@@ -568,47 +564,6 @@ public class LogStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testSaveShardUpdateConfigs() throws Exception {
-    final JobKey jobKey = JobKeys.from("role", "env", "job").newBuilder();
-    final String updateToken = "update-ok";
-    final ImmutableSet<TaskUpdateConfiguration> updateConfiguration = ImmutableSet.of(
-        new TaskUpdateConfiguration().setNewConfig(new TaskConfig().setInstanceIdDEPRECATED(42)));
-    final JobUpdateConfiguration config =
-        new JobUpdateConfiguration(jobKey, updateToken, updateConfiguration);
-    final SaveJobUpdate saveOp = new SaveJobUpdate(jobKey, updateToken, updateConfiguration);
-
-    new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
-        storageUtil.updateStore.saveJobUpdateConfig(config);
-        streamMatcher.expectTransaction(Op.saveJobUpdate(saveOp)).andReturn(position);
-      }
-
-      @Override protected void performMutations() {
-        logStorage.saveJobUpdateConfig(config);
-      }
-    }.run();
-  }
-
-  @Test
-  public void testRemoveShardUpdateConfigs() throws Exception {
-    final IJobKey jobKey = JobKeys.from("role", "env", "job");
-    new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
-        storageUtil.updateStore.removeShardUpdateConfigs(jobKey);
-        streamMatcher.expectTransaction(
-            Op.removeJobUpdate(new RemoveJobUpdate(jobKey.newBuilder())))
-            .andReturn(position);
-      }
-
-      @Override protected void performMutations() {
-        logStorage.removeShardUpdateConfigs(jobKey);
-      }
-    }.run();
-  }
-
-  @Test
   public void testSaveQuota() throws Exception {
     final String role = "role";
     final IQuota quota = IQuota.build(new Quota(1.0, 128L, 1024L));
@@ -652,7 +607,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
-        storageUtil.updateStore.saveLock(lock);
+        storageUtil.lockStore.saveLock(lock);
         streamMatcher.expectTransaction(Op.saveLock(new SaveLock(lock.newBuilder())))
             .andReturn(position);
       }
@@ -670,7 +625,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
-        storageUtil.updateStore.removeLock(lockKey);
+        storageUtil.lockStore.removeLock(lockKey);
         streamMatcher.expectTransaction(Op.removeLock(new RemoveLock(lockKey.newBuilder())))
             .andReturn(position);
       }

@@ -40,7 +40,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -54,7 +53,6 @@ import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.gen.ConfigRewrite;
 import com.twitter.aurora.gen.DrainHostsResult;
 import com.twitter.aurora.gen.EndMaintenanceResult;
-import com.twitter.aurora.gen.GetJobUpdatesResult;
 import com.twitter.aurora.gen.GetJobsResult;
 import com.twitter.aurora.gen.GetQuotaResult;
 import com.twitter.aurora.gen.Hosts;
@@ -64,7 +62,6 @@ import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfigValidation;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.ListBackupsResult;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
@@ -77,7 +74,6 @@ import com.twitter.aurora.gen.Response;
 import com.twitter.aurora.gen.ResponseCode;
 import com.twitter.aurora.gen.Result;
 import com.twitter.aurora.gen.RewriteConfigsRequest;
-import com.twitter.aurora.gen.RollbackShardsResult;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduleStatusResult;
 import com.twitter.aurora.gen.SessionKey;
@@ -85,7 +81,6 @@ import com.twitter.aurora.gen.StartMaintenanceResult;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
 import com.twitter.aurora.gen.UpdateResult;
-import com.twitter.aurora.gen.UpdateShardsResult;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
@@ -105,7 +100,6 @@ import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
-import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.aurora.scheduler.storage.backup.Recovery;
 import com.twitter.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
@@ -533,13 +527,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return response;
   }
 
+  private static final Response DEPRECATED_CLIENT_RESPONSE = new Response()
+      .setResponseCode(ERROR)
+      .setMessage("This client version is deprecated. Please, sync Aurora client "
+          + "to the latest version and retry your action. See: go/getaurora for more details.");
+
   @Override
   public Response startUpdate(JobConfiguration mutableJob, SessionKey session) {
-    Response response = new Response();
-    response.setMessage("This client version is deprecated. Please, sync Aurora client "
-        + "to the latest version and retry your action. See: go/getaurora for more details.");
-    response.setResponseCode(ERROR);
-    return response;
+    return DEPRECATED_CLIENT_RESPONSE;
   }
 
   @Override
@@ -549,32 +544,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       String updateToken,
       SessionKey session) {
 
-    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
-    checkNotBlank(shards);
-    checkNotBlank(updateToken);
-    checkNotNull(session);
-
-    Response response = new Response();
-    SessionContext context;
-    try {
-      context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
-    } catch (AuthFailedException e) {
-      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-      return response;
-    }
-
-    try {
-      response
-          .setResponseCode(OK)
-          .setMessage("Successfully started update of shards: " + shards)
-          .setResult(Result.updateShardsResult(new UpdateShardsResult()
-          .setShards(schedulerCore.updateShards(jobKey, context.getIdentity(), shards, updateToken))
-      ));
-    } catch (ScheduleException e) {
-      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    }
-
-    return response;
+    return DEPRECATED_CLIENT_RESPONSE;
   }
 
   @Override
@@ -584,31 +554,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       String updateToken,
       SessionKey session) {
 
-    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
-    checkNotBlank(shards);
-    checkNotBlank(updateToken);
-    checkNotNull(session);
-
-    Response response = new Response();
-    SessionContext context;
-    try {
-      context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
-    } catch (AuthFailedException e) {
-      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-      return response;
-    }
-
-    try {
-      response.setResult(Result.rollbackShardsResult(new RollbackShardsResult()
-          .setShards(schedulerCore.rollbackShards(
-              jobKey, context.getIdentity(), shards, updateToken))))
-          .setResponseCode(OK)
-          .setMessage("Successfully started rollback of shards: " + shards);
-    } catch (ScheduleException e) {
-      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    }
-
-    return response;
+    return DEPRECATED_CLIENT_RESPONSE;
   }
 
   @Override
@@ -618,28 +564,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       String updateToken,
       SessionKey session) {
 
-    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
-    checkNotNull(session);
-
-    Response response = new Response();
-    SessionContext context;
-    try {
-      context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
-    } catch (AuthFailedException e) {
-      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
-      return response;
-    }
-
-    Optional<String> token = updateResult == UpdateResult.TERMINATE
-        ? Optional.<String>absent() : Optional.of(updateToken);
-    try {
-      schedulerCore.finishUpdate(jobKey, context.getIdentity(), token, updateResult);
-      response.setResponseCode(OK).setMessage("Update successfully finished.");
-    } catch (ScheduleException e) {
-      response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
-    }
-
-    return response;
+    return DEPRECATED_CLIENT_RESPONSE;
   }
 
   @Override
@@ -835,20 +760,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response getJobUpdates(SessionKey session) {
-    return storage.weaklyConsistentRead(new Work.Quiet<Response>() {
-      @Override public Response apply(StoreProvider storeProvider) {
-        GetJobUpdatesResult result = new GetJobUpdatesResult()
-            .setJobUpdates(Sets.<JobUpdateConfiguration>newHashSet());
-        UpdateStore store = storeProvider.getUpdateStore();
-        for (String role : store.fetchUpdatingRoles()) {
-          for (JobUpdateConfiguration config : store.fetchUpdateConfigs(role)) {
-            result.addToJobUpdates(config);
-          }
-        }
-        return new Response().setResponseCode(OK)
-            .setResult(Result.getJobUpdatesResult(result));
-      }
-    });
+    return DEPRECATED_CLIENT_RESPONSE;
   }
 
   @Override

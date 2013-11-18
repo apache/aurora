@@ -38,7 +38,7 @@ public interface Storage {
     SchedulerStore getSchedulerStore();
     JobStore getJobStore();
     TaskStore getTaskStore();
-    UpdateStore getUpdateStore();
+    LockStore getLockStore();
     QuotaStore getQuotaStore();
     AttributeStore getAttributeStore();
   }
@@ -62,7 +62,7 @@ public interface Storage {
      */
     TaskStore.Mutable getUnsafeTaskStore();
 
-    UpdateStore.Mutable getUpdateStore();
+    LockStore.Mutable getLockStore();
     QuotaStore.Mutable getQuotaStore();
     AttributeStore.Mutable getAttributeStore();
   }

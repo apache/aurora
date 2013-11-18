@@ -27,7 +27,6 @@ import org.junit.Test;
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
@@ -165,7 +164,6 @@ public class RecoveryTest extends EasyMockTest {
         .setHostAttributes(ImmutableSet.<HostAttributes>of())
         .setJobs(ImmutableSet.<StoredJob>of())
         .setSchedulerMetadata(new SchedulerMetadata().setVersion(CURRENT_API_VERSION))
-        .setUpdateConfigurations(ImmutableSet.<JobUpdateConfiguration>of())
         .setQuotaConfigurations(ImmutableSet.<QuotaConfiguration>of())
         .setTasks(ImmutableSet.<ScheduledTask>builder().add(tasks).build())
         .setLocks(ImmutableSet.<Lock>of());

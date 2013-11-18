@@ -15,26 +15,16 @@
  */
 package com.twitter.aurora.scheduler.quota;
 
-import java.util.Collection;
-
-import javax.inject.Inject;
-
-import com.google.common.base.Function;
-import com.google.common.base.Predicates;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
+import com.google.inject.Inject;
 
-import com.twitter.aurora.gen.JobUpdateConfiguration;
-import com.twitter.aurora.gen.TaskUpdateConfiguration;
 import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.TaskInstances;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.Storage.Work.Quiet;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -63,18 +53,6 @@ public interface QuotaManager {
       this.storage = checkNotNull(storage);
     }
 
-    private static IQuota getUpdateQuota(
-        Collection<TaskUpdateConfiguration> configs,
-        Function<TaskUpdateConfiguration, ITaskConfig> taskExtractor) {
-
-      FluentIterable<ITaskConfig> tasks =
-          FluentIterable
-          .from(configs)
-          .transform(taskExtractor)
-          .filter(Predicates.notNull());
-      return Quotas.fromProductionTasks(tasks);
-    }
-
     @Override
     public IQuota getConsumption(final String role) {
       checkNotBlank(role);
@@ -84,23 +62,8 @@ public interface QuotaManager {
       return storage.consistentRead(
           new Work.Quiet<IQuota>() {
             @Override public IQuota apply(StoreProvider storeProvider) {
-              IQuota quota = Quotas.fromProductionTasks(Iterables.transform(
+              return Quotas.fromProductionTasks(Iterables.transform(
                   storeProvider.getTaskStore().fetchTasks(query), Tasks.SCHEDULED_TO_INFO));
-
-              for (JobUpdateConfiguration updateConfig
-                  : storeProvider.getUpdateStore().fetchUpdateConfigs(role)) {
-                // If the user is performing an update that increases the quota for the job,
-                // bill them for the updated job.
-                IQuota additionalQuota = Quotas.subtract(
-                    getUpdateQuota(updateConfig.getConfigs(), TaskInstances.GET_NEW_CONFIG),
-                    getUpdateQuota(updateConfig.getConfigs(), TaskInstances.GET_ORIGINAL_CONFIG)
-                );
-                if (Quotas.greaterThan(additionalQuota, Quotas.noQuota())) {
-                  quota = Quotas.add(quota, additionalQuota);
-                }
-              }
-
-              return quota;
             }
           });
     }

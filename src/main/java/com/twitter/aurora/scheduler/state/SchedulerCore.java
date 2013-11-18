@@ -15,15 +15,12 @@
  */
 package com.twitter.aurora.scheduler.state;
 
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ShardUpdateResult;
-import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
@@ -82,74 +79,6 @@ public interface SchedulerCore {
    * @throws TaskDescriptionException If the parsing of the job failed.
    */
   void startCronJob(IJobKey jobKey) throws ScheduleException, TaskDescriptionException;
-
-  /**
-   * Registers an update for a job.
-   *
-   * @param sanitizedConfiguration Updated job configuration.
-   * @throws ScheduleException If there was an error in scheduling an update when no active tasks
-   *                           are found for a job or an update for the job is already in progress.
-   * @return A unique update token if an update must be coordinated through
-   *         {@link #updateShards(IJobKey, String, Set, String)}and
-   *         {@link #finishUpdate(IJobKey, String, Optional, UpdateResult)}, or an absent value if
-   * the update was completed in-place and no further action is necessary.
-   */
-  Optional<String> initiateJobUpdate(SanitizedConfiguration sanitizedConfiguration)
-      throws ScheduleException;
-
-  /**
-   * Initiates an update on shards within a job.
-   * Requires that startUpdate was called for the job first.
-   *
-   * @param jobKey Job being updated.
-   * @param invokingUser Name of the invoking user for auditing purposes.
-   * @param shards Shards to be updated.
-   * @param updateToken A unique string identifying the update, must be provided from
-   *                    {@link #initiateJobUpdate(SanitizedConfiguration)}.
-   * @throws ScheduleException If there was an error in updating the state to UPDATING.
-   * @return The action taken on each of the shards.
-   */
-  Map<Integer, ShardUpdateResult> updateShards(
-      IJobKey jobKey,
-      String invokingUser,
-      Set<Integer> shards,
-      String updateToken) throws ScheduleException;
-
-  /**
-   * Initiates a rollback of the specified shards.
-   * Requires that startUpdate was called for the job first.
-   *
-   * @param jobKey Job being updated.
-   * @param invokingUser Name of the invoking user for auditing purposes.
-   * @param shards Shards to be updated.
-   * @param updateToken A unique string identifying the update, must be provided from
-   *                    {@link #initiateJobUpdate(SanitizedConfiguration)}
-   * @throws ScheduleException If there was an error in updating the state to ROLLBACK.
-   * @return The action taken on each of the shards.
-   */
-  Map<Integer, ShardUpdateResult> rollbackShards(
-      IJobKey jobKey,
-      String invokingUser,
-      Set<Integer> shards,
-      String updateToken) throws ScheduleException;
-
-  /**
-   * Completes an update.
-   *
-   * @param jobKey The job being updated.
-   * @param invokingUser Name of the invoking user for auditing purposes.
-   * @param updateToken The update token provided from
-   *                    {@link #initiateJobUpdate(SanitizedConfiguration)},
-   *                    or not present if the update is being forcibly terminated.
-   * @param result {@code true} if the update was successful, {@code false} otherwise.
-   * @throws ScheduleException If an update for the job does not exist or if the update token is
-   *                           invalid.
-   */
-  void finishUpdate(
-      IJobKey jobKey,
-      String invokingUser,
-      Optional<String> updateToken,
-      UpdateResult result) throws ScheduleException;
 
   /**
    * Assigns a new state to tasks.

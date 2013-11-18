@@ -41,12 +41,10 @@ import com.google.inject.BindingAnnotation;
 
 import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
-import com.twitter.aurora.gen.storage.RemoveJobUpdate;
 import com.twitter.aurora.gen.storage.RemoveLock;
 import com.twitter.aurora.gen.storage.RemoveQuota;
 import com.twitter.aurora.gen.storage.RemoveTasks;
@@ -54,7 +52,6 @@ import com.twitter.aurora.gen.storage.RewriteTask;
 import com.twitter.aurora.gen.storage.SaveAcceptedJob;
 import com.twitter.aurora.gen.storage.SaveFrameworkId;
 import com.twitter.aurora.gen.storage.SaveHostAttributes;
-import com.twitter.aurora.gen.storage.SaveJobUpdate;
 import com.twitter.aurora.gen.storage.SaveLock;
 import com.twitter.aurora.gen.storage.SaveQuota;
 import com.twitter.aurora.gen.storage.SaveTasks;
@@ -68,13 +65,13 @@ import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.DistributedSnapshotStore;
 import com.twitter.aurora.scheduler.storage.ForwardingStore;
 import com.twitter.aurora.scheduler.storage.JobStore;
+import com.twitter.aurora.scheduler.storage.LockStore;
 import com.twitter.aurora.scheduler.storage.QuotaStore;
 import com.twitter.aurora.scheduler.storage.SchedulerStore;
 import com.twitter.aurora.scheduler.storage.SnapshotStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import com.twitter.aurora.scheduler.storage.TaskStore;
-import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.ILock;
@@ -197,7 +194,7 @@ public class LogStorage extends ForwardingStore
       return LogStorage.this;
     }
 
-    @Override public UpdateStore.Mutable getUpdateStore() {
+    @Override public LockStore.Mutable getLockStore() {
       return LogStorage.this;
     }
 
@@ -246,7 +243,7 @@ public class LogStorage extends ForwardingStore
              @WriteBehind SchedulerStore.Mutable schedulerStore,
              @WriteBehind JobStore.Mutable jobStore,
              @WriteBehind TaskStore.Mutable taskStore,
-             @WriteBehind UpdateStore.Mutable updateStore,
+             @WriteBehind LockStore.Mutable lockStore,
              @WriteBehind QuotaStore.Mutable quotaStore,
              @WriteBehind AttributeStore.Mutable attributeStore) {
 
@@ -258,7 +255,7 @@ public class LogStorage extends ForwardingStore
         schedulerStore,
         jobStore,
         taskStore,
-        updateStore,
+        lockStore,
         quotaStore,
         attributeStore);
   }
@@ -272,11 +269,11 @@ public class LogStorage extends ForwardingStore
              SchedulerStore.Mutable schedulerStore,
              JobStore.Mutable jobStore,
              TaskStore.Mutable taskStore,
-             UpdateStore.Mutable updateStore,
+             LockStore.Mutable lockStore,
              QuotaStore.Mutable quotaStore,
              AttributeStore.Mutable attributeStore) {
 
-    super(storage, schedulerStore, jobStore, taskStore, updateStore, quotaStore, attributeStore);
+    super(storage, schedulerStore, jobStore, taskStore, lockStore, quotaStore, attributeStore);
     this.logManager = checkNotNull(logManager);
     this.schedulingService = checkNotNull(schedulingService);
     this.snapshotStore = checkNotNull(snapshotStore);
@@ -382,15 +379,11 @@ public class LogStorage extends ForwardingStore
         break;
 
       case SAVE_JOB_UPDATE:
-        SaveJobUpdate saveJobUpdate = op.getSaveJobUpdate();
-        saveJobUpdateConfig(new JobUpdateConfiguration(
-            saveJobUpdate.getJobKey(),
-            saveJobUpdate.getUpdateToken(),
-            saveJobUpdate.getConfigs()));
+        // Ignore recovery of JobUpdateConfiguration. To be removed when thrift is updated.
         break;
 
       case REMOVE_JOB_UPDATE:
-        removeShardUpdateConfigs(IJobKey.build(op.getRemoveJobUpdate().getJobKey()));
+        // Ignore recovery of JobUpdateConfiguration. To be removed when thrift is updated.
         break;
 
       case REMOVE_JOB:
@@ -625,31 +618,6 @@ public class LogStorage extends ForwardingStore
           log(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration.newBuilder())));
         }
         return mutated;
-      }
-    });
-  }
-
-  @Timed("scheduler_log_jobupdate_save")
-  @Override
-  public void saveJobUpdateConfig(final JobUpdateConfiguration configs) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.saveJobUpdate(new SaveJobUpdate(
-            configs.getJobKey(), configs.getUpdateToken(), configs.getConfigs())));
-        LogStorage.super.saveJobUpdateConfig(configs);
-      }
-    });
-  }
-
-  @Timed("scheduler_log_jobupdate_remove")
-  @Override
-  public void removeShardUpdateConfigs(final IJobKey jobKey) {
-    checkNotNull(jobKey);
-
-    write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
-        log(Op.removeJobUpdate(new RemoveJobUpdate().setJobKey(jobKey.newBuilder())));
-        LogStorage.super.removeShardUpdateConfigs(jobKey);
       }
     });
   }

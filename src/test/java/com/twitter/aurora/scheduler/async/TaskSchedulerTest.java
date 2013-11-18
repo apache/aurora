@@ -85,8 +85,8 @@ import static com.twitter.aurora.gen.ScheduleStatus.INIT;
 import static com.twitter.aurora.gen.ScheduleStatus.KILLED;
 import static com.twitter.aurora.gen.ScheduleStatus.LOST;
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
+import static com.twitter.aurora.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
-import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
 
 /**
  * TODO(wfarner): Break this test up to independently test TaskScheduler and OfferQueueImpl.
@@ -653,7 +653,7 @@ public class TaskSchedulerTest extends EasyMockTest {
   public void testNoPenaltyForInterruptedTasks() {
     expectAnyMaintenanceCalls();
 
-    makeFlappyTaskWithStates("a0", EnumSet.of(INIT, PENDING, ASSIGNED, UPDATING, FAILED), null);
+    makeFlappyTaskWithStates("a0", EnumSet.of(INIT, PENDING, ASSIGNED, RESTARTING, FAILED), null);
     IScheduledTask taskA1 = IScheduledTask.build(makeTask("a1", INIT).newBuilder()
         .setAncestorId("a0"));
 

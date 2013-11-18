@@ -29,9 +29,5 @@ enum WorkCommand {
   // Delete this task from the persistent store.
   DELETE,
   // Increment the failure count for this task.
-  INCREMENT_FAILURES,
-  // Update the task configuration as a part of a rolling update.
-  UPDATE,
-  // Roll the task configuration back as part of a rolling update.
-  ROLLBACK
+  INCREMENT_FAILURES
 }

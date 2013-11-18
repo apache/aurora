@@ -24,6 +24,7 @@ import org.easymock.IExpectationSetters;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.JobStore;
+import com.twitter.aurora.scheduler.storage.LockStore;
 import com.twitter.aurora.scheduler.storage.QuotaStore;
 import com.twitter.aurora.scheduler.storage.SchedulerStore;
 import com.twitter.aurora.scheduler.storage.Storage;
@@ -32,7 +33,6 @@ import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.TaskStore;
-import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -52,7 +52,7 @@ public class StorageTestUtil {
   public final QuotaStore.Mutable quotaStore;
   public final AttributeStore.Mutable attributeStore;
   public final JobStore.Mutable jobStore;
-  public final UpdateStore.Mutable updateStore;
+  public final LockStore.Mutable lockStore;
   public final SchedulerStore.Mutable schedulerStore;
   public final Storage storage;
 
@@ -68,7 +68,7 @@ public class StorageTestUtil {
     this.quotaStore = easyMock.createMock(QuotaStore.Mutable.class);
     this.attributeStore = easyMock.createMock(AttributeStore.Mutable.class);
     this.jobStore = easyMock.createMock(JobStore.Mutable.class);
-    this.updateStore = easyMock.createMock(UpdateStore.Mutable.class);
+    this.lockStore = easyMock.createMock(LockStore.Mutable.class);
     this.schedulerStore = easyMock.createMock(SchedulerStore.Mutable.class);
     this.storage = easyMock.createMock(Storage.class);
   }
@@ -108,14 +108,14 @@ public class StorageTestUtil {
     expect(storeProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
     expect(storeProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
     expect(storeProvider.getJobStore()).andReturn(jobStore).anyTimes();
-    expect(storeProvider.getUpdateStore()).andReturn(updateStore).anyTimes();
+    expect(storeProvider.getLockStore()).andReturn(lockStore).anyTimes();
     expect(storeProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
     expect(mutableStoreProvider.getTaskStore()).andReturn(taskStore).anyTimes();
     expect(mutableStoreProvider.getUnsafeTaskStore()).andReturn(taskStore).anyTimes();
     expect(mutableStoreProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
     expect(mutableStoreProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
     expect(mutableStoreProvider.getJobStore()).andReturn(jobStore).anyTimes();
-    expect(mutableStoreProvider.getUpdateStore()).andReturn(updateStore).anyTimes();
+    expect(mutableStoreProvider.getLockStore()).andReturn(lockStore).anyTimes();
     expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
     expectConsistentRead().anyTimes();
     expectWeaklyConsistentRead().anyTimes();

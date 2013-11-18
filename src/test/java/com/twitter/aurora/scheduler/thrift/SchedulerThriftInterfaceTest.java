@@ -499,8 +499,25 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testStartUpdate() throws Exception {
     control.replay();
-    Response resp = thrift.startUpdate(null, null);
-    assertEquals(ERROR, resp.getResponseCode());
+    assertEquals(ResponseCode.ERROR, thrift.startUpdate(null, null).getResponseCode());
+  }
+
+  @Test
+  public void testFinishUpdate() throws Exception {
+    control.replay();
+    assertEquals(ResponseCode.ERROR, thrift.finishUpdate(null, null, null, null).getResponseCode());
+  }
+
+  @Test
+  public void testUpdateShards() throws Exception {
+    control.replay();
+    assertEquals(ResponseCode.ERROR, thrift.updateShards(null, null, null, null).getResponseCode());
+  }
+
+  @Test
+  public void testRollbackShards() throws Exception {
+    control.replay();
+    assertEquals(ResponseCode.ERROR, thrift.updateShards(null, null, null, null).getResponseCode());
   }
 
   @Test

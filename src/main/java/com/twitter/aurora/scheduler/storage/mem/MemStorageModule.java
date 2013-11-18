@@ -22,12 +22,12 @@ import com.google.inject.PrivateModule;
 
 import com.twitter.aurora.scheduler.storage.AttributeStore;
 import com.twitter.aurora.scheduler.storage.JobStore;
+import com.twitter.aurora.scheduler.storage.LockStore;
 import com.twitter.aurora.scheduler.storage.QuotaStore;
 import com.twitter.aurora.scheduler.storage.SchedulerStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.Volatile;
 import com.twitter.aurora.scheduler.storage.TaskStore;
-import com.twitter.aurora.scheduler.storage.UpdateStore;
 import com.twitter.common.inject.Bindings.KeyFactory;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -43,7 +43,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *       <li>{@link com.twitter.aurora.scheduler.storage.SchedulerStore}</li>
  *       <li>{@link com.twitter.aurora.scheduler.storage.JobStore}</li>
  *       <li>{@link com.twitter.aurora.scheduler.storage.TaskStore}</li>
- *       <li>{@link com.twitter.aurora.scheduler.storage.UpdateStore}</li>
+ *       <li>{@link com.twitter.aurora.scheduler.storage.LockStore}</li>
  *       <li>{@link com.twitter.aurora.scheduler.storage.QuotaStore}</li>
  *       <li>{@link com.twitter.aurora.scheduler.storage.AttributeStore}</li>
  *     </ul>
@@ -78,7 +78,7 @@ public final class MemStorageModule extends PrivateModule {
     bindStore(SchedulerStore.Mutable.class, MemSchedulerStore.class);
     bindStore(JobStore.Mutable.class, MemJobStore.class);
     bindStore(TaskStore.Mutable.class, MemTaskStore.class);
-    bindStore(UpdateStore.Mutable.class, MemUpdateStore.class);
+    bindStore(LockStore.Mutable.class, MemLockStore.class);
     bindStore(QuotaStore.Mutable.class, MemQuotaStore.class);
     bindStore(AttributeStore.Mutable.class, MemAttributeStore.class);
   }

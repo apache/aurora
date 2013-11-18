@@ -74,9 +74,7 @@ class TaskTimeout implements EventSubscriber {
       ScheduleStatus.ASSIGNED,
       ScheduleStatus.PREEMPTING,
       ScheduleStatus.RESTARTING,
-      ScheduleStatus.KILLING,
-      ScheduleStatus.UPDATING,
-      ScheduleStatus.ROLLBACK);
+      ScheduleStatus.KILLING);
 
   @VisibleForTesting
   static final Query.Builder TRANSIENT_QUERY = Query.unscoped().byStatus(TRANSIENT_STATES);

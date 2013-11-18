@@ -63,10 +63,8 @@ import static com.twitter.aurora.gen.ScheduleStatus.LOST;
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 import static com.twitter.aurora.gen.ScheduleStatus.PREEMPTING;
 import static com.twitter.aurora.gen.ScheduleStatus.RESTARTING;
-import static com.twitter.aurora.gen.ScheduleStatus.ROLLBACK;
 import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
 import static com.twitter.aurora.gen.ScheduleStatus.STARTING;
-import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
 
 public class TaskTimeoutTest extends EasyMockTest {
 
@@ -212,13 +210,13 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Test
   public void testTaskDeleted() throws Exception {
     Capture<Runnable> assignedTimeout = expectTaskWatch();
-    Query.Builder query = Query.taskScoped(TASK_ID).byStatus(UPDATING);
+    Query.Builder query = Query.taskScoped(TASK_ID).byStatus(KILLING);
     expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(0);
 
     replayAndCreate();
 
     changeState(INIT, PENDING);
-    changeState(PENDING, UPDATING);
+    changeState(PENDING, KILLING);
     assignedTimeout.getValue().run();
     assertEquals(timedOutTaskCounter.intValue(), 0);
   }
@@ -291,8 +289,6 @@ public class TaskTimeoutTest extends EasyMockTest {
     checkOutstandingTimer(PREEMPTING, 0);
     checkOutstandingTimer(RESTARTING, 0);
     checkOutstandingTimer(KILLING, 0);
-    checkOutstandingTimer(UPDATING, 0);
-    checkOutstandingTimer(ROLLBACK, 0);
 
     changeState("a", PENDING, ASSIGNED);
 
@@ -322,7 +318,5 @@ public class TaskTimeoutTest extends EasyMockTest {
     checkOutstandingTimer(PREEMPTING, 0);
     checkOutstandingTimer(RESTARTING, 0);
     checkOutstandingTimer(KILLING, 0);
-    checkOutstandingTimer(UPDATING, 0);
-    checkOutstandingTimer(ROLLBACK, 0);
   }
 }

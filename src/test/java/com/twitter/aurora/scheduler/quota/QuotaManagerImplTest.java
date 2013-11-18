@@ -15,10 +15,7 @@
  */
 package com.twitter.aurora.scheduler.quota;
 
-import java.util.Set;
-
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
 
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
@@ -26,13 +23,10 @@ import org.junit.Test;
 
 import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.Quota;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskUpdateConfiguration;
-import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import com.twitter.aurora.scheduler.storage.entities.IQuota;
@@ -62,7 +56,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
   @Test
   public void testGetEmptyQuota() {
     storageUtil.expectOperations();
-    noActiveUpdates();
     returnNoTasks();
 
     control.replay();
@@ -73,7 +66,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
   @Test
   public void testConsumeNoQuota() {
     storageUtil.expectOperations();
-    noActiveUpdates();
     applyQuota(new Quota(1, 1, 1));
     returnNoTasks();
 
@@ -86,7 +78,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testNoQuotaExhausted() {
     storageUtil.expectOperations();
     returnNoTasks();
-    noActiveUpdates();
     expect(storageUtil.quotaStore.fetchQuota(ROLE)).andReturn(Optional.<IQuota>absent());
 
     control.replay();
@@ -101,7 +92,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2)).anyTimes();
-    noActiveUpdates();
     returnTasks(task1);
     returnTasks(task1, task2);
 
@@ -116,7 +106,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testExhaustCpu() {
     storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2));
-    noActiveUpdates();
     returnTasks(createTask("foo", "id1", 1, 1, 1));
 
     control.replay();
@@ -128,7 +117,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testExhaustRam() {
     storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2));
-    noActiveUpdates();
     returnTasks(createTask("foo", "id1", 1, 1, 1));
 
     control.replay();
@@ -140,7 +128,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testExhaustDisk() {
     storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2));
-    noActiveUpdates();
     returnTasks(createTask("foo", "id1", 1, 1, 1));
 
     control.replay();
@@ -156,36 +143,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     storageUtil.expectOperations();
     applyQuota(new Quota(2, 2, 2));
-    noActiveUpdates();
     returnTasks(task);
 
     control.replay();
 
     assertTrue(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(2, 2, 2))));
-  }
-
-  @Test
-  public void testUpdating() {
-    IScheduledTask task = createTask("bar", "id1", 1, 1, 1);
-    IScheduledTask updatingTask = createTask("foo", "id1", 1, 1, 1);
-
-    storageUtil.expectOperations();
-    applyQuota(new Quota(4, 4, 4)).anyTimes();
-    returnTasks(task, updatingTask).anyTimes();
-
-    // Simulate a job update that increases the job quota consumption.
-    expectUpdateQuery().andReturn(
-        ImmutableSet.of(new JobUpdateConfiguration(
-            JobKeys.from(ROLE, "env", "foo").newBuilder(),
-            "token",
-            ImmutableSet.of(new TaskUpdateConfiguration(
-                updatingTask.getAssignedTask().getTask().newBuilder(),
-                createTaskConfig("foo", 2, 2, 2)))))).anyTimes();
-
-    control.replay();
-
-    assertTrue(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(1, 1, 1))));
-    assertFalse(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(2, 2, 2))));
   }
 
   private IExpectationSetters<?> returnTasks(IScheduledTask... tasks) {
@@ -194,14 +156,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   private IExpectationSetters<?> returnNoTasks() {
     return returnTasks();
-  }
-
-  private IExpectationSetters<Set<JobUpdateConfiguration>> expectUpdateQuery() {
-    return expect(storageUtil.updateStore.fetchUpdateConfigs(ROLE));
-  }
-
-  private void noActiveUpdates() {
-    expectUpdateQuery().andReturn(ImmutableSet.<JobUpdateConfiguration>of()).anyTimes();
   }
 
   private IExpectationSetters<Optional<IQuota>> applyQuota(Quota quota) {

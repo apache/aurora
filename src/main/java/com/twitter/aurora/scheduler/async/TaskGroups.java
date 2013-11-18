@@ -69,8 +69,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.aurora.gen.ScheduleStatus.KILLING;
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 import static com.twitter.aurora.gen.ScheduleStatus.RESTARTING;
-import static com.twitter.aurora.gen.ScheduleStatus.ROLLBACK;
-import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
 import static com.twitter.aurora.scheduler.async.TaskGroup.GroupState;
 
 /**
@@ -234,7 +232,7 @@ public class TaskGroups implements EventSubscriber {
   };
 
   private static final Set<ScheduleStatus> INTERRUPTED_TASK_STATES =
-      EnumSet.of(RESTARTING, KILLING, UPDATING, ROLLBACK);
+      EnumSet.of(RESTARTING, KILLING);
 
   private final Predicate<IScheduledTask> flapped = new Predicate<IScheduledTask>() {
     @Override public boolean apply(IScheduledTask task) {

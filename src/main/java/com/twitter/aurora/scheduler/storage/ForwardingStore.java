@@ -25,7 +25,6 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.JobUpdateConfiguration;
 import com.twitter.aurora.gen.MaintenanceMode;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -47,7 +46,7 @@ public class ForwardingStore implements
     SchedulerStore.Mutable,
     JobStore.Mutable,
     TaskStore.Mutable,
-    UpdateStore.Mutable,
+    LockStore.Mutable,
     QuotaStore.Mutable,
     AttributeStore.Mutable {
 
@@ -55,7 +54,7 @@ public class ForwardingStore implements
   private final SchedulerStore.Mutable schedulerStore;
   private final JobStore.Mutable jobStore;
   private final TaskStore.Mutable taskStore;
-  private final UpdateStore.Mutable updateStore;
+  private final LockStore.Mutable lockStore;
   private final QuotaStore.Mutable quotaStore;
   private final AttributeStore.Mutable attributeStore;
 
@@ -66,7 +65,7 @@ public class ForwardingStore implements
    * @param schedulerStore Delegate.
    * @param jobStore Delegate.
    * @param taskStore Delegate.
-   * @param updateStore Delegate.
+   * @param lockStore Delegate.
    * @param quotaStore Delegate.
    * @param attributeStore Delegate.
    */
@@ -75,7 +74,7 @@ public class ForwardingStore implements
       SchedulerStore.Mutable schedulerStore,
       JobStore.Mutable jobStore,
       TaskStore.Mutable taskStore,
-      UpdateStore.Mutable updateStore,
+      LockStore.Mutable lockStore,
       QuotaStore.Mutable quotaStore,
       AttributeStore.Mutable attributeStore) {
 
@@ -83,7 +82,7 @@ public class ForwardingStore implements
     this.schedulerStore = checkNotNull(schedulerStore);
     this.jobStore = checkNotNull(jobStore);
     this.taskStore = checkNotNull(taskStore);
-    this.updateStore = checkNotNull(updateStore);
+    this.lockStore = checkNotNull(lockStore);
     this.quotaStore = checkNotNull(quotaStore);
     this.attributeStore = checkNotNull(attributeStore);
   }
@@ -186,58 +185,28 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void saveJobUpdateConfig(JobUpdateConfiguration updateConfiguration) {
-    updateStore.saveJobUpdateConfig(updateConfiguration);
-  }
-
-  @Override
-  public Optional<JobUpdateConfiguration> fetchJobUpdateConfig(IJobKey jobKey) {
-    return updateStore.fetchJobUpdateConfig(jobKey);
-  }
-
-  @Override
-  public Set<JobUpdateConfiguration> fetchUpdateConfigs(String role) {
-    return updateStore.fetchUpdateConfigs(role);
-  }
-
-  @Override
-  public Set<String> fetchUpdatingRoles() {
-    return updateStore.fetchUpdatingRoles();
-  }
-
-  @Override
   public Set<ILock> fetchLocks() {
-    return updateStore.fetchLocks();
+    return lockStore.fetchLocks();
   }
 
   @Override
   public Optional<ILock> fetchLock(ILockKey lockKey) {
-    return updateStore.fetchLock(lockKey);
+    return lockStore.fetchLock(lockKey);
   }
 
   @Override
   public void saveLock(ILock lock) {
-    updateStore.saveLock(lock);
+    lockStore.saveLock(lock);
   }
 
   @Override
   public void removeLock(ILockKey lockKey) {
-    updateStore.removeLock(lockKey);
+    lockStore.removeLock(lockKey);
   }
 
   @Override
   public void deleteLocks() {
-    updateStore.deleteLocks();
-  }
-
-  @Override
-  public void deleteShardUpdateConfigs() {
-    updateStore.deleteShardUpdateConfigs();
-  }
-
-  @Override
-  public void removeShardUpdateConfigs(IJobKey jobKey) {
-    updateStore.removeShardUpdateConfigs(jobKey);
+    lockStore.deleteLocks();
   }
 
   @Override

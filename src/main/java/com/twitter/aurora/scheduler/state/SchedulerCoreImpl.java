@@ -15,9 +15,8 @@
  */
 package com.twitter.aurora.scheduler.state;
 
-import java.util.Map;
+
 import java.util.Set;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
@@ -34,8 +33,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ShardUpdateResult;
-import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.TaskIdGenerator;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
@@ -43,7 +40,6 @@ import com.twitter.aurora.scheduler.base.ScheduleException;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import com.twitter.aurora.scheduler.configuration.SanitizedConfiguration;
-import com.twitter.aurora.scheduler.state.StateManagerImpl.UpdateException;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
@@ -60,8 +56,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import static com.twitter.aurora.gen.ScheduleStatus.KILLING;
 import static com.twitter.aurora.gen.ScheduleStatus.RESTARTING;
-import static com.twitter.aurora.gen.ScheduleStatus.ROLLBACK;
-import static com.twitter.aurora.gen.ScheduleStatus.UPDATING;
 import static com.twitter.aurora.scheduler.base.Tasks.ACTIVE_STATES;
 
 /**
@@ -74,12 +68,6 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   private static final Logger LOG = Logger.getLogger(SchedulerCoreImpl.class.getName());
 
-  private static final Predicate<IScheduledTask> IS_UPDATING = new Predicate<IScheduledTask>() {
-    @Override public boolean apply(IScheduledTask task) {
-      return task.getStatus() == UPDATING || task.getStatus() == ROLLBACK;
-    }
-  };
-
   private final Storage storage;
 
   private final CronJobManager cronScheduler;
@@ -90,6 +78,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   // TODO(Bill Farner): Avoid using StateManagerImpl.
   // State manager handles persistence of task modifications and state transitions.
   private final StateManagerImpl stateManager;
+
   private final TaskIdGenerator taskIdGenerator;
   private final JobFilter jobFilter;
 
@@ -272,7 +261,6 @@ class SchedulerCoreImpl implements SchedulerCore {
     LOG.info("Killing tasks matching " + query);
 
     boolean jobDeleted = false;
-    boolean updateFinished = false;
 
     if (Query.isOnlyJobScoped(query)) {
       // If this looks like a query for all tasks in a job, instruct the scheduler modules to
@@ -283,20 +271,6 @@ class SchedulerCoreImpl implements SchedulerCore {
           jobDeleted = true;
         }
       }
-
-      if (!jobDeleted) {
-        try {
-          updateFinished = stateManager.finishUpdate(
-              jobKey,
-              user,
-              Optional.<String>absent(),
-              UpdateResult.TERMINATE,
-              false);
-        } catch (UpdateException e) {
-          LOG.severe(
-              String.format("Could not terminate job update for %s\n%s", query, e.getMessage()));
-        }
-      }
     }
 
     // Unless statuses were specifically supplied, only attempt to kill active tasks.
@@ -304,7 +278,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
     int tasksAffected =
         stateManager.changeState(taskQuery, KILLING, Optional.of("Killed by " + user));
-    if (!jobDeleted && !updateFinished && (tasksAffected == 0)) {
+    if (!jobDeleted && (tasksAffected == 0)) {
       throw new ScheduleException("No jobs to kill");
     }
   }
@@ -341,86 +315,6 @@ class SchedulerCoreImpl implements SchedulerCore {
     });
   }
 
-  @Override
-  public synchronized Optional<String> initiateJobUpdate(
-      final SanitizedConfiguration sanitizedConfiguration) throws ScheduleException {
-
-    final IJobConfiguration job = sanitizedConfiguration.getJobConfig();
-    final IJobKey jobKey = job.getKey();
-    if (cronScheduler.hasJob(jobKey)) {
-      cronScheduler.updateJob(sanitizedConfiguration);
-      return Optional.absent();
-    }
-
-    return storage.write(new MutateWork<Optional<String>, ScheduleException>() {
-      @Override public Optional<String> apply(MutableStoreProvider storeProvider)
-          throws ScheduleException {
-        Query.Builder query = Query.jobScoped(jobKey).active();
-        Set<IScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(query);
-
-        // Reject if any existing task for the job is in UPDATING/ROLLBACK
-        if (Iterables.any(existingTasks, IS_UPDATING)) {
-          throw new ScheduleException("Update/Rollback already in progress for "
-              + JobKeys.toPath(job));
-        }
-
-        runJobFilters(jobKey, job.getTaskConfig(), job.getInstanceCount(), false);
-
-        try {
-          return Optional.of(
-              stateManager.registerUpdate(jobKey, sanitizedConfiguration.getTaskConfigs()));
-        } catch (UpdateException e) {
-          LOG.log(Level.INFO, "Failed to start update.", e);
-          throw new ScheduleException(e.getMessage(), e);
-        }
-      }
-    });
-  }
-
-  @Override
-  public synchronized Map<Integer, ShardUpdateResult> updateShards(
-      IJobKey jobKey,
-      String invokingUser,
-      Set<Integer> shards,
-      String updateToken) throws ScheduleException {
-
-    try {
-      return stateManager.modifyShards(jobKey, invokingUser, shards, updateToken, true);
-    } catch (UpdateException e) {
-      LOG.log(Level.INFO, "Failed to update shards for " + JobKeys.toPath(jobKey), e);
-      throw new ScheduleException(e.getMessage(), e);
-    }
-  }
-
-  @Override
-  public synchronized Map<Integer, ShardUpdateResult> rollbackShards(
-      IJobKey jobKey,
-      String invokingUser,
-      Set<Integer> shards,
-      String updateToken) throws ScheduleException {
-
-    try {
-      return stateManager.modifyShards(jobKey, invokingUser, shards, updateToken, false);
-    } catch (UpdateException e) {
-      LOG.log(Level.INFO, "Failed to roll back shards for " + JobKeys.toPath(jobKey), e);
-      throw new ScheduleException(e.getMessage(), e);
-    }
-  }
-
-  @Override
-  public synchronized void finishUpdate(
-      IJobKey jobKey,
-      String invokingUser,
-      Optional<String> updateToken,
-      UpdateResult result) throws ScheduleException {
-
-    try {
-      stateManager.finishUpdate(jobKey, invokingUser, updateToken, result, true);
-    } catch (UpdateException e) {
-      LOG.log(Level.INFO, "Failed to finish update for " + JobKeys.toPath(jobKey), e);
-      throw new ScheduleException(e.getMessage(), e);
-    }
-  }
 
   @Override
   public synchronized void preemptTask(IAssignedTask task, IAssignedTask preemptingTask) {
