@@ -181,7 +181,7 @@ public final class StorageBackfill {
    *
    * @param task Task to possibly modify when ensuring backwards compatibility.
    */
-  public static void dualWriteInstanceId(AssignedTask task) {
+  private static void dualWriteInstanceId(AssignedTask task) {
     boolean oldFieldSet = task.getTask().isSetInstanceIdDEPRECATED();
     boolean newFieldSet = task.isSetInstanceId();
     if (oldFieldSet && newFieldSet) {
@@ -198,6 +198,18 @@ public final class StorageBackfill {
     } else {
       throw new IllegalStateException(
           "Task " + task.getTaskId() + " does not have an instance id.");
+    }
+  }
+
+  /**
+   * Ensures backwards-compatibility of the throttled state, which exists in this version but is
+   * not handled.
+   *
+   * @param task Task to possibly rewrite.
+   */
+  private static void rewriteThrottledState(ScheduledTask task) {
+    if (ScheduleStatus.THROTTLED == task.getStatus()) {
+      task.setStatus(ScheduleStatus.PENDING);
     }
   }
 
@@ -222,6 +234,7 @@ public final class StorageBackfill {
         guaranteeShardUniqueness(builder, storeProvider.getUnsafeTaskStore(), clock);
         convertToExecutorConfig(builder);
         dualWriteInstanceId(builder.getAssignedTask());
+        rewriteThrottledState(builder);
         return IScheduledTask.build(builder);
       }
     });

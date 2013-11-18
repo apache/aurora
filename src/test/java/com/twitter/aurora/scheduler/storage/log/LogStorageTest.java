@@ -48,6 +48,7 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskUpdateConfiguration;
+import com.twitter.aurora.gen.storage.Constants;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.RemoveJob;
@@ -719,7 +720,8 @@ public class LogStorageTest extends EasyMockTest {
   }
 
   private LogEntry createTransaction(Op... ops) {
-    return LogEntry.transaction(new Transaction(ImmutableList.copyOf(ops)));
+    return LogEntry.transaction(
+        new Transaction(ImmutableList.copyOf(ops), Constants.CURRENT_SCHEMA_VERSION));
   }
 
   private static IScheduledTask task(String id, ScheduleStatus status) {

@@ -15,6 +15,7 @@ import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.LimitConstraint;
+import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
@@ -172,6 +173,24 @@ public class StorageBackfillTest {
         Optional.of(new ExecutorConfig(auroraExecutor, thermosConfigString)));
 
     assertEquals(expectedTask, getTask(newId));
+  }
+
+  @Test
+  public void testRewriteThrottledState() {
+    final IScheduledTask savedTask =
+        IScheduledTask.build(makeTask("id", Optional.<Integer>absent(), Optional.of(0)).newBuilder()
+            .setStatus(ScheduleStatus.THROTTLED));
+
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(savedTask));
+        StorageBackfill.backfill(storeProvider, clock);
+      }
+    });
+
+    assertEquals(
+        IScheduledTask.build(savedTask.newBuilder().setStatus(ScheduleStatus.PENDING)),
+        getTask("id"));
   }
 
   @Test

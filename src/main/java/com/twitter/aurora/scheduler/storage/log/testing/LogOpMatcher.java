@@ -24,6 +24,7 @@ import org.easymock.IExpectationSetters;
 
 import com.twitter.aurora.codec.ThriftBinaryCodec;
 import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
+import com.twitter.aurora.gen.storage.Constants;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.Snapshot;
@@ -82,7 +83,8 @@ public class LogOpMatcher implements IArgumentMatcher {
      * @return An expectation setter.
      */
     public IExpectationSetters<Position> expectTransaction(Op...ops) {
-      LogEntry entry = LogEntry.transaction(new Transaction().setOps(ImmutableList.copyOf(ops)));
+      LogEntry entry = LogEntry.transaction(
+          new Transaction(ImmutableList.copyOf(ops), Constants.CURRENT_SCHEMA_VERSION));
       return expect(stream.append(sameEntry(entry)));
     }
 

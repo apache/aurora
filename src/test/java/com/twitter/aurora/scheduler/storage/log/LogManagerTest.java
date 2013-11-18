@@ -44,6 +44,7 @@ import com.twitter.aurora.gen.HostAttributes;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
+import com.twitter.aurora.gen.storage.Constants;
 import com.twitter.aurora.gen.storage.Frame;
 import com.twitter.aurora.gen.storage.FrameChunk;
 import com.twitter.aurora.gen.storage.FrameHeader;
@@ -535,7 +536,8 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   private LogEntry createLogEntry(Op... ops) {
-    return LogEntry.transaction(new Transaction(ImmutableList.copyOf(ops)));
+    return LogEntry.transaction(
+        new Transaction(ImmutableList.copyOf(ops), Constants.CURRENT_SCHEMA_VERSION));
   }
 
   private void expectAppend(Position position, LogEntry logEntry) throws CodingException {

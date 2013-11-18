@@ -44,6 +44,7 @@ import com.google.inject.BindingAnnotation;
 
 import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.storage.Constants;
 import com.twitter.aurora.gen.storage.Frame;
 import com.twitter.aurora.gen.storage.FrameChunk;
 import com.twitter.aurora.gen.storage.FrameHeader;
@@ -382,7 +383,8 @@ public final class LogManager {
      * transaction and then later committed as an atomic unit.
      */
     final class StreamTransaction {
-      private final Transaction transaction = new Transaction();
+      private final Transaction transaction =
+          new Transaction().setSchemaVersion(Constants.CURRENT_SCHEMA_VERSION);
       private final AtomicBoolean committed = new AtomicBoolean(false);
 
       private StreamTransaction() {
