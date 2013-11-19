@@ -48,7 +48,7 @@ pushd "$PANTS_TEMP"
 
 curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-$VIRTUALENV_VERSION.tar.gz
 tar -zxf virtualenv-$VIRTUALENV_VERSION.tar.gz
-python virtualenv-$VIRTUALENV_VERSION/virtualenv.py tcp
+$PY virtualenv-$VIRTUALENV_VERSION/virtualenv.py tcp
 source tcp/bin/activate
 
 pip install twitter.common.python==0.2.0
