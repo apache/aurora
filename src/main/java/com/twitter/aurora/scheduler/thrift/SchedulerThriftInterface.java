@@ -80,7 +80,6 @@ import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.StartMaintenanceResult;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.UpdateResult;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.ScheduleException;
@@ -527,46 +526,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return response;
   }
 
-  private static final Response DEPRECATED_CLIENT_RESPONSE = new Response()
-      .setResponseCode(ERROR)
-      .setMessage("This client version is deprecated. Please, sync Aurora client "
-          + "to the latest version and retry your action. See: go/getaurora for more details.");
-
-  @Override
-  public Response startUpdate(JobConfiguration mutableJob, SessionKey session) {
-    return DEPRECATED_CLIENT_RESPONSE;
-  }
-
-  @Override
-  public Response updateShards(
-      JobKey mutableJobKey,
-      Set<Integer> shards,
-      String updateToken,
-      SessionKey session) {
-
-    return DEPRECATED_CLIENT_RESPONSE;
-  }
-
-  @Override
-  public Response rollbackShards(
-      JobKey mutableJobKey,
-      Set<Integer> shards,
-      String updateToken,
-      SessionKey session) {
-
-    return DEPRECATED_CLIENT_RESPONSE;
-  }
-
-  @Override
-  public Response finishUpdate(
-      JobKey mutableJobKey,
-      UpdateResult updateResult,
-      String updateToken,
-      SessionKey session) {
-
-    return DEPRECATED_CLIENT_RESPONSE;
-  }
-
   @Override
   public Response restartShards(
       JobKey mutableJobKey,
@@ -756,11 +715,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     return response;
-  }
-
-  @Override
-  public Response getJobUpdates(SessionKey session) {
-    return DEPRECATED_CLIENT_RESPONSE;
   }
 
   @Override

@@ -68,7 +68,7 @@ public class AopModuleTest extends EasyMockTest {
 
   @Test
   public void testNonFlaggedMethod() throws Exception {
-    assertCreateAllowed(ImmutableMap.of("startUpdate", false));
+    assertCreateAllowed(ImmutableMap.of("acquireLock", false));
   }
 
   @Test

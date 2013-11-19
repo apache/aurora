@@ -452,8 +452,6 @@ public final class LogManager {
             return true;
 
           case SAVE_ACCEPTED_JOB:
-          case SAVE_JOB_UPDATE:
-          case REMOVE_JOB_UPDATE:
           case REMOVE_JOB:
           case SAVE_QUOTA:
           case REMOVE_QUOTA:

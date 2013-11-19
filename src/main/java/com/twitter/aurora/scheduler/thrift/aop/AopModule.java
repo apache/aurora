@@ -69,7 +69,7 @@ public class AopModule extends AbstractModule {
   public AopModule() {
     this(ImmutableMap.of(
         "createJob", ENABLE_JOB_CREATION.get(),
-        "startUpdate", ENABLE_UPDATES.get()));
+        "acquireLock", ENABLE_UPDATES.get()));
   }
 
   @VisibleForTesting

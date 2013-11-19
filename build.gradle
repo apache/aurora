@@ -83,7 +83,7 @@ dependencies {
   def slf4jRev = '1.6.1'
   compile "org.slf4j:slf4j-api:${slf4jRev}"
   compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
-  compile 'com.twitter.aurora:aurora:0.0.4'
+  compile 'com.twitter.aurora:aurora:0.0.5'
   compile 'com.twitter.common.logging:log4j:0.0.3'
   compile 'com.twitter.common.webassets:bootstrap:0.0.1'
   compile 'com.twitter.common.webassets:jquery:0.0.1'

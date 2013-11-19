@@ -378,14 +378,6 @@ public class LogStorage extends ForwardingStore
             IJobConfiguration.build(acceptedJob.getJobConfig()));
         break;
 
-      case SAVE_JOB_UPDATE:
-        // Ignore recovery of JobUpdateConfiguration. To be removed when thrift is updated.
-        break;
-
-      case REMOVE_JOB_UPDATE:
-        // Ignore recovery of JobUpdateConfiguration. To be removed when thrift is updated.
-        break;
-
       case REMOVE_JOB:
         removeJob(IJobKey.build(op.getRemoveJob().getJobKey()));
         break;

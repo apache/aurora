@@ -34,7 +34,6 @@ import com.twitter.aurora.gen.RewriteConfigsRequest;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.SessionKey;
 import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.UpdateResult;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -135,43 +134,6 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response startUpdate(JobConfiguration updatedConfig, SessionKey session)
-      throws TException {
-
-    return delegate.startUpdate(updatedConfig, session);
-  }
-
-  @Override
-  public Response updateShards(
-      JobKey job,
-      Set<Integer> shardIds,
-      String updateToken,
-      SessionKey session) throws TException {
-
-    return delegate.updateShards(job, shardIds, updateToken, session);
-  }
-
-  @Override
-  public Response rollbackShards(
-      JobKey job,
-      Set<Integer> shardIds,
-      String updateToken,
-      SessionKey session) throws TException {
-
-    return delegate.rollbackShards(job, shardIds, updateToken, session);
-  }
-
-  @Override
-  public Response finishUpdate(
-      JobKey job,
-      UpdateResult updateResult,
-      String updateToken,
-      SessionKey session) throws TException {
-
-    return delegate.finishUpdate(job, updateResult, updateToken, session);
-  }
-
-  @Override
   public Response restartShards(
       JobKey job,
       Set<Integer> shardIds,
@@ -223,11 +185,6 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   @Override
   public Response endMaintenance(Hosts hosts, SessionKey session) throws TException {
     return delegate.endMaintenance(hosts, session);
-  }
-
-  @Override
-  public Response getJobUpdates(SessionKey session) throws TException {
-    return delegate.getJobUpdates(session);
   }
 
   @Override
