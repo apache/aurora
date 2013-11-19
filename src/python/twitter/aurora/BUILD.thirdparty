@@ -9,12 +9,11 @@ def make_dep(name, version, dependency_name=None):
   versioned_name = "%s==%s" % (dependency_name, version)
   python_requirement(requirement=versioned_name, name=name)
 
+make_dep('mesos-core', '0.15.0-rc3', 'mesos')
 make_dep('mock', '1.0.1')
 make_dep('mox', '0.5.3')
 make_dep('psutil', '1.1.2')
 make_dep('pystachio', '0.7.2')
 make_dep('pyyaml', '3.10', 'PyYAML')
+make_dep('socksipy-branch', '1.01', 'SocksiPy-Branch')
 make_dep('thrift', '0.9.0')
-
-# TODO(wickman) This must be switched to 1.01 post-split
-make_dep('socksipy-branch', '1.03', 'SocksiPy-Branch')

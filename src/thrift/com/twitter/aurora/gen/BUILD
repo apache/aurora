@@ -11,15 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 TEST_DATA = globs('*test.thrift')
 
 java_thrift_library(
   name = 'thrift',
-  provides = artifact(
-    org = 'com.twitter.aurora',
-    name = 'aurora',
-    repo = pants('build-support/twitter/ivy:internal'),
-  ),
   sources = globs('*.thrift'),
 )
 

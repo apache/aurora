@@ -27,3 +27,8 @@ python_requirement(
   name = 'thrift',
   requirement = 'thrift==0.9.0',
 )
+
+python_requirement(
+  name = 'mock',
+  requirement = 'mock==1.0.1',
+)

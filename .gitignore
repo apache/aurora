@@ -4,8 +4,10 @@
 *.pyc
 *~
 .gradle/
-.pants.d/
+.pants.*
 .reviewboardrc
+.vagrant/
+artifacts/
 dist/
 gradle-app.setting
 out/

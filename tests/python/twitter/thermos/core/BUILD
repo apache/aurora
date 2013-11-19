@@ -76,8 +76,8 @@ python_tests(name = 'test_failure_limit',
 python_tests(name = 'test_helper',
   sources = ['test_helper.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:psutil'),
+    pants('src/python/twitter/thermos/BUILD.thirdparty:mock'),
+    pants('src/python/twitter/thermos/BUILD.thirdparty:psutil'),
     pants('src/python/twitter/thermos/core:helper'),
   ]
 )
@@ -85,8 +85,8 @@ python_tests(name = 'test_helper',
 python_tests(name = 'test_process',
   sources = ['test_process.py'],
   dependencies = [
+    pants('src/python/twitter/thermos/BUILD.thirdparty:mock'),
     pants('src/python/twitter/thermos/testing:runner'),
-    pants('3rdparty/python:mock'),
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
   ],
 )
