@@ -76,9 +76,16 @@ pb.info.entry_point = 'twitter.pants.bin.pants_exe:main'
 pb.build('dist/pants.pex')
 EOF
 
+BUILD_SUCCESS=$?
+
 deactivate
 
 popd
+
+if [ $BUILD_SUCCESS -ne 0 ]; then
+  echo 'Failed to build pants.'
+  exit 1
+fi
 
 cp -f -- "$PANTS_TEMP/dist/pants.pex" "$PANTS_ROOT"
 rm -rf "$PANTS_TEMP"
