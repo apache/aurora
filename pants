@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-
 PANTS_ROOT=$(dirname "$0")
 PANTS_VERSION=$(cat "$PANTS_ROOT/.pantsversion")
 VIRTUALENV_VERSION=1.10.1

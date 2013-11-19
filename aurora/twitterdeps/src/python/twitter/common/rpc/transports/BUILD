@@ -1,4 +1,6 @@
-python_requirement(
+python_library(
   name = 'tsslsocket',
-  requirement = 'twitter.common.rpc==0.1.0',
+  dependencies = [
+    pants('aurora/twitterdeps/src/python/twitter/common/rpc'),
+  ],
 )
