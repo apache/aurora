@@ -6,7 +6,6 @@ from twitter.common import log
 
 from twitter.aurora.client.api import AuroraClientAPI
 from twitter.aurora.config.schema.base import MesosContext
-from twitter.aurora.config.thrift import resolve_thermos_config
 from twitter.aurora.common.cluster import Cluster
 from twitter.thermos.config.schema import ThermosContext
 
@@ -83,7 +82,7 @@ class DistributedCommandRunner(object):
 
   @classmethod
   def substitute(cls, command, task, cluster, **kw):
-    if resolve_thermos_config(task.assignedTask.task):
+    if task.assignedTask.task.executorConfig:
       return cls.substitute_thermos(command, task, cluster, **kw)
     else:
       return cls.substitute_aurora(command, task, cluster, **kw)

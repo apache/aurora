@@ -207,7 +207,6 @@ invoking cancel_update.
 
   def _unset_deprecated_fields(self, from_config, to_config):
     """Unsets deprecated fields in task configs to provide common base for diffing.
-       TODO(maximk): remove when instanceIdDEPRECATED and thermosConfig are out of thrift.
 
        Arguments:
        from_config - task config to update from.
@@ -215,11 +214,9 @@ invoking cancel_update.
     """
     if from_config:
       from_config.instanceIdDEPRECATED = None
-      from_config.thermosConfig = None
 
     if to_config:
       to_config.instanceIdDEPRECATED = None
-      to_config.thermosConfig = None
 
 
   def _update_instances(self, instance_ids, operation_configs):

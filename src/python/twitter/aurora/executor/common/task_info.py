@@ -2,7 +2,7 @@ import json
 
 from twitter.aurora.config.port_resolver import PortResolver
 from twitter.aurora.config.schema.base import MesosJob, MesosTaskInstance
-from twitter.aurora.config.thrift import resolve_thermos_config, task_instance_from_job
+from twitter.aurora.config.thrift import task_instance_from_job
 from twitter.common import log
 
 from gen.twitter.aurora.ttypes import AssignedTask
@@ -23,7 +23,7 @@ def assigned_task_from_mesos_task(task):
 
 def mesos_job_from_assigned_task(assigned_task):
   """Deserialize a MesosJob pystachio struct from an AssignedTask."""
-  thermos_task = resolve_thermos_config(assigned_task.task)
+  thermos_task = assigned_task.task.executorConfig.data
   try:
     json_blob = json.loads(thermos_task)
   except (TypeError, ValueError):
@@ -36,7 +36,7 @@ def mesos_job_from_assigned_task(assigned_task):
 
 def mesos_task_instance_from_assigned_task(assigned_task):
   """Deserialize MesosTaskInstance from an AssignedTask thrift."""
-  thermos_task = resolve_thermos_config(assigned_task.task)
+  thermos_task = assigned_task.task.executorConfig.data
 
   if not thermos_task:
     raise ValueError('Task did not have a thermos config!')

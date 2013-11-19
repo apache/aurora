@@ -41,10 +41,9 @@ from twitter.aurora.client.options import (
     SHARDS_OPTION,
     WAIT_UNTIL_OPTION)
 from twitter.aurora.common.aurora_job_key import AuroraJobKey
-from twitter.aurora.config.thrift import resolve_thermos_config
 
-from gen.twitter.aurora.constants import ACTIVE_STATES, CURRENT_API_VERSION
-from gen.twitter.aurora.ttypes import ResponseCode, ScheduleStatus
+from gen.twitter.aurora.constants import ACTIVE_STATES, CURRENT_API_VERSION, AURORA_EXECUTOR_NAME
+from gen.twitter.aurora.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
 
 
 def get_job_config(job_spec, config_file, options):
@@ -160,7 +159,9 @@ def diff(job_spec, config_file):
   def pretty_print_task(task):
     # The raw configuration is not interesting - we only care about what gets parsed.
     task.configuration = None
-    task.thermosConfig = json.loads(resolve_thermos_config(task))
+    task.executorConfig = ExecutorConfig(
+        name=AURORA_EXECUTOR_NAME,
+        data=json.loads(task.executorConfig.data))
     return pp.pformat(vars(task))
 
   def pretty_print_tasks(tasks):

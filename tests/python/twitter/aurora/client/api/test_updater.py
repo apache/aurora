@@ -408,7 +408,6 @@ class UpdaterTest(TestCase):
     old_configs = self.make_task_configs(5)
     new_config = old_configs[0]
     old_configs[1].instanceIdDEPRECATED = 7
-    old_configs[1].thermosConfig = "thermos config"
     job_config = self.make_job_config(new_config, 5)
     self._config.job_config = job_config
     self.expect_start()

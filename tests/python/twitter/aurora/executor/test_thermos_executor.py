@@ -37,8 +37,10 @@ from twitter.thermos.common.path import TaskPath
 from twitter.thermos.core.runner import TaskRunner
 from twitter.thermos.monitoring.monitor import TaskMonitor
 
+from gen.twitter.aurora.constants import AURORA_EXECUTOR_NAME
 from gen.twitter.aurora.ttypes import (
   AssignedTask,
+  ExecutorConfig,
   Identity,
   TaskConfig,
 )
@@ -121,7 +123,9 @@ def make_task(thermos_config, assigned_ports={}, **kw):
   at = AssignedTask(
       taskId=task_id,
       task=TaskConfig(
-          thermosConfig=thermos_config.json_dumps(),
+          executorConfig=ExecutorConfig(
+              name=AURORA_EXECUTOR_NAME,
+              data=thermos_config.json_dumps()),
           owner=Identity(role=role, user=role)),
       assignedPorts=assigned_ports,
       **kw)
@@ -493,7 +497,9 @@ class TestThermosExecutor(object):
 
     task_info = mesos_pb.TaskInfo()
     task_info.name = task_info.task_id.value = 'broken'
-    task_info.data = serialize(AssignedTask(task=TaskConfig(thermosConfig='garbage')))
+    task_info.data = serialize(AssignedTask(task=TaskConfig(executorConfig=ExecutorConfig(
+        name=AURORA_EXECUTOR_NAME,
+        data='garbage'))))
 
     te = ThermosExecutor(
         runner_provider=make_provider(safe_mkdtemp()),

@@ -36,20 +36,6 @@ MESOS_JOB = MesosJob(
   role = getpass.getuser(),
 )
 
-
-def test_deserialize_thermos_task_old():
-  """TODO(maximk): decomission this test once migration to thermosConfigData is done."""
-  assigned_task = AssignedTask(
-      task=TaskConfig(thermosConfig=MESOS_JOB(task=HELLO_WORLD).json_dumps()),
-      instanceId=0)
-  assert mesos_task_instance_from_assigned_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
-
-  assigned_task = AssignedTask(
-      task=TaskConfig(thermosConfig=HELLO_WORLD_MTI.json_dumps()),
-      instanceId=0)
-  assert mesos_task_instance_from_assigned_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
-
-
 def test_deserialize_thermos_task():
   task_config = TaskConfig(
       executorConfig=ExecutorConfig(name='thermos', data=MESOS_JOB(task=HELLO_WORLD).json_dumps()))

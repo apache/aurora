@@ -9,7 +9,7 @@ from twitter.aurora.config.schema.base import (
 from twitter.common.lang import Compatibility
 from twitter.thermos.config.loader import ThermosTaskValidator
 
-from gen.twitter.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
+from gen.twitter.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON, AURORA_EXECUTOR_NAME
 from gen.twitter.aurora.ttypes import (
   Constraint,
   CronCollisionPolicy,
@@ -247,7 +247,7 @@ def convert(job, packages=frozenset(), ports=frozenset()):
   cron_policy = select_cron_policy(job.cron_policy(), job.cron_collision_policy())
 
   task.executorConfig = ExecutorConfig(
-      name='AuroraExecutor',
+      name=AURORA_EXECUTOR_NAME,
       data=filter_aliased_fields(underlying).json_dumps())
 
   return JobConfiguration(
@@ -257,10 +257,3 @@ def convert(job, packages=frozenset(), ports=frozenset()):
       cronCollisionPolicy=cron_policy,
       taskConfig=task,
       instanceCount=fully_interpolated(job.instances()))
-
-def resolve_thermos_config(task):
-  """TODO(maximk): Delete this method when migration to executorConfig is done"""
-  if task.executorConfig is None:
-    return task.thermosConfig
-
-  return task.executorConfig.data

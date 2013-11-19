@@ -41,8 +41,7 @@ class TestRunCommand(AuroraClientCommandTest):
       job.assignedTask.taskId = 1287391823
       job.assignedTask.slaveHost = 'slavehost'
       job.assignedTask.task = Mock(spec=TaskConfig)
-      job.assignedTask.task.executorConfig = None
-      job.assignedTask.task.thermosConfig = Mock()
+      job.assignedTask.task.executorConfig = Mock()
       job.assignedTask.task.maxTaskFailures = 1
       job.assignedTask.task.packages = []
       job.assignedTask.task.owner = Identity(role='mchucarroll')

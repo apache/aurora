@@ -31,6 +31,9 @@ struct APIVersion {
 // Scheduler Thrift API Version. Increment this when breaking backwards compatibility.
 const APIVersion CURRENT_API_VERSION = {'major': 3}
 
+// Aurora executor framework name.
+const string AURORA_EXECUTOR_NAME = 'AuroraExecutor'
+
 struct Identity {
   1: string role
   2: string user
@@ -161,8 +164,6 @@ struct TaskConfig {
                                              // for a job that has N instances.
  18: optional bool production                // Whether this is a production task, which can preempt
                                              // non-production tasks.
- 19: optional binary thermosConfig           // TODO(maximk): Deprecate once fully converted to
-                                             // executorConfig
  20: set<Constraint> constraints
  21: set<string> requestedPorts              // a list of named ports this task requests
  22: optional map<string, string> taskLinks  // Custom links to include when displaying this task
@@ -537,7 +538,7 @@ service AuroraAdmin extends AuroraSchedulerManager {
 
   // Forcibly rewrites the stored definition of user configurations.  This is intended to be used
   // in a controlled setting, primarily to migrate pieces of configurations that are opaque to the
-  // scheduler (e.g. thermosConfig).
+  // scheduler (e.g. executorConfig).
   // The scheduler may do some validation of the rewritten configurations, but it is important
   // that the caller take care to provide valid input and alter only necessary fields.
   Response rewriteConfigs(1: RewriteConfigsRequest request, 2: SessionKey session)
