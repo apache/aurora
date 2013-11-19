@@ -67,6 +67,7 @@ python_library(
     pants(':status_manager'),
     pants(':thermos_executor_base'),
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
+    pants('aurora/twitterdeps/src/python/twitter/common/concurrent'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
     pants('src/python/twitter/aurora/executor/common:kill_manager'),

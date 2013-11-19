@@ -10,3 +10,4 @@ dist/
 gradle-app.setting
 out/
 pants.pex
+third_party/
