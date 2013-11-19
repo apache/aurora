@@ -19,13 +19,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
-import com.google.common.base.Charsets;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.ExecutorConfig;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -104,71 +102,6 @@ public final class StorageBackfill {
     }
   }
 
-  private static final AtomicLong BOTH_CONFIGS_SET = Stats.exportLong("both_configs_set");
-  private static final AtomicLong OLD_CONFIG_SET = Stats.exportLong("old_conifg_id_set");
-  private static final AtomicLong NEW_CONFIG_SET = Stats.exportLong("new_config_set");
-  private static final AtomicLong CONFIGS_INCONSISTENT = Stats.exportLong("configs_inconsistent");
-
-  private static final AtomicLong JOB_BOTH_CONFIGS_SET = Stats.exportLong("job_both_configs_set");
-  private static final AtomicLong JOB_OLD_CONFIG_SET = Stats.exportLong("job_old_conifg_id_set");
-  private static final AtomicLong JOB_NEW_CONFIG_SET = Stats.exportLong("job_new_config_set");
-  private static final AtomicLong JOB_CONFIGS_INCONSISTENT =
-      Stats.exportLong("job_configs_inconsistent");
-
-  private static void mutateTaskConfig(
-      TaskConfig taskConfig,
-      AtomicLong bothSet,
-      AtomicLong oldSet,
-      AtomicLong newSet,
-      AtomicLong inconsistent) {
-    boolean oldFieldSet = taskConfig.isSetThermosConfig();
-    boolean newFieldSet = taskConfig.isSetExecutorConfig();
-    if (oldFieldSet && newFieldSet) {
-      bothSet.incrementAndGet();
-      if (!taskConfig.getExecutorConfig().getData().equals(
-          new String(taskConfig.getThermosConfig(), Charsets.UTF_8))) {
-
-        inconsistent.incrementAndGet();
-      }
-    } else if (oldFieldSet) {
-      oldSet.incrementAndGet();
-      taskConfig.setExecutorConfig(
-          new ExecutorConfig(
-              "AuroraExecutor",
-              new String(taskConfig.getThermosConfig(), Charsets.UTF_8)));
-    } else if (newFieldSet) {
-      newSet.incrementAndGet();
-      taskConfig.setThermosConfig(
-          taskConfig.getExecutorConfig().getData().getBytes(Charsets.UTF_8));
-    } else {
-      throw new IllegalStateException(
-          "Task for " + taskConfig.getJobName() + " does not have a thermos config.");
-    }
-  }
-
-  private static void convertToExecutorConfig(ScheduledTask task) {
-    mutateTaskConfig(
-        task.getAssignedTask().getTask(),
-        BOTH_CONFIGS_SET,
-        OLD_CONFIG_SET,
-        NEW_CONFIG_SET,
-        CONFIGS_INCONSISTENT);
-  }
-
-  private static void convertToExecutorConfig(JobStore.Mutable jobStore) {
-    for (String id : jobStore.fetchManagerIds()) {
-      for (JobConfiguration job : IJobConfiguration.toBuildersList(jobStore.fetchJobs(id))) {
-        mutateTaskConfig(
-            job.getTaskConfig(),
-            JOB_BOTH_CONFIGS_SET,
-            JOB_OLD_CONFIG_SET,
-            JOB_NEW_CONFIG_SET,
-            JOB_CONFIGS_INCONSISTENT);
-        jobStore.saveAcceptedJob(id, IJobConfiguration.build(job));
-      }
-    }
-  }
-
   private static final AtomicLong BOTH_FIELDS_SET = Stats.exportLong("both_instance_ids_set");
   private static final AtomicLong OLD_FIELD_SET = Stats.exportLong("old_instance_id_set");
   private static final AtomicLong NEW_FIELD_SET = Stats.exportLong("new_instance_id_set");
@@ -222,7 +155,6 @@ public final class StorageBackfill {
    */
   public static void backfill(final MutableStoreProvider storeProvider, final Clock clock) {
     backfillJobDefaults(storeProvider.getJobStore());
-    convertToExecutorConfig(storeProvider.getJobStore());
 
     LOG.info("Performing shard uniqueness sanity check.");
     storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {
@@ -232,7 +164,6 @@ public final class StorageBackfill {
         // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they
         // don't.
         guaranteeShardUniqueness(builder, storeProvider.getUnsafeTaskStore(), clock);
-        convertToExecutorConfig(builder);
         dualWriteInstanceId(builder.getAssignedTask());
         rewriteThrottledState(builder);
         return IScheduledTask.build(builder);

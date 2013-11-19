@@ -299,7 +299,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
             .setTask(new TaskConfig()
                 .setJobName("job-" + id)
                 .setEnvironment("test")
-                .setThermosConfig(new byte[]{})
                 .setExecutorConfig(new com.twitter.aurora.gen.ExecutorConfig("AuroraExecutor", ""))
                 .setOwner(new Identity("role-" + id, "user-" + id))));
     // Apply defaults here so that we can expect the same task that will be written to the stream.

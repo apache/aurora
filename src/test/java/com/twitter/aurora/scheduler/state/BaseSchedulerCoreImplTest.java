@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
@@ -294,7 +293,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setNumCpus(1.0)
         .setRamMb(ONE_GB)
         .setDiskMb(500)
-        .setThermosConfig(thermosConfig.getBytes(Charsets.UTF_8))
         .setExecutorConfig(new ExecutorConfig("AuroraExecutor", thermosConfig))
         .setRequestedPorts(ImmutableSet.<String>of())
         .setConstraints(ImmutableSet.<Constraint>of())
@@ -323,7 +321,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     ITaskConfig expected = ITaskConfig.build(new TaskConfig(storedTask)
         .setProduction(false)
         .setMaxTaskFailures(1)
-        .setThermosConfig(thermosConfig.getBytes(Charsets.UTF_8))
         .setExecutorConfig(new ExecutorConfig("AuroraExecutor", thermosConfig))
         .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1))));
 

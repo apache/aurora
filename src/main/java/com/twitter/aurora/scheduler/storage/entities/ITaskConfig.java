@@ -201,14 +201,6 @@ public final class ITaskConfig {
     return wrapped.isProduction();
   }
 
-  public boolean isSetThermosConfig() {
-    return wrapped.isSetThermosConfig();
-  }
-
-  public byte[] getThermosConfig() {
-    return wrapped.getThermosConfig();
-  }
-
   public boolean isSetConstraints() {
     return wrapped.isSetConstraints();
   }

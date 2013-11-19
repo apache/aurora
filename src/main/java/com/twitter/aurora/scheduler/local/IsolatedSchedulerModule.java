@@ -272,7 +272,6 @@ public class IsolatedSchedulerModule extends AbstractModule {
               .setDiskMb(1024)
               .setRamMb(1024)
               .setPackages(ImmutableSet.of(new Package(owner.getRole(), "package", 15)))
-              .setThermosConfig("opaque".getBytes())
               .setExecutorConfig(new ExecutorConfig("aurora", "opaque")));
     }
 

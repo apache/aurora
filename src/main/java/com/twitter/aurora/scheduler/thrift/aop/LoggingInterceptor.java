@@ -56,7 +56,6 @@ class LoggingInterceptor implements MethodInterceptor {
             @Override public String apply(Object input) {
               JobConfiguration configuration = ((JobConfiguration) input).deepCopy();
               if (configuration.isSetTaskConfig()) {
-                configuration.getTaskConfig().setThermosConfig("BLANKED".getBytes());
                 configuration.getTaskConfig().setExecutorConfig(
                     new ExecutorConfig("BLANKED", "BLANKED"));
               }
