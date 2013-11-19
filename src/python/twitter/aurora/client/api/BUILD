@@ -16,7 +16,7 @@ python_library(
   name = 'command_runner',
   sources = ['command_runner.py'],
   dependencies = [
-    pants('3rdparty/python:pystachio'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:pystachio'),
     pants(':api'),
     pants('aurora/twitterdeps/src/python/twitter/thermos/config:schema'),
     pants('src/python/twitter/aurora/common:cluster'),

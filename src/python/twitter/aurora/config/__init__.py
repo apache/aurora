@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 from collections import defaultdict
 
-from twitter.aurora.common import AuroraJobKey
+from twitter.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.aurora.config.schema.base import MesosContext
 from twitter.thermos.config.loader import PortExtractor, ThermosTaskWrapper
 from twitter.thermos.config.schema import ThermosContext

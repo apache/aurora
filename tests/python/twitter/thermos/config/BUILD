@@ -7,7 +7,7 @@ python_test_suite(name = 'all',
 python_tests(name = 'test_schema',
   sources = ['test_schema.py'],
   dependencies = [
-    pants('src/python/twitter/common/collections'),
+    pants('aurora/twitterdeps/src/python/twitter/common/collections'),
     pants('src/python/twitter/thermos/config:schema')
   ]
 )

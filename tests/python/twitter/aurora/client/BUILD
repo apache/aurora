@@ -12,7 +12,7 @@ python_tests(
   name = 'binding_helper',
   sources = ['test_binding_helper.py'],
   dependencies = [
-    pants('3rdparty/python:pystachio'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:pystachio'),
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
     pants('src/python/twitter/aurora/client:binding_helper'),
     pants('src/python/twitter/aurora/config'),
@@ -22,7 +22,7 @@ python_tests(
 python_tests(name = 'config',
   sources = ['test_config.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mox'),
     pants('src/python/twitter/aurora/client:config'),
   ],
 )

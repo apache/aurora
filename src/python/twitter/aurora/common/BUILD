@@ -1,16 +1,4 @@
 python_library(
-  name = 'common',
-  sources = ['__init__.py'],
-  dependencies = [
-    pants(':aurora_job_key'),
-    pants(':cluster'),
-    pants(':cluster_option'),
-    pants(':clusters'),
-    pants(':http_signaler'),
-  ]
-)
-
-python_library(
   name = 'aurora_job_key',
   sources = ['aurora_job_key.py'],
   dependencies = [
@@ -23,7 +11,7 @@ python_library(
   name = 'cluster',
   sources = ['cluster.py'],
   dependencies = [
-    pants('3rdparty/python:pystachio'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:pystachio'),
   ]
 )
 
@@ -32,7 +20,7 @@ python_library(
   sources = ['clusters.py'],
   dependencies = [
     pants(':cluster'),
-    pants('3rdparty/python:pystachio'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:pystachio'),
     pants('aurora/twitterdeps/src/python/twitter/common/collections'),
   ]
 )
@@ -49,8 +37,25 @@ python_library(
   name = 'http_signaler',
   sources = ['http_signaler.py'],
   dependencies = [
-    pants('3rdparty/python:socksipy-branch'),  # TODO(wickman) MESOS-3710
+    pants('src/python/twitter/aurora/BUILD.thirdparty:socksipy-branch'),  # TODO(wickman) MESOS-3710
     pants('aurora/twitterdeps/src/python/twitter/common/lang'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
   ]
+)
+
+python_library(
+  name = 'common',
+  dependencies = [
+    pants(':aurora_job_key'),
+    pants(':cluster'),
+    pants(':cluster_option'),
+    pants(':clusters'),
+    pants(':http_signaler'),
+  ],
+  provides = setup_py(
+    name = 'twitter.aurora.common',
+    version = '0.1.0',
+    description = 'Aurora common libraries.',
+    license = 'Apache License, Version 2.0',
+  )
 )

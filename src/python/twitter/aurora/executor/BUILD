@@ -28,7 +28,7 @@ python_library(
   name = 'executor_vars',
   sources = ['executor_vars.py'],
   dependencies = [
-    pants('3rdparty/python:psutil'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:psutil'),
     pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
     pants('aurora/twitterdeps/src/python/twitter/common/metrics'),
     pants('aurora/twitterdeps/src/python/twitter/common/python'),
@@ -63,7 +63,7 @@ python_library(
   name = 'thermos_executor',
   sources = ['thermos_executor.py'],
   dependencies = [
-    pants('3rdparty/python:pystachio'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:pystachio'),
     pants(':status_manager'),
     pants(':thermos_executor_base'),
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
@@ -93,7 +93,7 @@ python_library(
   name = 'gc_executor',
   sources = ['gc_executor.py'],
   dependencies = [
-    pants('3rdparty/python:psutil'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:psutil'),
     pants(':executor_detector'),
     pants(':thermos_executor_base'),
     pants('aurora/twitterdeps/src/python/twitter/common/collections'),
@@ -112,4 +112,19 @@ python_library(
     pants('src/python/twitter/aurora:mesos-core'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
+)
+
+python_library(
+  name = 'executor-packaged',
+  dependencies = [
+    pants('src/python/twitter/aurora/common'),
+    pants('src/python/twitter/aurora/config'),
+  ],
+  provides = setup_py(
+    name = 'twitter.aurora.executor',
+    version = '0.1.0',
+  ).with_binaries(
+    gc_executor = pants('src/python/twitter/aurora/executor/bin:gc_executor'),
+    thermos_executor = pants('src/python/twitter/aurora/executor/bin:thermos_executor'),
+  )
 )

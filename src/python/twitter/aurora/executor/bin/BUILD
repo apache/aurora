@@ -1,6 +1,7 @@
 python_binary(
   name = 'thermos_executor',
   source = 'thermos_executor_main.py',
+  entry_point = 'twitter.aurora.executor.bin.thermos_executor_main:proxy_main',
   ignore_errors = True,
   always_write_cache = True,
   dependencies = [
@@ -20,6 +21,7 @@ python_binary(
 python_binary(
   name = 'gc_executor',
   source = 'gc_executor_main.py',
+  entry_point = 'twitter.aurora.executor.bin.gc_executor_main:proxy_main',
   ignore_errors = True,
   always_write_cache = True,
   dependencies = [

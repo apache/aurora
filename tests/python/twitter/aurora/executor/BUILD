@@ -13,7 +13,7 @@ python_test_suite(name = 'all',
 python_tests(name = 'gc_executor',
   sources = ['test_gc_executor.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mock'),
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
     pants('aurora/twitterdeps/src/python/twitter/common/concurrent'),
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
@@ -54,7 +54,6 @@ python_tests(name = 'thermos_executor',
     pants('src/python/twitter/aurora/executor/common:task_runner'),
     pants('src/python/twitter/aurora/executor:thermos_executor'),
     pants('src/python/twitter/aurora/executor:thermos_task_runner'),
-    pants('src/python/twitter/pants:pants-lib'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )

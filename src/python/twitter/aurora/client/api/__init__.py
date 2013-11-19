@@ -1,6 +1,6 @@
 from twitter.common import log
 
-from twitter.aurora.common import AuroraJobKey
+from twitter.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.aurora.common.auth import make_session_key
 from twitter.aurora.common.cluster import Cluster
 

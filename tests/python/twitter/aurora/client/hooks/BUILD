@@ -11,7 +11,7 @@ python_tests(name = 'hooked_api',
     pants('src/python/twitter/aurora/common:cluster'),
     pants('src/python/twitter/aurora/client:api'),
     pants('src/python/twitter/aurora/client/hooks'),
-    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mock'),
   ]
 )
 

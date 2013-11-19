@@ -2,7 +2,7 @@ from twitter.common import log
 
 from twitter.aurora.client.api import AuroraClientAPI
 from twitter.aurora.client.base import check_and_log_response, deprecation_warning, die
-from twitter.aurora.common import AuroraJobKey
+from twitter.aurora.common.aurora_job_key import AuroraJobKey
 
 
 class LiveJobDisambiguator(object):

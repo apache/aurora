@@ -10,6 +10,6 @@ python_tests(name = 'mesos_maintenance',
     pants('src/python/twitter/aurora/common:cluster'),
     pants('src/python/twitter/aurora/admin:mesos_maintenance'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
-    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mock'),
   ],
 )

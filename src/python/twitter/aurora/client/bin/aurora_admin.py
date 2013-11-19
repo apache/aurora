@@ -17,4 +17,7 @@ LogOptions.set_stderr_log_level('INFO')
 LogOptions.disable_disk_logging()
 app.set_name('aurora-admin')
 app.set_usage(generate_terse_usage())
-app.main()
+
+
+def proxy_main():
+  app.main()

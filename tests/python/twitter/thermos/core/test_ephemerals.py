@@ -1,8 +1,8 @@
-from runner_base import RunnerTestBase
 from twitter.thermos.config.schema import (
   Task,
   Resources,
   Process)
+from twitter.thermos.testing.runner import RunnerTestBase
 from gen.twitter.thermos.ttypes import (
   TaskState,
   ProcessState

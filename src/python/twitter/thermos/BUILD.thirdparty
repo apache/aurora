@@ -22,3 +22,8 @@ python_requirement(
   name = 'bottle',
   requirement = 'bottle==0.11.6',
 )
+
+python_requirement(
+  name = 'thrift',
+  requirement = 'thrift==0.9.0',
+)

@@ -28,7 +28,7 @@ python_library(
   name = 'config',
   sources = ['config.py'],
   dependencies = [
-    pants('3rdparty/python:pystachio'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:pystachio'),
     pants(':base'),
     pants(':binding_helper'),
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
@@ -50,7 +50,6 @@ python_library(
   ]
 )
 
-
 python_library(
   name = 'options',
   sources = ['options.py'],
@@ -58,4 +57,19 @@ python_library(
     pants('aurora/twitterdeps/src/python/twitter/thermos/common:options'),
     pants('src/python/twitter/aurora/common:aurora_job_key'),
   ]
+)
+
+python_library(
+  name = 'client-packaged',
+  dependencies = [
+    pants('src/python/twitter/aurora/common'),
+    pants('src/python/twitter/aurora/config'),
+  ],
+  provides = setup_py(
+    name = 'twitter.aurora.client',
+    version = '0.1.0',
+  ).with_binaries(
+    aurora_admin = pants('src/python/twitter/aurora/client/bin:aurora_admin'),
+    aurora_client = pants('src/python/twitter/aurora/client/bin:aurora_client'),
+  )
 )

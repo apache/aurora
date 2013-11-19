@@ -12,7 +12,7 @@ python_tests(
   name = 'directory_sandbox',
   sources = ['test_directory_sandbox.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mock'),
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
     pants('src/python/twitter/aurora/executor/common:sandbox'),
   ],
@@ -22,7 +22,7 @@ python_tests(
   name = 'health_checker',
   sources = ['test_health_checker.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mox'),
     pants('aurora/twitterdeps/src/python/twitter/common/testing'),
     pants('src/python/twitter/aurora/executor/common:health_checker'),
   ]

@@ -30,50 +30,47 @@ python_test_suite(name = 'large',
   ]
 )
 
-python_library(
-  name = 'runner_baselibs',
-  sources = ['runner_base.py'],
-  dependencies = [
-    pants('3rdparty/python:thrift'),
-    pants('src/python/twitter/common/contextutil'),
-    pants('src/python/twitter/common/log'),
-    pants('src/python/twitter/thermos/common:ckpt'),
-    pants('src/python/twitter/thermos/common:path'),
-    pants('src/python/twitter/thermos/config'),
-    pants('src/python/twitter/thermos/core'),
-    pants('src/thrift/com/twitter/thermos:py-thrift'),
-  ]
-)
-
 python_tests(name = 'test_runner_integration',
   sources = ['test_runner_integration.py'],
-  dependencies = [pants(':runner_baselibs')]
+  dependencies = [
+    pants('src/python/twitter/thermos/testing:runner'),
+  ],
 )
 
 python_tests(name = 'test_angry',
   sources = ['test_angry.py'],
-  dependencies = [pants(':runner_baselibs')],
+  dependencies = [
+    pants('src/python/twitter/thermos/testing:runner'),
+  ],
   timeout = Amount(5, Time.MINUTES)
 )
 
 python_tests(name = 'test_ephemerals',
   sources = ['test_ephemerals.py'],
-  dependencies = [pants(':runner_baselibs')]
+  dependencies = [
+    pants('src/python/twitter/thermos/testing:runner'),
+  ],
 )
 
 python_tests(name = 'test_failing_runner',
   sources = ['test_failing_runner.py'],
-  dependencies = [pants(':runner_baselibs')]
+  dependencies = [
+    pants('src/python/twitter/thermos/testing:runner'),
+  ],
 )
 
 python_tests(name = 'test_finalization',
   sources = ['test_finalization.py'],
-  dependencies = [pants(':runner_baselibs')]
+  dependencies = [
+    pants('src/python/twitter/thermos/testing:runner'),
+  ],
 )
 
 python_tests(name = 'test_failure_limit',
   sources = ['test_failure_limit.py'],
-  dependencies = [pants(':runner_baselibs')]
+  dependencies = [
+    pants('src/python/twitter/thermos/testing:runner'),
+  ],
 )
 
 python_tests(name = 'test_helper',
@@ -88,17 +85,17 @@ python_tests(name = 'test_helper',
 python_tests(name = 'test_process',
   sources = ['test_process.py'],
   dependencies = [
-    pants(':runner_baselibs'),
+    pants('src/python/twitter/thermos/testing:runner'),
     pants('3rdparty/python:mock'),
-    pants('src/python/twitter/common/contextutil'),
+    pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
   ],
 )
 
 python_tests(name = 'test_staged_kill',
   sources = ['test_staged_kill.py'],
   dependencies = [
-     pants(':runner_baselibs'),
-     pants('src/python/twitter/common/process'),
+     pants('src/python/twitter/thermos/testing:runner'),
+     pants('aurora/twitterdeps/src/python/twitter/common/process'),
      pants('src/python/twitter/thermos/monitoring:monitor'),
   ]
 )

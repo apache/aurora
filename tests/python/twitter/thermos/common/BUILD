@@ -25,7 +25,7 @@ python_tests(name = 'test_planner',
 python_tests(name = 'test_task_planner',
   sources = ['test_task_planner.py'],
   dependencies = [
-    pants('src/python/twitter/common/testing'),
+    pants('aurora/twitterdeps/src/python/twitter/common/testing'),
     pants('src/python/twitter/thermos/common:planner'),
     pants('src/python/twitter/thermos/config:schema'),
   ],

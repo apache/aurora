@@ -15,7 +15,7 @@ python_tests(
     'test_update.py'
   ],
   dependencies = [
-    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mock'),
     pants(':util'),
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
     pants('src/python/twitter/aurora/client/commands:core'),
@@ -28,7 +28,7 @@ python_tests(
     'test_ssh.py',
   ],
   dependencies = [
-    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mock'),
     pants(':util'),
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
     pants('src/python/twitter/aurora/client/commands:ssh'),
@@ -41,7 +41,7 @@ python_tests(
     'test_run.py',
   ],
   dependencies = [
-    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mock'),
     pants(':util'),
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
     pants('src/python/twitter/aurora/client/commands:run'),
@@ -52,7 +52,7 @@ python_library(
   name='util',
   sources = [ 'util.py' ],
   dependencies = [
-    pants('3rdparty/python:mock'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mock'),
     pants('src/python/twitter/aurora/client/commands:core'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]

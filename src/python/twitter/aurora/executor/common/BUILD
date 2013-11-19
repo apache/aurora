@@ -60,7 +60,7 @@ python_library(
   name = 'task_info',
   sources = ['task_info.py'],
   dependencies = [
-    pants('3rdparty/python:pystachio'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:pystachio'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('src/python/twitter/aurora/config'),
     pants('src/python/twitter/aurora/config/schema'),

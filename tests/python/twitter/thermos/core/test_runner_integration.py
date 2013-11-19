@@ -9,13 +9,12 @@ from twitter.thermos.config.schema import (
   Task,
   Tasks,
 )
+from twitter.thermos.testing.runner import RunnerTestBase
 
 from gen.twitter.thermos.ttypes import (
   TaskState,
   ProcessState
 )
-
-from runner_base import RunnerTestBase
 
 import pytest
 

@@ -13,7 +13,7 @@ python_tests(
   name = 'disambiguator',
   sources = ['test_disambiguator.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mox'),
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
     pants('src/python/twitter/aurora/client/api:disambiguator'),
   ],
@@ -22,7 +22,7 @@ python_tests(
 python_tests(name = 'job_monitor',
   sources = ['test_job_monitor.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mox'),
     pants('src/python/twitter/aurora/client/api:api'),
     pants('src/python/twitter/aurora/client/api:job_monitor'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
@@ -33,7 +33,7 @@ python_tests(name = 'job_monitor',
 python_tests(name = 'restarter',
   sources = ['test_restarter.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mox'),
     pants('src/python/twitter/aurora/client/api:restarter'),
     pants('src/python/twitter/aurora/common:aurora_job_key'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
@@ -44,7 +44,7 @@ python_tests(name = 'restarter',
 python_tests(name = 'scheduler_client',
   sources = ['test_scheduler_client.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mox'),
     pants('src/python/twitter/aurora/client/api:scheduler_client'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
@@ -53,7 +53,7 @@ python_tests(name = 'scheduler_client',
 python_tests(name = 'instance_watcher',
   sources = ['test_instance_watcher.py', 'test_health_check.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mox'),
     pants('src/python/twitter/aurora/client/api:instance_watcher'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
@@ -62,7 +62,7 @@ python_tests(name = 'instance_watcher',
 python_tests(name = 'updater',
   sources = ['test_updater.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
+    pants('src/python/twitter/aurora/BUILD.thirdparty:mox'),
     pants('src/python/twitter/aurora/client/api:updater'),
     pants('src/thrift/com/twitter/aurora/gen:py-thrift'),
     pants('tests/python/twitter/aurora/client:fake_scheduler_proxy'),

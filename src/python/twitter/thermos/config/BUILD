@@ -2,7 +2,7 @@ python_library(
   name = 'schema',
   sources = globs('*.py'),
   dependencies = [
-    pants('src/python/twitter/common/lang'),
+    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
     pants('src/python/twitter/thermos:pystachio'),
     pants('src/python/twitter/thermos/common:planner')
   ],

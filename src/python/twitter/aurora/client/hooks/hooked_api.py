@@ -3,7 +3,7 @@ import traceback
 
 from twitter.common import log
 from twitter.aurora.client.api import AuroraClientAPI
-from twitter.aurora.common import AuroraJobKey
+from twitter.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.twitter.aurora.ttypes import ResponseCode
 

@@ -1,8 +1,7 @@
 import random
 
-from runner_base import Runner
-
 from twitter.thermos.config.schema import Task, Process
+from twitter.thermos.testing.runner import Runner
 from gen.twitter.thermos.ttypes import TaskState, ProcessState
 
 

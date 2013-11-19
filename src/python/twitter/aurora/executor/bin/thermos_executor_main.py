@@ -64,4 +64,5 @@ LogOptions.set_disk_log_level('DEBUG')
 LogOptions.set_log_dir('.')
 
 
-app.main()
+def proxy_main():
+  app.main()
