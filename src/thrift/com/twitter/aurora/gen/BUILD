@@ -14,11 +14,6 @@
 
 TEST_DATA = globs('*test.thrift')
 
-java_thrift_library(
-  name = 'thrift',
-  sources = globs('*.thrift'),
-)
-
 python_thrift_library(
   name = 'py-thrift',
   sources = [
