@@ -12,7 +12,8 @@ compileJava {
 }
 
 tasks.withType(Compile) {
-  options.compilerArgs << '-Werror'
+  // TOOO(zmanji): Add `-Werror` here once we can exlucde it from thrift
+  // generated java code.
   options.compilerArgs << '-Xlint:all'
   // Don't fail for annotations not claimed by annotation processors.
   options.compilerArgs << '-Xlint:-processing'
@@ -83,7 +84,6 @@ dependencies {
   def slf4jRev = '1.6.1'
   compile "org.slf4j:slf4j-api:${slf4jRev}"
   compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
-  compile 'com.twitter.aurora:aurora:0.0.5'
   compile 'com.twitter.common.logging:log4j:0.0.3'
   compile 'com.twitter.common.webassets:bootstrap:0.0.1'
   compile 'com.twitter.common.webassets:jquery:0.0.1'
@@ -136,8 +136,54 @@ sourceSets {
   }
 }
 
+def thriftBinary = 'build-support/thrift/thrift-0.5.0/compiler/cpp/thrift'
+
+task bootstrapThrift {
+  // build-support/thrift/thrift-0.5.0/compiler/cpp/thrift
+  inputs.file file(thriftBinary)
+  outputs.dir file(thriftBinary)
+  exec {
+    executable = 'make'
+    args = ['-C', 'build-support/thrift']
+  }
+}
+
+task generateSources(dependsOn: 'bootstrapThrift') {
+  ext.inputFiles = fileTree(dir: 'src/main/thrift').matching { include '**/*.thrift' }
+  ext.outputDir = file("$buildDir/generated-src")
+  inputs.file inputFiles
+  outputs.dir outputDir
+  doFirst {
+    outputDir.exists() || outputDir.mkdirs()
+    inputFiles.each { File file ->
+      exec {
+        executable = thriftBinary
+        args = ['--gen', 'java:hashcode', '-o', outputDir, file]
+      }
+    }
+  }
+}
+compileJava.source generateSources.outputs.files, sourceSets.main.java
+
 tasks.withType(Test) {
   maxParallelForks = Runtime.runtime.availableProcessors()
+}
+
+// TODO(zmanji): This is an awful hack. Find a better way of adding the
+// generated soruces.
+idea {
+   module {
+    iml {
+      beforeMerged { module ->
+        module.sourceFolders.add(new org.gradle.plugins.ide.idea.model.Path('file://$MODULE_DIR$/dist/generated-src/gen-java'))
+      }
+      whenMerged { module ->
+        // TODO(zmanji): Find a way to remove the `dist` directory instead of
+        // clearing all the exlcudes.
+        module.excludeFolders.clear()
+      }
+    }
+  }
 }
 
 // Configuration parameters for the application plugin.
