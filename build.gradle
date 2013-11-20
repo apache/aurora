@@ -39,13 +39,15 @@ publishing {
       }
     }
   }
-  repositories {
-    maven {
-      credentials {
-        username = internalMavenUser
-        password = internalMavenPass
+  if (hasProperty('internalMavenUrl')) {
+    repositories {
+      maven {
+        credentials {
+          username = internalMavenUser
+          password = internalMavenPass
+        }
+        url internalMavenUrl
       }
-      url internalMavenUrl
     }
   }
 }
@@ -54,10 +56,6 @@ repositories {
   mavenCentral()
   maven {
     url 'http://maven.twttr.com/'
-  }
-  // TODO(William Farner): Remove this when source is fully detached from internal.
-  maven {
-    url internalMavenUrl
   }
 }
 
