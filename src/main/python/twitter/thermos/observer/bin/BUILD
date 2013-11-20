@@ -3,8 +3,8 @@ python_binary(
   source = 'thermos_observer.py',
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
-    # XXX(wickman) The Thermos observer is broken without the http app module.
-    # pants('src/python/twitter/common/app/modules:http'),
+    pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
+    pants('aurora/twitterdeps/src/python/twitter/common/http'),
     pants('src/main/python/twitter/thermos:cherrypy'),
     pants('src/main/python/twitter/thermos/common:path'),
     pants('src/main/python/twitter/thermos/observer/http:http_observer'),
