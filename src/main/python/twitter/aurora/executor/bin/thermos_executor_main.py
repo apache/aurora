@@ -18,6 +18,12 @@ from twitter.aurora.executor.thermos_task_runner import DefaultThermosTaskRunner
 import mesos
 
 
+app.configure(debug=True)
+LogOptions.set_simple(True)
+LogOptions.set_disk_log_level('DEBUG')
+LogOptions.set_log_dir('.')
+
+
 # TODO(wickman) Consider just having the OSS version require pip installed
 # thermos_runner binaries on every machine and instead of embedding the pex
 # as a resource, shell out to one on the PATH.
@@ -33,36 +39,29 @@ def dump_runner_pex():
   return runner_pex
 
 
-def main():
-  runner_provider = DefaultThermosTaskRunnerProvider(
-      dump_runner_pex(),
-      artifact_dir=os.path.realpath('.'),
-  )
-
-  # Create executor stub
-  thermos_executor = ThermosExecutor(
-      runner_provider=runner_provider,
-      status_providers=(HealthCheckerProvider(),),
-  )
-
-  # Create driver stub
-  driver = mesos.MesosExecutorDriver(thermos_executor)
-
-  # This is an ephemeral executor -- shutdown if we receive no tasks within a certain
-  # time period
-  ExecutorTimeout(thermos_executor.launched, driver).start()
-
-  # Start executor
-  driver.run()
-
-  log.info('MesosExecutorDriver.run() has finished.')
-
-
-app.configure(debug=True)
-LogOptions.set_simple(True)
-LogOptions.set_disk_log_level('DEBUG')
-LogOptions.set_log_dir('.')
-
-
 def proxy_main():
+  def main():
+    runner_provider = DefaultThermosTaskRunnerProvider(
+        dump_runner_pex(),
+        artifact_dir=os.path.realpath('.'),
+    )
+
+    # Create executor stub
+    thermos_executor = ThermosExecutor(
+        runner_provider=runner_provider,
+        status_providers=(HealthCheckerProvider(),),
+    )
+
+    # Create driver stub
+    driver = mesos.MesosExecutorDriver(thermos_executor)
+
+    # This is an ephemeral executor -- shutdown if we receive no tasks within a certain
+    # time period
+    ExecutorTimeout(thermos_executor.launched, driver).start()
+
+    # Start executor
+    driver.run()
+
+    log.info('MesosExecutorDriver.run() has finished.')
+
   app.main()

@@ -25,8 +25,7 @@ cat > /usr/local/bin/thermos_observer.sh <<"EOF"
   do
     /usr/local/bin/thermos_observer \
          --root=/var/run/thermos \
-         --enable_http \
-         --http_port=1338 \
+         --port=1338 \
          --log_to_disk=NONE \
          --log_to_stderr=google:INFO
     echo "Observer exited with $?, restarting."

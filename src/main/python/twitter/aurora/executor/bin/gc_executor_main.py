@@ -15,24 +15,6 @@ from twitter.thermos.common.path import TaskPath
 import mesos
 
 
-def main():
-  # Create executor stub
-  thermos_gc_executor = ThermosGCExecutor(checkpoint_root=TaskPath.DEFAULT_CHECKPOINT_ROOT)
-  thermos_gc_executor.start()
-
-  # Start metrics collection
-  metric_writer = DiskMetricWriter(thermos_gc_executor.metrics, ExecutorDetector.VARS_PATH)
-  metric_writer.start()
-
-  # Create driver stub
-  driver = mesos.MesosExecutorDriver(thermos_gc_executor)
-
-  # Start GC executor
-  driver.run()
-
-  log.info('MesosExecutorDriver.run() has finished.')
-
-
 app.configure(debug=True)
 
 
@@ -43,4 +25,21 @@ LogOptions.set_log_dir(ExecutorDetector.LOG_PATH)
 
 
 def proxy_main():
+  def main():
+    # Create executor stub
+    thermos_gc_executor = ThermosGCExecutor(checkpoint_root=TaskPath.DEFAULT_CHECKPOINT_ROOT)
+    thermos_gc_executor.start()
+
+    # Start metrics collection
+    metric_writer = DiskMetricWriter(thermos_gc_executor.metrics, ExecutorDetector.VARS_PATH)
+    metric_writer.start()
+
+    # Create driver stub
+    driver = mesos.MesosExecutorDriver(thermos_gc_executor)
+
+    # Start GC executor
+    driver.run()
+
+    log.info('MesosExecutorDriver.run() has finished.')
+
   app.main()

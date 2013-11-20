@@ -29,7 +29,7 @@ EOF
   fi
 fi
 
-PANTS_TEMP=$(mktemp -d -t pants)
+PANTS_TEMP=$(mktemp -d /tmp/pants.XXXXXX)
 
 if which python2.7 >/dev/null; then
   PY=$(which python2.7)

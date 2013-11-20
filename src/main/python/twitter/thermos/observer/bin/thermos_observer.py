@@ -27,29 +27,29 @@ app.add_option("--port",
                help="port number to listen on.")
 
 
-def main(args, opts):
-  if args:
-    print("ERROR: unrecognized arguments: %s\n" % (" ".join(args)), file=sys.stderr)
-    app.help()
-    sys.exit(1)
+def proxy_main():
+  def main(args, opts):
+    if args:
+      print("ERROR: unrecognized arguments: %s\n" % (" ".join(args)), file=sys.stderr)
+      app.help()
+      sys.exit(1)
 
-  root_server = HttpServer()
-  root_server.mount_routes(DiagnosticsEndpoints())
+    root_server = HttpServer()
+    root_server.mount_routes(DiagnosticsEndpoints())
 
-  task_observer = TaskObserver(opts.root)
-  task_observer.start()
+    task_observer = TaskObserver(opts.root)
+    task_observer.start()
 
-  bottle_wrapper = BottleObserver(task_observer)
+    bottle_wrapper = BottleObserver(task_observer)
 
-  root_server.mount_routes(bottle_wrapper)
+    root_server.mount_routes(bottle_wrapper)
 
-  def run():
-    root_server.run('0.0.0.0', opts.port, 'cherrypy')
+    def run():
+      root_server.run('0.0.0.0', opts.port, 'cherrypy')
 
-  et = ExceptionalThread(target=run)
-  et.daemon = True
-  et.start()
-  et.join()
+    et = ExceptionalThread(target=run)
+    et.daemon = True
+    et.start()
+    et.join()
 
-
-app.main()
+  app.main()

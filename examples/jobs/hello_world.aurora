@@ -1,12 +1,10 @@
 hello = Process(
   name = 'hello',
-  cmdline = """while true; do
-    exec > >(nc -l {{thermos.ports[http]}})
-      echo "200 OK"
-      echo
-      echo
-      echo "OK"
-    exec >&-
+  cmdline = """
+    while true; do
+      echo hello world
+      sleep 10
+    done
   """)
 
 task = SequentialTask(

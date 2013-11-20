@@ -12,6 +12,14 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # doesn't already exist on the user's system.
   config.vm.box_url = "http://files.vagrantup.com/precise64.box"
 
+  config.vm.define "devtools" do |devtools|
+    devtools.vm.network :private_network, ip: "192.168.33.6"
+    devtools.vm.provider :virtualbox do |vb|
+      vb.customize ["modifyvm", :id, "--memory", "2048", "--cpus", "8"]
+    end
+    devtools.vm.provision "shell", path: "examples/vagrant/provision-dev-environment.sh"
+  end
+
   config.vm.define "zookeeper" do |zookeeper|
     zookeeper.vm.network :private_network, ip: "192.168.33.2"
     zookeeper.vm.provider :virtualbox do |vb|
@@ -42,12 +50,5 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       vb.customize ["modifyvm", :id, "--memory", "1024"]
     end
     scheduler.vm.provision "shell", path: "examples/vagrant/provision-aurora-scheduler.sh"
-  end
-
-  config.vm.define "devtools" do |devtools|
-    devtools.vm.network :private_network, ip: "192.168.33.6"
-    devtools.vm.provider :virtualbox do |vb|
-      vb.customize ["modifyvm", :id, "--memory", "2048", "--cpus", "8"]
-    end
   end
 end

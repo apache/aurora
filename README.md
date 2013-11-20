@@ -1,7 +1,7 @@
 Apache Aurora is a service scheduler that runs on top of Mesos, enabling
-you run long-running services that take advantage of Mesos' scalability,
+you to run long-running services that take advantage of Mesos' scalability,
 fault-tolerance, and resource isolation. Apache Aurora is currently
-apart of the Apache Incubator.
+a part of the Apache Incubator.
 
 Getting Started
 ---------------
