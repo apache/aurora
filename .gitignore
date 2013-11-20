@@ -6,6 +6,8 @@
 .gradle/
 .pants.*
 .reviewboardrc
+.vagrant/
+build/
 dist/
 gradle-app.setting
 out/

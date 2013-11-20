@@ -1,0 +1,17 @@
+hello = Process(
+  name = 'hello',
+  cmdline = """while true; do
+    exec > >(nc -l {{thermos.ports[http]}})
+      echo "200 OK"
+      echo
+      echo
+      echo "OK"
+    exec >&-
+  """)
+
+task = SequentialTask(
+  processes = [hello],
+  resources = Resources(cpu = 1.0, ram = 128*MB, disk = 128*MB))
+
+jobs = [Service(
+  task = task, cluster = 'example', role = 'www-data', environment = 'prod', name = 'hello')]
