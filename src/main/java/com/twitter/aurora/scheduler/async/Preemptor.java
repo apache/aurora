@@ -49,10 +49,8 @@ import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.state.SchedulerCore;
 import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.Storage.StorageException;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -71,14 +69,14 @@ import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 import static com.twitter.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
 
 /**
- * A task preempter that tries to find tasks that are waiting to be scheduled, which are of higher
+ * A task preemptor that tries to find tasks that are waiting to be scheduled, which are of higher
  * priority than tasks that are currently running.
  *
- * To avoid excessive churn, the preempter requires that a task is PENDING for a duration (dictated
- * by {@link #preemptionCandidacyDelay}) before it becomes eligible to preempt other tasks.
+ * To avoid excessive churn, the preemptor requires that a task is PENDING for a duration
+ * (dictated by {@link #preemptionCandidacyDelay}) before it becomes eligible to preempt other
+ * tasks.
  */
-// TODO(zmanji): Remove public attribute when periodic module is removed.
-public class Preemptor implements Runnable {
+class Preemptor implements PreemptorIface {
 
   /**
    * Binding annotation for the time interval after which a pending task becomes eligible to
@@ -86,11 +84,7 @@ public class Preemptor implements Runnable {
    */
   @BindingAnnotation
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-  // TODO(zmanji): Remove public attribute when periodic module is removed.
-  public @interface PreemptionDelay { }
-
-  @VisibleForTesting
-  static final Query.Builder PENDING_QUERY = Query.statusScoped(PENDING);
+  @interface PreemptionDelay { }
 
   @VisibleForTesting
   static final Query.Builder ACTIVE_NOT_PENDING_QUERY = Query.statusScoped(
@@ -105,6 +99,13 @@ public class Preemptor implements Runnable {
         }
       };
 
+  private final AtomicLong tasksPreempted = Stats.exportLong("preemptor_tasks_preempted");
+  private final AtomicLong failedPreemptions = Stats.exportLong("preemptor_failed_preemptions");
+  // Incremented every time the preemptor is invoked and finds tasks pending and preemptable tasks
+  private final AtomicLong attemptedPreemptions = Stats.exportLong("preemptor_attempts");
+  // Incremented every time we fail to find tasks to preempt for a pending task.
+  private final AtomicLong noSlotsFound = Stats.exportLong("preemptor_no_slots_found");
+
   private final Predicate<IScheduledTask> isIdleTask = new Predicate<IScheduledTask>() {
     @Override public boolean apply(IScheduledTask task) {
       return (clock.nowMillis() - Iterables.getLast(task.getTaskEvents()).getTimestamp())
@@ -112,17 +113,7 @@ public class Preemptor implements Runnable {
     }
   };
 
-  private final AtomicLong tasksPreempted = Stats.exportLong("preemptor_tasks_preempted");
-  private final AtomicLong failedPreemptions = Stats.exportLong("preemptor_failed_preemptions");
-  // Incremented every time the preemptor is invoked and finds tasks pending and preemptable tasks.
-  private final AtomicLong attemptedPreemptions = Stats.exportLong("preemptor_attempts");
-  // Incremented every time we fail to find tasks to preempt for a pending task.
-  private final AtomicLong noSlotsFound = Stats.exportLong("preemptor_no_slots_found");
-
-  // TODO(zmanji): Move this code to the regular scheduling flow. Now that the preemptor has access
-  // to the offer queue and considers slack on machines when preempting, it is useful enough to be
-  // invoked by TaskGroups directly.
-  private Storage storage;
+  private final Storage storage;
   private final SchedulerCore scheduler;
   private final OfferQueue offerQueue;
   private final SchedulingFilter schedulingFilter;
@@ -130,13 +121,15 @@ public class Preemptor implements Runnable {
   private final Clock clock;
 
   /**
-   * Creates a new preempter.
+   * Creates a new preemptor.
    *
    * @param storage Backing store for tasks.
-   * @param scheduler Scheduler to fetch task information from, and instruct when preempting tasks.
+   * @param scheduler Scheduler to fetch task information from, and instruct when preempting
+   *                  tasks.
    * @param offerQueue Queue that contains available Mesos resource offers.
    * @param schedulingFilter Filter to identify whether tasks may reside on given slaves.
-   * @param preemptionCandidacyDelay Time a task must be PENDING before it may preempt other tasks.
+   * @param preemptionCandidacyDelay Time a task must be PENDING before it may preempt other
+   *                                 tasks.
    * @param clock Clock to check current time.
    */
   @Inject
@@ -236,13 +229,13 @@ public class Preemptor implements Runnable {
         ResourceSlot.sum(Iterables.transform(offers, OFFER_TO_RESOURCE_SLOT));
 
     if (!Iterables.isEmpty(offers)) {
-      Set<SchedulingFilter.Veto> p = schedulingFilter.filter(
+      Set<SchedulingFilter.Veto> vetos = schedulingFilter.filter(
           slackResources,
           host,
           pendingTask.getTask(),
           pendingTask.getTaskId());
 
-      if (p.isEmpty()) {
+      if (vetos.isEmpty()) {
         return Optional.<Set<IAssignedTask>>of(ImmutableSet.<IAssignedTask>of());
       }
     }
@@ -285,70 +278,62 @@ public class Preemptor implements Runnable {
         }
       };
 
-  @Override
-  public void run() {
-    // We are only interested in preempting in favor of pending tasks.
-    List<IAssignedTask> pendingTasks;
-    try {
-      pendingTasks = fetch(PENDING_QUERY, isIdleTask);
-    } catch (StorageException e) {
-      LOG.fine("Failed to fetch PENDING tasks, storage is likely not yet ready.");
-      return;
-    }
-
-    if (pendingTasks.isEmpty()) {
-      return;
-    }
-
+  private Multimap<String, IAssignedTask> getSlavesToActiveTasks() {
     // Only non-pending active tasks may be preempted.
     List<IAssignedTask> activeTasks = fetch(ACTIVE_NOT_PENDING_QUERY);
-    if (activeTasks.isEmpty()) {
-      return;
-    }
-
-    attemptedPreemptions.incrementAndGet();
-
-    // Arrange the pending tasks in scheduling order.
-    Collections.sort(pendingTasks, Tasks.SCHEDULING_ORDER);
 
     // Walk through the preemption candidates in reverse scheduling order.
     Collections.sort(activeTasks, Tasks.SCHEDULING_ORDER.reverse());
 
     // Group the tasks by slave id so they can be paired with offers from the same slave.
-    Multimap<String, IAssignedTask> slavesToActiveTasks =
-        Multimaps.index(activeTasks, TASK_TO_SLAVE_ID);
+    return Multimaps.index(activeTasks, TASK_TO_SLAVE_ID);
+  }
+
+  // TODO(zmanji): Add throttling to prevent how much preemption a single task can cause over
+  // time.
+  // TODO(zmanji): Get the offer queue to associate a slave with a pending task.
+  @Override
+  public synchronized Optional<String> findPreemptionSlotFor(String taskId) {
+    List<IAssignedTask> pendingTasks =
+        fetch(Query.statusScoped(PENDING).byId(taskId), isIdleTask);
+
+    // Task is no longer PENDING no need to preempt
+    if (pendingTasks.isEmpty()) {
+      return Optional.absent();
+    }
+
+    IAssignedTask pendingTask = Iterables.getOnlyElement(pendingTasks);
+
+    Multimap<String, IAssignedTask> slavesToActiveTasks = getSlavesToActiveTasks();
+
+    if (slavesToActiveTasks.isEmpty()) {
+      return Optional.absent();
+    }
+
+    attemptedPreemptions.incrementAndGet();
 
     // Group the offers by slave id so they can be paired with active tasks from the same slave.
     Multimap<String, Offer> slavesToOffers =
         Multimaps.index(offerQueue.getOffers(), OFFER_TO_SLAVE_ID);
 
-    // We only want to consider slaves that have active tasks. Tasks that only have offers will
-    // not result in any preemption.
-    Set<String> allSlaves = slavesToActiveTasks.keySet();
+    Set<String> allSlaves = ImmutableSet.<String>builder()
+        .addAll(slavesToOffers.keySet())
+        .addAll(slavesToActiveTasks.keySet())
+        .build();
 
     for (String slaveID : allSlaves) {
-      // Stores the task causing preemption and the tasks to preempt
-      Optional<Pair<IAssignedTask, Set<IAssignedTask>>> preemptionPair = Optional.absent();
+      Optional<Set<IAssignedTask>> toPreemptTasks = getTasksToPreempt(
+          slavesToActiveTasks.get(slaveID),
+          slavesToOffers.get(slaveID),
+          pendingTask);
 
-      for (IAssignedTask pendingTask : pendingTasks) {
-        Optional<Set<IAssignedTask>> minimalSet = getTasksToPreempt(
-            slavesToActiveTasks.get(slaveID),
-            slavesToOffers.get(slaveID),
-            pendingTask);
-
-        if (minimalSet.isPresent()) {
-          preemptionPair = Optional.of(Pair.of(pendingTask, minimalSet.get()));
-          break;
-        }
-      }
-
-      if (preemptionPair.isPresent()) {
-        pendingTasks.remove(preemptionPair.get().getFirst());
+      if (toPreemptTasks.isPresent()) {
         try {
-          for (IAssignedTask toPreempt : preemptionPair.get().getSecond()) {
-            scheduler.preemptTask(toPreempt, preemptionPair.get().getFirst());
+          for (IAssignedTask toPreempt : toPreemptTasks.get()) {
+            scheduler.preemptTask(toPreempt, pendingTask);
             tasksPreempted.incrementAndGet();
           }
+          return Optional.of(slaveID);
         } catch (ScheduleException e) {
           LOG.log(Level.SEVERE, "Preemption failed", e);
           failedPreemptions.incrementAndGet();
@@ -357,6 +342,8 @@ public class Preemptor implements Runnable {
         noSlotsFound.incrementAndGet();
       }
     }
+
+    return Optional.absent();
   }
 
   private static final Predicate<IAssignedTask> IS_PRODUCTION =

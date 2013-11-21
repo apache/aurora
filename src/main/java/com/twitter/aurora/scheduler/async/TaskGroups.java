@@ -42,6 +42,7 @@ import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.twitter.aurora.gen.ScheduleStatus;
+import com.twitter.aurora.scheduler.async.PreemptorIface;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -89,6 +90,7 @@ public class TaskGroups implements EventSubscriber {
   private final Amount<Long, Time> flappingThreshold;
   private final BackoffStrategy flappingBackoffStrategy;
   private final Clock clock;
+  private final PreemptorIface preemptor;
 
   @Inject
   TaskGroups(
@@ -97,7 +99,8 @@ public class TaskGroups implements EventSubscriber {
       SchedulingSettings schedulingSettings,
       SchedulingAction schedulingAction,
       FlappingTaskSettings flappingTaskSettings,
-      Clock clock) {
+      Clock clock,
+      PreemptorIface preemptor) {
 
     this(
         createThreadPool(shutdownRegistry),
@@ -107,7 +110,8 @@ public class TaskGroups implements EventSubscriber {
         schedulingAction,
         flappingTaskSettings.getFlappingThreashold(),
         clock,
-        flappingTaskSettings.getBackoff());
+        flappingTaskSettings.getBackoff(),
+        preemptor);
   }
 
   TaskGroups(
@@ -118,7 +122,8 @@ public class TaskGroups implements EventSubscriber {
       final SchedulingAction schedulingAction,
       final Amount<Long, Time> flappingThreshold,
       final Clock clock,
-      final BackoffStrategy flappingBackoffStrategy) {
+      final BackoffStrategy flappingBackoffStrategy,
+      final PreemptorIface preemptor) {
 
     this.storage = checkNotNull(storage);
     checkNotNull(executor);
@@ -127,6 +132,7 @@ public class TaskGroups implements EventSubscriber {
     this.flappingThreshold = checkNotNull(flappingThreshold);
     this.clock = checkNotNull(clock);
     this.flappingBackoffStrategy = checkNotNull(flappingBackoffStrategy);
+    this.preemptor = checkNotNull(preemptor);
 
     final SchedulingAction rateLimitedAction = new SchedulingAction() {
       @Override public boolean schedule(String taskId) {
@@ -176,6 +182,8 @@ public class TaskGroups implements EventSubscriber {
             } else {
               group.push(id, clock.nowMillis());
               executor.schedule(this, group.penalizeAndGet(), TimeUnit.MILLISECONDS);
+              // TODO(zmanji): Use the return value in a slave <-> task matching manner
+              preemptor.findPreemptionSlotFor(id);
             }
             break;
 

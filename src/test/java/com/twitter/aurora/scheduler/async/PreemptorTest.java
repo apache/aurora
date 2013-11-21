@@ -20,7 +20,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -41,6 +43,8 @@ import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.ResourceSlot;
+import com.twitter.aurora.scheduler.base.Query;
+import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.Resources;
 import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.aurora.scheduler.filter.SchedulingFilterImpl;
@@ -105,8 +109,8 @@ public class PreemptorTest extends EasyMockTest {
     offerQueue = createMock(OfferQueue.class);
   }
 
-  private void runPreempter() {
-    Preemptor preempter = new Preemptor(
+  private void runPreemptor(ScheduledTask pendingTask) {
+    Preemptor preemptor = new Preemptor(
         storageUtil.storage,
         scheduler,
         offerQueue,
@@ -114,23 +118,17 @@ public class PreemptorTest extends EasyMockTest {
         PREEMPTION_DELAY,
         clock);
 
-    preempter.run();
+    preemptor.findPreemptionSlotFor(pendingTask.getAssignedTask().getTaskId());
   }
 
-  // TODO(zmanji): Put together a SchedulerPreempterIntegrationTest as well.
-
-  @Test
-  public void testNoPendingTasks() {
-    schedulingFilter = createMock(SchedulingFilter.class);
-    expectGetPendingTasks();
-
-    control.replay();
-    runPreempter();
-  }
+  // TODO(zmanji): Put together a SchedulerPreemptorIntegrationTest as well.
 
   private void expectGetPendingTasks(ScheduledTask... returnedTasks) {
+    Iterable<String> taskIds = FluentIterable.from(Arrays.asList(returnedTasks))
+        .transform(IScheduledTask.FROM_BUILDER)
+        .transform(Tasks.SCHEDULED_TO_ID);
     storageUtil.expectTaskFetch(
-        Preemptor.PENDING_QUERY,
+        Query.statusScoped(PENDING).byId(taskIds),
         IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
   }
 
@@ -138,18 +136,6 @@ public class PreemptorTest extends EasyMockTest {
     storageUtil.expectTaskFetch(
         Preemptor.ACTIVE_NOT_PENDING_QUERY,
         IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
-  }
-
-  @Test
-  public void testRecentlyPending() {
-    schedulingFilter = createMock(SchedulingFilter.class);
-    ScheduledTask lowPriority = makeTask(USER_A, JOB_A, TASK_ID_A);
-    runOnHost(lowPriority, HOST_A);
-
-    expectGetPendingTasks(lowPriority, makeTask(USER_A, JOB_A, TASK_ID_B, 100));
-
-    control.replay();
-    runPreempter();
   }
 
   @Test
@@ -170,7 +156,7 @@ public class PreemptorTest extends EasyMockTest {
     expectPreempted(lowPriority, highPriority);
 
     control.replay();
-    runPreempter();
+    runPreemptor(highPriority);
   }
 
   @Test
@@ -194,7 +180,7 @@ public class PreemptorTest extends EasyMockTest {
     expectPreempted(lowerPriority, highPriority);
 
     control.replay();
-    runPreempter();
+    runPreemptor(highPriority);
   }
 
   @Test
@@ -221,7 +207,7 @@ public class PreemptorTest extends EasyMockTest {
     expectPreempted(lowestPriority, pendingPriority);
 
     control.replay();
-    runPreempter();
+    runPreemptor(pendingPriority);
   }
 
   @Test
@@ -239,30 +225,7 @@ public class PreemptorTest extends EasyMockTest {
     expectGetActiveTasks(highPriority);
 
     control.replay();
-    runPreempter();
-  }
-
-  @Test
-  public void testOversubscribed() throws Exception {
-    schedulingFilter = createMock(SchedulingFilter.class);
-    ScheduledTask lowPriority = makeTask(USER_A, JOB_A, TASK_ID_A);
-    runOnHost(lowPriority, HOST_A);
-
-    // Despite having two high priority tasks, we only perform one eviction.
-    ScheduledTask highPriority1 = makeTask(USER_A, JOB_A, TASK_ID_B, 100);
-    ScheduledTask highPriority2 = makeTask(USER_A, JOB_A, TASK_ID_C, 100);
-    clock.advance(PREEMPTION_DELAY);
-
-    expectNoOffers();
-
-    expectGetPendingTasks(highPriority1, highPriority2);
-    expectGetActiveTasks(lowPriority);
-
-    expectFiltering();
-    expectPreempted(lowPriority, highPriority1);
-
-    control.replay();
-    runPreempter();
+    runPreemptor(task);
   }
 
   @Test
@@ -284,7 +247,7 @@ public class PreemptorTest extends EasyMockTest {
     expectPreempted(a1, p1);
 
     control.replay();
-    runPreempter();
+    runPreemptor(p1);
   }
 
   @Test
@@ -306,7 +269,7 @@ public class PreemptorTest extends EasyMockTest {
     expectPreempted(a1, p1);
 
     control.replay();
-    runPreempter();
+    runPreemptor(p1);
   }
 
   @Test
@@ -324,34 +287,7 @@ public class PreemptorTest extends EasyMockTest {
     expectGetActiveTasks(a1);
 
     control.replay();
-    runPreempter();
-  }
-
-  @Test
-  public void testInterleavedPriorities() throws Exception {
-    schedulingFilter = createMock(SchedulingFilter.class);
-    ScheduledTask p1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_p1", 1);
-    ScheduledTask a3 = makeTask(USER_A, JOB_A, TASK_ID_B + "_a3", 3);
-    ScheduledTask p2 = makeTask(USER_A, JOB_B, TASK_ID_A + "_p2", 2);
-    ScheduledTask a2 = makeTask(USER_A, JOB_B, TASK_ID_B + "_a2", 2);
-    ScheduledTask p3 = makeTask(USER_B, JOB_A, TASK_ID_A + "_p3", 3);
-    ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_B + "_a1", 1);
-    runOnHost(a3, HOST_A);
-    runOnHost(a2, HOST_A);
-    runOnHost(a1, HOST_B);
-
-    clock.advance(PREEMPTION_DELAY);
-
-    expectNoOffers();
-
-    expectGetPendingTasks(p1, p2, p3);
-    expectGetActiveTasks(a1, a2, a3);
-
-    expectFiltering().anyTimes();
-    expectPreempted(a1, p2);
-
-    control.replay();
-    runPreempter();
+    runPreemptor(p1);
   }
 
   // Ensures a production task can preempt 2 tasks on the same host.
@@ -383,7 +319,7 @@ public class PreemptorTest extends EasyMockTest {
     expectPreempted(b1, p1);
 
     control.replay();
-    runPreempter();
+    runPreemptor(p1);
   }
 
   // Ensures we select the minimal number of tasks to preempt
@@ -418,7 +354,7 @@ public class PreemptorTest extends EasyMockTest {
     expectPreempted(a1, p1);
 
     control.replay();
-    runPreempter();
+    runPreemptor(p1);
   }
 
   // Ensures a production task *never* preempts a production task from another job.
@@ -443,80 +379,7 @@ public class PreemptorTest extends EasyMockTest {
     expectGetPendingTasks(p2);
 
     control.replay();
-    runPreempter();
-  }
-
-  // Ensures two production tasks can preempt multiple non production tasks on different
-  // hosts.
-  @Test
-  public void testMultipleProductionPreemptingManyNonProduction() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl(storageUtil.storage, maintenance);
-    ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
-
-    ScheduledTask a2 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a2");
-    a2.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
-
-    ScheduledTask b1 = makeTask(USER_B, JOB_C, TASK_ID_A + "_b1");
-    b1.getAssignedTask().getTask().setNumCpus(4).setRamMb(1024);
-
-    setUpHost(HOST_A, RACK_A);
-    setUpHost(HOST_B, RACK_B);
-
-    runOnHost(a1, HOST_A);
-    runOnHost(a2, HOST_A);
-    runOnHost(b1, HOST_B);
-
-    ScheduledTask p1 = makeProductionTask(USER_C, JOB_D, TASK_ID_B + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(512);
-
-    ScheduledTask p2 = makeProductionTask(USER_C, JOB_D, TASK_ID_B + "_p2");
-    p2.getAssignedTask().getTask().setNumCpus(2).setRamMb(512);
-
-    clock.advance(PREEMPTION_DELAY);
-
-    expectNoOffers();
-
-    expectGetActiveTasks(a1, a2, b1);
-    expectGetPendingTasks(p1, p2);
-
-    expectPreempted(b1, p1);
-    expectPreempted(a2, p2);
-    expectPreempted(a1, p2);
-
-    control.replay();
-    runPreempter();
-  }
-
-  // Ensures that we don't try to preempt a task after it has already been preempted.
-  @Test
-  public void testEnsureNoDoublePreemption() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl(storageUtil.storage, maintenance);
-
-    ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
-    a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
-
-    setUpHost(HOST_A, RACK_A);
-    runOnHost(a1, HOST_A);
-
-    ScheduledTask p1 = makeProductionTask(USER_B, JOB_D, TASK_ID_B + "_p1");
-    p1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
-
-    ScheduledTask p2 = makeProductionTask(USER_B, JOB_D, TASK_ID_B + "_p2");
-    p2.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
-
-    expectNoOffers();
-
-    clock.advance(PREEMPTION_DELAY);
-
-    expectGetActiveTasks(a1);
-    expectGetPendingTasks(p1, p2);
-
-    expectPreempted(a1, p1);
-    // a1 should not be used to preempt p2.
-
-    control.replay();
-    runPreempter();
+    runPreemptor(p2);
   }
 
   // Ensures that we can preempt if a task + offer can satisfy a pending task.
@@ -544,7 +407,7 @@ public class PreemptorTest extends EasyMockTest {
     expectPreempted(a1, p1);
 
     control.replay();
-    runPreempter();
+    runPreemptor(p1);
   }
 
   // Ensures we can preempt if two tasks and an offer can satisfy a pending task.
@@ -577,7 +440,7 @@ public class PreemptorTest extends EasyMockTest {
     expectPreempted(a2, p1);
 
     control.replay();
-    runPreempter();
+    runPreemptor(p1);
   }
 
   // Ensures we don't preempt if a host has enough slack to satisfy a pending task.
@@ -603,7 +466,7 @@ public class PreemptorTest extends EasyMockTest {
     expectGetPendingTasks(p1);
 
     control.replay();
-    runPreempter();
+    runPreemptor(p1);
   }
 
   // TODO(zmanji) spread tasks across slave ids on the same host and see if preemption fails.

@@ -111,6 +111,7 @@ public class TaskSchedulerTest extends EasyMockTest {
   private TaskGroups taskGroups;
   private FakeClock clock;
   private BackoffStrategy flappingStrategy;
+  private Preemptor preemptor;
 
   @Before
   public void setUp() {
@@ -126,6 +127,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     clock = new FakeClock();
     clock.setNowMillis(0);
     flappingStrategy = createMock(BackoffStrategy.class);
+    preemptor = createMock(Preemptor.class);
   }
 
   private void replayAndCreateScheduler() {
@@ -143,7 +145,8 @@ public class TaskSchedulerTest extends EasyMockTest {
         scheduler,
         flappingThreshold,
         clock,
-        flappingStrategy);
+        flappingStrategy,
+        preemptor);
   }
 
   private Capture<Runnable> expectOffer() {
@@ -211,6 +214,7 @@ public class TaskSchedulerTest extends EasyMockTest {
   public void testNoOffers() {
     Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
     expectTaskGroupBackoff(10, 20);
+    expect(preemptor.findPreemptionSlotFor("a")).andReturn(Optional.<String>absent());
 
     replayAndCreateScheduler();
 
@@ -273,6 +277,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.<TaskInfo>absent());
+    expect(preemptor.findPreemptionSlotFor("a")).andReturn(Optional.<String>absent());
 
     Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(10, 20);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.of(mesosTask));
@@ -280,6 +285,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     Capture<Runnable> timeoutCapture3 = expectTaskGroupBackoff(10);
     expectTaskGroupBackoff(10, 20);
+    expect(preemptor.findPreemptionSlotFor("b")).andReturn(Optional.<String>absent());
 
     replayAndCreateScheduler();
 
@@ -336,6 +342,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     expect(assigner.maybeAssign(OFFER_A, task)).andThrow(new StorageException("Injected failure."));
 
     Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(10, 20);
+    expect(preemptor.findPreemptionSlotFor("a")).andReturn(Optional.<String>absent());
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.of(mesosTask));
     driver.launchTask(OFFER_A.getId(), mesosTask);
     expectLastCall();
@@ -357,8 +364,10 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectAnyMaintenanceCalls();
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.<TaskInfo>absent());
     Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(10, 20);
+    expect(preemptor.findPreemptionSlotFor("a")).andReturn(Optional.<String>absent());
     driver.declineOffer(OFFER_A.getId());
     expectTaskGroupBackoff(20, 30);
+    expect(preemptor.findPreemptionSlotFor("a")).andReturn(Optional.<String>absent());
 
     replayAndCreateScheduler();
 
@@ -553,6 +562,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.<TaskInfo>absent());
     expectTaskGroupBackoff(10, 20);
+    expect(preemptor.findPreemptionSlotFor("a")).andReturn(Optional.<String>absent());
 
     replayAndCreateScheduler();
 

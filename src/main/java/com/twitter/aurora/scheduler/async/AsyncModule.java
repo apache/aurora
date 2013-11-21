@@ -41,6 +41,7 @@ import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
 import static com.twitter.aurora.scheduler.async.HistoryPruner.PruneThreshold;
+import static com.twitter.aurora.scheduler.async.Preemptor.PreemptionDelay;
 import static com.twitter.aurora.scheduler.async.TaskGroups.FlappingTaskSettings;
 import static com.twitter.aurora.scheduler.async.TaskGroups.SchedulingSettings;
 
@@ -97,6 +98,11 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> MAX_FLAPPING_DELAY =
       Arg.create(Amount.of(5L, Time.MINUTES));
 
+  @CmdLine(name = "preemption_delay",
+      help = "Time interval after which a pending task becomes eligible to preempt other tasks")
+  private static final Arg<Amount<Long, Time>> PREEMPTION_DELAY =
+      Arg.create(Amount.of(10L, Time.MINUTES));
+
   @Override
   protected void configure() {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
@@ -136,6 +142,10 @@ public class AsyncModule extends AbstractModule {
         ));
         bind(SchedulingAction.class).to(TaskScheduler.class);
         bind(TaskScheduler.class).in(Singleton.class);
+        bind(PreemptorIface.class).to(Preemptor.class);
+        bind(Preemptor.class).in(Singleton.class);
+        bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
+            .toInstance(PREEMPTION_DELAY.get());
         bind(TaskGroups.class).in(Singleton.class);
         expose(TaskGroups.class);
       }
