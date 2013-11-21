@@ -8,6 +8,7 @@ python_tests(
   sources = [
     'test_cancel_update.py',
     'test_create.py',
+    'test_diff.py',
     'test_kill.py',
     'test_listjobs.py',
     'test_restart.py',
