@@ -118,8 +118,6 @@ python_library(
 python_library(
   name = 'executor-packaged',
   dependencies = [
-    pants(':thermos_runner'),
-
     # Covering dependencies
     pants('src/main/python/twitter/aurora/common'),
     pants('src/main/python/twitter/aurora/config'),
@@ -134,5 +132,6 @@ python_library(
   ).with_binaries(
     gc_executor = pants('src/main/python/twitter/aurora/executor/bin:gc_executor'),
     thermos_executor = pants('src/main/python/twitter/aurora/executor/bin:thermos_executor'),
+    thermos_runner = pants('src/main/python/twitter/aurora/executor/bin:thermos_runner'),
   )
 )
