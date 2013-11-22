@@ -134,7 +134,7 @@ public class PreemptorImplTest extends EasyMockTest {
 
   private void expectGetActiveTasks(ScheduledTask... returnedTasks) {
     storageUtil.expectTaskFetch(
-        PreemptorImpl.ACTIVE_NOT_PENDING_QUERY,
+        PreemptorImpl.CANDIDATE_QUERY,
         IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
   }
 

@@ -66,6 +66,7 @@ import org.apache.mesos.Protos.Offer;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
+import static com.twitter.aurora.gen.ScheduleStatus.PREEMPTING;
 import static com.twitter.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
 
 /**
@@ -100,8 +101,8 @@ public interface Preemptor {
     @interface PreemptionDelay { }
 
     @VisibleForTesting
-    static final Query.Builder ACTIVE_NOT_PENDING_QUERY = Query.statusScoped(
-        EnumSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(PENDING))));
+    static final Query.Builder CANDIDATE_QUERY = Query.statusScoped(
+        EnumSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(PENDING, PREEMPTING))));
 
     private static final Logger LOG = Logger.getLogger(PreemptorImpl.class.getName());
 
@@ -293,7 +294,7 @@ public interface Preemptor {
 
     private Multimap<String, IAssignedTask> getSlavesToActiveTasks() {
       // Only non-pending active tasks may be preempted.
-      List<IAssignedTask> activeTasks = fetch(ACTIVE_NOT_PENDING_QUERY);
+      List<IAssignedTask> activeTasks = fetch(CANDIDATE_QUERY);
 
       // Walk through the preemption candidates in reverse scheduling order.
       Collections.sort(activeTasks, Tasks.SCHEDULING_ORDER.reverse());

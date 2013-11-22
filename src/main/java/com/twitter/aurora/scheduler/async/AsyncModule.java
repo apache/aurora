@@ -17,9 +17,11 @@ package com.twitter.aurora.scheduler.async;
 
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
+import com.google.common.base.Optional;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
@@ -50,6 +52,8 @@ import static com.twitter.aurora.scheduler.async.TaskGroups.SchedulingSettings;
  * Binding module for async task management.
  */
 public class AsyncModule extends AbstractModule {
+
+  private static final Logger LOG = Logger.getLogger(AsyncModule.class.getName());
 
   @CmdLine(name = "async_worker_threads",
       help = "The number of worker threads to process async task operations with.")
@@ -104,6 +108,16 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> PREEMPTION_DELAY =
       Arg.create(Amount.of(10L, Time.MINUTES));
 
+  @CmdLine(name = "enable_preemptor",
+      help = "Enable the preemptor and preemption")
+  private static final Arg<Boolean> ENABLE_PREEMPTOR = Arg.create(true);
+
+  private static final Preemptor NULL_PREEMPTOR = new Preemptor() {
+    @Override public Optional<String> findPreemptionSlotFor(String taskId) {
+      return Optional.absent();
+    }
+  };
+
   @Override
   protected void configure() {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
@@ -143,8 +157,14 @@ public class AsyncModule extends AbstractModule {
         ));
         bind(SchedulingAction.class).to(TaskScheduler.class);
         bind(TaskScheduler.class).in(Singleton.class);
-        bind(Preemptor.class).to(PreemptorImpl.class);
-        bind(PreemptorImpl.class).in(Singleton.class);
+        if (ENABLE_PREEMPTOR.get()) {
+          bind(Preemptor.class).to(PreemptorImpl.class);
+          bind(PreemptorImpl.class).in(Singleton.class);
+          LOG.info("Preemptor Enabled.");
+        } else {
+          bind(Preemptor.class).toInstance(NULL_PREEMPTOR);
+          LOG.warning("Preemptor Disabled.");
+        }
         bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
             .toInstance(PREEMPTION_DELAY.get());
         bind(TaskGroups.class).in(Singleton.class);
