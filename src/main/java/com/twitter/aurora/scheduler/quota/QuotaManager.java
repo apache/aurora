@@ -73,17 +73,17 @@ public interface QuotaManager {
      *
      * @param role Role to consume quota for.
      * @param quota Quota amount to check for availability.
-     * @return {@code true} if the role currently has at least {@code quota} quota remaining,
-     *     {@code false} otherwise.
+     * @return QuotaComparisonResult with {@code result()} returning {@code true} if the role
+     * currently has at least {@code quota} quota remaining, {@code false} otherwise.
      */
-    boolean hasRemaining(final String role, final IQuota quota) {
+    QuotaComparisonResult checkQuota(final String role, final IQuota quota) {
       checkNotBlank(role);
       checkNotNull(quota);
 
-      return storage.consistentRead(new Quiet<Boolean>() {
-        @Override public Boolean apply(StoreProvider storeProvider) {
+      return storage.consistentRead(new Quiet<QuotaComparisonResult>() {
+        @Override public QuotaComparisonResult apply(StoreProvider storeProvider) {
           IQuota reserved = storeProvider.getQuotaStore().fetchQuota(role).or(Quotas.noQuota());
-          return Quotas.geq(reserved, Quotas.add(getConsumption(role), quota));
+          return Quotas.greaterOrEqual(reserved, Quotas.add(getConsumption(role), quota));
         }
       });
     }

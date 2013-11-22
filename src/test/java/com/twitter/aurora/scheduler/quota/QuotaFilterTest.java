@@ -1,3 +1,18 @@
+/*
+ * Copyright 2013 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.twitter.aurora.scheduler.quota;
 
 import org.junit.Before;
@@ -24,6 +39,9 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import static com.twitter.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
+import static com.twitter.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
+
 public class QuotaFilterTest extends EasyMockTest {
   private static final int DEFAULT_TASKS_IN_QUOTA = 10;
   private static final String ROLE = "test";
@@ -48,10 +66,12 @@ public class QuotaFilterTest extends EasyMockTest {
 
   private QuotaManagerImpl quotaManager;
   private StorageTestUtil storageTestUtil;
+  private QuotaComparisonResult quotaCompResult;
 
   @Before
   public void setUp() {
     quotaManager = createMock(QuotaManagerImpl.class);
+    quotaCompResult = createMock(QuotaComparisonResult.class);
     storageTestUtil = new StorageTestUtil(this);
 
     quotaFilter = new QuotaFilter(quotaManager, storageTestUtil.storage);
@@ -77,8 +97,11 @@ public class QuotaFilterTest extends EasyMockTest {
     storageTestUtil.expectOperations();
     storageTestUtil.expectTaskFetch(QUERY).times(2);
 
-    expect(quotaManager.hasRemaining(ROLE, QUOTA)).andReturn(true);
-    expect(quotaManager.hasRemaining(ROLE, QUOTA)).andReturn(false);
+    expect(quotaManager.checkQuota(ROLE, QUOTA)).andReturn(quotaCompResult);
+    expect(quotaCompResult.result()).andReturn(SUFFICIENT_QUOTA);
+    expect(quotaManager.checkQuota(ROLE, QUOTA)).andReturn(quotaCompResult);
+    expect(quotaCompResult.result()).andReturn(INSUFFICIENT_QUOTA);
+    expect(quotaCompResult.details()).andReturn("Details");
 
     control.replay();
 
@@ -96,7 +119,9 @@ public class QuotaFilterTest extends EasyMockTest {
         IScheduledTask.build(new ScheduledTask().setAssignedTask(
             new AssignedTask().setTask(jobBuilder.getTaskConfig()))));
 
-    expect(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(0, 0, 0)))).andReturn(true);
+    expect(quotaManager.checkQuota(ROLE, IQuota.build(new Quota(0, 0, 0))))
+        .andReturn(quotaCompResult);
+    expect(quotaCompResult.result()).andReturn(SUFFICIENT_QUOTA);
 
     control.replay();
 
@@ -122,7 +147,9 @@ public class QuotaFilterTest extends EasyMockTest {
     storageTestUtil.expectOperations();
     storageTestUtil.expectTaskFetch(QUERY, scheduledTasks);
 
-    expect(quotaManager.hasRemaining(ROLE, QUOTA)).andReturn(false);
+    expect(quotaManager.checkQuota(ROLE, QUOTA)).andReturn(quotaCompResult);
+    expect(quotaCompResult.result()).andReturn(INSUFFICIENT_QUOTA);
+    expect(quotaCompResult.details()).andReturn("Details");
 
     control.replay();
 
@@ -143,7 +170,9 @@ public class QuotaFilterTest extends EasyMockTest {
         IScheduledTask.build(new ScheduledTask().setAssignedTask(
             new AssignedTask().setTask(jobBuilder.getTaskConfig()))));
 
-    expect(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(0, 0, 0)))).andReturn(true);
+    expect(quotaManager.checkQuota(ROLE, IQuota.build(new Quota(0, 0, 0))))
+        .andReturn(quotaCompResult);
+    expect(quotaCompResult.result()).andReturn(SUFFICIENT_QUOTA);
 
     control.replay();
 

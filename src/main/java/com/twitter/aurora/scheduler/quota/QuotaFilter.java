@@ -32,6 +32,8 @@ import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import static com.twitter.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
+
 /**
  * A filter that fails production jobs for roles that do not have sufficient quota to run them.
  */
@@ -71,8 +73,11 @@ class QuotaFilter implements JobFilter {
 
     IQuota additionalRequested =
         Quotas.subtract(Quotas.fromTasks(template, instanceCount), currentUsage);
-    if (!quotaManager.hasRemaining(jobKey.getRole(), additionalRequested)) {
-      return JobFilterResult.fail("Insufficient resource quota.");
+    QuotaComparisonResult comparisonResult =
+        quotaManager.checkQuota(jobKey.getRole(), additionalRequested);
+
+    if (comparisonResult.result() == INSUFFICIENT_QUOTA) {
+      return JobFilterResult.fail("Insufficient resource quota: " + comparisonResult.details());
     }
 
     return JobFilterResult.pass();

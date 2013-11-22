@@ -36,15 +36,17 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+
+import static com.twitter.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
+import static com.twitter.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
 
 public class QuotaManagerImplTest extends EasyMockTest {
   private static final String ROLE = "foo";
   private static final Query.Builder ACTIVE_QUERY = Query.roleScoped(ROLE).active();
 
   private StorageTestUtil storageUtil;
-  // TODO(Kevin Sweeney): Move hasRemaining to QuotaFilter along with tests.
+  // TODO(maximk): Move checkQuota to QuotaFilter along with tests.
   private QuotaManagerImpl quotaManager;
 
   @Before
@@ -71,7 +73,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(quotaManager.hasRemaining(ROLE, Quotas.noQuota()));
+    assertEquals(SUFFICIENT_QUOTA, quotaManager.checkQuota(ROLE, Quotas.noQuota()).result());
   }
 
   @Test
@@ -82,7 +84,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(1, 1, 1))));
+    QuotaComparisonResult result =
+        quotaManager.checkQuota(ROLE, IQuota.build(new Quota(1, 1, 1)));
+
+    assertEquals(INSUFFICIENT_QUOTA, result.result());
+    assertTrue(result.details().length() > 0);
   }
 
   @Test
@@ -98,8 +104,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
     control.replay();
 
     IQuota half = IQuota.build(new Quota(1, 1, 1));
-    assertTrue(quotaManager.hasRemaining(ROLE, half));
-    assertFalse(quotaManager.hasRemaining(ROLE, half));
+    assertEquals(SUFFICIENT_QUOTA, quotaManager.checkQuota(ROLE, half).result());
+    assertEquals(INSUFFICIENT_QUOTA, quotaManager.checkQuota(ROLE, half).result());
   }
 
   @Test
@@ -110,7 +116,9 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(2, 1, 1))));
+    assertEquals(
+        INSUFFICIENT_QUOTA,
+        quotaManager.checkQuota(ROLE, IQuota.build(new Quota(2, 1, 1))).result());
   }
 
   @Test
@@ -121,7 +129,9 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(1, 2, 1))));
+    assertEquals(
+        INSUFFICIENT_QUOTA,
+        quotaManager.checkQuota(ROLE, IQuota.build(new Quota(1, 2, 1))).result());
   }
 
   @Test
@@ -132,7 +142,9 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(1, 1, 2))));
+    assertEquals(
+        INSUFFICIENT_QUOTA,
+        quotaManager.checkQuota(ROLE, IQuota.build(new Quota(1, 1, 2))).result());
   }
 
   @Test
@@ -147,7 +159,9 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertTrue(quotaManager.hasRemaining(ROLE, IQuota.build(new Quota(2, 2, 2))));
+    assertEquals(
+        SUFFICIENT_QUOTA,
+        quotaManager.checkQuota(ROLE, IQuota.build(new Quota(2, 2, 2))).result());
   }
 
   private IExpectationSetters<?> returnTasks(IScheduledTask... tasks) {

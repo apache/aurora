@@ -94,19 +94,8 @@ public final class Quotas {
   /**
    * a >= b
    */
-  public static boolean geq(IQuota a, IQuota b) {
-    return (a.getNumCpus() >= b.getNumCpus())
-        && (a.getRamMb() >= b.getRamMb())
-        && (a.getDiskMb() >= b.getDiskMb());
-  }
-
-  /**
-   * a > b
-   */
-  public static boolean greaterThan(IQuota a, IQuota b) {
-    return (a.getNumCpus() > b.getNumCpus())
-        && (a.getRamMb() > b.getRamMb())
-        && (a.getDiskMb() > b.getDiskMb());
+  public static QuotaComparisonResult greaterOrEqual(IQuota a, IQuota b) {
+    return QuotaComparisonResult.greaterOrEqual(a, b);
   }
 
   /**
