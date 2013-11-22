@@ -112,7 +112,6 @@ import static com.twitter.aurora.gen.ResponseCode.WARNING;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 
-// TODO(ksweeney): Get role from JobKey instead of Identity everywhere in here.
 public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static final String ROLE = "bar_role";

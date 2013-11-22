@@ -461,9 +461,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response killTasks(final TaskQuery query, Lock mutablelock, SessionKey session) {
-    // TODO(wfarner): Determine whether this is a useful function, or if it should simply be
-    //     switched to 'killJob'.
-
     checkNotNull(query);
     checkNotNull(session);
 
@@ -763,76 +760,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         List<String> errors = Lists.newArrayList();
 
         for (ConfigRewrite command : request.getRewriteCommands()) {
-          switch (command.getSetField()) {
-            case JOB_REWRITE:
-              JobConfigRewrite jobRewrite = command.getJobRewrite();
-              IJobConfiguration existingJob = IJobConfiguration.build(jobRewrite.getOldJob());
-              IJobConfiguration rewrittenJob;
-              try {
-                rewrittenJob = ConfigurationManager.validateAndPopulate(
-                    IJobConfiguration.build(jobRewrite.getRewrittenJob()));
-              } catch (TaskDescriptionException e) {
-                // We could add an error here, but this is probably a hint of something wrong in
-                // the client that's causing a bad configuration to be applied.
-                throw Throwables.propagate(e);
-              }
-              if (!existingJob.getKey().equals(rewrittenJob.getKey())) {
-                errors.add("Disallowing rewrite attempting to change job key.");
-              } else if (!existingJob.getOwner().equals(rewrittenJob.getOwner())) {
-                errors.add("Disallowing rewrite attempting to change job owner.");
-              } else {
-                JobStore.Mutable jobStore = storeProvider.getJobStore();
-                Multimap<String, IJobConfiguration> matches =
-                    jobsByKey(jobStore, existingJob.getKey());
-                switch (matches.size()) {
-                  case 0:
-                    errors.add("No jobs found for key " + JobKeys.toPath(existingJob));
-                    break;
-
-                  case 1:
-                    Map.Entry<String, IJobConfiguration> match =
-                        Iterables.getOnlyElement(matches.entries());
-                    IJobConfiguration storedJob = match.getValue();
-                    if (!storedJob.equals(existingJob)) {
-                      errors.add("CAS compare failed for " + JobKeys.toPath(storedJob));
-                    } else {
-                      jobStore.saveAcceptedJob(match.getKey(), rewrittenJob);
-                    }
-                    break;
-
-                  default:
-                    errors.add("Multiple jobs found for key " + JobKeys.toPath(existingJob));
-                }
-              }
-              break;
-
-            case INSTANCE_REWRITE:
-              InstanceConfigRewrite instanceRewrite = command.getInstanceRewrite();
-              InstanceKey instanceKey = instanceRewrite.getInstanceKey();
-              Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
-                  Query.instanceScoped(IJobKey.build(instanceKey.getJobKey()),
-                      instanceKey.getInstanceId())
-                      .active());
-              Optional<IAssignedTask> task =
-                  Optional.fromNullable(Iterables.getOnlyElement(tasks, null))
-                      .transform(Tasks.SCHEDULED_TO_ASSIGNED);
-              if (!task.isPresent()) {
-                errors.add("No active task found for " + instanceKey);
-              } else if (!task.get().getTask().newBuilder().equals(instanceRewrite.getOldTask())) {
-                errors.add("CAS compare failed for " + instanceKey);
-              } else {
-                ITaskConfig newConfiguration = ITaskConfig.build(
-                    ConfigurationManager.applyDefaultsIfUnset(instanceRewrite.getRewrittenTask()));
-                boolean changed = storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(
-                    task.get().getTaskId(), newConfiguration);
-                if (!changed) {
-                  errors.add("Did not change " + task.get().getTaskId());
-                }
-              }
-              break;
-
-            default:
-              throw new IllegalArgumentException("Unhandled command type " + command.getSetField());
+          Optional<String> error = rewriteConfig(command, storeProvider);
+          if (error.isPresent()) {
+            errors.add(error.get());
           }
         }
 
@@ -845,6 +775,86 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         return resp;
       }
     });
+  }
+
+  private Optional<String> rewriteConfig(
+      ConfigRewrite command,
+      MutableStoreProvider storeProvider) {
+
+    Optional<String> error = Optional.absent();
+    switch (command.getSetField()) {
+      case JOB_REWRITE:
+        JobConfigRewrite jobRewrite = command.getJobRewrite();
+        IJobConfiguration existingJob = IJobConfiguration.build(jobRewrite.getOldJob());
+        IJobConfiguration rewrittenJob;
+        try {
+          rewrittenJob = ConfigurationManager.validateAndPopulate(
+              IJobConfiguration.build(jobRewrite.getRewrittenJob()));
+        } catch (TaskDescriptionException e) {
+          // We could add an error here, but this is probably a hint of something wrong in
+          // the client that's causing a bad configuration to be applied.
+          throw Throwables.propagate(e);
+        }
+        if (!existingJob.getKey().equals(rewrittenJob.getKey())) {
+          error = Optional.of("Disallowing rewrite attempting to change job key.");
+        } else if (!existingJob.getOwner().equals(rewrittenJob.getOwner())) {
+          error = Optional.of("Disallowing rewrite attempting to change job owner.");
+        } else {
+          JobStore.Mutable jobStore = storeProvider.getJobStore();
+          Multimap<String, IJobConfiguration> matches =
+              jobsByKey(jobStore, existingJob.getKey());
+          switch (matches.size()) {
+            case 0:
+              error = Optional.of("No jobs found for key " + JobKeys.toPath(existingJob));
+              break;
+
+            case 1:
+              Map.Entry<String, IJobConfiguration> match =
+                  Iterables.getOnlyElement(matches.entries());
+              IJobConfiguration storedJob = match.getValue();
+              if (!storedJob.equals(existingJob)) {
+                error = Optional.of("CAS compare failed for " + JobKeys.toPath(storedJob));
+              } else {
+                jobStore.saveAcceptedJob(match.getKey(), rewrittenJob);
+              }
+              break;
+
+            default:
+              error = Optional.of("Multiple jobs found for key " + JobKeys.toPath(existingJob));
+          }
+        }
+        break;
+
+      case INSTANCE_REWRITE:
+        InstanceConfigRewrite instanceRewrite = command.getInstanceRewrite();
+        InstanceKey instanceKey = instanceRewrite.getInstanceKey();
+        Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
+            Query.instanceScoped(IJobKey.build(instanceKey.getJobKey()),
+                instanceKey.getInstanceId())
+                .active());
+        Optional<IAssignedTask> task =
+            Optional.fromNullable(Iterables.getOnlyElement(tasks, null))
+                .transform(Tasks.SCHEDULED_TO_ASSIGNED);
+        if (!task.isPresent()) {
+          error = Optional.of("No active task found for " + instanceKey);
+        } else if (!task.get().getTask().newBuilder().equals(instanceRewrite.getOldTask())) {
+          error = Optional.of("CAS compare failed for " + instanceKey);
+        } else {
+          ITaskConfig newConfiguration = ITaskConfig.build(
+              ConfigurationManager.applyDefaultsIfUnset(instanceRewrite.getRewrittenTask()));
+          boolean changed = storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(
+              task.get().getTaskId(), newConfiguration);
+          if (!changed) {
+            error = Optional.of("Did not change " + task.get().getTaskId());
+          }
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Unhandled command type " + command.getSetField());
+    }
+
+    return error;
   }
 
   @Override
