@@ -41,7 +41,8 @@ import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
 import static com.twitter.aurora.scheduler.async.HistoryPruner.PruneThreshold;
-import static com.twitter.aurora.scheduler.async.Preemptor.PreemptionDelay;
+import static com.twitter.aurora.scheduler.async.Preemptor.PreemptorImpl;
+import static com.twitter.aurora.scheduler.async.Preemptor.PreemptorImpl.PreemptionDelay;
 import static com.twitter.aurora.scheduler.async.TaskGroups.FlappingTaskSettings;
 import static com.twitter.aurora.scheduler.async.TaskGroups.SchedulingSettings;
 
@@ -142,8 +143,8 @@ public class AsyncModule extends AbstractModule {
         ));
         bind(SchedulingAction.class).to(TaskScheduler.class);
         bind(TaskScheduler.class).in(Singleton.class);
-        bind(PreemptorIface.class).to(Preemptor.class);
-        bind(Preemptor.class).in(Singleton.class);
+        bind(Preemptor.class).to(PreemptorImpl.class);
+        bind(PreemptorImpl.class).in(Singleton.class);
         bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
             .toInstance(PREEMPTION_DELAY.get());
         bind(TaskGroups.class).in(Singleton.class);

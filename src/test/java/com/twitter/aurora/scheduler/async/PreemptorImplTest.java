@@ -20,7 +20,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -67,9 +66,10 @@ import static org.easymock.EasyMock.expect;
 import static com.twitter.aurora.gen.MaintenanceMode.NONE;
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
+import static com.twitter.aurora.scheduler.async.Preemptor.PreemptorImpl;
 import static com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
 
-public class PreemptorTest extends EasyMockTest {
+public class PreemptorImplTest extends EasyMockTest {
 
   private static final String USER_A = "user_a";
   private static final String USER_B = "user_b";
@@ -110,7 +110,7 @@ public class PreemptorTest extends EasyMockTest {
   }
 
   private void runPreemptor(ScheduledTask pendingTask) {
-    Preemptor preemptor = new Preemptor(
+    PreemptorImpl preemptor = new PreemptorImpl(
         storageUtil.storage,
         scheduler,
         offerQueue,
@@ -134,7 +134,7 @@ public class PreemptorTest extends EasyMockTest {
 
   private void expectGetActiveTasks(ScheduledTask... returnedTasks) {
     storageUtil.expectTaskFetch(
-        Preemptor.ACTIVE_NOT_PENDING_QUERY,
+        PreemptorImpl.ACTIVE_NOT_PENDING_QUERY,
         IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
   }
 

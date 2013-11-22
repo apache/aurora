@@ -42,7 +42,6 @@ import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.scheduler.async.PreemptorIface;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -90,7 +89,7 @@ public class TaskGroups implements EventSubscriber {
   private final Amount<Long, Time> flappingThreshold;
   private final BackoffStrategy flappingBackoffStrategy;
   private final Clock clock;
-  private final PreemptorIface preemptor;
+  private final Preemptor preemptor;
 
   @Inject
   TaskGroups(
@@ -100,7 +99,7 @@ public class TaskGroups implements EventSubscriber {
       SchedulingAction schedulingAction,
       FlappingTaskSettings flappingTaskSettings,
       Clock clock,
-      PreemptorIface preemptor) {
+      Preemptor preemptor) {
 
     this(
         createThreadPool(shutdownRegistry),
@@ -123,7 +122,7 @@ public class TaskGroups implements EventSubscriber {
       final Amount<Long, Time> flappingThreshold,
       final Clock clock,
       final BackoffStrategy flappingBackoffStrategy,
-      final PreemptorIface preemptor) {
+      final Preemptor preemptor) {
 
     this.storage = checkNotNull(storage);
     checkNotNull(executor);
