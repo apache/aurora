@@ -52,11 +52,11 @@ public class BackupModule extends PrivateModule {
 
   @CmdLine(name = "backup_interval", help = "Minimum interval on which to write a storage backup.")
   private static final Arg<Amount<Long, Time>> BACKUP_INTERVAL =
-      Arg.create(Amount.of(6L, Time.HOURS));
+      Arg.create(Amount.of(1L, Time.HOURS));
 
   @CmdLine(name = "max_saved_backups",
       help = "Maximum number of backups to retain before deleting the oldest backups.")
-  private static final Arg<Integer> MAX_SAVED_BACKUPS = Arg.create(10);
+  private static final Arg<Integer> MAX_SAVED_BACKUPS = Arg.create(48);
 
   @NotNull
   @CmdLine(name = "backup_dir",
