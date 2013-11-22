@@ -16,7 +16,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.thermos.config',
-    version = '0.1.0',
+    version = '0.1.1',
     description = 'Thermos configuration schema and loader.',
   )
 )

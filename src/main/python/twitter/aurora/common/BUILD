@@ -37,7 +37,10 @@ python_library(
   name = 'http_signaler',
   sources = ['http_signaler.py'],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:socksipy-branch'),  # TODO(wickman) MESOS-3710
+    # TODO(wickman) This dependency needs to be removed.  It is a scope leak
+    # for monkeypatched SOCKS usage and should be moved into an org-specific
+    # HttpSignaler and injected at the AuroraClientAPI level.
+    pants('src/main/python/twitter/aurora/BUILD.thirdparty:socksipy-branch'),
     pants('aurora/twitterdeps/src/python/twitter/common/lang'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
   ]
@@ -51,10 +54,11 @@ python_library(
     pants(':cluster_option'),
     pants(':clusters'),
     pants(':http_signaler'),
+    pants('src/main/python/twitter/aurora/common/auth'),
   ],
   provides = setup_py(
     name = 'twitter.aurora.common',
-    version = '0.1.0',
+    version = '0.1.1',
     description = 'Aurora common libraries.',
     license = 'Apache License, Version 2.0',
   )

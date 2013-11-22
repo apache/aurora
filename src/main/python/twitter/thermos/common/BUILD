@@ -37,7 +37,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.thermos.common',
-    version = '0.1.0',
+    version = '0.1.1',
     description = 'Thermos common libraries.',
   )
 )

@@ -41,7 +41,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.thermos.observer',
-    version = '0.1.0',
+    version = '0.1.1',
     description = 'The Thermos observer web interface.',
   ).with_binaries(
     thermos_observer = pants('src/main/python/twitter/thermos/observer/bin:thermos_observer'),

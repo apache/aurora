@@ -80,7 +80,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.thermos.core',
-    version = '0.1.0',
+    version = '0.1.1',
     description = 'The Thermos core state machine.',
   )
 )

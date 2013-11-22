@@ -21,9 +21,20 @@ python_library(
     pants('src/main/python/twitter/aurora/config/schema'),
     pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
   ],
+
+)
+
+python_library(
+  name = 'config-packaged',
+  dependencies = [
+    pants(':config'),
+
+    # covering dependencies
+    pants('src/main/python/twitter/thermos/config'),
+  ],
   provides = setup_py(
     name = 'twitter.aurora.config',
-    version = '0.1.0',
+    version = '0.1.1',
     description = 'Aurora/Thermos Pystachio schemas for describing job configurations.',
     license = 'Apache License, Version 2.0',
   )

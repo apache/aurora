@@ -64,10 +64,11 @@ python_library(
   dependencies = [
     pants('src/main/python/twitter/aurora/common'),
     pants('src/main/python/twitter/aurora/config'),
+    pants('src/main/python/twitter/thermos/common'),
   ],
   provides = setup_py(
     name = 'twitter.aurora.client',
-    version = '0.1.0',
+    version = '0.1.1',
   ).with_binaries(
     aurora_admin = pants('src/main/python/twitter/aurora/client/bin:aurora_admin'),
     aurora_client = pants('src/main/python/twitter/aurora/client/bin:aurora_client'),
