@@ -43,9 +43,20 @@ class FailureThreshold(object):
 
 
   def update_failure_counts(self, failed_instances):
-    """Update the failure counts metrics based upon a batch of failed instances."""
+    """Update the failure counts metrics based upon a batch of failed instances.
+
+    Arguments:
+    failed_instances - list of failed instances
+
+    Returns a list of instances with failure counts exceeding _max_per_instance_failures.
+    """
+    exceeded_failure_count_instances = []
     for instance in failed_instances:
       self._failures_by_instance[instance] += 1
+      if self._failures_by_instance[instance] > self._max_per_instance_failures:
+        exceeded_failure_count_instances.append(instance)
+
+    return exceeded_failure_count_instances
 
   def is_failed_update(self):
     total_failed_instances = self._exceeded_instance_fail_count()

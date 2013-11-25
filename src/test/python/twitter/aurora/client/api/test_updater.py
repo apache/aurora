@@ -596,3 +596,37 @@ class UpdaterTest(TestCase):
     self._updater.update([3, 4])
     self.verify_mocks()
 
+  def test_update_skips_unretryable(self):
+    """Update process skips instances exceeding max_per_shard_failures"""
+    update_config = self.UPDATE_CONFIG.copy()
+    update_config.update(max_total_failures=2, max_per_shard_failures=2)
+    self.init_updater(update_config)
+
+    old_configs = self.make_task_configs(10)
+    new_config = deepcopy(old_configs[0])
+    new_config.priority = 5
+    job_config = self.make_job_config(new_config, 10)
+    self._config.job_config = job_config
+    self.expect_start()
+    self.expect_get_tasks(old_configs)
+    self.expect_populate(job_config)
+    self.expect_kill([0, 1, 2])
+    self.expect_add([0, 1, 2], new_config)
+    self.expect_watch_instances([0, 1, 2], failed_instances=[0])
+    self.expect_restart([0])
+    self.expect_kill([3, 4])
+    self.expect_add([3, 4], new_config)
+    self.expect_watch_instances([0, 3, 4], failed_instances=[0])
+    self.expect_restart([0])
+    self.expect_kill([5, 6])
+    self.expect_add([5, 6], new_config)
+    self.expect_watch_instances([0, 5, 6], failed_instances=[0])
+    self.expect_kill([7, 8, 9])
+    self.expect_add([7, 8, 9], new_config)
+    self.expect_watch_instances([7, 8, 9])
+    self.expect_finish()
+    self.replay_mocks()
+
+    self._updater.update()
+    self.verify_mocks()
+

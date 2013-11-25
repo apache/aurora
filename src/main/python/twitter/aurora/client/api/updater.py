@@ -134,15 +134,23 @@ invoking cancel_update.
 
       if failed_instances:
         log.error('Failed instances: %s' % failed_instances)
+
+      unretryable_instances = failure_threshold.update_failure_counts(failed_instances)
+      if unretryable_instances:
+        log.warn('Not restarting failed instances %s, which exceeded '
+                 'maximum allowed instance failure limit of %s' %
+                 (unretryable_instances, self._update_config.max_per_instance_failures))
+      retryable_instances = list(set(failed_instances) - set(unretryable_instances))
       remaining_instances += [
-          self.InstanceState(instance_id, is_updated=True) for instance_id in failed_instances
+          self.InstanceState(instance_id, is_updated=True) for instance_id in retryable_instances
       ]
       remaining_instances.sort(key=lambda tup: tup.instance_id)
-      failure_threshold.update_failure_counts(failed_instances)
 
     if failed_instances:
       untouched_instances = [s.instance_id for s in remaining_instances if not s.is_updated]
-      instances_to_rollback = list(set(instance_configs.instances_to_process) - set(untouched_instances))
+      instances_to_rollback = list(
+          set(instance_configs.instances_to_process) - set(untouched_instances)
+      )
       self._rollback(instances_to_rollback, instance_configs)
 
     return failed_instances
