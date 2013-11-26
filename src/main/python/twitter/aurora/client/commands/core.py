@@ -316,7 +316,11 @@ def start_cron(args, options):
     help='List jobs registered with the Aurora scheduler')
 @requires.exactly('cluster/role')
 def list_jobs(cluster_and_role):
-  """usage: list_jobs [--show_cron_schedule] cluster/role/env/job"""
+  """usage: list_jobs [--show-cron] cluster/role/env/job
+
+  Shows all jobs that match the job-spec known by the scheduler.
+  If --show-cron is specified, then also shows the registered cron schedule.
+  """
   def show_job_simple(job):
     if options.show_cron_schedule:
       print(('{0}/{1.key.role}/{1.key.environment}/{1.key.name}' +
