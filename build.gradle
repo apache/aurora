@@ -81,7 +81,8 @@ sourceSets {
 dependencies {
   compile 'aopalliance:aopalliance:1.0'
   compile 'com.google.code.findbugs:jsr305:1.3.9'
-  compile 'com.google.guava:guava:14.0.1'
+  def guavaDep = 'com.google.guava:guava:14.0.1'
+  compile guavaDep
   compile 'com.google.inject:guice:3.0'
   compile 'com.google.protobuf:protobuf-java:2.4.1'
   def jerseyRev = '1.12'
@@ -142,6 +143,7 @@ dependencies {
   compile 'com.twitter.common:zookeeper-testing:0.0.37'
   testCompile 'junit:junit:4.10'
 
+  generatedCompile guavaDep
   generatedCompile thriftLib
 
   checkstyle 'com.puppycrawl.tools:checkstyle:5.6'
@@ -176,11 +178,21 @@ task generateSources(dependsOn: 'bootstrapThrift') {
         args = ['--gen', 'java:hashcode', '-o', outputDir, file]
       }
     }
+    ['JobConfiguration', 'Lock', 'ScheduledTask', 'Quota'].each {
+      def structName = it
+      exec {
+        executable = 'python'
+        args = ['src/main/python/twitter/aurora/tools/java/thrift_wrapper_codegen.py',
+                'src/main/thrift/com/twitter/aurora/gen/api.thrift',
+                structName,
+                "$generatedDir/gen-java"]
+      }
+    }
   }
 }
 
 compileGeneratedJava {
-  dependsOn(generateSources)
+  dependsOn generateSources
 }
 
 compileJava.source sourceSets.main.java
@@ -195,7 +207,8 @@ idea {
    module {
     iml {
       beforeMerged { module ->
-        module.sourceFolders.add(new org.gradle.plugins.ide.idea.model.Path('file://$MODULE_DIR$/dist/generated-src/gen-java'))
+        module.sourceFolders.add(new org.gradle.plugins.ide.idea.model.Path(
+            'file://$MODULE_DIR$/dist/generated-src/gen-java'))
       }
       whenMerged { module ->
         // TODO(zmanji): Find a way to remove the `dist` directory instead of
