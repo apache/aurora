@@ -6,6 +6,7 @@ apply plugin: 'maven-publish'
 
 buildDir = 'dist'
 def generatedDir = "$buildDir/generated-src"
+def generatedJavaDir = "$generatedDir/gen-java"
 
 compileJava {
   sourceCompatibility = 1.7
@@ -178,6 +179,8 @@ task generateSources(dependsOn: 'bootstrapThrift') {
         args = ['--gen', 'java:hashcode', '-o', outputDir, file]
       }
     }
+    // These are the 'root' structs, the tool recursively generates all composed structs.
+    // TODO(wfarner): Change codegen tool to generate for all structs in a thrift file.
     ['JobConfiguration', 'Lock', 'ScheduledTask', 'Quota'].each {
       def structName = it
       exec {
@@ -185,7 +188,7 @@ task generateSources(dependsOn: 'bootstrapThrift') {
         args = ['src/main/python/twitter/aurora/tools/java/thrift_wrapper_codegen.py',
                 'src/main/thrift/com/twitter/aurora/gen/api.thrift',
                 structName,
-                "$generatedDir/gen-java"]
+                generatedJavaDir]
       }
     }
   }
@@ -208,7 +211,7 @@ idea {
     iml {
       beforeMerged { module ->
         module.sourceFolders.add(new org.gradle.plugins.ide.idea.model.Path(
-            'file://$MODULE_DIR$/dist/generated-src/gen-java'))
+            "file://$generatedJavaDir"))
       }
       whenMerged { module ->
         // TODO(zmanji): Find a way to remove the `dist` directory instead of
