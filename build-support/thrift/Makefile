@@ -21,7 +21,7 @@ all: $(THRIFT)
 
 $(THRIFT):
 	curl $(THRIFT_URL) | tar zxv
-	(cd $(THRIFT_DISTNAME) && ./configure --without-php --without-php_extension --without-ruby)
+	(cd $(THRIFT_DISTNAME) && ./configure --without-php --without-php_extension --without-ruby --without-haskell)
 	(cd $(THRIFT_DISTNAME) && make -j4)
 
 clean:
