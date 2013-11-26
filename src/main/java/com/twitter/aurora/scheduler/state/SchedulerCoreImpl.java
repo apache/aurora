@@ -64,7 +64,7 @@ import static com.twitter.aurora.scheduler.base.Tasks.ACTIVE_STATES;
 class SchedulerCoreImpl implements SchedulerCore {
   @Positive
   @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
-  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(1000);
+  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(4000);
 
   private static final Logger LOG = Logger.getLogger(SchedulerCoreImpl.class.getName());
 
