@@ -79,6 +79,10 @@ sourceSets {
   }
 }
 
+jar {
+    from sourceSets.generated.output
+}
+
 dependencies {
   compile 'aopalliance:aopalliance:1.0'
   compile 'com.google.code.findbugs:jsr305:1.3.9'
