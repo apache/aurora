@@ -128,7 +128,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.aurora.executor',
-    version = '0.1.2',
+    version = '0.1.3',
   ).with_binaries(
     gc_executor = pants('src/main/python/twitter/aurora/executor/bin:gc_executor'),
     thermos_executor = pants('src/main/python/twitter/aurora/executor/bin:thermos_executor'),

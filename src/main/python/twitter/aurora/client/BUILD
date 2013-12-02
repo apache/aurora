@@ -68,7 +68,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.aurora.client',
-    version = '0.1.1',
+    version = '0.1.2',
   ).with_binaries(
     aurora_admin = pants('src/main/python/twitter/aurora/client/bin:aurora_admin'),
     aurora_client = pants('src/main/python/twitter/aurora/client/bin:aurora_client'),

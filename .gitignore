@@ -3,6 +3,7 @@
 *.iws
 *.pyc
 *~
+.coverage
 .gradle/
 .pants.*
 .reviewboardrc

@@ -37,10 +37,6 @@ python_library(
   name = 'http_signaler',
   sources = ['http_signaler.py'],
   dependencies = [
-    # TODO(wickman) This dependency needs to be removed.  It is a scope leak
-    # for monkeypatched SOCKS usage and should be moved into an org-specific
-    # HttpSignaler and injected at the AuroraClientAPI level.
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:socksipy-branch'),
     pants('aurora/twitterdeps/src/python/twitter/common/lang'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
   ]
@@ -58,7 +54,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.aurora.common',
-    version = '0.1.1',
+    version = '0.1.2',
     description = 'Aurora common libraries.',
     license = 'Apache License, Version 2.0',
   )

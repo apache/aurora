@@ -14,10 +14,6 @@ else:
   import urllib2 as urllib_request
   from urllib2 import URLError, HTTPError
 
-# TODO(wickman) This is an abstraction leak -- this should be fixed upstream by
-# MESOS-3710
-import socks
-
 
 class HttpSignaler(object):
   """Simple HTTP endpoint wrapper to check health or trigger quitquitquit/abortabortabort"""
@@ -43,16 +39,22 @@ class HttpSignaler(object):
     """Request an HTTP endpoint with a GET request (or POST if data is not None)"""
     url = self.url(endpoint)
     log.debug("%s: %s %s" % (self.__class__.__name__, 'GET' if data is None else 'POST', url))
+
+    def raise_error(reason):
+      raise self.QueryError('Failed to signal %s: %s' % (self.url(endpoint), reason))
+
     try:
       with contextlib.closing(
           self.opener(url, data, timeout=self._timeout_secs)) as fp:
         return fp.read()
-    except (URLError, HTTPError, HTTPException, SocketTimeout, socks.GeneralProxyError) as e:
+    except (HTTPException, SocketTimeout) as e:
       # the type of an HTTPException is typically more useful than its contents (since for example
       # BadStatusLines are often empty). likewise with socket.timeout.
-      err = e.__class__.__name__ if isinstance(e, (HTTPException, SocketTimeout)) else e
-      reason = 'Failed to signal %s: %s' % (self.url(endpoint), err)
-      raise self.QueryError(reason)
+      raise_error('Error within %s' % e.__class__.__name__)
+    except (URLError, HTTPError) as e:
+      raise_error(e)
+    except Exception as e:
+      raise_error('Unexpected error: %s' % e)
 
   def __call__(self, endpoint, use_post_method=False, expected_response=None):
     """Returns a (boolean, string|None) tuple of (call success, failure reason)"""

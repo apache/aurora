@@ -68,4 +68,4 @@ EOF
   done
 popd
 
-sudo chown -R vagrant.vagrant mesos mesos-build aurora .pex
+sudo chown -R vagrant.vagrant mesos mesos-build aurora
