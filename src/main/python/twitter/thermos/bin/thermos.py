@@ -467,16 +467,6 @@ def gc(args, options):
     print('Cancelling gc.')
 
 
-# TODO(wickman)  Implement.
-@app.command
-def monitor(args, options):
-  """Monitor task(s)
-
-    Usage: thermos monitor task_id [task_id_2 ...]
-  """
-  pass
-
-
 @app.command
 @app.command_option("--verbosity", default=0, dest='verbose', type='int',
                     help="Display more verbosity")
@@ -637,6 +627,8 @@ def help(args, options):
   print('unknown command: %s' % args[0], file=sys.stderr)
 
 
+
+
 def generate_usage():
   usage = """
 thermos
@@ -652,4 +644,9 @@ commands:
 LogOptions.set_disk_log_level('NONE')
 LogOptions.set_stdout_log_level('INFO')
 generate_usage()
-app.main()
+
+
+proxy_main = app.main
+
+
+proxy_main()

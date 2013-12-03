@@ -4,6 +4,7 @@ python_library(
   name = 'thermos',
   dependencies = [
     pants('src/main/python/twitter/thermos/core'),
+    pants('src/main/python/twitter/thermos/monitoring'),
   ],
   provides = setup_py(
     name = 'twitter.thermos',
