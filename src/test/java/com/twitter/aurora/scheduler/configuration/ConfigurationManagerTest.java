@@ -103,24 +103,4 @@ public class ConfigurationManagerTest {
     assertTrue(copy.isSetKey());
     assertEquals(DEFAULT_ENVIRONMENT, copy.getKey().getEnvironment());
   }
-
-  @Test
-  public void testRequiresContactEmail() throws Exception {
-    JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy();
-    copy.getTaskConfig().unsetContactEmail();
-    expectRejected(copy);
-    copy.getTaskConfig().setContactEmail("invalid");
-    expectRejected(copy);
-    copy.getTaskConfig().setContactEmail("jim@aol.com");
-    expectRejected(copy);
-  }
-
-  private void expectRejected(JobConfiguration job) {
-    try {
-      ConfigurationManager.validateAndPopulate(IJobConfiguration.build(job));
-      fail();
-    } catch (ConfigurationManager.TaskDescriptionException e) {
-      // expected
-    }
-  }
 }
