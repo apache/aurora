@@ -9,3 +9,10 @@ The observer is listening on http://192.168.33.4:1338/
 The master is listening on http://192.168.33.3:5050/
 
 Once everything is up, you can `vagrant ssh aurora-scheduler` and execute aurora client commands using the `aurora` client.
+
+Troubleshooting
+---------------
+Most of the vagrant related problems can be fixed by the following steps:
+* Destroying the vagrant environment with `vagrant destroy`
+* Cleaning the repository of build artifacts and other intermediate output with `git clean -fdx`
+* Bringing up the vagrant environment with `vagrant up`
