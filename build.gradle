@@ -40,7 +40,7 @@ publishing {
       }
     }
   }
-  if (hasProperty('internalMavenUrl')) {
+  if (project.hasProperty('internalMavenUrl')) {
     repositories {
       maven {
         credentials {
@@ -80,7 +80,7 @@ sourceSets {
 }
 
 jar {
-    from sourceSets.generated.output
+  from sourceSets.generated.output
 }
 
 dependencies {
