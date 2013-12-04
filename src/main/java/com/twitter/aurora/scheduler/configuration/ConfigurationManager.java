@@ -207,22 +207,6 @@ public final class ConfigurationManager {
   }
 
   /**
-   * Resets fields within a task configuration that would make it unique from originally-equal
-   * configurations.
-   *
-   * @param task Task to scrub.
-   * @return Scrubbed task.
-   */
-  public static ITaskConfig scrubNonUniqueTaskFields(ITaskConfig task) {
-    TaskConfig copy = task.newBuilder();
-    // Unsetting only changes the isset bit vector.  For equals() comparison, the value must also be
-    // canonical.
-    copy.setInstanceIdDEPRECATED(0);
-    copy.unsetInstanceIdDEPRECATED();
-    return ITaskConfig.build(copy);
-  }
-
-  /**
    * Check validity of and populates defaults in a job configuration.  This will return a deep copy
    * of the provided job configuration with default configuration values applied, and configuration
    * map values sanitized and applied to their respective struct fields.

@@ -1,6 +1,5 @@
 package com.twitter.aurora.scheduler.storage;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -36,10 +35,7 @@ public class StorageBackfillTest {
     clock = new FakeClock();
   }
 
-  private static IScheduledTask makeTask(
-      String id,
-      Optional<Integer> oldInstanceId,
-      Optional<Integer> newInstanceId) {
+  private static IScheduledTask makeTask(String id, int instanceId) {
 
     TaskConfig config = new TaskConfig()
         .setOwner(new Identity("user", "role"))
@@ -54,43 +50,14 @@ public class StorageBackfillTest {
     ScheduledTask task = new ScheduledTask().setAssignedTask(
         new AssignedTask().setTask(config));
     task.getAssignedTask().setTaskId(id);
-
-    if (oldInstanceId.isPresent()) {
-      task.getAssignedTask().getTask().setInstanceIdDEPRECATED(oldInstanceId.get());
-    }
-    if (newInstanceId.isPresent()) {
-      task.getAssignedTask().setInstanceId(newInstanceId.get());
-    }
+    task.getAssignedTask().setInstanceId(instanceId);
     return IScheduledTask.build(task);
-  }
-
-  @Test
-  public void testInstanceIdBackfill() {
-    final String bothId = "both";
-    final String oldId = "old";
-    final String newId = "new";
-    final IScheduledTask bothFields = makeTask(bothId, Optional.of(5), Optional.of(5));
-    final IScheduledTask oldField = makeTask(oldId, Optional.of(6), Optional.<Integer>absent());
-    final IScheduledTask newField = makeTask(newId, Optional.<Integer>absent(), Optional.of(7));
-
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().saveTasks(
-            ImmutableSet.of(bothFields, oldField, newField));
-        StorageBackfill.backfill(storeProvider, clock);
-      }
-    });
-
-    assertEquals(makeTask(bothId, Optional.of(5), Optional.of(5)), getTask(bothId));
-    assertEquals(makeTask(oldId, Optional.of(6), Optional.of(6)), getTask(oldId));
-    assertEquals(makeTask(newId, Optional.of(7), Optional.of(7)), getTask(newId));
   }
 
   @Test
   public void testRewriteThrottledState() {
     final IScheduledTask savedTask =
-        IScheduledTask.build(makeTask("id", Optional.<Integer>absent(), Optional.of(0)).newBuilder()
-            .setStatus(ScheduleStatus.THROTTLED));
+        IScheduledTask.build(makeTask("id", 0).newBuilder().setStatus(ScheduleStatus.THROTTLED));
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider storeProvider) {

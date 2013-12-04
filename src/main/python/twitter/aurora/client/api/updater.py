@@ -193,7 +193,6 @@ invoking cancel_update.
     for instance_id in instance_ids:
       from_config = operation_configs.from_config.get(instance_id)
       to_config = operation_configs.to_config.get(instance_id)
-      self._unset_deprecated_fields(from_config, to_config)
 
       if from_config and to_config:
         # Sort internal dicts before comparing to rule out differences due to hashing.
@@ -212,20 +211,6 @@ invoking cancel_update.
         raise self.InvalidStateError('Instance %s is outside of supported range' % instance_id)
 
     return to_kill, to_add
-
-  def _unset_deprecated_fields(self, from_config, to_config):
-    """Unsets deprecated fields in task configs to provide common base for diffing.
-
-       Arguments:
-       from_config - task config to update from.
-       to_config - task config to update to.
-    """
-    if from_config:
-      from_config.instanceIdDEPRECATED = None
-
-    if to_config:
-      to_config.instanceIdDEPRECATED = None
-
 
   def _update_instances(self, instance_ids, operation_configs):
     """Applies kill/add actions for the specified batch instances.

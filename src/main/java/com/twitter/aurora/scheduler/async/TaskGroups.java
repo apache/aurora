@@ -45,7 +45,6 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
-import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -340,15 +339,15 @@ public class TaskGroups implements EventSubscriber {
   }
 
   static class GroupKey {
-    private final ITaskConfig scrubbedCanonicalTask;
+    private final ITaskConfig canonicalTask;
 
     GroupKey(ITaskConfig task) {
-      this.scrubbedCanonicalTask = ConfigurationManager.scrubNonUniqueTaskFields(task);
+      this.canonicalTask = task;
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(scrubbedCanonicalTask);
+      return Objects.hashCode(canonicalTask);
     }
 
     @Override
@@ -357,12 +356,12 @@ public class TaskGroups implements EventSubscriber {
         return false;
       }
       GroupKey other = (GroupKey) o;
-      return Objects.equal(scrubbedCanonicalTask, other.scrubbedCanonicalTask);
+      return Objects.equal(canonicalTask, other.canonicalTask);
     }
 
     @Override
     public String toString() {
-      return JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(scrubbedCanonicalTask));
+      return JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(canonicalTask));
     }
   }
 

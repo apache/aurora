@@ -403,19 +403,6 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-  def test_noop_update_with_deprecated_fields(self):
-    """Deprecated fields in task config do not affect diffing."""
-    old_configs = self.make_task_configs(5)
-    new_config = old_configs[0]
-    old_configs[1].instanceIdDEPRECATED = 7
-    job_config = self.make_job_config(new_config, 5)
-    self._config.job_config = job_config
-    self.expect_start()
-    self.expect_get_tasks(old_configs)
-    self.expect_populate(job_config)
-    self.expect_finish()
-    self.replay_mocks()
-
   def test_update_rollback(self):
     """Update process failures exceed total allowable count and update is rolled back."""
     update_config = self.UPDATE_CONFIG.copy()

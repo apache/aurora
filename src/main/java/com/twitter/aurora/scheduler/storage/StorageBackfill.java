@@ -23,7 +23,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
-import com.twitter.aurora.gen.AssignedTask;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
@@ -109,32 +108,6 @@ public final class StorageBackfill {
       Stats.exportLong("instance_ids_inconsistent");
 
   /**
-   * Ensures backwards-compatible data is present for both the new and deprecated instance ID
-   * fields.
-   *
-   * @param task Task to possibly modify when ensuring backwards compatibility.
-   */
-  private static void dualWriteInstanceId(AssignedTask task) {
-    boolean oldFieldSet = task.getTask().isSetInstanceIdDEPRECATED();
-    boolean newFieldSet = task.isSetInstanceId();
-    if (oldFieldSet && newFieldSet) {
-      BOTH_FIELDS_SET.incrementAndGet();
-      if (task.getInstanceId() != task.getTask().getInstanceIdDEPRECATED()) {
-        FIELDS_INCONSISTENT.incrementAndGet();
-      }
-    } else if (oldFieldSet) {
-      OLD_FIELD_SET.incrementAndGet();
-      task.setInstanceId(task.getTask().getInstanceIdDEPRECATED());
-    } else if (newFieldSet) {
-      NEW_FIELD_SET.incrementAndGet();
-      task.getTask().setInstanceIdDEPRECATED(task.getInstanceId());
-    } else {
-      throw new IllegalStateException(
-          "Task " + task.getTaskId() + " does not have an instance id.");
-    }
-  }
-
-  /**
    * Ensures backwards-compatibility of the throttled state, which exists in this version but is
    * not handled.
    *
@@ -164,7 +137,6 @@ public final class StorageBackfill {
         // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they
         // don't.
         guaranteeShardUniqueness(builder, storeProvider.getUnsafeTaskStore(), clock);
-        dualWriteInstanceId(builder.getAssignedTask());
         rewriteThrottledState(builder);
         return IScheduledTask.build(builder);
       }

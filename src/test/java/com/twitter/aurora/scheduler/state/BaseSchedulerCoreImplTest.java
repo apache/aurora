@@ -224,19 +224,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       assertFalse(state.getAssignedTask().isSetSlaveId());
       assertEquals(
           validateAndPopulate(job.getJobConfig()).getTaskConfig(),
-          ConfigurationManager.scrubNonUniqueTaskFields(state.getAssignedTask().getTask()));
+          state.getAssignedTask().getTask());
     }
     Set<Integer> expectedInstanceIds =
         ContiguousSet.create(Range.closedOpen(0, numTasks), DiscreteDomain.integers());
     assertEquals(
         expectedInstanceIds,
         FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet());
-    assertEquals(
-        expectedInstanceIds,
-        FluentIterable.from(tasks)
-            .transform(Tasks.SCHEDULED_TO_INFO)
-            .transform(Tasks.INFO_TO_INSTANCE_ID_DEPRECATED)
-            .toSet());
   }
 
   private static Constraint dedicatedConstraint(Set<String> values) {

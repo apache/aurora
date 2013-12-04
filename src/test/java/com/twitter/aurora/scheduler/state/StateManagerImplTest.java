@@ -42,14 +42,12 @@ import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.TaskIdGenerator;
-import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.aurora.scheduler.storage.mem.MemStorage;
@@ -75,7 +73,6 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final String HOST_A = "host_a";
   private static final Identity JIM = new Identity("jim", "jim-user");
   private static final String MY_JOB = "myJob";
-  private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
 
   private Driver driver;
   private TaskIdGenerator taskIdGenerator;
@@ -180,7 +177,7 @@ public class StateManagerImplTest extends EasyMockTest {
         .setAssignedTask(new AssignedTask()
             .setInstanceId(3)
             .setTaskId(taskId)
-            .setTask(task.newBuilder().setInstanceIdDEPRECATED(3)));
+            .setTask(task.newBuilder()));
     assertEquals(ImmutableSet.of(IScheduledTask.build(expected)),
         Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId)));
   }
