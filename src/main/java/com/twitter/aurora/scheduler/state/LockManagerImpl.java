@@ -22,6 +22,7 @@ import javax.inject.Inject;
 import com.google.common.base.Optional;
 
 import com.twitter.aurora.gen.Lock;
+import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.storage.LockStore;
 import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -62,7 +63,7 @@ class LockManagerImpl implements LockManager {
         if (existingLock.isPresent()) {
           throw new LockException(String.format(
               "Operation for: %s is already in progress. Started at: %s. Current owner: %s.",
-              lockKey,
+              formatLockKey(lockKey),
               new Date(existingLock.get().getTimestampMs()).toString(),
               existingLock.get().getUser()));
         }
@@ -110,10 +111,20 @@ class LockManagerImpl implements LockManager {
       if (stored.isPresent()) {
         throw new LockException(String.format(
             "Unable to perform operation for: %s. Use override/cancel option.",
-            context));
+            formatLockKey(context)));
       } else if (heldLock.isPresent()) {
-        throw new LockException(String.format("Invalid operation context: %s", context));
+        throw new LockException(
+            String.format("Invalid operation context: %s", formatLockKey(context)));
       }
+    }
+  }
+
+  private static String formatLockKey(ILockKey lockKey) {
+    switch (lockKey.getSetField()) {
+      case JOB:
+        return JobKeys.toPath(lockKey.getJob());
+      default:
+        return "Unknown lock key type: " + lockKey.getSetField();
     }
   }
 }

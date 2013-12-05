@@ -21,7 +21,9 @@ import com.google.common.base.Optional;
 
 import org.easymock.EasyMock;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import com.twitter.aurora.gen.Identity;
 import com.twitter.aurora.gen.Lock;
@@ -52,6 +54,9 @@ public class LockManagerImplTest extends EasyMockTest {
   private LockManager lockManager;
   private long timestampMs;
 
+  @Rule
+  public ExpectedException expectedException = ExpectedException.none();
+
   @Before
   public void setUp() throws Exception {
     FakeClock clock = new FakeClock();
@@ -77,8 +82,9 @@ public class LockManagerImplTest extends EasyMockTest {
     assertEquals(expected, actual);
   }
 
-  @Test(expected = LockException.class)
+  @Test
   public void testAcquireLockInProgress() throws Exception {
+    expectLockException(JOB_KEY);
     lockManager.acquireLock(LOCK_KEY, USER);
     lockManager.acquireLock(LOCK_KEY, USER);
   }
@@ -103,23 +109,32 @@ public class LockManagerImplTest extends EasyMockTest {
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
   }
 
-  @Test(expected = LockException.class)
+  @Test
   public void testValidateLockStoredNotEqualHeld() throws Exception {
+    expectLockException(JOB_KEY);
     ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
     lock = ILock.build(lock.newBuilder().setUser("bob"));
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(lock));
   }
 
-  @Test(expected = LockException.class)
+  @Test
   public void testValidateLockStoredNotEqualHeldWithHeldNull() throws Exception {
+    expectLockException(JOB_KEY);
     lockManager.acquireLock(LOCK_KEY, USER);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
   }
 
-  @Test(expected = LockException.class)
+  @Test
   public void testValidateLockNotStoredHeld() throws Exception {
+    IJobKey jobKey = JobKeys.from("r", "e", "n");
+    expectLockException(jobKey);
     ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
-    ILockKey key = ILockKey.build(LockKey.job(JobKeys.from("r", "e", "n").newBuilder()));
+    ILockKey key = ILockKey.build(LockKey.job(jobKey.newBuilder()));
     lockManager.validateIfLocked(key, Optional.of(lock));
+  }
+
+  private void expectLockException(IJobKey key) {
+    expectedException.expect(LockException.class);
+    expectedException.expectMessage(JobKeys.toPath(key));
   }
 }
