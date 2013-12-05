@@ -15,9 +15,6 @@
  */
 package com.twitter.aurora.scheduler.async;
 
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -25,23 +22,16 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Function;
 import com.google.common.base.Objects;
-import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -53,7 +43,6 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
-import com.twitter.aurora.scheduler.storage.entities.ITaskEvent;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
@@ -65,9 +54,7 @@ import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.aurora.gen.ScheduleStatus.KILLING;
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
-import static com.twitter.aurora.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.aurora.scheduler.async.TaskGroup.GroupState;
 
 /**
@@ -85,51 +72,58 @@ public class TaskGroups implements EventSubscriber {
 
   private final Storage storage;
   private final LoadingCache<GroupKey, TaskGroup> groups;
-  private final Amount<Long, Time> flappingThreshold;
-  private final BackoffStrategy flappingBackoffStrategy;
   private final Clock clock;
+  private final RescheduleCalculator rescheduleCalculator;
   private final Preemptor preemptor;
+
+  static class TaskGroupsSettings {
+    private final BackoffStrategy taskGroupBackoff;
+    private final RateLimiter rateLimiter;
+
+    TaskGroupsSettings(BackoffStrategy taskGroupBackoff, RateLimiter rateLimiter) {
+      this.taskGroupBackoff = checkNotNull(taskGroupBackoff);
+      this.rateLimiter = checkNotNull(rateLimiter);
+    }
+  }
 
   @Inject
   TaskGroups(
       ShutdownRegistry shutdownRegistry,
       Storage storage,
-      SchedulingSettings schedulingSettings,
+      TaskGroupsSettings settings,
       SchedulingAction schedulingAction,
-      FlappingTaskSettings flappingTaskSettings,
       Clock clock,
+      RescheduleCalculator rescheduleCalculator,
       Preemptor preemptor) {
 
     this(
         createThreadPool(shutdownRegistry),
         storage,
-        schedulingSettings.getBackoff(),
-        schedulingSettings.getRateLimit(),
+        settings.taskGroupBackoff,
+        settings.rateLimiter,
         schedulingAction,
-        flappingTaskSettings.getFlappingThreashold(),
         clock,
-        flappingTaskSettings.getBackoff(),
+        rescheduleCalculator,
         preemptor);
   }
 
   TaskGroups(
       final ScheduledExecutorService executor,
       final Storage storage,
-      final BackoffStrategy backoffStrategy,
+      final BackoffStrategy taskGroupBackoffStrategy,
       final RateLimiter rateLimiter,
       final SchedulingAction schedulingAction,
-      final Amount<Long, Time> flappingThreshold,
       final Clock clock,
-      final BackoffStrategy flappingBackoffStrategy,
+      final RescheduleCalculator rescheduleCalculator,
       final Preemptor preemptor) {
 
     this.storage = checkNotNull(storage);
     checkNotNull(executor);
-    checkNotNull(backoffStrategy);
+    checkNotNull(taskGroupBackoffStrategy);
+    checkNotNull(rateLimiter);
     checkNotNull(schedulingAction);
-    this.flappingThreshold = checkNotNull(flappingThreshold);
     this.clock = checkNotNull(clock);
-    this.flappingBackoffStrategy = checkNotNull(flappingBackoffStrategy);
+    this.rescheduleCalculator = checkNotNull(rescheduleCalculator);
     this.preemptor = checkNotNull(preemptor);
 
     final SchedulingAction rateLimitedAction = new SchedulingAction() {
@@ -141,7 +135,7 @@ public class TaskGroups implements EventSubscriber {
 
     groups = CacheBuilder.newBuilder().build(new CacheLoader<GroupKey, TaskGroup>() {
       @Override public TaskGroup load(GroupKey key) {
-        TaskGroup group = new TaskGroup(key, backoffStrategy);
+        TaskGroup group = new TaskGroup(key, taskGroupBackoffStrategy);
         LOG.info("Evaluating group " + key + " in " + group.getPenaltyMs() + " ms");
         startGroup(group, executor, rateLimitedAction);
         return group;
@@ -216,76 +210,6 @@ public class TaskGroups implements EventSubscriber {
     groups.getUnchecked(new GroupKey(task.getTask())).push(task.getTaskId(), readyTimestamp);
   }
 
-  private Optional<IScheduledTask> getTaskAncestor(IScheduledTask task) {
-    if (!task.isSetAncestorId()) {
-      return Optional.absent();
-    }
-
-    ImmutableSet<IScheduledTask> res =
-        Storage.Util.weaklyConsistentFetchTasks(storage, Query.taskScoped(task.getAncestorId()));
-
-    return Optional.fromNullable(Iterables.getOnlyElement(res, null));
-  }
-
-  private static final Predicate<ScheduleStatus> IS_ACTIVE_STATUS =
-      Predicates.in(Tasks.ACTIVE_STATES);
-
-  private static final Function<ITaskEvent, ScheduleStatus> TO_STATUS =
-      new Function<ITaskEvent, ScheduleStatus>() {
-    @Override public ScheduleStatus apply(ITaskEvent input) {
-      return input.getStatus();
-    }
-  };
-
-  private static final Set<ScheduleStatus> INTERRUPTED_TASK_STATES =
-      EnumSet.of(RESTARTING, KILLING);
-
-  private final Predicate<IScheduledTask> flapped = new Predicate<IScheduledTask>() {
-    @Override public boolean apply(IScheduledTask task) {
-      if (!task.isSetTaskEvents()) {
-        return false;
-      }
-
-      List<ITaskEvent> events = Lists.reverse(task.getTaskEvents());
-
-      // Avoid penalizing tasks that were interrupted by outside action, such as a user
-      // restarting them.
-      if (Iterables.any(Iterables.transform(events, TO_STATUS),
-          Predicates.in(INTERRUPTED_TASK_STATES))) {
-        return false;
-      }
-
-      ITaskEvent terminalEvent = Iterables.get(events, 0);
-      ScheduleStatus terminalState = terminalEvent.getStatus();
-      Preconditions.checkState(Tasks.isTerminated(terminalState));
-
-      ITaskEvent activeEvent =
-          Iterables.find(events, Predicates.compose(IS_ACTIVE_STATUS, TO_STATUS));
-
-      long thresholdMs = flappingThreshold.as(Time.MILLISECONDS);
-
-      return (terminalEvent.getTimestamp() - activeEvent.getTimestamp()) < thresholdMs;
-    }
-  };
-
-  private long getTaskReadyTimestamp(IScheduledTask task) {
-    Optional<IScheduledTask> curTask = getTaskAncestor(task);
-    long penaltyMs = 0;
-    while (curTask.isPresent() && flapped.apply(curTask.get())) {
-      LOG.info(
-          String.format("Ancestor of %s flapped: %s", Tasks.id(task), Tasks.id(curTask.get())));
-      long newPenalty = flappingBackoffStrategy.calculateBackoffMs(penaltyMs);
-      // If the backoff strategy is truncated then there is no need for us to continue.
-      if (newPenalty == penaltyMs) {
-        break;
-      }
-      penaltyMs = newPenalty;
-      curTask = getTaskAncestor(curTask.get());
-    }
-
-    return penaltyMs + clock.nowMillis();
-  }
-
   /**
    * Informs the task groups of a task state change.
    * <p>
@@ -297,7 +221,9 @@ public class TaskGroups implements EventSubscriber {
   @Subscribe
   public synchronized void taskChangedState(TaskStateChange stateChange) {
     if (stateChange.getNewState() == PENDING) {
-      add(stateChange.getTask().getAssignedTask(), getTaskReadyTimestamp(stateChange.getTask()));
+      add(
+          stateChange.getTask().getAssignedTask(),
+          rescheduleCalculator.getReadyTimeMs(stateChange.getTask()));
     }
   }
 
@@ -314,7 +240,7 @@ public class TaskGroups implements EventSubscriber {
     for (IScheduledTask task
         : Storage.Util.consistentFetchTasks(storage, Query.unscoped().byStatus(PENDING))) {
 
-      add(task.getAssignedTask(), getTaskReadyTimestamp(task));
+      add(task.getAssignedTask(), rescheduleCalculator.getStartupReadyTimeMs(task));
     }
   }
 
@@ -373,41 +299,5 @@ public class TaskGroups implements EventSubscriber {
      * @return {@code true} if the task was scheduled, {@code false} otherwise.
      */
     boolean schedule(String taskId);
-  }
-
-  static class SchedulingSettings {
-    private final BackoffStrategy backoff;
-    private final RateLimiter rateLimit;
-
-    SchedulingSettings(BackoffStrategy backoff, RateLimiter rateLimit) {
-      this.backoff = checkNotNull(backoff);
-      this.rateLimit = checkNotNull(rateLimit);
-    }
-
-    BackoffStrategy getBackoff() {
-      return backoff;
-    }
-
-    RateLimiter getRateLimit() {
-      return rateLimit;
-    }
-  }
-
-  static class FlappingTaskSettings {
-    private final BackoffStrategy backoff;
-    private final Amount<Long, Time> flappingThreashold;
-
-    FlappingTaskSettings(BackoffStrategy backoff, Amount<Long, Time> flappingThreashold) {
-      this.backoff = checkNotNull(backoff);
-      this.flappingThreashold = checkNotNull(flappingThreashold);
-    }
-
-    BackoffStrategy getBackoff() {
-      return backoff;
-    }
-
-    Amount<Long, Time> getFlappingThreashold() {
-      return flappingThreashold;
-    }
   }
 }

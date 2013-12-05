@@ -49,6 +49,8 @@ import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import com.twitter.aurora.scheduler.async.TaskGroups.SchedulingAction;
+import com.twitter.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
+import com.twitter.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl.RescheduleCalculatorSettings;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent.HostMaintenanceStateChange;
@@ -143,9 +145,14 @@ public class TaskSchedulerTest extends EasyMockTest {
         retryStrategy,
         rateLimiter,
         scheduler,
-        flappingThreshold,
         clock,
-        flappingStrategy,
+        new RescheduleCalculatorImpl(
+            storage,
+            new RescheduleCalculatorSettings(
+                flappingStrategy,
+                flappingThreshold,
+                Amount.of(5, Time.SECONDS)),
+            clock),
         preemptor);
   }
 

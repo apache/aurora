@@ -30,7 +30,9 @@ import com.google.inject.TypeLiteral;
 
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
+import com.twitter.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
 import com.twitter.aurora.scheduler.async.TaskGroups.SchedulingAction;
+import com.twitter.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
 import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -45,8 +47,6 @@ import com.twitter.common.util.TruncatedBinaryBackoff;
 import static com.twitter.aurora.scheduler.async.HistoryPruner.PruneThreshold;
 import static com.twitter.aurora.scheduler.async.Preemptor.PreemptorImpl;
 import static com.twitter.aurora.scheduler.async.Preemptor.PreemptorImpl.PreemptionDelay;
-import static com.twitter.aurora.scheduler.async.TaskGroups.FlappingTaskSettings;
-import static com.twitter.aurora.scheduler.async.TaskGroups.SchedulingSettings;
 
 /**
  * Binding module for async task management.
@@ -103,6 +103,11 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> MAX_FLAPPING_DELAY =
       Arg.create(Amount.of(5L, Time.MINUTES));
 
+  @CmdLine(name = "max_reschedule_task_delay_on_startup",
+      help = "Upper bound of random delay for pending task rescheduling on scheduler startup.")
+  private static final Arg<Amount<Integer, Time>> MAX_RESCHEDULING_DELAY =
+      Arg.create(Amount.of(30, Time.SECONDS));
+
   @CmdLine(name = "preemption_delay",
       help = "Time interval after which a pending task becomes eligible to preempt other tasks")
   private static final Arg<Amount<Long, Time>> PREEMPTION_DELAY =
@@ -148,13 +153,17 @@ public class AsyncModule extends AbstractModule {
 
     binder().install(new PrivateModule() {
       @Override protected void configure() {
-        bind(SchedulingSettings.class).toInstance(new SchedulingSettings(
+        bind(TaskGroupsSettings.class).toInstance(new TaskGroupsSettings(
             new TruncatedBinaryBackoff(INITIAL_SCHEDULE_DELAY.get(), MAX_SCHEDULE_DELAY.get()),
             RateLimiter.create(MAX_SCHEDULE_ATTEMPTS_PER_SEC.get())));
-        bind(FlappingTaskSettings.class).toInstance(new FlappingTaskSettings(
-            new TruncatedBinaryBackoff(INITIAL_FLAPPING_DELAY.get(), MAX_FLAPPING_DELAY.get()),
-            FLAPPING_THRESHOLD.get()
-        ));
+
+        bind(RescheduleCalculatorImpl.RescheduleCalculatorSettings.class)
+            .toInstance(new RescheduleCalculatorImpl.RescheduleCalculatorSettings(
+                new TruncatedBinaryBackoff(INITIAL_FLAPPING_DELAY.get(), MAX_FLAPPING_DELAY.get()),
+                FLAPPING_THRESHOLD.get(),
+                MAX_RESCHEDULING_DELAY.get()));
+
+        bind(RescheduleCalculator.class).to(RescheduleCalculatorImpl.class).in(Singleton.class);
         bind(SchedulingAction.class).to(TaskScheduler.class);
         bind(TaskScheduler.class).in(Singleton.class);
         if (ENABLE_PREEMPTOR.get()) {
