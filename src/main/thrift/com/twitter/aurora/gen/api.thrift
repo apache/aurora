@@ -21,7 +21,8 @@ enum ResponseCode {
   OK              = 1,
   ERROR           = 2,
   WARNING         = 3,
-  AUTH_FAILED     = 4
+  AUTH_FAILED     = 4,
+  LOCK_ERROR      = 5  // Raised when a Lock-protected operation failed due to lock validation.
 }
 
 struct APIVersion {

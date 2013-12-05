@@ -106,6 +106,7 @@ import static com.twitter.aurora.gen.MaintenanceMode.SCHEDULED;
 import static com.twitter.aurora.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.aurora.gen.ResponseCode.ERROR;
 import static com.twitter.aurora.gen.ResponseCode.INVALID_REQUEST;
+import static com.twitter.aurora.gen.ResponseCode.LOCK_ERROR;
 import static com.twitter.aurora.gen.ResponseCode.OK;
 import static com.twitter.aurora.gen.ResponseCode.WARNING;
 import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
@@ -239,7 +240,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     Response response = thrift.createJob(job.newBuilder(), LOCK.newBuilder(), SESSION);
-    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+    assertEquals(ResponseCode.LOCK_ERROR, response.getResponseCode());
   }
 
   @Test
@@ -364,7 +365,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     Response response = thrift.killTasks(query.get(), LOCK.newBuilder(), SESSION);
-    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+    assertEquals(ResponseCode.LOCK_ERROR, response.getResponseCode());
   }
 
   @Test
@@ -520,7 +521,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     Response resp = thrift.restartShards(JOB_KEY.newBuilder(), shards, LOCK.newBuilder(), SESSION);
-    assertEquals(ResponseCode.INVALID_REQUEST, resp.getResponseCode());
+    assertEquals(ResponseCode.LOCK_ERROR, resp.getResponseCode());
   }
 
   @Test
@@ -664,7 +665,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        INVALID_REQUEST,
+        LOCK_ERROR,
         thrift.replaceCronTemplate(CRON_JOB, LOCK.newBuilder(), SESSION).getResponseCode());
   }
 
@@ -1146,7 +1147,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     Response response = thrift.addInstances(config, LOCK.newBuilder(), SESSION);
-    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+    assertEquals(ResponseCode.LOCK_ERROR, response.getResponseCode());
   }
 
   @Test
@@ -1221,7 +1222,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     Response response = thrift.acquireLock(LOCK_KEY.newBuilder(), SESSION);
-    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+    assertEquals(ResponseCode.LOCK_ERROR, response.getResponseCode());
   }
 
   @Test
@@ -1265,7 +1266,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     Response response = thrift.releaseLock(LOCK.newBuilder(), CHECKED, SESSION);
-    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
+    assertEquals(ResponseCode.LOCK_ERROR, response.getResponseCode());
   }
 
   private static JobConfiguration makeJob() {

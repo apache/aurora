@@ -126,6 +126,7 @@ import static com.twitter.aurora.auth.SessionValidator.SessionContext;
 import static com.twitter.aurora.gen.ResponseCode.AUTH_FAILED;
 import static com.twitter.aurora.gen.ResponseCode.ERROR;
 import static com.twitter.aurora.gen.ResponseCode.INVALID_REQUEST;
+import static com.twitter.aurora.gen.ResponseCode.LOCK_ERROR;
 import static com.twitter.aurora.gen.ResponseCode.OK;
 import static com.twitter.aurora.gen.apiConstants.CURRENT_API_VERSION;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -246,7 +247,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
               sanitized.getJobConfig().getInstanceCount(), JobKeys.toPath(job)));
-    } catch (LockException | TaskDescriptionException | ScheduleException e) {
+    } catch (LockException e) {
+      response.setResponseCode(LOCK_ERROR).setMessage(e.getMessage());
+    } catch (TaskDescriptionException | ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
 
@@ -286,10 +289,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return response.setResponseCode(OK).setMessage("Replaced template for: " + jobKey);
 
     } catch (LockException e) {
-      return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    } catch (TaskDescriptionException e) {
-      return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-    } catch (ScheduleException e) {
+      return response.setResponseCode(LOCK_ERROR).setMessage(e.getMessage());
+    } catch (TaskDescriptionException | ScheduleException e) {
       return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
   }
@@ -490,10 +491,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       validateLockForTasks(Optional.fromNullable(mutablelock).transform(ILock.FROM_BUILDER), tasks);
       schedulerCore.killTasks(Query.arbitrary(query), context.get().getIdentity());
     } catch (LockException e) {
-      return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+      return response.setResponseCode(LOCK_ERROR).setMessage(e.getMessage());
     } catch (ScheduleException e) {
-      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
-      return response;
+      return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
 
     // TODO(William Farner): Move this into the client.
@@ -549,7 +549,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
       schedulerCore.restartShards(jobKey, shardIds, context.getIdentity());
       response.setResponseCode(OK).setMessage("Shards are restarting.");
-    } catch (LockException | ScheduleException e) {
+    } catch (LockException e) {
+      response.setResponseCode(ResponseCode.LOCK_ERROR).setMessage(e.getMessage());
+    } catch (ScheduleException e) {
       response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
     }
 
@@ -894,7 +896,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return resp.setResponseCode(OK).setMessage("Successfully added instances.");
     } catch (AuthFailedException e) {
       return resp.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
-    } catch (TaskDescriptionException | LockException | ScheduleException e) {
+    } catch (LockException e) {
+      return resp.setResponseCode(LOCK_ERROR).setMessage(e.getMessage());
+    } catch (TaskDescriptionException | ScheduleException e) {
       return resp.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
   }
@@ -930,7 +934,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     } catch (AuthFailedException e) {
       return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
     } catch (LockException e) {
-      return response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+      return response.setResponseCode(ResponseCode.LOCK_ERROR).setMessage(e.getMessage());
     }
   }
 
@@ -956,7 +960,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     } catch (AuthFailedException e) {
       return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
     } catch (LockException e) {
-      return response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+      return response.setResponseCode(ResponseCode.LOCK_ERROR).setMessage(e.getMessage());
     }
   }
 
