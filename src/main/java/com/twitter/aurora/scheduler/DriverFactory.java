@@ -15,14 +15,22 @@
  */
 package com.twitter.aurora.scheduler;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.protobuf.ByteString;
 
 import org.apache.mesos.MesosSchedulerDriver;
@@ -51,14 +59,15 @@ public interface DriverFactory extends Function<String, SchedulerDriver> {
         help = "Address for the mesos master, can be a socket address or zookeeper path.")
     private static final Arg<String> MESOS_MASTER_ADDRESS = Arg.create();
 
-    @CmdLine(name = "framework_authentication_principal",
-        help = "Principal used to authenticate to the Mesos master.")
-    private static final Arg<String> FRAMEWORK_AUTHENTICATION_PRINCIPAL = Arg.create();
-
-    // TODO(Kevin Sweeney): Read a file here to avoid leaking secrets on the command-line.
-    @CmdLine(name = "framework_authentication_secret",
-        help = "Secret used to authenticate to the Mesos master.")
-    private static final Arg<String> FRAMEWORK_AUTHENTICATION_SECRET = Arg.create();
+    @VisibleForTesting
+    static final String PRINCIPAL_KEY = "aurora_authentication_principal";
+    @VisibleForTesting
+    static final String SECRET_KEY = "aurora_authentication_secret";
+    @CmdLine(name = "framework_authentication_file",
+        help = "Properties file which contains framework credentials to authenticate with Mesos"
+            + "master. Must contain the properties '" + PRINCIPAL_KEY + "' and "
+            + "'" + SECRET_KEY + "'.")
+    private static final Arg<File> FRAMEWORK_AUTHENTICATION_FILE = Arg.create();
 
     @CmdLine(name = "framework_failover_timeout",
         help = "Time after which a framework is considered deleted.  SHOULD BE VERY HIGH.")
@@ -104,6 +113,22 @@ public interface DriverFactory extends Function<String, SchedulerDriver> {
       this.scheduler = Preconditions.checkNotNull(scheduler);
     }
 
+    @VisibleForTesting
+    static Properties parseCredentials(InputStream credentialsStream) {
+      Properties properties = new Properties();
+      try {
+        properties.load(credentialsStream);
+      } catch (IOException e) {
+        LOG.severe("Unable to load authentication file");
+        throw Throwables.propagate(e);
+      }
+      Preconditions.checkState(properties.containsKey(PRINCIPAL_KEY),
+          "The framework authentication file is missing the key: %s", PRINCIPAL_KEY);
+      Preconditions.checkState(properties.containsKey(SECRET_KEY),
+          "The framework authentication file is missing the key: %s", SECRET_KEY);
+      return properties;
+    }
+
     @Override
     public SchedulerDriver apply(@Nullable String frameworkId) {
       LOG.info("Connecting to mesos master: " + MESOS_MASTER_ADDRESS.get());
@@ -121,15 +146,21 @@ public interface DriverFactory extends Function<String, SchedulerDriver> {
         LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
       }
 
-      if (FRAMEWORK_AUTHENTICATION_PRINCIPAL.hasAppliedValue()
-          && FRAMEWORK_AUTHENTICATION_SECRET.hasAppliedValue()) {
+      if (FRAMEWORK_AUTHENTICATION_FILE.hasAppliedValue()) {
+        Properties properties;
+        try {
+          properties = parseCredentials(new FileInputStream(FRAMEWORK_AUTHENTICATION_FILE.get()));
+        } catch (FileNotFoundException e) {
+          LOG.severe("Authentication File not Found");
+          throw Throwables.propagate(e);
+        }
 
         LOG.info(String.format("Connecting to master using authentication (principal: %s).",
-            FRAMEWORK_AUTHENTICATION_PRINCIPAL.get()));
+            properties.get(PRINCIPAL_KEY)));
 
         Credential credential = Credential.newBuilder()
-            .setPrincipal(FRAMEWORK_AUTHENTICATION_PRINCIPAL.get())
-            .setSecret(ByteString.copyFromUtf8(FRAMEWORK_AUTHENTICATION_SECRET.get()))
+            .setPrincipal(properties.getProperty(PRINCIPAL_KEY))
+            .setSecret(ByteString.copyFromUtf8(properties.getProperty(SECRET_KEY)))
             .build();
 
         return new MesosSchedulerDriver(
