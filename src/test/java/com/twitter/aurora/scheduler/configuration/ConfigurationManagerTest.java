@@ -37,9 +37,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
-import static com.twitter.aurora.gen.test.Constants.INVALID_IDENTIFIERS;
-import static com.twitter.aurora.gen.test.Constants.VALID_IDENTIFIERS;
+import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
+import static com.twitter.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
+import static com.twitter.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.isGoodIdentifier;
 
 // TODO(Sathya): Improve test coverage for this class.

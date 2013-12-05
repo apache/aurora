@@ -14,6 +14,6 @@ class SchedulerAPIServlet extends TServlet {
 
   @Inject
   SchedulerAPIServlet(AuroraAdmin.Iface schedulerThriftInterface) {
-    super(new AuroraAdmin.Processor(schedulerThriftInterface), new TJSONProtocol.Factory());
+    super(new AuroraAdmin.Processor<>(schedulerThriftInterface), new TJSONProtocol.Factory());
   }
 }

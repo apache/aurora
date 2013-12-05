@@ -47,8 +47,8 @@ import com.twitter.aurora.scheduler.storage.entities.IValueConstraint;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 
-import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
-import static com.twitter.aurora.gen.Constants.GOOD_IDENTIFIER_PATTERN_JVM;
+import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
+import static com.twitter.aurora.gen.apiConstants.GOOD_IDENTIFIER_PATTERN_JVM;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and

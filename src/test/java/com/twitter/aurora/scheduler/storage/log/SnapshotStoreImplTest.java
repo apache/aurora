@@ -49,7 +49,7 @@ import com.twitter.common.util.testing.FakeClock;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
-import static com.twitter.aurora.gen.Constants.CURRENT_API_VERSION;
+import static com.twitter.aurora.gen.apiConstants.CURRENT_API_VERSION;
 
 public class SnapshotStoreImplTest extends EasyMockTest {
 

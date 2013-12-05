@@ -60,13 +60,13 @@ import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
 import static com.twitter.aurora.gen.ScheduleStatus.ASSIGNED;
 import static com.twitter.aurora.gen.ScheduleStatus.INIT;
 import static com.twitter.aurora.gen.ScheduleStatus.KILLING;
 import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
 import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
 import static com.twitter.aurora.gen.ScheduleStatus.UNKNOWN;
+import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 
 public class StateManagerImplTest extends EasyMockTest {
 

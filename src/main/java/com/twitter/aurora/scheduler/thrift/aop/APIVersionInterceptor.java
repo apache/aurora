@@ -5,7 +5,7 @@ import org.aopalliance.intercept.MethodInvocation;
 
 import com.twitter.aurora.gen.Response;
 
-import static com.twitter.aurora.gen.Constants.CURRENT_API_VERSION;
+import static com.twitter.aurora.gen.apiConstants.CURRENT_API_VERSION;
 
 class APIVersionInterceptor implements MethodInterceptor {
 

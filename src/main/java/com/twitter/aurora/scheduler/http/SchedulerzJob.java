@@ -50,8 +50,8 @@ import com.google.common.collect.Ordering;
 
 import org.antlr.stringtemplate.StringTemplate;
 
-import com.twitter.aurora.gen.Constants;
 import com.twitter.aurora.gen.ScheduleStatus;
+import com.twitter.aurora.gen.apiConstants;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -187,7 +187,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           };
 
           Map<String, String> links = ImmutableMap.of();
-          if (Constants.LIVE_STATES.contains(scheduledTask.getStatus())) {
+          if (apiConstants.LIVE_STATES.contains(scheduledTask.getStatus())) {
             links =
                 ImmutableMap.copyOf(Maps.transformValues(task.getTask().getTaskLinks(), expander));
           }

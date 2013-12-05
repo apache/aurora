@@ -99,7 +99,6 @@ import static org.junit.Assert.assertTrue;
 
 import static com.twitter.aurora.auth.CapabilityValidator.Capability.ROOT;
 import static com.twitter.aurora.auth.SessionValidator.SessionContext;
-import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
 import static com.twitter.aurora.gen.LockValidation.CHECKED;
 import static com.twitter.aurora.gen.MaintenanceMode.DRAINING;
 import static com.twitter.aurora.gen.MaintenanceMode.NONE;
@@ -109,6 +108,7 @@ import static com.twitter.aurora.gen.ResponseCode.ERROR;
 import static com.twitter.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static com.twitter.aurora.gen.ResponseCode.OK;
 import static com.twitter.aurora.gen.ResponseCode.WARNING;
+import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static com.twitter.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 

@@ -35,8 +35,6 @@ import com.twitter.aurora.gen.AuroraAdmin.Iface;
 import com.twitter.common.application.modules.LifecycleModule.ServiceRunner;
 import com.twitter.common.application.modules.LocalServiceRegistry.LocalService;
 import com.twitter.common.base.Command;
-import com.twitter.common.thrift.ThriftServer;
-import com.twitter.common.thrift.ThriftServer.ServerSetup;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -69,12 +67,10 @@ class ThriftServerLauncher implements ServiceRunner {
 
   @Override
   public LocalService launch() {
-    ServerSetup setup = new ServerSetup(
-        0,  // TODO(John Sirois): unused, fix ServerSetup constructors
-        new AuroraAdmin.Processor(schedulerThriftInterface),
-        ThriftServer.BINARY_PROTOCOL.get());
-    setup.setSocket(getServerSocket());
-    schedulerThriftServer.start(setup);
+    ServerSocket socket = getServerSocket();
+    schedulerThriftServer.start(
+        socket,
+        new AuroraAdmin.Processor<>(schedulerThriftInterface));
 
     Command shutdown = new Command() {
       @Override public void execute() {
@@ -83,7 +79,7 @@ class ThriftServerLauncher implements ServiceRunner {
       }
     };
 
-    return LocalService.primaryService(schedulerThriftServer.getListeningPort(), shutdown);
+    return LocalService.primaryService(socket.getLocalPort(), shutdown);
   }
 
   private ServerSocket getServerSocket() {

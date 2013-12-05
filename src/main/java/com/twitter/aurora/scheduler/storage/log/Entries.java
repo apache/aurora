@@ -99,7 +99,7 @@ final class Entries {
     Preconditions.checkArgument(entry.isSet(_Fields.DEFLATED_ENTRY));
 
     ByteArrayOutputStream inflated = new ByteArrayOutputStream();
-    ByteBuffer data = entry.getDeflatedEntry();
+    ByteBuffer data = entry.bufferForDeflatedEntry();
     LOG.info("Inflating deflated log entry of size " + data.remaining());
     InflaterInputStream inflater = new InflaterInputStream(
         new ByteArrayInputStream(data.array(), data.position(), data.remaining()));

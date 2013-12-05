@@ -23,7 +23,6 @@ import com.twitter.aurora.gen.AuroraAdmin;
 import com.twitter.aurora.scheduler.thrift.aop.AopModule;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.thrift.ThriftServer;
 
 /**
  * Binding module to configure a thrift server.
@@ -33,7 +32,7 @@ public class ThriftModule extends AbstractModule {
   @Override
   protected void configure() {
     bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
-    bind(ThriftServer.class).to(SchedulerThriftServer.class).in(Singleton.class);
+    bind(ThriftServer.class).in(Singleton.class);
     LifecycleModule.bindServiceRunner(binder(), ThriftServerLauncher.class);
 
     Registration.registerServlet(binder(), "/api", SchedulerAPIServlet.class, true);

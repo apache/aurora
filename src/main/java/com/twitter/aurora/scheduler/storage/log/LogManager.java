@@ -44,7 +44,6 @@ import com.google.inject.BindingAnnotation;
 
 import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.storage.Constants;
 import com.twitter.aurora.gen.storage.Frame;
 import com.twitter.aurora.gen.storage.FrameChunk;
 import com.twitter.aurora.gen.storage.FrameHeader;
@@ -56,6 +55,7 @@ import com.twitter.aurora.gen.storage.SaveHostAttributes;
 import com.twitter.aurora.gen.storage.SaveTasks;
 import com.twitter.aurora.gen.storage.Snapshot;
 import com.twitter.aurora.gen.storage.Transaction;
+import com.twitter.aurora.gen.storage.storageConstants;
 import com.twitter.aurora.scheduler.log.Log;
 import com.twitter.aurora.scheduler.log.Log.Entry;
 import com.twitter.aurora.scheduler.log.Log.Position;
@@ -384,7 +384,7 @@ public final class LogManager {
      */
     final class StreamTransaction {
       private final Transaction transaction =
-          new Transaction().setSchemaVersion(Constants.CURRENT_SCHEMA_VERSION);
+          new Transaction().setSchemaVersion(storageConstants.CURRENT_SCHEMA_VERSION);
       private final AtomicBoolean committed = new AtomicBoolean(false);
 
       private StreamTransaction() {

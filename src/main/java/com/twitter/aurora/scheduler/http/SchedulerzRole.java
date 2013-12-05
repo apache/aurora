@@ -49,9 +49,9 @@ import com.google.common.collect.Sets;
 
 import org.antlr.stringtemplate.StringTemplate;
 
-import com.twitter.aurora.gen.Constants;
 import com.twitter.aurora.gen.CronCollisionPolicy;
 import com.twitter.aurora.gen.ScheduleStatus;
+import com.twitter.aurora.gen.apiConstants;
 import com.twitter.aurora.scheduler.base.JobKeys;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -82,8 +82,8 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 public class SchedulerzRole extends JerseyTemplateServlet {
 
   private static final List<ScheduleStatus> STATUSES = ImmutableList.<ScheduleStatus>builder()
-      .addAll(Constants.TERMINAL_STATES)
-      .addAll(Constants.ACTIVE_STATES)
+      .addAll(apiConstants.TERMINAL_STATES)
+      .addAll(apiConstants.ACTIVE_STATES)
       .build();
 
   // The freshest task is the latest active task

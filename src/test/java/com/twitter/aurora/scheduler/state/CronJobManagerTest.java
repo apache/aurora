@@ -62,8 +62,8 @@ import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.fail;
 
-import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
 import static com.twitter.aurora.gen.CronCollisionPolicy.RUN_OVERLAP;
+import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 
 public class CronJobManagerTest extends EasyMockTest {
 

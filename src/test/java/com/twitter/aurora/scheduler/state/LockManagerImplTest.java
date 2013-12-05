@@ -39,7 +39,7 @@ import com.twitter.common.util.testing.FakeClock;
 
 import static org.junit.Assert.assertEquals;
 
-import static com.twitter.aurora.gen.Constants.DEFAULT_ENVIRONMENT;
+import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 
 public class LockManagerImplTest extends EasyMockTest {
   private static final String USER = "jim-user";

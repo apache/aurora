@@ -48,7 +48,7 @@ import com.twitter.common.util.Clock;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.aurora.gen.Constants.CURRENT_API_VERSION;
+import static com.twitter.aurora.gen.apiConstants.CURRENT_API_VERSION;
 
 /**
  * Snapshot store implementation that delegates to underlying snapshot stores by

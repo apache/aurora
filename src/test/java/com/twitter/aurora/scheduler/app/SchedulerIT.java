@@ -63,13 +63,13 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.gen.storage.Constants;
 import com.twitter.aurora.gen.storage.LogEntry;
 import com.twitter.aurora.gen.storage.Op;
 import com.twitter.aurora.gen.storage.SaveFrameworkId;
 import com.twitter.aurora.gen.storage.SaveTasks;
 import com.twitter.aurora.gen.storage.Snapshot;
 import com.twitter.aurora.gen.storage.Transaction;
+import com.twitter.aurora.gen.storage.storageConstants;
 import com.twitter.aurora.scheduler.DriverFactory;
 import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
 import com.twitter.aurora.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
@@ -316,7 +316,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         LogEntry.snapshot(new Snapshot().setTasks(ImmutableSet.of(snapshotTask))),
         LogEntry.transaction(new Transaction(
             ImmutableList.of(Op.saveTasks(new SaveTasks(ImmutableSet.of(transactionTask)))),
-            Constants.CURRENT_SCHEMA_VERSION)));
+            storageConstants.CURRENT_SCHEMA_VERSION)));
 
     expect(log.open()).andReturn(logStream);
     expect(logStream.readAll()).andReturn(recoveredEntries.iterator()).anyTimes();

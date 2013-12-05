@@ -25,7 +25,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 
 import static org.junit.Assert.assertTrue;
 
-import static com.twitter.aurora.gen.test.Constants.VALID_CRON_SCHEDULES;
+import static com.twitter.aurora.gen.test.testConstants.VALID_CRON_SCHEDULES;
 
 /**
  * Abstract test to verify conformance with the {@link CronScheduler} interface.

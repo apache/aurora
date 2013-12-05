@@ -30,9 +30,9 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 
-import com.twitter.aurora.gen.Constants;
 import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
+import com.twitter.aurora.gen.apiConstants;
 import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
 import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
@@ -97,13 +97,13 @@ public final class Tasks {
    * Different states that an active task may be in.
    */
   public static final EnumSet<ScheduleStatus> ACTIVE_STATES =
-      EnumSet.copyOf(Constants.ACTIVE_STATES);
+      EnumSet.copyOf(apiConstants.ACTIVE_STATES);
 
   /**
    * Terminal states, which a task should not move from.
    */
   public static final Set<ScheduleStatus> TERMINAL_STATES =
-      EnumSet.copyOf(Constants.TERMINAL_STATES);
+      EnumSet.copyOf(apiConstants.TERMINAL_STATES);
 
   public static final Predicate<ITaskConfig> IS_PRODUCTION =
       new Predicate<ITaskConfig>() {
