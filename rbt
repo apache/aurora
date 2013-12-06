@@ -1,5 +1,6 @@
-#!/bin/sh -e
+#!/usr/bin/env bash
 # Wrapper script for self-bootstrapping rbt.
+set -e
 
 # TODO(kevints): Pin to stable version after patch --commit is available.
 # Stable version of the release-0.5.x branch
