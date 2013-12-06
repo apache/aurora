@@ -22,17 +22,19 @@ fields in your browser and hit Publish.
 
 Merging Your Own Review (Committers)
 ------------------------------------
-Once you have shipits from the right committers, merge your changes in a single squash commit
-and mark the review as submitted. The typical workflow is
+Once you have shipits from the right committers, merge your changes in a single commit and mark
+the review as submitted. The typical workflow is:
 
     git checkout master
     git pull origin master
-    git merge --squash my_feature_branch
-    git commit
-    git show master  # Verify everything looks sane
+    ./rbt patch -c <RB_ID>  # Verify the automatically-generated commit message looks sane,
+                            # editing if necessary.
+    git show master         # Verify everything looks sane
     git push origin master
     ./rbt close <RB_ID>
-    git branch -d my_feature_branch
+
+Note that even if you're developing using feature branches you will not use `git merge` - each
+commit will be an atomic change accompanied by a ReviewBoard entry.
 
 Merging Someone Else's Review
 -----------------------------
