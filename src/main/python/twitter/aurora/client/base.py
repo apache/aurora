@@ -7,18 +7,31 @@ from twitter.common import app, log
 
 from gen.twitter.aurora.ttypes import ResponseCode
 
+LOCKED_WARNING = """
+Note: if the scheduler detects that a job update is in progress (or was not
+properly completed) it will reject subsequent updates.  This is because your
+job is likely in a partially-updated state.  You should only begin another
+update if you are confident that nobody is updating this job, and that
+the job is in a state suitable for an update.
+
+After checking on the above, you may release the update lock on the job by
+invoking cancel_update.
+"""
 
 def die(msg):
   log.fatal(msg)
   sys.exit(1)
 
-
 def check_and_log_response(resp):
   log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
   if resp.responseCode != ResponseCode.OK:
+    check_and_log_locked_response(resp)
     sys.exit(1)
 
+def check_and_log_locked_response(resp):
+  if resp.responseCode == ResponseCode.LOCK_ERROR:
+    log.info(LOCKED_WARNING)
 
 def deprecation_warning(text):
   log.warning('')

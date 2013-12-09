@@ -4,6 +4,8 @@ from difflib import unified_diff
 from twitter.common import log
 
 from gen.twitter.aurora.constants import ACTIVE_STATES
+
+from twitter.aurora.client.base import check_and_log_locked_response
 from gen.twitter.aurora.ttypes import (
     AddInstancesConfig,
     JobConfigValidation,
@@ -23,16 +25,7 @@ from .scheduler_client import SchedulerProxy
 
 class Updater(object):
   """Update the instances of a job in batches."""
-  UPDATE_FAILURE_WARNING = """
-Note: if the scheduler detects that an update is in progress (or was not
-properly completed) it will reject subsequent updates.  This is because your
-job is likely in a partially-updated state.  You should only begin another
-update if you are confident that no other team members are updating this
-job, and that the job is in a state suitable for an update.
 
-After checking on the above, you may release the update lock on the job by
-invoking cancel_update.
-"""
   class Error(Exception): pass
   class InvalidConfigError(Error): pass
   class InvalidStateError(Error): pass
@@ -72,7 +65,7 @@ invoking cancel_update.
       self._lock = resp.result.acquireLockResult.lock
     else:
       log.error('Error starting update: %s' % resp.message)
-      log.error(self.UPDATE_FAILURE_WARNING)
+      check_and_log_locked_response(resp)
     return resp
 
   def _finish(self):
