@@ -186,10 +186,6 @@ class UpdaterTest(TestCase):
         LockValidation.CHECKED,
         self._session_key).AndReturn(response)
 
-  def assert_response_code(self, expected_code, actual_resp):
-    assert expected_code == actual_resp.responseCode, (
-      'Expected response:%s Actual response:%s' % (expected_code, actual_resp.responseCode))
-
   def make_task_configs(self, count=1):
     return [TaskConfig(
         owner=Identity(role=self._job_key.role),
@@ -216,6 +212,14 @@ class UpdaterTest(TestCase):
         instanceCount=instance_count
     )
 
+  def update_and_expect_ok(self, instances=None):
+    self.update_and_expect_response(ResponseCode.OK, instances)
+
+  def update_and_expect_response(self, expected_code, instances=None):
+    resp = self._updater.update(instances)
+    assert expected_code == resp.responseCode, (
+      'Expected response:%s Actual response:%s' % (expected_code, resp.responseCode))
+
   def test_grow(self):
     """Adds instances to the existing job."""
     old_configs = self.make_task_configs(3)
@@ -232,7 +236,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_ok()
     self.verify_mocks()
 
   def test_shrink(self):
@@ -250,7 +254,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_ok()
     self.verify_mocks()
 
   def test_update_and_grow(self):
@@ -273,7 +277,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_ok()
     self.verify_mocks()
 
   def test_update_and_shrink(self):
@@ -295,7 +299,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_ok()
     self.verify_mocks()
 
   def test_update_instances(self):
@@ -317,7 +321,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_ok()
     self.verify_mocks()
 
   def test_grow_with_instance_option(self):
@@ -334,7 +338,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update([3, 4])
+    self.update_and_expect_ok(instances=[3, 4])
     self.verify_mocks()
 
   def test_shrink_with_instance_option(self):
@@ -351,7 +355,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update([4, 5, 6, 7, 8, 9])
+    self.update_and_expect_ok(instances=[4, 5, 6, 7, 8, 9])
     self.verify_mocks()
 
   def test_update_with_instance_option(self):
@@ -370,7 +374,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update([2, 3, 4])
+    self.update_and_expect_ok(instances=[2, 3, 4])
     self.verify_mocks()
 
 
@@ -388,7 +392,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update([2, 3])
+    self.update_and_expect_ok([2, 3])
     self.verify_mocks()
 
   def test_noop_update(self):
@@ -402,6 +406,9 @@ class UpdaterTest(TestCase):
     self.expect_populate(job_config)
     self.expect_finish()
     self.replay_mocks()
+
+    self.update_and_expect_ok()
+    self.verify_mocks()
 
   def test_update_rollback(self):
     """Update process failures exceed total allowable count and update is rolled back."""
@@ -428,7 +435,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_response(ResponseCode.ERROR)
     self.verify_mocks()
 
   def test_update_rollback_sorted(self):
@@ -468,7 +475,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_response(ResponseCode.ERROR)
     self.verify_mocks()
 
   def test_update_after_restart(self):
@@ -496,7 +503,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_ok()
     self.verify_mocks()
 
   def test_update_cron_job(self):
@@ -509,7 +516,7 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_ok()
     self.verify_mocks()
 
   def test_start_invalid_response(self):
@@ -517,8 +524,7 @@ class UpdaterTest(TestCase):
     self.expect_start(response_code=ResponseCode.INVALID_REQUEST)
     self.replay_mocks()
 
-    resp = self._updater.update()
-    self.assert_response_code(ResponseCode.INVALID_REQUEST, resp)
+    self.update_and_expect_response(ResponseCode.INVALID_REQUEST)
     self.verify_mocks()
 
   def test_finish_invalid_response(self):
@@ -531,29 +537,28 @@ class UpdaterTest(TestCase):
     self.expect_finish(response_code=ResponseCode.INVALID_REQUEST)
     self.replay_mocks()
 
-    resp = self._updater.update()
-    self.assert_response_code(ResponseCode.INVALID_REQUEST, resp)
+    self.update_and_expect_response(ResponseCode.INVALID_REQUEST)
     self.verify_mocks()
 
   def test_invalid_batch_size(self):
     """Test for out of range error for batch size."""
     update_config = self.UPDATE_CONFIG.copy()
     update_config.update(batch_size=0)
-    with raises(Updater.InvalidConfigError):
+    with raises(Updater.Error):
       self.init_updater(update_config)
 
   def test_invalid_restart_threshold(self):
     """Test for out of range error for restart threshold."""
     update_config = self.UPDATE_CONFIG.copy()
     update_config.update(restart_threshold=0)
-    with raises(Updater.InvalidConfigError):
+    with raises(Updater.Error):
       self.init_updater(update_config)
 
   def test_invalid_watch_secs(self):
     """Test for out of range error for watch secs."""
     update_config = self.UPDATE_CONFIG.copy()
     update_config.update(watch_secs=0)
-    with raises(Updater.InvalidConfigError):
+    with raises(Updater.Error):
       self.init_updater(update_config)
 
   def test_update_invalid_response(self):
@@ -566,7 +571,7 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs, response_code=ResponseCode.INVALID_REQUEST)
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_response(ResponseCode.ERROR)
     self.verify_mocks()
 
   def test_instances_outside_range(self):
@@ -580,13 +585,13 @@ class UpdaterTest(TestCase):
     self.expect_populate(job_config)
     self.replay_mocks()
 
-    self._updater.update([3, 4])
+    self.update_and_expect_response(ResponseCode.ERROR, instances=[3, 4])
     self.verify_mocks()
 
   def test_update_skips_unretryable(self):
     """Update process skips instances exceeding max_per_shard_failures"""
     update_config = self.UPDATE_CONFIG.copy()
-    update_config.update(max_total_failures=2, max_per_shard_failures=2)
+    update_config.update(max_total_failures=1, max_per_shard_failures=2)
     self.init_updater(update_config)
 
     old_configs = self.make_task_configs(10)
@@ -614,6 +619,35 @@ class UpdaterTest(TestCase):
     self.expect_finish()
     self.replay_mocks()
 
-    self._updater.update()
+    self.update_and_expect_ok()
+    self.verify_mocks()
+
+  def test_failed_unretryable_do_not_cause_rollback(self):
+    """Update process still succeeds if failed instances in last batch are within allowed limit."""
+    update_config = self.UPDATE_CONFIG.copy()
+    update_config.update(max_total_failures=1, max_per_shard_failures=2)
+    self.init_updater(update_config)
+
+    old_configs = self.make_task_configs(5)
+    new_config = deepcopy(old_configs[0])
+    new_config.priority = 5
+    job_config = self.make_job_config(new_config, 5)
+    self._config.job_config = job_config
+    self.expect_start()
+    self.expect_get_tasks(old_configs)
+    self.expect_populate(job_config)
+    self.expect_kill([0, 1, 2])
+    self.expect_add([0, 1, 2], new_config)
+    self.expect_watch_instances([0, 1, 2], failed_instances=[0])
+    self.expect_restart([0])
+    self.expect_kill([3, 4])
+    self.expect_add([3, 4], new_config)
+    self.expect_watch_instances([0, 3, 4], failed_instances=[0])
+    self.expect_restart([0])
+    self.expect_watch_instances([0], failed_instances=[0])
+    self.expect_finish()
+    self.replay_mocks()
+
+    self.update_and_expect_ok()
     self.verify_mocks()
 

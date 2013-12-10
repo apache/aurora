@@ -27,8 +27,6 @@ class Updater(object):
   """Update the instances of a job in batches."""
 
   class Error(Exception): pass
-  class InvalidConfigError(Error): pass
-  class InvalidStateError(Error): pass
 
   InstanceState = namedtuple('InstanceState', ['instance_id', 'is_updated'])
   OperationConfigs = namedtuple('OperationConfigs', ['from_config', 'to_config'])
@@ -45,7 +43,7 @@ class Updater(object):
     try:
       self._update_config = UpdaterConfig(**config.update_config().get())
     except ValueError as e:
-      raise self.InvalidConfigError(str(e))
+      raise self.Error(str(e))
     self._lock = None
     self._watcher = instance_watcher or InstanceWatcher(
         self._scheduler,
@@ -109,7 +107,6 @@ class Updater(object):
     ]
 
     log.info('Starting job update.')
-    failed_instances = set()
     while remaining_instances and not failure_threshold.is_failed_update():
       batch_instances = remaining_instances[0 : self._update_config.batch_size]
       remaining_instances = list(set(remaining_instances) - set(batch_instances))
@@ -139,14 +136,14 @@ class Updater(object):
       ]
       remaining_instances.sort(key=lambda tup: tup.instance_id)
 
-    if failed_instances:
+    if failure_threshold.is_failed_update():
       untouched_instances = [s.instance_id for s in remaining_instances if not s.is_updated]
       instances_to_rollback = list(
           set(instance_configs.instances_to_process) - set(untouched_instances)
       )
       self._rollback(instances_to_rollback, instance_configs)
 
-    return failed_instances
+    return not failure_threshold.is_failed_update()
 
   def _rollback(self, instances_to_rollback, instance_configs):
     """Performs a rollback operation for the failed instances.
@@ -201,7 +198,7 @@ class Updater(object):
       elif not from_config and to_config:
         to_add.append(instance_id)
       else:
-        raise self.InvalidStateError('Instance %s is outside of supported range' % instance_id)
+        raise self.Error('Instance %s is outside of supported range' % instance_id)
 
     return to_kill, to_add
 
@@ -303,7 +300,7 @@ class Updater(object):
       instances_to_process = instances
       unrecognized = list(set(instances) - set(instance_superset))
       if unrecognized:
-        raise self.InvalidConfigError('Instances %s are outside of supported range' % unrecognized)
+        raise self.Error('Instances %s are outside of supported range' % unrecognized)
 
     # Populate local config map
     local_config_map = dict.fromkeys(job_config_instances, local_task_config)
@@ -350,6 +347,9 @@ class Updater(object):
         statuses=ACTIVE_STATES,
         instanceIds=instanceIds)
 
+  def _failed_response(self, message):
+    return Response(responseCode=ResponseCode.ERROR, message=message)
+
   def update(self, instances=None):
     """Performs the job update, blocking until it completes.
     A rollback will be performed if the update was considered a failure based on the
@@ -368,20 +368,17 @@ class Updater(object):
       # Handle cron jobs separately from other jobs.
       if self._replace_template_if_cron():
         log.info('Cron template updated, next run will reflect changes')
+        return self._finish()
       else:
-        failed_instances = self._update(instances)
-        if failed_instances:
-          log.error('Update reverted, failures detected on instances %s' % failed_instances)
+        if not self._update(instances):
+          log.warn('Update failures threshold reached')
+          self._finish()
+          return self._failed_response('Update reverted')
         else:
           log.info('Update successful')
-      resp = self._finish()
-    except (self.InvalidConfigError, self.InvalidStateError) as e:
-      log.error(e)
-      log.error('Aborting update without rollback!')
-    except self.Error:
-      pass  # Error is already logged in _check_and_log_response()
-
-    return resp
+          return self._finish()
+    except self.Error as e:
+      return self._failed_response('Aborting update without rollback! Fatal error: %s' % e)
 
   @classmethod
   def cancel_update(cls, scheduler, job_key):
@@ -397,9 +394,8 @@ class Updater(object):
         Lock(key=LockKey(job=job_key.to_thrift())),
         LockValidation.UNCHECKED)
 
-  @classmethod
-  def _check_and_log_response(cls, resp):
-    """Checks scheduler return status, logs and raises Error in case of unexpected response.
+  def _check_and_log_response(self, resp):
+    """Checks scheduler return status, raises Error in case of unexpected response.
 
     Arguments:
     resp -- scheduler response object.
@@ -410,7 +406,4 @@ class Updater(object):
     if resp.responseCode == ResponseCode.OK:
       log.debug('Response from scheduler: %s (message: %s)' % (name, message))
     else:
-      e = cls.Error('Unexpected response from scheduler: %s (message: %s)' % (name, message))
-      log.error(e)
-      log.error('Aborting update without rollback!!!')
-      raise e
+      raise self.Error(message)
