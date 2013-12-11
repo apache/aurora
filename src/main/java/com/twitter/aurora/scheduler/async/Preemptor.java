@@ -352,11 +352,10 @@ public interface Preemptor {
             LOG.log(Level.SEVERE, "Preemption failed", e);
             failedPreemptions.incrementAndGet();
           }
-        } else {
-          noSlotsFound.incrementAndGet();
         }
       }
 
+      noSlotsFound.incrementAndGet();
       return Optional.absent();
     }
 
