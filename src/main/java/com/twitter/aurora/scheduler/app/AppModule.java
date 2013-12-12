@@ -40,6 +40,7 @@ import com.twitter.aurora.scheduler.filter.SchedulingFilterImpl;
 import com.twitter.aurora.scheduler.http.ClusterName;
 import com.twitter.aurora.scheduler.http.ServletModule;
 import com.twitter.aurora.scheduler.metadata.MetadataModule;
+import com.twitter.aurora.scheduler.quota.QuotaModule;
 import com.twitter.aurora.scheduler.state.StateModule;
 import com.twitter.aurora.scheduler.stats.AsyncStatsModule;
 import com.twitter.common.application.ShutdownRegistry;
@@ -99,6 +100,7 @@ class AppModule extends AbstractModule {
     install(new AsyncModule());
     install(new AsyncStatsModule());
     install(new MetadataModule());
+    install(new QuotaModule());
     install(new ServletModule());
     install(new SchedulerModule());
     install(new StateModule());
