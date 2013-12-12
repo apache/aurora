@@ -1,43 +1,22 @@
-export TAG=0.15.0-rc4
-
 apt-get update
 apt-get -y install \
     git automake libtool g++ java7-runtime-headless curl \
     openjdk-7-jdk python-dev libsasl2-dev libcurl4-openssl-dev \
     make
 
-echo Cloning aurora repo
 if [ ! -d aurora ]; then
+  echo Cloning aurora repo
   git clone /vagrant aurora
 fi
 
 pushd aurora
   mkdir -p third_party
+  pushd third_party
+    wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.15.0-rc4_amd64.egg \
+      -O mesos-0.15.0_rc4-py2.7-linux-x86_64.egg
+  popd
   git pull
-popd
 
-echo Cloning mesos repo
-
-if [ ! -d mesos ]; then
-  git clone https://git-wip-us.apache.org/repos/asf/mesos.git
-fi
-
-if [ ! -f mesos-build/src/python/dist/*.egg ]; then
-  pushd mesos
-    git checkout $TAG
-    sed -i~ "s/\[mesos\], \[.*\]/[mesos], [$TAG]/" configure.ac
-    [[ -f ./configure ]] || ./bootstrap
-  popd
-
-  mkdir -p mesos-build
-  pushd mesos-build
-    ../mesos/configure
-    make -j3
-    cp src/python/dist/*.egg ../aurora/third_party
-  popd
-fi
-
-pushd aurora
   # build scheduler
   ./gradlew distTar
 
@@ -68,4 +47,4 @@ EOF
   done
 popd
 
-sudo chown -R vagrant.vagrant mesos mesos-build aurora
+sudo chown -R vagrant:vagrant aurora
