@@ -26,13 +26,13 @@ task sourceJar(type: Jar) {
   from sourceSets.main.allJava
 }
 
+group 'com.twitter.aurora'
+version = file('.auroraversion').text.trim().toUpperCase()
+
 publishing {
   publications {
     maven(MavenPublication) {
-      groupId 'com.twitter.aurora'
-      artifactId 'twitter-aurora'
-      version file('.auroraversion').text.trim().toUpperCase()
-
+      artifactId 'aurora-scheduler'
       from components.java
 
       artifact sourceJar {

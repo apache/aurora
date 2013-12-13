@@ -10,6 +10,7 @@ if [ ! -d aurora ]; then
 fi
 
 pushd aurora
+  AURORA_VERSION=$(cat .auroraversion | tr '[a-z]' '[A-Z]')
   mkdir -p third_party
   pushd third_party
     wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.15.0-rc4_amd64.egg \
@@ -40,7 +41,7 @@ with contextlib.closing(zipfile.ZipFile('dist/thermos_executor.pex', 'a')) as zf
 EOF
 
   mkdir -p /vagrant/dist/distributions
-  cp dist/distributions/aurora-scheduler.tar /vagrant/dist/distributions
+  cp dist/distributions/aurora-scheduler-$AURORA_VERSION.tar /vagrant/dist/distributions
 
   for pex in aurora_admin aurora_client gc_executor thermos_executor thermos_observer; do
     cp dist/$pex.pex /vagrant/dist

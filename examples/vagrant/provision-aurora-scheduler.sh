@@ -1,6 +1,8 @@
 #!/bin/bash -ex
 # TODO(ksweeney): Use public and versioned URLs instead of local artifacts.
-tar xvf /vagrant/dist/distributions/aurora-scheduler.tar -C /usr/local
+AURORA_VERSION=$(cat /vagrant/.auroraversion | tr '[a-z]' '[A-Z]')
+
+tar xvf /vagrant/dist/distributions/aurora-scheduler-$AURORA_VERSION.tar -C /usr/local
 install -m 755 /vagrant/dist/aurora_client.pex /usr/local/bin/aurora
 install -m 755 /vagrant/dist/aurora_admin.pex /usr/local/bin/aurora_admin
 
@@ -10,12 +12,12 @@ wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.15.0-rc4_amd6
 dpkg --install mesos_0.15.0-rc4_amd64.deb
 
 # TODO(ksweeney): Make this a be part of the Aurora distribution tarball.
-cat > /usr/local/sbin/aurora-scheduler.sh <<"EOF"
+# Location where aurora-scheduler.zip was unpacked.
+AURORA_SCHEDULER_HOME=/usr/local/aurora-scheduler-$AURORA_VERSION
+cat > /usr/local/sbin/aurora-scheduler.sh <<EOF
 #!/usr/bin/env bash
 # An example scheduler launch script that works with the included Vagrantfile.
 
-# Location where aurora-scheduler.zip was unpacked.
-AURORA_SCHEDULER_HOME=/usr/local/aurora-scheduler
 
 # Flags that control the behavior of the JVM.
 JAVA_OPTS=(
@@ -63,7 +65,8 @@ export LIBPROCESS_IP=192.168.33.5
 (
   while true
   do
-    JAVA_OPTS="${JAVA_OPTS[*]}" exec "$AURORA_SCHEDULER_HOME/bin/aurora-scheduler" "${AURORA_FLAGS[@]}"
+    JAVA_OPTS="\${JAVA_OPTS[*]}" exec "$AURORA_SCHEDULER_HOME/bin/aurora-scheduler" \\
+      "\${AURORA_FLAGS[@]}"
   done
 ) &
 EOF
