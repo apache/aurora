@@ -1,3 +1,5 @@
+import os
+
 python_library(
   name = 'detector',
   sources = ['detector.py'],
@@ -89,7 +91,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.thermos.monitoring',
-    version = '0.1.1',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'Thermos monitoring library.',
   )
 )

@@ -1,3 +1,5 @@
+import os
+
 # Alias for src/main/python/twitter/aurora/config/schema
 python_library(
   name = 'schema',
@@ -34,7 +36,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.aurora.config',
-    version = '0.1.2',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'Aurora/Thermos Pystachio schemas for describing job configurations.',
     license = 'Apache License, Version 2.0',
   )

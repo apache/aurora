@@ -1,3 +1,5 @@
+import os
+
 python_library(
   name = 'observed_task',
   sources = ['observed_task.py'],
@@ -41,7 +43,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.thermos.observer',
-    version = '0.1.1',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'The Thermos observer web interface.',
   ).with_binaries(
     thermos_observer = pants('src/main/python/twitter/thermos/observer/bin:thermos_observer'),

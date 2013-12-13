@@ -1,3 +1,5 @@
+import os
+
 # Create an alias for the previous target
 python_library(
   name = 'api',
@@ -68,7 +70,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.aurora.client',
-    version = '0.1.2',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
   ).with_binaries(
     aurora_admin = pants('src/main/python/twitter/aurora/client/bin:aurora_admin'),
     aurora_client = pants('src/main/python/twitter/aurora/client/bin:aurora_client'),

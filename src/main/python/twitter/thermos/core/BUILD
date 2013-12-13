@@ -1,3 +1,5 @@
+import os
+
 python_library(
   name = 'helper',
   sources = ['helper.py'],
@@ -80,7 +82,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.thermos.core',
-    version = '0.1.1',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'The Thermos core state machine.',
   )
 )

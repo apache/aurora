@@ -1,3 +1,5 @@
+import os
+
 python_library(
   name = 'ckpt',
   sources = ['ckpt.py'],
@@ -37,7 +39,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.thermos.common',
-    version = '0.1.1',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'Thermos common libraries.',
   )
 )

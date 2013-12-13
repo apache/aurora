@@ -31,7 +31,7 @@ publishing {
     maven(MavenPublication) {
       groupId 'com.twitter.aurora'
       artifactId 'twitter-aurora'
-      version '0.0.12'
+      version file('.auroraversion').text.trim().toUpperCase()
 
       from components.java
 

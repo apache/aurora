@@ -1,3 +1,5 @@
+import os
+
 page(name = 'readme', source = 'README.md')
 
 python_library(
@@ -8,7 +10,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.thermos',
-    version = '0.1.0',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     descripton = 'The Twitter Thermos runtime.',
   ).with_binaries(
     thermos = pants('src/main/python/twitter/thermos/bin:thermos'),
