@@ -15,10 +15,14 @@
  */
 package com.twitter.aurora.scheduler.state;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -44,9 +48,6 @@ import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertEquals;
-
 import static com.twitter.aurora.gen.MaintenanceMode.DRAINED;
 import static com.twitter.aurora.gen.MaintenanceMode.DRAINING;
 import static com.twitter.aurora.gen.MaintenanceMode.NONE;
@@ -54,6 +55,8 @@ import static com.twitter.aurora.gen.MaintenanceMode.SCHEDULED;
 import static com.twitter.aurora.gen.ScheduleStatus.FINISHED;
 import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
 import static com.twitter.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
+import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertEquals;
 
 public class MaintenanceControllerImplTest extends EasyMockTest {
 
@@ -103,15 +106,19 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     ScheduledTask task = makeTask(HOST_A, "taskA");
 
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
-    expectMaintenanceModeChange(HOST_A, DRAINING);
     expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of(task));
-    expectMaintenanceModeChange(HOST_A, DRAINED);
-    expectMaintenanceModeChange(HOST_A, NONE);
     expect(stateManager.changeState(
         Query.slaveScoped(HOST_A).active(),
         ScheduleStatus.RESTARTING,
         MaintenanceControllerImpl.DRAINING_MESSAGE))
         .andReturn(1);
+    expectMaintenanceModeChange(HOST_A, DRAINING);
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
+        .andReturn(Optional.of(new HostAttributes().setHost(HOST_A).setMode(DRAINING)));
+    // TaskA is FINISHED and therefore no longer active
+    expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of());
+    expectMaintenanceModeChange(HOST_A, DRAINED);
+    expectMaintenanceModeChange(HOST_A, NONE);
 
     control.replay();
 
@@ -148,6 +155,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   public void testEndEarly() {
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
     expectMaintenanceModeChange(HOST_A, NONE);
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
+        .andReturn(Optional.of(new HostAttributes().setHost(HOST_A).setMode(NONE)));
 
     control.replay();
 
@@ -170,10 +179,14 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
         .andReturn(ImmutableSet.of(
             new HostAttributes().setHost(HOST_A).setMode(DRAINING),
             new HostAttributes().setHost(HOST_B).setMode(DRAINING)));
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of(taskA));
     expectFetchTasksByHost(HOST_B, ImmutableSet.<ScheduledTask>of());
     expectMaintenanceModeChange(HOST_B, DRAINED);
     expectMaintenanceModeChange(HOST_A, DRAINING);
-    expectFetchTasksByHost(HOST_A, ImmutableSet.of(taskA));
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
+        .andReturn(Optional.of(new HostAttributes().setHost(HOST_A).setMode(DRAINING)));
+    // TaskA is FINISHED and therefore no longer active
+    expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of());
     expectMaintenanceModeChange(HOST_A, DRAINED);
 
     control.replay();
