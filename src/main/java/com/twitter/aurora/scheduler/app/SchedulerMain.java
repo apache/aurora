@@ -20,6 +20,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.logging.Logger;
 
 import javax.annotation.Nonnegative;
@@ -28,9 +29,9 @@ import javax.inject.Singleton;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList.Builder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
-import com.google.inject.PrivateModule;
 
 import com.twitter.aurora.auth.CapabilityValidator;
 import com.twitter.aurora.auth.SessionValidator;
@@ -123,6 +124,12 @@ public class SchedulerMain extends AbstractApplication {
       .add(CronScheduler.class)
       .build();
 
+  // TODO(Suman Karumuri): Pass in AUTH and CRON modules as extra modules
+  @CmdLine(name = "extra_modules",
+      help = "A list of modules that provide additional functionality.")
+  private static final Arg<List<Class<? extends Module>>> EXTRA_MODULES =
+      Arg.create((List<Class<? extends Module>>) ImmutableList.<Class<? extends Module>>of());
+
   @Inject private SingletonService schedulerService;
   @Inject private LocalServiceRegistry serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
@@ -136,48 +143,16 @@ public class SchedulerMain extends AbstractApplication {
     );
   }
 
-  // TODO(ksweeney): Consider factoring this out into a ModuleParser library.
-  private static Module instantiateFlaggedModule(Arg<? extends Class<? extends Module>> moduleArg) {
-    Class<? extends Module> moduleClass = moduleArg.get();
-    try {
-      return moduleClass.newInstance();
-    } catch (InstantiationException e) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Failed to instantiate module %s. Are you sure it has a no-arg constructor?",
-              moduleClass.getName()),
-          e);
-    } catch (IllegalAccessException e) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Failed to instantiate module %s. Are you sure it's public?",
-              moduleClass.getName()),
-          e);
+  private static Iterable<? extends Module> getExtraModules() {
+    Builder<Module> modules = ImmutableList.builder();
+    modules.add(Modules.wrapInPrivateModule(AUTH_MODULE.get(), AUTH_MODULE_CLASSES))
+        .add(Modules.wrapInPrivateModule(CRON_MODULE.get(), CRON_MODULE_CLASSES));
+
+    for (Class<? extends Module> moduleClass : EXTRA_MODULES.get()) {
+      modules.add(Modules.getModule(moduleClass));
     }
-  }
 
-  // Defensively wrap each module provided on the command-line in a PrivateModule that only
-  // exposes requested classes to ensure that we don't depend on surprise extra bindings across
-  // different implementations.
-  private static Module getFlaggedModule(
-      Arg<? extends Class<? extends Module>> moduleArg,
-      final Iterable<Class<?>> exposedClasses) {
-
-    final Module module = instantiateFlaggedModule(moduleArg);
-    return new PrivateModule() {
-      @Override protected void configure() {
-        install(module);
-        for (Class<?> klass : exposedClasses) {
-          expose(klass);
-        }
-      }
-    };
-  }
-
-  private static Iterable<? extends Module> getFlaggedModules() {
-    return ImmutableList.of(
-        getFlaggedModule(AUTH_MODULE, AUTH_MODULE_CLASSES),
-        getFlaggedModule(CRON_MODULE, CRON_MODULE_CLASSES));
+    return modules.build();
   }
 
   static Iterable<? extends Module> getModules(
@@ -186,9 +161,9 @@ public class SchedulerMain extends AbstractApplication {
       ClientConfig zkClientConfig) {
 
     return ImmutableList.<Module>builder()
-        .addAll(getFlaggedModules())
         .addAll(getSystemModules())
         .add(new AppModule(clusterName, serverSetPath, zkClientConfig))
+        .addAll(getExtraModules())
         .add(new LogStorageModule())
         .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
         .add(new ThriftModule())
