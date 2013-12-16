@@ -19,7 +19,7 @@ from gen.twitter.aurora.ttypes import (
 from mock import Mock, patch
 
 
-class TestClientKllCommand(AuroraClientCommandTest):
+class TestClientKillCommand(AuroraClientCommandTest):
 
   @classmethod
   def setup_mock_options(cls):
