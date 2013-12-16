@@ -18,6 +18,7 @@ package com.twitter.aurora.scheduler.log.testing;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.Iterator;
 
 import javax.inject.Inject;
@@ -61,7 +62,11 @@ class FileLog implements Log {
   public Stream open() throws IOException {
     try {
       FileLogContents logContents;
-      if (logFile.createNewFile()) {
+      // Treat an empty file as a new file.
+      // NOTE: we can't use logFile.length == 0 to test for an empty file, since empty unicode files
+      // contain a byte order mark (BOM) header that is 255 bytes in length.
+      if (logFile.createNewFile()
+          || Files.readFirstLine(logFile, Charset.defaultCharset()) == null) {
         logContents = new FileLogContents(Maps.<Long, LogRecord>newHashMap());
       } else {
         logContents = ThriftBinaryCodec.decode(FileLogContents.class, Files.toByteArray(logFile));
