@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableList;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.OfferID;
+import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.SchedulerDriver;
 
@@ -72,11 +73,18 @@ public interface Driver {
   void stop();
 
   /**
-   * Runs the underlying driver.  Can only be called once.
+   * Starts the underlying driver.  Can only be called once.
    *
    * @return The status of the underlying driver run request.
    */
-  Protos.Status run();
+  Protos.Status start();
+
+  /**
+   * Blocks until the underlying driver is stopped or aborted.
+   *
+   * @return The status of the underlying driver upon exit.
+   */
+  Protos.Status join();
 
   /**
    * Mesos driver implementation.
@@ -134,10 +142,15 @@ public interface Driver {
     }
 
     @Override
-    public Protos.Status run() {
+    public Protos.Status start() {
       SchedulerDriver driver = get(State.INIT);
       stateMachine.transition(State.RUNNING);
-      return driver.run();
+      return driver.start();
+    }
+
+    @Override
+    public Status join() {
+      return get(State.RUNNING).join();
     }
 
     @Override

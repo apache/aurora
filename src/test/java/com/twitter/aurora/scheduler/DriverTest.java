@@ -62,11 +62,11 @@ public class DriverTest extends EasyMockTest {
   @Test
   public void testMultipleStops() {
     expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver)).times(2);
-    expect(schedulerDriver.run()).andReturn(DRIVER_RUNNING);
+    expect(schedulerDriver.start()).andReturn(DRIVER_RUNNING);
     expect(schedulerDriver.stop(true)).andReturn(DRIVER_ABORTED);
     control.replay();
 
-    assertEquals(DRIVER_RUNNING, driver.run());
+    assertEquals(DRIVER_RUNNING, driver.start());
     driver.stop();
     driver.stop();
   }
@@ -74,24 +74,24 @@ public class DriverTest extends EasyMockTest {
   @Test
   public void testStop() {
     expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver)).times(2);
-    expect(schedulerDriver.run()).andReturn(DRIVER_RUNNING);
+    expect(schedulerDriver.start()).andReturn(DRIVER_RUNNING);
     expect(schedulerDriver.stop(true)).andReturn(DRIVER_ABORTED);
     control.replay();
 
-    assertEquals(DRIVER_RUNNING, driver.run());
+    assertEquals(DRIVER_RUNNING, driver.start());
     driver.stop();
   }
 
   @Test
   public void testNormalLifecycle() {
     expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver)).times(4);
-    expect(schedulerDriver.run()).andReturn(DRIVER_RUNNING);
+    expect(schedulerDriver.start()).andReturn(DRIVER_RUNNING);
     expect(schedulerDriver.killTask(createTaskId(TASK_1))).andReturn(DRIVER_RUNNING);
     expect(schedulerDriver.killTask(createTaskId(TASK_2))).andReturn(DRIVER_RUNNING);
     expect(schedulerDriver.stop(true)).andReturn(DRIVER_ABORTED);
     control.replay();
 
-    assertEquals(DRIVER_RUNNING, driver.run());
+    assertEquals(DRIVER_RUNNING, driver.start());
     driver.killTask(TASK_1);
     driver.killTask(TASK_2);
     driver.stop();
@@ -107,10 +107,10 @@ public class DriverTest extends EasyMockTest {
   @Test(expected = IllegalStateException.class)
   public void testOnlyOneRunAllowed() {
     expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver));
-    expect(schedulerDriver.run()).andReturn(DRIVER_RUNNING);
+    expect(schedulerDriver.start()).andReturn(DRIVER_RUNNING);
     control.replay();
 
-    assertEquals(DRIVER_RUNNING, driver.run());
-    driver.run();
+    assertEquals(DRIVER_RUNNING, driver.start());
+    driver.start();
   }
 }

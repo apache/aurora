@@ -72,7 +72,6 @@ import com.twitter.aurora.gen.storage.Transaction;
 import com.twitter.aurora.gen.storage.storageConstants;
 import com.twitter.aurora.scheduler.DriverFactory;
 import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
-import com.twitter.aurora.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
 import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
 import com.twitter.aurora.scheduler.log.Log;
 import com.twitter.aurora.scheduler.log.Log.Entry;
@@ -187,7 +186,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
             }
         );
         bind(ExecutorConfig.class).toInstance(new ExecutorConfig("/executor/thermos"));
-        bind(Boolean.class).annotatedWith(ShutdownOnDriverExit.class).toInstance(false);
         install(new BackupModule(backupDir, SnapshotStoreImpl.class));
       }
     };
@@ -330,8 +328,12 @@ public class SchedulerIT extends BaseZooKeeperTest {
     logStream.close();
     expectLastCall().anyTimes();
 
-    expect(driver.run()).andAnswer(new IAnswer<Status>() {
-      @Override public Status answer() throws InterruptedException {
+    final AtomicReference<Scheduler> scheduler = Atomics.newReference();
+    expect(driver.start()).andAnswer(new IAnswer<Status>() {
+      @Override public Status answer() {
+        scheduler.get().registered(driver,
+            FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
+            MasterInfo.getDefaultInstance());
         return Status.DRIVER_RUNNING;
       }
     });
@@ -339,12 +341,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
     control.replay();
     startScheduler();
 
+    scheduler.set(getScheduler());
     awaitSchedulerReady();
-
-    Scheduler scheduler = getScheduler();
-    scheduler.registered(driver,
-        FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
-        MasterInfo.getDefaultInstance());
 
     assertEquals(0L, Stats.<Long>getVariable("task_store_PENDING").read().longValue());
     assertEquals(1L, Stats.<Long>getVariable("task_store_ASSIGNED").read().longValue());

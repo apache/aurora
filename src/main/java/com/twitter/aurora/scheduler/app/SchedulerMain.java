@@ -40,7 +40,6 @@ import com.twitter.aurora.scheduler.DriverFactory;
 import com.twitter.aurora.scheduler.DriverFactory.DriverFactoryImpl;
 import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
 import com.twitter.aurora.scheduler.SchedulerLifecycle;
-import com.twitter.aurora.scheduler.SchedulerLifecycle.ShutdownOnDriverExit;
 import com.twitter.aurora.scheduler.cron.CronPredictor;
 import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.aurora.scheduler.cron.noop.NoopCronModule;
@@ -56,6 +55,7 @@ import com.twitter.aurora.scheduler.thrift.ThriftModule;
 import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.AppLauncher;
+import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.application.modules.LogModule;
@@ -68,6 +68,7 @@ import com.twitter.common.inject.Bindings;
 import com.twitter.common.logging.RootLogConfig;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.SingletonService;
+import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule;
 import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import com.twitter.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
@@ -133,6 +134,7 @@ public class SchedulerMain extends AbstractApplication {
   @Inject private SingletonService schedulerService;
   @Inject private LocalServiceRegistry serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
+  @Inject private Lifecycle appLifecycle;
   @Inject private Optional<RootLogConfig.Configuration> glogConfig;
 
   private static Iterable<? extends Module> getSystemModules() {
@@ -183,7 +185,6 @@ public class SchedulerMain extends AbstractApplication {
         @Override protected void configure() {
           bind(DriverFactory.class).to(DriverFactoryImpl.class);
           bind(DriverFactoryImpl.class).in(Singleton.class);
-          bind(Boolean.class).annotatedWith(ShutdownOnDriverExit.class).toInstance(true);
           install(new MesosLogStreamModule(zkClientConfig));
         }
       };
@@ -205,7 +206,6 @@ public class SchedulerMain extends AbstractApplication {
           }
         });
         bind(ExecutorConfig.class).toInstance(new ExecutorConfig(THERMOS_EXECUTOR_PATH.get()));
-        bind(Boolean.class).annotatedWith(ShutdownOnDriverExit.class).toInstance(true);
       }
     };
 
@@ -227,7 +227,7 @@ public class SchedulerMain extends AbstractApplication {
       LOG.warning("Running without expected glog configuration.");
     }
 
-    SchedulerLifecycle.SchedulerCandidate candidate = schedulerLifecycle.prepare();
+    LeadershipListener leaderListener = schedulerLifecycle.prepare();
 
     Optional<InetSocketAddress> primarySocket = serviceRegistry.getPrimarySocket();
     if (!primarySocket.isPresent()) {
@@ -235,7 +235,10 @@ public class SchedulerMain extends AbstractApplication {
     }
 
     try {
-      schedulerService.lead(primarySocket.get(), serviceRegistry.getAuxiliarySockets(), candidate);
+      schedulerService.lead(
+          primarySocket.get(),
+          serviceRegistry.getAuxiliarySockets(),
+          leaderListener);
     } catch (Group.WatchException e) {
       throw new IllegalStateException("Failed to watch group and lead service.", e);
     } catch (Group.JoinException e) {
@@ -244,7 +247,7 @@ public class SchedulerMain extends AbstractApplication {
       throw new IllegalStateException("Interrupted while joining scheduler service group.", e);
     }
 
-    candidate.awaitShutdown();
+    appLifecycle.awaitShutdown();
   }
 
   public static void main(String[] args) {

@@ -15,21 +15,23 @@
  */
 package com.twitter.aurora.scheduler;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.eventbus.Subscribe;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.inject.BindingAnnotation;
+import com.google.common.util.concurrent.Atomics;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
@@ -43,93 +45,283 @@ import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.StorageBackfill;
 import com.twitter.common.application.Lifecycle;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
+import com.twitter.common.base.Closure;
+import com.twitter.common.base.Closures;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
-import com.twitter.common.zookeeper.Group;
+import com.twitter.common.util.StateMachine;
+import com.twitter.common.util.StateMachine.Transition;
+import com.twitter.common.zookeeper.Group.JoinException;
 import com.twitter.common.zookeeper.ServerSet;
-import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import static com.google.common.base.Preconditions.checkNotNull;
+
+import static com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 
 /**
  * The central driver of the scheduler runtime lifecycle.  Handles the transitions from startup and
  * initialization through acting as a standby scheduler / log replica and finally to becoming the
  * scheduler leader.
- *
- * <p>TODO(John Sirois): This class contains the old logic of SchedulerMain - now that its extracted
- * it should be tested.
+ * <p>
+ * The (enforced) call order to be used with this class is:
+ * <ol>
+ *   <li>{@link #prepare()}, to initialize the storage system.</li>
+ *   <li>{@link LeadershipListener#onLeading(LeaderControl) onLeading()} on the
+ *       {@link LeadershipListener LeadershipListener}
+ *       returned from {@link #prepare()}, signaling that this process has exclusive control of the
+ *       cluster.</li>
+ *   <li>{@link #registered(DriverRegistered) registered()},
+ *       indicating that registration with the mesos master has succeeded.
+ *       At this point, the scheduler's presence will be announced via
+ *       {@link LeaderControl#advertise() advertise()}.</li>
+ * </ol>
+ * If this call order is broken, calls will fail by throwing
+ * {@link java.lang.IllegalStateException}.
+ * <p>
+ * At any point in the lifecycle, the scheduler will respond to
+ * {@link LeadershipListener#onDefeated(com.twitter.common.zookeeper.ServerSet.EndpointStatus)
+ * onDefeated()} by initiating a clean shutdown using {@link Lifecycle#shutdown() shutdown()}.
+ * A clean shutdown will also be initiated if control actions fail during normal state transitions.
  */
 public class SchedulerLifecycle implements EventSubscriber {
 
-  /**
-   * A {@link SingletonService} scheduler leader candidate that exposes a method for awaiting clean
-   * shutdown.
-   */
-  public interface SchedulerCandidate extends SingletonService.LeadershipListener {
-    /**
-     * Waits for this candidate to abdicate or otherwise decide to quit.
-     */
-    void awaitShutdown();
-  }
-
-  @CmdLine(name = "max_registration_delay",
-      help = "Max allowable delay to allow the driver to register before aborting")
-  private static final Arg<Amount<Long, Time>> MAX_REGISTRATION_DELAY =
-      Arg.create(Amount.of(1L, Time.MINUTES));
-
-  @CmdLine(name = "max_leading_duration",
-      help = "After leading for this duration, the scheduler should commit suicide.")
-  private static final Arg<Amount<Long, Time>> MAX_LEADING_DURATION =
-      Arg.create(Amount.of(1L, Time.DAYS));
-
-  /**
-   * Binding annotation to attach to the flag indicating whether to initiate application shutdown
-   * when the driver returns from {@link Driver#run()}.
-   */
-  @BindingAnnotation
-  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-  public @interface ShutdownOnDriverExit { }
-
   private static final Logger LOG = Logger.getLogger(SchedulerLifecycle.class.getName());
 
-  private final DriverFactory driverFactory;
-  private final NonVolatileStorage storage;
-  private final Lifecycle lifecycle;
-  private final CountDownLatch registeredLatch = new CountDownLatch(1);
-  private final AtomicInteger registeredFlag = Stats.exportInt("framework_registered");
+  private enum State {
+    IDLE,
+    PREPARING_STORAGE,
+    STORAGE_PREPARED,
+    LEADER_AWAITING_REGISTRATION,
+    REGISTERED_LEADER,
+    RUNNING,
+    DEAD
+  }
 
-  private final Driver driver;
-  private final DriverReference driverRef;
-  private final boolean shutdownAfterRunning;
-  private final Clock clock;
+  private static final Predicate<Transition<State>> IS_DEAD = new Predicate<Transition<State>>() {
+    @Override public boolean apply(Transition<State> state) {
+      return state.getTo() == State.DEAD;
+    }
+  };
+
+  private static final Predicate<Transition<State>> NOT_DEAD = Predicates.not(IS_DEAD);
+
+  private final LeadershipListener leadershipListener;
+  private final AtomicBoolean registrationAcked = new AtomicBoolean(false);
+  private final AtomicReference<LeaderControl> leaderControl = Atomics.newReference();
+  private final StateMachine<State> stateMachine;
 
   @Inject
   SchedulerLifecycle(
-      DriverFactory driverFactory,
-      NonVolatileStorage storage,
-      Lifecycle lifecycle,
-      Driver driver,
-      DriverReference driverRef,
-      @ShutdownOnDriverExit boolean shutdownAfterRunning,
-      Clock clock) {
+      final DriverFactory driverFactory,
+      final NonVolatileStorage storage,
+      final Lifecycle lifecycle,
+      final Driver driver,
+      final DriverReference driverRef,
+      final LeadingOptions leadingOptions,
+      final ScheduledExecutorService executorService,
+      final Clock clock) {
 
-    this.driverFactory = checkNotNull(driverFactory);
-    this.storage = checkNotNull(storage);
-    this.lifecycle = checkNotNull(lifecycle);
-    this.driver  = checkNotNull(driver);
-    this.driverRef = checkNotNull(driverRef);
-    this.shutdownAfterRunning = shutdownAfterRunning;
-    this.clock = checkNotNull(clock);
+    this(
+        driverFactory,
+        storage,
+        lifecycle,
+        driver,
+        driverRef,
+        new DelayedActions() {
+          @Override public void blockingDriverJoin(Runnable runnable) {
+            executorService.execute(runnable);
+          }
+
+          @Override public void onAutoFailover(Runnable runnable) {
+            executorService.schedule(
+                runnable,
+                leadingOptions.leadingTimeLimit.getValue(),
+                leadingOptions.leadingTimeLimit.getUnit().getTimeUnit());
+          }
+
+          @Override public void onRegistrationTimeout(Runnable runnable) {
+            LOG.info(
+                "Giving up on registration in " + leadingOptions.registrationDelayLimit);
+            executorService.schedule(
+                runnable,
+                leadingOptions.registrationDelayLimit.getValue(),
+                leadingOptions.registrationDelayLimit.getUnit().getTimeUnit());
+          }
+        },
+        clock);
+  }
+
+  @VisibleForTesting
+  SchedulerLifecycle(
+      final DriverFactory driverFactory,
+      final NonVolatileStorage storage,
+      final Lifecycle lifecycle,
+      // TODO(wfarner): The presence of Driver and DriverReference is quite confusing.  Figure out
+      //                a clean way to collapse the duties of DriverReference into DriverImpl.
+      final Driver driver,
+      final DriverReference driverRef,
+      final DelayedActions delayedActions,
+      final Clock clock) {
+
+    Stats.export(new StatImpl<Integer>("framework_registered") {
+      @Override public Integer read() {
+        return registrationAcked.get() ? 1 : 0;
+      }
+    });
+    for (final State state : State.values()) {
+      Stats.export(new StatImpl<Integer>("scheduler_lifecycle_" + state) {
+        @Override public Integer read() {
+          return (state == stateMachine.getState()) ? 1 : 0;
+        }
+      });
+    }
+
+    final Closure<Transition<State>> prepareStorage = new Closure<Transition<State>>() {
+      @Override public void execute(Transition<State> transition) {
+        try {
+          storage.prepare();
+          stateMachine.transition(State.STORAGE_PREPARED);
+        } catch (RuntimeException e) {
+          stateMachine.transition(State.DEAD);
+          throw e;
+        }
+      }
+    };
+
+    final Closure<Transition<State>> handleLeading = new Closure<Transition<State>>() {
+      @Override public void execute(Transition<State> transition) {
+        LOG.info("Elected as leading scheduler!");
+        storage.start(new MutateWork.NoResult.Quiet() {
+          @Override protected void execute(MutableStoreProvider storeProvider) {
+            StorageBackfill.backfill(storeProvider, clock);
+          }
+        });
+
+        @Nullable final String frameworkId = storage.consistentRead(
+            new Work.Quiet<String>() {
+              @Override public String apply(StoreProvider storeProvider) {
+                return storeProvider.getSchedulerStore().fetchFrameworkId();
+              }
+            });
+        driverRef.set(driverFactory.apply(frameworkId));
+
+        delayedActions.onRegistrationTimeout(
+            new Runnable() {
+              @Override public void run() {
+                if (!registrationAcked.get()) {
+                  LOG.severe(
+                      "Framework has not been registered within the tolerated delay.");
+                  stateMachine.transition(State.DEAD);
+                }
+              }
+            });
+
+        delayedActions.onAutoFailover(
+            new Runnable() {
+              @Override public void run() {
+                LOG.info("Triggering automatic failover.");
+                stateMachine.transition(State.DEAD);
+              }
+            });
+
+        Protos.Status status = driver.start();
+        LOG.info("Driver started with code " + status);
+        delayedActions.blockingDriverJoin(new Runnable() {
+          @Override public void run() {
+            // Blocks until driver exits.
+            driver.join();
+            stateMachine.transition(State.DEAD);
+          }
+        });
+      }
+    };
+
+    final Closure<Transition<State>> handleRegistered = new Closure<Transition<State>>() {
+      @Override public void execute(Transition<State> transition) {
+        registrationAcked.set(true);
+        try {
+          leaderControl.get().advertise();
+        } catch (JoinException e) {
+          LOG.log(Level.SEVERE, "Failed to advertise leader, shutting down.", e);
+          stateMachine.transition(State.DEAD);
+        } catch (InterruptedException e) {
+          LOG.log(Level.SEVERE, "Interrupted while advertising leader, shutting down.", e);
+          stateMachine.transition(State.DEAD);
+          Thread.currentThread().interrupt();
+        }
+      }
+    };
+
+    final Closure<Transition<State>> shutDown = new Closure<Transition<State>>() {
+      private final AtomicBoolean invoked = new AtomicBoolean(false);
+      @Override public void execute(Transition<State> transition) {
+        if (!invoked.compareAndSet(false, true)) {
+          LOG.info("Shutdown already invoked, ignoring extra call.");
+          return;
+        }
+
+        // TODO(wfarner): Consider using something like guava's Closer to abstractly tear down
+        // resources here.
+        try {
+          LeaderControl control = leaderControl.get();
+          if (control != null) {
+            try {
+              control.leave();
+            } catch (JoinException e) {
+              LOG.log(Level.WARNING, "Failed to leave leadership: " + e, e);
+            } catch (ServerSet.UpdateException e) {
+              LOG.log(Level.WARNING, "Failed to leave server set: " + e, e);
+            }
+          }
+
+          // TODO(wfarner): Re-evaluate tear-down ordering here.  Should the top-level shutdown
+          // be invoked first, or the underlying critical components?
+          driver.stop();
+          storage.stop();
+        } finally {
+          lifecycle.shutdown();
+        }
+      }
+    };
+
+    stateMachine = StateMachine.<State>builder("SchedulerLifecycle")
+        .initialState(State.IDLE)
+        .logTransitions()
+        .addState(
+            Closures.filter(NOT_DEAD, prepareStorage),
+            State.IDLE,
+            State.PREPARING_STORAGE, State.DEAD)
+        .addState(
+            State.PREPARING_STORAGE,
+            State.STORAGE_PREPARED, State.DEAD)
+        .addState(
+            Closures.filter(NOT_DEAD, handleLeading),
+            State.STORAGE_PREPARED,
+            State.LEADER_AWAITING_REGISTRATION, State.DEAD)
+        .addState(
+            Closures.filter(NOT_DEAD, handleRegistered),
+            State.LEADER_AWAITING_REGISTRATION,
+            State.REGISTERED_LEADER, State.DEAD)
+        .addState(
+            State.REGISTERED_LEADER,
+            State.RUNNING, State.DEAD)
+        .addState(
+            State.RUNNING,
+            State.DEAD)
+        .addState(
+            State.DEAD,
+            // Allow cycles in DEAD to prevent throwing and avoid the need for call-site checking.
+            State.DEAD
+        )
+        .onAnyTransition(
+            Closures.filter(IS_DEAD, shutDown))
+        .build();
+
+    this.leadershipListener = new SchedulerCandidateImpl(stateMachine, leaderControl);
   }
 
   /**
@@ -137,144 +329,89 @@ public class SchedulerLifecycle implements EventSubscriber {
    * host a live log replica and start syncing data from the leader via the log until it gets called
    * upon to lead.
    *
-   * @return A candidate that can be offered for leadership of a distributed election.
+   * @return A listener that can be offered for leadership of a distributed election.
    */
-  public SchedulerCandidate prepare() {
-    LOG.info("Preparing storage");
-    storage.prepare();
-    return new SchedulerCandidateImpl();
+  public LeadershipListener prepare() {
+    stateMachine.transition(State.PREPARING_STORAGE);
+    return leadershipListener;
   }
 
   @Subscribe
   public void registered(DriverRegistered event) {
-    registeredLatch.countDown();
-    registeredFlag.set(1);
+    stateMachine.transition(State.REGISTERED_LEADER);
   }
 
   /**
    * Maintains a reference to the driver.
    */
   static class DriverReference implements Supplier<Optional<SchedulerDriver>> {
-    private volatile Optional<SchedulerDriver> driver = Optional.absent();
+    private final AtomicReference<SchedulerDriver> driver = Atomics.newReference();
 
     @Override public Optional<SchedulerDriver> get() {
-      return driver;
+      return Optional.fromNullable(driver.get());
     }
 
     private void set(SchedulerDriver ref) {
-      this.driver = Optional.of(ref);
+      driver.set(ref);
     }
   }
 
-  /**
-   * Implementation of the scheduler candidate lifecycle.
-   */
-  private class SchedulerCandidateImpl implements SchedulerCandidate {
+  private static class SchedulerCandidateImpl implements LeadershipListener {
+    private final StateMachine<State> stateMachine;
+    private final AtomicReference<LeaderControl> leaderControl;
+
+    SchedulerCandidateImpl(
+        StateMachine<State> stateMachine,
+        AtomicReference<LeaderControl> leaderControl) {
+
+      this.stateMachine = stateMachine;
+      this.leaderControl = leaderControl;
+    }
+
     @Override public void onLeading(LeaderControl control) {
-      LOG.info("Elected as leading scheduler!");
-      try {
-        lead();
-        control.advertise();
-      } catch (Group.JoinException e) {
-        LOG.log(Level.SEVERE, "Failed to advertise leader, shutting down.", e);
-        lifecycle.shutdown();
-      } catch (InterruptedException e) {
-        LOG.log(Level.SEVERE, "Failed to update endpoint status, shutting down.", e);
-        lifecycle.shutdown();
-        Thread.currentThread().interrupt();
-      } catch (RuntimeException e) {
-        LOG.log(Level.SEVERE, "Unexpected exception attempting to lead, shutting down.", e);
-        lifecycle.shutdown();
-      }
-    }
-
-    private void startDaemonThread(String name, Runnable work) {
-      new ThreadFactoryBuilder()
-          .setNameFormat(name + "-%d")
-          .setDaemon(true)
-          .build()
-          .newThread(work)
-          .start();
-    }
-
-    private void lead() {
-      storage.start(new MutateWork.NoResult.Quiet() {
-        @Override protected void execute(MutableStoreProvider storeProvider) {
-          StorageBackfill.backfill(storeProvider, clock);
-        }
-      });
-      @Nullable final String frameworkId = storage.consistentRead(new Work.Quiet<String>() {
-        @Override public String apply(StoreProvider storeProvider) {
-          return storeProvider.getSchedulerStore().fetchFrameworkId();
-        }
-      });
-
-      driverRef.set(driverFactory.apply(frameworkId));
-
-      startDaemonThread("Driver-Runner", new Runnable() {
-        @Override public void run() {
-          Protos.Status status = driver.run();
-          LOG.info("Driver completed with exit code " + status);
-          if (shutdownAfterRunning) {
-            lifecycle.shutdown();
-          }
-        }
-      });
-
-      startDaemonThread("Driver-Register-Watchdog", new Runnable() {
-        @Override public void run() {
-          LOG.info(String.format("Waiting up to %s for scheduler registration.",
-              MAX_REGISTRATION_DELAY.get()));
-
-          try {
-            boolean registered = registeredLatch.await(
-                MAX_REGISTRATION_DELAY.get().getValue(),
-                MAX_REGISTRATION_DELAY.get().getUnit().getTimeUnit());
-            if (!registered) {
-              LOG.severe("Framework has not been registered within the tolerated delay, quitting.");
-              lifecycle.shutdown();
-            }
-          } catch (InterruptedException e) {
-            LOG.log(Level.WARNING, "Delayed registration check interrupted.", e);
-            Thread.currentThread().interrupt();
-          }
-        }
-      });
-
-      startDaemonThread("Leader-Assassin", new Runnable() {
-        @Override public void run() {
-          try {
-            Thread.sleep(MAX_LEADING_DURATION.get().as(Time.MILLISECONDS));
-            LOG.info(
-                "Leader has been active for " + MAX_LEADING_DURATION.get() + ", forcing failover.");
-            onDefeated(null);
-          } catch (InterruptedException e) {
-            LOG.warning("Leader assassin thread interrupted.");
-            Thread.currentThread().interrupt();
-          }
-        }
-      });
+      leaderControl.set(control);
+      stateMachine.transition(State.LEADER_AWAITING_REGISTRATION);
     }
 
     @Override public void onDefeated(@Nullable ServerSet.EndpointStatus status) {
-      LOG.info("Lost leadership, committing suicide.");
-
-      try {
-        if (status != null) {
-          status.leave();
-        }
-
-        driver.stop(); // shut down incoming offers
-        storage.stop();
-      } catch (ServerSet.UpdateException e) {
-        LOG.log(Level.WARNING, "Failed to leave server set.", e);
-      } finally {
-        lifecycle.shutdown(); // shut down the server
-      }
+      LOG.severe("Lost leadership, committing suicide.");
+      stateMachine.transition(State.DEAD);
     }
+  }
 
-    @Override public void awaitShutdown() {
-      lifecycle.awaitShutdown();
+  public static class LeadingOptions {
+    private final Amount<Long, Time> registrationDelayLimit;
+    private final Amount<Long, Time> leadingTimeLimit;
+
+    /**
+     * Creates a new collection of options for tuning leadership behavior.
+     *
+     * @param registrationDelayLimit Maximum amount of time to wait for framework registration to
+     *                               complete.
+     * @param leadingTimeLimit Maximum amount of time to serve as leader before abdicating.
+     */
+    public LeadingOptions(
+        Amount<Long, Time> registrationDelayLimit,
+        Amount<Long, Time> leadingTimeLimit) {
+
+      Preconditions.checkArgument(
+          registrationDelayLimit.getValue() >= 0,
+          "Registration delay limit must be positive.");
+      Preconditions.checkArgument(
+          leadingTimeLimit.getValue() >= 0,
+          "Leading time limit must be positive.");
+
+      this.registrationDelayLimit = checkNotNull(registrationDelayLimit);
+      this.leadingTimeLimit = checkNotNull(leadingTimeLimit);
     }
+  }
+
+  @VisibleForTesting
+  interface DelayedActions {
+    void blockingDriverJoin(Runnable runnable);
+
+    void onAutoFailover(Runnable runnable);
+
+    void onRegistrationTimeout(Runnable runnable);
   }
 }

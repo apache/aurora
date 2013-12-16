@@ -16,13 +16,17 @@
 package com.twitter.aurora.scheduler;
 
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import javax.inject.Singleton;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
+import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 
@@ -32,6 +36,7 @@ import org.apache.mesos.SchedulerDriver;
 import com.twitter.aurora.scheduler.Driver.DriverImpl;
 import com.twitter.aurora.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.aurora.scheduler.SchedulerLifecycle.DriverReference;
+import com.twitter.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
 import com.twitter.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher;
@@ -54,6 +59,16 @@ public class SchedulerModule extends AbstractModule {
   @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
   private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
 
+  @CmdLine(name = "max_registration_delay",
+      help = "Max allowable delay to allow the driver to register before aborting")
+  private static final Arg<Amount<Long, Time>> MAX_REGISTRATION_DELAY =
+      Arg.create(Amount.of(1L, Time.MINUTES));
+
+  @CmdLine(name = "max_leading_duration",
+      help = "After leading for this duration, the scheduler should commit suicide.")
+  private static final Arg<Amount<Long, Time>> MAX_LEADING_DURATION =
+      Arg.create(Amount.of(1L, Time.DAYS));
+
   @Override
   protected void configure() {
     bind(Driver.class).to(DriverImpl.class);
@@ -75,7 +90,19 @@ public class SchedulerModule extends AbstractModule {
     bind(GcExecutorLauncher.class).in(Singleton.class);
     bind(UserTaskLauncher.class).in(Singleton.class);
 
-    bind(SchedulerLifecycle.class).in(Singleton.class);
+    install(new PrivateModule() {
+      @Override protected void configure() {
+        bind(LeadingOptions.class).toInstance(
+            new LeadingOptions(MAX_REGISTRATION_DELAY.get(), MAX_LEADING_DURATION.get()));
+          final ScheduledExecutorService executor = Executors.newScheduledThreadPool(
+              1,
+              new ThreadFactoryBuilder().setNameFormat("Lifecycle-%d").setDaemon(true).build());
+        bind(ScheduledExecutorService.class).toInstance(executor);
+        bind(SchedulerLifecycle.class).in(Singleton.class);
+        expose(SchedulerLifecycle.class);
+      }
+    });
+
     PubsubEventModule.bindSubscriber(binder(), SchedulerLifecycle.class);
     PubsubEventModule.bindSubscriber(binder(), TaskVars.class);
   }

@@ -27,9 +27,9 @@ import com.twitter.aurora.scheduler.storage.JobStore;
 import com.twitter.aurora.scheduler.storage.LockStore;
 import com.twitter.aurora.scheduler.storage.QuotaStore;
 import com.twitter.aurora.scheduler.storage.SchedulerStore;
-import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
+import com.twitter.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
 import com.twitter.aurora.scheduler.storage.Storage.Work;
 import com.twitter.aurora.scheduler.storage.TaskStore;
@@ -54,7 +54,7 @@ public class StorageTestUtil {
   public final JobStore.Mutable jobStore;
   public final LockStore.Mutable lockStore;
   public final SchedulerStore.Mutable schedulerStore;
-  public final Storage storage;
+  public final NonVolatileStorage storage;
 
   /**
    * Creates a new storage test utility.
@@ -70,7 +70,7 @@ public class StorageTestUtil {
     this.jobStore = easyMock.createMock(JobStore.Mutable.class);
     this.lockStore = easyMock.createMock(LockStore.Mutable.class);
     this.schedulerStore = easyMock.createMock(SchedulerStore.Mutable.class);
-    this.storage = easyMock.createMock(Storage.class);
+    this.storage = easyMock.createMock(NonVolatileStorage.class);
   }
 
   private <T> IExpectationSetters<T> expectConsistentRead() {
