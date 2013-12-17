@@ -5,7 +5,6 @@ from twitter.common import log
 
 from gen.twitter.aurora.constants import ACTIVE_STATES
 
-from twitter.aurora.client.base import check_and_log_locked_response
 from gen.twitter.aurora.ttypes import (
     AddInstancesConfig,
     JobConfigValidation,
@@ -61,9 +60,6 @@ class Updater(object):
     resp = self._scheduler.acquireLock(LockKey(job=self._job_key))
     if resp.responseCode == ResponseCode.OK:
       self._lock = resp.result.acquireLockResult.lock
-    else:
-      log.error('Error starting update: %s' % resp.message)
-      check_and_log_locked_response(resp)
     return resp
 
   def _finish(self):

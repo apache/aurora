@@ -91,7 +91,6 @@ python_library(
     pants(':instance_watcher'),
     pants(':updater_util'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/twitter/aurora/client:base'),
     pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
   ]
 )
