@@ -1,4 +1,4 @@
 python_requirement(
   name = 'recordio-thrift',
-  requirement = 'twitter.common.recordio==0.1.1',
+  requirement = 'twitter.common.recordio==0.1.2',
 )

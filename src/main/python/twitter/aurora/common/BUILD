@@ -1,3 +1,5 @@
+import os
+
 python_library(
   name = 'aurora_job_key',
   sources = ['aurora_job_key.py'],
@@ -54,7 +56,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'twitter.aurora.common',
-    version = '0.1.2',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'Aurora common libraries.',
     license = 'Apache License, Version 2.0',
   )
