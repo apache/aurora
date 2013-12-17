@@ -18,7 +18,7 @@ from twitter.common.dirutil.tail import tail as tail_closed
 from twitter.common.quantity import Amount, Time, Data
 from twitter.common.quantity.parse_simple import parse_time, parse_data
 from twitter.common.recordio import RecordIO, ThriftRecordReader
-from twitter.thermos.common.path import TaskPath
+from twitter.thermos.common.path import TkPath
 from twitter.thermos.common.ckpt import CheckpointDispatcher
 from twitter.thermos.common.options import add_port_to, add_binding_to
 from twitter.thermos.config.loader import ThermosConfigLoader, ThermosTaskWrapper
@@ -58,22 +58,23 @@ def get_task_from_options(args, opts, **kw):
 
   tasks = loader(args[0], bindings=opts.bindings, **kw)
 
-  if len(tasks.tasks()) == 0:
+  task_list = list(tasks.tasks())
+  if len(task_list) == 0:
     app.error("No tasks specified!")
 
-  if opts.task is None and len(tasks.tasks()) > 1:
+  if opts.task is None and len(task_list) > 1:
     app.error("Multiple tasks in config but no task name specified!")
 
   task = None
   if opts.task is not None:
-    for t in tasks.tasks():
+    for t in task_list:
       if t.task().name().get() == opts.task:
         task = t
         break
     if task is None:
       app.error("Could not find task %s!" % opts.task)
   else:
-    task = tasks.tasks()[0]
+    task = task_list[0]
 
   if kw.get('strict', False):
     if not task.task.check().ok():
