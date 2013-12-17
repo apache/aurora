@@ -564,11 +564,29 @@ class UpdaterTest(TestCase):
   def test_update_invalid_response(self):
     """A response code other than success is returned by a scheduler RPC."""
     old_configs = self.make_task_configs(5)
-    new_config = old_configs[0]
+    new_config = deepcopy(old_configs[0])
+    new_config.priority = 5
+    job_config = self.make_job_config(new_config, 5)
+    self._config.job_config = job_config
+    self.expect_start()
+    self.expect_get_tasks(old_configs)
+    self.expect_populate(job_config)
+    self.expect_kill([0, 1, 2], response_code=ResponseCode.INVALID_REQUEST)
+    self.replay_mocks()
+
+    self.update_and_expect_response(ResponseCode.ERROR)
+    self.verify_mocks()
+
+  def test_job_does_not_exist(self):
+    """Unable to update a job that does not exist."""
+    old_configs = self.make_task_configs(5)
+    new_config = deepcopy(old_configs[0])
+    new_config.priority = 5
     job_config = self.make_job_config(new_config, 5)
     self._config.job_config = job_config
     self.expect_start()
     self.expect_get_tasks(old_configs, response_code=ResponseCode.INVALID_REQUEST)
+    self.expect_finish()
     self.replay_mocks()
 
     self.update_and_expect_response(ResponseCode.ERROR)
@@ -583,6 +601,7 @@ class UpdaterTest(TestCase):
     self.expect_start()
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
+    self.expect_finish()
     self.replay_mocks()
 
     self.update_and_expect_response(ResponseCode.ERROR, instances=[3, 4])

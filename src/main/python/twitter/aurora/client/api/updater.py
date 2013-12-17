@@ -76,12 +76,12 @@ class Updater(object):
       log.error('There was an error finalizing the update: %s' % resp.message)
     return resp
 
-  def _update(self, instances=None):
+  def _update(self, instance_configs):
     """Drives execution of the update logic. Performs a batched update/rollback for all instances
     affected by the current update request.
 
     Arguments:
-    instances -- (optional) set of instances to update.
+    instance_configs -- list of instance update configurations to go through.
 
     Returns the set of instances that failed to update.
     """
@@ -89,8 +89,6 @@ class Updater(object):
         self._update_config.max_per_instance_failures,
         self._update_config.max_total_failures
     )
-
-    instance_configs = self._get_update_instructions(instances)
 
     instance_operation = self.OperationConfigs(
       from_config=instance_configs.remote_config_map,
@@ -366,7 +364,14 @@ class Updater(object):
         log.info('Cron template updated, next run will reflect changes')
         return self._finish()
       else:
-        if not self._update(instances):
+        try:
+          instance_configs = self._get_update_instructions(instances)
+        except self.Error as e:
+          # Safe to release the lock acquired above as no job mutation has happened yet.
+          self._finish()
+          return self._failed_response('Unable to start job update: %s' % e)
+
+        if not self._update(instance_configs):
           log.warn('Update failures threshold reached')
           self._finish()
           return self._failed_response('Update reverted')
