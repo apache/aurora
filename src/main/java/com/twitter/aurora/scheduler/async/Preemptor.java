@@ -303,9 +303,6 @@ public interface Preemptor {
       return Multimaps.index(activeTasks, TASK_TO_SLAVE_ID);
     }
 
-    // TODO(zmanji): Add throttling to prevent how much preemption a single task can cause over
-    // time.
-    // TODO(zmanji): Get the offer queue to associate a slave with a pending task.
     @Override
     public synchronized Optional<String> findPreemptionSlotFor(String taskId) {
       List<IAssignedTask> pendingTasks =

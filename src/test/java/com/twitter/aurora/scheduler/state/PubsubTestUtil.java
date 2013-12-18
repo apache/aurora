@@ -32,7 +32,7 @@ import com.twitter.common.base.ExceptionalCommand;
  * A convenience utility for unit tests that which to verify pubsub wiring.
  * TODO(wfarner): Clean this up - make it integrate more cleanly with callers and LifecycleModule.
  */
-final class PubsubTestUtil {
+public final class PubsubTestUtil {
 
   private PubsubTestUtil() {
     // Utility class.
@@ -43,7 +43,7 @@ final class PubsubTestUtil {
    *
    * @param binder Binder to install pubsub system onto.
    */
-  static void installPubsub(Binder binder) {
+  public static void installPubsub(Binder binder) {
     PubsubEventModule.installForTest(binder);
   }
 
@@ -54,7 +54,7 @@ final class PubsubTestUtil {
    * @return The pubsub event sink.
    * @throws Exception If the pubsub system failed to start.
    */
-  static Closure<PubsubEvent> startPubsub(Injector injector) throws Exception {
+  public static Closure<PubsubEvent> startPubsub(Injector injector) throws Exception {
     // TODO(wfarner): Make it easier to write a unit test wired for pubsub events.
     // In this case, a trade-off was made to avoid installing several distant modules and providing
     // required bindings that seem unrelated from this code.

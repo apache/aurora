@@ -15,24 +15,30 @@
  */
 package com.twitter.aurora.scheduler.async;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
+import com.google.inject.Binder;
+import com.google.inject.BindingAnnotation;
+import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import com.twitter.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
-import com.twitter.aurora.scheduler.async.TaskGroups.SchedulingAction;
 import com.twitter.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
+import com.twitter.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -44,9 +50,15 @@ import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 import static com.twitter.aurora.scheduler.async.HistoryPruner.PruneThreshold;
 import static com.twitter.aurora.scheduler.async.Preemptor.PreemptorImpl;
 import static com.twitter.aurora.scheduler.async.Preemptor.PreemptorImpl.PreemptionDelay;
+import static com.twitter.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
 
 /**
  * Binding module for async task management.
@@ -123,6 +135,18 @@ public class AsyncModule extends AbstractModule {
     }
   };
 
+  @CmdLine(name = "offer_reservation_duration", help = "Time to reserve a slave's offers while "
+      + "trying to satisfy a task preempting another.")
+  private static final Arg<Amount<Long, Time>> RESERVATION_DURATION =
+      Arg.create(Amount.of(3L, Time.MINUTES));
+
+  @BindingAnnotation
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  private @interface PreemptionBinding { }
+
+  @VisibleForTesting
+  static final Key<Preemptor> PREEMPTOR_KEY = Key.get(Preemptor.class, PreemptionBinding.class);
+
   @Override
   protected void configure() {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
@@ -164,22 +188,23 @@ public class AsyncModule extends AbstractModule {
                 MAX_RESCHEDULING_DELAY.get()));
 
         bind(RescheduleCalculator.class).to(RescheduleCalculatorImpl.class).in(Singleton.class);
-        bind(SchedulingAction.class).to(TaskScheduler.class);
-        bind(TaskScheduler.class).in(Singleton.class);
         if (ENABLE_PREEMPTOR.get()) {
-          bind(Preemptor.class).to(PreemptorImpl.class);
+          bind(PREEMPTOR_KEY).to(PreemptorImpl.class);
           bind(PreemptorImpl.class).in(Singleton.class);
           LOG.info("Preemptor Enabled.");
         } else {
-          bind(Preemptor.class).toInstance(NULL_PREEMPTOR);
+          bind(PREEMPTOR_KEY).toInstance(NULL_PREEMPTOR);
           LOG.warning("Preemptor Disabled.");
         }
-        bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
+        expose(PREEMPTOR_KEY);
+        bind(new TypeLiteral<Amount<Long, Time>>() {
+        }).annotatedWith(PreemptionDelay.class)
             .toInstance(PREEMPTION_DELAY.get());
         bind(TaskGroups.class).in(Singleton.class);
         expose(TaskGroups.class);
       }
     });
+    bindTaskScheduler(binder(), PREEMPTOR_KEY, RESERVATION_DURATION.get());
     PubsubEventModule.bindSubscriber(binder(), TaskGroups.class);
 
     binder().install(new PrivateModule() {
@@ -207,6 +232,30 @@ public class AsyncModule extends AbstractModule {
       }
     });
     PubsubEventModule.bindSubscriber(binder(), HistoryPruner.class);
+  }
+
+  /**
+   * This method exists because we want to test the wiring up of TaskSchedulerImpl class to the
+   * PubSub system in the TaskSchedulerImplTest class. The method has a complex signature because
+   * the binding of the TaskScheduler and friends occurs in a PrivateModule which does not interact
+   * well with the MultiBinder that backs the PubSub system.
+   */
+  @VisibleForTesting
+  static void bindTaskScheduler(
+      Binder binder,
+      final Key<Preemptor> preemptorKey,
+      final Amount<Long, Time> reservationDuration) {
+        binder.install(new PrivateModule() {
+          @Override protected void configure() {
+            bind(Preemptor.class).to(preemptorKey);
+            bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(ReservationDuration.class)
+                .toInstance(reservationDuration);
+            bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
+            bind(TaskSchedulerImpl.class).in(Singleton.class);
+            expose(TaskScheduler.class);
+          }
+        });
+        PubsubEventModule.bindSubscriber(binder, TaskScheduler.class);
   }
 
   /**

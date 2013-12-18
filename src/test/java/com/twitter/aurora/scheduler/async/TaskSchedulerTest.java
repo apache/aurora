@@ -48,9 +48,9 @@ import com.twitter.aurora.gen.TaskEvent;
 import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
-import com.twitter.aurora.scheduler.async.TaskGroups.SchedulingAction;
 import com.twitter.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
 import com.twitter.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl.RescheduleCalculatorSettings;
+import com.twitter.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.events.PubsubEvent.HostMaintenanceStateChange;
@@ -91,7 +91,7 @@ import static com.twitter.aurora.gen.ScheduleStatus.RESTARTING;
 import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
 
 /**
- * TODO(wfarner): Break this test up to independently test TaskScheduler and OfferQueueImpl.
+ * TODO(wfarner): Break this test up to independently test TaskSchedulerImpl and OfferQueueImpl.
  */
 public class TaskSchedulerTest extends EasyMockTest {
 
@@ -111,9 +111,11 @@ public class TaskSchedulerTest extends EasyMockTest {
   private OfferReturnDelay returnDelay;
   private OfferQueue offerQueue;
   private TaskGroups taskGroups;
+  private TaskScheduler scheduler;
   private FakeClock clock;
   private BackoffStrategy flappingStrategy;
   private Preemptor preemptor;
+  private Amount<Long, Time> reservationDuration = Amount.of(1L, Time.MINUTES);
 
   @Before
   public void setUp() {
@@ -137,8 +139,13 @@ public class TaskSchedulerTest extends EasyMockTest {
     offerQueue = new OfferQueueImpl(driver, returnDelay, executor, maintenance);
     RateLimiter rateLimiter = RateLimiter.create(1);
     Amount<Long, Time> flappingThreshold = Amount.of(5L, Time.MINUTES);
-    SchedulingAction scheduler =
-        new TaskScheduler(storage, stateManager, assigner, offerQueue);
+    scheduler = new TaskSchedulerImpl(storage,
+        stateManager,
+        assigner,
+        offerQueue,
+        preemptor,
+        reservationDuration,
+        clock);
     taskGroups = new TaskGroups(
         executor,
         storage,
@@ -152,8 +159,7 @@ public class TaskSchedulerTest extends EasyMockTest {
                 flappingStrategy,
                 flappingThreshold,
                 Amount.of(5, Time.SECONDS)),
-            clock),
-        preemptor);
+            clock));
   }
 
   private Capture<Runnable> expectOffer() {
@@ -324,7 +330,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     expect(stateManager.changeState(
         Query.taskScoped("a").byStatus(PENDING),
         LOST,
-        TaskScheduler.LAUNCH_FAILED_MSG))
+        TaskSchedulerImpl.LAUNCH_FAILED_MSG))
         .andReturn(1);
 
     replayAndCreateScheduler();
@@ -349,7 +355,6 @@ public class TaskSchedulerTest extends EasyMockTest {
     expect(assigner.maybeAssign(OFFER_A, task)).andThrow(new StorageException("Injected failure."));
 
     Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(10, 20);
-    expect(preemptor.findPreemptionSlotFor("a")).andReturn(Optional.<String>absent());
     expect(assigner.maybeAssign(OFFER_A, task)).andReturn(Optional.of(mesosTask));
     driver.launchTask(OFFER_A.getId(), mesosTask);
     expectLastCall();

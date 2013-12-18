@@ -74,7 +74,6 @@ public class TaskGroups implements EventSubscriber {
   private final LoadingCache<GroupKey, TaskGroup> groups;
   private final Clock clock;
   private final RescheduleCalculator rescheduleCalculator;
-  private final Preemptor preemptor;
 
   static class TaskGroupsSettings {
     private final BackoffStrategy taskGroupBackoff;
@@ -91,20 +90,18 @@ public class TaskGroups implements EventSubscriber {
       ShutdownRegistry shutdownRegistry,
       Storage storage,
       TaskGroupsSettings settings,
-      SchedulingAction schedulingAction,
+      TaskScheduler taskScheduler,
       Clock clock,
-      RescheduleCalculator rescheduleCalculator,
-      Preemptor preemptor) {
+      RescheduleCalculator rescheduleCalculator) {
 
     this(
         createThreadPool(shutdownRegistry),
         storage,
         settings.taskGroupBackoff,
         settings.rateLimiter,
-        schedulingAction,
+        taskScheduler,
         clock,
-        rescheduleCalculator,
-        preemptor);
+        rescheduleCalculator);
   }
 
   TaskGroups(
@@ -112,24 +109,22 @@ public class TaskGroups implements EventSubscriber {
       final Storage storage,
       final BackoffStrategy taskGroupBackoffStrategy,
       final RateLimiter rateLimiter,
-      final SchedulingAction schedulingAction,
+      final TaskScheduler taskScheduler,
       final Clock clock,
-      final RescheduleCalculator rescheduleCalculator,
-      final Preemptor preemptor) {
+      final RescheduleCalculator rescheduleCalculator) {
 
     this.storage = checkNotNull(storage);
     checkNotNull(executor);
     checkNotNull(taskGroupBackoffStrategy);
     checkNotNull(rateLimiter);
-    checkNotNull(schedulingAction);
+    checkNotNull(taskScheduler);
     this.clock = checkNotNull(clock);
     this.rescheduleCalculator = checkNotNull(rescheduleCalculator);
-    this.preemptor = checkNotNull(preemptor);
 
-    final SchedulingAction rateLimitedAction = new SchedulingAction() {
-      @Override public boolean schedule(String taskId) {
+    final TaskScheduler ratelLimitedScheduler = new TaskScheduler() {
+      @Override public TaskSchedulerResult schedule(String taskId) {
         rateLimiter.acquire();
-        return schedulingAction.schedule(taskId);
+        return taskScheduler.schedule(taskId);
       }
     };
 
@@ -137,7 +132,7 @@ public class TaskGroups implements EventSubscriber {
       @Override public TaskGroup load(GroupKey key) {
         TaskGroup group = new TaskGroup(key, taskGroupBackoffStrategy);
         LOG.info("Evaluating group " + key + " in " + group.getPenaltyMs() + " ms");
-        startGroup(group, executor, rateLimitedAction);
+        startGroup(group, executor, ratelLimitedScheduler);
         return group;
       }
     });
@@ -154,7 +149,7 @@ public class TaskGroups implements EventSubscriber {
   private void startGroup(
       final TaskGroup group,
       final ScheduledExecutorService executor,
-      final SchedulingAction action) {
+      final TaskScheduler taskScheduler) {
 
     Runnable monitor = new Runnable() {
       @Override public void run() {
@@ -167,15 +162,21 @@ public class TaskGroups implements EventSubscriber {
 
           case READY:
             String id = group.pop();
-            if (action.schedule(id)) {
-              if (!maybeInvalidate(group)) {
-                executor.schedule(this, group.resetPenaltyAndGet(), TimeUnit.MILLISECONDS);
-              }
-            } else {
-              group.push(id, clock.nowMillis());
-              executor.schedule(this, group.penalizeAndGet(), TimeUnit.MILLISECONDS);
-              // TODO(zmanji): Use the return value in a slave <-> task matching manner
-              preemptor.findPreemptionSlotFor(id);
+            TaskScheduler.TaskSchedulerResult result = taskScheduler.schedule(id);
+            switch (result) {
+              case SUCCESS:
+                if (!maybeInvalidate(group)) {
+                  executor.schedule(this, group.resetPenaltyAndGet(), TimeUnit.MILLISECONDS);
+                }
+                break;
+
+              case TRY_AGAIN:
+                group.push(id, clock.nowMillis());
+                executor.schedule(this, group.penalizeAndGet(), TimeUnit.MILLISECONDS);
+                break;
+
+              default:
+                throw new IllegalStateException("Unknown TaskSchedulerResult " + result);
             }
             break;
 
@@ -289,15 +290,5 @@ public class TaskGroups implements EventSubscriber {
     public String toString() {
       return JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(canonicalTask));
     }
-  }
-
-  interface SchedulingAction {
-    /**
-     * Attempts to schedule a task, possibly performing irreversible actions.
-     *
-     * @param taskId The task to attempt to schedule.
-     * @return {@code true} if the task was scheduled, {@code false} otherwise.
-     */
-    boolean schedule(String taskId);
   }
 }
