@@ -1,8 +1,20 @@
+apply plugin: 'about'
 apply plugin: 'application'
 apply plugin: 'checkstyle'
 apply plugin: 'idea'
 apply plugin: 'java'
 apply plugin: 'maven-publish'
+apply plugin: 'versions'
+
+buildscript {
+  repositories {
+    mavenCentral()
+  }
+  dependencies {
+    classpath 'com.github.ben-manes:gradle-versions-plugin:0.4'
+    classpath 'com.github.goldin.plugins.gradle:about:0.3.1'
+  }
+}
 
 buildDir = 'dist'
 def generatedDir = "$buildDir/generated-src"
@@ -85,6 +97,7 @@ sourceSets {
  */
 
 jar {
+  dependsOn 'about'
   from sourceSets.generated.output
 }
 
