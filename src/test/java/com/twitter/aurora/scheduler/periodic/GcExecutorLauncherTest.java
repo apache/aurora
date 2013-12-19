@@ -40,17 +40,22 @@ import com.twitter.aurora.gen.ScheduleStatus;
 import com.twitter.aurora.gen.ScheduledTask;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.comm.AdjustRetainedTasks;
-import com.twitter.aurora.scheduler.PulseMonitor;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
 import com.twitter.aurora.scheduler.configuration.Resources;
+import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutorSettings;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
+import com.twitter.common.util.testing.FakeClock;
 
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import static com.twitter.aurora.gen.ScheduleStatus.FAILED;
@@ -69,55 +74,61 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
   private static final String JOB_A = "jobA";
 
+  private static final Amount<Long, Time> MAX_GC_INTERVAL = Amount.of(1L, Time.HOURS);
+  private static final Optional<String> GC_EXCECUTOR_PATH = Optional.of("nonempty");
+
   private final AtomicInteger taskIdCounter = new AtomicInteger();
 
+  private FakeClock clock;
   private StorageTestUtil storageUtil;
-  private PulseMonitor<String> hostMonitor;
   private GcExecutorLauncher gcExecutorLauncher;
+  private GcExecutorSettings settings;
 
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
+    clock = new FakeClock();
     storageUtil.expectOperations();
-    hostMonitor = createMock(new Clazz<PulseMonitor<String>>() { });
-    gcExecutorLauncher = new GcExecutorLauncher(
-        hostMonitor,
-        Optional.of("nonempty"),
-        storageUtil.storage);
+    settings = createMock(GcExecutorSettings.class);
+    expect(settings.getMaxGcInterval()).andReturn(MAX_GC_INTERVAL.as(Time.MILLISECONDS)).anyTimes();
+  }
+
+  private void replayAndCreate() {
+    control.replay();
+    gcExecutorLauncher = new GcExecutorLauncher(settings, storageUtil.storage, clock);
   }
 
   @Test
-  public void testPruning() throws ThriftBinaryCodec.CodingException {
+  public void testPruning() throws Exception {
     IScheduledTask thermosPrunedTask = makeTask(JOB_A, true, FAILED);
     IScheduledTask thermosTask = makeTask(JOB_A, true, FAILED);
     IScheduledTask nonThermosTask = makeTask(JOB_A, false, FAILED);
 
-    // Service first createTask - no hosts ready for GC.
-    expect(hostMonitor.isAlive(HOST)).andReturn(true);
-
-    // Service second createTask - prune no tasks.
-    expect(hostMonitor.isAlive(HOST)).andReturn(false);
+    // First call - no tasks to be collected.
     expectGetTasksByHost(HOST, thermosPrunedTask, thermosTask, nonThermosTask);
-    hostMonitor.pulse(HOST);
+    expect(settings.getDelayMs()).andReturn(Amount.of(30, Time.MINUTES).as(Time.MILLISECONDS));
 
-    // Service third createTask - prune one tasks.
-    expect(hostMonitor.isAlive(HOST)).andReturn(false);
+    // Third call - two tasks collected.
     expectGetTasksByHost(HOST, thermosPrunedTask);
-    hostMonitor.pulse(HOST);
+    expect(settings.getDelayMs()).andReturn(Amount.of(30, Time.MINUTES).as(Time.MILLISECONDS));
 
-    control.replay();
+    expect(settings.getGcExecutorPath()).andReturn(GC_EXCECUTOR_PATH).times(5);
 
-    // First call - hostMonitor returns true, no GC.
+    replayAndCreate();
+
+    // First call - no items in the cache, no tasks collected.
     Optional<TaskInfo> taskInfo = gcExecutorLauncher.createTask(OFFER);
-    assertFalse(taskInfo.isPresent());
-
-    // Second call - no tasks pruned.
-    taskInfo = gcExecutorLauncher.createTask(OFFER);
     assertTrue(taskInfo.isPresent());
     assertRetainedTasks(taskInfo.get(), thermosPrunedTask, thermosTask, nonThermosTask);
     ExecutorInfo executor1 = taskInfo.get().getExecutor();
 
-    // Third call - two tasks pruned.
+    // Second call - host item alive, no tasks collected.
+    clock.advance(Amount.of(15L, Time.MINUTES));
+    taskInfo = gcExecutorLauncher.createTask(OFFER);
+    assertFalse(taskInfo.isPresent());
+
+    // Third call - two tasks collected.
+    clock.advance(Amount.of(15L, Time.MINUTES));
     taskInfo = gcExecutorLauncher.createTask(OFFER);
     assertTrue(taskInfo.isPresent());
     assertRetainedTasks(taskInfo.get(), thermosPrunedTask);
@@ -128,7 +139,8 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
   @Test
   public void testNoAcceptingSmallOffers() {
-    control.replay();
+    expect(settings.getGcExecutorPath()).andReturn(GC_EXCECUTOR_PATH);
+    replayAndCreate();
 
     Iterable<Resource> resources =
         Resources.subtract(
@@ -146,6 +158,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     AdjustRetainedTasks message = ThriftBinaryCodec.decode(
         AdjustRetainedTasks.class, taskInfo.getData().toByteArray());
     Map<String, IScheduledTask> byId = Tasks.mapById(ImmutableSet.copyOf(tasks));
+    assertNotNull(message);
     assertEquals(Maps.transformValues(byId, Tasks.GET_STATUS), message.getRetainedTasks());
   }
 

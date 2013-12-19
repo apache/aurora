@@ -15,18 +15,19 @@
  */
 package com.twitter.aurora.scheduler.periodic;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Maps;
-import com.google.inject.BindingAnnotation;
 import com.google.protobuf.ByteString;
 
 import org.apache.mesos.Protos.ExecutorID;
@@ -41,7 +42,6 @@ import com.twitter.aurora.Protobufs;
 import com.twitter.aurora.codec.ThriftBinaryCodec;
 import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
 import com.twitter.aurora.gen.comm.AdjustRetainedTasks;
-import com.twitter.aurora.scheduler.PulseMonitor;
 import com.twitter.aurora.scheduler.TaskLauncher;
 import com.twitter.aurora.scheduler.base.CommandUtil;
 import com.twitter.aurora.scheduler.base.Query;
@@ -51,11 +51,10 @@ import com.twitter.aurora.scheduler.storage.Storage;
 import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
-
-import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.PARAMETER;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stats;
+import com.twitter.common.util.Clock;
+import com.twitter.common.util.Random;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -66,12 +65,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class GcExecutorLauncher implements TaskLauncher {
   private static final Logger LOG = Logger.getLogger(GcExecutorLauncher.class.getName());
 
-  /**
-   * Binding annotation for gc executor-related fields..
-   */
-  @BindingAnnotation
-  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-  public @interface GcExecutor { }
+  private final AtomicLong tasksCreated = Stats.exportLong("scheduler_gc_tasks_created");
 
   @VisibleForTesting
   static final Resources TOTAL_GC_EXECUTOR_RESOURCES =
@@ -88,26 +82,31 @@ public class GcExecutorLauncher implements TaskLauncher {
   private static final String SYSTEM_TASK_PREFIX = "system-gc-";
   private static final String EXECUTOR_NAME = "aurora.gc";
 
-  private final PulseMonitor<String> pulseMonitor;
-  private final Optional<String> gcExecutorPath;
+  private final GcExecutorSettings settings;
   private final Storage storage;
+  private final Clock clock;
+  private final Cache<String, Long> pulses;
 
   @Inject
   GcExecutorLauncher(
-      @GcExecutor PulseMonitor<String> pulseMonitor,
-      @GcExecutor Optional<String> gcExecutorPath,
-      Storage storage) {
+      GcExecutorSettings settings,
+      Storage storage,
+      Clock clock) {
 
-    this.pulseMonitor = checkNotNull(pulseMonitor);
-    this.gcExecutorPath = checkNotNull(gcExecutorPath);
+    this.settings = checkNotNull(settings);
     this.storage = checkNotNull(storage);
+    this.clock = checkNotNull(clock);
+
+    this.pulses = CacheBuilder.newBuilder()
+        .expireAfterWrite(settings.getMaxGcInterval(), TimeUnit.MILLISECONDS)
+        .build();
   }
 
   @Override
   public Optional<TaskInfo> createTask(Offer offer) {
-    if (!gcExecutorPath.isPresent()
+    if (!settings.getGcExecutorPath().isPresent()
         || !Resources.from(offer).greaterThanOrEqual(TOTAL_GC_EXECUTOR_RESOURCES)
-        || pulseMonitor.isAlive(offer.getHostname())) {
+        || isAlive(offer.getHostname())) {
       return Optional.absent();
     }
 
@@ -123,14 +122,15 @@ public class GcExecutorLauncher implements TaskLauncher {
       return Optional.absent();
     }
 
-    pulseMonitor.pulse(offer.getHostname());
+    tasksCreated.incrementAndGet();
+    pulses.put(offer.getHostname(), clock.nowMillis() + settings.getDelayMs());
 
     ExecutorInfo.Builder executor = ExecutorInfo.newBuilder()
         .setExecutorId(ExecutorID.newBuilder().setValue(EXECUTOR_NAME))
         .setName(EXECUTOR_NAME)
         .setSource(offer.getHostname())
         .addAllResources(GC_EXECUTOR_RESOURCES.toResourceList())
-        .setCommand(CommandUtil.create(gcExecutorPath.get()));
+        .setCommand(CommandUtil.create(settings.getGcExecutorPath().get()));
 
     return Optional.of(TaskInfo.newBuilder().setName("system-gc")
         .setTaskId(TaskID.newBuilder().setValue(SYSTEM_TASK_PREFIX + UUID.randomUUID().toString()))
@@ -154,5 +154,42 @@ public class GcExecutorLauncher implements TaskLauncher {
   @Override
   public void cancelOffer(OfferID offer) {
     // No-op.
+  }
+
+  private boolean isAlive(String hostname) {
+    Optional<Long> timestamp = Optional.fromNullable(pulses.getIfPresent(hostname));
+    return timestamp.isPresent() && clock.nowMillis() < timestamp.get();
+  }
+
+  /**
+   * Wraps configuration values for the {@code GcExecutorLauncher}.
+   */
+  public static class GcExecutorSettings {
+    private final Amount<Long, Time> gcInterval;
+    private final Optional<String> gcExecutorPath;
+    private final Random rand = new Random.SystemRandom(new java.util.Random());
+
+    public GcExecutorSettings(
+        Amount<Long, Time> gcInterval,
+        Optional<String> gcExecutorPath) {
+
+      this.gcInterval = checkNotNull(gcInterval);
+      this.gcExecutorPath = checkNotNull(gcExecutorPath);
+    }
+
+    @VisibleForTesting
+    long getMaxGcInterval() {
+      return gcInterval.as(Time.MILLISECONDS);
+    }
+
+    @VisibleForTesting
+    int getDelayMs() {
+      return rand.nextInt(gcInterval.as(Time.MILLISECONDS).intValue());
+    }
+
+    @VisibleForTesting
+    Optional<String> getGcExecutorPath() {
+      return gcExecutorPath;
+    }
   }
 }

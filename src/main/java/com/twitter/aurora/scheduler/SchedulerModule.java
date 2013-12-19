@@ -34,13 +34,12 @@ import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
 import com.twitter.aurora.scheduler.Driver.DriverImpl;
-import com.twitter.aurora.scheduler.PulseMonitor.PulseMonitorImpl;
 import com.twitter.aurora.scheduler.SchedulerLifecycle.DriverReference;
 import com.twitter.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
 import com.twitter.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher;
-import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutor;
+import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutorSettings;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
@@ -52,7 +51,7 @@ import com.twitter.common.quantity.Time;
 public class SchedulerModule extends AbstractModule {
 
   @CmdLine(name = "executor_gc_interval",
-      help = "Interval on which to run the GC executor on a host to clean up dead tasks.")
+      help = "Max interval on which to run the GC executor on a host to clean up dead tasks.")
   private static final Arg<Amount<Long, Time>> EXECUTOR_GC_INTERVAL =
       Arg.create(Amount.of(1L, Time.HOURS));
 
@@ -81,11 +80,9 @@ public class SchedulerModule extends AbstractModule {
 
     bind(TaskIdGenerator.class).to(TaskIdGeneratorImpl.class);
 
-    bind(new TypeLiteral<Optional<String>>() { }).annotatedWith(GcExecutor.class)
-        .toInstance(Optional.fromNullable(GC_EXECUTOR_PATH.get()));
-    bind(new TypeLiteral<PulseMonitor<String>>() { })
-        .annotatedWith(GcExecutor.class)
-        .toInstance(new PulseMonitorImpl<String>(EXECUTOR_GC_INTERVAL.get()));
+    bind(GcExecutorSettings.class).toInstance(new GcExecutorSettings(
+        EXECUTOR_GC_INTERVAL.get(),
+        Optional.fromNullable(GC_EXECUTOR_PATH.get())));
 
     bind(GcExecutorLauncher.class).in(Singleton.class);
     bind(UserTaskLauncher.class).in(Singleton.class);
