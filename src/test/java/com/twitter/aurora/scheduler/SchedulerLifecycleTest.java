@@ -38,7 +38,6 @@ import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
 
 public class SchedulerLifecycleTest extends EasyMockTest {

@@ -173,7 +173,7 @@ dependencies {
 }
 
 checkstyle {
-  sourceSets = [ sourceSets.main ]
+  sourceSets = [ sourceSets.main , sourceSets.test]
 }
 
 def thriftBinary = 'build-support/thrift/thrift-0.9.1/compiler/cpp/thrift'

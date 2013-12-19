@@ -30,12 +30,10 @@ import com.twitter.aurora.gen.LimitConstraint;
 import com.twitter.aurora.gen.TaskConfig;
 import com.twitter.aurora.gen.TaskConstraint;
 import com.twitter.aurora.gen.ValueConstraint;
-import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static com.twitter.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;

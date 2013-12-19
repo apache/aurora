@@ -49,7 +49,6 @@ import com.twitter.aurora.scheduler.Driver;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import com.twitter.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
-import com.twitter.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl.RescheduleCalculatorSettings;
 import com.twitter.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import com.twitter.aurora.scheduler.base.Query;
 import com.twitter.aurora.scheduler.base.Tasks;
@@ -111,7 +110,6 @@ public class TaskSchedulerTest extends EasyMockTest {
   private OfferReturnDelay returnDelay;
   private OfferQueue offerQueue;
   private TaskGroups taskGroups;
-  private TaskScheduler scheduler;
   private FakeClock clock;
   private BackoffStrategy flappingStrategy;
   private Preemptor preemptor;
@@ -139,7 +137,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     offerQueue = new OfferQueueImpl(driver, returnDelay, executor, maintenance);
     RateLimiter rateLimiter = RateLimiter.create(1);
     Amount<Long, Time> flappingThreshold = Amount.of(5L, Time.MINUTES);
-    scheduler = new TaskSchedulerImpl(storage,
+    TaskScheduler scheduler = new TaskSchedulerImpl(storage,
         stateManager,
         assigner,
         offerQueue,
@@ -155,7 +153,7 @@ public class TaskSchedulerTest extends EasyMockTest {
         clock,
         new RescheduleCalculatorImpl(
             storage,
-            new RescheduleCalculatorSettings(
+            new RescheduleCalculatorImpl.RescheduleCalculatorSettings(
                 flappingStrategy,
                 flappingThreshold,
                 Amount.of(5, Time.SECONDS)),

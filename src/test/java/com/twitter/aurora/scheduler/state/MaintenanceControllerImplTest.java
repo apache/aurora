@@ -15,14 +15,10 @@
  */
 package com.twitter.aurora.scheduler.state;
 
-import java.util.HashSet;
 import java.util.Set;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -48,6 +44,9 @@ import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertEquals;
+
 import static com.twitter.aurora.gen.MaintenanceMode.DRAINED;
 import static com.twitter.aurora.gen.MaintenanceMode.DRAINING;
 import static com.twitter.aurora.gen.MaintenanceMode.NONE;
@@ -55,8 +54,6 @@ import static com.twitter.aurora.gen.MaintenanceMode.SCHEDULED;
 import static com.twitter.aurora.gen.ScheduleStatus.FINISHED;
 import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
 import static com.twitter.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
-import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertEquals;
 
 public class MaintenanceControllerImplTest extends EasyMockTest {
 

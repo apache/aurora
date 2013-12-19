@@ -17,21 +17,11 @@ package com.twitter.aurora.scheduler;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.Writer;
-import java.nio.charset.Charset;
 import java.util.Properties;
 
-import javax.inject.Provider;
-
-import com.google.common.base.Charsets;
-import com.google.common.io.Files;
 import com.google.common.base.Throwables;
 
-import org.apache.mesos.Scheduler;
-import org.junit.Before;
 import org.junit.Test;
 
 import com.twitter.aurora.scheduler.DriverFactory.DriverFactoryImpl;
@@ -41,7 +31,7 @@ import static org.junit.Assert.assertEquals;
 
 public class DriverFactoryImplTest extends EasyMockTest {
 
-  @Test(expected=IllegalStateException.class)
+  @Test(expected = IllegalStateException.class)
   public void testMissingPropertiesParsing() {
     Properties testProperties = new Properties();
     testProperties.put(DriverFactoryImpl.PRINCIPAL_KEY, "aurora-scheduler");
