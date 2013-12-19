@@ -5,6 +5,13 @@ from twitter.aurora.client.cli import (
     Verb
 )
 from twitter.aurora.client.cli.context import AuroraCommandContext
+from twitter.aurora.client.cli.options import (
+    BIND_OPTION,
+    BROWSER_OPTION,
+    CONFIG_OPTION,
+    JOBSPEC_OPTION,
+    JSON_OPTION
+)
 from twitter.aurora.common.aurora_job_key import AuroraJobKey
 
 from pystachio.config import Config
@@ -39,20 +46,15 @@ class CreateJobCommand(Verb):
   CREATE_STATES = ('PENDING', 'RUNNING', 'FINISHED')
 
   def setup_options_parser(self, parser):
-    parser.add_argument('--bind', type=str, default=[], dest='bindings',
-        action='append',
-        help='Bind a thermos mustache variable name to a value. '
-         'Multiple flags may be used to specify multiple values.')
-    parser.add_argument('--open-browser', default=False, dest='open_browser', action='store_true',
-        help='open browser to view job page after job is created')
-    parser.add_argument('--json', default=False, dest='json', action='store_true',
-        help='Read job configuration in json format')
+    self.add_option(parser, BIND_OPTION)
+    self.add_option(parser, BROWSER_OPTION)
+    self.add_option(parser, JSON_OPTION)
     parser.add_argument('--wait_until', choices=self.CREATE_STATES,
         default='PENDING',
         help=('Block the client until all the tasks have transitioned into the requested state. '
                         'Default: PENDING'))
-    parser.add_argument('jobspec', type=AuroraJobKey.from_path)
-    parser.add_argument('config_file', type=str)
+    self.add_option(parser, JOBSPEC_OPTION)
+    self.add_option(parser, CONFIG_OPTION)
 
   def execute(self, context):
     try:
@@ -78,15 +80,14 @@ class KillJobCommand(Verb):
     return 'kill'
 
   def setup_options_parser(self, parser):
-    parser.add_argument('--open-browser', default=False, dest='open_browser', action='store_true',
-        help='open browser to view job page after job is created')
+    self.add_option(parser, BROWSER_OPTION)
     parser.add_argument('--instances', type=parse_instances, dest='instances', default=None,
         help='A list of instance ids to act on. Can either be a comma-separated list (e.g. 0,1,2) '
             'or a range (e.g. 0-2) or any combination of the two (e.g. 0-2,5,7-9). If not set, '
             'all instances will be acted on.')
     parser.add_argument('--config', type=str, default=None, dest='config',
          help='Config file for the job, possibly containing hooks')
-    parser.add_argument('jobspec', type=AuroraJobKey.from_path)
+    self.add_option(parser, JOBSPEC_OPTION)
 
   def execute(self, context):
     api = context.get_api(context.options.jobspec.cluster)

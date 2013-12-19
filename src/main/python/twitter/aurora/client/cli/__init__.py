@@ -17,11 +17,9 @@ For example:
 
 from __future__ import print_function
 
-import sys
-
 from abc import abstractmethod
-
 import argparse
+import sys
 
 
 # Constants for standard return codes.
@@ -54,6 +52,18 @@ class Context(object):
     self.options = options
 
 
+class CommandOption(object):
+  """A lightweight encapsulation of an argparse option specification, which can be used to
+  define options that can be reused by multiple commands."""
+
+  def __init__(self, *args, **kwargs):
+    self.args = args
+    self.kwargs = kwargs
+
+  def add_to_parser(self, parser):
+    parser.add_argument(*self.args, **self.kwargs)
+
+
 class AuroraCommand(object):
   def setup_options_parser(self, argparser):
     """Set up command line options parsing for this command.
@@ -61,6 +71,12 @@ class AuroraCommand(object):
     :param argparser: the argument parser where this command can add its arguments.
     """
     pass
+
+  def add_option(self, argparser, option):
+    """Add a predefined argument encapsulated an a CommandOption to an argument parser."""
+    if not isinstance(option, CommandOption):
+      raise TypeError('Command option object must be an instance of CommandOption')
+    option.add_to_parser(argparser)
 
   @property
   def help(self):
