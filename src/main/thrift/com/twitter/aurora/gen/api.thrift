@@ -351,6 +351,12 @@ struct HostStatus {
   2: MaintenanceMode mode
 }
 
+struct JobSummary {
+  1: string role
+  2: i32 jobCount
+  3: i32 cronJobCount
+}
+
 struct Hosts {
   1: set<string> hostNames
 }
@@ -379,6 +385,10 @@ struct EndMaintenanceResult {
   1: set<HostStatus> statuses
 }
 
+struct JobSummaryResult {
+  1: list<JobSummary> summaries
+}
+
 // Specifies validation level for the populateJobConfig.
 enum JobConfigValidation {
   NONE              = 0   // No additional job config validation would be performed (only parsing).
@@ -398,6 +408,7 @@ union Result {
   11: EndMaintenanceResult endMaintenanceResult
   15: APIVersion getVersionResult
   16: AcquireLockResult acquireLockResult
+  17: JobSummaryResult jobSummaryResult
 }
 
 struct Response {
@@ -407,10 +418,16 @@ struct Response {
   3: optional Result result
 }
 
+// A service that provides all the read only calls to the Aurora scheduler.
+service ReadOnlyScheduler {
+  // Returns a summary of the jobs grouped by role.
+  Response getJobSummary()
+}
+
 // Due to assumptions in the client all authenticated RPCs must have a SessionKey as their
 // last argument. Note that the order in this file is what matters, and message numbers should still
 // never be reused.
-service AuroraSchedulerManager {
+service AuroraSchedulerManager extends ReadOnlyScheduler {
   // Creates a new job.  The request will be denied if a job with the provided
   // name already exists in the cluster.
   Response createJob(1: JobConfiguration description, 3: Lock lock, 2: SessionKey session)
@@ -426,9 +443,11 @@ service AuroraSchedulerManager {
   // Restarts a batch of shards.
   Response restartShards(5: JobKey job, 3: set<i32> shardIds, 6: Lock lock 4: SessionKey session)
 
+  // TODO(Suman Karumuri): Move this call into read only api
   // Fetches the status of tasks.
   Response getTasksStatus(1: TaskQuery query)
 
+  // TODO(Suman Karumuri): Move this call into the read only api
   // Fetches the status of jobs.
   // ownerRole is optional, in which case all jobs are returned.
   Response getJobs(1: string ownerRole)
@@ -436,9 +455,11 @@ service AuroraSchedulerManager {
   // Initiates a kill on tasks.
   Response killTasks(1: TaskQuery query, 3: Lock lock, 2: SessionKey session)
 
+  // TODO(Suman Karumuri): Move this call into the read only api
   // Fetches the quota allocated for a user.
   Response getQuota(1: string ownerRole)
 
+  // TODO(Suman Karumuri): Move this call into the read only api
   // Returns the current version of the API implementation
   Response getVersion()
 

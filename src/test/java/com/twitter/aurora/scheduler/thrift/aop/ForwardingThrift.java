@@ -107,6 +107,11 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
+  public Response getJobSummary() throws TException {
+    return delegate.getJobSummary();
+  }
+
+  @Override
   public Response createJob(JobConfiguration description, Lock lock, SessionKey session)
       throws TException {
 

@@ -40,6 +40,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
+import com.google.common.collect.Sets;
 
 import org.apache.commons.lang.StringUtils;
 
@@ -62,6 +64,8 @@ import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfigValidation;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
+import com.twitter.aurora.gen.JobSummary;
+import com.twitter.aurora.gen.JobSummaryResult;
 import com.twitter.aurora.gen.ListBackupsResult;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
@@ -368,6 +372,31 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     return response;
+  }
+
+  @Override
+  public Response getJobSummary() {
+    Set<IScheduledTask> tasks = Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped());
+    Multimap<String, IJobKey> jobsByRole = Multimaps.index(
+        FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_JOB_KEY),
+        JobKeys.TO_ROLE);
+
+    Multimap<String, IJobKey> cronJobsByRole = Multimaps.index(
+        FluentIterable.from(cronJobManager.getJobs()).transform(JobKeys.FROM_CONFIG),
+        JobKeys.TO_ROLE);
+
+    List<JobSummary> jobSummaries = Lists.newLinkedList();
+    for (String role : Sets.union(jobsByRole.keySet(), cronJobsByRole.keySet())) {
+      JobSummary summary = new JobSummary();
+      summary.setRole(role);
+      summary.setJobCount(jobsByRole.get(role).size());
+      summary.setCronJobCount(cronJobsByRole.get(role).size());
+      jobSummaries.add(summary);
+    }
+
+    return new Response()
+        .setResponseCode(OK)
+        .setResult(Result.jobSummaryResult(new JobSummaryResult(jobSummaries)));
   }
 
   @Override

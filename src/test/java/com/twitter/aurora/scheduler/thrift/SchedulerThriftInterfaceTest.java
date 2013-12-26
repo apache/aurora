@@ -50,6 +50,8 @@ import com.twitter.aurora.gen.JobConfigRewrite;
 import com.twitter.aurora.gen.JobConfigValidation;
 import com.twitter.aurora.gen.JobConfiguration;
 import com.twitter.aurora.gen.JobKey;
+import com.twitter.aurora.gen.JobSummary;
+import com.twitter.aurora.gen.JobSummaryResult;
 import com.twitter.aurora.gen.LimitConstraint;
 import com.twitter.aurora.gen.Lock;
 import com.twitter.aurora.gen.LockKey;
@@ -1032,6 +1034,56 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Set<JobConfiguration> allJobs =
         ImmutableSet.<JobConfiguration>builder().addAll(crons).add(immediateJob).build();
     assertEquals(allJobs, thrift.getJobs(null).getResult().getGetJobsResult().getConfigs());
+  }
+
+  @Test
+  public void testGetRoleSummary() throws Exception {
+    final String BAZ_ROLE = "baz_role";
+    final Identity BAZ_ROLE_IDENTITY = new Identity(BAZ_ROLE, USER);
+
+    JobConfiguration cronJobOne = makeJob()
+        .setCronSchedule("1 * * * *")
+        .setKey(JOB_KEY.newBuilder())
+        .setTaskConfig(nonProductionTask());
+    JobConfiguration cronJobTwo = makeJob()
+        .setCronSchedule("2 * * * *")
+        .setKey(JOB_KEY.newBuilder())
+        .setTaskConfig(nonProductionTask());
+
+    JobConfiguration cronJobThree = makeJob()
+        .setCronSchedule("3 * * * *")
+        .setKey(JOB_KEY.newBuilder().setRole(BAZ_ROLE))
+        .setTaskConfig(nonProductionTask())
+        .setOwner(BAZ_ROLE_IDENTITY);
+
+    Set<JobConfiguration> crons = ImmutableSet.of(cronJobOne, cronJobTwo, cronJobThree);
+
+    TaskConfig immediateTaskConfig = defaultTask(false)
+        .setJobName("immediate")
+        .setOwner(ROLE_IDENTITY);
+    IScheduledTask immediateTask = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig)));
+
+    TaskConfig immediateTaskConfigTwo = defaultTask(false)
+        .setJobName("immediateTwo")
+        .setOwner(BAZ_ROLE_IDENTITY);
+    IScheduledTask immediateTaskTwo = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(immediateTaskConfigTwo)));
+
+    storageUtil.expectTaskFetch(Query.unscoped(), immediateTask, immediateTaskTwo);
+    expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(crons));
+
+    JobSummaryResult expectedResult = new JobSummaryResult();
+    expectedResult.addToSummaries(
+        new JobSummary().setRole(ROLE).setCronJobCount(2).setJobCount(1));
+    expectedResult.addToSummaries(
+        new JobSummary().setRole(BAZ_ROLE).setCronJobCount(1).setJobCount(1));
+
+    control.replay();
+
+    Response response = thrift.getJobSummary();
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+    assertEquals(expectedResult, response.getResult().getJobSummaryResult());
   }
 
   @Test
