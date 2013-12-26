@@ -247,10 +247,24 @@ idea {
 applicationName = 'aurora-scheduler'
 mainClassName = 'com.twitter.aurora.scheduler.app.SchedulerMain'
 
-// Simplify direct running of the scheduler, pass command line args.
-// This can be used by passing -PrunArgs="-arg1=val -arg2=val"
+// Run a local scheduler with a local log file and fake jobs
 run {
-  if (project.hasProperty("runArgs")) {
-    args runArgs.split('\\s+')
-  }
+  classpath += sourceSets.generated.output
+  args = [
+    '-thermos_executor_path=/dev/null',
+    '-gc_executor_path=/dev/null',
+    '-http_port=8081',
+    '-thrift_port=8082',
+    '-zk_in_proc=true',
+    '-zk_endpoints=localhost:0',
+    '-serverset_path=/twitter/service/mesos/local/scheduler',
+    '-mesos_master_address=local',
+    '-cluster_name=local',
+    '-log_dir=/tmp',
+    '-backup_dir=/tmp',
+    '-logtostderr',
+    '-vlog=INFO',
+    '-testing_isolated_scheduler=true',
+    '-testing_log_file_path=/tmp/testing_log_file',
+  ]
 }
