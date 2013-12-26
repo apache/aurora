@@ -3,7 +3,7 @@ apt-get update
 apt-get -y install java7-runtime-headless curl
 wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.15.0-rc4_amd64.deb
 dpkg --install mesos_0.15.0-rc4_amd64.deb
-cat > /usr/local/sbin/mesos-slave.sh <<EOF
+cat > /usr/local/sbin/mesos-slave.sh <<"EOF"
 #!/bin/bash
 export LD_LIBRARY_PATH=/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server
 (
