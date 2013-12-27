@@ -55,6 +55,33 @@ NOTE: Anyone thinking about adding a new dependency should first familiarize the
 Apache Foundation's third-party licensing
 [policy](http://www.apache.org/legal/resolved.html#category-x).
 
+Developing Aurora UI
+======================
+
+Installing bower (optional)
+----------------------------
+Third party JS libraries used in Aurora (located at 3rdparty/javascript/bower_components) are
+managed by bower, a JS dependency manager. Bower is only required if you plan to add, remove or
+update JS libraries. Bower can be installed using the following command:
+
+    npm install -g bower
+
+Bower depends on node.js and npm. The easiest way to install node on a mac is via brew:
+
+    brew install node
+
+For more node.js installation options refer to https://github.com/joyent/node/wiki/Installation.
+
+More info on installing and using bower can be found at: http://bower.io/. Once installed, you can
+use the following commands to view and modify the bower repo at
+3rdparty/javascript/bower_components
+
+    bower list
+    bower install <library name>
+    bower remove <library name>
+    bower update <library name>
+    bower help
+
 Developing the Aurora Build System
 ==================================
 

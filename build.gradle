@@ -84,6 +84,9 @@ sourceSets {
   }
   main {
     compileClasspath += sourceSets.generated.output
+    resources {
+      srcDir '3rdparty/javascript'
+    }
   }
   test {
     compileClasspath += sourceSets.generated.output
@@ -99,6 +102,10 @@ sourceSets {
 jar {
   dependsOn 'about'
   from sourceSets.generated.output
+  manifest {
+    attributes('Created-By': 'Gradle')
+    attributes('Main-Class': 'com.twitter.aurora.scheduler.app.SchedulerMain')
+  }
 }
 
 dependencies {
