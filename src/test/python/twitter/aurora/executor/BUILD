@@ -1,10 +1,11 @@
+# TODO(jfarrell): AURORA-14 for executor_builds, gc_executor and thermos_executor
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':executor_builds'),
+    # pants(':executor_builds'),
     pants(':executor_detector'),
     pants(':executor_vars'),
-    pants(':gc_executor'),
-    pants(':thermos_executor'),
+    # pants(':gc_executor'),
+    # pants(':thermos_executor'),
     pants(':thermos_task_runner'),
     pants('src/test/python/twitter/aurora/executor/common:all'),
   ]
