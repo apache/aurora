@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
 
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -33,17 +33,6 @@ import com.google.common.base.Supplier;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Atomics;
 
-import org.apache.mesos.Protos;
-import org.apache.mesos.SchedulerDriver;
-
-import com.twitter.aurora.scheduler.events.PubsubEvent.DriverRegistered;
-import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
-import com.twitter.aurora.scheduler.storage.Storage.NonVolatileStorage;
-import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
-import com.twitter.aurora.scheduler.storage.Storage.Work;
-import com.twitter.aurora.scheduler.storage.StorageBackfill;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
@@ -57,6 +46,18 @@ import com.twitter.common.util.StateMachine.Transition;
 import com.twitter.common.zookeeper.Group.JoinException;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
+
+import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
+import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
+import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.StorageBackfill;
+
+import org.apache.mesos.Protos;
+import org.apache.mesos.SchedulerDriver;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.log;
+package org.apache.aurora.scheduler.storage.log;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -31,38 +31,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
 
-import org.easymock.Capture;
-import org.easymock.EasyMock;
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.codec.ThriftBinaryCodec;
-import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.Attribute;
-import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.storage.Frame;
-import com.twitter.aurora.gen.storage.FrameChunk;
-import com.twitter.aurora.gen.storage.FrameHeader;
-import com.twitter.aurora.gen.storage.LogEntry;
-import com.twitter.aurora.gen.storage.Op;
-import com.twitter.aurora.gen.storage.RemoveJob;
-import com.twitter.aurora.gen.storage.RemoveTasks;
-import com.twitter.aurora.gen.storage.SaveFrameworkId;
-import com.twitter.aurora.gen.storage.SaveTasks;
-import com.twitter.aurora.gen.storage.Snapshot;
-import com.twitter.aurora.gen.storage.Transaction;
-import com.twitter.aurora.gen.storage.storageConstants;
-import com.twitter.aurora.scheduler.base.JobKeys;
-import com.twitter.aurora.scheduler.log.Log;
-import com.twitter.aurora.scheduler.log.Log.Entry;
-import com.twitter.aurora.scheduler.log.Log.Position;
-import com.twitter.aurora.scheduler.log.Log.Stream;
-import com.twitter.aurora.scheduler.storage.log.LogManager.StreamManager;
-import com.twitter.aurora.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
@@ -70,9 +38,44 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.codec.ThriftBinaryCodec;
+import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Attribute;
+import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.storage.Frame;
+import org.apache.aurora.gen.storage.FrameChunk;
+import org.apache.aurora.gen.storage.FrameHeader;
+import org.apache.aurora.gen.storage.LogEntry;
+import org.apache.aurora.gen.storage.Op;
+import org.apache.aurora.gen.storage.RemoveJob;
+import org.apache.aurora.gen.storage.RemoveTasks;
+import org.apache.aurora.gen.storage.SaveFrameworkId;
+import org.apache.aurora.gen.storage.SaveTasks;
+import org.apache.aurora.gen.storage.Snapshot;
+import org.apache.aurora.gen.storage.Transaction;
+import org.apache.aurora.gen.storage.storageConstants;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.log.Log;
+import org.apache.aurora.scheduler.log.Log.Entry;
+import org.apache.aurora.scheduler.log.Log.Position;
+import org.apache.aurora.scheduler.log.Log.Stream;
+import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager;
+import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
+
+import org.easymock.Capture;
+import org.easymock.EasyMock;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import static org.easymock.EasyMock.aryEq;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;

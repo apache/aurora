@@ -1,18 +1,18 @@
-from twitter.aurora.client.api.job_monitor import JobMonitor
-from twitter.aurora.client.cli import (
+from apache.aurora.client.api.job_monitor import JobMonitor
+from apache.aurora.client.cli import (
     EXIT_INVALID_CONFIGURATION,
     Noun,
     Verb
 )
-from twitter.aurora.client.cli.context import AuroraCommandContext
-from twitter.aurora.client.cli.options import (
+from apache.aurora.client.cli.context import AuroraCommandContext
+from apache.aurora.client.cli.options import (
     BIND_OPTION,
     BROWSER_OPTION,
     CONFIG_OPTION,
     JOBSPEC_OPTION,
     JSON_OPTION
 )
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from pystachio.config import Config
 

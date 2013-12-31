@@ -1,11 +1,11 @@
 
-from twitter.aurora.client.base import synthesize_url
-from twitter.aurora.client.cli import Context, EXIT_NETWORK_ERROR
-from twitter.aurora.client.config import get_config
-from twitter.aurora.client.factory import make_client
+from apache.aurora.client.base import synthesize_url
+from apache.aurora.client.cli import Context, EXIT_NETWORK_ERROR
+from apache.aurora.client.config import get_config
+from apache.aurora.client.factory import make_client
 from twitter.common import log
 
-from gen.twitter.aurora.ttypes import ResponseCode
+from gen.apache.aurora.ttypes import ResponseCode
 
 
 class AuroraCommandContext(Context):

@@ -1,6 +1,6 @@
 import os
 
-from twitter.aurora.executor.common.sandbox import DirectorySandbox
+from apache.aurora.executor.common.sandbox import DirectorySandbox
 from twitter.common.contextutil import temporary_dir
 
 import mock

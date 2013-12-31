@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.async;
+package org.apache.aurora.scheduler.async;
 
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -32,17 +32,6 @@ import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import com.twitter.aurora.scheduler.base.JobKeys;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.Tasks;
-import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
-import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
-import com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
@@ -52,10 +41,22 @@ import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
+import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
+import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
-import static com.twitter.aurora.scheduler.async.TaskGroup.GroupState;
+import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.scheduler.async.TaskGroup.GroupState;
 
 /**
  * A collection of task groups, where a task group is a collection of tasks that are known to be
@@ -214,7 +215,7 @@ public class TaskGroups implements EventSubscriber {
   /**
    * Informs the task groups of a task state change.
    * <p>
-   * This is used to observe {@link com.twitter.aurora.gen.ScheduleStatus#PENDING} tasks and begin
+   * This is used to observe {@link org.apache.aurora.gen.ScheduleStatus#PENDING} tasks and begin
    * attempting to schedule them.
    *
    * @param stateChange State change notification.
@@ -231,7 +232,7 @@ public class TaskGroups implements EventSubscriber {
   /**
    * Signals that storage has started and is consistent.
    * <p>
-   * Upon this signal, all {@link com.twitter.aurora.gen.ScheduleStatus#PENDING} tasks in the stoage
+   * Upon this signal, all {@link org.apache.aurora.gen.ScheduleStatus#PENDING} tasks in the stoage
    * will become eligible for scheduling.
    *
    * @param event Storage started notification.

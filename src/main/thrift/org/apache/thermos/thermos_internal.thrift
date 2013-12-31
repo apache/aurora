@@ -1,4 +1,4 @@
-namespace py gen.twitter.thermos
+namespace py gen.apache.thermos
 
 enum ProcessState {
   // normal state

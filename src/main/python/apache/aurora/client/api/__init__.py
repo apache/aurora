@@ -1,11 +1,11 @@
 from twitter.common import log
 
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
-from twitter.aurora.common.auth import make_session_key
-from twitter.aurora.common.cluster import Cluster
+from apache.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.common.auth import make_session_key
+from apache.aurora.common.cluster import Cluster
 
-from gen.twitter.aurora.constants import LIVE_STATES
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.constants import LIVE_STATES
+from gen.apache.aurora.ttypes import (
     Response,
     Identity,
     Quota,

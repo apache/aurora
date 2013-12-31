@@ -1,7 +1,7 @@
 import unittest
 
-from twitter.aurora.common.http_signaler import HttpSignaler
-from twitter.aurora.client.api.health_check import (
+from apache.aurora.common.http_signaler import HttpSignaler
+from apache.aurora.client.api.health_check import (
   ChainedHealthCheck,
   HealthCheck,
   HealthStatus,
@@ -12,7 +12,7 @@ from twitter.aurora.client.api.health_check import (
   StatusHealthCheck
 )
 
-from gen.twitter.aurora.ttypes import *
+from gen.apache.aurora.ttypes import *
 
 import mox
 import pytest

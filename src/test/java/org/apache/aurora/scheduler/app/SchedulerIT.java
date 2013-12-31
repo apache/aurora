@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.app;
+package org.apache.aurora.scheduler.app;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,44 +46,6 @@ import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
 
-import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.MasterInfo;
-import org.apache.mesos.Protos.Status;
-import org.apache.mesos.Scheduler;
-import org.apache.mesos.SchedulerDriver;
-import org.easymock.IAnswer;
-import org.easymock.IMocksControl;
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.gen.storage.LogEntry;
-import com.twitter.aurora.gen.storage.Op;
-import com.twitter.aurora.gen.storage.SaveFrameworkId;
-import com.twitter.aurora.gen.storage.SaveTasks;
-import com.twitter.aurora.gen.storage.Snapshot;
-import com.twitter.aurora.gen.storage.Transaction;
-import com.twitter.aurora.gen.storage.storageConstants;
-import com.twitter.aurora.scheduler.DriverFactory;
-import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
-import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
-import com.twitter.aurora.scheduler.log.Log;
-import com.twitter.aurora.scheduler.log.Log.Entry;
-import com.twitter.aurora.scheduler.log.Log.Position;
-import com.twitter.aurora.scheduler.log.Log.Stream;
-import com.twitter.aurora.scheduler.storage.backup.BackupModule;
-import com.twitter.aurora.scheduler.storage.log.LogManager.StreamManager.EntrySerializer;
-import com.twitter.aurora.scheduler.storage.log.LogStorageModule;
-import com.twitter.aurora.scheduler.storage.log.SnapshotStoreImpl;
-import com.twitter.aurora.scheduler.storage.log.testing.LogOpMatcher;
-import com.twitter.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
-import com.twitter.aurora.scheduler.thrift.ThriftConfiguration;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.StartupStage;
 import com.twitter.common.application.modules.AppLauncherModule;
@@ -104,9 +66,51 @@ import com.twitter.common.zookeeper.testing.BaseZooKeeperTest;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
+import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.gen.storage.LogEntry;
+import org.apache.aurora.gen.storage.Op;
+import org.apache.aurora.gen.storage.SaveFrameworkId;
+import org.apache.aurora.gen.storage.SaveTasks;
+import org.apache.aurora.gen.storage.Snapshot;
+import org.apache.aurora.gen.storage.Transaction;
+import org.apache.aurora.gen.storage.storageConstants;
+import org.apache.aurora.scheduler.DriverFactory;
+import org.apache.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.log.Log;
+import org.apache.aurora.scheduler.log.Log.Entry;
+import org.apache.aurora.scheduler.log.Log.Position;
+import org.apache.aurora.scheduler.log.Log.Stream;
+import org.apache.aurora.scheduler.storage.backup.BackupModule;
+import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager.EntrySerializer;
+import org.apache.aurora.scheduler.storage.log.LogStorageModule;
+import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
+import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
+import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
+import org.apache.aurora.scheduler.thrift.ThriftConfiguration;
+
+import org.apache.mesos.Protos.FrameworkID;
+import org.apache.mesos.Protos.MasterInfo;
+import org.apache.mesos.Protos.Status;
+import org.apache.mesos.Scheduler;
+import org.apache.mesos.SchedulerDriver;
+
+import org.easymock.IAnswer;
+import org.easymock.IMocksControl;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -297,7 +301,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
             .setTask(new TaskConfig()
                 .setJobName("job-" + id)
                 .setEnvironment("test")
-                .setExecutorConfig(new com.twitter.aurora.gen.ExecutorConfig("AuroraExecutor", ""))
+                .setExecutorConfig(new org.apache.aurora.gen.ExecutorConfig("AuroraExecutor", ""))
                 .setOwner(new Identity("role-" + id, "user-" + id))));
     // Apply defaults here so that we can expect the same task that will be written to the stream.
     ConfigurationManager.applyDefaultsIfUnset(scheduledTask.getAssignedTask().getTask());

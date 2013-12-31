@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift;
+package org.apache.aurora.scheduler.thrift;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,11 +30,12 @@ import javax.net.ssl.SSLServerSocketFactory;
 
 import com.google.common.base.Optional;
 
-import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.AuroraAdmin.Iface;
 import com.twitter.common.application.modules.LifecycleModule.ServiceRunner;
 import com.twitter.common.application.modules.LocalServiceRegistry.LocalService;
 import com.twitter.common.base.Command;
+
+import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.AuroraAdmin.Iface;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

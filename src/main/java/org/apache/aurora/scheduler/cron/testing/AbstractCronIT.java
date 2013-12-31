@@ -13,19 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.cron.testing;
+package org.apache.aurora.scheduler.cron.testing;
 
 import java.util.concurrent.CountDownLatch;
 
-import org.junit.Test;
-
-import com.twitter.aurora.scheduler.cron.CronPredictor;
-import com.twitter.aurora.scheduler.cron.CronScheduler;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import static org.junit.Assert.assertTrue;
+import org.apache.aurora.scheduler.cron.CronPredictor;
+import org.apache.aurora.scheduler.cron.CronScheduler;
 
-import static com.twitter.aurora.gen.test.testConstants.VALID_CRON_SCHEDULES;
+import org.junit.Test;
+
+import static org.apache.aurora.gen.test.testConstants.VALID_CRON_SCHEDULES;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * Abstract test to verify conformance with the {@link CronScheduler} interface.

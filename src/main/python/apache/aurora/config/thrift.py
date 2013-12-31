@@ -1,16 +1,16 @@
 import getpass
 import re
 
-from twitter.aurora.config.schema.base import (
+from apache.aurora.config.schema.base import (
   HealthCheckConfig,
   MesosContext,
   MesosTaskInstance,
 )
 from twitter.common.lang import Compatibility
-from twitter.thermos.config.loader import ThermosTaskValidator
+from apache.thermos.config.loader import ThermosTaskValidator
 
-from gen.twitter.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON, AURORA_EXECUTOR_NAME
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON, AURORA_EXECUTOR_NAME
+from gen.apache.aurora.ttypes import (
   Constraint,
   CronCollisionPolicy,
   ExecutorConfig,

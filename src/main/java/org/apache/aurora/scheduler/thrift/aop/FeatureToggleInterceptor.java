@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import java.lang.reflect.Method;
 
@@ -24,7 +24,7 @@ import com.google.common.base.Predicate;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
-import com.twitter.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.ResponseCode;
 
 /**
  * A method interceptor that blocks access to features based on a supplied predicate.

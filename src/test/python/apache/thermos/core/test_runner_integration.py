@@ -1,7 +1,7 @@
 import os
 from textwrap import dedent
 
-from twitter.thermos.config.schema import (
+from apache.thermos.config.schema import (
   order,
   Process,
   Resources,
@@ -9,9 +9,9 @@ from twitter.thermos.config.schema import (
   Task,
   Tasks,
 )
-from twitter.thermos.testing.runner import RunnerTestBase
+from apache.thermos.testing.runner import RunnerTestBase
 
-from gen.twitter.thermos.ttypes import (
+from gen.apache.thermos.ttypes import (
   TaskState,
   ProcessState
 )

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import java.util.Map;
 
@@ -23,18 +23,20 @@ import com.google.inject.CreationException;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
+import com.twitter.common.testing.easymock.EasyMockTest;
+
+import org.apache.aurora.auth.CapabilityValidator;
+import org.apache.aurora.gen.AuroraAdmin.Iface;
+import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.Response;
+import org.apache.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.SessionKey;
+
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.aurora.auth.CapabilityValidator;
-import com.twitter.aurora.gen.AuroraAdmin.Iface;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.Response;
-import com.twitter.aurora.gen.ResponseCode;
-import com.twitter.aurora.gen.SessionKey;
-import com.twitter.common.testing.easymock.EasyMockTest;
-
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 

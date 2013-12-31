@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import java.lang.reflect.Method;
 
@@ -24,18 +24,21 @@ import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matchers;
 
+import com.twitter.common.testing.easymock.EasyMockTest;
+
+import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.Response;
+import org.apache.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
+
 import org.easymock.EasyMock;
+
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.Response;
-import com.twitter.aurora.gen.ResponseCode;
-import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
-import com.twitter.common.testing.easymock.EasyMockTest;
-
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertSame;
 
 public class FeatureToggleInterceptorTest extends EasyMockTest {

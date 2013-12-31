@@ -6,8 +6,8 @@ import textwrap
 
 from twitter.common.dirutil import safe_open
 from twitter.common.lang import Compatibility
-from twitter.thermos.common.planner import TaskPlanner
-from twitter.thermos.config.schema import Task
+from apache.thermos.common.planner import TaskPlanner
+from apache.thermos.config.schema import Task
 
 from pystachio import Ref
 from pystachio.config import Config
@@ -147,7 +147,7 @@ class ThermosTaskValidator(object):
 class ThermosConfigLoader(object):
   SCHEMA = textwrap.dedent("""
     from pystachio import *
-    from twitter.thermos.config.schema import *
+    from apache.thermos.config.schema import *
 
     __TASKS = []
 

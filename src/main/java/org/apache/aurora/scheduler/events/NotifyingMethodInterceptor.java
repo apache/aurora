@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.events;
+package org.apache.aurora.scheduler.events;
 
 import java.lang.reflect.Method;
 import java.util.logging.Logger;
@@ -22,12 +22,13 @@ import javax.inject.Inject;
 
 import com.google.common.base.Preconditions;
 
+import com.twitter.common.base.Closure;
+
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
-import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
-import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
-import com.twitter.common.base.Closure;
+import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
+import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 
 /**
  * A method interceptor that sends pubsub notifications before and/or after a method annotated

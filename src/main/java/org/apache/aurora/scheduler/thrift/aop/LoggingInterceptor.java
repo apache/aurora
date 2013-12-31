@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import java.util.List;
 import java.util.Map;
@@ -30,13 +30,13 @@ import com.google.common.collect.Lists;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
-import com.twitter.aurora.auth.CapabilityValidator;
-import com.twitter.aurora.gen.ExecutorConfig;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.ResponseCode;
-import com.twitter.aurora.gen.SessionKey;
+import org.apache.aurora.auth.CapabilityValidator;
+import org.apache.aurora.gen.ExecutorConfig;
+import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.SessionKey;
 
-import static com.twitter.aurora.scheduler.thrift.aop.Interceptors.properlyTypedResponse;
+import static org.apache.aurora.scheduler.thrift.aop.Interceptors.properlyTypedResponse;
 
 /**
  * A method interceptor that logs all invocations as well as any unchecked exceptions thrown from

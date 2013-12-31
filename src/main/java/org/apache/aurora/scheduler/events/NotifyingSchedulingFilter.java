@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.events;
+package org.apache.aurora.scheduler.events;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -23,11 +23,12 @@ import javax.inject.Inject;
 
 import com.google.inject.BindingAnnotation;
 
-import com.twitter.aurora.scheduler.ResourceSlot;
-import com.twitter.aurora.scheduler.events.PubsubEvent.Vetoed;
-import com.twitter.aurora.scheduler.filter.SchedulingFilter;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
+
+import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
+import org.apache.aurora.scheduler.filter.SchedulingFilter;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;

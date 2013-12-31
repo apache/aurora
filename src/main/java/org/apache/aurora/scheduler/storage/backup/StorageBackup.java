@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.backup;
+package org.apache.aurora.scheduler.storage.backup;
 
 import java.io.File;
 import java.io.FilenameFilter;
@@ -37,14 +37,15 @@ import com.google.common.collect.Ordering;
 import com.google.common.io.Files;
 import com.google.inject.BindingAnnotation;
 
-import com.twitter.aurora.codec.ThriftBinaryCodec;
-import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.aurora.gen.storage.Snapshot;
-import com.twitter.aurora.scheduler.storage.SnapshotStore;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
+
+import org.apache.aurora.codec.ThriftBinaryCodec;
+import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.storage.Snapshot;
+import org.apache.aurora.scheduler.storage.SnapshotStore;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;

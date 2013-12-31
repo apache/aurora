@@ -1,16 +1,16 @@
 import contextlib
 
-from twitter.aurora.client.cli import (
+from apache.aurora.client.cli import (
     AuroraCommandLine,
     EXIT_INVALID_CONFIGURATION,
     EXIT_NETWORK_ERROR
 )
-from twitter.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
-from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
-from twitter.aurora.config import AuroraConfig
+from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.config import AuroraConfig
 from twitter.common.contextutil import temporary_file
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     AssignedTask,
     Identity,
     ScheduledTask,
@@ -104,7 +104,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     # We'll patch out create_context, which will give us a fake context
     # object, and everything can be stubbed through that.
     mock_context = FakeAuroraCommandContext()
-    with patch('twitter.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       # After making the client, create sets up a job monitor.
       # The monitor uses TaskQuery to get the tasks. It's called at least twice:once before
       # the job is created, and once after. So we need to set up mocks for the query results.
@@ -136,7 +136,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
         patch('time.sleep'),
-        patch('twitter.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       mock_query = self.create_mock_query()
       for result in [ScheduleStatus.INIT, ScheduleStatus.PENDING, ScheduleStatus.PENDING,
           ScheduleStatus.RUNNING, ScheduleStatus.FINISHED]:
@@ -159,7 +159,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     this time, make the monitor check status several times before successful completion.
     """
     mock_context = FakeAuroraCommandContext()
-    with patch('twitter.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       mock_context.add_expected_status_query_result(
           self.create_mock_status_query_result(ScheduleStatus.INIT))
       api = mock_context.get_api('west')
@@ -184,7 +184,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     """Run a test of the "create" command against a mocked-out API, with a configuration
     containing a syntax error"""
     mock_context = FakeAuroraCommandContext()
-    with patch('twitter.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       with temporary_file() as fp:
         fp.write(self.get_invalid_config('invalid_clause=oops'))
         fp.flush()

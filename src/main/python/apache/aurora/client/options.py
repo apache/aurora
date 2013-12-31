@@ -1,7 +1,7 @@
 import optparse
 
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
-from twitter.thermos.common.options import add_binding_to
+from apache.aurora.common.aurora_job_key import AuroraJobKey
+from apache.thermos.common.options import add_binding_to
 
 
 __all__ = (

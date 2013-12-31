@@ -1,11 +1,11 @@
 from math import ceil
 import unittest
 
-from twitter.aurora.client.api.health_check import HealthCheck
-from twitter.aurora.client.api.instance_watcher import InstanceWatcher
+from apache.aurora.client.api.health_check import HealthCheck
+from apache.aurora.client.api.instance_watcher import InstanceWatcher
 
-from gen.twitter.aurora.ttypes import *
-from gen.twitter.aurora.AuroraSchedulerManager import Client as scheduler_client
+from gen.apache.aurora.ttypes import *
+from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
 
 import mox
 

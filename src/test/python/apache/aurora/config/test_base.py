@@ -2,8 +2,8 @@ import pytest
 
 from twitter.common.contextutil import temporary_file
 
-from twitter.aurora.config import AuroraConfig, PortResolver
-from twitter.aurora.config.schema.base import (
+from apache.aurora.config import AuroraConfig, PortResolver
+from apache.aurora.config.schema.base import (
     Announcer,
     Empty,
     Integer,
@@ -13,7 +13,7 @@ from twitter.aurora.config.schema.base import (
     Task,
 )
 
-from gen.twitter.aurora.ttypes import Identity
+from gen.apache.aurora.ttypes import Identity
 
 
 resolve = PortResolver.resolve

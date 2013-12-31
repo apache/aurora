@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.filter;
+package org.apache.aurora.scheduler.filter;
 
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 
-import com.twitter.aurora.scheduler.ResourceSlot;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Determines whether a proposed scheduling assignment should be allowed.

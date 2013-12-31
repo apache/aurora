@@ -1,8 +1,8 @@
 from twitter.common import log
 
-from gen.twitter.aurora.constants import TERMINAL_STATES as AURORA_TERMINAL_STATES
-from gen.twitter.aurora.ttypes import ScheduleStatus
-from gen.twitter.thermos.ttypes import TaskState
+from gen.apache.aurora.constants import TERMINAL_STATES as AURORA_TERMINAL_STATES
+from gen.apache.aurora.ttypes import ScheduleStatus
+from gen.apache.thermos.ttypes import TaskState
 
 import mesos
 import mesos_pb2 as mesos_pb

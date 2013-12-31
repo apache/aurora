@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.auth;
+package org.apache.aurora.auth;
 
 import java.util.Set;
 import java.util.logging.Logger;
 
 import com.google.inject.AbstractModule;
 
-import com.twitter.aurora.gen.SessionKey;
+import org.apache.aurora.gen.SessionKey;
 
 /**
  * An authentication module that uses an {@link UnsecureSessionValidator}. This behavior

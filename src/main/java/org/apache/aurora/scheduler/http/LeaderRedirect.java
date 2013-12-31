@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.atomic.AtomicReference;

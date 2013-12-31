@@ -8,7 +8,7 @@ import tempfile
 import threading
 import time
 
-from twitter.aurora.config.schema.base import (
+from apache.aurora.config.schema.base import (
     HealthCheckConfig,
     MB,
     MesosJob,
@@ -17,28 +17,28 @@ from twitter.aurora.config.schema.base import (
     Resources,
     Task,
 )
-from twitter.aurora.executor.common.executor_timeout import ExecutorTimeout
-from twitter.aurora.executor.common.health_checker import HealthCheckerProvider
-from twitter.aurora.executor.common.sandbox import DirectorySandbox, SandboxProvider
-from twitter.aurora.executor.common.task_runner import TaskError
-from twitter.aurora.executor.status_manager import StatusManager
-from twitter.aurora.executor.thermos_task_runner import (
+from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
+from apache.aurora.executor.common.health_checker import HealthCheckerProvider
+from apache.aurora.executor.common.sandbox import DirectorySandbox, SandboxProvider
+from apache.aurora.executor.common.task_runner import TaskError
+from apache.aurora.executor.status_manager import StatusManager
+from apache.aurora.executor.thermos_task_runner import (
     DefaultThermosTaskRunnerProvider,
     ThermosTaskRunner,
 )
-from twitter.aurora.executor.thermos_executor import ThermosExecutor
+from apache.aurora.executor.thermos_executor import ThermosExecutor
 from twitter.common import log
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_mkdtemp, safe_rmtree
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
-from twitter.thermos.common.path import TaskPath
-from twitter.thermos.core.runner import TaskRunner
-from twitter.thermos.monitoring.monitor import TaskMonitor
+from apache.thermos.common.path import TaskPath
+from apache.thermos.core.runner import TaskRunner
+from apache.thermos.monitoring.monitor import TaskMonitor
 
-from gen.twitter.aurora.constants import AURORA_EXECUTOR_NAME
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.constants import AURORA_EXECUTOR_NAME
+from gen.apache.aurora.ttypes import (
   AssignedTask,
   ExecutorConfig,
   Identity,
@@ -251,7 +251,7 @@ class TestThermosExecutor(object):
     log.init('executor_logger')
     if not cls.PANTS_BUILT and 'SKIP_PANTS_BUILD' not in os.environ:
       assert subprocess.call(["./pants",
-          "src/main/python/twitter/aurora/executor/bin:thermos_runner"]) == 0
+          "src/main/python/apache/aurora/executor/bin:thermos_runner"]) == 0
       cls.PANTS_BUILT = True
 
   @classmethod

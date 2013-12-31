@@ -10,10 +10,10 @@ import os
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
-from twitter.aurora.executor.common.executor_timeout import ExecutorTimeout
-from twitter.aurora.executor.common.health_checker import HealthCheckerProvider
-from twitter.aurora.executor.thermos_executor import ThermosExecutor
-from twitter.aurora.executor.thermos_task_runner import DefaultThermosTaskRunnerProvider
+from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
+from apache.aurora.executor.common.health_checker import HealthCheckerProvider
+from apache.aurora.executor.thermos_executor import ThermosExecutor
+from apache.aurora.executor.thermos_task_runner import DefaultThermosTaskRunnerProvider
 
 import mesos
 
@@ -29,13 +29,13 @@ LogOptions.set_log_dir('.')
 # as a resource, shell out to one on the PATH.
 def dump_runner_pex():
   import pkg_resources
-  import twitter.aurora.executor.resources
+  import apache.aurora.executor.resources
   pex_name = 'thermos_runner.pex'
   runner_pex = os.path.join(os.path.realpath('.'), pex_name)
   with open(runner_pex, 'w') as fp:
     # TODO(wickman) Use shutil.copyfileobj to reduce memory footprint here.
     fp.write(pkg_resources.resource_stream(
-        twitter.aurora.executor.resources.__name__, pex_name).read())
+        apache.aurora.executor.resources.__name__, pex_name).read())
   return runner_pex
 
 

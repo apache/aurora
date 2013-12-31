@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.log;
+package org.apache.aurora.scheduler.storage.log;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -27,11 +27,12 @@ import java.util.zip.InflaterInputStream;
 import com.google.common.base.Preconditions;
 import com.google.common.io.ByteStreams;
 
-import com.twitter.aurora.codec.ThriftBinaryCodec;
-import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.aurora.gen.storage.LogEntry;
-import com.twitter.aurora.gen.storage.LogEntry._Fields;
 import com.twitter.common.stats.Stats;
+
+import org.apache.aurora.codec.ThriftBinaryCodec;
+import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.storage.LogEntry;
+import org.apache.aurora.gen.storage.LogEntry._Fields;
 
 /**
  * Utility class for working with log entries.

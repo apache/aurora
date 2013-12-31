@@ -7,16 +7,16 @@ import os
 import optparse
 import subprocess
 
-from twitter.aurora.admin.mesos_maintenance import MesosMaintenance
-from twitter.aurora.client.api import AuroraClientAPI
-from twitter.aurora.client.base import check_and_log_response, die, requires
-from twitter.aurora.common.clusters import CLUSTERS
+from apache.aurora.admin.mesos_maintenance import MesosMaintenance
+from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.client.base import check_and_log_response, die, requires
+from apache.aurora.common.clusters import CLUSTERS
 from twitter.common import app, log
 from twitter.common.quantity import Amount, Data
 from twitter.common.quantity.parse_simple import parse_data
 
-from gen.twitter.aurora.constants import ACTIVE_STATES, TERMINAL_STATES
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.constants import ACTIVE_STATES, TERMINAL_STATES
+from gen.apache.aurora.ttypes import (
     ResponseCode,
     ScheduleStatus,
     TaskQuery,

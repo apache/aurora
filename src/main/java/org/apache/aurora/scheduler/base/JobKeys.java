@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.base;
+package org.apache.aurora.scheduler.base;
 
 import javax.annotation.Nullable;
 
@@ -22,11 +22,11 @@ import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 
-import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkArgument;
 

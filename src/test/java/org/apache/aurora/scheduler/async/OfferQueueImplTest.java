@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.async;
+package org.apache.aurora.scheduler.async;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -27,25 +27,29 @@ import com.google.common.base.Throwables;
 import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import org.apache.mesos.Protos.Offer;
-import org.apache.mesos.Protos.TaskInfo;
-import org.easymock.IAnswer;
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.gen.MaintenanceMode;
-import com.twitter.aurora.scheduler.Driver;
-import com.twitter.aurora.scheduler.async.OfferQueue.LaunchException;
-import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
-import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
-import com.twitter.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
-import com.twitter.aurora.scheduler.state.MaintenanceController;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
+import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.scheduler.Driver;
+import org.apache.aurora.scheduler.async.OfferQueue.LaunchException;
+import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
+import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
+import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
+import org.apache.aurora.scheduler.state.MaintenanceController;
+
+import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.TaskInfo;
+
+import org.easymock.IAnswer;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertFalse;
 
 public class OfferQueueImplTest extends EasyMockTest {

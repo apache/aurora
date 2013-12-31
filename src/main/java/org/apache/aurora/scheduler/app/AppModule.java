@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.app;
+package org.apache.aurora.scheduler.app;
 
 import java.util.Arrays;
 import java.util.List;
@@ -29,20 +29,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.Provides;
 
-import org.apache.mesos.Scheduler;
-import org.apache.zookeeper.data.ACL;
-
-import com.twitter.aurora.GuiceUtils;
-import com.twitter.aurora.scheduler.SchedulerModule;
-import com.twitter.aurora.scheduler.async.AsyncModule;
-import com.twitter.aurora.scheduler.events.PubsubEventModule;
-import com.twitter.aurora.scheduler.filter.SchedulingFilterImpl;
-import com.twitter.aurora.scheduler.http.ClusterName;
-import com.twitter.aurora.scheduler.http.ServletModule;
-import com.twitter.aurora.scheduler.metadata.MetadataModule;
-import com.twitter.aurora.scheduler.quota.QuotaModule;
-import com.twitter.aurora.scheduler.state.StateModule;
-import com.twitter.aurora.scheduler.stats.AsyncStatsModule;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.Command;
@@ -59,6 +45,22 @@ import com.twitter.common.zookeeper.ZooKeeperClient.Credentials;
 import com.twitter.common.zookeeper.ZooKeeperUtils;
 import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import com.twitter.thrift.ServiceInstance;
+
+import org.apache.aurora.GuiceUtils;
+import org.apache.aurora.scheduler.SchedulerModule;
+import org.apache.aurora.scheduler.async.AsyncModule;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
+import org.apache.aurora.scheduler.http.ClusterName;
+import org.apache.aurora.scheduler.http.ServletModule;
+import org.apache.aurora.scheduler.metadata.MetadataModule;
+import org.apache.aurora.scheduler.quota.QuotaModule;
+import org.apache.aurora.scheduler.state.StateModule;
+import org.apache.aurora.scheduler.stats.AsyncStatsModule;
+
+import org.apache.mesos.Scheduler;
+
+import org.apache.zookeeper.data.ACL;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

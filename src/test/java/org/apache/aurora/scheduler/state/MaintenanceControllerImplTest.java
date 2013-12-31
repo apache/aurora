@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.state;
+package org.apache.aurora.scheduler.state;
 
 import java.util.Set;
 
@@ -23,37 +23,39 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.HostStatus;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.MaintenanceMode;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.events.PubsubEvent;
-import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
-import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertEquals;
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.HostStatus;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.events.PubsubEvent;
+import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
+import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 
-import static com.twitter.aurora.gen.MaintenanceMode.DRAINED;
-import static com.twitter.aurora.gen.MaintenanceMode.DRAINING;
-import static com.twitter.aurora.gen.MaintenanceMode.NONE;
-import static com.twitter.aurora.gen.MaintenanceMode.SCHEDULED;
-import static com.twitter.aurora.gen.ScheduleStatus.FINISHED;
-import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
-import static com.twitter.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
+import org.junit.Before;
+import org.junit.Test;
+
+import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
+import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
+import static org.apache.aurora.gen.MaintenanceMode.NONE;
+import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
+import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
+import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
+
+import static org.easymock.EasyMock.expect;
+
+import static org.junit.Assert.assertEquals;
 
 public class MaintenanceControllerImplTest extends EasyMockTest {
 

@@ -15,9 +15,9 @@ import threading
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
-from twitter.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.common.ckpt import CheckpointDispatcher
 
-from gen.twitter.thermos.ttypes import (
+from gen.apache.thermos.ttypes import (
   ProcessState,
   RunnerCkpt,
   RunnerState,

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
 
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -30,20 +30,21 @@ import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 
-import org.apache.mesos.Scheduler;
-import org.apache.mesos.SchedulerDriver;
-
-import com.twitter.aurora.scheduler.Driver.DriverImpl;
-import com.twitter.aurora.scheduler.SchedulerLifecycle.DriverReference;
-import com.twitter.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
-import com.twitter.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
-import com.twitter.aurora.scheduler.events.PubsubEventModule;
-import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher;
-import com.twitter.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutorSettings;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+
+import org.apache.aurora.scheduler.Driver.DriverImpl;
+import org.apache.aurora.scheduler.SchedulerLifecycle.DriverReference;
+import org.apache.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
+import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.periodic.GcExecutorLauncher;
+import org.apache.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutorSettings;
+
+import org.apache.mesos.Scheduler;
+import org.apache.mesos.SchedulerDriver;
 
 /**
  * Binding module for top-level scheduling logic.

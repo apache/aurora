@@ -3,9 +3,9 @@ from difflib import unified_diff
 
 from twitter.common import log
 
-from gen.twitter.aurora.constants import ACTIVE_STATES
+from gen.apache.aurora.constants import ACTIVE_STATES
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     AddInstancesConfig,
     JobConfigValidation,
     JobKey,

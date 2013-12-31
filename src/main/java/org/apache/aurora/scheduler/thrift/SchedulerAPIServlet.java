@@ -1,11 +1,11 @@
-package com.twitter.aurora.scheduler.thrift;
+package org.apache.aurora.scheduler.thrift;
 
 import javax.inject.Inject;
 
+import org.apache.aurora.gen.AuroraAdmin;
+
 import org.apache.thrift.protocol.TJSONProtocol;
 import org.apache.thrift.server.TServlet;
-
-import com.twitter.aurora.gen.AuroraAdmin;
 
 /**
  * A servlet that exposes the scheduler Thrift API over HTTP/JSON.

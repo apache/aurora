@@ -1,12 +1,12 @@
 import contextlib
 import functools
 
-from twitter.aurora.client.commands.core import restart
-from twitter.aurora.client.commands.util import AuroraClientCommandTest
-from twitter.aurora.client.api.health_check import InstanceWatcherHealthCheck, Retriable
+from apache.aurora.client.commands.core import restart
+from apache.aurora.client.commands.util import AuroraClientCommandTest
+from apache.aurora.client.api.health_check import InstanceWatcherHealthCheck, Retriable
 from twitter.common.contextutil import temporary_file
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     AssignedTask,
     JobKey,
     PopulateJobResult,
@@ -90,9 +90,9 @@ class TestRestartCommand(AuroraClientCommandTest):
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('time.sleep', return_value=None)
@@ -124,9 +124,9 @@ class TestRestartCommand(AuroraClientCommandTest):
     mock_scheduler.getTasksStatus.return_value = self.create_error_response()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('time.sleep', return_value=None)
@@ -150,9 +150,9 @@ class TestRestartCommand(AuroraClientCommandTest):
     mock_scheduler.restartShards.return_value = self.create_error_response()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('time.sleep', return_value=None)

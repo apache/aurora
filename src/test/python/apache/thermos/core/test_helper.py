@@ -1,9 +1,9 @@
 import time
 
 from twitter.common.quantity import Time
-from twitter.thermos.core.helper import TaskRunnerHelper as TRH
+from apache.thermos.core.helper import TaskRunnerHelper as TRH
 
-from gen.twitter.thermos.ttypes import (
+from gen.apache.thermos.ttypes import (
     ProcessStatus,
     RunnerHeader,
     RunnerState,
@@ -44,7 +44,7 @@ def test_this_is_really_our_pid():
       process.create_time - (TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) + 1))
 
 
-TRH_PATH = 'twitter.thermos.core.helper.TaskRunnerHelper'
+TRH_PATH = 'apache.thermos.core.helper.TaskRunnerHelper'
 PSUTIL_PATH = 'psutil.Process'
 
 

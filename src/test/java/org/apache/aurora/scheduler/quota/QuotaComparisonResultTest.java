@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.quota;
+package org.apache.aurora.scheduler.quota;
+
+import org.apache.aurora.gen.Quota;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
 
 import org.junit.Test;
 
-import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
+import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-
-import static com.twitter.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
-import static com.twitter.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
 
 public class QuotaComparisonResultTest {
 

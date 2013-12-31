@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.mem;
+package org.apache.aurora.scheduler.storage.mem;
 
-import com.twitter.aurora.scheduler.state.BaseSchedulerCoreImplTest;
-import com.twitter.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.state.BaseSchedulerCoreImplTest;
+import org.apache.aurora.scheduler.storage.Storage;
 
 public class MemStorageSchedulerCoreImplTest extends BaseSchedulerCoreImplTest {
 

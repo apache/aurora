@@ -1,4 +1,4 @@
-package com.twitter.aurora.scheduler.log.mesos;
+package org.apache.aurora.scheduler.log.mesos;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;

@@ -11,7 +11,7 @@ python_library(
   sources = ['static_assets.py'],
   resources = rglobs('assets/*'),
   dependencies = [
-    pants('src/main/python/twitter/thermos:bottle'),
+    pants('src/main/python/apache/thermos:bottle'),
   ]
 )
 
@@ -28,8 +28,8 @@ python_library(
     pants(':templating'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/http'),
-    pants('src/main/python/twitter/thermos:bottle'),
-    pants('src/main/python/twitter/thermos:mako'),
+    pants('src/main/python/apache/thermos:bottle'),
+    pants('src/main/python/apache/thermos:mako'),
   ]
 )
 

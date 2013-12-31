@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.cron.noop;
+package org.apache.aurora.scheduler.cron.noop;
 
 import java.util.Date;
 
-import com.twitter.aurora.scheduler.cron.CronPredictor;
+import org.apache.aurora.scheduler.cron.CronPredictor;
 
 /**
  * A cron predictor that always suggests that the next run is Unix epoch time.

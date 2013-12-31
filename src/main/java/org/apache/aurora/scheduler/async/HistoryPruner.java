@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.async;
+package org.apache.aurora.scheduler.async;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -38,15 +38,16 @@ import com.google.common.collect.Multimaps;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.BindingAnnotation;
 
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.Tasks;
-import com.twitter.aurora.scheduler.state.StateManager;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
+
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -55,11 +56,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.aurora.scheduler.base.Tasks.LATEST_ACTIVITY;
-import static com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import static com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
-import static com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
-import static com.twitter.aurora.scheduler.events.PubsubEvent.TasksDeleted;
+import static org.apache.aurora.scheduler.base.Tasks.LATEST_ACTIVITY;
+import static org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
+import static org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
+import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import static org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 
 /**
  * Prunes tasks in a job based on per-job history and an inactive time threshold by observing tasks

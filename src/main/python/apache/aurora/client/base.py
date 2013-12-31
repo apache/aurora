@@ -5,7 +5,7 @@ from urlparse import urljoin
 
 from twitter.common import app, log
 
-from gen.twitter.aurora.ttypes import ResponseCode
+from gen.apache.aurora.ttypes import ResponseCode
 
 LOCKED_WARNING = """
 Note: if the scheduler detects that a job update is in progress (or was not

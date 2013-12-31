@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.state;
+package org.apache.aurora.scheduler.state;
 
 /**
  * Descriptions of the different types of external work commands that task state machines may

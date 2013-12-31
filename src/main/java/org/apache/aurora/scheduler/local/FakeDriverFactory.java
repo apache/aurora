@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.local;
+package org.apache.aurora.scheduler.local;
 
 import java.util.Collection;
 
@@ -23,6 +23,10 @@ import javax.inject.Provider;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+
+import com.twitter.common.application.Lifecycle;
+
+import org.apache.aurora.scheduler.DriverFactory;
 
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Filters;
@@ -37,9 +41,6 @@ import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
-
-import com.twitter.aurora.scheduler.DriverFactory;
-import com.twitter.common.application.Lifecycle;
 
 /**
  * A factory for fake scheduler driver instances.

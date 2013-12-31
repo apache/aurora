@@ -11,8 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-namespace java com.twitter.aurora.gen.comm
-namespace py gen.twitter.aurora.comm
+namespace java org.apache.aurora.gen.comm
+namespace py gen.apache.aurora.comm
 
 include "api.thrift"
 

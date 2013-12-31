@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.codec;
+package org.apache.aurora.codec;
+
+import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.Identity;
 
 import org.junit.Test;
-
-import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.aurora.gen.Identity;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;

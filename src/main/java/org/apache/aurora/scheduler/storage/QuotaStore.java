@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage;
+package org.apache.aurora.scheduler.storage;
 
 import java.util.Map;
 
 import com.google.common.base.Optional;
 
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
 
 /**
  * Point of storage for quota records.

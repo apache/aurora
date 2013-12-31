@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.log.mesos;
+package org.apache.aurora.scheduler.log.mesos;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -36,10 +36,6 @@ import com.google.common.collect.UnmodifiableIterator;
 import com.google.common.primitives.Longs;
 import com.google.inject.BindingAnnotation;
 
-import org.apache.mesos.Log;
-
-import com.twitter.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
-import com.twitter.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
 import com.twitter.common.base.Function;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -48,6 +44,11 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.SlidingStats;
 import com.twitter.common.stats.Stats;
 
+import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
+import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
+
+import org.apache.mesos.Log;
+
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -55,7 +56,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 /**
  * A {@code Log} implementation backed by a true distributed log in mesos core.
  */
-public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
+public class MesosLog implements org.apache.aurora.scheduler.log.Log {
 
   private static final Logger LOG = Logger.getLogger(MesosLog.class.getName());
 
@@ -130,7 +131,7 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
   }
 
   @VisibleForTesting
-  static class LogStream implements com.twitter.aurora.scheduler.log.Log.Stream {
+  static class LogStream implements org.apache.aurora.scheduler.log.Log.Stream {
     @VisibleForTesting
     static final class OpStats {
       private final String opName;
@@ -197,7 +198,7 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
     @Override
     public Iterator<Entry> readAll() throws StreamAccessException {
       // TODO(John Sirois): Currently we must be the coordinator to ensure we get the 'full read'
-      // of log entries expected by the users of the com.twitter.aurora.scheduler.log.Log interface.
+      // of log entries expected by the users of the org.apache.aurora.scheduler.log.Log interface.
       // Switch to another method of ensuring this when it becomes available in mesos' log
       // interface.
       try {
@@ -289,7 +290,7 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
 
     @Timed("scheduler_log_native_truncate_before")
     @Override
-    public void truncateBefore(com.twitter.aurora.scheduler.log.Log.Position position)
+    public void truncateBefore(org.apache.aurora.scheduler.log.Log.Position position)
         throws StreamAccessException {
 
       Preconditions.checkArgument(position instanceof LogPosition);
@@ -342,7 +343,7 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
       // noop
     }
 
-    private static class LogPosition implements com.twitter.aurora.scheduler.log.Log.Position {
+    private static class LogPosition implements org.apache.aurora.scheduler.log.Log.Position {
       private final Log.Position underlying;
 
       LogPosition(Log.Position underlying) {
@@ -363,7 +364,7 @@ public class MesosLog implements com.twitter.aurora.scheduler.log.Log {
       }
     }
 
-    private static class LogEntry implements com.twitter.aurora.scheduler.log.Log.Entry {
+    private static class LogEntry implements org.apache.aurora.scheduler.log.Log.Entry {
       private final Log.Entry underlying;
 
       public LogEntry(Log.Entry entry) {

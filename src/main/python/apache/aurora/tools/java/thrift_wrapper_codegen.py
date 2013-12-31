@@ -110,10 +110,10 @@ STRUCT_COLLECTION_FIELD_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
               .transform(%(params)s.FROM_BUILDER)
               .to%(collection)s();'''
 
-PACKAGE_NAME = 'com.twitter.aurora.scheduler.storage.entities'
+PACKAGE_NAME = 'org.apache.aurora.scheduler.storage.entities'
 
 CLASS_TEMPLATE = '''/*
- * Copyright 2013 Twitter, Inc.
+ * Copyright 2013 Apache Software Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -263,7 +263,7 @@ class GeneratedCode(object):
 
 
 # A namespace declaration, e.g.:
-#    namespace java com.twitter.aurora.gen
+#    namespace java org.apache.aurora.gen
 NAMESPACE_RE = 'namespace\s+(?P<lang>\w+)\s+(?P<namespace>[^\s]+)'
 
 # A possibly-parameterized type name, e.g.:

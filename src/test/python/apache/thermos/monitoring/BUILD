@@ -7,7 +7,7 @@ python_test_suite(name = 'all',
 python_tests(name = 'test_disk',
   sources = ['test_disk.py'],
   dependencies = [
-    pants('src/main/python/twitter/thermos/monitoring:disk'),
+    pants('src/main/python/apache/thermos/monitoring:disk'),
   ]
 )
 

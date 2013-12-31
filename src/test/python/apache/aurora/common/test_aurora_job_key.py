@@ -1,6 +1,6 @@
 import unittest
 
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 # TODO(ksweeney): Moar coverage
 class AuroraJobKeyTest(unittest.TestCase):

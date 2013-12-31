@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.app;
+package org.apache.aurora.scheduler.app;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -33,26 +33,6 @@ import com.google.common.collect.ImmutableList.Builder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
 
-import com.twitter.aurora.auth.CapabilityValidator;
-import com.twitter.aurora.auth.SessionValidator;
-import com.twitter.aurora.auth.UnsecureAuthModule;
-import com.twitter.aurora.scheduler.DriverFactory;
-import com.twitter.aurora.scheduler.DriverFactory.DriverFactoryImpl;
-import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
-import com.twitter.aurora.scheduler.SchedulerLifecycle;
-import com.twitter.aurora.scheduler.cron.CronPredictor;
-import com.twitter.aurora.scheduler.cron.CronScheduler;
-import com.twitter.aurora.scheduler.cron.noop.NoopCronModule;
-import com.twitter.aurora.scheduler.local.IsolatedSchedulerModule;
-import com.twitter.aurora.scheduler.log.mesos.MesosLogStreamModule;
-import com.twitter.aurora.scheduler.storage.backup.BackupModule;
-import com.twitter.aurora.scheduler.storage.log.LogStorage;
-import com.twitter.aurora.scheduler.storage.log.LogStorageModule;
-import com.twitter.aurora.scheduler.storage.log.SnapshotStoreImpl;
-import com.twitter.aurora.scheduler.storage.mem.MemStorageModule;
-import com.twitter.aurora.scheduler.thrift.ThriftConfiguration;
-import com.twitter.aurora.scheduler.thrift.ThriftModule;
-import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.AppLauncher;
 import com.twitter.common.application.Lifecycle;
@@ -72,6 +52,27 @@ import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule;
 import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import com.twitter.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
+
+import org.apache.aurora.auth.CapabilityValidator;
+import org.apache.aurora.auth.SessionValidator;
+import org.apache.aurora.auth.UnsecureAuthModule;
+import org.apache.aurora.scheduler.DriverFactory;
+import org.apache.aurora.scheduler.DriverFactory.DriverFactoryImpl;
+import org.apache.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
+import org.apache.aurora.scheduler.SchedulerLifecycle;
+import org.apache.aurora.scheduler.cron.CronPredictor;
+import org.apache.aurora.scheduler.cron.CronScheduler;
+import org.apache.aurora.scheduler.cron.noop.NoopCronModule;
+import org.apache.aurora.scheduler.local.IsolatedSchedulerModule;
+import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
+import org.apache.aurora.scheduler.storage.backup.BackupModule;
+import org.apache.aurora.scheduler.storage.log.LogStorage;
+import org.apache.aurora.scheduler.storage.log.LogStorageModule;
+import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
+import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
+import org.apache.aurora.scheduler.thrift.ThriftConfiguration;
+import org.apache.aurora.scheduler.thrift.ThriftModule;
+import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 
 /**
  * Launcher for the aurora scheduler.

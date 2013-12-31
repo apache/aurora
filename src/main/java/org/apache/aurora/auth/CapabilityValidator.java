@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.auth;
+package org.apache.aurora.auth;
 
-import com.twitter.aurora.gen.SessionKey;
+import org.apache.aurora.gen.SessionKey;
 
 /**
  * A session validator that supports user capability matching.

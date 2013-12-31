@@ -15,18 +15,18 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import Observable
 from twitter.common.metrics.gauge import AtomicGauge
 from twitter.common.quantity import Amount, Time
-from twitter.thermos.common.ckpt import CheckpointDispatcher
-from twitter.thermos.common.path import TaskPath
-from twitter.thermos.core.inspector import CheckpointInspector
-from twitter.thermos.core.helper import TaskKiller
-from twitter.thermos.monitoring.detector import TaskDetector
-from twitter.thermos.monitoring.garbage import TaskGarbageCollector
+from apache.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.common.path import TaskPath
+from apache.thermos.core.inspector import CheckpointInspector
+from apache.thermos.core.helper import TaskKiller
+from apache.thermos.monitoring.detector import TaskDetector
+from apache.thermos.monitoring.garbage import TaskGarbageCollector
 
-from gen.twitter.aurora.comm.ttypes import (
+from gen.apache.aurora.comm.ttypes import (
     AdjustRetainedTasks,
     DeletedTasks,
     SchedulerMessage)
-from gen.twitter.aurora.ttypes import ScheduleStatus
+from gen.apache.aurora.ttypes import ScheduleStatus
 
 from .common.sandbox import DirectorySandbox, SandboxInterface
 from .executor_base import ThermosExecutorBase

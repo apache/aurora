@@ -1,26 +1,27 @@
-package com.twitter.aurora.scheduler.storage;
+package org.apache.aurora.scheduler.storage;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
+import com.twitter.common.util.testing.FakeClock;
+
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Constraint;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.LimitConstraint;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskConstraint;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.mem.MemStorage;
+
 import org.junit.Before;
 import org.junit.Test;
-
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.Constraint;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.LimitConstraint;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.aurora.scheduler.storage.mem.MemStorage;
-import com.twitter.common.util.testing.FakeClock;
 
 import static org.junit.Assert.assertEquals;
 

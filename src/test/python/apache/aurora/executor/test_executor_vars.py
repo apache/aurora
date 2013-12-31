@@ -1,6 +1,6 @@
 from twitter.common.contextutil import temporary_file, open_zip
 
-from twitter.aurora.executor.executor_vars import ExecutorVars
+from apache.aurora.executor.executor_vars import ExecutorVars
 
 
 def test_release_from_tag():

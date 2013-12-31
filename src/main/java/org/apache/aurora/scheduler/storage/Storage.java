@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage;
+package org.apache.aurora.scheduler.storage;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -24,10 +24,10 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.BindingAnnotation;
 
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.SchedulerException;
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.SchedulerException;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 /**
  * Manages scheduler storage operations providing an interface to perform atomic changes.
@@ -52,7 +52,7 @@ public interface Storage {
      * <p>
      * This is labeled as unsafe, since it's rare that a caller should be using this.  In most
      * cases, mutations to the task store should be done through
-     * {@link com.twitter.aurora.scheduler.state.StateManager}.
+     * {@link org.apache.aurora.scheduler.state.StateManager}.
      * <p>
      * TODO(William Farner): Come up with a way to restrict access to this interface.  As it stands,
      * it's trivial for an unsuspecting caller to modify the task store directly and subvert the

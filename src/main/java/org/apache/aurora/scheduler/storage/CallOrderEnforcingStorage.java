@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage;
+package org.apache.aurora.scheduler.storage;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -27,11 +27,12 @@ import com.google.inject.BindingAnnotation;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 
-import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
-import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
-import com.twitter.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
-import com.twitter.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import com.twitter.common.util.StateMachine;
+
+import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
+import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
+import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 
 /**
  * A non-volatile storage wrapper that enforces method call ordering.

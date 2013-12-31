@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.filter;
+package org.apache.aurora.scheduler.filter;
 
 import java.util.Collection;
 import java.util.Set;
@@ -27,14 +27,14 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
-import com.twitter.aurora.gen.Attribute;
-import com.twitter.aurora.scheduler.base.SchedulerException;
-import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
-import com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
-import com.twitter.aurora.scheduler.storage.entities.IConstraint;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConstraint;
+import org.apache.aurora.gen.Attribute;
+import org.apache.aurora.scheduler.base.SchedulerException;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
+import org.apache.aurora.scheduler.storage.entities.IConstraint;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

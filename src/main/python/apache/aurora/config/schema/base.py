@@ -1,6 +1,6 @@
-from twitter.thermos.config.schema import *
+from apache.thermos.config.schema import *
 
-from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
+from gen.apache.aurora.constants import DEFAULT_ENVIRONMENT
 
 
 # TODO(wickman) Bind {{mesos.instance}} to %shard_id%

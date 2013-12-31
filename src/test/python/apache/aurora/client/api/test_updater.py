@@ -2,13 +2,13 @@ from copy import deepcopy
 from os import environ
 from unittest import TestCase
 
-from twitter.aurora.client.api.instance_watcher import InstanceWatcher
-from twitter.aurora.client.api.updater import Updater
-from twitter.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
+from apache.aurora.client.api.instance_watcher import InstanceWatcher
+from apache.aurora.client.api.updater import Updater
+from apache.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
 
-from gen.twitter.aurora.AuroraSchedulerManager import Client as scheduler_client
-from gen.twitter.aurora.constants import ACTIVE_STATES
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
+from gen.apache.aurora.constants import ACTIVE_STATES
+from gen.apache.aurora.ttypes import (
   AddInstancesConfig,
   AcquireLockResult,
   AssignedTask,

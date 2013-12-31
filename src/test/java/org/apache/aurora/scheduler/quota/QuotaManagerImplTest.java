@@ -13,33 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.quota;
+package org.apache.aurora.scheduler.quota;
 
 import com.google.common.base.Optional;
 
+import com.twitter.common.testing.easymock.EasyMockTest;
+
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+
 import org.easymock.IExpectationSetters;
+
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
-import com.twitter.common.testing.easymock.EasyMockTest;
+import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
 
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-
-import static com.twitter.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
-import static com.twitter.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
 
 public class QuotaManagerImplTest extends EasyMockTest {
   private static final String ROLE = "foo";

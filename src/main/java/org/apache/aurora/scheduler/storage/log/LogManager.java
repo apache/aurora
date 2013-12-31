@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.log;
+package org.apache.aurora.scheduler.storage.log;
 
 import java.io.IOException;
 import java.lang.annotation.ElementType;
@@ -42,26 +42,6 @@ import com.google.common.collect.Maps;
 import com.google.common.primitives.Bytes;
 import com.google.inject.BindingAnnotation;
 
-import com.twitter.aurora.codec.ThriftBinaryCodec.CodingException;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.storage.Frame;
-import com.twitter.aurora.gen.storage.FrameChunk;
-import com.twitter.aurora.gen.storage.FrameHeader;
-import com.twitter.aurora.gen.storage.LogEntry;
-import com.twitter.aurora.gen.storage.LogEntry._Fields;
-import com.twitter.aurora.gen.storage.Op;
-import com.twitter.aurora.gen.storage.RemoveTasks;
-import com.twitter.aurora.gen.storage.SaveHostAttributes;
-import com.twitter.aurora.gen.storage.SaveTasks;
-import com.twitter.aurora.gen.storage.Snapshot;
-import com.twitter.aurora.gen.storage.Transaction;
-import com.twitter.aurora.gen.storage.storageConstants;
-import com.twitter.aurora.scheduler.log.Log;
-import com.twitter.aurora.scheduler.log.Log.Entry;
-import com.twitter.aurora.scheduler.log.Log.Position;
-import com.twitter.aurora.scheduler.log.Log.Stream;
-import com.twitter.aurora.scheduler.log.Log.Stream.InvalidPositionException;
-import com.twitter.aurora.scheduler.log.Log.Stream.StreamAccessException;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
@@ -69,6 +49,27 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.stats.Stats;
+
+import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.storage.Frame;
+import org.apache.aurora.gen.storage.FrameChunk;
+import org.apache.aurora.gen.storage.FrameHeader;
+import org.apache.aurora.gen.storage.LogEntry;
+import org.apache.aurora.gen.storage.LogEntry._Fields;
+import org.apache.aurora.gen.storage.Op;
+import org.apache.aurora.gen.storage.RemoveTasks;
+import org.apache.aurora.gen.storage.SaveHostAttributes;
+import org.apache.aurora.gen.storage.SaveTasks;
+import org.apache.aurora.gen.storage.Snapshot;
+import org.apache.aurora.gen.storage.Transaction;
+import org.apache.aurora.gen.storage.storageConstants;
+import org.apache.aurora.scheduler.log.Log;
+import org.apache.aurora.scheduler.log.Log.Entry;
+import org.apache.aurora.scheduler.log.Log.Position;
+import org.apache.aurora.scheduler.log.Log.Stream;
+import org.apache.aurora.scheduler.log.Log.Stream.InvalidPositionException;
+import org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -134,7 +135,7 @@ public final class LogManager {
    * {@link #readFromBeginning(com.twitter.common.base.Closure) read from} the beginning,
    * a {@link #startTransaction() transaction} consisting of one or more local storage
    * operations can be committed atomically, or the log can be compacted by
-   * {@link #snapshot(com.twitter.aurora.gen.storage.Snapshot) snapshotting}.
+   * {@link #snapshot(org.apache.aurora.gen.storage.Snapshot) snapshotting}.
    */
   public static class StreamManager {
 

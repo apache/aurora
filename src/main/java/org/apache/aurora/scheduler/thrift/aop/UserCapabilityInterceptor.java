@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -32,13 +32,13 @@ import com.google.common.collect.ImmutableList;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
-import com.twitter.aurora.auth.CapabilityValidator;
-import com.twitter.aurora.auth.CapabilityValidator.AuditCheck;
-import com.twitter.aurora.auth.CapabilityValidator.Capability;
-import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
-import com.twitter.aurora.gen.ResponseCode;
-import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.scheduler.thrift.auth.Requires;
+import org.apache.aurora.auth.CapabilityValidator;
+import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
+import org.apache.aurora.auth.CapabilityValidator.Capability;
+import org.apache.aurora.auth.SessionValidator.AuthFailedException;
+import org.apache.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.scheduler.thrift.auth.Requires;
 
 /**
  * A method interceptor that will authenticate users identified by a {@link SessionKey} argument

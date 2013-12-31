@@ -5,12 +5,12 @@ slave.
 
 """
 
-from twitter.aurora.executor.executor_detector import ExecutorDetector
-from twitter.aurora.executor.gc_executor import ThermosGCExecutor
+from apache.aurora.executor.executor_detector import ExecutorDetector
+from apache.aurora.executor.gc_executor import ThermosGCExecutor
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.metrics.sampler import DiskMetricWriter
-from twitter.thermos.common.path import TaskPath
+from apache.thermos.common.path import TaskPath
 
 import mesos
 

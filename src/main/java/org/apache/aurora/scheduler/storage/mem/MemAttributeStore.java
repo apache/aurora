@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.mem;
+package org.apache.aurora.scheduler.storage.mem;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
@@ -22,10 +22,10 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 
-import com.twitter.aurora.gen.Attribute;
-import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.MaintenanceMode;
-import com.twitter.aurora.scheduler.storage.AttributeStore.Mutable;
+import org.apache.aurora.gen.Attribute;
+import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.scheduler.storage.AttributeStore.Mutable;
 
 /**
  * An in-memory attribute store.

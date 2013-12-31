@@ -15,13 +15,13 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.lang import Lockable
 from twitter.common.quantity import Amount, Time
 
-from twitter.thermos.common.path import TaskPath
-from twitter.thermos.monitoring.detector import TaskDetector
-from twitter.thermos.monitoring.monitor import TaskMonitor
-from twitter.thermos.monitoring.process import ProcessSample
-from twitter.thermos.monitoring.resource import ResourceMonitorBase, TaskResourceMonitor
+from apache.thermos.common.path import TaskPath
+from apache.thermos.monitoring.detector import TaskDetector
+from apache.thermos.monitoring.monitor import TaskMonitor
+from apache.thermos.monitoring.process import ProcessSample
+from apache.thermos.monitoring.resource import ResourceMonitorBase, TaskResourceMonitor
 
-from gen.twitter.thermos.ttypes import ProcessState, TaskState
+from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 from .observed_task import ActiveObservedTask, FinishedObservedTask
 
@@ -208,7 +208,7 @@ class TaskObserver(ExceptionalThread, Lockable):
   @Lockable.sync
   def raw_state(self, task_id):
     """
-      Return the current runner state (thrift blob: gen.twitter.thermos.ttypes.RunnerState)
+      Return the current runner state (thrift blob: gen.apache.thermos.ttypes.RunnerState)
       of a given task id
     """
     if task_id not in self.all_tasks:

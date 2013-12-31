@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import java.lang.reflect.Method;
 import java.util.List;
@@ -38,15 +38,16 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matcher;
 import com.google.inject.matcher.Matchers;
 
-import org.aopalliance.intercept.MethodInterceptor;
-
-import com.twitter.aurora.GuiceUtils;
-import com.twitter.aurora.auth.CapabilityValidator;
-import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.AuroraSchedulerManager;
-import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+
+import org.aopalliance.intercept.MethodInterceptor;
+
+import org.apache.aurora.GuiceUtils;
+import org.apache.aurora.auth.CapabilityValidator;
+import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.AuroraSchedulerManager;
+import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 
 /**
  * Binding module for AOP-style decorations of the thrift API.

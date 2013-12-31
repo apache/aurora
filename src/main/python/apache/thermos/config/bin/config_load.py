@@ -4,7 +4,7 @@ import json
 import pprint
 
 from twitter.common import app
-from twitter.thermos.config.loader import ThermosConfigLoader
+from apache.thermos.config.loader import ThermosConfigLoader
 
 def main(args):
   """

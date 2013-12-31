@@ -1,25 +1,25 @@
 import getpass
 import re
 
-from twitter.aurora.config import AuroraConfig
-from twitter.aurora.config.schema.base import Job, SimpleTask
-from twitter.aurora.config.thrift import (
+from apache.aurora.config import AuroraConfig
+from apache.aurora.config.schema.base import Job, SimpleTask
+from apache.aurora.config.thrift import (
     convert as convert_pystachio_to_thrift,
     InvalidConfig,
     task_instance_from_job,
 )
-from twitter.thermos.config.schema import (
+from apache.thermos.config.schema import (
     Process,
     Resources,
     Task,
 )
 
-from gen.twitter.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
-from gen.twitter.aurora.test.constants import (
+from gen.apache.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
+from gen.apache.aurora.test.constants import (
     INVALID_IDENTIFIERS,
     VALID_IDENTIFIERS,
 )
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     CronCollisionPolicy,
     JobKey,
     Identity,

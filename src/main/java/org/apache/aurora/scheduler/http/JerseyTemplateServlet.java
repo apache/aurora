@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import java.io.StringWriter;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
-import org.antlr.stringtemplate.StringTemplate;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.util.templating.StringTemplateHelper;
 import com.twitter.common.util.templating.StringTemplateHelper.TemplateException;
+
+import org.antlr.stringtemplate.StringTemplate;
 
 /**
  * Base class for common functions needed in a jersey stringtemplate servlet.

@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift;
+package org.apache.aurora.scheduler.thrift;
 
 import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
 
-import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.scheduler.thrift.aop.AopModule;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
+
+import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.scheduler.thrift.aop.AopModule;
 
 /**
  * Binding module to configure a thrift server.

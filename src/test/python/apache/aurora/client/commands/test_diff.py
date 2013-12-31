@@ -1,10 +1,10 @@
 import contextlib
 
-from twitter.aurora.client.commands.core import diff
-from twitter.aurora.client.commands.util import AuroraClientCommandTest
+from apache.aurora.client.commands.core import diff
+from apache.aurora.client.commands.util import AuroraClientCommandTest
 from twitter.common.contextutil import temporary_file
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     AssignedTask,
     ExecutorConfig,
     Identity,
@@ -94,8 +94,8 @@ class TestDiffCommand(AuroraClientCommandTest):
     mock_scheduler.getTasksStatus.return_value = self.create_status_response()
     self.setup_populate_job_config(mock_scheduler)
     with contextlib.nested(
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('subprocess.call', return_value=0),
         patch('json.loads', return_value=Mock())) as (
@@ -131,8 +131,8 @@ class TestDiffCommand(AuroraClientCommandTest):
     mock_scheduler.getTasksStatus.return_value = self.create_status_response()
     self.setup_populate_job_config(mock_scheduler)
     with contextlib.nested(
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('subprocess.call', return_value=0),
         patch('json.loads', return_value=Mock())) as (
@@ -157,8 +157,8 @@ class TestDiffCommand(AuroraClientCommandTest):
     mock_scheduler.getTasksStatus.return_value = self.create_failed_status_response()
     self.setup_populate_job_config(mock_scheduler)
     with contextlib.nested(
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('subprocess.call', return_value=0),
         patch('json.loads', return_value=Mock())) as (

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.log.mesos;
+package org.apache.aurora.scheduler.log.mesos;
 
 import java.io.File;
 import java.util.List;
@@ -29,19 +29,21 @@ import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
 
-import org.apache.mesos.Log;
-import org.apache.zookeeper.common.PathUtils;
-
-import com.twitter.aurora.codec.ThriftBinaryCodec;
-import com.twitter.aurora.gen.storage.LogEntry;
-import com.twitter.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
-import com.twitter.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.net.InetSocketAddressHelper;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
+
+import org.apache.aurora.codec.ThriftBinaryCodec;
+import org.apache.aurora.gen.storage.LogEntry;
+import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
+import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
+
+import org.apache.mesos.Log;
+
+import org.apache.zookeeper.common.PathUtils;
 
 /**
  * Binds a native mesos Log implementation.
@@ -109,9 +111,9 @@ public class MesosLogStreamModule extends PrivateModule {
     bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.WriteTimeout.class)
         .toInstance(WRITE_TIMEOUT.get());
 
-    bind(com.twitter.aurora.scheduler.log.Log.class).to(MesosLog.class);
+    bind(org.apache.aurora.scheduler.log.Log.class).to(MesosLog.class);
     bind(MesosLog.class).in(Singleton.class);
-    expose(com.twitter.aurora.scheduler.log.Log.class);
+    expose(org.apache.aurora.scheduler.log.Log.class);
   }
 
   @Provides

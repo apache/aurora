@@ -38,7 +38,7 @@ task sourceJar(type: Jar) {
   from sourceSets.main.allJava
 }
 
-group 'com.twitter.aurora'
+group 'org.apache.aurora'
 version = file('.auroraversion').text.trim().toUpperCase()
 
 publishing {
@@ -104,7 +104,7 @@ jar {
   from sourceSets.generated.output
   manifest {
     attributes('Created-By': 'Gradle')
-    attributes('Main-Class': 'com.twitter.aurora.scheduler.app.SchedulerMain')
+    attributes('Main-Class': 'org.apache.aurora.scheduler.app.SchedulerMain')
   }
 }
 
@@ -213,8 +213,8 @@ task generateSources(dependsOn: 'bootstrapThrift') {
       def structName = it
       exec {
         executable = 'python'
-        args = ['src/main/python/twitter/aurora/tools/java/thrift_wrapper_codegen.py',
-                'src/main/thrift/com/twitter/aurora/gen/api.thrift',
+        args = ['src/main/python/apache/aurora/tools/java/thrift_wrapper_codegen.py',
+                'src/main/thrift/org/apache/aurora/gen/api.thrift',
                 structName,
                 generatedJavaDir]
       }
@@ -252,7 +252,7 @@ idea {
 
 // Configuration parameters for the application plugin.
 applicationName = 'aurora-scheduler'
-mainClassName = 'com.twitter.aurora.scheduler.app.SchedulerMain'
+mainClassName = 'org.apache.aurora.scheduler.app.SchedulerMain'
 
 // Run a local scheduler with a local log file and fake jobs
 run {

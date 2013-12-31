@@ -1,4 +1,4 @@
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import java.util.Collections;
 import java.util.List;
@@ -6,21 +6,21 @@ import java.util.List;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+
 import org.junit.Test;
 
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
+import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
+import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.http.SchedulerzRole.getFreshestTask;
 
 import static org.junit.Assert.assertEquals;
-
-import static com.twitter.aurora.gen.ScheduleStatus.FINISHED;
-import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
-import static com.twitter.aurora.scheduler.http.SchedulerzRole.getFreshestTask;
 
 public class SchedulerzRoleTest {
 

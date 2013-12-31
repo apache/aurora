@@ -1,4 +1,4 @@
-from twitter.aurora.config.loader import AuroraConfigLoader
+from apache.aurora.config.loader import AuroraConfigLoader
 from twitter.common.lang import Compatibility
 
 

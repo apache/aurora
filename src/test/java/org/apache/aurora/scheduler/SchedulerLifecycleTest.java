@@ -13,22 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 
-import org.apache.mesos.Protos.Status;
-import org.apache.mesos.SchedulerDriver;
-import org.easymock.Capture;
-import org.easymock.EasyMock;
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.scheduler.SchedulerLifecycle.DelayedActions;
-import com.twitter.aurora.scheduler.SchedulerLifecycle.DriverReference;
-import com.twitter.aurora.scheduler.events.PubsubEvent.DriverRegistered;
-import com.twitter.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
-import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Command;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -36,8 +24,24 @@ import com.twitter.common.util.Clock;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 
+import org.apache.aurora.scheduler.SchedulerLifecycle.DelayedActions;
+import org.apache.aurora.scheduler.SchedulerLifecycle.DriverReference;
+import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
+import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+
+import org.apache.mesos.Protos.Status;
+import org.apache.mesos.SchedulerDriver;
+
+import org.easymock.Capture;
+import org.easymock.EasyMock;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.fail;
 
 public class SchedulerLifecycleTest extends EasyMockTest {

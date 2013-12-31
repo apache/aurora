@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage;
+package org.apache.aurora.scheduler.storage;
 
 import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
 
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Stores all tasks configured with the scheduler.
@@ -31,7 +31,7 @@ public interface TaskStore {
 
   /**
    * Fetches a read-only view of tasks matching a query and filters. Intended for use with a
-   * {@link com.twitter.aurora.scheduler.base.Query.Builder}.
+   * {@link org.apache.aurora.scheduler.base.Query.Builder}.
    *
    * @param query Builder of the query to identify tasks with.
    * @return A read-only view of matching tasks.

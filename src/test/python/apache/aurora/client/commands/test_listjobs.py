@@ -1,12 +1,12 @@
 import contextlib
 import unittest
 
-from twitter.aurora.common.cluster import Cluster
-from twitter.aurora.common.clusters import Clusters
-from twitter.aurora.client.commands.core import list_jobs
-from twitter.aurora.client.commands.util import AuroraClientCommandTest
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import Clusters
+from apache.aurora.client.commands.core import list_jobs
+from apache.aurora.client.commands.util import AuroraClientCommandTest
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     GetJobsResult,
     JobKey,
 )
@@ -46,8 +46,8 @@ class TestListJobs(AuroraClientCommandTest):
     (mock_api, mock_scheduler) = self.create_mock_api()
     mock_scheduler.getJobs.return_value = self.create_listjobs_response()
     with contextlib.nested(
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (
             mock_scheduler_proxy_class,
             mock_clusters,
@@ -62,8 +62,8 @@ class TestListJobs(AuroraClientCommandTest):
     (mock_api, mock_scheduler) = self.create_mock_api()
     mock_scheduler.getJobs.return_value = self.create_listjobs_response()
     with contextlib.nested(
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (
             mock_scheduler_proxy_class,
             mock_clusters,

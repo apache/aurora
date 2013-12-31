@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.quota;
+package org.apache.aurora.scheduler.quota;
 
 import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
 
-import com.twitter.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
-import com.twitter.aurora.scheduler.state.JobFilter;
-import com.twitter.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
+import org.apache.aurora.scheduler.state.JobFilter;
+import org.apache.aurora.scheduler.storage.Storage;
 
 /**
  * Guice module for the quota package.

@@ -3,9 +3,9 @@ import os
 
 from twitter.common import log
 from twitter.common.lang import AbstractClass
-from twitter.thermos.config.loader import ThermosTaskWrapper
-from twitter.thermos.config.schema import ThermosContext
-from twitter.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.config.loader import ThermosTaskWrapper
+from apache.thermos.config.schema import ThermosContext
+from apache.thermos.common.ckpt import CheckpointDispatcher
 
 from pystachio import Environment
 
@@ -85,7 +85,7 @@ class ObservedTask(AbstractClass):
 
   @abstractproperty
   def state(self):
-    """Return state of task (gen.twitter.thermos.ttypes.RunnerState)"""
+    """Return state of task (gen.apache.thermos.ttypes.RunnerState)"""
 
 
 class ActiveObservedTask(ObservedTask):

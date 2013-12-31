@@ -4,8 +4,8 @@ python_binary(
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
     pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
-    pants('src/main/python/twitter/thermos/common'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift')
+    pants('src/main/python/apache/thermos/common'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift')
   ]
 )
 
@@ -15,10 +15,10 @@ python_binary(
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/twitter/thermos/common'),
-    pants('src/main/python/twitter/thermos/config:schema'),
-    pants('src/main/python/twitter/thermos/core'),
-    pants('src/main/python/twitter/thermos/monitoring'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift'),
+    pants('src/main/python/apache/thermos/common'),
+    pants('src/main/python/apache/thermos/config:schema'),
+    pants('src/main/python/apache/thermos/core'),
+    pants('src/main/python/apache/thermos/monitoring'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ],
 )

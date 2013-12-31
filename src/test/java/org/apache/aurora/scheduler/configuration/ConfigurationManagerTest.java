@@ -13,32 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.configuration;
+package org.apache.aurora.scheduler.configuration;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.gen.Constraint;
+import org.apache.aurora.gen.CronCollisionPolicy;
+import org.apache.aurora.gen.ExecutorConfig;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.LimitConstraint;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskConstraint;
+import org.apache.aurora.gen.ValueConstraint;
+
 import org.junit.Test;
 
-import com.twitter.aurora.gen.Constraint;
-import com.twitter.aurora.gen.CronCollisionPolicy;
-import com.twitter.aurora.gen.ExecutorConfig;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.LimitConstraint;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.gen.ValueConstraint;
+import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
+import static org.apache.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
+import static org.apache.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
+import static org.apache.aurora.scheduler.configuration.ConfigurationManager.isGoodIdentifier;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-
-import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
-import static com.twitter.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
-import static com.twitter.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
-import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.isGoodIdentifier;
 
 // TODO(Sathya): Improve test coverage for this class.
 public class ConfigurationManagerTest {

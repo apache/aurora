@@ -6,8 +6,8 @@ import sys
 
 from twitter.common.quantity import Amount, Data, Time
 from twitter.common.dirutil import safe_mkdtemp
-from twitter.thermos.monitoring.disk import DiskCollector
-from twitter.thermos.monitoring.disk import InotifyDiskCollector
+from apache.thermos.monitoring.disk import DiskCollector
+from apache.thermos.monitoring.disk import InotifyDiskCollector
 
 import pytest
 

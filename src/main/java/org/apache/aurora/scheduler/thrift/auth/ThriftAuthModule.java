@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.auth;
+package org.apache.aurora.scheduler.thrift.auth;
 
 import java.util.Map;
 
@@ -23,12 +23,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.inject.AbstractModule;
 import com.google.inject.TypeLiteral;
 
-import com.twitter.aurora.auth.CapabilityValidator;
-import com.twitter.aurora.auth.CapabilityValidator.Capability;
-import com.twitter.aurora.auth.SessionValidator;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotEmpty;
+
+import org.apache.aurora.auth.CapabilityValidator;
+import org.apache.aurora.auth.CapabilityValidator.Capability;
+import org.apache.aurora.auth.SessionValidator;
 
 /**
  * Binding module for authentication of users with special capabilities for admin functions.

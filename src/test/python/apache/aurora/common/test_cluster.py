@@ -1,4 +1,4 @@
-from twitter.aurora.common.cluster import Cluster
+from apache.aurora.common.cluster import Cluster
 
 from pystachio import (
     Default,

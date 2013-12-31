@@ -18,21 +18,21 @@ from twitter.common.dirutil.tail import tail as tail_closed
 from twitter.common.quantity import Amount, Time, Data
 from twitter.common.quantity.parse_simple import parse_time, parse_data
 from twitter.common.recordio import RecordIO, ThriftRecordReader
-from twitter.thermos.common.path import TkPath
-from twitter.thermos.common.ckpt import CheckpointDispatcher
-from twitter.thermos.common.options import add_port_to, add_binding_to
-from twitter.thermos.config.loader import ThermosConfigLoader, ThermosTaskWrapper
-from twitter.thermos.config.schema import (
+from apache.thermos.common.path import TkPath
+from apache.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.common.options import add_port_to, add_binding_to
+from apache.thermos.config.loader import ThermosConfigLoader, ThermosTaskWrapper
+from apache.thermos.config.schema import (
   Process,
   Resources,
   Task)
-from twitter.thermos.core.helper import TaskRunnerHelper
-from twitter.thermos.core.runner import TaskRunner
-from twitter.thermos.monitoring.detector import TaskDetector
-from twitter.thermos.monitoring.garbage import TaskGarbageCollector, DefaultCollector
-from twitter.thermos.monitoring.monitor import TaskMonitor
+from apache.thermos.core.helper import TaskRunnerHelper
+from apache.thermos.core.runner import TaskRunner
+from apache.thermos.monitoring.detector import TaskDetector
+from apache.thermos.monitoring.garbage import TaskGarbageCollector, DefaultCollector
+from apache.thermos.monitoring.monitor import TaskMonitor
 
-from gen.twitter.thermos.ttypes import (
+from gen.apache.thermos.ttypes import (
   ProcessState,
   RunnerCkpt,
   RunnerState,

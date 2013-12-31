@@ -1,10 +1,10 @@
-package com.twitter.aurora.scheduler.state;
+package org.apache.aurora.scheduler.state;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
-import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * An action that either accepts a configuration or rejects it with a reason.

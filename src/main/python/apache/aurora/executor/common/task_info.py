@@ -1,11 +1,11 @@
 import json
 
-from twitter.aurora.config.port_resolver import PortResolver
-from twitter.aurora.config.schema.base import MesosJob, MesosTaskInstance
-from twitter.aurora.config.thrift import task_instance_from_job
+from apache.aurora.config.port_resolver import PortResolver
+from apache.aurora.config.schema.base import MesosJob, MesosTaskInstance
+from apache.aurora.config.thrift import task_instance_from_job
 from twitter.common import log
 
-from gen.twitter.aurora.ttypes import AssignedTask
+from gen.apache.aurora.ttypes import AssignedTask
 
 from pystachio import Ref
 from thrift.Thrift import TException

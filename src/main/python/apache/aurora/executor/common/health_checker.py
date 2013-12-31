@@ -1,7 +1,7 @@
 import threading
 import time
 
-from twitter.aurora.common.http_signaler import HttpSignaler
+from apache.aurora.common.http_signaler import HttpSignaler
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 

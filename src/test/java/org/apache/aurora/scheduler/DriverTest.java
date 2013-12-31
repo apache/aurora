@@ -13,22 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 
+import com.twitter.common.testing.easymock.EasyMockTest;
+
+import org.apache.aurora.scheduler.Driver.DriverImpl;
+
 import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
+
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.aurora.scheduler.Driver.DriverImpl;
-import com.twitter.common.testing.easymock.EasyMockTest;
-
 import static org.apache.mesos.Protos.Status.DRIVER_ABORTED;
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
+
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertEquals;
 
 public class DriverTest extends EasyMockTest {

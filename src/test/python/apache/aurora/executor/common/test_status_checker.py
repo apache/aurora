@@ -1,6 +1,6 @@
 import threading
 
-from twitter.aurora.executor.common.status_checker import (
+from apache.aurora.executor.common.status_checker import (
     ChainedStatusChecker,
     ExitState,
     Healthy,

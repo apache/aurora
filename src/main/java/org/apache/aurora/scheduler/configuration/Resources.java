@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.configuration;
+package org.apache.aurora.scheduler.configuration;
 
 import java.util.Collections;
 import java.util.List;
@@ -33,18 +33,20 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
+
+import org.apache.aurora.scheduler.base.Numbers;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+
 import org.apache.commons.lang.builder.EqualsBuilder;
+
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Value.Range;
 import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Type;
-
-import com.twitter.aurora.scheduler.base.Numbers;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

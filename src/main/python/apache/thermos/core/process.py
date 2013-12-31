@@ -26,7 +26,7 @@ from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
-from gen.twitter.thermos.ttypes import (
+from gen.apache.thermos.ttypes import (
     ProcessState,
     ProcessStatus,
     RunnerCkpt,

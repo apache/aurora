@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora;
+package org.apache.aurora;
 
 import java.util.List;
 
@@ -25,9 +25,9 @@ import com.google.inject.CreationException;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
-import org.junit.Test;
+import org.apache.aurora.GuiceUtils.AllowUnchecked;
 
-import com.twitter.aurora.GuiceUtils.AllowUnchecked;
+import org.junit.Test;
 
 import static org.junit.Assert.fail;
 

@@ -2,8 +2,8 @@ import re
 
 from twitter.common.lang import Compatibility, total_ordering
 
-from gen.twitter.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
-from gen.twitter.aurora.ttypes import Identity, JobKey, TaskQuery
+from gen.apache.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
+from gen.apache.aurora.ttypes import Identity, JobKey, TaskQuery
 
 # TODO(ksweeney): This can just probably just extend namedtuple.
 @total_ordering

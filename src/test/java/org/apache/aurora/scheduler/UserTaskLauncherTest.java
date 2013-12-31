@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
 
 import java.util.Set;
 
@@ -21,6 +21,15 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+
+import com.twitter.common.collections.Pair;
+import com.twitter.common.testing.easymock.EasyMockTest;
+
+import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.storage.Storage.StorageException;
 
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.FrameworkID;
@@ -36,24 +45,18 @@ import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Text;
 import org.apache.mesos.Protos.Value.Type;
+
 import org.junit.Before;
 import org.junit.Test;
 
-import com.twitter.aurora.scheduler.async.OfferQueue;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.configuration.Resources;
-import com.twitter.aurora.scheduler.state.StateManager;
-import com.twitter.aurora.scheduler.storage.Storage.StorageException;
-import com.twitter.common.collections.Pair;
-import com.twitter.common.testing.easymock.EasyMockTest;
+import static org.apache.aurora.gen.ScheduleStatus.FAILED;
+import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.configuration.ConfigurationManager.HOST_CONSTRAINT;
 
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-
-import static com.twitter.aurora.gen.ScheduleStatus.FAILED;
-import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
-import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.HOST_CONSTRAINT;
 
 public class UserTaskLauncherTest extends EasyMockTest {
 

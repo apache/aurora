@@ -1,8 +1,7 @@
 #!/bin/env python
 '''
-Organizes a java source file's import statements in a way that pleases Twitter's checkstyle
-configuration.
-This expects exactly one argument: the name of the file to modify with preferred import
+Organizes a java source file's import statements in a way that pleases Apache Aurora's checkstyle
+configuration. This expects exactly one argument: the name of the file to modify with preferred import
 ordering.
 '''
 
@@ -18,10 +17,7 @@ def get_group(import_statement):
   matcher = IMPORT_RE.match(import_statement)
   assert matcher, 'Could not parse import statement: %s' % import_statement
   class_name = matcher.group(1)
-  if class_name.startswith('com.twitter'):
-    group = 'com.twitter'
-  else:
-    group = class_name.split('.')[0]
+  group = class_name.split('.')[0]
   return group
 
 
@@ -56,7 +52,7 @@ def get_all_group_lines(import_groups):
     return lines 
 
   all_lines = []
-  explicit_groups = ['java', 'javax', 'scala', 'com', 'net', 'org', 'com.twitter']
+  explicit_groups = ['java', 'javax', 'scala', 'com', 'net', 'org']
   for group in explicit_groups:
     if group in import_groups:
       all_lines += get_group_lines(group)

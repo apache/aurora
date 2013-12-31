@@ -1,8 +1,8 @@
 import textwrap
 
-from twitter.aurora.client import binding_helper
-from twitter.aurora.client.binding_helper import BindingHelper, CachingBindingHelper
-from twitter.aurora.config import AuroraConfig
+from apache.aurora.client import binding_helper
+from apache.aurora.client.binding_helper import BindingHelper, CachingBindingHelper
+from apache.aurora.config import AuroraConfig
 from twitter.common.contextutil import temporary_file
 
 from pystachio import Ref

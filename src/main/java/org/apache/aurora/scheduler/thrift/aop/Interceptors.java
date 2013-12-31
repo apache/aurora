@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -21,7 +21,7 @@ import java.util.logging.Logger;
 
 import com.google.common.base.Throwables;
 
-import com.twitter.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.ResponseCode;
 
 /**
  * Utility class for functions useful when implementing an interceptor on the thrift interface.

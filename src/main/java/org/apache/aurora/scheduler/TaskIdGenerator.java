@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
 
 import java.util.UUID;
 
@@ -21,8 +21,9 @@ import javax.inject.Inject;
 
 import com.google.common.base.Preconditions;
 
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.util.Clock;
+
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * A function that generates universally-unique (not guaranteed, but highly confident) task IDs.

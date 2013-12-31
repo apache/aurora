@@ -4,13 +4,13 @@ import subprocess
 
 from twitter.common import log
 
-from twitter.aurora.client.api import AuroraClientAPI
-from twitter.aurora.config.schema.base import MesosContext
-from twitter.aurora.common.cluster import Cluster
-from twitter.thermos.config.schema import ThermosContext
+from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.config.schema.base import MesosContext
+from apache.aurora.common.cluster import Cluster
+from apache.thermos.config.schema import ThermosContext
 
-from gen.twitter.aurora.constants import LIVE_STATES
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.constants import LIVE_STATES
+from gen.apache.aurora.ttypes import (
   Identity,
   ResponseCode,
   TaskQuery)

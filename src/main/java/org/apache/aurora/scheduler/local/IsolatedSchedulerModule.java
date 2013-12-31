@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.local;
+package org.apache.aurora.scheduler.local;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -39,6 +39,33 @@ import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 
+import com.twitter.common.application.ShutdownRegistry;
+import com.twitter.common.base.Command;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stats;
+import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
+
+import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.ExecutorConfig;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.Package;
+import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.Response;
+import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.DriverFactory;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
+import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
+import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.local.FakeDriverFactory.FakeSchedulerDriver;
+import org.apache.aurora.scheduler.log.testing.FileLogStreamModule;
+
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
@@ -53,33 +80,8 @@ import org.apache.mesos.Protos.Value.Text;
 import org.apache.mesos.Protos.Value.Type;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
-import org.apache.thrift.TException;
 
-import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.ExecutorConfig;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.Package;
-import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.Response;
-import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.scheduler.DriverFactory;
-import com.twitter.aurora.scheduler.base.JobKeys;
-import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
-import com.twitter.aurora.scheduler.configuration.Resources;
-import com.twitter.aurora.scheduler.events.PubsubEvent.DriverRegistered;
-import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import com.twitter.aurora.scheduler.events.PubsubEvent.TaskStateChange;
-import com.twitter.aurora.scheduler.events.PubsubEventModule;
-import com.twitter.aurora.scheduler.local.FakeDriverFactory.FakeSchedulerDriver;
-import com.twitter.aurora.scheduler.log.testing.FileLogStreamModule;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.base.Command;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.Stats;
-import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
+import org.apache.thrift.TException;
 
 /**
  * A module that binds a fake mesos driver factory and a local (non-replicated) storage system.

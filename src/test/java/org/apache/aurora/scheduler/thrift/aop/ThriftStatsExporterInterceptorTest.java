@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
@@ -21,23 +21,25 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.matcher.Matchers;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.GetJobsResult;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.Response;
-import com.twitter.aurora.gen.Result;
-import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.GetJobsResult;
+import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.Response;
+import org.apache.aurora.gen.Result;
+import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
+
+import org.junit.Before;
+import org.junit.Test;
+
+import static org.apache.aurora.gen.ResponseCode.OK;
+
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
-
-import static com.twitter.aurora.gen.ResponseCode.OK;
 
 public class ThriftStatsExporterInterceptorTest extends EasyMockTest {
 

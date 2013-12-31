@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift;
+package org.apache.aurora.scheduler.thrift;
 
 import java.util.Set;
 
@@ -27,93 +27,96 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 
-import org.easymock.IExpectationSetters;
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.auth.CapabilityValidator;
-import com.twitter.aurora.auth.CapabilityValidator.AuditCheck;
-import com.twitter.aurora.auth.CapabilityValidator.Capability;
-import com.twitter.aurora.auth.SessionValidator.AuthFailedException;
-import com.twitter.aurora.gen.AddInstancesConfig;
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.ConfigRewrite;
-import com.twitter.aurora.gen.Constraint;
-import com.twitter.aurora.gen.ExecutorConfig;
-import com.twitter.aurora.gen.HostStatus;
-import com.twitter.aurora.gen.Hosts;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.InstanceConfigRewrite;
-import com.twitter.aurora.gen.InstanceKey;
-import com.twitter.aurora.gen.JobConfigRewrite;
-import com.twitter.aurora.gen.JobConfigValidation;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.JobSummary;
-import com.twitter.aurora.gen.JobSummaryResult;
-import com.twitter.aurora.gen.LimitConstraint;
-import com.twitter.aurora.gen.Lock;
-import com.twitter.aurora.gen.LockKey;
-import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.Response;
-import com.twitter.aurora.gen.ResponseCode;
-import com.twitter.aurora.gen.RewriteConfigsRequest;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.gen.ValueConstraint;
-import com.twitter.aurora.scheduler.base.JobKeys;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.ScheduleException;
-import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
-import com.twitter.aurora.scheduler.configuration.SanitizedConfiguration;
-import com.twitter.aurora.scheduler.state.CronJobManager;
-import com.twitter.aurora.scheduler.state.LockManager;
-import com.twitter.aurora.scheduler.state.LockManager.LockException;
-import com.twitter.aurora.scheduler.state.MaintenanceController;
-import com.twitter.aurora.scheduler.state.SchedulerCore;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.backup.Recovery;
-import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
-import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
-import com.twitter.aurora.scheduler.storage.entities.ILock;
-import com.twitter.aurora.scheduler.storage.entities.ILockKey;
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
-import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
-import com.twitter.aurora.scheduler.thrift.aop.AopModule;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
+
+import org.apache.aurora.auth.CapabilityValidator;
+import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
+import org.apache.aurora.auth.CapabilityValidator.Capability;
+import org.apache.aurora.auth.SessionValidator.AuthFailedException;
+import org.apache.aurora.gen.AddInstancesConfig;
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.ConfigRewrite;
+import org.apache.aurora.gen.Constraint;
+import org.apache.aurora.gen.ExecutorConfig;
+import org.apache.aurora.gen.HostStatus;
+import org.apache.aurora.gen.Hosts;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.InstanceConfigRewrite;
+import org.apache.aurora.gen.InstanceKey;
+import org.apache.aurora.gen.JobConfigRewrite;
+import org.apache.aurora.gen.JobConfigValidation;
+import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobSummary;
+import org.apache.aurora.gen.JobSummaryResult;
+import org.apache.aurora.gen.LimitConstraint;
+import org.apache.aurora.gen.Lock;
+import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.Response;
+import org.apache.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.RewriteConfigsRequest;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskConstraint;
+import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.ScheduleException;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
+import org.apache.aurora.scheduler.state.CronJobManager;
+import org.apache.aurora.scheduler.state.LockManager;
+import org.apache.aurora.scheduler.state.LockManager.LockException;
+import org.apache.aurora.scheduler.state.MaintenanceController;
+import org.apache.aurora.scheduler.state.SchedulerCore;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.backup.Recovery;
+import org.apache.aurora.scheduler.storage.backup.StorageBackup;
+import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.ILock;
+import org.apache.aurora.scheduler.storage.entities.ILockKey;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.thrift.aop.AopModule;
+
+import org.easymock.IExpectationSetters;
+
+import org.junit.Before;
+import org.junit.Test;
+
+import static org.apache.aurora.auth.CapabilityValidator.Capability.ROOT;
+import static org.apache.aurora.auth.SessionValidator.SessionContext;
+import static org.apache.aurora.gen.LockValidation.CHECKED;
+import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
+import static org.apache.aurora.gen.MaintenanceMode.NONE;
+import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
+import static org.apache.aurora.gen.ResponseCode.AUTH_FAILED;
+import static org.apache.aurora.gen.ResponseCode.ERROR;
+import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
+import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
+import static org.apache.aurora.gen.ResponseCode.OK;
+import static org.apache.aurora.gen.ResponseCode.WARNING;
+import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
+import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-
-import static com.twitter.aurora.auth.CapabilityValidator.Capability.ROOT;
-import static com.twitter.aurora.auth.SessionValidator.SessionContext;
-import static com.twitter.aurora.gen.LockValidation.CHECKED;
-import static com.twitter.aurora.gen.MaintenanceMode.DRAINING;
-import static com.twitter.aurora.gen.MaintenanceMode.NONE;
-import static com.twitter.aurora.gen.MaintenanceMode.SCHEDULED;
-import static com.twitter.aurora.gen.ResponseCode.AUTH_FAILED;
-import static com.twitter.aurora.gen.ResponseCode.ERROR;
-import static com.twitter.aurora.gen.ResponseCode.INVALID_REQUEST;
-import static com.twitter.aurora.gen.ResponseCode.LOCK_ERROR;
-import static com.twitter.aurora.gen.ResponseCode.OK;
-import static com.twitter.aurora.gen.ResponseCode.WARNING;
-import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
-import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static com.twitter.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 
 public class SchedulerThriftInterfaceTest extends EasyMockTest {
 

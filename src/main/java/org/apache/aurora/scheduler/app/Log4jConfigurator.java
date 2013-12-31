@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.app;
+package org.apache.aurora.scheduler.app;
 
 import com.google.common.base.Preconditions;
+
+import com.twitter.common.logging.RootLogConfig;
+import com.twitter.common.logging.RootLogConfig.Configuration;
+import com.twitter.common.logging.log4j.GlogLayout;
 
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-
-import com.twitter.common.logging.RootLogConfig;
-import com.twitter.common.logging.RootLogConfig.Configuration;
-import com.twitter.common.logging.log4j.GlogLayout;
 
 /**
  * Configures log4j logging.

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -48,38 +48,40 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 
+import com.twitter.common.base.Closure;
+
 import org.antlr.stringtemplate.StringTemplate;
 
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.apiConstants;
-import com.twitter.aurora.scheduler.base.JobKeys;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.Tasks;
-import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
-import com.twitter.aurora.scheduler.metadata.NearestFit;
-import com.twitter.aurora.scheduler.state.CronJobManager;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
-import com.twitter.aurora.scheduler.storage.entities.IConstraint;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConstraint;
-import com.twitter.aurora.scheduler.storage.entities.ITaskEvent;
-import com.twitter.common.base.Closure;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.apiConstants;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.metadata.NearestFit;
+import org.apache.aurora.scheduler.state.CronJobManager;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IConstraint;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
+import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.aurora.gen.ScheduleStatus.ASSIGNED;
-import static com.twitter.aurora.gen.ScheduleStatus.FAILED;
-import static com.twitter.aurora.gen.ScheduleStatus.FINISHED;
-import static com.twitter.aurora.gen.ScheduleStatus.KILLED;
-import static com.twitter.aurora.gen.ScheduleStatus.KILLING;
-import static com.twitter.aurora.gen.ScheduleStatus.LOST;
-import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
-import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
-import static com.twitter.aurora.gen.ScheduleStatus.STARTING;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+
+import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
+import static org.apache.aurora.gen.ScheduleStatus.FAILED;
+import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
+import static org.apache.aurora.gen.ScheduleStatus.KILLED;
+import static org.apache.aurora.gen.ScheduleStatus.KILLING;
+import static org.apache.aurora.gen.ScheduleStatus.LOST;
+import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 
 /**
  * HTTP interface to view information about a job in the aurora scheduler.

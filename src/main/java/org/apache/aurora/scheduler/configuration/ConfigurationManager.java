@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.configuration;
+package org.apache.aurora.scheduler.configuration;
 
 import java.util.regex.Pattern;
 
@@ -29,26 +29,27 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
-import org.apache.commons.lang.StringUtils;
-
-import com.twitter.aurora.gen.Constraint;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.LimitConstraint;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskConfig._Fields;
-import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.scheduler.base.JobKeys;
-import com.twitter.aurora.scheduler.storage.entities.IConstraint;
-import com.twitter.aurora.scheduler.storage.entities.IIdentity;
-import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConstraint;
-import com.twitter.aurora.scheduler.storage.entities.IValueConstraint;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 
-import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
-import static com.twitter.aurora.gen.apiConstants.GOOD_IDENTIFIER_PATTERN_JVM;
+import org.apache.aurora.gen.Constraint;
+import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.LimitConstraint;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskConfig._Fields;
+import org.apache.aurora.gen.TaskConstraint;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.storage.entities.IConstraint;
+import org.apache.aurora.scheduler.storage.entities.IIdentity;
+import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
+import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
+
+import org.apache.commons.lang.StringUtils;
+
+import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
+import static org.apache.aurora.gen.apiConstants.GOOD_IDENTIFIER_PATTERN_JVM;
 
 /**
  * Manages translation from a string-mapped configuration to a concrete configuration type, and

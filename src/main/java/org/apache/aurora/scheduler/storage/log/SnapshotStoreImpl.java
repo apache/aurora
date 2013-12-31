@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.log;
+package org.apache.aurora.scheduler.storage.log;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -24,31 +24,32 @@ import javax.inject.Inject;
 
 import com.google.common.collect.ImmutableSet;
 
-import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.Lock;
-import com.twitter.aurora.gen.storage.QuotaConfiguration;
-import com.twitter.aurora.gen.storage.SchedulerMetadata;
-import com.twitter.aurora.gen.storage.Snapshot;
-import com.twitter.aurora.gen.storage.StoredJob;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.storage.SnapshotStore;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import com.twitter.aurora.scheduler.storage.Storage.MutateWork;
-import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
-import com.twitter.aurora.scheduler.storage.Storage.Volatile;
-import com.twitter.aurora.scheduler.storage.Storage.Work;
-import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
-import com.twitter.aurora.scheduler.storage.entities.ILock;
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.Lock;
+import org.apache.aurora.gen.storage.QuotaConfiguration;
+import org.apache.aurora.gen.storage.SchedulerMetadata;
+import org.apache.aurora.gen.storage.Snapshot;
+import org.apache.aurora.gen.storage.StoredJob;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.storage.SnapshotStore;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.Volatile;
+import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.ILock;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.aurora.gen.apiConstants.CURRENT_API_VERSION;
+import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 
 /**
  * Snapshot store implementation that delegates to underlying snapshot stores by

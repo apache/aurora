@@ -8,7 +8,7 @@ import glob
 import os
 import re
 
-from twitter.thermos.common.path import TaskPath
+from apache.thermos.common.path import TaskPath
 
 
 class TaskDetector(object):

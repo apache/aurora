@@ -1,6 +1,6 @@
-from twitter.thermos.config.schema import Task, Resources, Process
-from twitter.thermos.testing.runner import RunnerTestBase
-from gen.twitter.thermos.ttypes import (
+from apache.thermos.config.schema import Task, Resources, Process
+from apache.thermos.testing.runner import RunnerTestBase
+from gen.apache.thermos.ttypes import (
   TaskState,
   ProcessState
 )

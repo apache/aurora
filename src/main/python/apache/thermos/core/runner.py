@@ -39,21 +39,21 @@ from twitter.common.dirutil import safe_mkdir
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader
 
-from twitter.thermos.common.ckpt import (
+from apache.thermos.common.ckpt import (
   CheckpointDispatcher,
   UniversalStateHandler,
   ProcessStateHandler,
   TaskStateHandler)
-from twitter.thermos.common.path import TaskPath
-from twitter.thermos.common.planner import TaskPlanner
-from twitter.thermos.config.loader import (
+from apache.thermos.common.path import TaskPath
+from apache.thermos.common.planner import TaskPlanner
+from apache.thermos.config.loader import (
   ThermosConfigLoader,
   ThermosProcessWrapper,
   ThermosTaskWrapper,
   ThermosTaskValidator)
-from twitter.thermos.config.schema import ThermosContext
+from apache.thermos.config.schema import ThermosContext
 
-from gen.twitter.thermos.ttypes import (
+from gen.apache.thermos.ttypes import (
   ProcessState,
   ProcessStatus,
   RunnerCkpt,

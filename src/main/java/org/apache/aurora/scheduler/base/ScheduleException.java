@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.base;
+package org.apache.aurora.scheduler.base;
 
 /**
  * Exception class to signal a failure to schedule a task or job.

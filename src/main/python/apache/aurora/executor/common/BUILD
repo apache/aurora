@@ -25,7 +25,7 @@ python_library(
     pants(':task_info'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
-    pants('src/main/python/twitter/aurora/common:http_signaler'),
+    pants('src/main/python/apache/aurora/common:http_signaler'),
   ]
 )
 
@@ -60,10 +60,10 @@ python_library(
   name = 'task_info',
   sources = ['task_info.py'],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:pystachio'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/twitter/aurora/config'),
-    pants('src/main/python/twitter/aurora/config/schema'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/aurora/config'),
+    pants('src/main/python/apache/aurora/config/schema'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )

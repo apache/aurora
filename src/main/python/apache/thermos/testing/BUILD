@@ -4,11 +4,11 @@ python_library(
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/twitter/thermos/common:ckpt'),
-    pants('src/main/python/twitter/thermos/common:path'),
-    pants('src/main/python/twitter/thermos/config'),
-    pants('src/main/python/twitter/thermos/core'),
-    pants('src/main/python/twitter/thermos:thrift'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift'),
+    pants('src/main/python/apache/thermos/common:ckpt'),
+    pants('src/main/python/apache/thermos/common:path'),
+    pants('src/main/python/apache/thermos/config'),
+    pants('src/main/python/apache/thermos/core'),
+    pants('src/main/python/apache/thermos:thrift'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
 )

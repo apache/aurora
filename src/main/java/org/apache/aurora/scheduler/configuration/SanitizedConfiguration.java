@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.configuration;
+package org.apache.aurora.scheduler.configuration;
 
 import java.util.Map;
 
@@ -25,9 +25,9 @@ import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Range;
 
-import com.twitter.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
-import com.twitter.aurora.scheduler.storage.entities.IJobConfiguration;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Wrapper for a configuration that has been fully-sanitized and populated with defaults.

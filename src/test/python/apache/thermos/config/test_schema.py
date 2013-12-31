@@ -1,7 +1,7 @@
 import pytest
 
 from twitter.common.collections import OrderedDict
-from twitter.thermos.config.schema import (
+from apache.thermos.config.schema import (
   Constraint,
   List,
   Process,

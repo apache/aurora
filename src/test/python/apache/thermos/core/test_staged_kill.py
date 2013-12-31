@@ -6,15 +6,15 @@ import time
 
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time
-from twitter.thermos.config.schema import (
+from apache.thermos.config.schema import (
   Task,
   Resources,
   Process)
-from twitter.thermos.core.runner import TaskRunner
-from twitter.thermos.monitoring.monitor import TaskMonitor
-from twitter.thermos.testing.runner import Runner
+from apache.thermos.core.runner import TaskRunner
+from apache.thermos.monitoring.monitor import TaskMonitor
+from apache.thermos.testing.runner import Runner
 
-from gen.twitter.thermos.ttypes import (
+from gen.apache.thermos.ttypes import (
   TaskState,
   ProcessState
 )

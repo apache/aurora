@@ -4,6 +4,6 @@ python_library(
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/lang'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )

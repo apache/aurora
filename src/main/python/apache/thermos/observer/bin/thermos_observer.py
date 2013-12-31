@@ -8,9 +8,9 @@ from twitter.common import app
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.http import HttpServer
 from twitter.common.http.diagnostics import DiagnosticsEndpoints
-from twitter.thermos.common.path import TaskPath
-from twitter.thermos.observer.task_observer import TaskObserver
-from twitter.thermos.observer.http.http_observer import BottleObserver
+from apache.thermos.common.path import TaskPath
+from apache.thermos.observer.task_observer import TaskObserver
+from apache.thermos.observer.http.http_observer import BottleObserver
 
 
 app.add_option("--root",

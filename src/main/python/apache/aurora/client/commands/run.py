@@ -1,12 +1,12 @@
 from twitter.common import app
-from twitter.aurora.client.base import die
-from twitter.aurora.client.options import (
+from apache.aurora.client.base import die
+from apache.aurora.client.options import (
     EXECUTOR_SANDBOX_OPTION,
     SSH_USER_OPTION,
 )
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
-from twitter.aurora.common.clusters import CLUSTERS
-from twitter.aurora.client.api.command_runner import DistributedCommandRunner
+from apache.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.common.clusters import CLUSTERS
+from apache.aurora.client.api.command_runner import DistributedCommandRunner
 
 
 @app.command

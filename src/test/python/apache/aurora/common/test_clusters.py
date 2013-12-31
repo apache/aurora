@@ -1,7 +1,7 @@
 import json
 import os
 
-from twitter.aurora.common.clusters import Clusters, Parser
+from apache.aurora.common.clusters import Clusters, Parser
 from twitter.common.contextutil import temporary_dir
 
 import pytest

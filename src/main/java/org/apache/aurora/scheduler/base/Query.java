@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.base;
+package org.apache.aurora.scheduler.base;
 
 import java.util.EnumSet;
 
@@ -23,11 +23,11 @@ import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
 
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.InstanceKey;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.TaskQuery;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.InstanceKey;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

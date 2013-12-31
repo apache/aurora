@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.stats;
+package org.apache.aurora.scheduler.stats;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -30,13 +30,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.BindingAnnotation;
 
-import org.apache.mesos.Protos.Offer;
-
-import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.scheduler.async.OfferQueue;
-import com.twitter.aurora.scheduler.configuration.Resources;
-import com.twitter.aurora.scheduler.stats.SlotSizeCounter.ResourceSlotProvider;
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -44,6 +37,14 @@ import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
+
+import org.apache.aurora.gen.Quota;
+import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.stats.SlotSizeCounter.ResourceSlotProvider;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
+
+import org.apache.mesos.Protos.Offer;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;

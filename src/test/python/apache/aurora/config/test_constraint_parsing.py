@@ -1,7 +1,7 @@
 import pytest
 import unittest
 
-from twitter.aurora.config.thrift import constraints_to_thrift
+from apache.aurora.config.thrift import constraints_to_thrift
 
 
 def test_parsing_constraints():

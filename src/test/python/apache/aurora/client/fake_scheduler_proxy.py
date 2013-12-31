@@ -1,4 +1,4 @@
-from twitter.aurora.client.api.scheduler_client import SchedulerProxy
+from apache.aurora.client.api.scheduler_client import SchedulerProxy
 
 
 class FakeSchedulerProxy(SchedulerProxy):

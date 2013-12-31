@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.events;
+package org.apache.aurora.scheduler.events;
 
 import javax.inject.Singleton;
 
@@ -23,15 +23,16 @@ import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matchers;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.scheduler.events.PubsubEvent.DriverRegistered;
-import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
-import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
-import com.twitter.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
+
+import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
+import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
+import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
+import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
+
+import org.junit.Before;
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 

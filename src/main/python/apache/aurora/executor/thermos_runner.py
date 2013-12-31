@@ -5,10 +5,10 @@ import sys
 import traceback
 
 from twitter.common import app, log
-from twitter.thermos.common.options import add_port_to
-from twitter.thermos.common.planner import TaskPlanner
-from twitter.thermos.config.loader import ThermosConfigLoader
-from twitter.thermos.core.runner import TaskRunner
+from apache.thermos.common.options import add_port_to
+from apache.thermos.common.planner import TaskPlanner
+from apache.thermos.config.loader import ThermosConfigLoader
+from apache.thermos.core.runner import TaskRunner
 
 
 app.add_option(

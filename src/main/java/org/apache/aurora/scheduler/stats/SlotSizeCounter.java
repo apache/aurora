@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.stats;
+package org.apache.aurora.scheduler.stats;
 
 import java.util.Map;
 
@@ -24,9 +24,9 @@ import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
-import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.scheduler.quota.Quotas;
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.gen.Quota;
+import org.apache.aurora.scheduler.quota.Quotas;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

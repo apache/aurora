@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.base;
+package org.apache.aurora.scheduler.base;
+
+import com.twitter.common.base.MorePreconditions;
 
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.CommandInfo.URI;
-
-import com.twitter.common.base.MorePreconditions;
 
 /**
  * Utility class for constructing {@link CommandInfo} objects given an executor URI.

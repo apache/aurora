@@ -1,13 +1,13 @@
-package com.twitter.aurora.scheduler.stats;
+package org.apache.aurora.scheduler.stats;
 
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import com.twitter.aurora.scheduler.stats.AsyncStatsModule.StatUpdater;
-import com.twitter.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
-import com.twitter.aurora.scheduler.stats.ResourceCounter.Metric;
-import com.twitter.aurora.scheduler.storage.Storage.StorageException;
+import org.apache.aurora.scheduler.stats.AsyncStatsModule.StatUpdater;
+import org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
+import org.apache.aurora.scheduler.stats.ResourceCounter.Metric;
+import org.apache.aurora.scheduler.storage.Storage.StorageException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

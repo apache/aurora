@@ -2,12 +2,12 @@ import os
 
 from twitter.common.contextutil import temporary_dir, temporary_file
 
-from twitter.aurora.client import config
-from twitter.aurora.config import AuroraConfig
-from twitter.aurora.config.loader import AuroraConfigLoader
-from twitter.aurora.config.schema.base import Announcer, Job, MB, Resources, Task
+from apache.aurora.client import config
+from apache.aurora.config import AuroraConfig
+from apache.aurora.config.loader import AuroraConfigLoader
+from apache.aurora.config.schema.base import Announcer, Job, MB, Resources, Task
 
-from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
+from gen.apache.aurora.constants import DEFAULT_ENVIRONMENT
 
 import pytest
 

@@ -1,10 +1,10 @@
-from twitter.thermos.config.schema import (
+from apache.thermos.config.schema import (
   Constraint,
   Process,
   Task
 )
-from twitter.thermos.testing.runner import RunnerTestBase
-from gen.twitter.thermos.ttypes import ProcessState, TaskState
+from apache.thermos.testing.runner import RunnerTestBase
+from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 
 class TestRegularFinalizingTask(RunnerTestBase):

@@ -1,15 +1,15 @@
-from twitter.aurora.client.api.restarter import Restarter
-from twitter.aurora.client.api.instance_watcher import InstanceWatcher
-from twitter.aurora.client.api.updater_util import UpdaterConfig
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.client.api.restarter import Restarter
+from apache.aurora.client.api.instance_watcher import InstanceWatcher
+from apache.aurora.client.api.updater_util import UpdaterConfig
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.twitter.aurora.AuroraSchedulerManager import Client as scheduler_client
-from gen.twitter.aurora.ttypes import *
+from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
+from gen.apache.aurora.ttypes import *
 
 from mox import IgnoreArg, MoxTestBase
 
 # test space
-from twitter.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
+from apache.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
 
 
 SESSION_KEY = 'test_session'

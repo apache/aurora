@@ -1,7 +1,7 @@
 import pytest
 from twitter.common.testing.clock import ThreadedClock
-from twitter.thermos.common.planner import TaskPlanner
-from twitter.thermos.config.schema import *
+from apache.thermos.common.planner import TaskPlanner
+from apache.thermos.config.schema import *
 
 
 p1 = Process(name = "p1", cmdline = "")

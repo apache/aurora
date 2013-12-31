@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.state;
+package org.apache.aurora.scheduler.state;
 
 import javax.inject.Singleton;
 
@@ -21,12 +21,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 
-import com.twitter.aurora.scheduler.MesosTaskFactory;
-import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
-import com.twitter.aurora.scheduler.events.PubsubEventModule;
-import com.twitter.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
-import com.twitter.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
-import com.twitter.aurora.scheduler.state.UUIDGenerator.UUIDGeneratorImpl;
+import org.apache.aurora.scheduler.MesosTaskFactory;
+import org.apache.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
+import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
+import org.apache.aurora.scheduler.state.UUIDGenerator.UUIDGeneratorImpl;
 
 /**
  * Binding module for scheduling logic and higher-level state management.

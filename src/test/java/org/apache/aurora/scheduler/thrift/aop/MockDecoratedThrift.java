@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -25,8 +25,8 @@ import javax.inject.Inject;
 import com.google.inject.Binder;
 import com.google.inject.BindingAnnotation;
 
-import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.scheduler.thrift.auth.DecoratedThrift;
+import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 
 /**
  * An injected forwarding thrift implementation that delegates to a bound mock interface.

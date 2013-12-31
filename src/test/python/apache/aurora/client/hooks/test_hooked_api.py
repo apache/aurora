@@ -1,8 +1,8 @@
 from inspect import getargspec
 
-from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI, NonHookedAuroraClientAPI
-from twitter.aurora.client.api import AuroraClientAPI
-from twitter.aurora.common.cluster import Cluster
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI, NonHookedAuroraClientAPI
+from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.common.cluster import Cluster
 
 from mock import Mock
 

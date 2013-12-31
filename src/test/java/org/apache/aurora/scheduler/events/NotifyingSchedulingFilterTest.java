@@ -13,25 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.events;
+package org.apache.aurora.scheduler.events;
 
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.scheduler.ResourceSlot;
-import com.twitter.aurora.scheduler.events.PubsubEvent.Vetoed;
-import com.twitter.aurora.scheduler.filter.SchedulingFilter;
-import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
+import org.apache.aurora.scheduler.filter.SchedulingFilter;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertEquals;
 
 public class NotifyingSchedulingFilterTest extends EasyMockTest {

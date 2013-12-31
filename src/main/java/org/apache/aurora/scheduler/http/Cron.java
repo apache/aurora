@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import java.util.Map;
 
@@ -26,7 +26,7 @@ import javax.ws.rs.core.Response;
 
 import com.google.common.collect.ImmutableMap;
 
-import com.twitter.aurora.scheduler.state.CronJobManager;
+import org.apache.aurora.scheduler.state.CronJobManager;
 
 /**
  * HTTP interface to dump state of the internal cron scheduler.

@@ -1,14 +1,14 @@
 import contextlib
 import unittest
 
-from twitter.aurora.client.cli import AuroraCommandLine
-from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.client.cli import AuroraCommandLine
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.common.contextutil import temporary_file
-from twitter.aurora.client.cli.jobs import parse_instances
-from twitter.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+from apache.aurora.client.cli.jobs import parse_instances
+from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     Identity,
     TaskQuery,
 )
@@ -55,8 +55,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_context = FakeAuroraCommandContext()
     mock_scheduler = Mock()
     with contextlib.nested(
-        patch('twitter.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
 
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.get_kill_job_response()
@@ -75,8 +75,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('twitter.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.get_kill_job_response()
       with temporary_file() as fp:
@@ -96,8 +96,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_context = FakeAuroraCommandContext()
     (mock_api, mock_scheduler) = self.setup_mock_api()
     with contextlib.nested(
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       mock_scheduler.killTasks.return_value = self.get_kill_job_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())

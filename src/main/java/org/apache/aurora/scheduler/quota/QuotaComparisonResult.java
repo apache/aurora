@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.quota;
+package org.apache.aurora.scheduler.quota;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
 
 /**
  * Calculates and formats detailed quota comparison result.

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift;
+package org.apache.aurora.scheduler.thrift;
 
 import java.net.ServerSocket;
 import java.util.logging.Level;
@@ -22,13 +22,13 @@ import java.util.logging.Logger;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import com.twitter.thrift.Status;
+
 import org.apache.thrift.TProcessor;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TThreadPoolServer;
 import org.apache.thrift.transport.TServerSocket;
-
-import com.twitter.thrift.Status;
 
 class ThriftServer {
   private static final Logger LOG = Logger.getLogger(ThriftServer.class.getName());

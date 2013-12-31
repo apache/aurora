@@ -1,8 +1,8 @@
 import functools
 
-from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
-from twitter.aurora.common.cluster import Cluster
-from twitter.aurora.common.clusters import CLUSTERS
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import CLUSTERS
 from twitter.common import app
 
 from .base import die

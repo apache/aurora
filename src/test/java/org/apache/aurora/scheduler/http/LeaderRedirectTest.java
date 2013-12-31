@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -25,11 +25,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
 import com.google.inject.util.Providers;
-
-import org.easymock.Capture;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
 
 import com.twitter.common.application.ShutdownRegistry.ShutdownRegistryImpl;
 import com.twitter.common.application.modules.LifecycleModule.ServiceRunner;
@@ -43,11 +38,17 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
+import org.easymock.Capture;
+
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Test;
+
+import static org.apache.aurora.scheduler.http.LeaderRedirect.HTTP_PORT_NAME;
+
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
-
-import static com.twitter.aurora.scheduler.http.LeaderRedirect.HTTP_PORT_NAME;
 
 public class LeaderRedirectTest extends EasyMockTest {
 

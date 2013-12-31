@@ -13,22 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.mem;
+package org.apache.aurora.scheduler.storage.mem;
 
 import javax.inject.Singleton;
 
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 
-import com.twitter.aurora.scheduler.storage.AttributeStore;
-import com.twitter.aurora.scheduler.storage.JobStore;
-import com.twitter.aurora.scheduler.storage.LockStore;
-import com.twitter.aurora.scheduler.storage.QuotaStore;
-import com.twitter.aurora.scheduler.storage.SchedulerStore;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.Storage.Volatile;
-import com.twitter.aurora.scheduler.storage.TaskStore;
 import com.twitter.common.inject.Bindings.KeyFactory;
+
+import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.LockStore;
+import org.apache.aurora.scheduler.storage.QuotaStore;
+import org.apache.aurora.scheduler.storage.SchedulerStore;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.Volatile;
+import org.apache.aurora.scheduler.storage.TaskStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -37,15 +38,15 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * <p>
  * Exposes bindings for storage components:
  * <ul>
- *   <li>{@link com.twitter.aurora.scheduler.storage.Storage}</li>
+ *   <li>{@link org.apache.aurora.scheduler.storage.Storage}</li>
  *   <li>Keyed with keys provided by the provided{@code keyFactory}:</li>
  *     <ul>
- *       <li>{@link com.twitter.aurora.scheduler.storage.SchedulerStore}</li>
- *       <li>{@link com.twitter.aurora.scheduler.storage.JobStore}</li>
- *       <li>{@link com.twitter.aurora.scheduler.storage.TaskStore}</li>
- *       <li>{@link com.twitter.aurora.scheduler.storage.LockStore}</li>
- *       <li>{@link com.twitter.aurora.scheduler.storage.QuotaStore}</li>
- *       <li>{@link com.twitter.aurora.scheduler.storage.AttributeStore}</li>
+ *       <li>{@link org.apache.aurora.scheduler.storage.SchedulerStore}</li>
+ *       <li>{@link org.apache.aurora.scheduler.storage.JobStore}</li>
+ *       <li>{@link org.apache.aurora.scheduler.storage.TaskStore}</li>
+ *       <li>{@link org.apache.aurora.scheduler.storage.LockStore}</li>
+ *       <li>{@link org.apache.aurora.scheduler.storage.QuotaStore}</li>
+ *       <li>{@link org.apache.aurora.scheduler.storage.AttributeStore}</li>
  *     </ul>
  * </ul>
  */

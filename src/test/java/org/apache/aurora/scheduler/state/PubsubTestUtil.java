@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.state;
+package org.apache.aurora.scheduler.state;
 
 import java.util.Set;
 
@@ -22,11 +22,12 @@ import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 
-import com.twitter.aurora.scheduler.events.PubsubEvent;
-import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.common.application.StartupStage;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
+
+import org.apache.aurora.scheduler.events.PubsubEvent;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
 
 /**
  * A convenience utility for unit tests that which to verify pubsub wiring.

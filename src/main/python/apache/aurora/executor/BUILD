@@ -7,14 +7,14 @@ python_library(
     pants('aurora/twitterdeps/src/python/twitter/common/dirutil'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
-    pants('src/main/python/twitter/thermos/common'),
-    pants('src/main/python/twitter/thermos/config:schema'),
-    pants('src/main/python/twitter/thermos/core'),
-    pants('src/main/python/twitter/thermos/monitoring:monitor'),
-    pants('src/main/python/twitter/aurora/common:http_signaler'),
-    pants('src/main/python/twitter/aurora/executor/common:status_checker'),
-    pants('src/main/python/twitter/aurora/executor/common:task_info'),
-    pants('src/main/python/twitter/aurora/executor/common:task_runner'),
+    pants('src/main/python/apache/thermos/common'),
+    pants('src/main/python/apache/thermos/config:schema'),
+    pants('src/main/python/apache/thermos/core'),
+    pants('src/main/python/apache/thermos/monitoring:monitor'),
+    pants('src/main/python/apache/aurora/common:http_signaler'),
+    pants('src/main/python/apache/aurora/executor/common:status_checker'),
+    pants('src/main/python/apache/aurora/executor/common:task_info'),
+    pants('src/main/python/apache/aurora/executor/common:task_runner'),
   ]
 )
 
@@ -30,7 +30,7 @@ python_library(
   name = 'executor_vars',
   sources = ['executor_vars.py'],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:psutil'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:psutil'),
     pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
     pants('aurora/twitterdeps/src/python/twitter/common/metrics'),
     pants('aurora/twitterdeps/src/python/twitter/common/python'),
@@ -46,7 +46,7 @@ python_library(
     pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
-    pants('src/main/python/twitter/aurora/executor/common:status_checker'),
+    pants('src/main/python/apache/aurora/executor/common:status_checker'),
   ]
 )
 
@@ -55,9 +55,9 @@ python_library(
   sources = ['executor_base.py'],
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift'),
-    pants('src/main/python/twitter/aurora:mesos-core'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    pants('src/main/python/apache/aurora:mesos-core'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
@@ -65,18 +65,18 @@ python_library(
   name = 'thermos_executor',
   sources = ['thermos_executor.py'],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:pystachio'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
     pants(':status_manager'),
     pants(':thermos_executor_base'),
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
     pants('aurora/twitterdeps/src/python/twitter/common/concurrent'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
-    pants('src/main/python/twitter/aurora/executor/common:kill_manager'),
-    pants('src/main/python/twitter/aurora/executor/common:sandbox'),
-    pants('src/main/python/twitter/aurora/executor/common:task_info'),
-    pants('src/main/python/twitter/aurora/executor/common:task_runner'),
-    pants('src/main/python/twitter/aurora:mesos-core'),
+    pants('src/main/python/apache/aurora/executor/common:kill_manager'),
+    pants('src/main/python/apache/aurora/executor/common:sandbox'),
+    pants('src/main/python/apache/aurora/executor/common:task_info'),
+    pants('src/main/python/apache/aurora/executor/common:task_runner'),
+    pants('src/main/python/apache/aurora:mesos-core'),
   ]
 )
 
@@ -86,9 +86,9 @@ python_library(
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/app'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/twitter/thermos/common:planner'),
-    pants('src/main/python/twitter/thermos/config:schema'),
-    pants('src/main/python/twitter/thermos/core'),
+    pants('src/main/python/apache/thermos/common:planner'),
+    pants('src/main/python/apache/thermos/config:schema'),
+    pants('src/main/python/apache/thermos/core'),
   ],
 )
 
@@ -96,7 +96,7 @@ python_library(
   name = 'gc_executor',
   sources = ['gc_executor.py'],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:psutil'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:psutil'),
     pants(':executor_detector'),
     pants(':thermos_executor_base'),
     pants('aurora/twitterdeps/src/python/twitter/common/collections'),
@@ -104,16 +104,16 @@ python_library(
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/metrics'),
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
-    pants('src/main/python/twitter/thermos/common:ckpt'),
-    pants('src/main/python/twitter/thermos/common:path'),
-    pants('src/main/python/twitter/thermos/core:helper'),
-    pants('src/main/python/twitter/thermos/core:inspector'),
-    pants('src/main/python/twitter/thermos/monitoring:detector'),
-    pants('src/main/python/twitter/thermos/monitoring:garbage'),
-    pants('src/main/python/twitter/aurora/config:schema'),
-    pants('src/main/python/twitter/aurora/executor/common:sandbox'),
-    pants('src/main/python/twitter/aurora:mesos-core'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/thermos/common:ckpt'),
+    pants('src/main/python/apache/thermos/common:path'),
+    pants('src/main/python/apache/thermos/core:helper'),
+    pants('src/main/python/apache/thermos/core:inspector'),
+    pants('src/main/python/apache/thermos/monitoring:detector'),
+    pants('src/main/python/apache/thermos/monitoring:garbage'),
+    pants('src/main/python/apache/aurora/config:schema'),
+    pants('src/main/python/apache/aurora/executor/common:sandbox'),
+    pants('src/main/python/apache/aurora:mesos-core'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
@@ -121,19 +121,19 @@ python_library(
   name = 'executor-packaged',
   dependencies = [
     # Covering dependencies
-    pants('src/main/python/twitter/aurora/common'),
-    pants('src/main/python/twitter/aurora/config'),
-    pants('src/main/python/twitter/thermos/common'),
-    pants('src/main/python/twitter/thermos/config'),
-    pants('src/main/python/twitter/thermos/core'),
-    pants('src/main/python/twitter/thermos/monitoring'),
+    pants('src/main/python/apache/aurora/common'),
+    pants('src/main/python/apache/aurora/config'),
+    pants('src/main/python/apache/thermos/common'),
+    pants('src/main/python/apache/thermos/config'),
+    pants('src/main/python/apache/thermos/core'),
+    pants('src/main/python/apache/thermos/monitoring'),
   ],
   provides = setup_py(
-    name = 'twitter.aurora.executor',
+    name = 'apache.aurora.executor',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
   ).with_binaries(
-    gc_executor = pants('src/main/python/twitter/aurora/executor/bin:gc_executor'),
-    thermos_executor = pants('src/main/python/twitter/aurora/executor/bin:thermos_executor'),
-    thermos_runner = pants('src/main/python/twitter/aurora/executor/bin:thermos_runner'),
+    gc_executor = pants('src/main/python/apache/aurora/executor/bin:gc_executor'),
+    thermos_executor = pants('src/main/python/apache/aurora/executor/bin:thermos_executor'),
+    thermos_runner = pants('src/main/python/apache/aurora/executor/bin:thermos_runner'),
   )
 )

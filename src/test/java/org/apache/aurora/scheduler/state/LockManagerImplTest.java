@@ -13,35 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.state;
+package org.apache.aurora.scheduler.state;
 
 import java.util.UUID;
 
 import com.google.common.base.Optional;
 
-import org.easymock.EasyMock;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.Lock;
-import com.twitter.aurora.gen.LockKey;
-import com.twitter.aurora.scheduler.base.JobKeys;
-import com.twitter.aurora.scheduler.state.LockManager.LockException;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
-import com.twitter.aurora.scheduler.storage.entities.ILock;
-import com.twitter.aurora.scheduler.storage.entities.ILockKey;
-import com.twitter.aurora.scheduler.storage.mem.MemStorage;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
-import static org.junit.Assert.assertEquals;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.Lock;
+import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.state.LockManager.LockException;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.ILock;
+import org.apache.aurora.scheduler.storage.entities.ILockKey;
+import org.apache.aurora.scheduler.storage.mem.MemStorage;
 
-import static com.twitter.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
+import org.easymock.EasyMock;
+
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+
+import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
+
+import static org.junit.Assert.assertEquals;
 
 public class LockManagerImplTest extends EasyMockTest {
   private static final String USER = "jim-user";

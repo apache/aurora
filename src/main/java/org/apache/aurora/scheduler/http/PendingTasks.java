@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -24,7 +24,7 @@ import javax.ws.rs.core.Response;
 
 import com.google.common.base.Preconditions;
 
-import com.twitter.aurora.scheduler.async.TaskGroups;
+import org.apache.aurora.scheduler.async.TaskGroups;
 
 /**
  * Servlet that exposes detailed information about tasks that are pending.

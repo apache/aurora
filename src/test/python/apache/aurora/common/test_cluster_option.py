@@ -2,9 +2,9 @@ import pytest
 
 from twitter.common import options
 
-from twitter.aurora.common.cluster import Cluster
-from twitter.aurora.common.clusters import Clusters
-from twitter.aurora.common.cluster_option import ClusterOption
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import Clusters
+from apache.aurora.common.cluster_option import ClusterOption
 
 
 CLUSTER_LIST = Clusters((

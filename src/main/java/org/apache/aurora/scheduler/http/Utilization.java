@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import java.io.StringWriter;
 import java.util.Map;
@@ -35,18 +35,19 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 
-import org.antlr.stringtemplate.StringTemplate;
-
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.stats.ResourceCounter;
-import com.twitter.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
-import com.twitter.aurora.scheduler.stats.ResourceCounter.Metric;
-import com.twitter.aurora.scheduler.stats.ResourceCounter.MetricType;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.util.templating.StringTemplateHelper;
 import com.twitter.common.util.templating.StringTemplateHelper.TemplateException;
+
+import org.antlr.stringtemplate.StringTemplate;
+
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.stats.ResourceCounter;
+import org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
+import org.apache.aurora.scheduler.stats.ResourceCounter.Metric;
+import org.apache.aurora.scheduler.stats.ResourceCounter.MetricType;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * A servlet to give an aggregate view of cluster resources consumed, grouped by category.

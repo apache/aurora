@@ -2,10 +2,10 @@ import functools
 import traceback
 
 from twitter.common import log
-from twitter.aurora.client.api import AuroraClientAPI
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.twitter.aurora.ttypes import ResponseCode
+from gen.apache.aurora.ttypes import ResponseCode
 
 
 def _partial(function, *args, **kw):
@@ -50,7 +50,7 @@ class NonHookedAuroraClientAPI(AuroraClientAPI):
 class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
   """
     Adds a hooking aspect/behaviour to the lifecycle of Mesos Client API methods
-    by injecting hooks (instances of twitter.aurora.client.hooks.Hooks)
+    by injecting hooks (instances of apache.aurora.client.hooks.Hooks)
 
     * Hooks are available in the 'config' (AuroraConfig) param that each API call receives
     * Each Hook is run around each API call:

@@ -1,11 +1,11 @@
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
-import com.twitter.aurora.gen.Response;
+import org.apache.aurora.gen.Response;
 
-import static com.twitter.aurora.gen.apiConstants.CURRENT_API_VERSION;
+import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 
 class APIVersionInterceptor implements MethodInterceptor {
 

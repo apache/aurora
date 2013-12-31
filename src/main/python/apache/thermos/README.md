@@ -28,8 +28,8 @@ Thermos lives in `science` at Twitter and publically on GitHub in `twitter-commo
 Build the Thermos CLI and the Thermos observer.
 
 ```shell
-$ ./pants src/python/twitter/thermos
-$ ./pants src/python/twitter/thermos/bin:thermos_observe
+$ ./pants src/python/apache/thermos
+$ ./pants src/python/apache/thermos/bin:thermos_observe
 ```
 
 You can copy `dist/thermos.pex` to `thermos` somewhere in your `$PATH` or use a la carte.
@@ -131,7 +131,7 @@ export({
 ```
 
 The full Thermos pystachio schema can be found at
-`src/python/twitter/thermos/config/schema.py` and is mostly described below.
+`src/python/apache/thermos/config/schema.py` and is mostly described below.
 
 
 ## Configuration reference ##
@@ -351,11 +351,11 @@ mostly a best-effort signal.
 ## REPL ##
 
 You can interactively experiment with the Thermos configuration REPL via the
-`src/python/twitter/thermos/config:repl` target:
+`src/python/apache/thermos/config:repl` target:
 
 ```python
-$ ./pants py src/python/twitter/thermos/config:repl
-Build operating on target: PythonBinary(src/python/twitter/thermos/config/BUILD:repl)
+$ ./pants py src/python/apache/thermos/config:repl
+Build operating on target: PythonBinary(src/python/apache/thermos/config/BUILD:repl)
 Thermos Config REPL
 >>> boilerplate = Process(cmdline = "echo hello world")
 >>> boilerplate
@@ -397,7 +397,7 @@ If this is left unbound, the thermos CLI will complain:
 
 ```
 $ thermos run thermos/examples/tutorial/unbound.thermos
-twitter.thermos.config.loader.InvalidTask: Task[processes] failed: Element in ProcessList failed check: Process[cmdline] failed: Uninterpolated variables: {{first}}
+apache.thermos.config.loader.InvalidTask: Task[processes] failed: Element in ProcessList failed check: Process[cmdline] failed: Uninterpolated variables: {{first}}
 ```
 
 But free variables can be populated at runtime using the `-E` parameter:

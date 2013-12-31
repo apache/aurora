@@ -6,16 +6,16 @@ import sys
 import tempfile
 import time
 
-from twitter.aurora.config.schema.base import (
+from apache.aurora.config.schema.base import (
     MB,
     MesosTaskInstance,
     Process,
     Resources,
     Task,
 )
-from twitter.aurora.executor.common.sandbox import DirectorySandbox
-from twitter.aurora.executor.common.status_checker import ExitState
-from twitter.aurora.executor.thermos_task_runner import ThermosTaskRunner
+from apache.aurora.executor.common.sandbox import DirectorySandbox
+from apache.aurora.executor.common.status_checker import ExitState
+from apache.aurora.executor.thermos_task_runner import ThermosTaskRunner
 from twitter.common import log
 from twitter.common.log.options import LogOptions
 from twitter.common.dirutil import safe_rmtree
@@ -48,7 +48,7 @@ class TestThermosTaskRunnerIntegration(object):
     log.init('executor_logger')
     if not cls.PANTS_BUILT and 'SKIP_PANTS_BUILD' not in os.environ:
       assert subprocess.call(["./pants",
-          "src/main/python/twitter/aurora/executor/bin:thermos_runner"]) == 0
+          "src/main/python/apache/aurora/executor/bin:thermos_runner"]) == 0
       cls.PANTS_BUILT = True
 
   @classmethod

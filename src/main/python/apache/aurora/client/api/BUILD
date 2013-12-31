@@ -7,8 +7,8 @@ python_library(
     pants(':updater'),
     pants('aurora/twitterdeps/src/python/twitter/common/lang'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/twitter/aurora/common'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/aurora/common'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
@@ -16,12 +16,12 @@ python_library(
   name = 'command_runner',
   sources = ['command_runner.py'],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:pystachio'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
     pants(':api'),
-    pants('src/main/python/twitter/thermos/config:schema'),
-    pants('src/main/python/twitter/aurora/common:cluster'),
-    pants('src/main/python/twitter/aurora/config:schema'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/thermos/config:schema'),
+    pants('src/main/python/apache/aurora/common:cluster'),
+    pants('src/main/python/apache/aurora/config:schema'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
@@ -31,8 +31,8 @@ python_library(
   dependencies = [
     pants(':api'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/twitter/aurora/client:base'),
-    pants('src/main/python/twitter/aurora/common'),
+    pants('src/main/python/apache/aurora/client:base'),
+    pants('src/main/python/apache/aurora/common'),
   ]
 )
 
@@ -41,7 +41,7 @@ python_library(
   sources = ['job_monitor.py'],
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
@@ -52,7 +52,7 @@ python_library(
     pants(':instance_watcher'),
     pants(':updater_util'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
@@ -65,9 +65,9 @@ python_library(
     pants('aurora/twitterdeps/src/python/twitter/common/rpc/transports:tsslsocket'),
     pants('aurora/twitterdeps/src/python/twitter/common/zookeeper/serverset:kazoo_serverset'),
     pants('aurora/twitterdeps/src/python/twitter/common/zookeeper:kazoo_client'),
-    pants('src/main/python/twitter/aurora/common/auth'),
-    pants('src/main/python/twitter/aurora/common:cluster'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/aurora/common/auth'),
+    pants('src/main/python/apache/aurora/common:cluster'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
@@ -78,8 +78,8 @@ python_library(
     pants(':scheduler_client'),
     pants('aurora/twitterdeps/src/python/twitter/common/lang'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/twitter/aurora/common:http_signaler'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/aurora/common:http_signaler'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
@@ -91,7 +91,7 @@ python_library(
     pants(':instance_watcher'),
     pants(':updater_util'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 

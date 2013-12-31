@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
 
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
@@ -24,14 +24,14 @@ import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 
+import com.twitter.common.stats.Stats;
+import com.twitter.common.util.StateMachine;
+
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.SchedulerDriver;
-
-import com.twitter.common.stats.Stats;
-import com.twitter.common.util.StateMachine;
 
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
 

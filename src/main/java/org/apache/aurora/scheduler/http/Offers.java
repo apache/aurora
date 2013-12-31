@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import java.util.Map;
 
@@ -29,13 +29,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
+import org.apache.aurora.scheduler.async.OfferQueue;
+
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Value.Range;
-
-import com.twitter.aurora.scheduler.async.OfferQueue;
 
 /**
  * Servlet that exposes resource offers that the scheduler is currently retaining.

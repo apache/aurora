@@ -12,7 +12,7 @@ import os
 
 from twitter.common import log
 from twitter.common.recordio import RecordIO, ThriftRecordReader
-from gen.twitter.thermos.ttypes import (
+from gen.apache.thermos.ttypes import (
   ProcessState,
   ProcessStatus,
   RunnerCkpt,

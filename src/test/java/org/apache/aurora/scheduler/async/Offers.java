@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.async;
+package org.apache.aurora.scheduler.async;
 
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;

@@ -1,9 +1,9 @@
 import contextlib
 
-from twitter.aurora.client.commands.run import run
-from twitter.aurora.client.commands.util import AuroraClientCommandTest
+from apache.aurora.client.commands.run import run
+from apache.aurora.client.commands.util import AuroraClientCommandTest
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     AssignedTask,
     Identity,
     JobKey,
@@ -86,11 +86,11 @@ class TestRunCommand(AuroraClientCommandTest):
     mock_scheduler.getTasksStatus.return_value = self.create_status_response()
     sandbox_args = {'slave_root': '/slaveroot', 'slave_run_directory': 'slaverun'}
     with contextlib.nested(
-        patch('twitter.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
-        patch('twitter.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.aurora.client.commands.run.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.commands.run.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('twitter.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
+        patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
             return_value=sandbox_args),
         patch('subprocess.Popen', return_value=self.create_mock_process())) as (
             mock_scheduler_proxy_class,

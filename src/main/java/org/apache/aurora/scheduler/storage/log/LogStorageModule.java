@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.log;
+package org.apache.aurora.scheduler.storage.log;
 
 import java.lang.annotation.Annotation;
 
@@ -24,13 +24,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 
-import com.twitter.aurora.scheduler.log.Log;
-import com.twitter.aurora.scheduler.storage.CallOrderEnforcingStorage;
-import com.twitter.aurora.scheduler.storage.DistributedSnapshotStore;
-import com.twitter.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
-import com.twitter.aurora.scheduler.storage.log.LogManager.SnapshotSetting;
-import com.twitter.aurora.scheduler.storage.log.LogStorage.ShutdownGracePeriod;
-import com.twitter.aurora.scheduler.storage.log.LogStorage.SnapshotInterval;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -38,6 +31,14 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
+
+import org.apache.aurora.scheduler.log.Log;
+import org.apache.aurora.scheduler.storage.CallOrderEnforcingStorage;
+import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
+import org.apache.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
+import org.apache.aurora.scheduler.storage.log.LogManager.SnapshotSetting;
+import org.apache.aurora.scheduler.storage.log.LogStorage.ShutdownGracePeriod;
+import org.apache.aurora.scheduler.storage.log.LogStorage.SnapshotInterval;
 
 /**
  * Bindings for scheduler distributed log based storage.

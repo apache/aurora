@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -28,19 +28,21 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 
+import com.twitter.common.base.Closure;
+
 import org.antlr.stringtemplate.StringTemplate;
 
-import com.twitter.aurora.gen.Attribute;
-import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.MaintenanceMode;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.common.base.Closure;
+import org.apache.aurora.gen.Attribute;
+import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.scheduler.storage.Storage;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
-import static com.twitter.aurora.scheduler.storage.Storage.Work;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+
+import static org.apache.aurora.scheduler.storage.Storage.StoreProvider;
+import static org.apache.aurora.scheduler.storage.Storage.Work;
 
 /**
  * HTTP interface to serve as a HUD for the mesos slaves tracked in the scheduler.

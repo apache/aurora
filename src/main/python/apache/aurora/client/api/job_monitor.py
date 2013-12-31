@@ -2,11 +2,11 @@ import time
 
 from twitter.common.quantity import Amount, Time
 
-from gen.twitter.aurora.constants import (
+from gen.apache.aurora.constants import (
     LIVE_STATES,
     TERMINAL_STATES
 )
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     Identity,
     TaskQuery
 )

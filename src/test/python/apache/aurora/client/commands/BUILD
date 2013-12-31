@@ -16,11 +16,11 @@ python_tests(
     'test_update.py'
   ],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:mock'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),
     pants(':util'),
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
-    pants('src/main/python/twitter/aurora/client/commands:core'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/aurora/client/commands:core'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ])
 
 python_tests(
@@ -29,11 +29,11 @@ python_tests(
     'test_ssh.py',
   ],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:mock'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),
     pants(':util'),
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
-    pants('src/main/python/twitter/aurora/client/commands:ssh'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/aurora/client/commands:ssh'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ])
 
 python_tests(
@@ -42,19 +42,19 @@ python_tests(
     'test_run.py',
   ],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:mock'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),
     pants(':util'),
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
-    pants('src/main/python/twitter/aurora/client/commands:run'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/aurora/client/commands:run'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ])
 
 python_library(
   name='util',
   sources = [ 'util.py' ],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:mock'),
-    pants('src/main/python/twitter/aurora/client/commands:core'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),
+    pants('src/main/python/apache/aurora/client/commands:core'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )

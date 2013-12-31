@@ -3,7 +3,7 @@ from __future__ import print_function
 import collections
 import sys
 
-from twitter.aurora.client.base import die
+from apache.aurora.client.base import die
 from twitter.common import app
 
 

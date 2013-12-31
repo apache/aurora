@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.async;
+package org.apache.aurora.scheduler.async;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -34,12 +34,6 @@ import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 
-import com.twitter.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
-import com.twitter.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
-import com.twitter.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
-import com.twitter.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
-import com.twitter.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
-import com.twitter.aurora.scheduler.events.PubsubEventModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
@@ -50,15 +44,22 @@ import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
+import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
+import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
+import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
+import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
+import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
+
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import static com.twitter.aurora.scheduler.async.HistoryPruner.PruneThreshold;
-import static com.twitter.aurora.scheduler.async.Preemptor.PreemptorImpl;
-import static com.twitter.aurora.scheduler.async.Preemptor.PreemptorImpl.PreemptionDelay;
-import static com.twitter.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
+import static org.apache.aurora.scheduler.async.HistoryPruner.PruneThreshold;
+import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl;
+import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl.PreemptionDelay;
+import static org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
 
 /**
  * Binding module for async task management.

@@ -3,7 +3,7 @@ import time
 from twitter.common import log
 from .health_check import InstanceWatcherHealthCheck
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
   Identity,
   ResponseCode,
   ScheduleStatus,

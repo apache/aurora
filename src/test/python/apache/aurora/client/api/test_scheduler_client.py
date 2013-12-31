@@ -1,12 +1,12 @@
 import inspect
 import unittest
 
-import twitter.aurora.client.api.scheduler_client as scheduler_client
+import apache.aurora.client.api.scheduler_client as scheduler_client
 
-import gen.twitter.aurora.AuroraAdmin as AuroraAdmin
-import gen.twitter.aurora.AuroraSchedulerManager as AuroraSchedulerManager
-from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT, CURRENT_API_VERSION
-from gen.twitter.aurora.ttypes import *
+import gen.apache.aurora.AuroraAdmin as AuroraAdmin
+import gen.apache.aurora.AuroraSchedulerManager as AuroraSchedulerManager
+from gen.apache.aurora.constants import DEFAULT_ENVIRONMENT, CURRENT_API_VERSION
+from gen.apache.aurora.ttypes import *
 
 from mox import IgnoreArg, IsA, Mox
 

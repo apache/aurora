@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.stats;
+package org.apache.aurora.scheduler.stats;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,17 +21,19 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.scheduler.quota.Quotas;
-import com.twitter.aurora.scheduler.stats.SlotSizeCounter.ResourceSlotProvider;
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.gen.Quota;
+import org.apache.aurora.scheduler.quota.Quotas;
+import org.apache.aurora.scheduler.stats.SlotSizeCounter.ResourceSlotProvider;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertEquals;
 
 public class SlotSizeCounterTest extends EasyMockTest {

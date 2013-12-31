@@ -12,10 +12,10 @@ def build_and_execute_pex_target(target, binary):
 
 
 def test_thermos_executor_build():
-  build_and_execute_pex_target('src/main/python/twitter/aurora/executor/bin:thermos_executor',
+  build_and_execute_pex_target('src/main/python/apache/aurora/executor/bin:thermos_executor',
                                'dist/thermos_executor.pex')
 
 
 def test_gc_executor_build():
-  build_and_execute_pex_target('src/main/python/twitter/aurora/executor/bin:gc_executor',
+  build_and_execute_pex_target('src/main/python/apache/aurora/executor/bin:gc_executor',
                                'dist/gc_executor.pex')

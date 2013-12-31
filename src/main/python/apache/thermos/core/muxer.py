@@ -3,7 +3,7 @@ import errno
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
-from gen.twitter.thermos.ttypes import RunnerCkpt
+from gen.apache.thermos.ttypes import RunnerCkpt
 
 
 class ProcessMuxer(object):

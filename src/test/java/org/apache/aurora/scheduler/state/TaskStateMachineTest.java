@@ -13,53 +13,57 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.state;
+package org.apache.aurora.scheduler.state;
 
 import java.util.Set;
 
 import com.google.common.base.Function;
 
-import org.easymock.EasyMock;
-import org.easymock.IExpectationSetters;
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskEvent;
-import com.twitter.aurora.scheduler.base.Tasks;
-import com.twitter.aurora.scheduler.state.TaskStateMachine.WorkSink;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.state.TaskStateMachine.WorkSink;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+
+import org.easymock.EasyMock;
+import org.easymock.IExpectationSetters;
+
+import org.junit.Before;
+import org.junit.Test;
+
+import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
+import static org.apache.aurora.gen.ScheduleStatus.FAILED;
+import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
+import static org.apache.aurora.gen.ScheduleStatus.INIT;
+import static org.apache.aurora.gen.ScheduleStatus.KILLED;
+import static org.apache.aurora.gen.ScheduleStatus.KILLING;
+import static org.apache.aurora.gen.ScheduleStatus.LOST;
+import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
+import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.gen.ScheduleStatus.STARTING;
+import static org.apache.aurora.gen.ScheduleStatus.UNKNOWN;
+import static org.apache.aurora.scheduler.state.WorkCommand.DELETE;
+import static org.apache.aurora.scheduler.state.WorkCommand.INCREMENT_FAILURES;
+import static org.apache.aurora.scheduler.state.WorkCommand.KILL;
+import static org.apache.aurora.scheduler.state.WorkCommand.RESCHEDULE;
+import static org.apache.aurora.scheduler.state.WorkCommand.UPDATE_STATE;
+
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expectLastCall;
+
 import static org.hamcrest.CoreMatchers.is;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
-
-import static com.twitter.aurora.gen.ScheduleStatus.ASSIGNED;
-import static com.twitter.aurora.gen.ScheduleStatus.FAILED;
-import static com.twitter.aurora.gen.ScheduleStatus.FINISHED;
-import static com.twitter.aurora.gen.ScheduleStatus.INIT;
-import static com.twitter.aurora.gen.ScheduleStatus.KILLED;
-import static com.twitter.aurora.gen.ScheduleStatus.KILLING;
-import static com.twitter.aurora.gen.ScheduleStatus.LOST;
-import static com.twitter.aurora.gen.ScheduleStatus.PENDING;
-import static com.twitter.aurora.gen.ScheduleStatus.RESTARTING;
-import static com.twitter.aurora.gen.ScheduleStatus.RUNNING;
-import static com.twitter.aurora.gen.ScheduleStatus.STARTING;
-import static com.twitter.aurora.gen.ScheduleStatus.UNKNOWN;
-import static com.twitter.aurora.scheduler.state.WorkCommand.DELETE;
-import static com.twitter.aurora.scheduler.state.WorkCommand.INCREMENT_FAILURES;
-import static com.twitter.aurora.scheduler.state.WorkCommand.KILL;
-import static com.twitter.aurora.scheduler.state.WorkCommand.RESCHEDULE;
-import static com.twitter.aurora.scheduler.state.WorkCommand.UPDATE_STATE;
 
 public class TaskStateMachineTest extends EasyMockTest {
 

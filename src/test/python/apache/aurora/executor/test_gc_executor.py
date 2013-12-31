@@ -8,20 +8,20 @@ import threading
 import time
 import unittest
 
-from twitter.aurora.executor.gc_executor import ThermosGCExecutor
+from apache.aurora.executor.gc_executor import ThermosGCExecutor
 from twitter.common.concurrent import deadline, Timeout
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
 from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
-from twitter.thermos.common.path import TaskPath
-from twitter.thermos.config.schema import SimpleTask
-from twitter.thermos.core.runner import TaskRunner
+from apache.thermos.common.path import TaskPath
+from apache.thermos.config.schema import SimpleTask
+from apache.thermos.core.runner import TaskRunner
 
-from gen.twitter.aurora.comm.ttypes import AdjustRetainedTasks, SchedulerMessage
-from gen.twitter.aurora.constants import LIVE_STATES, TERMINAL_STATES
-from gen.twitter.aurora.ttypes import ScheduleStatus
-from gen.twitter.thermos.ttypes import ProcessState, TaskState
+from gen.apache.aurora.comm.ttypes import AdjustRetainedTasks, SchedulerMessage
+from gen.apache.aurora.constants import LIVE_STATES, TERMINAL_STATES
+from gen.apache.aurora.ttypes import ScheduleStatus
+from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 import mock
 from thrift.TSerialization import serialize as thrift_serialize
@@ -66,7 +66,7 @@ def setup_tree(td, lose=False):
   safe_rmtree(td)
   
   # TODO(wickman) These should be referred as resources= in the python_target instead.
-  shutil.copytree('src/resources/com/twitter/thermos/root', td)
+  shutil.copytree('src/resources/org/apache/thermos/root', td)
 
   if lose:
     lost_age = time.time() - (
@@ -544,7 +544,7 @@ def test_gc_lifetime():
     assert not executor._stop_event.is_set()
 
 
-DIRECTORY_SANDBOX = 'twitter.aurora.executor.gc_executor.DirectorySandbox'
+DIRECTORY_SANDBOX = 'apache.aurora.executor.gc_executor.DirectorySandbox'
 
 
 class TestRealGC(unittest.TestCase):

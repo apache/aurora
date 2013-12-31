@@ -17,19 +17,19 @@ from twitter.common import app, log
 from twitter.common.python.pex import PexInfo
 from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 
-from twitter.aurora.client.base import (
+from apache.aurora.client.base import (
     check_and_log_response,
     deprecation_warning,
     die,
     handle_open,
     requires,
     synthesize_url)
-from twitter.aurora.client.api.disambiguator import LiveJobDisambiguator
-from twitter.aurora.client.api.job_monitor import JobMonitor
-from twitter.aurora.client.api.updater_util import UpdaterConfig
-from twitter.aurora.client.config import get_config
-from twitter.aurora.client.factory import make_client, make_client_factory
-from twitter.aurora.client.options import (
+from apache.aurora.client.api.disambiguator import LiveJobDisambiguator
+from apache.aurora.client.api.job_monitor import JobMonitor
+from apache.aurora.client.api.updater_util import UpdaterConfig
+from apache.aurora.client.config import get_config
+from apache.aurora.client.factory import make_client, make_client_factory
+from apache.aurora.client.options import (
     CLUSTER_CONFIG_OPTION,
     CLUSTER_INVOKE_OPTION,
     ENV_CONFIG_OPTION,
@@ -40,10 +40,10 @@ from twitter.aurora.client.options import (
     OPEN_BROWSER_OPTION,
     SHARDS_OPTION,
     WAIT_UNTIL_OPTION)
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.twitter.aurora.constants import ACTIVE_STATES, CURRENT_API_VERSION, AURORA_EXECUTOR_NAME
-from gen.twitter.aurora.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
+from gen.apache.aurora.constants import ACTIVE_STATES, CURRENT_API_VERSION, AURORA_EXECUTOR_NAME
+from gen.apache.aurora.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
 
 
 def get_job_config(job_spec, config_file, options):

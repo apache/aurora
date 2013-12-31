@@ -11,12 +11,12 @@ import sys
 
 from twitter.common import app, log
 
-from twitter.aurora.client import binding_helper
-from twitter.aurora.client.base import deprecation_warning, die
-from twitter.aurora.config import AuroraConfig
-from twitter.thermos.config.schema_helpers import Tasks
+from apache.aurora.client import binding_helper
+from apache.aurora.client.base import deprecation_warning, die
+from apache.aurora.config import AuroraConfig
+from apache.thermos.config.schema_helpers import Tasks
 
-from gen.twitter.aurora.constants import DEFAULT_ENVIRONMENT
+from gen.apache.aurora.constants import DEFAULT_ENVIRONMENT
 
 from pystachio import Empty, Ref
 

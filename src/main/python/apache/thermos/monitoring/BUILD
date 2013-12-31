@@ -4,7 +4,7 @@ python_library(
   name = 'detector',
   sources = ['detector.py'],
   dependencies = [
-    pants('src/main/python/twitter/thermos/common:path')
+    pants('src/main/python/apache/thermos/common:path')
   ]
 )
 
@@ -16,8 +16,8 @@ python_library(
     pants('aurora/twitterdeps/src/python/twitter/common/dirutil'),
     pants('aurora/twitterdeps/src/python/twitter/common/lang'),
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
-    pants('src/main/python/twitter/thermos/common:ckpt'),
-    pants('src/main/python/twitter/thermos/common:path'),
+    pants('src/main/python/apache/thermos/common:ckpt'),
+    pants('src/main/python/apache/thermos/common:path'),
   ]
 )
 
@@ -27,8 +27,8 @@ python_library(
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
-    pants('src/main/python/twitter/thermos/common:ckpt'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift'),
+    pants('src/main/python/apache/thermos/common:ckpt'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
 )
 
@@ -56,7 +56,7 @@ python_library(
   dependencies = [
     pants(':process'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/twitter/thermos:psutil'),
+    pants('src/main/python/apache/thermos:psutil'),
   ]
 )
 
@@ -87,10 +87,10 @@ python_library(
     pants(':resource'),
 
     # covering dependency for common
-    pants('src/main/python/twitter/thermos/common'),
+    pants('src/main/python/apache/thermos/common'),
   ],
   provides = setup_py(
-    name = 'twitter.thermos.monitoring',
+    name = 'apache.thermos.monitoring',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'Thermos monitoring library.',
   )

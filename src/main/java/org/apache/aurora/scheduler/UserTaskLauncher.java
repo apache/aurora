@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -24,17 +24,17 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.base.Conversions;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.SchedulerException;
+import org.apache.aurora.scheduler.state.StateManager;
+
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
-
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.scheduler.async.OfferQueue;
-import com.twitter.aurora.scheduler.base.Conversions;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.SchedulerException;
-import com.twitter.aurora.scheduler.state.StateManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

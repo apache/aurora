@@ -5,10 +5,10 @@ import pwd
 from twitter.common import log
 from twitter.common.recordio import RecordIO, ThriftRecordReader
 
-from twitter.thermos.common.ckpt import CheckpointDispatcher
-from twitter.thermos.common.path import TaskPath
+from apache.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.common.path import TaskPath
 
-from gen.twitter.thermos.ttypes import (
+from gen.apache.thermos.ttypes import (
   ProcessState,
   RunnerCkpt,
   RunnerState)

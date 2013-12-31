@@ -1,5 +1,5 @@
-from twitter.aurora.client.cli import CommandOption
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.client.cli import CommandOption
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 
 BIND_OPTION = CommandOption('--bind', type=str, default=[], dest='bindings',

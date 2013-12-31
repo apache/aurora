@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.events;
+package org.apache.aurora.scheduler.events;
 
 import java.util.Set;
 import java.util.logging.Logger;
@@ -31,15 +31,16 @@ import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matchers;
 import com.google.inject.multibindings.Multibinder;
 
-import org.aopalliance.intercept.MethodInterceptor;
-
-import com.twitter.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
-import com.twitter.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import com.twitter.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
-import com.twitter.aurora.scheduler.filter.SchedulingFilter;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
+
+import org.aopalliance.intercept.MethodInterceptor;
+
+import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
+import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
+import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
+import org.apache.aurora.scheduler.filter.SchedulingFilter;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

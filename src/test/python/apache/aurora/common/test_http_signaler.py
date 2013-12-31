@@ -3,7 +3,7 @@ import unittest
 
 from twitter.common.lang import Compatibility
 
-from twitter.aurora.common.http_signaler import HttpSignaler
+from apache.aurora.common.http_signaler import HttpSignaler
 
 import mox
 

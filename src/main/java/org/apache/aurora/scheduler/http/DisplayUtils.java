@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Ordering;
 
-import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
-import com.twitter.aurora.scheduler.http.SchedulerzHome.Role;
-import com.twitter.aurora.scheduler.http.SchedulerzRole.Job;
-import com.twitter.aurora.scheduler.storage.entities.IJobKey;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+
+import org.apache.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
+import org.apache.aurora.scheduler.http.SchedulerzHome.Role;
+import org.apache.aurora.scheduler.http.SchedulerzRole.Job;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
 /**
  * Utility class to hold common display helper functions.

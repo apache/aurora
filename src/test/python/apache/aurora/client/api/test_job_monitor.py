@@ -1,7 +1,7 @@
-from gen.twitter.aurora.AuroraSchedulerManager import Client
-from gen.twitter.aurora.ttypes import Response, ResponseCode, Result, ScheduleStatusResult, Identity, TaskQuery
-from twitter.aurora.client.api import AuroraClientAPI
-from twitter.aurora.client.api.job_monitor import JobMonitor
+from gen.apache.aurora.AuroraSchedulerManager import Client
+from gen.apache.aurora.ttypes import Response, ResponseCode, Result, ScheduleStatusResult, Identity, TaskQuery
+from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.client.api.job_monitor import JobMonitor
 
 from mox import MoxTestBase
 

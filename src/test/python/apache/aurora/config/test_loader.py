@@ -3,9 +3,9 @@ import tempfile
 
 from twitter.common.contextutil import temporary_file
 
-from twitter.aurora.config import AuroraConfig
-from twitter.aurora.config.loader import AuroraConfigLoader
-from twitter.thermos.config.loader import ThermosTaskWrapper
+from apache.aurora.config import AuroraConfig
+from apache.aurora.config.loader import AuroraConfigLoader
+from apache.thermos.config.loader import ThermosTaskWrapper
 
 from pystachio import Environment
 import pytest

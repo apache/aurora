@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.async;
+package org.apache.aurora.scheduler.async;
 
 import java.util.Queue;
 import java.util.Set;
@@ -26,9 +26,10 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 
-import com.twitter.aurora.scheduler.async.TaskGroups.GroupKey;
 import com.twitter.common.base.Function;
 import com.twitter.common.util.BackoffStrategy;
+
+import org.apache.aurora.scheduler.async.TaskGroups.GroupKey;
 
 /**
  * A group of task IDs that are eligible for scheduling, but may be waiting for a backoff to expire.

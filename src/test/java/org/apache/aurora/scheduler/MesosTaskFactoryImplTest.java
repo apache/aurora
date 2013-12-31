@@ -13,7 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
+
+import com.twitter.common.quantity.Data;
+
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
+import org.apache.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.CommandInfo.URI;
@@ -23,16 +32,9 @@ import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Type;
+
 import org.junit.Before;
 import org.junit.Test;
-
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
-import com.twitter.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
-import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
-import com.twitter.common.quantity.Data;
 
 import static org.junit.Assert.assertEquals;
 

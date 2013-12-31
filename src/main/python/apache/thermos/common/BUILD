@@ -6,7 +6,7 @@ python_library(
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift')
+    pants('src/main/thrift/org/apache/thermos:py-thrift')
   ]
 )
 
@@ -24,8 +24,8 @@ python_library(
   name = 'options',
   sources = ['options.py'],
   dependencies = [
-    pants('src/main/python/twitter/thermos:pystachio'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift'),
+    pants('src/main/python/apache/thermos:pystachio'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
 )
 
@@ -38,7 +38,7 @@ python_library(
     pants(':planner'),
   ],
   provides = setup_py(
-    name = 'twitter.thermos.common',
+    name = 'apache.thermos.common',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'Thermos common libraries.',
   )

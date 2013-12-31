@@ -1,4 +1,4 @@
-package com.twitter.aurora.scheduler.state;
+package org.apache.aurora.scheduler.state;
 
 import java.util.UUID;
 

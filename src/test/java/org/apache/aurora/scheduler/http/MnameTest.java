@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 
-import org.junit.Test;
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.scheduler.storage.entities.IAssignedTask;
+import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 

@@ -1,8 +1,8 @@
 import random
 
-from twitter.thermos.config.schema import Task, Process
-from twitter.thermos.testing.runner import Runner
-from gen.twitter.thermos.ttypes import TaskState, ProcessState
+from apache.thermos.config.schema import Task, Process
+from apache.thermos.testing.runner import Runner
+from gen.apache.thermos.ttypes import TaskState, ProcessState
 
 
 def flaky_task():

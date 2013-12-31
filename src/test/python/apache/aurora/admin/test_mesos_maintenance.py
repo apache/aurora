@@ -1,9 +1,9 @@
 import unittest
 
-from twitter.aurora.admin.mesos_maintenance import MesosMaintenance
-from twitter.aurora.common.cluster import Cluster
+from apache.aurora.admin.mesos_maintenance import MesosMaintenance
+from apache.aurora.common.cluster import Cluster
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     Hosts,
     Response,
     ResponseCode,
@@ -21,7 +21,7 @@ MOCK_TEST_HOSTS = ['us-west-001.example.com']
 
 
 class TestMesosMaintenance(unittest.TestCase):
-  @mock.patch("twitter.aurora.client.api.AuroraClientAPI.start_maintenance")
+  @mock.patch("apache.aurora.client.api.AuroraClientAPI.start_maintenance")
   def test_start_maintenance(self, mock_api):
     mock_api.return_value = Response(responseCode=ResponseCode.OK)
     maintenance = MesosMaintenance(DEFAULT_CLUSTER, 'quiet')

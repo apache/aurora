@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.filter;
+package org.apache.aurora.scheduler.filter;
 
 import java.util.Collection;
 import java.util.Comparator;
@@ -33,34 +33,35 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 
-import com.twitter.aurora.gen.Attribute;
-import com.twitter.aurora.gen.MaintenanceMode;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.scheduler.ResourceSlot;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.base.Tasks;
-import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
-import com.twitter.aurora.scheduler.state.MaintenanceController;
-import com.twitter.aurora.scheduler.storage.AttributeStore;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
-import com.twitter.aurora.scheduler.storage.Storage.Work.Quiet;
-import com.twitter.aurora.scheduler.storage.entities.IConstraint;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
+import org.apache.aurora.gen.Attribute;
+import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.TaskConstraint;
+import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.state.MaintenanceController;
+import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
+import org.apache.aurora.scheduler.storage.entities.IConstraint;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static com.twitter.aurora.gen.MaintenanceMode.DRAINED;
-import static com.twitter.aurora.gen.MaintenanceMode.DRAINING;
-import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
-import static com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
-import static com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.PORTS;
-import static com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.RAM;
+import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
+import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
+import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
+import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
+import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.PORTS;
+import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.RAM;
 
 /**
  * Implementation of the scheduling filter that ensures resource requirements of tasks are

@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.metadata;
+package org.apache.aurora.scheduler.metadata;
 
 import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
 
-import com.twitter.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
 
 /**
  * Binding module for scheduler metadata management.

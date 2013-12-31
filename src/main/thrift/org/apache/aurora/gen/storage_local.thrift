@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // Thrift structures for a local log storage system, for use in simulated environments.
-namespace java com.twitter.aurora.gen.test
+namespace java org.apache.aurora.gen.test
 
 struct LogRecord {
   1: binary contents

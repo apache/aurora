@@ -1,10 +1,10 @@
 import unittest
 
-from twitter.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
-from twitter.aurora.common.cluster import Cluster
-from twitter.aurora.common.clusters import Clusters
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import Clusters
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
     Response,
     ResponseCode,
     Result,

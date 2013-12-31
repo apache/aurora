@@ -3,9 +3,9 @@ from abc import abstractmethod
 from twitter.common import log
 from twitter.common.lang import Interface
 
-from twitter.aurora.common.http_signaler import HttpSignaler
+from apache.aurora.common.http_signaler import HttpSignaler
 
-from gen.twitter.aurora.ttypes import ScheduleStatus
+from gen.apache.aurora.ttypes import ScheduleStatus
 
 
 class HealthCheck(Interface):

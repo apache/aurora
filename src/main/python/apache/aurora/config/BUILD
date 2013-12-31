@@ -1,10 +1,10 @@
 import os
 
-# Alias for src/main/python/twitter/aurora/config/schema
+# Alias for src/main/python/apache/aurora/config/schema
 python_library(
   name = 'schema',
   dependencies = [
-    pants('src/main/python/twitter/aurora/config/schema'),
+    pants('src/main/python/apache/aurora/config/schema'),
   ]
 )
 
@@ -17,11 +17,11 @@ python_library(
     'thrift.py',
   ),
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:pystachio'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
     pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('src/main/python/twitter/aurora/common'),
-    pants('src/main/python/twitter/aurora/config/schema'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/aurora/common'),
+    pants('src/main/python/apache/aurora/config/schema'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ],
 
 )
@@ -32,10 +32,10 @@ python_library(
     pants(':config'),
 
     # covering dependencies
-    pants('src/main/python/twitter/thermos/config'),
+    pants('src/main/python/apache/thermos/config'),
   ],
   provides = setup_py(
-    name = 'twitter.aurora.config',
+    name = 'apache.aurora.config',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'Aurora/Thermos Pystachio schemas for describing job configurations.',
     license = 'Apache License, Version 2.0',

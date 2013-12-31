@@ -1,8 +1,8 @@
 import functools
 import unittest
 
-from twitter.aurora.common.aurora_job_key import AuroraJobKey
-from twitter.aurora.client.hooks.hooked_api import NonHookedAuroraClientAPI
+from apache.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.client.hooks.hooked_api import NonHookedAuroraClientAPI
 
 
 API_METHODS = ('cancel_update', 'create_job', 'kill_job', 'restart', 'start_cronjob', 'update_job')

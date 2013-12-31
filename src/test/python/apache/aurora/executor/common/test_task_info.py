@@ -1,6 +1,6 @@
 import getpass
 
-from twitter.aurora.config.schema.base import (
+from apache.aurora.config.schema.base import (
     MB,
     MesosJob,
     MesosTaskInstance,
@@ -8,9 +8,9 @@ from twitter.aurora.config.schema.base import (
     Resources,
     Task,
 )
-from twitter.aurora.executor.common.task_info import mesos_task_instance_from_assigned_task
+from apache.aurora.executor.common.task_info import mesos_task_instance_from_assigned_task
 
-from gen.twitter.aurora.ttypes import (
+from gen.apache.aurora.ttypes import (
   AssignedTask,
   ExecutorConfig,
   TaskConfig,

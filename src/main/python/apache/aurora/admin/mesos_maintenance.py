@@ -4,10 +4,10 @@ import time
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
 
-from twitter.aurora.client.api import AuroraClientAPI
-from twitter.aurora.client.base import check_and_log_response
+from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.client.base import check_and_log_response
 
-from gen.twitter.aurora.ttypes import Hosts, MaintenanceMode
+from gen.apache.aurora.ttypes import Hosts, MaintenanceMode
 
 
 def group_by_host(hostname):

@@ -4,14 +4,14 @@ python_library(
   name = 'helper',
   sources = ['helper.py'],
   dependencies = [
-    pants('src/main/python/twitter/thermos:psutil'),
+    pants('src/main/python/apache/thermos:psutil'),
     pants('aurora/twitterdeps/src/python/twitter/common/dirutil'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
     pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
-    pants('src/main/python/twitter/thermos/common:ckpt'),
-    pants('src/main/python/twitter/thermos/common:path'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift'),
+    pants('src/main/python/apache/thermos/common:ckpt'),
+    pants('src/main/python/apache/thermos/common:path'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
 )
 
@@ -21,9 +21,9 @@ python_library(
   dependencies = [
     pants(':muxer'),
     pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
-    pants('src/main/python/twitter/thermos/common:ckpt'),
-    pants('src/main/python/twitter/thermos/common:path'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift'),
+    pants('src/main/python/apache/thermos/common:ckpt'),
+    pants('src/main/python/apache/thermos/common:path'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
 )
 
@@ -33,7 +33,7 @@ python_library(
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
 )
 
@@ -46,7 +46,7 @@ python_library(
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
     pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
 )
 
@@ -61,12 +61,12 @@ python_library(
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
     pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
-    pants('src/main/python/twitter/thermos:psutil'),
-    pants('src/main/python/twitter/thermos/common:ckpt'),
-    pants('src/main/python/twitter/thermos/common:path'),
-    pants('src/main/python/twitter/thermos/common:planner'),
-    pants('src/main/python/twitter/thermos/config:schema'),
-    pants('src/main/thrift/com/twitter/thermos:py-thrift'),
+    pants('src/main/python/apache/thermos:psutil'),
+    pants('src/main/python/apache/thermos/common:ckpt'),
+    pants('src/main/python/apache/thermos/common:path'),
+    pants('src/main/python/apache/thermos/common:planner'),
+    pants('src/main/python/apache/thermos/config:schema'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
 )
 
@@ -77,11 +77,11 @@ python_library(
     pants(':runner'),
 
     # covering libs
-    pants('src/main/python/twitter/thermos/common'),
-    pants('src/main/python/twitter/thermos/config'),
+    pants('src/main/python/apache/thermos/common'),
+    pants('src/main/python/apache/thermos/config'),
   ],
   provides = setup_py(
-    name = 'twitter.thermos.core',
+    name = 'apache.thermos.core',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'The Thermos core state machine.',
   )

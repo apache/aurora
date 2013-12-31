@@ -13,27 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift.aop;
+package org.apache.aurora.scheduler.thrift.aop;
 
 import java.util.Set;
 
-import org.apache.thrift.TException;
+import org.apache.aurora.gen.AddInstancesConfig;
+import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.Hosts;
+import org.apache.aurora.gen.JobConfigValidation;
+import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.Lock;
+import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.LockValidation;
+import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.Response;
+import org.apache.aurora.gen.RewriteConfigsRequest;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.gen.TaskQuery;
 
-import com.twitter.aurora.gen.AddInstancesConfig;
-import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.Hosts;
-import com.twitter.aurora.gen.JobConfigValidation;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.Lock;
-import com.twitter.aurora.gen.LockKey;
-import com.twitter.aurora.gen.LockValidation;
-import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.Response;
-import com.twitter.aurora.gen.RewriteConfigsRequest;
-import com.twitter.aurora.gen.ScheduleStatus;
-import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.gen.TaskQuery;
+import org.apache.thrift.TException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 

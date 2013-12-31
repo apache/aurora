@@ -9,10 +9,10 @@ from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.recordio import ThriftRecordReader
 
-from twitter.thermos.common.path import TaskPath
-from twitter.thermos.core.process import Process
+from apache.thermos.common.path import TaskPath
+from apache.thermos.core.process import Process
 
-from gen.twitter.thermos.ttypes import RunnerCkpt
+from gen.apache.thermos.ttypes import RunnerCkpt
 
 import mock
 import pytest

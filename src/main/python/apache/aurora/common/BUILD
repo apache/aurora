@@ -5,7 +5,7 @@ python_library(
   sources = ['aurora_job_key.py'],
   dependencies = [
     pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('src/main/thrift/com/twitter/aurora/gen:py-thrift'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
@@ -13,7 +13,7 @@ python_library(
   name = 'cluster',
   sources = ['cluster.py'],
   dependencies = [
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:pystachio'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
   ]
 )
 
@@ -22,7 +22,7 @@ python_library(
   sources = ['clusters.py'],
   dependencies = [
     pants(':cluster'),
-    pants('src/main/python/twitter/aurora/BUILD.thirdparty:pystachio'),
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
     pants('aurora/twitterdeps/src/python/twitter/common/collections'),
   ]
 )
@@ -52,10 +52,10 @@ python_library(
     pants(':cluster_option'),
     pants(':clusters'),
     pants(':http_signaler'),
-    pants('src/main/python/twitter/aurora/common/auth'),
+    pants('src/main/python/apache/aurora/common/auth'),
   ],
   provides = setup_py(
-    name = 'twitter.aurora.common',
+    name = 'apache.aurora.common',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
     description = 'Aurora common libraries.',
     license = 'Apache License, Version 2.0',

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -33,18 +33,18 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.protobuf.ByteString;
 
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.NotNull;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+
 import org.apache.mesos.MesosSchedulerDriver;
 import org.apache.mesos.Protos.Credential;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.FrameworkInfo;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
-
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
-import com.twitter.common.args.constraints.NotNull;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 
 /**
  * Factory to create scheduler driver instances.

@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.cron.noop;
+package org.apache.aurora.scheduler.cron.noop;
 
 import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
 
-import com.twitter.aurora.scheduler.cron.CronPredictor;
-import com.twitter.aurora.scheduler.cron.CronScheduler;
+import org.apache.aurora.scheduler.cron.CronPredictor;
+import org.apache.aurora.scheduler.cron.CronScheduler;
 
 /**
  * A Module to wire up a cron scheduler that does not actually schedule cron jobs.

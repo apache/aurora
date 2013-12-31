@@ -5,7 +5,7 @@ import time
 
 from twitter.common.lang import Interface
 
-from gen.twitter.aurora.ttypes import SessionKey
+from gen.apache.aurora.ttypes import SessionKey
 
 
 class AuthModule(Interface):

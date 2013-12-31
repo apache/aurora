@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler;
+package org.apache.aurora.scheduler;
 
 import java.util.Arrays;
 
@@ -22,10 +22,11 @@ import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 
-import com.twitter.aurora.scheduler.configuration.Resources;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
+
+import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static org.apache.mesos.Protos.Offer;
 

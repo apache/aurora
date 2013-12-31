@@ -2,7 +2,7 @@ import json
 import pkgutil
 import textwrap
 
-from twitter.aurora.config.schema import base as base_schema
+from apache.aurora.config.schema import base as base_schema
 
 from pystachio.config import Config as PystachioConfig
 

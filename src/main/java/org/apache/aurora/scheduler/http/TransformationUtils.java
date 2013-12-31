@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.http;
+package org.apache.aurora.scheduler.http;
 
 import java.util.Collection;
 
@@ -22,8 +22,8 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Range;
 
-import com.twitter.aurora.scheduler.base.Numbers;
-import com.twitter.aurora.scheduler.storage.entities.IPackage;
+import org.apache.aurora.scheduler.base.Numbers;
+import org.apache.aurora.scheduler.storage.entities.IPackage;
 
 /**
  * Utility class to hold common object to string transformation helper functions.

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.filter;
+package org.apache.aurora.scheduler.filter;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -23,53 +23,56 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
-import org.easymock.EasyMock;
-import org.easymock.IAnswer;
-import org.easymock.IExpectationSetters;
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.gen.AssignedTask;
-import com.twitter.aurora.gen.Attribute;
-import com.twitter.aurora.gen.Constraint;
-import com.twitter.aurora.gen.ExecutorConfig;
-import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.Identity;
-import com.twitter.aurora.gen.LimitConstraint;
-import com.twitter.aurora.gen.MaintenanceMode;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.TaskConfig;
-import com.twitter.aurora.gen.TaskConstraint;
-import com.twitter.aurora.gen.ValueConstraint;
-import com.twitter.aurora.scheduler.ResourceSlot;
-import com.twitter.aurora.scheduler.base.Query;
-import com.twitter.aurora.scheduler.configuration.ConfigurationManager;
-import com.twitter.aurora.scheduler.filter.SchedulingFilter.Veto;
-import com.twitter.aurora.scheduler.state.MaintenanceController;
-import com.twitter.aurora.scheduler.storage.AttributeStore;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.Storage.StoreProvider;
-import com.twitter.aurora.scheduler.storage.Storage.Work.Quiet;
-import com.twitter.aurora.scheduler.storage.TaskStore;
-import com.twitter.aurora.scheduler.storage.entities.IScheduledTask;
-import com.twitter.aurora.scheduler.storage.entities.ITaskConfig;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Attribute;
+import org.apache.aurora.gen.Constraint;
+import org.apache.aurora.gen.ExecutorConfig;
+import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.LimitConstraint;
+import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.TaskConstraint;
+import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.state.MaintenanceController;
+import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
+import org.apache.aurora.scheduler.storage.TaskStore;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+
+import org.easymock.EasyMock;
+import org.easymock.IAnswer;
+import org.easymock.IExpectationSetters;
+
+import org.junit.Before;
+import org.junit.Test;
+
+import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static org.apache.aurora.scheduler.filter.ConstraintFilter.limitVeto;
+import static org.apache.aurora.scheduler.filter.ConstraintFilter.mismatchVeto;
+import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.DEDICATED_HOST_VETO;
+import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
+import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
+import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.PORTS;
+import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.RAM;
+
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-
-import static com.twitter.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static com.twitter.aurora.scheduler.filter.ConstraintFilter.limitVeto;
-import static com.twitter.aurora.scheduler.filter.ConstraintFilter.mismatchVeto;
-import static com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.DEDICATED_HOST_VETO;
-import static com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
-import static com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
-import static com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.PORTS;
-import static com.twitter.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.RAM;
 
 public class SchedulingFilterImplTest extends EasyMockTest {
 

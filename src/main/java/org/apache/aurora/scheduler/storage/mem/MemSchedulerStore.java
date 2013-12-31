@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.mem;
+package org.apache.aurora.scheduler.storage.mem;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -21,7 +21,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.util.concurrent.Atomics;
 
-import com.twitter.aurora.scheduler.storage.SchedulerStore;
+import org.apache.aurora.scheduler.storage.SchedulerStore;
 
 /**
  * An in-memory scheduler store.

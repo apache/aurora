@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.thrift;
+package org.apache.aurora.scheduler.thrift;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -25,35 +25,37 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.auth.CapabilityValidator;
-import com.twitter.aurora.auth.CapabilityValidator.Capability;
-import com.twitter.aurora.auth.SessionValidator;
-import com.twitter.aurora.gen.AuroraAdmin;
-import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.SessionKey;
-import com.twitter.aurora.scheduler.cron.CronScheduler;
-import com.twitter.aurora.scheduler.state.LockManager;
-import com.twitter.aurora.scheduler.state.MaintenanceController;
-import com.twitter.aurora.scheduler.state.SchedulerCore;
-import com.twitter.aurora.scheduler.state.StateManager;
-import com.twitter.aurora.scheduler.storage.Storage;
-import com.twitter.aurora.scheduler.storage.backup.Recovery;
-import com.twitter.aurora.scheduler.storage.backup.StorageBackup;
-import com.twitter.aurora.scheduler.storage.entities.IQuota;
-import com.twitter.aurora.scheduler.storage.testing.StorageTestUtil;
-import com.twitter.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import static org.easymock.EasyMock.expectLastCall;
-import static org.junit.Assert.assertEquals;
+import org.apache.aurora.auth.CapabilityValidator;
+import org.apache.aurora.auth.CapabilityValidator.Capability;
+import org.apache.aurora.auth.SessionValidator;
+import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.scheduler.cron.CronScheduler;
+import org.apache.aurora.scheduler.state.LockManager;
+import org.apache.aurora.scheduler.state.MaintenanceController;
+import org.apache.aurora.scheduler.state.SchedulerCore;
+import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.backup.Recovery;
+import org.apache.aurora.scheduler.storage.backup.StorageBackup;
+import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 
-import static com.twitter.aurora.auth.SessionValidator.SessionContext;
-import static com.twitter.aurora.gen.ResponseCode.AUTH_FAILED;
-import static com.twitter.aurora.gen.ResponseCode.OK;
+import org.junit.Before;
+import org.junit.Test;
+
+import static org.apache.aurora.auth.SessionValidator.SessionContext;
+import static org.apache.aurora.gen.ResponseCode.AUTH_FAILED;
+import static org.apache.aurora.gen.ResponseCode.OK;
+
+import static org.easymock.EasyMock.expectLastCall;
+
+import static org.junit.Assert.assertEquals;
 
 public class ThriftIT extends EasyMockTest {
 

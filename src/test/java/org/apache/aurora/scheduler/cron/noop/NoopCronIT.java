@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.cron.noop;
+package org.apache.aurora.scheduler.cron.noop;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
+import org.apache.aurora.scheduler.cron.CronPredictor;
+import org.apache.aurora.scheduler.cron.CronScheduler;
+
 import org.junit.Before;
 import org.junit.Test;
-
-import com.twitter.aurora.scheduler.cron.CronPredictor;
-import com.twitter.aurora.scheduler.cron.CronScheduler;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;

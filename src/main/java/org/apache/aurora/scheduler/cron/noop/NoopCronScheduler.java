@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.cron.noop;
+package org.apache.aurora.scheduler.cron.noop;
 
 import java.util.Collections;
 import java.util.Set;
@@ -24,8 +24,8 @@ import javax.annotation.Nullable;
 import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
 
-import com.twitter.aurora.scheduler.cron.CronException;
-import com.twitter.aurora.scheduler.cron.CronScheduler;
+import org.apache.aurora.scheduler.cron.CronException;
+import org.apache.aurora.scheduler.cron.CronScheduler;
 
 /**
  * A cron scheduler that accepts cron jobs but never runs them. Useful if you want to hook up an

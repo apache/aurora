@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twitter.aurora.scheduler.storage.backup;
+package org.apache.aurora.scheduler.storage.backup;
 
 import java.io.File;
 import java.util.List;
@@ -24,30 +24,32 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import com.google.common.testing.TearDown;
 
-import org.junit.Before;
-import org.junit.Test;
-
-import com.twitter.aurora.codec.ThriftBinaryCodec;
-import com.twitter.aurora.gen.Attribute;
-import com.twitter.aurora.gen.HostAttributes;
-import com.twitter.aurora.gen.JobConfiguration;
-import com.twitter.aurora.gen.JobKey;
-import com.twitter.aurora.gen.Quota;
-import com.twitter.aurora.gen.ScheduledTask;
-import com.twitter.aurora.gen.storage.QuotaConfiguration;
-import com.twitter.aurora.gen.storage.SchedulerMetadata;
-import com.twitter.aurora.gen.storage.Snapshot;
-import com.twitter.aurora.gen.storage.StoredJob;
-import com.twitter.aurora.scheduler.storage.SnapshotStore;
-import com.twitter.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
-import com.twitter.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import com.twitter.common.io.FileUtils;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
+import org.apache.aurora.codec.ThriftBinaryCodec;
+import org.apache.aurora.gen.Attribute;
+import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.storage.QuotaConfiguration;
+import org.apache.aurora.gen.storage.SchedulerMetadata;
+import org.apache.aurora.gen.storage.Snapshot;
+import org.apache.aurora.gen.storage.StoredJob;
+import org.apache.aurora.scheduler.storage.SnapshotStore;
+import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
+import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
+
+import org.junit.Before;
+import org.junit.Test;
+
 import static org.easymock.EasyMock.expect;
+
 import static org.junit.Assert.assertEquals;
 
 public class StorageBackupTest extends EasyMockTest {
