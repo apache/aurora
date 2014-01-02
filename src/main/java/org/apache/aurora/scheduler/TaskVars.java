@@ -30,7 +30,6 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
-
 import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.gen.Attribute;

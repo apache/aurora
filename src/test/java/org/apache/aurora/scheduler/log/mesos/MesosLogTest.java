@@ -20,7 +20,6 @@ import java.util.concurrent.TimeoutException;
 import javax.inject.Provider;
 
 import com.google.inject.util.Providers;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -28,11 +27,8 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
-
 import org.apache.mesos.Log;
-
 import org.easymock.EasyMock;
-
 import org.junit.Before;
 import org.junit.Test;
 

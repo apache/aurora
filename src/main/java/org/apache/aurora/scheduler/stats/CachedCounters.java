@@ -22,7 +22,6 @@ import javax.inject.Inject;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-
 import com.twitter.common.stats.StatsProvider;
 
 /**

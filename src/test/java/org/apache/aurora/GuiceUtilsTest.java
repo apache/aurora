@@ -26,7 +26,6 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 
 import org.apache.aurora.GuiceUtils.AllowUnchecked;
-
 import org.junit.Test;
 
 import static org.junit.Assert.fail;

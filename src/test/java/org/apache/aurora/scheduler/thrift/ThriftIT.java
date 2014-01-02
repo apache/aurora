@@ -24,7 +24,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -45,16 +44,13 @@ import org.apache.aurora.scheduler.storage.backup.StorageBackup;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.auth.SessionValidator.SessionContext;
 import static org.apache.aurora.gen.ResponseCode.AUTH_FAILED;
 import static org.apache.aurora.gen.ResponseCode.OK;
-
 import static org.easymock.EasyMock.expectLastCall;
-
 import static org.junit.Assert.assertEquals;
 
 public class ThriftIT extends EasyMockTest {

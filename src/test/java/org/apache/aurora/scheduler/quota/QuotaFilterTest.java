@@ -32,15 +32,12 @@ import org.apache.aurora.scheduler.storage.entities.IQuota;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
-
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 

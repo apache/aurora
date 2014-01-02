@@ -26,7 +26,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
-
 import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.Protobufs;
@@ -39,7 +38,6 @@ import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Resource;
@@ -48,7 +46,6 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**

@@ -17,12 +17,10 @@ package org.apache.aurora.scheduler.quota;
 
 import org.apache.aurora.gen.Quota;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
-
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 

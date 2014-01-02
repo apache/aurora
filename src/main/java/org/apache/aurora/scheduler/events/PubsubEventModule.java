@@ -30,13 +30,11 @@ import com.google.inject.Binder;
 import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matchers;
 import com.google.inject.multibindings.Multibinder;
-
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 
 import org.aopalliance.intercept.MethodInterceptor;
-
 import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;

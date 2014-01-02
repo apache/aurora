@@ -30,11 +30,9 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
-
 import com.twitter.common.base.Closure;
 
 import org.antlr.stringtemplate.StringTemplate;
-
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.CronJobManager;
@@ -44,7 +42,6 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**

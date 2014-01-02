@@ -23,11 +23,9 @@ import javax.inject.Provider;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-
 import com.twitter.common.application.Lifecycle;
 
 import org.apache.aurora.scheduler.DriverFactory;
-
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Filters;
 import org.apache.mesos.Protos.FrameworkID;

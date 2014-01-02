@@ -18,7 +18,6 @@ package org.apache.aurora.scheduler.state;
 import java.util.Set;
 
 import com.google.common.base.Function;
-
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -31,10 +30,8 @@ import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.TaskStateMachine.WorkSink;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-
 import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
-
 import org.junit.Before;
 import org.junit.Test;
 
@@ -55,12 +52,9 @@ import static org.apache.aurora.scheduler.state.WorkCommand.INCREMENT_FAILURES;
 import static org.apache.aurora.scheduler.state.WorkCommand.KILL;
 import static org.apache.aurora.scheduler.state.WorkCommand.RESCHEDULE;
 import static org.apache.aurora.scheduler.state.WorkCommand.UPDATE_STATE;
-
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expectLastCall;
-
 import static org.hamcrest.CoreMatchers.is;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;

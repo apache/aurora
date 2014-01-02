@@ -16,7 +16,6 @@
 package org.apache.aurora.scheduler.quota;
 
 import com.google.common.base.Optional;
-
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -30,17 +29,13 @@ import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-
 import org.easymock.IExpectationSetters;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
-
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 

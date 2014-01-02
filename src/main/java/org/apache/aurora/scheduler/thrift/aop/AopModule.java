@@ -37,12 +37,10 @@ import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matcher;
 import com.google.inject.matcher.Matchers;
-
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 
 import org.aopalliance.intercept.MethodInterceptor;
-
 import org.apache.aurora.GuiceUtils;
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.gen.AuroraAdmin;

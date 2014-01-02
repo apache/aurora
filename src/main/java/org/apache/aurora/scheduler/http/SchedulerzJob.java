@@ -47,11 +47,9 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
-
 import com.twitter.common.base.Closure;
 
 import org.antlr.stringtemplate.StringTemplate;
-
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
@@ -70,7 +68,6 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;

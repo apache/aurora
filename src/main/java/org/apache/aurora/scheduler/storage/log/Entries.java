@@ -26,7 +26,6 @@ import java.util.zip.InflaterInputStream;
 
 import com.google.common.base.Preconditions;
 import com.google.common.io.ByteStreams;
-
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;

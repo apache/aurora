@@ -21,7 +21,6 @@ import java.util.logging.Logger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import com.twitter.thrift.Status;
 
 import org.apache.thrift.TProcessor;

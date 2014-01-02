@@ -28,7 +28,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
 

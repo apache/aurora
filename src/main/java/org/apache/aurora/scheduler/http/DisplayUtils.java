@@ -17,7 +17,6 @@ package org.apache.aurora.scheduler.http;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Ordering;
-
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 

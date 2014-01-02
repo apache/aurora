@@ -21,11 +21,9 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CronScheduler;
-
 import org.junit.Test;
 
 import static org.apache.aurora.gen.test.testConstants.VALID_CRON_SCHEDULES;
-
 import static org.junit.Assert.assertTrue;
 
 /**

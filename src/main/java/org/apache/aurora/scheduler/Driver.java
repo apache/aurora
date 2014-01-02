@@ -23,7 +23,6 @@ import javax.inject.Inject;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
-
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.StateMachine;
 

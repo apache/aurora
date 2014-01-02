@@ -32,7 +32,6 @@ import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskQuery;
-
 import org.apache.thrift.TException;
 
 import static com.google.common.base.Preconditions.checkNotNull;

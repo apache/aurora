@@ -21,7 +21,6 @@ import javax.inject.Singleton;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.PrivateModule;
-
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 

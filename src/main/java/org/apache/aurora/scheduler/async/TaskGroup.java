@@ -25,7 +25,6 @@ import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
-
 import com.twitter.common.base.Function;
 import com.twitter.common.util.BackoffStrategy;
 

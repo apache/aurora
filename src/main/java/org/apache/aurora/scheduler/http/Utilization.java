@@ -34,14 +34,12 @@ import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.util.templating.StringTemplateHelper;
 import com.twitter.common.util.templating.StringTemplateHelper.TemplateException;
 
 import org.antlr.stringtemplate.StringTemplate;
-
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.stats.ResourceCounter;
 import org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;

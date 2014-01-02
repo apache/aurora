@@ -17,7 +17,6 @@ package org.apache.aurora.codec;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.gen.Identity;
-
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

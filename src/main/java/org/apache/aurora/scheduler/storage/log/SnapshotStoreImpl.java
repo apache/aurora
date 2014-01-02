@@ -23,7 +23,6 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.collect.ImmutableSet;
-
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.common.util.Clock;

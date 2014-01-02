@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
-
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -38,9 +37,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-
 import org.easymock.IExpectationSetters;
-
 import org.junit.Before;
 import org.junit.Test;
 
@@ -51,9 +48,7 @@ import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertEquals;
 
 public class TaskVarsTest extends EasyMockTest {

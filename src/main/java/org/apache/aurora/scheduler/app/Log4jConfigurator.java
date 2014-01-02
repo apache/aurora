@@ -16,7 +16,6 @@
 package org.apache.aurora.scheduler.app;
 
 import com.google.common.base.Preconditions;
-
 import com.twitter.common.logging.RootLogConfig;
 import com.twitter.common.logging.RootLogConfig.Configuration;
 import com.twitter.common.logging.log4j.GlogLayout;

@@ -34,7 +34,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import com.google.common.io.Files;
 import com.google.common.primitives.Longs;
-
 import com.twitter.common.base.Closure;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;

@@ -18,7 +18,6 @@ package org.apache.aurora.scheduler.events;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -28,12 +27,10 @@ import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertEquals;
 
 public class NotifyingSchedulingFilterTest extends EasyMockTest {

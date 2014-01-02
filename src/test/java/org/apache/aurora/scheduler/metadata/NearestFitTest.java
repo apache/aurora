@@ -18,7 +18,6 @@ package org.apache.aurora.scheduler.metadata;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.testing.FakeTicker;
@@ -31,7 +30,6 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-
 import org.junit.Before;
 import org.junit.Test;
 

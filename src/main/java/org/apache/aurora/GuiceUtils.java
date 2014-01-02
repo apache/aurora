@@ -37,7 +37,6 @@ import com.google.inject.BindingAnnotation;
 import com.google.inject.matcher.AbstractMatcher;
 import com.google.inject.matcher.Matcher;
 import com.google.inject.matcher.Matchers;
-
 import com.twitter.common.collections.Pair;
 
 import org.aopalliance.intercept.MethodInterceptor;

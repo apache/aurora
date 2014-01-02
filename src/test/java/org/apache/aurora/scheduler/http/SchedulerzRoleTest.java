@@ -28,13 +28,11 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.http.SchedulerzRole.getFreshestTask;
-
 import static org.junit.Assert.assertEquals;
 
 public class SchedulerzRoleTest {

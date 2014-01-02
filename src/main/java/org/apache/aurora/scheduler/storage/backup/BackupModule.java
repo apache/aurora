@@ -26,7 +26,6 @@ import com.google.common.base.Function;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
-
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;

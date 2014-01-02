@@ -29,19 +29,15 @@ import org.apache.aurora.scheduler.SchedulerLifecycle.DriverReference;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.SchedulerDriver;
-
 import org.easymock.Capture;
 import org.easymock.EasyMock;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.fail;
 
 public class SchedulerLifecycleTest extends EasyMockTest {

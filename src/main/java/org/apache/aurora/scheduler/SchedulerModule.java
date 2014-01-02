@@ -29,7 +29,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
-
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
@@ -42,7 +41,6 @@ import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.periodic.GcExecutorLauncher;
 import org.apache.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutorSettings;
-
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 

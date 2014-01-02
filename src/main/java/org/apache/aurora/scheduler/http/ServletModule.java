@@ -28,11 +28,9 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 import com.google.inject.servlet.GuiceFilter;
-
 import com.sun.jersey.api.container.filter.GZIPContentEncodingFilter;
 import com.sun.jersey.guice.JerseyServletModule;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
-
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.application.modules.LocalServiceRegistry;

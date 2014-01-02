@@ -35,7 +35,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.UnmodifiableIterator;
 import com.google.common.primitives.Longs;
 import com.google.inject.BindingAnnotation;
-
 import com.twitter.common.base.Function;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -46,7 +45,6 @@ import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
-
 import org.apache.mesos.Log;
 
 import static java.lang.annotation.ElementType.METHOD;

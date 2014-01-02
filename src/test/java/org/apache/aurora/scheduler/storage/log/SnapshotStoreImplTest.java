@@ -19,7 +19,6 @@ import java.util.Set;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -43,14 +42,11 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
-
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertEquals;
 
 public class SnapshotStoreImplTest extends EasyMockTest {

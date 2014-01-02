@@ -27,7 +27,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
-
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
@@ -44,7 +43,6 @@ import org.apache.aurora.scheduler.state.SchedulerCore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Offer;
@@ -55,14 +53,11 @@ import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.SchedulerDriver;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
-
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertTrue;
 
 public class MesosSchedulerImplTest extends EasyMockTest {

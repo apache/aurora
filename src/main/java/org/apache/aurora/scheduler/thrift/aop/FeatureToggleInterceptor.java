@@ -23,7 +23,6 @@ import com.google.common.base.Predicate;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-
 import org.apache.aurora.gen.ResponseCode;
 
 /**

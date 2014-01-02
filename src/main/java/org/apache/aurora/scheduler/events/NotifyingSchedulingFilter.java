@@ -22,7 +22,6 @@ import java.util.Set;
 import javax.inject.Inject;
 
 import com.google.inject.BindingAnnotation;
-
 import com.twitter.common.base.Closure;
 
 import org.apache.aurora.scheduler.ResourceSlot;

@@ -26,7 +26,6 @@ import javax.inject.Singleton;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
-
 import com.twitter.common.util.StateMachine;
 
 import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.Event;

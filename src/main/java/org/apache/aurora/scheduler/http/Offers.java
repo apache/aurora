@@ -30,7 +30,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.scheduler.async.OfferQueue;
-
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Offer;

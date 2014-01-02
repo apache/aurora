@@ -18,7 +18,6 @@ package org.apache.aurora.scheduler.state;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -33,16 +32,13 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
-
 import org.easymock.EasyMock;
-
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
-
 import static org.junit.Assert.assertEquals;
 
 public class LockManagerImplTest extends EasyMockTest {

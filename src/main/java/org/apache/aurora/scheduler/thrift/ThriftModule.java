@@ -18,7 +18,6 @@ package org.apache.aurora.scheduler.thrift;
 import javax.inject.Singleton;
 
 import com.google.inject.AbstractModule;
-
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
 

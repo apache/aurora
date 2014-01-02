@@ -25,7 +25,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
 import com.google.inject.util.Providers;
-
 import com.twitter.common.application.ShutdownRegistry.ShutdownRegistryImpl;
 import com.twitter.common.application.modules.LifecycleModule.ServiceRunner;
 import com.twitter.common.application.modules.LocalServiceRegistry;
@@ -39,13 +38,11 @@ import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
 import org.easymock.Capture;
-
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.http.LeaderRedirect.HTTP_PORT_NAME;
-
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;

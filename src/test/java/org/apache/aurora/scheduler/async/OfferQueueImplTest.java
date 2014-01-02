@@ -26,7 +26,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -39,17 +38,13 @@ import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.state.MaintenanceController;
-
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskInfo;
-
 import org.easymock.IAnswer;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertFalse;
 
 public class OfferQueueImplTest extends EasyMockTest {

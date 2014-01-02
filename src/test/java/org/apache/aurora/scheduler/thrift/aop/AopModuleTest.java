@@ -22,7 +22,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.CreationException;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.auth.CapabilityValidator;
@@ -31,12 +30,10 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.SessionKey;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 

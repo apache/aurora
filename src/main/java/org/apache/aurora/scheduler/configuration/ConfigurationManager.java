@@ -28,7 +28,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 
@@ -45,7 +44,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
-
 import org.apache.commons.lang.StringUtils;
 
 import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;

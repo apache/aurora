@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-
 import com.twitter.common.base.Closure;
 
 import org.apache.aurora.scheduler.events.PubsubEvent;

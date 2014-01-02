@@ -20,7 +20,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -28,12 +27,10 @@ import org.apache.aurora.gen.Quota;
 import org.apache.aurora.scheduler.quota.Quotas;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.ResourceSlotProvider;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertEquals;
 
 public class SlotSizeCounterTest extends EasyMockTest {

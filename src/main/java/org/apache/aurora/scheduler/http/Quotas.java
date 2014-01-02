@@ -35,7 +35,6 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
-
 import org.codehaus.jackson.annotate.JsonProperty;
 
 /**

@@ -32,7 +32,6 @@ import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Atomics;
-
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
@@ -55,12 +54,10 @@ import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.StorageBackfill;
-
 import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-
 import static com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 
 /**

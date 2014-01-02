@@ -21,7 +21,6 @@ import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
-
 import com.twitter.common.application.StartupStage;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;

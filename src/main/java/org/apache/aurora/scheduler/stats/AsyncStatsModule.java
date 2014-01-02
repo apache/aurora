@@ -29,7 +29,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.BindingAnnotation;
-
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -43,7 +42,6 @@ import org.apache.aurora.scheduler.async.OfferQueue;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.ResourceSlotProvider;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
-
 import org.apache.mesos.Protos.Offer;
 
 import static java.lang.annotation.ElementType.FIELD;

@@ -20,7 +20,6 @@ import java.util.Date;
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
-
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.Lock;

@@ -28,7 +28,6 @@ import com.google.common.collect.Iterables;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
 import com.google.inject.TypeLiteral;
-
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.net.InetSocketAddressHelper;
@@ -40,9 +39,7 @@ import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.ReaderInterface;
 import org.apache.aurora.scheduler.log.mesos.LogInterface.WriterInterface;
-
 import org.apache.mesos.Log;
-
 import org.apache.zookeeper.common.PathUtils;
 
 /**

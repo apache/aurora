@@ -26,7 +26,6 @@ import javax.servlet.http.HttpServletResponseWrapper;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-
 import com.twitter.common.net.http.filters.AbstractHttpFilter;
 import com.twitter.common.stats.SlidingStats;
 

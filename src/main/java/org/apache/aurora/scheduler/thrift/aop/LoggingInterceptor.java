@@ -29,7 +29,6 @@ import com.google.common.collect.Lists;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.JobConfiguration;

@@ -23,7 +23,6 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matchers;
-
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AuroraAdmin;
@@ -31,14 +30,11 @@ import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
-
 import org.easymock.EasyMock;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertSame;
 
 public class FeatureToggleInterceptorTest extends EasyMockTest {

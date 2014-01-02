@@ -21,11 +21,9 @@ import java.io.IOException;
 import java.util.Properties;
 
 import com.google.common.base.Throwables;
-
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.DriverFactory.DriverFactoryImpl;
-
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

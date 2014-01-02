@@ -18,7 +18,6 @@ package org.apache.aurora.scheduler.thrift;
 import javax.inject.Inject;
 
 import org.apache.aurora.gen.AuroraAdmin;
-
 import org.apache.thrift.protocol.TJSONProtocol;
 import org.apache.thrift.server.TServlet;
 

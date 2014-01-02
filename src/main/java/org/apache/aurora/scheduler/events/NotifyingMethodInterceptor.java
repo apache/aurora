@@ -21,12 +21,10 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.base.Preconditions;
-
 import com.twitter.common.base.Closure;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-
 import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
 import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 

@@ -20,7 +20,6 @@ import com.google.inject.Injector;
 
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CronScheduler;
-
 import org.junit.Before;
 import org.junit.Test;
 

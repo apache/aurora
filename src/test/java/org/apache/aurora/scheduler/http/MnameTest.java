@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

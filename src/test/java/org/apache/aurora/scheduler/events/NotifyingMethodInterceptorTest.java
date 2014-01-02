@@ -22,7 +22,6 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
 import com.google.inject.matcher.Matchers;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -30,7 +29,6 @@ import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
 import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
-
 import org.junit.Before;
 import org.junit.Test;
 

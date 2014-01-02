@@ -27,12 +27,10 @@ import javax.ws.rs.core.Response.Status;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
-
 import com.twitter.common.base.Closure;
 import com.twitter.common.thrift.Util;
 
 import org.antlr.stringtemplate.StringTemplate;
-
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
@@ -43,7 +41,6 @@ import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
-
 import org.apache.thrift.TBase;
 
 /**

@@ -19,7 +19,6 @@ import java.io.File;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.TearDown;
-
 import com.twitter.common.base.Command;
 import com.twitter.common.io.FileUtils;
 import com.twitter.common.quantity.Amount;
@@ -50,17 +49,13 @@ import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImp
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import org.apache.aurora.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-
 import org.easymock.Capture;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
-
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertEquals;
 
 public class RecoveryTest extends EasyMockTest {

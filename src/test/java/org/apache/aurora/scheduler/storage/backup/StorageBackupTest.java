@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import com.google.common.testing.TearDown;
-
 import com.twitter.common.io.FileUtils;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -44,12 +43,10 @@ import org.apache.aurora.gen.storage.StoredJob;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
-
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertEquals;
 
 public class StorageBackupTest extends EasyMockTest {

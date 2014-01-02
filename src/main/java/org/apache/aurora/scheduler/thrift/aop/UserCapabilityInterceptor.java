@@ -31,7 +31,6 @@ import com.google.common.collect.ImmutableList;
 
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
 import org.apache.aurora.auth.CapabilityValidator.Capability;
