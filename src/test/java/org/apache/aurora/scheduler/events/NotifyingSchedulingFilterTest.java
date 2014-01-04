@@ -18,7 +18,6 @@ package org.apache.aurora.scheduler.events;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
-import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.TaskConfig;
@@ -48,13 +47,13 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
 
   private SchedulingFilter filter;
 
-  private Closure<PubsubEvent> eventSink;
+  private EventSink eventSink;
   private SchedulingFilter delegate;
 
   @Before
   public void setUp() {
     delegate = createMock(SchedulingFilter.class);
-    eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
+    eventSink = createMock(EventSink.class);
     filter = new NotifyingSchedulingFilter(delegate, eventSink);
   }
 
@@ -62,7 +61,7 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
   public void testEvents() {
     Set<Veto> vetoes = ImmutableSet.of(VETO_1, VETO_2);
     expect(delegate.filter(TASK_RESOURCES, SLAVE, TASK, TASK_ID)).andReturn(vetoes);
-    eventSink.execute(new Vetoed(TASK_ID, vetoes));
+    eventSink.post(new Vetoed(TASK_ID, vetoes));
 
     control.replay();
 

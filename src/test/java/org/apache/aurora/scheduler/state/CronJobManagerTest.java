@@ -25,7 +25,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -41,8 +40,8 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronScheduler;
-import org.apache.aurora.scheduler.events.PubsubEvent;
-import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
+import org.apache.aurora.scheduler.events.EventSink;
+import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -145,8 +144,8 @@ public class CronJobManagerTest extends EasyMockTest {
       }
     });
     cron = injector.getInstance(CronJobManager.class);
-    Closure<PubsubEvent> eventSink = PubsubTestUtil.startPubsub(injector);
-    eventSink.execute(new StorageStarted());
+    EventSink eventSink = PubsubTestUtil.startPubsub(injector);
+    eventSink.post(new SchedulerActive());
   }
 
   @Test

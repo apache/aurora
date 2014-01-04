@@ -68,6 +68,8 @@ interface RescheduleCalculator {
    */
   long getReadyTimeMs(IScheduledTask task);
 
+  // TODO(wfarner): Create a unit test for this class.  It currently piggybacks on
+  // TaskSchedulerTest.  Once a unit test exists, TaskSchedulerTest should use a mock.
   class RescheduleCalculatorImpl implements RescheduleCalculator {
 
     private static final Logger LOG = Logger.getLogger(TaskGroups.class.getName());
@@ -75,6 +77,7 @@ interface RescheduleCalculator {
     private final Storage storage;
     private final RescheduleCalculatorSettings settings;
     private final Clock clock;
+    // TODO(wfarner): Inject 'random' in the constructor for better test coverage.
     private final Random random = new Random.SystemRandom(new java.util.Random());
 
     private static final Predicate<ScheduleStatus> IS_ACTIVE_STATUS =

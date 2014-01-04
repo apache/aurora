@@ -107,7 +107,7 @@ public class NearestFitTest {
     IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.ASSIGNED)
         .setAssignedTask(new AssignedTask().setTaskId(TASK)));
-    nearest.stateChanged(new TaskStateChange(task, ScheduleStatus.PENDING));
+    nearest.stateChanged(TaskStateChange.transition(task, ScheduleStatus.PENDING));
     assertNearest();
   }
 

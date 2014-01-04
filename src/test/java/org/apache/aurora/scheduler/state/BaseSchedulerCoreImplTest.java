@@ -39,7 +39,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.base.Closure;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
@@ -68,6 +67,7 @@ import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronScheduler;
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.state.JobFilter.JobFilterResult;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -136,7 +136,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private CronScheduler cronScheduler;
   private CronJobManager cron;
   private FakeClock clock;
-  private Closure<PubsubEvent> eventSink;
+  private EventSink eventSink;
   private ShutdownRegistry shutdownRegistry;
   private JobFilter jobFilter;
 
@@ -152,8 +152,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void setUp() throws Exception {
     driver = createMock(Driver.class);
     clock = new FakeClock();
-    eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
-    eventSink.execute(EasyMock.<PubsubEvent>anyObject());
+    eventSink = createMock(EventSink.class);
+    eventSink.post(EasyMock.<PubsubEvent>anyObject());
     cronScheduler = createMock(CronScheduler.class);
     shutdownRegistry = createMock(ShutdownRegistry.class);
     jobFilter = createMock(JobFilter.class);

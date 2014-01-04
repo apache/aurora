@@ -46,8 +46,10 @@ import com.twitter.common.zookeeper.Group.JoinException;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
+import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
@@ -95,7 +97,7 @@ public class SchedulerLifecycle implements EventSubscriber {
     STORAGE_PREPARED,
     LEADER_AWAITING_REGISTRATION,
     REGISTERED_LEADER,
-    RUNNING,
+    ACTIVE,
     DEAD
   }
 
@@ -114,14 +116,15 @@ public class SchedulerLifecycle implements EventSubscriber {
 
   @Inject
   SchedulerLifecycle(
-      final DriverFactory driverFactory,
-      final NonVolatileStorage storage,
-      final Lifecycle lifecycle,
-      final Driver driver,
-      final DriverReference driverRef,
+      DriverFactory driverFactory,
+      NonVolatileStorage storage,
+      Lifecycle lifecycle,
+      Driver driver,
+      DriverReference driverRef,
       final LeadingOptions leadingOptions,
       final ScheduledExecutorService executorService,
-      final Clock clock) {
+      Clock clock,
+      EventSink eventSink) {
 
     this(
         driverFactory,
@@ -150,7 +153,8 @@ public class SchedulerLifecycle implements EventSubscriber {
                 leadingOptions.registrationDelayLimit.getUnit().getTimeUnit());
           }
         },
-        clock);
+        clock,
+        eventSink);
   }
 
   @VisibleForTesting
@@ -163,7 +167,8 @@ public class SchedulerLifecycle implements EventSubscriber {
       final Driver driver,
       final DriverReference driverRef,
       final DelayedActions delayedActions,
-      final Clock clock) {
+      final Clock clock,
+      final EventSink eventSink) {
 
     Stats.export(new StatImpl<Integer>("framework_registered") {
       @Override public Integer read() {
@@ -241,6 +246,7 @@ public class SchedulerLifecycle implements EventSubscriber {
     final Closure<Transition<State>> handleRegistered = new Closure<Transition<State>>() {
       @Override public void execute(Transition<State> transition) {
         registrationAcked.set(true);
+        eventSink.post(new SchedulerActive());
         try {
           leaderControl.get().advertise();
         } catch (JoinException e) {
@@ -306,9 +312,9 @@ public class SchedulerLifecycle implements EventSubscriber {
             State.REGISTERED_LEADER, State.DEAD)
         .addState(
             State.REGISTERED_LEADER,
-            State.RUNNING, State.DEAD)
+            State.ACTIVE, State.DEAD)
         .addState(
-            State.RUNNING,
+            State.ACTIVE,
             State.DEAD)
         .addState(
             State.DEAD,

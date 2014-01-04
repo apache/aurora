@@ -28,17 +28,15 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
 import com.twitter.common.application.Lifecycle;
-import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.configuration.Resources;
-import org.apache.aurora.scheduler.events.PubsubEvent;
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
-import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.state.SchedulerCore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
@@ -108,7 +106,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   private TaskLauncher systemLauncher;
   private TaskLauncher userLauncher;
   private SchedulerDriver driver;
-  private Closure<PubsubEvent> eventBus;
+  private EventSink eventSink;
 
   private MesosSchedulerImpl scheduler;
 
@@ -119,7 +117,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         new Lifecycle(createMock(Command.class), createMock(UncaughtExceptionHandler.class));
     systemLauncher = createMock(TaskLauncher.class);
     userLauncher = createMock(TaskLauncher.class);
-    eventBus = createMock(new Clazz<Closure<PubsubEvent>>() { });
+    eventSink = createMock(EventSink.class);
 
     Injector injector = Guice.createInjector(new AbstractModule() {
       @Override protected void configure() {
@@ -128,8 +126,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         bind(Lifecycle.class).toInstance(lifecycle);
         bind(new TypeLiteral<List<TaskLauncher>>() { })
             .toInstance(Arrays.asList(systemLauncher, userLauncher));
-        bind(new TypeLiteral<Closure<PubsubEvent>>() { }).toInstance(eventBus);
-        PubsubEventModule.bindNotifyingInterceptor(binder());
+        bind(EventSink.class).toInstance(eventSink);
       }
     });
     scheduler = injector.getInstance(MesosSchedulerImpl.class);
@@ -260,7 +257,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   public void testDisconnected() throws Exception {
     new RegisteredFixture() {
       @Override void expectations() throws Exception {
-        eventBus.execute(new DriverDisconnected());
+        eventSink.post(new DriverDisconnected());
       }
 
       @Override void test() {
@@ -287,7 +284,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
     void run() throws Exception {
       runCalled.set(true);
-      eventBus.execute(new DriverRegistered());
+      eventSink.post(new DriverRegistered());
       storageUtil.expectOperations();
       storageUtil.schedulerStore.saveFrameworkId(FRAMEWORK_ID);
       expectations();

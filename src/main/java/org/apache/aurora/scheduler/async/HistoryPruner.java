@@ -41,10 +41,8 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -55,9 +53,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import static org.apache.aurora.scheduler.base.Tasks.LATEST_ACTIVITY;
 import static org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import static org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import static org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 
@@ -68,9 +64,6 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 public class HistoryPruner implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(HistoryPruner.class.getName());
 
-  @VisibleForTesting
-  static final Query.Builder INACTIVE_QUERY = Query.unscoped().terminal();
-
   private final Multimap<IJobKey, String> tasksByJob =
       Multimaps.synchronizedSetMultimap(LinkedHashMultimap.<IJobKey, String>create());
   @VisibleForTesting
@@ -79,7 +72,6 @@ public class HistoryPruner implements EventSubscriber {
   }
 
   private final ScheduledExecutorService executor;
-  private final Storage storage;
   private final StateManager stateManager;
   private final Clock clock;
   private final long pruneThresholdMillis;
@@ -93,14 +85,12 @@ public class HistoryPruner implements EventSubscriber {
   @Inject
   HistoryPruner(
       final ScheduledExecutorService executor,
-      final Storage storage,
       final StateManager stateManager,
       final Clock clock,
       @PruneThreshold Amount<Long, Time> inactivePruneThreshold,
       @PruneThreshold int perJobHistoryGoal) {
 
     this.executor = checkNotNull(executor);
-    this.storage = checkNotNull(storage);
     this.stateManager = checkNotNull(stateManager);
     this.clock = checkNotNull(clock);
     this.pruneThresholdMillis = inactivePruneThreshold.as(Time.MILLISECONDS);
@@ -120,28 +110,13 @@ public class HistoryPruner implements EventSubscriber {
   @Subscribe
   public void recordStateChange(TaskStateChange change) {
     if (Tasks.isTerminated(change.getNewState())) {
+      long timeoutBasis = change.isTransition()
+          ? clock.nowMillis()
+          : Iterables.getLast(change.getTask().getTaskEvents()).getTimestamp();
       registerInactiveTask(
           Tasks.SCHEDULED_TO_JOB_KEY.apply(change.getTask()),
           change.getTaskId(),
-          calculateTimeout(clock.nowMillis()));
-    }
-  }
-
-  /**
-   * When triggered, iterates through inactive tasks in the system and prunes tasks that
-   * exceed the history goal for a job or are beyond the time threshold.
-   *
-   * @param event A new StorageStarted event.
-   */
-  @Subscribe
-  public void storageStarted(StorageStarted event) {
-    for (IScheduledTask task
-        : LATEST_ACTIVITY.sortedCopy(Storage.Util.consistentFetchTasks(storage, INACTIVE_QUERY))) {
-
-      registerInactiveTask(
-          Tasks.SCHEDULED_TO_JOB_KEY.apply(task),
-          Tasks.id(task),
-          calculateTimeout(Iterables.getLast(task.getTaskEvents()).getTimestamp()));
+          calculateTimeout(timeoutBasis));
     }
   }
 

@@ -22,7 +22,6 @@ import java.util.Set;
 import javax.inject.Inject;
 
 import com.google.inject.BindingAnnotation;
-import com.twitter.common.base.Closure;
 
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
@@ -49,12 +48,12 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   public @interface NotifyDelegate { }
 
   private final SchedulingFilter delegate;
-  private final Closure<PubsubEvent> eventSink;
+  private final EventSink eventSink;
 
   @Inject
   NotifyingSchedulingFilter(
       @NotifyDelegate SchedulingFilter delegate,
-      Closure<PubsubEvent> eventSink) {
+      EventSink eventSink) {
 
     this.delegate = checkNotNull(delegate);
     this.eventSink = checkNotNull(eventSink);
@@ -64,7 +63,7 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   public Set<Veto> filter(ResourceSlot offer, String slaveHost, ITaskConfig task, String taskId) {
     Set<Veto> vetoes = delegate.filter(offer, slaveHost, task, taskId);
     if (!vetoes.isEmpty()) {
-      eventSink.execute(new Vetoed(taskId, vetoes));
+      eventSink.post(new Vetoed(taskId, vetoes));
     }
 
     return vetoes;

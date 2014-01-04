@@ -96,12 +96,12 @@ public class NearestFit implements EventSubscriber {
    * Records a task state change event.
    * This will ignore any events where the previous state is not {@link ScheduleStatus#PENDING}.
    *
-   * @param stateChangeEvent Task state change.
+   * @param event Task state change.
    */
   @Subscribe
-  public synchronized void stateChanged(TaskStateChange stateChangeEvent) {
-    if (stateChangeEvent.getOldState() == ScheduleStatus.PENDING) {
-      fitByTask.invalidate(stateChangeEvent.getTaskId());
+  public synchronized void stateChanged(TaskStateChange event) {
+    if (event.isTransition() && event.getOldState().get() == ScheduleStatus.PENDING) {
+      fitByTask.invalidate(event.getTaskId());
     }
   }
 

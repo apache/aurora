@@ -38,7 +38,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Atomics;
-import com.twitter.common.base.Closure;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 
@@ -49,6 +48,7 @@ import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.state.SideEffectStorage.SideEffectWork;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -157,7 +157,7 @@ public class StateManagerImpl implements StateManager {
       final Clock clock,
       Driver driver,
       TaskIdGenerator taskIdGenerator,
-      Closure<PubsubEvent> taskEventSink) {
+      EventSink eventSink) {
 
     checkNotNull(storage);
     this.clock = checkNotNull(clock);
@@ -168,8 +168,7 @@ public class StateManagerImpl implements StateManager {
       }
     };
 
-    this.storage = new SideEffectStorage(storage, finalizer, taskEventSink);
-
+    this.storage = new SideEffectStorage(storage, finalizer, eventSink);
     this.driver = checkNotNull(driver);
     this.taskIdGenerator = checkNotNull(taskIdGenerator);
 
@@ -369,7 +368,7 @@ public class StateManagerImpl implements StateManager {
               }
             });
             sideEffectWork.addTaskEvent(
-                new PubsubEvent.TaskStateChange(
+                PubsubEvent.TaskStateChange.transition(
                     Iterables.getOnlyElement(taskStore.fetchTasks(idQuery)),
                     stateMachine.getPreviousState()));
             break;

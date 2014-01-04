@@ -27,17 +27,12 @@ import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
-import com.google.inject.TypeLiteral;
-import com.google.inject.matcher.Matchers;
 import com.google.inject.multibindings.Multibinder;
 import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.base.Closure;
 import com.twitter.common.base.Command;
 
-import org.aopalliance.intercept.MethodInterceptor;
 import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -69,17 +64,16 @@ public final class PubsubEventModule extends AbstractModule {
 
     bind(EventBus.class).toInstance(eventBus);
 
-    Closure<PubsubEvent> eventPoster = new Closure<PubsubEvent>() {
-      @Override public void execute(PubsubEvent event) {
+    EventSink eventSink = new EventSink() {
+      @Override public void post(PubsubEvent event) {
         eventBus.post(event);
       }
     };
-    bind(new TypeLiteral<Closure<PubsubEvent>>() { }).toInstance(eventPoster);
+    bind(EventSink.class).toInstance(eventSink);
 
     // Ensure at least an empty binding is present.
     getSubscriberBinder(binder());
     LifecycleModule.bindStartupAction(binder(), RegisterSubscribers.class);
-    bindNotifyingInterceptor(binder());
   }
 
   static class RegisterSubscribers implements Command {
@@ -125,22 +119,5 @@ public final class PubsubEventModule extends AbstractModule {
    */
   public static void bindSubscriber(Binder binder, Class<? extends EventSubscriber> subscriber) {
     getSubscriberBinder(binder).addBinding().to(subscriber);
-  }
-
-  /**
-   * Binds a method interceptor to all methods annotated with {@link SendNotification}.
-   * <p>
-   * The interceptor will send notifications before and/or after the wrapped method invocation.
-   *
-   * @param binder Guice binder.
-   */
-  @VisibleForTesting
-  public static void bindNotifyingInterceptor(Binder binder) {
-    MethodInterceptor interceptor = new NotifyingMethodInterceptor();
-    binder.requestInjection(interceptor);
-    binder.bindInterceptor(
-        Matchers.any(),
-        Matchers.annotatedWith(SendNotification.class),
-        interceptor);
   }
 }

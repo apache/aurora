@@ -15,20 +15,16 @@
  */
 package org.apache.aurora.scheduler.events;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
 import java.util.Set;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -83,21 +79,46 @@ public interface PubsubEvent {
   /**
    * Event sent when a task changed state.
    */
-  public static class TaskStateChange implements PubsubEvent {
+  public static final class TaskStateChange implements PubsubEvent {
     private final IScheduledTask task;
-    private final ScheduleStatus oldState;
+    private final Optional<ScheduleStatus> oldState;
 
-    public TaskStateChange(IScheduledTask task, ScheduleStatus oldState) {
+    private TaskStateChange(IScheduledTask task, Optional<ScheduleStatus> oldState) {
       this.task = checkNotNull(task);
       this.oldState = checkNotNull(oldState);
+    }
+
+    /**
+     * Creates a state change event that represents the initial value of a task.
+     *
+     * @param task Task structure.
+     * @return A state change event.
+     */
+    public static TaskStateChange initialized(IScheduledTask task) {
+      return new TaskStateChange(task, Optional.<ScheduleStatus>absent());
+    }
+
+    /**
+     * Creates a state change event that represents a transition from one state to another.
+     *
+     * @param task Current task structure.
+     * @param oldState State the task was previously in.
+     * @return A state change event.
+     */
+    public static TaskStateChange transition(IScheduledTask task, ScheduleStatus oldState) {
+      return new TaskStateChange(task, Optional.of(oldState));
     }
 
     public String getTaskId() {
       return Tasks.id(task);
     }
 
-    public ScheduleStatus getOldState() {
+    public Optional<ScheduleStatus> getOldState() {
       return oldState;
+    }
+
+    public boolean isTransition() {
+      return oldState.isPresent();
     }
 
     public IScheduledTask getTask() {
@@ -242,18 +263,6 @@ public interface PubsubEvent {
     }
   }
 
-  public static class StorageStarted implements PubsubEvent {
-    @Override
-    public boolean equals(Object o) {
-      return (o != null) && getClass().equals(o.getClass());
-    }
-
-    @Override
-    public int hashCode() {
-      return getClass().hashCode();
-    }
-  }
-
   public static class DriverRegistered implements PubsubEvent {
     @Override
     public boolean equals(Object o) {
@@ -278,42 +287,15 @@ public interface PubsubEvent {
     }
   }
 
-  public static final class Interceptors {
-    private Interceptors() {
-      // Utility class.
+  public static class SchedulerActive implements PubsubEvent {
+    @Override
+    public boolean equals(Object o) {
+      return (o != null) && getClass().equals(o.getClass());
     }
 
-    public enum Event {
-      None(null),
-      StorageStarted(new StorageStarted()),
-      DriverRegistered(new DriverRegistered()),
-      DriverDisconnected(new DriverDisconnected());
-
-      private final PubsubEvent event;
-      private Event(PubsubEvent event) {
-        this.event = event;
-      }
-
-      public PubsubEvent getEvent() {
-        return event;
-      }
-    }
-
-    /**
-     * An annotation to place on methods of injected classes that which to fire events before
-     * and/or after their invocation.
-     */
-    @Target(METHOD) @Retention(RUNTIME)
-    public @interface SendNotification {
-      /**
-       * Event to fire prior to invocation.
-       */
-      Event before() default Event.None;
-
-      /**
-       * Event to fire after invocation.
-       */
-      Event after() default Event.None;
+    @Override
+    public int hashCode() {
+      return getClass().hashCode();
     }
   }
 }

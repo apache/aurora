@@ -61,7 +61,7 @@ import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.CronScheduler;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
+import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.Work;
@@ -165,13 +165,13 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   /**
-   * Notifies the cron job manager that storage is started, and job configurations are ready to
+   * Notifies the cron job manager that the scheduler is active, and job configurations are ready to
    * load.
    *
-   * @param storageStarted Event.
+   * @param schedulerActive Event.
    */
   @Subscribe
-  public void storageStarted(StorageStarted storageStarted) {
+  public void schedulerActive(SchedulerActive schedulerActive) {
     cron.start();
     shutdownRegistry.addAction(new ExceptionalCommand<CronException>() {
       @Override public void execute() throws CronException {

@@ -35,8 +35,9 @@ import org.apache.aurora.gen.comm.SchedulerMessage;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.configuration.Resources;
-import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
-import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
+import org.apache.aurora.scheduler.events.EventSink;
+import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
+import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.state.SchedulerCore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -74,6 +75,7 @@ class MesosSchedulerImpl implements Scheduler {
   private final Storage storage;
   private final SchedulerCore schedulerCore;
   private final Lifecycle lifecycle;
+  private final EventSink eventSink;
   private volatile boolean registered = false;
 
   /**
@@ -88,12 +90,14 @@ class MesosSchedulerImpl implements Scheduler {
       Storage storage,
       SchedulerCore schedulerCore,
       final Lifecycle lifecycle,
-      List<TaskLauncher> taskLaunchers) {
+      List<TaskLauncher> taskLaunchers,
+      EventSink eventSink) {
 
     this.storage = checkNotNull(storage);
     this.schedulerCore = checkNotNull(schedulerCore);
     this.lifecycle = checkNotNull(lifecycle);
     this.taskLaunchers = checkNotNull(taskLaunchers);
+    this.eventSink = checkNotNull(eventSink);
   }
 
   @Override
@@ -101,7 +105,6 @@ class MesosSchedulerImpl implements Scheduler {
     LOG.info("Received notification of lost slave: " + slaveId);
   }
 
-  @SendNotification(after = Event.DriverRegistered)
   @Override
   public void registered(
       SchedulerDriver driver,
@@ -116,13 +119,14 @@ class MesosSchedulerImpl implements Scheduler {
       }
     });
     registered = true;
+    eventSink.post(new DriverRegistered());
   }
 
-  @SendNotification(after = Event.DriverDisconnected)
   @Override
   public void disconnected(SchedulerDriver schedulerDriver) {
     LOG.warning("Framework disconnected.");
     frameworkDisconnects.incrementAndGet();
+    eventSink.post(new DriverDisconnected());
   }
 
   @Override

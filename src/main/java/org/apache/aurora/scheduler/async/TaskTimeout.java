@@ -43,13 +43,9 @@ import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -75,9 +71,6 @@ class TaskTimeout implements EventSubscriber {
       ScheduleStatus.PREEMPTING,
       ScheduleStatus.RESTARTING,
       ScheduleStatus.KILLING);
-
-  @VisibleForTesting
-  static final Query.Builder TRANSIENT_QUERY = Query.unscoped().byStatus(TRANSIENT_STATES);
 
   private final Map<TimeoutKey, Context> futures = Maps.newConcurrentMap();
 
@@ -111,7 +104,6 @@ class TaskTimeout implements EventSubscriber {
     }
   }
 
-  private final Storage storage;
   private final ScheduledExecutorService executor;
   private final StateManager stateManager;
   private final long timeoutMillis;
@@ -120,14 +112,12 @@ class TaskTimeout implements EventSubscriber {
 
   @Inject
   TaskTimeout(
-      Storage storage,
       ScheduledExecutorService executor,
       StateManager stateManager,
       final Clock clock,
       Amount<Long, Time> timeout,
       StatsProvider statsProvider) {
 
-    this.storage = checkNotNull(storage);
     this.executor = checkNotNull(executor);
     this.stateManager = checkNotNull(stateManager);
     this.timeoutMillis = timeout.as(Time.MILLISECONDS);
@@ -162,8 +152,8 @@ class TaskTimeout implements EventSubscriber {
   public void recordStateChange(TaskStateChange change) {
     String taskId = change.getTaskId();
     ScheduleStatus newState = change.getNewState();
-    if (isTransient(change.getOldState())) {
-      TimeoutKey oldKey = new TimeoutKey(taskId, change.getOldState());
+    if (change.isTransition() && isTransient(change.getOldState().get())) {
+      TimeoutKey oldKey = new TimeoutKey(taskId, change.getOldState().get());
       Context context = futures.remove(oldKey);
       if (context != null) {
         LOG.fine("Canceling state timeout for task " + oldKey);
@@ -173,13 +163,6 @@ class TaskTimeout implements EventSubscriber {
 
     if (isTransient(newState)) {
       registerTimeout(new TimeoutKey(taskId, change.getNewState()));
-    }
-  }
-
-  @Subscribe
-  public void storageStarted(StorageStarted event) {
-    for (IScheduledTask task : Storage.Util.consistentFetchTasks(storage, TRANSIENT_QUERY)) {
-      registerTimeout(new TimeoutKey(Tasks.id(task), task.getStatus()));
     }
   }
 

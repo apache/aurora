@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
 import com.twitter.common.quantity.Amount;
@@ -48,7 +49,6 @@ import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.HostMaintenanceStateChange;
-import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -144,7 +144,6 @@ public class TaskSchedulerTest extends EasyMockTest {
         clock);
     taskGroups = new TaskGroups(
         executor,
-        storage,
         retryStrategy,
         rateLimiter,
         scheduler,
@@ -185,7 +184,7 @@ public class TaskSchedulerTest extends EasyMockTest {
         }
       }
     });
-    taskGroups.taskChangedState(new TaskStateChange(copy, oldState));
+    taskGroups.taskChangedState(TaskStateChange.transition(copy, oldState));
   }
 
   private Capture<Runnable> expectTaskRetryIn(long penaltyMs) {
@@ -253,16 +252,17 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
+    final IScheduledTask a = makeTask("a", KILLED);
+    final IScheduledTask b = makeTask("b", PENDING);
     final IScheduledTask c = makeTask("c", RUNNING);
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(MutableStoreProvider store) {
-        store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
-            makeTask("a", KILLED),
-            makeTask("b", PENDING),
-            c));
+        store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(a, b, c));
       }
     });
-    taskGroups.storageStarted(new StorageStarted());
+    for (IScheduledTask task : ImmutableList.of(a, b, c)) {
+      taskGroups.taskChangedState(TaskStateChange.initialized(task));
+    }
     changeState(c, RUNNING, FINISHED);
   }
 
@@ -272,7 +272,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    taskGroups.taskChangedState(new TaskStateChange(makeTask("a", PENDING), INIT));
+    taskGroups.taskChangedState(TaskStateChange.transition(makeTask("a", PENDING), INIT));
     timeoutCapture.getValue().run();
   }
 
@@ -581,7 +581,8 @@ public class TaskSchedulerTest extends EasyMockTest {
     // Ensure the offer was consumed.
     changeState(task, INIT, PENDING);
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().deleteTasks(Tasks.ids(task));
       }
     });

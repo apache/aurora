@@ -21,8 +21,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.twitter.common.base.Closure;
 
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -47,7 +47,7 @@ class SideEffectStorage {
 
   private final Storage storage;
   private final OperationFinalizer operationFinalizer;
-  private final Closure<PubsubEvent> taskEventSink;
+  private final EventSink eventSink;
 
   interface OperationFinalizer {
     /**
@@ -68,11 +68,11 @@ class SideEffectStorage {
   SideEffectStorage(
       Storage storage,
       OperationFinalizer operationFinalizer,
-      Closure<PubsubEvent> taskEventSink) {
+      EventSink eventSink) {
 
     this.storage = checkNotNull(storage);
     this.operationFinalizer = checkNotNull(operationFinalizer);
-    this.taskEventSink = checkNotNull(taskEventSink);
+    this.eventSink = checkNotNull(eventSink);
   }
 
   /**
@@ -154,7 +154,7 @@ class SideEffectStorage {
           operationFinalizer.finalize(work, storeProvider);
           if (topLevelOperation) {
             while (!events.isEmpty()) {
-              taskEventSink.execute(events.remove());
+              eventSink.post(events.remove());
             }
           }
           return result;

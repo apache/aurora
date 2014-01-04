@@ -22,10 +22,9 @@ import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 import com.twitter.common.application.StartupStage;
-import com.twitter.common.base.Closure;
 import com.twitter.common.base.ExceptionalCommand;
 
-import org.apache.aurora.scheduler.events.PubsubEvent;
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 
 /**
@@ -54,7 +53,7 @@ public final class PubsubTestUtil {
    * @return The pubsub event sink.
    * @throws Exception If the pubsub system failed to start.
    */
-  public static Closure<PubsubEvent> startPubsub(Injector injector) throws Exception {
+  public static EventSink startPubsub(Injector injector) throws Exception {
     // TODO(wfarner): Make it easier to write a unit test wired for pubsub events.
     // In this case, a trade-off was made to avoid installing several distant modules and providing
     // required bindings that seem unrelated from this code.
@@ -64,6 +63,6 @@ public final class PubsubTestUtil {
     for (ExceptionalCommand<?> command : startupCommands) {
       command.execute();
     }
-    return injector.getInstance(Key.get(new TypeLiteral<Closure<PubsubEvent>>() { }));
+    return injector.getInstance(EventSink.class);
   }
 }

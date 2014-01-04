@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -34,8 +33,8 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
-import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -62,7 +61,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private MaintenanceController maintenance;
-  private Closure<PubsubEvent> eventSink;
+  private EventSink eventSink;
 
   @Before
   public void setUp() throws Exception {
@@ -119,7 +118,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     assertStatus(HOST_A, SCHEDULED, maintenance.startMaintenance(A));
     assertStatus(HOST_A, DRAINING, maintenance.drain(A));
-    eventSink.execute(new TaskStateChange(IScheduledTask.build(task.setStatus(FINISHED)), RUNNING));
+    eventSink.post(
+        TaskStateChange.transition(IScheduledTask.build(task.setStatus(FINISHED)), RUNNING));
     assertStatus(HOST_A, NONE, maintenance.endMaintenance(A));
   }
 
@@ -162,33 +162,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     // Make sure a later transition on the host does not cause any ill effects that could surface
     // from stale internal state.
-    eventSink.execute(new TaskStateChange(
+    eventSink.post(TaskStateChange.transition(
         IScheduledTask.build(makeTask(HOST_A, "taskA").setStatus(FINISHED)), RUNNING));
-  }
-
-  @Test
-  public void testStorageStart() {
-    ScheduledTask taskA = makeTask(HOST_A, "taskA").setStatus(ScheduleStatus.RESTARTING);
-
-    expect(storageUtil.attributeStore.getHostAttributes())
-        .andReturn(ImmutableSet.of(
-            new HostAttributes().setHost(HOST_A).setMode(DRAINING),
-            new HostAttributes().setHost(HOST_B).setMode(DRAINING)));
-    expectFetchTasksByHost(HOST_A, ImmutableSet.of(taskA));
-    expectFetchTasksByHost(HOST_B, ImmutableSet.<ScheduledTask>of());
-    expectMaintenanceModeChange(HOST_B, DRAINED);
-    expectMaintenanceModeChange(HOST_A, DRAINING);
-    expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
-        .andReturn(Optional.of(new HostAttributes().setHost(HOST_A).setMode(DRAINING)));
-    // TaskA is FINISHED and therefore no longer active
-    expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of());
-    expectMaintenanceModeChange(HOST_A, DRAINED);
-
-    control.replay();
-
-    eventSink.execute(new StorageStarted());
-    eventSink.execute(
-        new TaskStateChange(IScheduledTask.build(taskA.setStatus(FINISHED)), RUNNING));
   }
 
   @Test
@@ -211,7 +186,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   private void expectMaintenanceModeChange(String hostName, MaintenanceMode mode) {
     expect(storageUtil.attributeStore.setMaintenanceMode(hostName, mode)).andReturn(true);
-    eventSink.execute(
+    eventSink.post(
         new PubsubEvent.HostMaintenanceStateChange(
             new HostStatus().setHost(hostName).setMode(mode)));
   }

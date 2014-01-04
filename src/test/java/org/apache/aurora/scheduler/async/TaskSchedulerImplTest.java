@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.twitter.common.base.Closure;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -33,7 +32,8 @@ import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.events.PubsubEvent;
+import org.apache.aurora.scheduler.events.EventSink;
+import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
@@ -62,7 +62,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private Preemptor preemptor;
   private Amount<Long, Time> reservationDuration;
   private Amount<Long, Time> halfReservationDuration;
-  private Closure<PubsubEvent> eventSink;
+  private EventSink eventSink;
 
   @Before
   public void setUp() throws Exception {
@@ -163,7 +163,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     assertEquals(scheduler.schedule("a"), TaskScheduler.TaskSchedulerResult.TRY_AGAIN);
     assertEquals(scheduler.schedule("a"), TaskScheduler.TaskSchedulerResult.SUCCESS);
     firstAssignment.getValue().apply(offerA);
-    eventSink.execute(new PubsubEvent.TaskStateChange(taskA, PENDING));
+    eventSink.post(TaskStateChange.transition(taskA, PENDING));
     clock.advance(halfReservationDuration);
     assertEquals(scheduler.schedule("b"), TaskScheduler.TaskSchedulerResult.SUCCESS);
     secondAssignment.getValue().apply(offerA);
@@ -222,7 +222,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     assertEquals(scheduler.schedule("a"), TaskScheduler.TaskSchedulerResult.TRY_AGAIN);
     clock.advance(halfReservationDuration);
     // Task is killed by user before it is scheduled
-    eventSink.execute(new PubsubEvent.TaskStateChange(taskA, PENDING));
+    eventSink.post(TaskStateChange.transition(taskA, PENDING));
     assertEquals(scheduler.schedule("b"), TaskScheduler.TaskSchedulerResult.SUCCESS);
     assignment.getValue().apply(offerA);
   }

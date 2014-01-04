@@ -26,7 +26,9 @@ import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 
 import org.apache.aurora.scheduler.SchedulerLifecycle.DelayedActions;
 import org.apache.aurora.scheduler.SchedulerLifecycle.DriverReference;
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
+import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos.Status;
@@ -52,6 +54,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   private LeaderControl leaderControl;
   private SchedulerDriver schedulerDriver;
   private DelayedActions delayedActions;
+  private EventSink eventSink;
 
   private SchedulerLifecycle schedulerLifecycle;
 
@@ -65,6 +68,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     leaderControl = createMock(LeaderControl.class);
     schedulerDriver = createMock(SchedulerDriver.class);
     delayedActions = createMock(DelayedActions.class);
+    eventSink = createMock(EventSink.class);
     schedulerLifecycle = new SchedulerLifecycle(
         driverFactory,
         storageUtil.storage,
@@ -76,7 +80,8 @@ public class SchedulerLifecycleTest extends EasyMockTest {
         driver,
         driverRef,
         delayedActions,
-        createMock(Clock.class));
+        createMock(Clock.class),
+        eventSink);
   }
 
   @Test
@@ -98,6 +103,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     delayedActions.blockingDriverJoin(EasyMock.<Runnable>anyObject());
 
     leaderControl.advertise();
+    eventSink.post(new SchedulerActive());
     leaderControl.leave();
     driver.stop();
     storageUtil.storage.stop();

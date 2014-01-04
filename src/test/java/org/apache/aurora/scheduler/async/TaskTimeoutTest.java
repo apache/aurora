@@ -36,11 +36,9 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
@@ -73,7 +71,6 @@ public class TaskTimeoutTest extends EasyMockTest {
   private Capture<Supplier<Number>> stateCountCapture;
   private Map<ScheduleStatus, Capture<Supplier<Number>>> stateCaptures;
 
-  private StorageTestUtil storageUtil;
   private ScheduledExecutorService executor;
   private ScheduledFuture<?> future;
   private StateManager stateManager;
@@ -83,8 +80,6 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    storageUtil = new StorageTestUtil(this);
-    storageUtil.expectOperations();
     executor = createMock(ScheduledExecutorService.class);
     future = createMock(new Clazz<ScheduledFuture<?>>() { });
     stateManager = createMock(StateManager.class);
@@ -122,7 +117,6 @@ public class TaskTimeoutTest extends EasyMockTest {
   private void replayAndCreate() {
     control.replay();
     timeout = new TaskTimeout(
-        storageUtil.storage,
         executor,
         stateManager,
         clock,
@@ -152,7 +146,7 @@ public class TaskTimeoutTest extends EasyMockTest {
     IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setStatus(to)
         .setAssignedTask(new AssignedTask().setTaskId(taskId)));
-    timeout.recordStateChange(new TaskStateChange(task, from));
+    timeout.recordStateChange(TaskStateChange.transition(task, from));
   }
 
   private void changeState(ScheduleStatus from, ScheduleStatus to) {
@@ -234,13 +228,7 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   @Test
   public void testStorageStart() {
-    clock.setNowMillis(TIMEOUT_MS * 2);
-    storageUtil.expectTaskFetch(
-        TaskTimeout.TRANSIENT_QUERY,
-        makeTask("a", ASSIGNED, 0),
-        makeTask("b", KILLING, TIMEOUT_MS),
-        makeTask("c", PREEMPTING, TIMEOUT_MS * 3) /* In the future */
-    );
+
     expectTaskWatch(TIMEOUT_MS);
     expectTaskWatch(TIMEOUT_MS);
     expectTaskWatch(TIMEOUT_MS);
@@ -248,24 +236,18 @@ public class TaskTimeoutTest extends EasyMockTest {
 
     replayAndCreate();
 
-    timeout.storageStarted(new StorageStarted());
+    clock.setNowMillis(TIMEOUT_MS * 2);
+    for (IScheduledTask task : ImmutableList.of(
+        makeTask("a", ASSIGNED, 0),
+        makeTask("b", KILLING, TIMEOUT_MS),
+        makeTask("c", PREEMPTING, clock.nowMillis() + TIMEOUT_MS))) {
+
+      timeout.recordStateChange(TaskStateChange.initialized(task));
+    }
+
     changeState("a", ASSIGNED, RUNNING);
     changeState("b", KILLING, KILLED);
     changeState("c", PREEMPTING, FINISHED);
-  }
-
-  @Test
-  public void testStorageStartTwice() {
-    // This should never happen, but testing that the class handles it gracefully.
-    storageUtil.expectTaskFetch(TaskTimeout.TRANSIENT_QUERY, makeTask("a", ASSIGNED, 0)).times(2);
-    expectTaskWatch();
-    expectCancel();
-
-    replayAndCreate();
-
-    timeout.storageStarted(new StorageStarted());
-    timeout.storageStarted(new StorageStarted());
-    changeState("a", ASSIGNED, RUNNING);
   }
 
   private void checkOutstandingTimer(ScheduleStatus status, long expectedValue) {

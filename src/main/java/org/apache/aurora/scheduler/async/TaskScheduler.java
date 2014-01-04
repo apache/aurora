@@ -210,7 +210,7 @@ interface TaskScheduler extends EventSubscriber {
 
     @Subscribe
     public void taskChanged(final TaskStateChange stateChangeEvent) {
-      if (stateChangeEvent.getOldState() == PENDING) {
+      if (Optional.of(PENDING).equals(stateChangeEvent.getOldState())) {
         reservations.invalidateTask(stateChangeEvent.getTaskId());
       }
     }

@@ -25,7 +25,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
-import com.twitter.common.base.Closure;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -39,6 +38,7 @@ import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
@@ -74,7 +74,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   private Driver driver;
   private TaskIdGenerator taskIdGenerator;
-  private Closure<PubsubEvent> eventSink;
+  private EventSink eventSink;
   private StateManagerImpl stateManager;
   private final FakeClock clock = new FakeClock();
   private Storage storage;
@@ -83,7 +83,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void setUp() throws Exception {
     taskIdGenerator = createMock(TaskIdGenerator.class);
     driver = createMock(Driver.class);
-    eventSink = createMock(new Clazz<Closure<PubsubEvent>>() { });
+    eventSink = createMock(EventSink.class);
     // TODO(William Farner): Use a mocked storage.
     storage = MemStorage.newEmptyStorage();
     stateManager = new StateManagerImpl(storage, clock, driver, taskIdGenerator, eventSink);
@@ -113,7 +113,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
       TaskStateChange change = (TaskStateChange) argument;
       return taskId.equals(Tasks.id(change.getTask()))
-          && (from == change.getOldState())
+          && (from == change.getOldState().get())
           && (to == change.getNewState());
     }
 
@@ -186,7 +186,7 @@ public class StateManagerImplTest extends EasyMockTest {
     String taskId = "a";
     expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
-    eventSink.execute(matchTasksDeleted(taskId));
+    eventSink.post(matchTasksDeleted(taskId));
 
     control.replay();
 
@@ -201,7 +201,7 @@ public class StateManagerImplTest extends EasyMockTest {
     String taskId = "a";
     expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING);
-    eventSink.execute(matchTasksDeleted(taskId));
+    eventSink.post(matchTasksDeleted(taskId));
 
     driver.killTask(EasyMock.<String>anyObject());
 
@@ -222,7 +222,7 @@ public class StateManagerImplTest extends EasyMockTest {
     expect(taskIdGenerator.generate(task, 0)).andReturn(id);
 
     // Trigger an event that produces a side-effect and a PubSub event .
-    eventSink.execute(matchStateChange(id, INIT, PENDING));
+    eventSink.post(matchStateChange(id, INIT, PENDING));
     expectLastCall().andAnswer(new IAnswer<Void>() {
       @Override public Void answer() throws Throwable {
         stateManager.changeState(
@@ -245,7 +245,7 @@ public class StateManagerImplTest extends EasyMockTest {
     String taskId = "a";
     expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING);
-    eventSink.execute(matchTasksDeleted(taskId));
+    eventSink.post(matchTasksDeleted(taskId));
 
     control.replay();
 
@@ -268,7 +268,7 @@ public class StateManagerImplTest extends EasyMockTest {
     while (it.hasNext()) {
       ScheduleStatus cur = it.next();
       try {
-        eventSink.execute(matchStateChange(taskId, cur, it.peek()));
+        eventSink.post(matchStateChange(taskId, cur, it.peek()));
       } catch (NoSuchElementException e) {
         // Expected.
       }

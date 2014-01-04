@@ -22,6 +22,7 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -41,13 +42,10 @@ import com.twitter.common.util.Clock;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.scheduler.base.JobKeys;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
-import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -70,7 +68,6 @@ public class TaskGroups implements EventSubscriber {
 
   private static final Logger LOG = Logger.getLogger(TaskGroups.class.getName());
 
-  private final Storage storage;
   private final LoadingCache<GroupKey, TaskGroup> groups;
   private final Clock clock;
   private final RescheduleCalculator rescheduleCalculator;
@@ -88,7 +85,6 @@ public class TaskGroups implements EventSubscriber {
   @Inject
   TaskGroups(
       ShutdownRegistry shutdownRegistry,
-      Storage storage,
       TaskGroupsSettings settings,
       TaskScheduler taskScheduler,
       Clock clock,
@@ -96,7 +92,6 @@ public class TaskGroups implements EventSubscriber {
 
     this(
         createThreadPool(shutdownRegistry),
-        storage,
         settings.taskGroupBackoff,
         settings.rateLimiter,
         taskScheduler,
@@ -104,16 +99,15 @@ public class TaskGroups implements EventSubscriber {
         rescheduleCalculator);
   }
 
+  @VisibleForTesting
   TaskGroups(
       final ScheduledExecutorService executor,
-      final Storage storage,
       final BackoffStrategy taskGroupBackoffStrategy,
       final RateLimiter rateLimiter,
       final TaskScheduler taskScheduler,
       final Clock clock,
       final RescheduleCalculator rescheduleCalculator) {
 
-    this.storage = checkNotNull(storage);
     checkNotNull(executor);
     checkNotNull(taskGroupBackoffStrategy);
     checkNotNull(rateLimiter);
@@ -222,26 +216,11 @@ public class TaskGroups implements EventSubscriber {
   @Subscribe
   public synchronized void taskChangedState(TaskStateChange stateChange) {
     if (stateChange.getNewState() == PENDING) {
-      add(
-          stateChange.getTask().getAssignedTask(),
-          rescheduleCalculator.getReadyTimeMs(stateChange.getTask()));
-    }
-  }
-
-  /**
-   * Signals that storage has started and is consistent.
-   * <p>
-   * Upon this signal, all {@link org.apache.aurora.gen.ScheduleStatus#PENDING} tasks in the stoage
-   * will become eligible for scheduling.
-   *
-   * @param event Storage started notification.
-   */
-  @Subscribe
-  public void storageStarted(StorageStarted event) {
-    for (IScheduledTask task
-        : Storage.Util.consistentFetchTasks(storage, Query.unscoped().byStatus(PENDING))) {
-
-      add(task.getAssignedTask(), rescheduleCalculator.getStartupReadyTimeMs(task));
+      IScheduledTask task = stateChange.getTask();
+      long readyAtMs = stateChange.isTransition()
+          ? rescheduleCalculator.getReadyTimeMs(task)
+          : rescheduleCalculator.getStartupReadyTimeMs(task);
+      add(task.getAssignedTask(), readyAtMs);
     }
   }
 

@@ -31,8 +31,7 @@ import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
+import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -67,28 +66,31 @@ public class TaskVarsTest extends EasyMockTest {
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
     trackedStats = createMock(StatsProvider.class);
-  }
-
-  private void initialize() {
     vars = new TaskVars(storageUtil.storage, trackedStats);
-    vars.storageStarted(new StorageStarted());
-  }
 
-  private void changeState(IScheduledTask task, ScheduleStatus status) {
-    vars.taskChangedState(new TaskStateChange(
-        IScheduledTask.build(task.newBuilder().setStatus(status)),
-        task.getStatus()));
-  }
-
-  private void expectLoadStorage(IScheduledTask... result) {
     storageUtil.expectOperations();
-    storageUtil.expectTaskFetch(Query.unscoped(), result);
     globalCounters = Maps.newHashMap();
+  }
+
+  private void expectStatusCountersInitialized() {
     for (ScheduleStatus status : ScheduleStatus.values()) {
       AtomicLong counter = new AtomicLong(0);
       globalCounters.put(status, counter);
       expect(trackedStats.makeCounter(TaskVars.getVarName(status))).andReturn(counter);
     }
+  }
+
+  private void changeState(IScheduledTask task, ScheduleStatus status) {
+    vars.taskChangedState(TaskStateChange.transition(
+        IScheduledTask.build(task.newBuilder().setStatus(status)),
+        task.getStatus()));
+  }
+
+  private void schedulerActivated(IScheduledTask... initialTasks) {
+    for (IScheduledTask task : initialTasks) {
+      vars.taskChangedState(TaskStateChange.initialized(task));
+    }
+    vars.schedulerActive(new SchedulerActive());
   }
 
   private IScheduledTask makeTask(String job, ScheduleStatus status, String host) {
@@ -114,10 +116,10 @@ public class TaskVarsTest extends EasyMockTest {
 
   @Test
   public void testStartsAtZero() {
-    expectLoadStorage();
+    expectStatusCountersInitialized();
 
     control.replay();
-    initialize();
+    schedulerActivated();
 
     assertAllZero();
   }
@@ -132,10 +134,10 @@ public class TaskVarsTest extends EasyMockTest {
 
   @Test
   public void testTaskLifeCycle() {
-    expectLoadStorage();
+    expectStatusCountersInitialized();
 
     control.replay();
-    initialize();
+    schedulerActivated();
 
     IScheduledTask taskA = makeTask(JOB_A, INIT);
     changeState(taskA, PENDING);
@@ -156,14 +158,15 @@ public class TaskVarsTest extends EasyMockTest {
 
   @Test
   public void testLoadsFromStorage() {
-    expectLoadStorage(
+    expectStatusCountersInitialized();
+
+    control.replay();
+    schedulerActivated(
         makeTask(JOB_A, PENDING),
         makeTask(JOB_A, RUNNING),
         makeTask(JOB_A, FINISHED),
         makeTask(JOB_B, PENDING),
         makeTask(JOB_B, FAILED));
-    control.replay();
-    initialize();
 
     assertEquals(2, globalCounters.get(PENDING).get());
     assertEquals(1, globalCounters.get(RUNNING).get());
@@ -182,7 +185,7 @@ public class TaskVarsTest extends EasyMockTest {
 
   @Test
   public void testLostCounters() {
-    expectLoadStorage();
+    expectStatusCountersInitialized();
     expectGetHostRack("host1", "rackA").atLeastOnce();
     expectGetHostRack("host2", "rackB").atLeastOnce();
     expectGetHostRack("host3", "rackB").atLeastOnce();
@@ -193,7 +196,7 @@ public class TaskVarsTest extends EasyMockTest {
     expect(trackedStats.makeCounter(TaskVars.rackStatName("rackB"))).andReturn(rackB);
 
     control.replay();
-    initialize();
+    schedulerActivated();
 
     IScheduledTask a = makeTask("jobA", RUNNING, "host1");
     IScheduledTask b = makeTask("jobB", RUNNING, "host2");
@@ -211,29 +214,15 @@ public class TaskVarsTest extends EasyMockTest {
 
   @Test
   public void testRackMissing() {
-    expectLoadStorage();
+    expectStatusCountersInitialized();
     expect(storageUtil.attributeStore.getHostAttributes("a"))
         .andReturn(Optional.<HostAttributes>absent());
 
     control.replay();
-    initialize();
+    schedulerActivated();
 
     IScheduledTask a = makeTask(JOB_A, RUNNING, "a");
     changeState(a, LOST);
     // Since no attributes are stored for the host, a variable is not exported/updated.
-  }
-
-  @Test
-  public void testDeleteBeforeStorageStarted() {
-    expectLoadStorage();
-
-    control.replay();
-
-    vars = new TaskVars(storageUtil.storage, trackedStats);
-    vars.tasksDeleted(new TasksDeleted(ImmutableSet.of(makeTask("jobA", RUNNING, "host1"))));
-    assertEquals(0, globalCounters.get(RUNNING).get());
-
-    vars.storageStarted(new StorageStarted());
-    assertEquals(0, globalCounters.get(RUNNING).get());
   }
 }

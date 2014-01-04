@@ -22,14 +22,12 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
 import com.twitter.common.base.Closure;
-import com.twitter.common.base.Closures;
 
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.HostStatus;
@@ -37,9 +35,9 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -108,13 +106,13 @@ public interface MaintenanceController {
   class MaintenanceControllerImpl implements MaintenanceController, EventSubscriber {
     private final Storage storage;
     private final StateManager stateManager;
-    private final Closure<PubsubEvent> eventSink;
+    private final EventSink eventSink;
 
     @Inject
     public MaintenanceControllerImpl(
         Storage storage,
         StateManager stateManager,
-        Closure<PubsubEvent> eventSink) {
+        EventSink eventSink) {
 
       this.storage = checkNotNull(storage);
       this.stateManager = checkNotNull(stateManager);
@@ -144,36 +142,6 @@ public interface MaintenanceController {
           .addAll(setMaintenanceMode(store, emptyHosts, DRAINED))
           .addAll(setMaintenanceMode(store, Sets.difference(hosts, emptyHosts), DRAINING))
           .build();
-    }
-
-    private Set<HostStatus> watchDrainingTasks(MutableStoreProvider store, Set<String> hosts) {
-      return watchDrainingTasks(store, hosts, Closures.<Query.Builder>noop());
-    }
-
-    private static final Predicate<HostAttributes> IS_DRAINING = new Predicate<HostAttributes>() {
-      @Override public boolean apply(HostAttributes attributes) {
-        return DRAINING == attributes.getMode();
-      }
-    };
-
-    /**
-     * Notifies the MaintenanceController that storage has started, and maintenance statuses are
-     * ready to be loaded.
-     *
-     * @param started Event.
-     */
-    @Subscribe
-    public void storageStarted(StorageStarted started) {
-      storage.write(new MutateWork.NoResult.Quiet() {
-        @Override protected void execute(MutableStoreProvider storeProvider) {
-          Set<String> drainingHosts =
-              FluentIterable.from(storeProvider.getAttributeStore().getHostAttributes())
-                  .filter(IS_DRAINING)
-                  .transform(HOST_NAME)
-                  .toSet();
-          watchDrainingTasks(storeProvider, drainingHosts);
-        }
-      });
     }
 
     /**
@@ -292,7 +260,7 @@ public interface MaintenanceController {
       for (String host : hosts) {
         if (store.setMaintenanceMode(host, mode)) {
           HostStatus status = new HostStatus().setHost(host).setMode(mode);
-          eventSink.execute(new PubsubEvent.HostMaintenanceStateChange(status.deepCopy()));
+          eventSink.post(new PubsubEvent.HostMaintenanceStateChange(status.deepCopy()));
           statuses.add(status);
         }
       }

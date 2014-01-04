@@ -28,10 +28,15 @@ import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 import com.twitter.common.util.StateMachine;
 
-import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.Event;
-import org.apache.aurora.scheduler.events.PubsubEvent.Interceptors.SendNotification;
+import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.events.EventSink;
+import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A non-volatile storage wrapper that enforces method call ordering.
@@ -47,6 +52,7 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
   private @interface EnforceOrderOn { }
 
   private final NonVolatileStorage wrapped;
+  private final EventSink eventSink;
 
   private enum State {
     CONSTRUCTED,
@@ -64,8 +70,9 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
       .build();
 
   @Inject
-  CallOrderEnforcingStorage(@EnforceOrderOn NonVolatileStorage wrapped) {
-    this.wrapped = wrapped;
+  CallOrderEnforcingStorage(@EnforceOrderOn NonVolatileStorage wrapped, EventSink eventSink) {
+    this.wrapped = checkNotNull(wrapped);
+    this.eventSink = checkNotNull(eventSink);
   }
 
   private void checkInState(State state) throws StorageException {
@@ -81,12 +88,20 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
     stateMachine.transition(State.PREPARED);
   }
 
-  @SendNotification(after = Event.StorageStarted)
   @Override
   public void start(Quiet initializationLogic) throws StorageException {
     checkInState(State.PREPARED);
     wrapped.start(initializationLogic);
     stateMachine.transition(State.READY);
+    wrapped.write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        Iterable<IScheduledTask> tasks = Tasks.LATEST_ACTIVITY.sortedCopy(
+            storeProvider.getTaskStore().fetchTasks(Query.unscoped()));
+        for (IScheduledTask task : tasks) {
+          eventSink.post(TaskStateChange.initialized(task));
+        }
+      }
+    });
   }
 
   @Override

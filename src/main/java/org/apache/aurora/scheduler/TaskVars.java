@@ -34,9 +34,8 @@ import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.events.PubsubEvent.StorageStarted;
+import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -52,12 +51,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class TaskVars implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(TaskVars.class.getName());
-
-  // Used to ignore pubsub events sent before storage has completely started.  This avoids a
-  // miscount where a StorageStarted consumer is invoked before storageStarted is invoked here,
-  // and pubsub events are fired for tasks that we have not yet counted.  For example, if
-  // tasksDeleted is invoked, we would end up with a negative count.
-  private volatile boolean storageStarted = false;
 
   private final LoadingCache<String, AtomicLong> countersByStatus;
   private final LoadingCache<String, AtomicLong> countersByRack;
@@ -116,14 +109,12 @@ class TaskVars implements EventSubscriber {
 
   @Subscribe
   public void taskChangedState(TaskStateChange stateChange) {
-    if (!storageStarted) {
-      return;
+    IScheduledTask task = stateChange.getTask();
+    Optional<ScheduleStatus> previousState = stateChange.getOldState();
+    if (stateChange.isTransition() && !previousState.equals(Optional.of(ScheduleStatus.INIT))) {
+      decrementCount(previousState.get());
     }
 
-    IScheduledTask task = stateChange.getTask();
-    if (stateChange.getOldState() != ScheduleStatus.INIT) {
-      decrementCount(stateChange.getOldState());
-    }
     incrementCount(task.getStatus());
 
     if (stateChange.getNewState() == ScheduleStatus.LOST) {
@@ -146,10 +137,9 @@ class TaskVars implements EventSubscriber {
   }
 
   @Subscribe
-  public void storageStarted(StorageStarted event) {
-    for (IScheduledTask task : Storage.Util.consistentFetchTasks(storage, Query.unscoped())) {
-      incrementCount(task.getStatus());
-    }
+  public void schedulerActive(SchedulerActive event) {
+    // TODO(wfarner): This should probably induce the initial 'export' of stats, so that incomplete
+    // values are not surfaced while storage is recovering.
 
     // Dummy read the counter for each status counter. This is important to guarantee a stat with
     // value zero is present for each state, even if all states are not represented in the task
@@ -157,15 +147,10 @@ class TaskVars implements EventSubscriber {
     for (ScheduleStatus status : ScheduleStatus.values()) {
       getCounter(status);
     }
-    storageStarted = true;
   }
 
   @Subscribe
   public void tasksDeleted(final TasksDeleted event) {
-    if (!storageStarted) {
-      return;
-    }
-
     for (IScheduledTask task : event.getTasks()) {
       decrementCount(task.getStatus());
     }
