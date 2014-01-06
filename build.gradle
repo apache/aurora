@@ -5,6 +5,7 @@ apply plugin: 'idea'
 apply plugin: 'java'
 apply plugin: 'maven-publish'
 apply plugin: 'versions'
+apply plugin: 'jacoco'
 
 buildscript {
   repositories {
@@ -275,3 +276,14 @@ run {
     '-testing_log_file_path=/tmp/testing_log_file',
   ]
 }
+
+jacocoTestReport {
+  group = "Reporting"
+  description = "Generate Jacoco coverage reports after running tests."
+  additionalSourceDirs = files(sourceSets.main.allJava.srcDirs)
+  doLast {
+    println "Coverage report generated: file:///$buildDir/reports/jacoco/test/html/index.html"
+  }
+}
+
+test.finalizedBy jacocoTestReport
