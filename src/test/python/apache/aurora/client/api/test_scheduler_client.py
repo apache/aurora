@@ -1,7 +1,11 @@
 import inspect
 import unittest
 
+from apache.aurora.common.cluster import Cluster
 import apache.aurora.client.api.scheduler_client as scheduler_client
+from twitter.common.quantity import Amount, Time
+from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
+from twitter.common.zookeeper.serverset.endpoint import ServiceInstance
 
 import gen.apache.aurora.AuroraAdmin as AuroraAdmin
 import gen.apache.aurora.AuroraSchedulerManager as AuroraSchedulerManager
@@ -258,3 +262,55 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mox.ReplayAll()
 
     self.make_scheduler_proxy().rewriteConfigs(RewriteConfigsRequest())
+
+
+class TestZookeeperSchedulerClient(unittest.TestCase):
+  def setUp(self):
+    self.mox = Mox()
+
+  def tearDown(self):
+    self.mox.UnsetStubs()
+    self.mox.VerifyAll()
+
+  def test_url_when_not_connected_and_cluster_has_no_proxy_url(self):
+    host = 'some-host.example.com'
+    port = 31181
+
+    mock_zk = self.mox.CreateMock(TwitterKazooClient)
+
+    def mock_get_serverset(*args, **kwargs):
+      service_json = '''{
+        "additionalEndpoints": {
+            "http": {
+                "host": "%s",
+                "port": %d
+            }
+        },
+        "serviceEndpoint": {
+            "host": "%s",
+            "port": %d
+        },
+        "shard": 0,
+        "status": "ALIVE"
+    }''' % (host, port, host, port)
+
+      return mock_zk, [ServiceInstance.unpack(service_json)]
+
+    class TestZookeeperSchedulerClient(scheduler_client.ZookeeperSchedulerClient):
+      SERVERSET_TIMEOUT = Amount(10, Time.MILLISECONDS)
+
+    original_method = TestZookeeperSchedulerClient.get_scheduler_serverset
+
+    try:
+      TestZookeeperSchedulerClient.get_scheduler_serverset = mock_get_serverset
+
+      zk_scheduler_client = TestZookeeperSchedulerClient(Cluster(proxy_url=None))
+      self.mox.StubOutWithMock(zk_scheduler_client, '_connect_scheduler')
+      mock_zk.stop()
+      zk_scheduler_client._connect_scheduler(host, port, False)
+
+      self.mox.ReplayAll()
+
+      assert zk_scheduler_client.url == 'http://%s:%d' % (host, port)
+    finally:
+      TestZookeeperSchedulerClient.get_scheduler_serverset = original_method

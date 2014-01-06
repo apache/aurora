@@ -111,6 +111,7 @@ class ZookeeperSchedulerClient(SchedulerClient):
     self._cluster = cluster
     self._zkport = port
     self._endpoint = None
+    self._http = None
 
   def _connect(self):
     joined = threading.Event()
@@ -133,6 +134,8 @@ class ZookeeperSchedulerClient(SchedulerClient):
     proxy_url = self._cluster.proxy_url
     if proxy_url:
       return proxy_url
+    if self._http is None:
+      self._connect()
     if self._http:
       return 'http://%s:%s' % (self._http.host, self._http.port)
 
