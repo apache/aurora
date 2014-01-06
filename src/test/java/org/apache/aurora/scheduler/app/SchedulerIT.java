@@ -327,10 +327,10 @@ public class SchedulerIT extends BaseZooKeeperTest {
     logStream.close();
     expectLastCall().anyTimes();
 
-    final AtomicReference<Scheduler> scheduler = Atomics.newReference();
+    final Scheduler scheduler = injector.getInstance(Scheduler.class);
     expect(driver.start()).andAnswer(new IAnswer<Status>() {
       @Override public Status answer() {
-        scheduler.get().registered(driver,
+        scheduler.registered(driver,
             FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
             MasterInfo.getDefaultInstance());
         return Status.DRIVER_RUNNING;
@@ -339,8 +339,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
     control.replay();
     startScheduler();
-
-    scheduler.set(getScheduler());
     awaitSchedulerReady();
 
     assertEquals(0L, Stats.<Long>getVariable("task_store_PENDING").read().longValue());

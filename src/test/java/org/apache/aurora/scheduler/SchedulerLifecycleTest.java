@@ -102,6 +102,8 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     expect(driver.start()).andReturn(Status.DRIVER_RUNNING);
     delayedActions.blockingDriverJoin(EasyMock.<Runnable>anyObject());
 
+    Capture<Runnable> handleRegisteredCapture = createCapture();
+    delayedActions.onRegistered(capture(handleRegisteredCapture));
     leaderControl.advertise();
     eventSink.post(new SchedulerActive());
     leaderControl.leave();
@@ -114,6 +116,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     LeadershipListener leaderListener = schedulerLifecycle.prepare();
     leaderListener.onLeading(leaderControl);
     schedulerLifecycle.registered(new DriverRegistered());
+    handleRegisteredCapture.getValue().run();
     triggerFailoverCapture.getValue().run();
   }
 

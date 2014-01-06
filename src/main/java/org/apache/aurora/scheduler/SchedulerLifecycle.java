@@ -121,8 +121,8 @@ public class SchedulerLifecycle implements EventSubscriber {
       Lifecycle lifecycle,
       Driver driver,
       DriverReference driverRef,
-      final LeadingOptions leadingOptions,
-      final ScheduledExecutorService executorService,
+      LeadingOptions leadingOptions,
+      ScheduledExecutorService executorService,
       Clock clock,
       EventSink eventSink) {
 
@@ -132,29 +132,50 @@ public class SchedulerLifecycle implements EventSubscriber {
         lifecycle,
         driver,
         driverRef,
-        new DelayedActions() {
-          @Override public void blockingDriverJoin(Runnable runnable) {
-            executorService.execute(runnable);
-          }
-
-          @Override public void onAutoFailover(Runnable runnable) {
-            executorService.schedule(
-                runnable,
-                leadingOptions.leadingTimeLimit.getValue(),
-                leadingOptions.leadingTimeLimit.getUnit().getTimeUnit());
-          }
-
-          @Override public void onRegistrationTimeout(Runnable runnable) {
-            LOG.info(
-                "Giving up on registration in " + leadingOptions.registrationDelayLimit);
-            executorService.schedule(
-                runnable,
-                leadingOptions.registrationDelayLimit.getValue(),
-                leadingOptions.registrationDelayLimit.getUnit().getTimeUnit());
-          }
-        },
+        new DefaultDelayedActions(leadingOptions, executorService),
         clock,
         eventSink);
+  }
+
+  private static final class DefaultDelayedActions implements DelayedActions {
+    private final LeadingOptions leadingOptions;
+    private final ScheduledExecutorService executorService;
+
+    private DefaultDelayedActions(
+        LeadingOptions leadingOptions,
+        ScheduledExecutorService executorService) {
+
+      this.leadingOptions = checkNotNull(leadingOptions);
+      this.executorService = checkNotNull(executorService);
+    }
+
+    @Override
+    public void blockingDriverJoin(Runnable runnable) {
+      executorService.execute(runnable);
+    }
+
+    @Override
+    public void onAutoFailover(Runnable runnable) {
+      executorService.schedule(
+          runnable,
+          leadingOptions.leadingTimeLimit.getValue(),
+          leadingOptions.leadingTimeLimit.getUnit().getTimeUnit());
+    }
+
+    @Override
+    public void onRegistrationTimeout(Runnable runnable) {
+      LOG.info(
+          "Giving up on registration in " + leadingOptions.registrationDelayLimit);
+      executorService.schedule(
+          runnable,
+          leadingOptions.registrationDelayLimit.getValue(),
+          leadingOptions.registrationDelayLimit.getUnit().getTimeUnit());
+    }
+
+    @Override
+    public void onRegistered(Runnable runnable) {
+      executorService.submit(runnable);
+    }
   }
 
   @VisibleForTesting
@@ -169,6 +190,15 @@ public class SchedulerLifecycle implements EventSubscriber {
       final DelayedActions delayedActions,
       final Clock clock,
       final EventSink eventSink) {
+
+    checkNotNull(driverFactory);
+    checkNotNull(storage);
+    checkNotNull(lifecycle);
+    checkNotNull(driver);
+    checkNotNull(driverRef);
+    checkNotNull(delayedActions);
+    checkNotNull(clock);
+    checkNotNull(eventSink);
 
     Stats.export(new StatImpl<Integer>("framework_registered") {
       @Override public Integer read() {
@@ -246,17 +276,47 @@ public class SchedulerLifecycle implements EventSubscriber {
     final Closure<Transition<State>> handleRegistered = new Closure<Transition<State>>() {
       @Override public void execute(Transition<State> transition) {
         registrationAcked.set(true);
-        eventSink.post(new SchedulerActive());
-        try {
-          leaderControl.get().advertise();
-        } catch (JoinException e) {
-          LOG.log(Level.SEVERE, "Failed to advertise leader, shutting down.", e);
-          stateMachine.transition(State.DEAD);
-        } catch (InterruptedException e) {
-          LOG.log(Level.SEVERE, "Interrupted while advertising leader, shutting down.", e);
-          stateMachine.transition(State.DEAD);
-          Thread.currentThread().interrupt();
-        }
+
+        // This action sequence must be deferred due to a subtle detail of how guava's EventBus
+        // works. EventBus event handlers are guaranteed to not be reentrant, meaning that posting
+        // an event from an event handler will not dispatch in the same sequence as the calls to
+        // post().
+        // In short, this is to enforce a happens-before relationship between delivering
+        // SchedulerActive and advertising leadership. Without deferring, you end up with a call
+        // sequence like this:
+        //
+        // - Enter DriverRegistered handler
+        //   - Post SchedulerActive event
+        //   - Announce leadership
+        // - Exit DriverRegistered handler
+        // - Dispatch SchedulerActive to subscribers
+        //
+        // With deferring, we get this instead:
+        //
+        // - Enter DriverRegistered handler
+        // - Exit DriverRegistered handler
+        // (executor service dispatch delay)
+        // - Post SchedulerActive Event
+        //   - Dispatch SchedulerActive to subscribers
+        // - Announce leadership
+        //
+        // The latter is preferable since it makes it easier to reason about the state of an
+        // announced scheduler.
+        delayedActions.onRegistered(new Runnable() {
+          @Override public void run() {
+            eventSink.post(new SchedulerActive());
+            try {
+              leaderControl.get().advertise();
+            } catch (JoinException e) {
+              LOG.log(Level.SEVERE, "Failed to advertise leader, shutting down.", e);
+              stateMachine.transition(State.DEAD);
+            } catch (InterruptedException e) {
+              LOG.log(Level.SEVERE, "Interrupted while advertising leader, shutting down.", e);
+              stateMachine.transition(State.DEAD);
+              Thread.currentThread().interrupt();
+            }
+          }
+        });
       }
     };
 
@@ -417,5 +477,7 @@ public class SchedulerLifecycle implements EventSubscriber {
     void onAutoFailover(Runnable runnable);
 
     void onRegistrationTimeout(Runnable runnable);
+
+    void onRegistered(Runnable runnable);
   }
 }
