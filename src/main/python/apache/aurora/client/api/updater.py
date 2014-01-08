@@ -1,3 +1,4 @@
+import json
 from collections import namedtuple
 from difflib import unified_diff
 
@@ -17,10 +18,13 @@ from gen.apache.aurora.ttypes import (
     ResponseCode,
     TaskQuery,
 )
+
 from .updater_util import FailureThreshold, UpdaterConfig
 from .instance_watcher import InstanceWatcher
 from .scheduler_client import SchedulerProxy
 
+from thrift.protocol import TJSONProtocol
+from thrift.TSerialization import serialize
 
 class Updater(object):
   """Update the instances of a job in batches."""
@@ -163,6 +167,31 @@ class Updater(object):
     if failed_instances:
       log.error('Rollback failed for instances: %s' % failed_instances)
 
+  def _hashable(self, element):
+    if isinstance(element, (list, set)):
+      return tuple(sorted(self._hashable(item) for item in element))
+    elif isinstance(element, dict):
+      return tuple(
+          sorted((self._hashable(key), self._hashable(value)) for (key, value) in element.items())
+      )
+    return element
+
+  def _thrift_to_json(self, config):
+    return json.loads(
+        serialize(config, protocol_factory=TJSONProtocol.TSimpleJSONProtocolFactory()))
+
+  def _diff_configs(self, from_config, to_config):
+    # Thrift objects do not correctly compare against each other due to the unhashable nature
+    # of python sets. That results in occasional diff failures with the following symptoms:
+    # - Sets are not equal even though their reprs are identical;
+    # - Items are reordered within thrift structs;
+    # - Items are reordered within sets;
+    # To overcome all the above, thrift objects are converted into JSON dicts to flatten out
+    # thrift type hierarchy. Next, JSONs are recursively converted into nested tuples to
+    # ensure proper ordering on compare.
+    return ''.join(unified_diff(repr(self._hashable(self._thrift_to_json(from_config))),
+                                repr(self._hashable(self._thrift_to_json(to_config)))))
+
   def _create_kill_add_lists(self, instance_ids, operation_configs):
     """Determines a particular action (kill or add) to use for every instance in instance_ids.
 
@@ -179,10 +208,7 @@ class Updater(object):
       to_config = operation_configs.to_config.get(instance_id)
 
       if from_config and to_config:
-        # Sort internal dicts before comparing to rule out differences due to hashing.
-        diff_output = ''.join(unified_diff(
-          str(sorted(from_config.__dict__.items(), key=lambda x: x[0])),
-          str(sorted(to_config.__dict__.items(), key=lambda x: x[0]))))
+        diff_output = self._diff_configs(from_config, to_config)
         if diff_output:
           log.debug('Task configuration changed for instance [%s]:\n%s' % (instance_id, diff_output))
           to_kill.append(instance_id)

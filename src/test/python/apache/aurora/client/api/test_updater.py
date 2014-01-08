@@ -18,6 +18,7 @@ from gen.apache.aurora.ttypes import (
   JobConfigValidation,
   JobKey,
   Identity,
+  LimitConstraint,
   Lock,
   LockKey,
   LockValidation,
@@ -29,12 +30,13 @@ from gen.apache.aurora.ttypes import (
   ScheduleStatusResult,
   ScheduledTask,
   TaskConfig,
+  TaskConstraint,
   TaskQuery,
+  ValueConstraint,
 )
 
 from mox import MockObject, Replay, Verify
 from pytest import raises
-
 
 # Debug output helper -> enables log.* in source.
 if 'UPDATER_DEBUG' in environ:
@@ -670,3 +672,25 @@ class UpdaterTest(TestCase):
     self.update_and_expect_ok()
     self.verify_mocks()
 
+  def test_diff_unordered_configs(self):
+    """Diff between two config objects with different repr but identical content works ok."""
+    from_config = self.make_task_configs()[0]
+    from_config.constraints = set([
+        Constraint(name='value', constraint=ValueConstraint(values=set(['1', '2']))),
+        Constraint(name='limit', constraint=TaskConstraint(limit=LimitConstraint(limit=int(10))))])
+    from_config.taskLinks = {'task1': 'link1', 'task2': 'link2'}
+    from_config.packages = set([
+      Package(name='n2', role='r2', version=4),
+      Package(role='r1', name='n1', version=1)])
+    from_config.executorConfig = ExecutorConfig(name='test', data='test data')
+    from_config.requestedPorts = set(['3424', '142', '45235'])
+
+    # Deepcopy() almost guarantees from_config != to_config due to a different sequence of
+    # dict insertions. That in turn generates unequal json objects. The ideal here would be to
+    # assert to_config != from_config but that would produce a flaky test as I have observed
+    # the opposite on rare occasions as the ordering is not stable between test runs.
+    to_config = deepcopy(from_config)
+
+    diff_result = self._updater._diff_configs(from_config, to_config)
+    assert diff_result == "", (
+      'diff result must be empty but was: %s' % diff_result)
