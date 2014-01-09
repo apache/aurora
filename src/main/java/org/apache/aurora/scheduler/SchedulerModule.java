@@ -90,9 +90,10 @@ public class SchedulerModule extends AbstractModule {
       @Override protected void configure() {
         bind(LeadingOptions.class).toInstance(
             new LeadingOptions(MAX_REGISTRATION_DELAY.get(), MAX_LEADING_DURATION.get()));
-          final ScheduledExecutorService executor = Executors.newScheduledThreadPool(
-              1,
-              new ThreadFactoryBuilder().setNameFormat("Lifecycle-%d").setDaemon(true).build());
+
+        final ScheduledExecutorService executor = Executors.newScheduledThreadPool(
+            1,
+            new ThreadFactoryBuilder().setNameFormat("Lifecycle-%d").setDaemon(true).build());
         bind(ScheduledExecutorService.class).toInstance(executor);
         bind(SchedulerLifecycle.class).in(Singleton.class);
         expose(SchedulerLifecycle.class);

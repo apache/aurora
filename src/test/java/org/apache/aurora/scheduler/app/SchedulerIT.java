@@ -98,6 +98,7 @@ import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.Before;
@@ -157,6 +158,9 @@ public class SchedulerIT extends BaseZooKeeperTest {
     });
 
     driver = control.createMock(SchedulerDriver.class);
+    // This is necessary to allow driver to block, otherwise it would stall other mocks.
+    EasyMock.makeThreadSafe(driver, false);
+
     driverFactory = control.createMock(DriverFactory.class);
     log = control.createMock(Log.class);
     logStream = control.createMock(Stream.class);
@@ -225,10 +229,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
         new ExecutorServiceShutdown(executor, Amount.of(10L, Time.SECONDS)).execute();
       }
     });
-  }
-
-  private Scheduler getScheduler() {
-    return injector.getInstance(Scheduler.class);
   }
 
   private HostAndPort awaitSchedulerReady() throws Exception {
@@ -327,18 +327,37 @@ public class SchedulerIT extends BaseZooKeeperTest {
     logStream.close();
     expectLastCall().anyTimes();
 
-    final Scheduler scheduler = injector.getInstance(Scheduler.class);
+    final CountDownLatch driverStarted = new CountDownLatch(1);
     expect(driver.start()).andAnswer(new IAnswer<Status>() {
       @Override public Status answer() {
-        scheduler.registered(driver,
-            FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
-            MasterInfo.getDefaultInstance());
+        driverStarted.countDown();
         return Status.DRIVER_RUNNING;
       }
     });
 
+    // Try to be a good test suite citizen by releasing the blocked thread when the test case exits.
+    final CountDownLatch testCompleted = new CountDownLatch(1);
+    expect(driver.join()).andAnswer(new IAnswer<Status>() {
+      @Override public Status answer() throws Throwable {
+        testCompleted.await();
+        return Status.DRIVER_STOPPED;
+      }
+    });
+    addTearDown(new TearDown() {
+      @Override public void tearDown() {
+        testCompleted.countDown();
+      }
+    });
+    expect(driver.stop(true)).andReturn(Status.DRIVER_STOPPED).anyTimes();
+
     control.replay();
     startScheduler();
+
+    driverStarted.await();
+    injector.getInstance(Scheduler.class).registered(driver,
+        FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
+        MasterInfo.getDefaultInstance());
+
     awaitSchedulerReady();
 
     assertEquals(0L, Stats.<Long>getVariable("task_store_PENDING").read().longValue());

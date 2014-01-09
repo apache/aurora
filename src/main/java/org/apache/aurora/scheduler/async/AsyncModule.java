@@ -197,8 +197,7 @@ public class AsyncModule extends AbstractModule {
           LOG.warning("Preemptor Disabled.");
         }
         expose(PREEMPTOR_KEY);
-        bind(new TypeLiteral<Amount<Long, Time>>() {
-        }).annotatedWith(PreemptionDelay.class)
+        bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
             .toInstance(PREEMPTION_DELAY.get());
         bind(TaskGroups.class).in(Singleton.class);
         expose(TaskGroups.class);

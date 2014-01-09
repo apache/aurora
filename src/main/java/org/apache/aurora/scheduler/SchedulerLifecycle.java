@@ -32,6 +32,7 @@ import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Atomics;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
@@ -151,7 +152,15 @@ public class SchedulerLifecycle implements EventSubscriber {
 
     @Override
     public void blockingDriverJoin(Runnable runnable) {
-      executorService.execute(runnable);
+      // We intentionally use an independent thread for this operation, since it blocks
+      // indefinitely. Using a separate thread allows us to inject an executor service with a safe
+      // expectation of operations that use minimal blocking.
+      new ThreadFactoryBuilder()
+          .setDaemon(true)
+          .setNameFormat("BlockingDriverJoin")
+          .build()
+          .newThread(runnable)
+          .start();
     }
 
     @Override
