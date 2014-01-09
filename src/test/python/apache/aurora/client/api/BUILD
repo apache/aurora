@@ -6,6 +6,7 @@ python_test_suite(name = 'all',
     pants(':scheduler_client'),
     pants(':instance_watcher'),
     pants(':updater'),
+    pants(':quota_check'),
   ],
 )
 
@@ -55,6 +56,15 @@ python_tests(name = 'instance_watcher',
   dependencies = [
     pants('src/main/python/apache/aurora/BUILD.thirdparty:mox'),
     pants('src/main/python/apache/aurora/client/api:instance_watcher'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ]
+)
+
+python_tests(name = 'quota_check',
+  sources = ['test_quota_check.py'],
+  dependencies = [
+    pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),
+    pants('src/main/python/apache/aurora/client/api:quota_check'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )

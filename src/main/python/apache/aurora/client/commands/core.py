@@ -26,6 +26,7 @@ from apache.aurora.client.base import (
     synthesize_url)
 from apache.aurora.client.api.disambiguator import LiveJobDisambiguator
 from apache.aurora.client.api.job_monitor import JobMonitor
+from apache.aurora.client.api.quota_check import print_quota
 from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.config import get_config
 from apache.aurora.client.factory import make_client, make_client_factory
@@ -589,12 +590,8 @@ def get_quota(role):
   """
   options = app.get_options()
   resp = make_client(options.cluster).get_quota(role)
-  quota = resp.result.getQuotaResult.quota
 
-  quota_fields = [
-    ('CPU', quota.numCpus),
-    ('RAM', '%f GB' % (float(quota.ramMb) / 1024)),
-    ('Disk', '%f GB' % (float(quota.diskMb) / 1024))
-  ]
-  log.info('Quota for %s:\n\t%s' %
-           (role, '\n\t'.join(['%s\t%s' % (k, v) for (k, v) in quota_fields])))
+  print_quota(resp.result.getQuotaResult.quota, 'Total allocated quota', role)
+
+  if resp.result.getQuotaResult.consumed:
+    print_quota(resp.result.getQuotaResult.consumed, 'Consumed quota', role)

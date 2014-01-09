@@ -8,6 +8,7 @@ from apache.aurora.client.commands.core import update
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.api.health_check import InstanceWatcherHealthCheck, Retriable
+from apache.aurora.client.api.quota_check import QuotaCheck
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.config import AuroraConfig
 from twitter.common.contextutil import temporary_file
@@ -187,12 +188,18 @@ class TestUpdateCommand(AuroraClientCommandTest):
     mock_health_check.health.return_value = Retriable.alive()
     return mock_health_check
 
+  @classmethod
+  def setup_quota_check(cls):
+    mock_quota_check = Mock(spec=QuotaCheck)
+    mock_quota_check.validate_quota_from_requested.return_value = cls.create_simple_success_response()
+
   def test_updater_simple(self):
     # Test the client-side updater logic in its simplest case: everything succeeds, and no rolling
     # updates.
     mock_options = self.setup_mock_options()
     (mock_api, mock_scheduler) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
+    mock_quota_check = self.setup_quota_check()
 
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
@@ -200,11 +207,12 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
             return_value=mock_health_check),
+        patch('apache.aurora.client.api.quota_check.QuotaCheck', return_value=mock_quota_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('time.sleep', return_value=None)
 
     ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
-          time_patch, sleep_patch):
+          mock_quota_check_patch, time_patch, sleep_patch):
       self.setup_mock_scheduler_for_simple_update(mock_api)
       with temporary_file() as fp:
         fp.write(self.get_valid_config())

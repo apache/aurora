@@ -212,7 +212,8 @@ struct PopulateJobResult {
 }
 
 struct GetQuotaResult {
-  1: Quota quota
+  1: Quota quota              // Total allocated quota.
+  2: optional Quota consumed  // Amount of quota already consumed by a role.
 }
 
 // Wraps return results for the acquireLock API.

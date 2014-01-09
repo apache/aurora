@@ -84,12 +84,23 @@ python_library(
 )
 
 python_library(
+  name = 'quota_check',
+  sources = ['quota_check.py'],
+  dependencies = [
+    pants(':scheduler_client'),
+    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ]
+)
+
+python_library(
   name = 'updater',
   sources = ['updater.py'],
   dependencies = [
     pants(':scheduler_client'),
     pants(':instance_watcher'),
     pants(':updater_util'),
+    pants(':quota_check'),
     pants('aurora/twitterdeps/src/python/twitter/common/log'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]

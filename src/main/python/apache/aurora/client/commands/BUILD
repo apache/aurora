@@ -33,6 +33,7 @@ python_library(
     pants('src/main/python/apache/aurora/client/api:command_runner'),
     pants('src/main/python/apache/aurora/client/api:disambiguator'),
     pants('src/main/python/apache/aurora/client/api:job_monitor'),
+    pants('src/main/python/apache/aurora/client/api:quota_check'),
     pants('src/main/python/apache/aurora/client/api:updater'),
     pants('src/main/python/apache/aurora/client/hooks'),
     pants('src/main/python/apache/aurora/client:base'),

@@ -1,0 +1,95 @@
+import unittest
+
+from copy import deepcopy
+
+from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck
+
+from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
+from gen.apache.aurora.ttypes import (
+    GetQuotaResult,
+    JobKey,
+    Quota,
+    Response,
+    ResponseCode,
+    Result)
+
+from mock import Mock
+
+
+class QuotaCheckTest(unittest.TestCase):
+  def setUp(self):
+    self._scheduler = Mock()
+    self._quota_checker = QuotaCheck(self._scheduler)
+    self._role = 'mesos'
+    self._name = 'quotajob'
+    self._env = 'test'
+    self._job_key = JobKey(name=self._name, environment=self._env, role=self._role)
+
+  def mock_get_quota(self, allocated, consumed, response_code=None):
+    response_code = ResponseCode.OK if response_code is None else response_code
+
+    resp = Response(responseCode=response_code, message='test')
+    resp.result = Result(
+        getQuotaResult=GetQuotaResult(quota=deepcopy(allocated), consumed=deepcopy(consumed)))
+    self._scheduler.getQuota.return_value = resp
+
+  def assert_result(self, prod, released, acquired, expected_code=None):
+    expected_code = ResponseCode.OK if expected_code is None else expected_code
+    resp = self._quota_checker.validate_quota_from_requested(
+        self._job_key,
+        prod,
+        released,
+        acquired)
+    assert expected_code == resp.responseCode, (
+      'Expected response:%s Actual response:%s' % (expected_code, resp.responseCode))
+    if prod:
+      self._scheduler.getQuota.assert_called_once_with(self._role)
+    else:
+      assert not self._scheduler.getQuota.called, 'Scheduler.getQuota() unexpected call.'
+
+  def test_pass(self):
+    allocated = Quota(numCpus=50.0, ramMb=1000, diskMb=3000)
+    consumed = Quota(numCpus=25.0, ramMb=500, diskMb=2000)
+    released = CapacityRequest(Quota(numCpus=5.0, ramMb=100, diskMb=500))
+    acquired = CapacityRequest(Quota(numCpus=15.0, ramMb=300, diskMb=800))
+
+    self.mock_get_quota(allocated, consumed)
+    self.assert_result(True, released, acquired)
+
+  def test_pass_with_no_consumed(self):
+    allocated = Quota(numCpus=50.0, ramMb=1000, diskMb=3000)
+    released = CapacityRequest(Quota(numCpus=5.0, ramMb=100, diskMb=500))
+    acquired = CapacityRequest(Quota(numCpus=15.0, ramMb=300, diskMb=800))
+
+    self.mock_get_quota(allocated, None)
+    self.assert_result(True, released, acquired)
+
+  def test_pass_due_to_released(self):
+    allocated = Quota(numCpus=50.0, ramMb=1000, diskMb=3000)
+    consumed = Quota(numCpus=45.0, ramMb=900, diskMb=2900)
+    released = CapacityRequest(Quota(numCpus=5.0, ramMb=100, diskMb=100))
+    acquired = CapacityRequest(Quota(numCpus=10.0, ramMb=200, diskMb=200))
+
+    self.mock_get_quota(allocated, consumed)
+    self.assert_result(True, released, acquired)
+
+  def test_skipped(self):
+    self.assert_result(False, None, None)
+
+  def test_fail(self):
+    allocated = Quota(numCpus=50.0, ramMb=1000, diskMb=3000)
+    consumed = Quota(numCpus=25.0, ramMb=500, diskMb=2000)
+    released = CapacityRequest(Quota(numCpus=5.0, ramMb=100, diskMb=500))
+    acquired = CapacityRequest(Quota(numCpus=35.0, ramMb=300, diskMb=800))
+
+    self.mock_get_quota(allocated, consumed)
+    self.assert_result(True, released, acquired, ResponseCode.INVALID_REQUEST)
+
+  def test_fail_scheduler_call(self):
+    allocated = Quota(numCpus=50.0, ramMb=1000, diskMb=3000)
+    consumed = Quota(numCpus=25.0, ramMb=500, diskMb=2000)
+    released = CapacityRequest(Quota(numCpus=5.0, ramMb=100, diskMb=500))
+    acquired = CapacityRequest(Quota(numCpus=1.0, ramMb=100, diskMb=100))
+
+    self.mock_get_quota(allocated, consumed, response_code=ResponseCode.INVALID_REQUEST)
+    self.assert_result(True, released, acquired, ResponseCode.INVALID_REQUEST)

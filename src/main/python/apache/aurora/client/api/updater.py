@@ -14,14 +14,16 @@ from gen.apache.aurora.ttypes import (
     Lock,
     LockKey,
     LockValidation,
+    Quota,
     Response,
     ResponseCode,
     TaskQuery,
 )
 
-from .updater_util import FailureThreshold, UpdaterConfig
 from .instance_watcher import InstanceWatcher
+from .quota_check import CapacityRequest, QuotaCheck
 from .scheduler_client import SchedulerProxy
+from .updater_util import FailureThreshold, UpdaterConfig
 
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
@@ -38,11 +40,17 @@ class Updater(object):
       ['remote_config_map', 'local_config_map', 'instances_to_process']
   )
 
-  def __init__(self, config, health_check_interval_seconds, scheduler=None, instance_watcher=None):
+  def __init__(self,
+               config,
+               health_check_interval_seconds,
+               scheduler=None,
+               instance_watcher=None,
+               quota_check=None):
     self._config = config
     self._job_key = JobKey(role=config.role(), environment=config.environment(), name=config.name())
     self._health_check_interval_seconds = health_check_interval_seconds
     self._scheduler = scheduler or SchedulerProxy(config.cluster())
+    self._quota_check = quota_check or QuotaCheck(self._scheduler)
     try:
       self._update_config = UpdaterConfig(**config.update_config().get())
     except ValueError as e:
@@ -283,6 +291,32 @@ class Updater(object):
     self._check_and_log_response(resp)
     return instance_ids
 
+  def _validate_quota(self, instance_configs):
+    """Validates job update will not exceed quota for production tasks.
+    Arguments:
+    instance_configs -- InstanceConfig with update details.
+
+    Returns Response.OK if quota check was successful.
+    """
+    instance_operation = self.OperationConfigs(
+      from_config=instance_configs.remote_config_map,
+      to_config=instance_configs.local_config_map
+    )
+
+    def _aggregate_quota(ops_list, config_map):
+      return sum(CapacityRequest.from_task(config_map[instance])
+                    for instance in ops_list) or CapacityRequest()
+
+    to_kill, to_add = self._create_kill_add_lists(
+        instance_configs.instances_to_process,
+        instance_operation)
+
+    return self._quota_check.validate_quota_from_requested(
+        self._job_key,
+        self._config.job().taskConfig.production,
+        _aggregate_quota(to_kill, instance_operation.from_config),
+        _aggregate_quota(to_add, instance_operation.to_config))
+
   def _get_update_instructions(self, instances=None):
     """Loads, validates and populates update working set.
 
@@ -392,6 +426,7 @@ class Updater(object):
       else:
         try:
           instance_configs = self._get_update_instructions(instances)
+          self._check_and_log_response(self._validate_quota(instance_configs))
         except self.Error as e:
           # Safe to release the lock acquired above as no job mutation has happened yet.
           self._finish()
