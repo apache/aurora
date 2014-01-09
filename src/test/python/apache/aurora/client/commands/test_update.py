@@ -136,7 +136,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     api.populateJobConfig.return_value = populate
     configs = []
     for i in range(20):
-      task_config = Mock(spec=TaskConfig)
+      task_config = TaskConfig(numCpus=1.0, ramMb=1, diskMb=1)
       configs.append(task_config)
     populate.result.populateJobResult.populated = set(configs)
     return populate
@@ -163,7 +163,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     scheduler.getTasksStatus.return_value = status_response
     schedule_status = Mock(spec=ScheduleStatusResult)
     status_response.result.scheduleStatusResult = schedule_status
-    mock_task_config = Mock()
+    task_config = TaskConfig(numCpus=1.0, ramMb=10, diskMb=1)
     # This should be a list of ScheduledTask's.
     schedule_status.tasks = []
     for i in range(20):
@@ -173,7 +173,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
       task_status.assignedTask.taskId = "Task%s" % i
       task_status.assignedTask.slaveId = "Slave%s" % i
       task_status.slaveHost = "Slave%s" % i
-      task_status.assignedTask.task = mock_task_config
+      task_status.assignedTask.task = task_config
       schedule_status.tasks.append(task_status)
 
   @classmethod
