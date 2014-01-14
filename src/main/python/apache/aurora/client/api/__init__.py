@@ -172,9 +172,6 @@ class AuroraClientAPI(object):
   def unload_recovery(self):
     return self._scheduler.unloadRecovery()
 
-  def get_job_updates(self):
-    return self._scheduler.getJobUpdates()
-
   def snapshot(self):
     return self._scheduler.snapshot()
 

@@ -379,24 +379,6 @@ def scheduler_unload_recovery(cluster):
 
 @app.command
 @requires.exactly('cluster')
-def scheduler_list_job_updates(cluster):
-  """usage: scheduler_list_job_updates cluster
-
-  Lists in-flight job updates.
-  """
-  options = app.get_options()
-  resp = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).get_job_updates()
-  check_and_log_response(resp)
-  print('Role\tEnv\tJob')
-  for update in resp.jobUpdates:
-    print('%s\t%s\t%s' % (
-      update.jobKey.role if update.jobKey else update.roleDeprecated,
-      update.jobKey.environment if update.jobKey else None,
-      update.jobKey.name if update.jobKey else update.jobDeprecated))
-
-
-@app.command
-@requires.exactly('cluster')
 def scheduler_snapshot(cluster):
   """usage: scheduler_snapshot cluster
 
