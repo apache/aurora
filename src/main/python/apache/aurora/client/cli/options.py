@@ -13,11 +13,11 @@ BROWSER_OPTION = CommandOption('--open-browser', default=False, dest='open_brows
     help='open browser to view job page after job is created')
 
 
-CONFIG_OPTION = CommandOption('config_file', type='str', dest='config_file',
+CONFIG_ARGUMENT = CommandOption('config_file', type=str,
     help='pathname of the aurora configuration file contain the job specification')
 
 
-JOBSPEC_OPTION = CommandOption('jobspec', type=AuroraJobKey.from_path,
+JOBSPEC_ARGUMENT = CommandOption('jobspec', type=AuroraJobKey.from_path,
     help='Fully specified job key, in CLUSTER/ROLE/ENV/NAME format')
 
 

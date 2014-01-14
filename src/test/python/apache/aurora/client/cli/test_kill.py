@@ -29,20 +29,6 @@ class TestInstancesParser(unittest.TestCase):
 
 class TestClientKillCommand(AuroraClientCommandTest):
   @classmethod
-  def setup_mock_api(cls):
-    """Builds up a mock API object, with a mock SchedulerProxy.
-    Returns the API and the proxy"""
-
-    mock_scheduler = Mock()
-    mock_scheduler.url = "http://something_or_other"
-    mock_scheduler_client = Mock()
-    mock_scheduler_client.scheduler.return_value = mock_scheduler
-    mock_scheduler_client.url = "http://something_or_other"
-    mock_api = Mock(spec=HookedAuroraClientAPI)
-    mock_api.scheduler = mock_scheduler_client
-    return (mock_api, mock_scheduler_client)
-
-  @classmethod
   def get_kill_job_response(cls):
     return cls.create_simple_success_response()
 
@@ -65,11 +51,11 @@ class TestClientKillCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--config=%s' % fp.name, 'west/mchucarroll/test/hello'])
+        cmd.execute(['job', 'kill', '--config=%s' % fp.name, 'west/bozo/test/hello'])
 
       # Now check that the right API calls got made.
       assert api.kill_job.call_count == 1
-      api.kill_job.assert_called_with(AuroraJobKey.from_path('west/mchucarroll/test/hello'), None)
+      api.kill_job.assert_called_with(AuroraJobKey.from_path('west/bozo/test/hello'), None)
 
   def test_kill_job_with_instances(self):
     """Test kill client-side API logic."""
@@ -84,16 +70,15 @@ class TestClientKillCommand(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--instances=0,2,4-6',
-           'west/mchucarroll/test/hello'])
+           'west/bozo/test/hello'])
 
       # Now check that the right API calls got made.
       assert api.kill_job.call_count == 1
-      api.kill_job.assert_called_with(AuroraJobKey.from_path('west/mchucarroll/test/hello'),
+      api.kill_job.assert_called_with(AuroraJobKey.from_path('west/bozo/test/hello'),
           [0, 2, 4, 5, 6])
 
   def test_kill_job_with_instances_deep_api(self):
     """Test kill client-side API logic."""
-    mock_context = FakeAuroraCommandContext()
     (mock_api, mock_scheduler) = self.setup_mock_api()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
@@ -104,11 +89,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--instances=0,2,4-6',
-           'west/mchucarroll/test/hello'])
+           'west/bozo/test/hello'])
       # Now check that the right API calls got made.
       assert mock_scheduler.killTasks.call_count == 1
       mock_scheduler.killTasks.assert_called_with(
         TaskQuery(jobName='hello', environment='test', instanceIds=frozenset([0, 2, 4, 5, 6]),
-            owner=Identity(role='mchucarroll')), None)
-
-
+            owner=Identity(role='bozo')), None)

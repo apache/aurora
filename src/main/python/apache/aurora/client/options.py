@@ -82,6 +82,8 @@ def make_env_option(explanation):
     default=None,
     help=explanation)
 
+# Note: in these predefined options, "OPTION" is used in names of optional arguments,
+# and "PARAMETER" is used in names of required ones.
 
 OPEN_BROWSER_OPTION = optparse.Option(
     '-o',

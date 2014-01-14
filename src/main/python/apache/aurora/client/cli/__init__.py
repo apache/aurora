@@ -9,7 +9,6 @@ arguments needed by the verb.
 For example:
 - To create a job, the noun is "job", the verb is "create":
   $ aurora job create us-west/www/prod/server server.aurora
-
 - To find out the resource quota for a specific user, the noun is "user" and the verb is
   "get_quota":
   $ aurora user get_quota mchucarroll
@@ -31,6 +30,7 @@ EXIT_INVALID_PARAMETER = 6
 EXIT_NETWORK_ERROR = 7
 EXIT_PERMISSION_VIOLATION = 8
 EXIT_TIMEOUT = 9
+EXIT_API_ERROR = 10
 EXIT_UNKNOWN_ERROR = 20
 
 
@@ -45,6 +45,10 @@ class Context(object):
       self.msg = msg
       self.code = code
 
+  @classmethod
+  def exit(cls, code, msg):
+    raise cls.CommandError(code, msg)
+
   def set_options(self, options):
     """Add the options object to a context.
     This is separated from the constructor to make patching tests easier.
@@ -54,7 +58,8 @@ class Context(object):
 
 class CommandOption(object):
   """A lightweight encapsulation of an argparse option specification, which can be used to
-  define options that can be reused by multiple commands."""
+  define options that can be reused by multiple commands.
+  """
 
   def __init__(self, *args, **kwargs):
     self.args = args

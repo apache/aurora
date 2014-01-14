@@ -1,13 +1,5 @@
 import contextlib
 
-from apache.aurora.client.cli import (
-    AuroraCommandLine,
-    EXIT_INVALID_CONFIGURATION,
-    EXIT_NETWORK_ERROR
-)
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
-from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
-from apache.aurora.config import AuroraConfig
 from twitter.common.contextutil import temporary_file
 
 from gen.apache.aurora.ttypes import (
@@ -20,6 +12,14 @@ from gen.apache.aurora.ttypes import (
     TaskQuery,
 )
 
+from apache.aurora.client.cli import (
+    AuroraCommandLine,
+    EXIT_COMMAND_FAILURE,
+    EXIT_INVALID_CONFIGURATION
+)
+from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.config import AuroraConfig
 from mock import Mock, patch
 
 
@@ -121,7 +121,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'create', '--wait_until=RUNNING', 'west/mchucarroll/test/hello',
+        cmd.execute(['job', 'create', '--wait_until=RUNNING', 'west/bozo/test/hello',
             fp.name])
 
       # Now check that the right API calls got made.
@@ -147,7 +147,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'create', '--wait_until=RUNNING', 'west/mchucarroll/test/hello',
+        cmd.execute(['job', 'create', '--wait_until=RUNNING', 'west/bozo/test/hello',
             fp.name])
         # Now check that the right API calls got made.
         # Check that create_job was called exactly once, with an AuroraConfig parameter.
@@ -170,8 +170,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         result = cmd.execute(['job', 'create', '--wait_until=RUNNING',
-            'west/mchucarroll/test/hello', fp.name])
-        assert result == EXIT_NETWORK_ERROR
+            'west/bozo/test/hello', fp.name])
+        assert result == EXIT_COMMAND_FAILURE
 
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
@@ -190,7 +190,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         result = cmd.execute(['job', 'create', '--wait_until=RUNNING',
-            'west/mchucarroll/test/hello', fp.name])
+            'west/bozo/test/hello', fp.name])
         assert result == EXIT_INVALID_CONFIGURATION
 
       # Now check that the right API calls got made.

@@ -1,15 +1,15 @@
 import unittest
 
-from apache.aurora.client.cli.context import AuroraCommandContext
-from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
-from apache.aurora.common.cluster import Cluster
-from apache.aurora.common.clusters import Clusters
-
 from gen.apache.aurora.ttypes import (
     Response,
     ResponseCode,
     Result,
 )
+
+from apache.aurora.client.cli.context import AuroraCommandContext
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import Clusters
 
 from mock import Mock
 
@@ -26,6 +26,20 @@ class FakeAuroraCommandContext(AuroraCommandContext):
   def get_api(self, cluster):
     return self.fake_api
 
+  @classmethod
+  def setup_mock_api(cls):
+    """Builds up a mock API object, with a mock SchedulerProxy.
+    Returns the API and the proxy"""
+
+    mock_scheduler = Mock()
+    mock_scheduler.url = "http://something_or_other"
+    mock_scheduler_client = Mock()
+    mock_scheduler_client.scheduler.return_value = mock_scheduler
+    mock_scheduler_client.url = "http://something_or_other"
+    mock_api = Mock(spec=HookedAuroraClientAPI)
+    mock_api.scheduler = mock_scheduler_client
+    return (mock_api, mock_scheduler_client)
+
   def setup_fake_api(self):
     # In here, we'd like to get it mocked so that the HookedAuroraClientAPI
     # object, and its underlying AuroraClientAPI objects are not
@@ -33,7 +47,7 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     new_fake = Mock(spec=HookedAuroraClientAPI)
     new_fake.scheduler = Mock()
     new_fake.scheduler.url = 'http://something_or_other'
-    new_fake.scheduler.getTasksStatus.side_effect = []
+#    new_fake.scheduler.getTasksStatus.side_effect = []
     self.fake_api = new_fake
     return self.fake_api
 
@@ -57,6 +71,21 @@ class AuroraClientCommandTest(unittest.TestCase):
     response.message = msg
     response.result = Mock(spec=Result)
     return response
+
+  @classmethod
+  def setup_mock_api(cls):
+    """Builds up a mock API object, with a mock SchedulerProxy.
+    Returns the API and the proxy"""
+    # TODO: merge this with setup_fake_api (MESOS-4861)
+    mock_scheduler = Mock()
+    mock_scheduler.url = "http://something_or_other"
+    mock_scheduler_client = Mock()
+    mock_scheduler_client.scheduler.return_value = mock_scheduler
+    mock_scheduler_client.url = "http://something_or_other"
+    mock_api = Mock(spec=HookedAuroraClientAPI)
+    mock_api.scheduler = mock_scheduler_client
+    return (mock_api, mock_scheduler_client)
+
 
   @classmethod
   def create_simple_success_response(cls):
@@ -119,7 +148,7 @@ HELLO_WORLD = Job(
 jobs = [HELLO_WORLD]
 """
 
-  TEST_ROLE = 'mchucarroll'
+  TEST_ROLE = 'bozo'
 
   TEST_ENV = 'test'
 
@@ -127,7 +156,7 @@ jobs = [HELLO_WORLD]
 
   TEST_CLUSTER = 'west'
 
-  TEST_JOBSPEC = 'west/mchucarroll/test/hello'
+  TEST_JOBSPEC = 'west/bozo/test/hello'
 
   TEST_CLUSTERS = Clusters([Cluster(
       name='west',
