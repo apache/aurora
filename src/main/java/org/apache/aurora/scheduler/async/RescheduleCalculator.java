@@ -33,7 +33,6 @@ import com.google.common.collect.Lists;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.BackoffStrategy;
-import com.twitter.common.util.Clock;
 import com.twitter.common.util.Random;
 
 import org.apache.aurora.gen.ScheduleStatus;
@@ -51,32 +50,31 @@ import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 /**
  * Calculates scheduling delays for tasks.
  */
-interface RescheduleCalculator {
+public interface RescheduleCalculator {
   /**
-   * Gets a timestamp for the task to become eligible for (re)scheduling at scheduler startup.
+   * Calculates the delay, in milliseconds, before the task should be considered eligible for
+   * (re)scheduling at scheduler startup.
    *
-   * @param task Task to calculate timestamp for.
-   * @return Timestamp in msec.
+   * @param task Task to calculate delay for.
+   * @return Delay in msec.
    */
-  long getStartupReadyTimeMs(IScheduledTask task);
+  long getStartupScheduleDelayMs(IScheduledTask task);
 
   /**
-   * Gets a timestamp for the task to become eligible for (re)scheduling.
+   * Calculates the penalty, in milliseconds, that a task should be penalized before being
+   * eligible for rescheduling.
    *
-   * @param task Task to calculate timestamp for.
-   * @return Timestamp in msec.
+   * @param task Task to calculate delay for.
+   * @return Delay in msec.
    */
-  long getReadyTimeMs(IScheduledTask task);
+  long getFlappingPenaltyMs(IScheduledTask task);
 
-  // TODO(wfarner): Create a unit test for this class.  It currently piggybacks on
-  // TaskSchedulerTest.  Once a unit test exists, TaskSchedulerTest should use a mock.
   class RescheduleCalculatorImpl implements RescheduleCalculator {
 
     private static final Logger LOG = Logger.getLogger(TaskGroups.class.getName());
 
     private final Storage storage;
     private final RescheduleCalculatorSettings settings;
-    private final Clock clock;
     // TODO(wfarner): Inject 'random' in the constructor for better test coverage.
     private final Random random = new Random.SystemRandom(new java.util.Random());
 
@@ -138,25 +136,15 @@ interface RescheduleCalculator {
     }
 
     @Inject
-    RescheduleCalculatorImpl(
-        Storage storage,
-        RescheduleCalculatorSettings settings,
-        Clock clock) {
-
+    RescheduleCalculatorImpl(Storage storage, RescheduleCalculatorSettings settings) {
       this.storage = checkNotNull(storage);
       this.settings = checkNotNull(settings);
-      this.clock = checkNotNull(clock);
     }
 
     @Override
-    public long getStartupReadyTimeMs(IScheduledTask task) {
-      return random.nextInt(settings.maxStartupRescheduleDelay.as(Time.MILLISECONDS))
-          + getTaskReadyTimestamp(task);
-    }
-
-    @Override
-    public long getReadyTimeMs(IScheduledTask task) {
-      return getTaskReadyTimestamp(task);
+    public long getStartupScheduleDelayMs(IScheduledTask task) {
+      return random.nextInt(settings.maxStartupRescheduleDelay.as(Time.MILLISECONDS).intValue())
+          + getFlappingPenaltyMs(task);
     }
 
     private Optional<IScheduledTask> getTaskAncestor(IScheduledTask task) {
@@ -170,7 +158,8 @@ interface RescheduleCalculator {
       return Optional.fromNullable(Iterables.getOnlyElement(res, null));
     }
 
-    private long getTaskReadyTimestamp(IScheduledTask task) {
+    @Override
+    public long getFlappingPenaltyMs(IScheduledTask task) {
       Optional<IScheduledTask> curTask = getTaskAncestor(task);
       long penaltyMs = 0;
       while (curTask.isPresent() && flapped.apply(curTask.get())) {
@@ -185,7 +174,7 @@ interface RescheduleCalculator {
         curTask = getTaskAncestor(curTask.get());
       }
 
-      return penaltyMs + clock.nowMillis();
+      return penaltyMs;
     }
   }
 }

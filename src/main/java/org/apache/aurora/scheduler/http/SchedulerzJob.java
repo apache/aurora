@@ -17,7 +17,6 @@ package org.apache.aurora.scheduler.http;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +64,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
-import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -102,24 +100,6 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         .put(FINISHED, EnumSet.of(KILLED, FINISHED))
         .put(FAILED, EnumSet.of(LOST, FAILED))
       .build();
-
-  private static final Comparator<IScheduledTask> REVERSE_CHRON_COMPARATOR =
-      new Comparator<IScheduledTask>() {
-        @Override public int compare(IScheduledTask taskA, IScheduledTask taskB) {
-          // Sort in reverse chronological order.
-          Iterable<ITaskEvent> taskAEvents = taskA.getTaskEvents();
-          Iterable<ITaskEvent> taskBEvents = taskB.getTaskEvents();
-
-          boolean taskAHasEvents = taskAEvents != null && !Iterables.isEmpty(taskAEvents);
-          boolean taskBHasEvents = taskBEvents != null && !Iterables.isEmpty(taskBEvents);
-          if (taskAHasEvents && taskBHasEvents) {
-            return Long.signum(Iterables.getLast(taskBEvents).getTimestamp()
-                - Iterables.getLast(taskAEvents).getTimestamp());
-          } else {
-            return 0;
-          }
-        }
-      };
 
   private static final Function<Veto, String> GET_REASON = new Function<Veto, String>() {
     @Override public String apply(Veto veto) {
@@ -165,7 +145,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
             .put("instanceId", task.getInstanceId())
             .put("slaveHost", task.isSetSlaveHost() ? task.getSlaveHost() : "")
             .put("status", scheduledTask.getStatus())
-            .put("statusTimestamp", Iterables.getLast(scheduledTask.getTaskEvents()).getTimestamp())
+            .put("statusTimestamp", Tasks.getLatestEvent(scheduledTask).getTimestamp())
             .put("taskEvents", scheduledTask.getTaskEvents());
 
           if (scheduledTask.getStatus() == ScheduleStatus.PENDING) {
@@ -411,7 +391,7 @@ public class SchedulerzJob extends JerseyTemplateServlet {
         if (completedQuery.isPresent()) {
           List<IScheduledTask> completedTasks = Lists.newArrayList(
               Storage.Util.weaklyConsistentFetchTasks(storage, completedQuery.get()));
-          Collections.sort(completedTasks, REVERSE_CHRON_COMPARATOR);
+          Collections.sort(completedTasks, Tasks.LATEST_ACTIVITY.reverse());
           template.setAttribute("completedTasks",
               ImmutableList.copyOf(
                   Iterables.transform(offsetAndLimit(completedTasks, offset), taskToStringMap)));

@@ -162,7 +162,7 @@ public class AsyncModule extends AbstractModule {
 
     // AsyncModule itself is not a subclass of PrivateModule because TaskEventModule internally uses
     // a MultiBinder, which cannot span multiple injectors.
-    binder().install(new PrivateModule() {
+    install(new PrivateModule() {
       @Override protected void configure() {
         bind(new TypeLiteral<Amount<Long, Time>>() { })
             .toInstance(TRANSIENT_TASK_STATE_TIMEOUT.get());
@@ -175,7 +175,7 @@ public class AsyncModule extends AbstractModule {
     });
     PubsubEventModule.bindSubscriber(binder(), TaskTimeout.class);
 
-    binder().install(new PrivateModule() {
+    install(new PrivateModule() {
       @Override protected void configure() {
         bind(TaskGroupsSettings.class).toInstance(new TaskGroupsSettings(
             new TruncatedBinaryBackoff(INITIAL_SCHEDULE_DELAY.get(), MAX_SCHEDULE_DELAY.get()),
@@ -188,6 +188,7 @@ public class AsyncModule extends AbstractModule {
                 MAX_RESCHEDULING_DELAY.get()));
 
         bind(RescheduleCalculator.class).to(RescheduleCalculatorImpl.class).in(Singleton.class);
+        expose(RescheduleCalculator.class);
         if (ENABLE_PREEMPTOR.get()) {
           bind(PREEMPTOR_KEY).to(PreemptorImpl.class);
           bind(PreemptorImpl.class).in(Singleton.class);
@@ -206,7 +207,7 @@ public class AsyncModule extends AbstractModule {
     bindTaskScheduler(binder(), PREEMPTOR_KEY, RESERVATION_DURATION.get());
     PubsubEventModule.bindSubscriber(binder(), TaskGroups.class);
 
-    binder().install(new PrivateModule() {
+    install(new PrivateModule() {
       @Override protected void configure() {
         bind(OfferReturnDelay.class).to(RandomJitterReturnDelay.class);
         bind(ScheduledExecutorService.class).toInstance(executor);
@@ -217,7 +218,7 @@ public class AsyncModule extends AbstractModule {
     });
     PubsubEventModule.bindSubscriber(binder(), OfferQueue.class);
 
-    binder().install(new PrivateModule() {
+    install(new PrivateModule() {
       @Override protected void configure() {
         // TODO(ksweeney): Create a configuration validator module so this can be injected.
         // TODO(William Farner): Revert this once large task counts is cheap ala hierarchichal store
@@ -231,6 +232,15 @@ public class AsyncModule extends AbstractModule {
       }
     });
     PubsubEventModule.bindSubscriber(binder(), HistoryPruner.class);
+
+    install(new PrivateModule() {
+      @Override protected void configure() {
+        bind(ScheduledExecutorService.class).toInstance(executor);
+        bind(TaskThrottler.class).in(Singleton.class);
+        expose(TaskThrottler.class);
+      }
+    });
+    PubsubEventModule.bindSubscriber(binder(), TaskThrottler.class);
   }
 
   /**

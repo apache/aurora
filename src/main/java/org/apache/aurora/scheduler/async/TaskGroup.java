@@ -115,7 +115,6 @@ class TaskGroup {
     return key.toString();
   }
 
-  // TODO(zmanji): Return Task instances here. Can use them to display flapping penalty on web UI.
   public Set<String> getTaskIds() {
     return ImmutableSet.copyOf(Iterables.transform(tasks, TO_TASK_ID));
   }

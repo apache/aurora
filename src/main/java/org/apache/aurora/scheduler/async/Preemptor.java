@@ -121,7 +121,7 @@ public interface Preemptor {
 
     private final Predicate<IScheduledTask> isIdleTask = new Predicate<IScheduledTask>() {
       @Override public boolean apply(IScheduledTask task) {
-        return (clock.nowMillis() - Iterables.getLast(task.getTaskEvents()).getTimestamp())
+        return (clock.nowMillis() - Tasks.getLatestEvent(task).getTimestamp())
             >= preemptionCandidacyDelay.as(Time.MILLISECONDS);
       }
     };

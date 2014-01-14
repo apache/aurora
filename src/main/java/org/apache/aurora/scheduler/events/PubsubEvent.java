@@ -222,47 +222,6 @@ public interface PubsubEvent {
     }
   }
 
-  public static class TaskRescheduled implements PubsubEvent {
-    private final String role;
-    private final String job;
-    private final int instance;
-
-    public TaskRescheduled(String role, String job, int instance) {
-      this.role = role;
-      this.job = job;
-      this.instance = instance;
-    }
-
-    public String getRole() {
-      return role;
-    }
-
-    public String getJob() {
-      return job;
-    }
-
-    public int getInstance() {
-      return instance;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof TaskRescheduled)) {
-        return false;
-      }
-
-      TaskRescheduled other = (TaskRescheduled) o;
-      return Objects.equal(role, other.role)
-          && Objects.equal(job, other.job)
-          && Objects.equal(instance, other.instance);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hashCode(role, job, instance);
-    }
-  }
-
   public static class DriverRegistered implements PubsubEvent {
     @Override
     public boolean equals(Object o) {

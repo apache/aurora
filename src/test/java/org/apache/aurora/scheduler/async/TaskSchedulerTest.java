@@ -15,12 +15,9 @@
  */
 package org.apache.aurora.scheduler.async;
 
-import java.util.EnumSet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-
-import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -40,7 +37,6 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
@@ -71,14 +67,11 @@ import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
-import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
-import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
@@ -148,13 +141,13 @@ public class TaskSchedulerTest extends EasyMockTest {
         rateLimiter,
         scheduler,
         clock,
+        // TODO(wfarner): Use a mock rather than impl here.
         new RescheduleCalculatorImpl(
             storage,
             new RescheduleCalculatorImpl.RescheduleCalculatorSettings(
                 flappingStrategy,
                 flappingThreshold,
-                Amount.of(5, Time.SECONDS)),
-            clock));
+                Amount.of(5, Time.SECONDS))));
   }
 
   private Capture<Runnable> expectOffer() {
@@ -588,144 +581,6 @@ public class TaskSchedulerTest extends EasyMockTest {
     });
     taskGroups.tasksDeleted(new TasksDeleted(ImmutableSet.of(task)));
     timeoutCapture.getValue().run();
-  }
-
-  @Test
-  public void testNoPenaltyForNoAncestor() {
-    // If a task doesn't have an ancestor there should be no penality for flapping.
-    expectAnyMaintenanceCalls();
-    IScheduledTask task = makeTask("a1", INIT);
-
-    expectOfferDeclineIn(10);
-    Capture<Runnable> first = expectTaskGroupBackoff(1);
-    expectTaskScheduled(task);
-
-    replayAndCreateScheduler();
-    offerQueue.addOffer(OFFER_A);
-
-    changeState(task, INIT, PENDING);
-
-    first.getValue().run();
-  }
-
-  @Test
-  public void testFlappingTasksBackoffTruncation() {
-    expectAnyMaintenanceCalls();
-
-    makeFlappyTask("a0", null);
-    makeFlappyTask("a1", "a0");
-    makeFlappyTask("a2", "a1");
-    IScheduledTask taskA3 = IScheduledTask.build(makeTask("a3", INIT).newBuilder()
-        .setAncestorId("a2"));
-
-    expectOfferDeclineIn(10);
-
-    Capture<Runnable> first = expectTaskGroupBackoff(10);
-    // The ancestry chain is 3 long, but if the backoff strategy truncates, we don't traverse the
-    // entire history.
-    expect(flappingStrategy.calculateBackoffMs(0)).andReturn(5L);
-    expect(flappingStrategy.calculateBackoffMs(5L)).andReturn(5L);
-    Capture<Runnable> flapping = expectTaskRetryIn(10);
-
-    expectTaskScheduled(taskA3);
-
-    replayAndCreateScheduler();
-    offerQueue.addOffer(OFFER_A);
-
-    changeState(taskA3, INIT, PENDING);
-
-    first.getValue().run();
-    clock.waitFor(10);
-    flapping.getValue().run();
-  }
-
-  @Test
-  public void testFlappingTasks() {
-    expectAnyMaintenanceCalls();
-
-    makeFlappyTask("a0", null);
-    IScheduledTask taskA1 = IScheduledTask.build(makeTask("a1", INIT).newBuilder()
-        .setAncestorId("a0"));
-
-    expectOfferDeclineIn(10);
-    Capture<Runnable> first = expectTaskGroupBackoff(10);
-
-    expect(flappingStrategy.calculateBackoffMs(0)).andReturn(5L);
-    // Since A1 has been penalized, the task has to wait for another 10 ms until the penalty has
-    // expired.
-    Capture<Runnable> flapping = expectTaskRetryIn(10);
-
-    expectTaskScheduled(taskA1);
-
-    replayAndCreateScheduler();
-
-    offerQueue.addOffer(OFFER_A);
-
-    changeState(taskA1, INIT, PENDING);
-
-    first.getValue().run();
-    clock.waitFor(10);
-    flapping.getValue().run();
-  }
-
-  @Test
-  public void testNoPenaltyForInterruptedTasks() {
-    expectAnyMaintenanceCalls();
-
-    makeFlappyTaskWithStates("a0", EnumSet.of(INIT, PENDING, ASSIGNED, RESTARTING, FAILED), null);
-    IScheduledTask taskA1 = IScheduledTask.build(makeTask("a1", INIT).newBuilder()
-        .setAncestorId("a0"));
-
-    expectOfferDeclineIn(10);
-    Capture<Runnable> first = expectTaskGroupBackoff(10);
-
-    expectTaskScheduled(taskA1);
-
-    replayAndCreateScheduler();
-
-    offerQueue.addOffer(OFFER_A);
-
-    changeState(taskA1, INIT, PENDING);
-
-    first.getValue().run();
-  }
-
-  private IScheduledTask makeFlappyTaskWithStates(
-      String taskId,
-      Iterable<ScheduleStatus> states,
-      @Nullable String ancestorId) {
-
-    Amount<Long, Time> timeInState = Amount.of(10L, Time.SECONDS);
-
-    ScheduledTask base = makeTask(taskId, INIT).newBuilder();
-
-    for (ScheduleStatus status : states) {
-      base.addToTaskEvents(new TaskEvent(clock.nowMillis(), status));
-      clock.advance(timeInState);
-    }
-
-    base.setAncestorId(ancestorId);
-
-    final IScheduledTask result = IScheduledTask.build(base);
-
-    // Insert the task if it doesn't already exist.
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
-        TaskStore.Mutable taskStore = storeProvider.getUnsafeTaskStore();
-        if (taskStore.fetchTasks(Query.taskScoped(Tasks.id(result))).isEmpty()) {
-          taskStore.saveTasks(ImmutableSet.of(result));
-        }
-      }
-    });
-
-    return result;
-  }
-
-  private IScheduledTask makeFlappyTask(String taskId, @Nullable String ancestorId) {
-    return makeFlappyTaskWithStates(
-        taskId,
-        EnumSet.of(INIT, PENDING, ASSIGNED, RUNNING, FAILED),
-        ancestorId);
   }
 
   private TaskInfo makeTaskInfo(IScheduledTask task) {

@@ -37,6 +37,7 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
 /**
  * Utility class providing convenience functions relating to tasks.
@@ -177,10 +178,14 @@ public final class Tasks {
     return task.getAssignedTask().getTask().getJobName();
   }
 
+  public static ITaskEvent getLatestEvent(IScheduledTask task) {
+    return Iterables.getLast(task.getTaskEvents());
+  }
+
   public static final Ordering<IScheduledTask> LATEST_ACTIVITY = Ordering.natural()
       .onResultOf(new Function<IScheduledTask, Long>() {
         @Override public Long apply(IScheduledTask task) {
-          return Iterables.getLast(task.getTaskEvents()).getTimestamp();
+          return getLatestEvent(task).getTimestamp();
         }
       });
 }

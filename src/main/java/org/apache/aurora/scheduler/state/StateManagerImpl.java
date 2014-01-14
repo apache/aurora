@@ -46,6 +46,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.TaskIdGenerator;
+import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -68,6 +69,7 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.apache.aurora.gen.ScheduleStatus.UNKNOWN;
 import static org.apache.aurora.scheduler.state.SideEffectStorage.OperationFinalizer;
 
@@ -82,13 +84,10 @@ import static org.apache.aurora.scheduler.state.SideEffectStorage.OperationFinal
 public class StateManagerImpl implements StateManager {
   private static final Logger LOG = Logger.getLogger(StateManagerImpl.class.getName());
 
-  private final SideEffectStorage storage;
   @VisibleForTesting
   SideEffectStorage getStorage() {
     return storage;
   }
-
-  private final TaskIdGenerator taskIdGenerator;
 
   // Work queue to receive state machine side effect work.
   // Items are sorted to place DELETE entries last.  This is to ensure that within an operation,
@@ -129,8 +128,11 @@ public class StateManagerImpl implements StateManager {
         }
       };
 
-  private final Driver driver;
+  private final SideEffectStorage storage;
   private final Clock clock;
+  private final Driver driver;
+  private final TaskIdGenerator taskIdGenerator;
+  private final RescheduleCalculator rescheduleCalculator;
 
   /**
    * An item of work on the work queue.
@@ -157,7 +159,8 @@ public class StateManagerImpl implements StateManager {
       final Clock clock,
       Driver driver,
       TaskIdGenerator taskIdGenerator,
-      EventSink eventSink) {
+      EventSink eventSink,
+      RescheduleCalculator rescheduleCalculator) {
 
     checkNotNull(storage);
     this.clock = checkNotNull(clock);
@@ -171,6 +174,7 @@ public class StateManagerImpl implements StateManager {
     this.storage = new SideEffectStorage(storage, finalizer, eventSink);
     this.driver = checkNotNull(driver);
     this.taskIdGenerator = checkNotNull(taskIdGenerator);
+    this.rescheduleCalculator = checkNotNull(rescheduleCalculator);
 
     Stats.exportSize("work_queue_depth", workQueue);
   }
@@ -334,8 +338,9 @@ public class StateManagerImpl implements StateManager {
 
         switch (work.command) {
           case RESCHEDULE:
-            ScheduledTask builder =
-                Iterables.getOnlyElement(taskStore.fetchTasks(idQuery)).newBuilder();
+            IScheduledTask ancestor = Iterables.getOnlyElement(taskStore.fetchTasks(idQuery));
+
+            ScheduledTask builder = ancestor.newBuilder();
             builder.getAssignedTask().unsetSlaveId();
             builder.getAssignedTask().unsetSlaveHost();
             builder.getAssignedTask().unsetAssignedPorts();
@@ -351,13 +356,19 @@ public class StateManagerImpl implements StateManager {
             IScheduledTask task = IScheduledTask.build(builder);
             taskStore.saveTasks(ImmutableSet.of(task));
 
-            createStateMachine(task).updateState(PENDING, Optional.of("Rescheduled"));
-            ITaskConfig taskInfo = task.getAssignedTask().getTask();
-            sideEffectWork.addTaskEvent(
-                new PubsubEvent.TaskRescheduled(
-                    taskInfo.getOwner().getRole(),
-                    taskInfo.getJobName(),
-                    task.getAssignedTask().getInstanceId()));
+            ScheduleStatus newState;
+            String auditMessage;
+            long flapPenaltyMs = rescheduleCalculator.getFlappingPenaltyMs(ancestor);
+            if (flapPenaltyMs > 0) {
+              newState = THROTTLED;
+              auditMessage =
+                  String.format("Rescheduled, penalized for %s ms for flapping", flapPenaltyMs);
+            } else {
+              newState = PENDING;
+              auditMessage = "Rescheduled";
+            }
+
+            createStateMachine(task).updateState(newState, Optional.of(auditMessage));
             break;
 
           case UPDATE_STATE:

@@ -294,9 +294,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
                 case UNKNOWN:
                   job.failedTaskCount++;
                   Date now = new Date();
-                  long elapsedMillis = now.getTime()
-                      - Iterables.getLast(task.getTaskEvents()).getTimestamp();
-
+                  long elapsedMillis = now.getTime() - Tasks.getLatestEvent(task).getTimestamp();
                   if (Amount.of(elapsedMillis, Time.MILLISECONDS).as(Time.HOURS) < 6) {
                     job.recentlyFailedTaskCount++;
                   }

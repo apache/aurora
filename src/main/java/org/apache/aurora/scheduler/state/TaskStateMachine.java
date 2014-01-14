@@ -77,6 +77,7 @@ class TaskStateMachine {
   private static final State RESTARTING = State.create(ScheduleStatus.RESTARTING);
   private static final State RUNNING = State.create(ScheduleStatus.RUNNING);
   private static final State STARTING = State.create(ScheduleStatus.STARTING);
+  private static final State THROTTLED = State.create(ScheduleStatus.THROTTLED);
   private static final State UNKNOWN = State.create(ScheduleStatus.UNKNOWN);
 
   @VisibleForTesting
@@ -263,29 +264,23 @@ class TaskStateMachine {
       }
     };
 
+    final Closure<Transition<State>> deleteIfKilling =
+        Closures.filter(Transition.to(KILLING), addWorkClosure(WorkCommand.DELETE));
+
     stateMachine = StateMachine.<State>builder(taskId)
         .logTransitions()
         .initialState(State.create(initialState))
         .addState(
             Rule.from(INIT)
-                .to(PENDING, UNKNOWN))
+                .to(PENDING, THROTTLED, UNKNOWN))
         .addState(
             Rule.from(PENDING)
                 .to(ASSIGNED, KILLING)
-                .withCallback(
-                    new Closure<Transition<State>>() {
-                      @Override public void execute(Transition<State> transition) {
-                        switch (transition.getTo().getState()) {
-                          case KILLING:
-                            addWork(WorkCommand.DELETE);
-                            break;
-
-                          default:
-                            // No-op.
-                        }
-                      }
-                    }
-                ))
+                .withCallback(deleteIfKilling))
+        .addState(
+            Rule.from(THROTTLED)
+            .to(PENDING, KILLING)
+            .withCallback(deleteIfKilling))
         .addState(
             Rule.from(ASSIGNED)
                 .to(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, KILLED,
@@ -552,7 +547,7 @@ class TaskStateMachine {
    * @param mutation Mutate operation to perform while updating the task.
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
-  public synchronized boolean updateState(
+  private synchronized boolean updateState(
       final ScheduleStatus status,
       Function<IScheduledTask, IScheduledTask> mutation,
       final Optional<String> auditMessage) {

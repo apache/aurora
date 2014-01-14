@@ -201,8 +201,9 @@ public class TaskGroups implements EventSubscriber {
     return executor;
   }
 
-  private synchronized void add(IAssignedTask task, long readyTimestamp) {
-    groups.getUnchecked(new GroupKey(task.getTask())).push(task.getTaskId(), readyTimestamp);
+  private synchronized void add(IAssignedTask task, long scheduleDelayMs) {
+    groups.getUnchecked(new GroupKey(task.getTask()))
+        .push(task.getTaskId(), clock.nowMillis() + scheduleDelayMs);
   }
 
   /**
@@ -218,8 +219,8 @@ public class TaskGroups implements EventSubscriber {
     if (stateChange.getNewState() == PENDING) {
       IScheduledTask task = stateChange.getTask();
       long readyAtMs = stateChange.isTransition()
-          ? rescheduleCalculator.getReadyTimeMs(task)
-          : rescheduleCalculator.getStartupReadyTimeMs(task);
+          ? rescheduleCalculator.getFlappingPenaltyMs(task)
+          : rescheduleCalculator.getStartupScheduleDelayMs(task);
       add(task.getAssignedTask(), readyAtMs);
     }
   }

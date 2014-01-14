@@ -46,12 +46,14 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
+import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.apache.aurora.gen.ScheduleStatus.UNKNOWN;
 import static org.apache.aurora.scheduler.state.WorkCommand.DELETE;
 import static org.apache.aurora.scheduler.state.WorkCommand.INCREMENT_FAILURES;
 import static org.apache.aurora.scheduler.state.WorkCommand.KILL;
 import static org.apache.aurora.scheduler.state.WorkCommand.RESCHEDULE;
 import static org.apache.aurora.scheduler.state.WorkCommand.UPDATE_STATE;
+
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.hamcrest.CoreMatchers.is;
@@ -313,6 +315,15 @@ public class TaskStateMachineTest extends EasyMockTest {
     control.replay();
 
     transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, KILLING, KILLED);
+  }
+
+  @Test
+  public void testThrottledTask() {
+    expectWork(UPDATE_STATE).times(2);
+
+    control.replay();
+
+    transition(stateMachine, THROTTLED, PENDING);
   }
 
   private static void transition(TaskStateMachine stateMachine, ScheduleStatus... states) {
