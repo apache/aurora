@@ -4,6 +4,7 @@ from apache.aurora.client.commands.core import diff
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 from twitter.common.contextutil import temporary_file
 
+from gen.apache.aurora.constants import ACTIVE_STATES
 from gen.apache.aurora.ttypes import (
     AssignedTask,
     ExecutorConfig,
@@ -112,9 +113,7 @@ class TestDiffCommand(AuroraClientCommandTest):
         # Diff should get the task status, populate a config, and run diff.
         mock_scheduler.getTasksStatus.assert_called_with(
             TaskQuery(jobName='hello', environment='test', owner=Identity(role='mchucarroll'),
-                statuses=set([ScheduleStatus.PENDING, ScheduleStatus.STARTING,
-                    ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.ASSIGNED,
-                    ScheduleStatus.RESTARTING, ScheduleStatus.PREEMPTING])))
+                statuses=ACTIVE_STATES))
         assert mock_scheduler.populateJobConfig.call_count == 1
         assert isinstance(mock_scheduler.populateJobConfig.call_args[0][0], JobConfiguration)
         assert (mock_scheduler.populateJobConfig.call_args[0][0].key ==
@@ -176,8 +175,6 @@ class TestDiffCommand(AuroraClientCommandTest):
         # but since it fails, we shouldn't call populateJobConfig or subprocess.
         mock_scheduler.getTasksStatus.assert_called_with(
             TaskQuery(jobName='hello', environment='test', owner=Identity(role='mchucarroll'),
-                statuses=set([ScheduleStatus.PENDING, ScheduleStatus.STARTING,
-                    ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.ASSIGNED,
-                    ScheduleStatus.RESTARTING, ScheduleStatus.PREEMPTING])))
+                statuses=ACTIVE_STATES))
         assert mock_scheduler.populateJobConfig.call_count == 0
         assert subprocess_patch.call_count == 0

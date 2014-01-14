@@ -13,6 +13,7 @@ from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.config import AuroraConfig
 from twitter.common.contextutil import temporary_file
 
+from gen.apache.aurora.constants import ACTIVE_STATES
 from gen.apache.aurora.ttypes import (
     AcquireLockResult,
     AddInstancesConfig,
@@ -33,10 +34,6 @@ from mock import Mock, patch
 
 
 class TestUpdateCommand(AuroraClientCommandTest):
-
-  QUERY_STATUSES = frozenset([ScheduleStatus.PENDING, ScheduleStatus.STARTING,
-      ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.ASSIGNED,
-      ScheduleStatus.RESTARTING, ScheduleStatus.PREEMPTING])
 
   @classmethod
   def setup_mock_options(cls):
@@ -250,7 +247,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         TaskQuery(taskIds=None, jobName='hello', environment='test',
             instanceIds=frozenset([16, 17, 18, 19, 15]),
             owner=Identity(role=u'mchucarroll', user=None),
-           statuses=cls.QUERY_STATUSES),
+           statuses=ACTIVE_STATES),
         'foo')
 
   @classmethod
@@ -266,7 +263,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     status_calls = api.getTasksStatus.call_args_list
     assert status_calls[0][0][0] == TaskQuery(taskIds=None, jobName='hello', environment='test',
         owner=Identity(role=u'mchucarroll', user=None),
-        statuses=cls.QUERY_STATUSES)
+        statuses=ACTIVE_STATES)
     for status_call in status_calls[1:]:
       status_call[0][0] == TaskQuery(taskIds=None, jobName='hello', environment='test',
           owner=Identity(role='mchucarroll', user=None), statuses=set([ScheduleStatus.RUNNING]))
