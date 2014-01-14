@@ -21,27 +21,39 @@ import java.util.Set;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.SlaveID;
 
 /**
- * Thin interface for the state manager.
+ * A manager for the state of tasks.  Most modifications to tasks should be made here, especially
+ * those that alter the {@link ScheduleStatus} of tasks.
  */
 public interface StateManager {
 
   /**
-   * Performs a simple state change, transitioning all tasks matching a query to the given
-   * state and applying the given audit message.
-   * TODO(William Farner): Consider removing the return value.
+   * Attempts to alter a task from its existing state to {@code newState}. If a {@code casState}
+   * (compare and swap) is provided, the transition will only performed if the task is currently
+   * in the state.
    *
-   * @param query Builder of the query to perform, the results of which will be modified.
-   * @param newState State to move the resulting tasks into.
-   * @param auditMessage Audit message to apply along with the state change.
-   * @return the number of successful state changes.
+   * @param taskId ID of the task to transition.
+   * @param casState State that the task must be in for the operation to proceed.  If the task
+   *                 is found to not be in {@code casState}, no action is performed and
+   *                 {@code false} is returned.  This can be useful when deferring asynchronous
+   *                 work, to perform a follow-up action iff the task has not changed since the
+   *                 decision to defer the action was mde.
+   * @param newState State to move the task to.
+   * @param auditMessage Message to include with the transition.
+   * @return {@code true} if the transition was performed and the task was moved to
+   *         {@code newState}, {@code false} if the transition was not allowed, or the task was not
+   *         in {@code casState}.
+   *
    */
-  int changeState(Query.Builder query, ScheduleStatus newState, Optional<String> auditMessage);
+  boolean changeState(
+      String taskId,
+      Optional<ScheduleStatus> casState,
+      ScheduleStatus newState,
+      Optional<String> auditMessage);
 
   /**
    * Assigns a task to a specific slave.

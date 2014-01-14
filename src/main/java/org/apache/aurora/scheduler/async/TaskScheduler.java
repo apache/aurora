@@ -161,9 +161,9 @@ interface TaskScheduler extends EventSubscriber {
         return storage.write(new MutateWork.Quiet<TaskSchedulerResult>() {
           @Override public TaskSchedulerResult apply(MutableStoreProvider store) {
             LOG.fine("Attempting to schedule task " + taskId);
-            Query.Builder pendingTaskQuery = Query.taskScoped(taskId).byStatus(PENDING);
-            final IScheduledTask task =
-                Iterables.getOnlyElement(store.getTaskStore().fetchTasks(pendingTaskQuery), null);
+            final IScheduledTask task = Iterables.getOnlyElement(
+                store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
+                null);
             if (task == null) {
               LOG.warning("Failed to look up task " + taskId + ", it may have been deleted.");
             } else {
@@ -182,7 +182,7 @@ interface TaskScheduler extends EventSubscriber {
                 // It is in the LOST state and a new task will move to PENDING to replace it.
                 // Should the state change fail due to storage issues, that's okay.  The task will
                 // time out in the ASSIGNED state and be moved to LOST.
-                stateManager.changeState(pendingTaskQuery, LOST, LAUNCH_FAILED_MSG);
+                stateManager.changeState(taskId, Optional.of(PENDING), LOST, LAUNCH_FAILED_MSG);
               }
             }
 

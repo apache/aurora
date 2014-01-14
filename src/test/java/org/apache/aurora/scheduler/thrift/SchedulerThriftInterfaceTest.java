@@ -474,7 +474,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     String taskId = "task_id_foo";
     ScheduleStatus status = ScheduleStatus.FAILED;
 
-    scheduler.setTaskStatus(Query.taskScoped(taskId), status, transitionMessage(USER));
+    scheduler.setTaskStatus(taskId, status, transitionMessage(USER));
     // Expect auth is first called by an interceptor and then by SchedulerThriftInterface to extract
     // the SessionContext.
     // Note: This will change after AOP-style session validation passes in a SessionContext.

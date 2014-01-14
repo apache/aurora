@@ -202,8 +202,8 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     insertTask(task, 0);
-    assertEquals(1, changeState(taskId, KILLING));
-    assertEquals(0, changeState(taskId, KILLING));
+    assertEquals(true, changeState(taskId, KILLING));
+    assertEquals(false, changeState(taskId, KILLING));
   }
 
   @Test
@@ -228,17 +228,15 @@ public class StateManagerImplTest extends EasyMockTest {
 
   @Test
   public void testNestedEvents() {
-    String id = "a";
+    final String id = "a";
     ITaskConfig task = makeTask(JIM, MY_JOB);
     expect(taskIdGenerator.generate(task, 0)).andReturn(id);
 
     // Trigger an event that produces a side-effect and a PubSub event .
     eventSink.post(matchStateChange(id, INIT, PENDING));
     expectLastCall().andAnswer(new IAnswer<Void>() {
-      @Override
-      public Void answer() throws Throwable {
-        stateManager.changeState(
-            Query.unscoped(), ScheduleStatus.ASSIGNED, Optional.<String>absent());
+      @Override public Void answer() throws Throwable {
+        changeState(id, ASSIGNED);
         return null;
       }
     });
@@ -285,6 +283,17 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(taskId, FAILED);
   }
 
+  @Test
+  public void testKillUnknownTask() {
+    String unknownTask = "unknown";
+
+    driver.killTask(unknownTask);
+
+    control.replay();
+
+    changeState(unknownTask, RUNNING);
+  }
+
   private void expectStateTransitions(
       String taskId,
       ScheduleStatus initial,
@@ -311,8 +320,12 @@ public class StateManagerImplTest extends EasyMockTest {
     stateManager.insertPendingTasks(ImmutableMap.of(instanceId, task));
   }
 
-  private int changeState(String taskId, ScheduleStatus status) {
-    return stateManager.changeState(Query.taskScoped(taskId), status, Optional.<String>absent());
+  private boolean changeState(String taskId, ScheduleStatus status) {
+    return stateManager.changeState(
+        taskId,
+        Optional.<ScheduleStatus>absent(),
+        status,
+        Optional.<String>absent());
   }
 
   private static ITaskConfig makeTask(Identity owner, String job) {

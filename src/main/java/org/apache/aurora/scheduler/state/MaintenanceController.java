@@ -27,7 +27,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
-import com.twitter.common.base.Closure;
 
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.HostStatus;
@@ -119,11 +118,7 @@ public interface MaintenanceController {
       this.eventSink = checkNotNull(eventSink);
     }
 
-    private Set<HostStatus> watchDrainingTasks(
-        MutableStoreProvider store,
-        Set<String> hosts,
-        Closure<Query.Builder> callback) {
-
+    private Set<HostStatus> watchDrainingTasks(MutableStoreProvider store, Set<String> hosts) {
       Set<String> emptyHosts = Sets.newHashSet();
       for (String host : hosts) {
         // If there are no tasks on the host, immediately transition to DRAINED.
@@ -134,7 +129,13 @@ public interface MaintenanceController {
         if (activeTasks.isEmpty()) {
           emptyHosts.add(host);
         } else {
-          callback.execute(query);
+          for (String taskId : activeTasks) {
+            stateManager.changeState(
+                taskId,
+                Optional.<ScheduleStatus>absent(),
+                ScheduleStatus.RESTARTING,
+                DRAINING_MESSAGE);
+          }
         }
       }
 
@@ -186,11 +187,7 @@ public interface MaintenanceController {
     public Set<HostStatus> drain(final Set<String> hosts) {
       return storage.write(new MutateWork.Quiet<Set<HostStatus>>() {
         @Override public Set<HostStatus> apply(MutableStoreProvider store) {
-          return watchDrainingTasks(store, hosts, new Closure<Query.Builder>() {
-            @Override public void execute(Query.Builder query) {
-              stateManager.changeState(query, ScheduleStatus.RESTARTING, DRAINING_MESSAGE);
-            }
-          });
+          return watchDrainingTasks(store, hosts);
         }
       });
     }

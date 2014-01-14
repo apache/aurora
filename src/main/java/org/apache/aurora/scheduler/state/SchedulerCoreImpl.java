@@ -75,9 +75,8 @@ class SchedulerCoreImpl implements SchedulerCore {
   // Schedulers that are responsible for triggering execution of jobs.
   private final ImmutableList<JobManager> jobManagers;
 
-  // TODO(Bill Farner): Avoid using StateManagerImpl.
   // State manager handles persistence of task modifications and state transitions.
-  private final StateManagerImpl stateManager;
+  private final StateManager stateManager;
 
   private final TaskIdGenerator taskIdGenerator;
   private final JobFilter jobFilter;
@@ -97,7 +96,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       Storage storage,
       CronJobManager cronScheduler,
       ImmediateJobManager immediateScheduler,
-      StateManagerImpl stateManager,
+      StateManager stateManager,
       TaskIdGenerator taskIdGenerator,
       JobFilter jobFilter) {
 
@@ -118,7 +117,9 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized void tasksDeleted(Set<String> taskIds) {
-    setTaskStatus(Query.taskScoped(taskIds), ScheduleStatus.UNKNOWN, Optional.<String>absent());
+    for (String taskId : taskIds) {
+      setTaskStatus(taskId, ScheduleStatus.UNKNOWN, Optional.<String>absent());
+    }
   }
 
   @Override
@@ -245,18 +246,20 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   @Override
   public synchronized void setTaskStatus(
-      Query.Builder query,
+      String taskId,
       final ScheduleStatus status,
       Optional<String> message) {
 
-    checkNotNull(query);
+    checkNotNull(taskId);
     checkNotNull(status);
 
-    stateManager.changeState(query, status, message);
+    stateManager.changeState(taskId, Optional.<ScheduleStatus>absent(), status, message);
   }
 
   @Override
-  public synchronized void killTasks(Query.Builder query, String user) throws ScheduleException {
+  public synchronized void killTasks(Query.Builder query, final String user)
+      throws ScheduleException {
+
     checkNotNull(query);
     LOG.info("Killing tasks matching " + query);
 
@@ -274,10 +277,28 @@ class SchedulerCoreImpl implements SchedulerCore {
     }
 
     // Unless statuses were specifically supplied, only attempt to kill active tasks.
-    Query.Builder taskQuery = query.get().isSetStatuses() ? query.byStatus(ACTIVE_STATES) : query;
+    final Query.Builder taskQuery = query.get().isSetStatuses()
+        ? query.byStatus(ACTIVE_STATES)
+        : query;
 
-    int tasksAffected =
-        stateManager.changeState(taskQuery, KILLING, Optional.of("Killed by " + user));
+    int tasksAffected = storage.write(new MutateWork.Quiet<Integer>() {
+      @Override public Integer apply(MutableStoreProvider storeProvider) {
+        int total = 0;
+        for (String taskId : Tasks.ids(storeProvider.getTaskStore().fetchTasks(taskQuery))) {
+          boolean changed = stateManager.changeState(
+              taskId,
+              Optional.<ScheduleStatus>absent(),
+              KILLING,
+              Optional.of("Killed by " + user));
+
+          if (changed) {
+            total++;
+          }
+        }
+        return total;
+      }
+    });
+
     if (!jobDeleted && (tasksAffected == 0)) {
       throw new ScheduleException("No jobs to kill");
     }
@@ -307,14 +328,16 @@ class SchedulerCoreImpl implements SchedulerCore {
           throw new ScheduleException("Not all requested shards are active.");
         }
         LOG.info("Restarting shards matching " + query);
-        stateManager.changeState(
-            Query.taskScoped(Tasks.ids(matchingTasks)),
-            RESTARTING,
-            Optional.of("Restarted by " + requestingUser));
+        for (String taskId : Tasks.ids(matchingTasks)) {
+          stateManager.changeState(
+              taskId,
+              Optional.<ScheduleStatus>absent(),
+              RESTARTING,
+              Optional.of("Restarted by " + requestingUser));
+        }
       }
     });
   }
-
 
   @Override
   public synchronized void preemptTask(IAssignedTask task, IAssignedTask preemptingTask) {
@@ -322,7 +345,10 @@ class SchedulerCoreImpl implements SchedulerCore {
     checkNotNull(preemptingTask);
     // TODO(William Farner): Throw SchedulingException if either task doesn't exist, etc.
 
-    stateManager.changeState(Query.taskScoped(task.getTaskId()), ScheduleStatus.PREEMPTING,
+    stateManager.changeState(
+        task.getTaskId(),
+        Optional.<ScheduleStatus>absent(),
+        ScheduleStatus.PREEMPTING,
         Optional.of("Preempting in favor of " + preemptingTask.getTaskId()));
   }
 }

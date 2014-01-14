@@ -25,7 +25,6 @@ import com.google.common.eventbus.Subscribe;
 import com.twitter.common.stats.SlidingStats;
 import com.twitter.common.util.Clock;
 
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -75,7 +74,8 @@ class TaskThrottler implements EventSubscriber {
           new Runnable() {
             @Override public void run() {
               stateManager.changeState(
-                  Query.taskScoped(stateChange.getTaskId()).byStatus(THROTTLED),
+                  stateChange.getTaskId(),
+                  Optional.of(THROTTLED),
                   PENDING,
                   Optional.<String>absent());
             }

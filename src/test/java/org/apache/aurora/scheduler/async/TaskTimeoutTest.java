@@ -21,6 +21,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -35,7 +36,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -175,8 +175,12 @@ public class TaskTimeoutTest extends EasyMockTest {
     expectTaskWatch();
     expectCancel();
     Capture<Runnable> killingTimeout = expectTaskWatch();
-    Query.Builder query = Query.taskScoped(TASK_ID).byStatus(KILLING);
-    expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(1);
+    expect(stateManager.changeState(
+        TASK_ID,
+        Optional.of(KILLING),
+        LOST,
+        TaskTimeout.TIMEOUT_MESSAGE))
+        .andReturn(true);
 
     replayAndCreate();
 
@@ -188,8 +192,12 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Test
   public void testTimeout() throws Exception {
     Capture<Runnable> assignedTimeout = expectTaskWatch();
-    Query.Builder query = Query.taskScoped(TASK_ID).byStatus(ASSIGNED);
-    expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(1);
+    expect(stateManager.changeState(
+        TASK_ID,
+        Optional.of(ASSIGNED),
+        LOST,
+        TaskTimeout.TIMEOUT_MESSAGE))
+        .andReturn(true);
 
     replayAndCreate();
 
@@ -202,8 +210,12 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Test
   public void testTaskDeleted() throws Exception {
     Capture<Runnable> assignedTimeout = expectTaskWatch();
-    Query.Builder query = Query.taskScoped(TASK_ID).byStatus(KILLING);
-    expect(stateManager.changeState(query, LOST, TaskTimeout.TIMEOUT_MESSAGE)).andReturn(0);
+    expect(stateManager.changeState(
+        TASK_ID,
+        Optional.of(KILLING),
+        LOST,
+        TaskTimeout.TIMEOUT_MESSAGE))
+        .andReturn(false);
 
     replayAndCreate();
 

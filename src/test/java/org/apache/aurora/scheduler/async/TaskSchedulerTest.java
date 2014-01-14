@@ -317,10 +317,11 @@ public class TaskSchedulerTest extends EasyMockTest {
     driver.launchTask(OFFER_A.getId(), mesosTask);
     expectLastCall().andThrow(new IllegalStateException("Driver not ready."));
     expect(stateManager.changeState(
-        Query.taskScoped("a").byStatus(PENDING),
+        "a",
+        Optional.of(PENDING),
         LOST,
         TaskSchedulerImpl.LAUNCH_FAILED_MSG))
-        .andReturn(1);
+        .andReturn(true);
 
     replayAndCreateScheduler();
 

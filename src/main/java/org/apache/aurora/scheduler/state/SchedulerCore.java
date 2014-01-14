@@ -83,11 +83,11 @@ public interface SchedulerCore {
   /**
    * Assigns a new state to tasks.
    *
-   * @param query Builder for a query to identify tasks
+   * @param taskId ID of the task to transition.
    * @param status The new state of the tasks.
    * @param message Additional information about the state transition.
    */
-  void setTaskStatus(Query.Builder query, ScheduleStatus status, Optional<String> message);
+  void setTaskStatus(String taskId, ScheduleStatus status, Optional<String> message);
 
   /**
    * Kills a specific set of tasks.

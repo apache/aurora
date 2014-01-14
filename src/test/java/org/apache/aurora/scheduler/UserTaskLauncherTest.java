@@ -24,8 +24,8 @@ import com.google.common.collect.Iterables;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.OfferQueue;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
@@ -88,9 +88,12 @@ public class UserTaskLauncherTest extends EasyMockTest {
 
   @Test
   public void testForwardsStatusUpdates() throws Exception {
-    expect(
-        stateManager.changeState(Query.taskScoped(TASK_ID_A), RUNNING, Optional.of("fake message")))
-        .andReturn(1);
+    expect(stateManager.changeState(
+        TASK_ID_A,
+        Optional.<ScheduleStatus>absent(),
+        RUNNING,
+        Optional.of("fake message")))
+        .andReturn(true);
 
     control.replay();
 
@@ -114,7 +117,8 @@ public class UserTaskLauncherTest extends EasyMockTest {
   @Test(expected = StorageException.class)
   public void testFailedStatusUpdate() throws Exception {
     expect(stateManager.changeState(
-        Query.taskScoped(TASK_ID_A),
+        TASK_ID_A,
+        Optional.<ScheduleStatus>absent(),
         RUNNING,
         Optional.of("fake message")))
         .andThrow(new StorageException("Injected error"));
@@ -132,10 +136,11 @@ public class UserTaskLauncherTest extends EasyMockTest {
   @Test
   public void testMemoryLimitTranslationHack() throws Exception {
     expect(stateManager.changeState(
-        Query.taskScoped(TASK_ID_A),
+        TASK_ID_A,
+        Optional.<ScheduleStatus>absent(),
         FAILED,
         Optional.of(UserTaskLauncher.MEMORY_LIMIT_DISPLAY)))
-        .andReturn(0);
+        .andReturn(false);
 
     control.replay();
 

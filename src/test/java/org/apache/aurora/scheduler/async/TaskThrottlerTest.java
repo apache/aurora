@@ -29,7 +29,6 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskEvent;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -119,10 +118,11 @@ public class TaskThrottlerTest extends EasyMockTest {
 
   private void expectMovedToPending(IScheduledTask task) {
     expect(stateManager.changeState(
-        Query.taskScoped(Tasks.id(task)).byStatus(THROTTLED),
+        Tasks.id(task),
+        Optional.of(THROTTLED),
         PENDING,
         Optional.<String>absent()))
-        .andReturn(1);
+        .andReturn(true);
   }
 
   private IScheduledTask makeTask(String id, ScheduleStatus status) {

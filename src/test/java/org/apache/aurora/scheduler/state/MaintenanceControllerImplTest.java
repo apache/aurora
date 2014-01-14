@@ -33,6 +33,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -55,7 +56,6 @@ import static org.junit.Assert.assertEquals;
 public class MaintenanceControllerImplTest extends EasyMockTest {
 
   private static final String HOST_A = "a";
-  private static final String HOST_B = "b";
   private static final Set<String> A = ImmutableSet.of(HOST_A);
 
   private StorageTestUtil storageUtil;
@@ -102,10 +102,11 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
     expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of(task));
     expect(stateManager.changeState(
-        Query.slaveScoped(HOST_A).active(),
+        Tasks.id(task),
+        Optional.<ScheduleStatus>absent(),
         ScheduleStatus.RESTARTING,
         MaintenanceControllerImpl.DRAINING_MESSAGE))
-        .andReturn(1);
+        .andReturn(true);
     expectMaintenanceModeChange(HOST_A, DRAINING);
     expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
         .andReturn(Optional.of(new HostAttributes().setHost(HOST_A).setMode(DRAINING)));

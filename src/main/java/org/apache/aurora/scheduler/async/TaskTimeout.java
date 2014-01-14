@@ -42,7 +42,6 @@ import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -186,9 +185,13 @@ class TaskTimeout implements EventSubscriber {
         // timeout is still valid.  Ideally, the future would have already been canceled, but in the
         // event of a state transition race, including transientState prevents an unintended
         // task timeout.
-        Query.Builder query = Query.taskScoped(key.taskId).byStatus(key.status);
         // Note: This requires LOST transitions trigger Driver.killTask.
-        if (stateManager.changeState(query, ScheduleStatus.LOST, TIMEOUT_MESSAGE) > 0) {
+        if (stateManager.changeState(
+            key.taskId,
+            Optional.of(key.status),
+            ScheduleStatus.LOST,
+            TIMEOUT_MESSAGE)) {
+
           timedOutTasks.incrementAndGet();
         } else {
           LOG.warning("Task " + key + " does not exist, or was not in the expected state.");

@@ -1453,7 +1453,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
       ScheduleStatus status,
       Optional<String> message) {
 
-    scheduler.setTaskStatus(query, status, message);
+    for (String taskId : Tasks.ids(Storage.Util.consistentFetchTasks(storage, query))) {
+      scheduler.setTaskStatus(taskId, status, message);
+    }
   }
 
   public void changeStatus(Query.Builder query, ScheduleStatus status, ScheduleStatus... statuses) {

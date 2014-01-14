@@ -27,7 +27,6 @@ import com.google.common.base.Optional;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.OfferQueue;
 import org.apache.aurora.scheduler.base.Conversions;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.mesos.Protos.Offer;
@@ -85,7 +84,8 @@ class UserTaskLauncher implements TaskLauncher {
       }
 
       stateManager.changeState(
-          Query.taskScoped(status.getTaskId().getValue()),
+          status.getTaskId().getValue(),
+          Optional.<ScheduleStatus>absent(),
           translatedState,
           Optional.fromNullable(message));
     } catch (SchedulerException e) {

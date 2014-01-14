@@ -31,8 +31,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -54,8 +52,6 @@ import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.state.SideEffectStorage.SideEffectWork;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
@@ -78,8 +74,9 @@ import static org.apache.aurora.scheduler.state.SideEffectStorage.OperationFinal
  * Manager of all persistence-related operations for the scheduler.  Acts as a controller for
  * persisted state machine transitions, and their side-effects.
  *
- * TODO(William Farner): Re-evaluate thread safety here, specifically risk of races that
- * modify managerState.
+ * TODO(wfarner): This class is due for an overhaul.  There are several aspects of it that could
+ * probably be made much simpler.  Specifically, the workQueue is particularly difficult to reason
+ * about.
  */
 public class StateManagerImpl implements StateManager {
   private static final Logger LOG = Logger.getLogger(StateManagerImpl.class.getName());
@@ -199,13 +196,15 @@ public class StateManagerImpl implements StateManager {
   }
 
   @Override
-  public int changeState(
-      Query.Builder query,
+  public boolean changeState(
+      String taskId,
+      Optional<ScheduleStatus> casState,
       final ScheduleStatus newState,
       final Optional<String> auditMessage) {
 
-    return changeState(query, new Function<TaskStateMachine, Boolean>() {
-      @Override public Boolean apply(TaskStateMachine stateMachine) {
+    return changeState(taskId, casState, new Function<TaskStateMachine, Boolean>() {
+      @Override
+      public Boolean apply(TaskStateMachine stateMachine) {
         return stateMachine.updateState(newState, auditMessage);
       }
     });
@@ -223,34 +222,26 @@ public class StateManagerImpl implements StateManager {
     checkNotNull(assignedPorts);
 
     TaskAssignMutation mutation = assignHost(slaveHost, slaveId, assignedPorts);
-    changeState(Query.taskScoped(taskId), mutation);
+    changeState(taskId, Optional.<ScheduleStatus>absent(), mutation);
 
     return mutation.getAssignedTask();
   }
 
-  private int changeStateInWriteOperation(
-      Set<String> taskIds,
-      Function<TaskStateMachine, Boolean> stateChange) {
-
-    int count = 0;
-    for (TaskStateMachine stateMachine : getStateMachines(taskIds).values()) {
-      if (stateChange.apply(stateMachine)) {
-        ++count;
-      }
-    }
-    return count;
-  }
-
-  private int changeState(
-      final Query.Builder query,
+  private boolean changeState(
+      final String taskId,
+      final Optional<ScheduleStatus> casState,
       final Function<TaskStateMachine, Boolean> stateChange) {
 
-    return storage.write(storage.new QuietSideEffectWork<Integer>() {
-      @Override public Integer apply(MutableStoreProvider storeProvider) {
-        Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
-            .transform(Tasks.SCHEDULED_TO_ID)
-            .toSet();
-        return changeStateInWriteOperation(ids, stateChange);
+    return storage.write(storage.new QuietSideEffectWork<Boolean>() {
+      @Override public Boolean apply(MutableStoreProvider storeProvider) {
+        IScheduledTask task = Iterables.getOnlyElement(
+            storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskId)),
+            null);
+        if (casState.isPresent() && (task != null) && (task.getStatus() != casState.get())) {
+          return false;
+        }
+
+        return stateChange.apply(getStateMachine(taskId, task));
       }
     });
   }
@@ -412,27 +403,6 @@ public class StateManagerImpl implements StateManager {
         Iterable<IScheduledTask> tasks = taskStore.fetchTasks(Query.taskScoped(taskIds));
         addTaskEvent(new PubsubEvent.TasksDeleted(ImmutableSet.copyOf(tasks)));
         taskStore.deleteTasks(taskIds);
-      }
-    });
-  }
-
-  private Map<String, TaskStateMachine> getStateMachines(final Set<String> taskIds) {
-    return storage.consistentRead(new Work.Quiet<Map<String, TaskStateMachine>>() {
-      @Override public Map<String, TaskStateMachine> apply(StoreProvider storeProvider) {
-        Map<String, IScheduledTask> existingTasks = Maps.uniqueIndex(
-            storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskIds)),
-            new Function<IScheduledTask, String>() {
-              @Override public String apply(IScheduledTask input) {
-                return input.getAssignedTask().getTaskId();
-              }
-            });
-
-        ImmutableMap.Builder<String, TaskStateMachine> builder = ImmutableMap.builder();
-        for (String taskId : taskIds) {
-          // Pass null get() values through.
-          builder.put(taskId, getStateMachine(taskId, existingTasks.get(taskId)));
-        }
-        return builder.build();
       }
     });
   }

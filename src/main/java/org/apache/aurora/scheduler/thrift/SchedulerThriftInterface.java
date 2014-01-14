@@ -672,8 +672,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return response;
     }
 
-    schedulerCore.setTaskStatus(
-        Query.taskScoped(taskId), status, transitionMessage(context.getIdentity()));
+    schedulerCore.setTaskStatus(taskId, status, transitionMessage(context.getIdentity()));
     return new Response().setResponseCode(OK).setMessage("Transition attempted.");
   }
 
