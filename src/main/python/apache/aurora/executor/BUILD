@@ -130,7 +130,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'apache.aurora.executor',
-    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
   ).with_binaries(
     gc_executor = pants('src/main/python/apache/aurora/executor/bin:gc_executor'),
     thermos_executor = pants('src/main/python/apache/aurora/executor/bin:thermos_executor'),

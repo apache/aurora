@@ -36,7 +36,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'apache.aurora.config',
-    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
     description = 'Aurora/Thermos Pystachio schemas for describing job configurations.',
     license = 'Apache License, Version 2.0',
   )

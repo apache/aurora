@@ -43,7 +43,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'apache.thermos.observer',
-    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
     description = 'The Thermos observer web interface.',
   ).with_binaries(
     thermos_observer = pants('src/main/python/apache/thermos/observer/bin:thermos_observer'),

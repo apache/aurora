@@ -82,7 +82,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'apache.thermos.core',
-    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
     description = 'The Thermos core state machine.',
   )
 )

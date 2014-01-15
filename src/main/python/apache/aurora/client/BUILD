@@ -70,7 +70,7 @@ python_library(
   ],
   provides = setup_py(
     name = 'apache.aurora.client',
-    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().lower(),
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
   ).with_binaries(
     aurora_admin = pants('src/main/python/apache/aurora/client/bin:aurora_admin'),
     aurora = pants('src/main/python/apache/aurora/client/bin:aurora_client'),
