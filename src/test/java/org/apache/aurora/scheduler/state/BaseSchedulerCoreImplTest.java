@@ -70,7 +70,8 @@ import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronScheduler;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
-import org.apache.aurora.scheduler.state.JobFilter.JobFilterResult;
+import org.apache.aurora.scheduler.quota.QuotaCheckResult;
+import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -100,6 +101,8 @@ import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.hostLimitConstraint;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.validateAndPopulate;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
 import static org.easymock.EasyMock.anyInt;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
@@ -130,6 +133,9 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("SlaveId").build();
   private static final String SLAVE_HOST_1 = "SlaveHost1";
 
+  private static final QuotaCheckResult ENOUGH_QUOTA = new QuotaCheckResult(SUFFICIENT_QUOTA);
+  private static final QuotaCheckResult NOT_ENOUGH_QUOTA = new QuotaCheckResult(INSUFFICIENT_QUOTA);
+
   private Driver driver;
   private StateManagerImpl stateManager;
   private Storage storage;
@@ -140,7 +146,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private EventSink eventSink;
   private RescheduleCalculator rescheduleCalculator;
   private ShutdownRegistry shutdownRegistry;
-  private JobFilter jobFilter;
+  private QuotaManager quotaManager;
 
   // TODO(William Farner): Set up explicit expectations for calls to generate task IDs.
   private final AtomicLong idCounter = new AtomicLong();
@@ -155,19 +161,19 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     driver = createMock(Driver.class);
     clock = new FakeClock();
     eventSink = createMock(EventSink.class);
-    eventSink.post(EasyMock.<PubsubEvent>anyObject());
     rescheduleCalculator = createMock(RescheduleCalculator.class);
     cronScheduler = createMock(CronScheduler.class);
     shutdownRegistry = createMock(ShutdownRegistry.class);
-    jobFilter = createMock(JobFilter.class);
-    expectLastCall().anyTimes();
+    quotaManager = createMock(QuotaManager.class);
 
+    eventSink.post(EasyMock.<PubsubEvent>anyObject());
+    expectLastCall().anyTimes();
     expect(cronScheduler.schedule(anyObject(String.class), anyObject(Runnable.class)))
         .andStubReturn("key");
     expect(cronScheduler.isValidSchedule(anyObject(String.class))).andStubReturn(true);
 
-    expect(jobFilter.filter(anyObject(ITaskConfig.class), anyInt())).andStubReturn(
-        JobFilterResult.pass());
+    expect(quotaManager.checkQuota(anyObject(ITaskConfig.class), anyInt()))
+        .andStubReturn(ENOUGH_QUOTA);
   }
 
   /**
@@ -187,8 +193,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private void buildScheduler(Storage newStorage) throws Exception {
     this.storage = newStorage;
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider storeProvider) {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
         StorageBackfill.backfill(storeProvider, clock);
       }
     });
@@ -208,7 +213,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         immediateManager,
         stateManager,
         taskIdGenerator,
-        jobFilter);
+        quotaManager);
     cron.schedulerCore = scheduler;
     immediateManager.schedulerCore = scheduler;
   }
@@ -1164,8 +1169,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testEnsureCanAddInstances() throws Exception {
     SanitizedConfiguration job = makeJob(KEY_A, 1);
-    expect(jobFilter.filter(job.getJobConfig().getTaskConfig(), 1))
-        .andReturn(JobFilterResult.pass());
 
     control.replay();
     buildScheduler();
@@ -1176,8 +1179,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testEnsureCanAddInstancesFails() throws Exception {
     SanitizedConfiguration job = makeJob(KEY_A, 1);
-    expect(jobFilter.filter(job.getJobConfig().getTaskConfig(), 1))
-        .andReturn(JobFilterResult.fail("fail"));
+    expect(quotaManager.checkQuota(anyObject(ITaskConfig.class), anyInt()))
+        .andReturn(NOT_ENOUGH_QUOTA);
 
     control.replay();
     buildScheduler();
@@ -1216,8 +1219,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testFilterFailRejectsCreate() throws Exception {
     SanitizedConfiguration job = makeJob(KEY_A, 1);
-    expect(jobFilter.filter(job.getJobConfig().getTaskConfig(), 1))
-        .andReturn(JobFilterResult.fail("failed"));
+    expect(quotaManager.checkQuota(anyObject(ITaskConfig.class), anyInt()))
+        .andReturn(NOT_ENOUGH_QUOTA);
 
     control.replay();
 
@@ -1228,7 +1231,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testFilterFailRejectsAddInstances() throws Exception {
     IJobConfiguration job = makeJob(KEY_A, 1).getJobConfig();
-    expect(jobFilter.filter(job.getTaskConfig(), 1)).andReturn(JobFilterResult.fail("failed"));
+    expect(quotaManager.checkQuota(anyObject(ITaskConfig.class), anyInt()))
+        .andReturn(NOT_ENOUGH_QUOTA);
 
     control.replay();
 
@@ -1258,7 +1262,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setEnvironment(ENV_A)
         .setJobName(KEY_A.getName())
         .setOwner(OWNER_A);
-    expect(jobFilter.filter(ITaskConfig.build(newTask), 2)).andReturn(JobFilterResult.pass());
     ImmutableSet<Integer> instances = ImmutableSet.of(1);
 
     control.replay();

@@ -96,7 +96,9 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
-import org.apache.aurora.scheduler.quota.Quotas;
+import org.apache.aurora.scheduler.quota.QuotaInfo;
+import org.apache.aurora.scheduler.quota.QuotaManager;
+import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.state.CronJobManager;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
@@ -106,8 +108,6 @@ import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
@@ -170,6 +170,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final Recovery recovery;
   private final MaintenanceController maintenance;
   private final CronJobManager cronJobManager;
+  private final QuotaManager quotaManager;
   private final Amount<Long, Time> killTaskInitialBackoff;
   private final Amount<Long, Time> killTaskMaxBackoff;
 
@@ -182,7 +183,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       StorageBackup backup,
       Recovery recovery,
       CronJobManager cronJobManager,
-      MaintenanceController maintenance) {
+      MaintenanceController maintenance,
+      QuotaManager quotaManager) {
 
     this(storage,
         schedulerCore,
@@ -192,6 +194,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         recovery,
         maintenance,
         cronJobManager,
+        quotaManager,
         KILL_TASK_INITIAL_BACKOFF.get(),
         KILL_TASK_MAX_BACKOFF.get());
   }
@@ -206,6 +209,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       Recovery recovery,
       MaintenanceController maintenance,
       CronJobManager cronJobManager,
+      QuotaManager quotaManager,
       Amount<Long, Time> initialBackoff,
       Amount<Long, Time> maxBackoff) {
 
@@ -217,6 +221,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.recovery = checkNotNull(recovery);
     this.maintenance = checkNotNull(maintenance);
     this.cronJobManager = checkNotNull(cronJobManager);
+    this.quotaManager = checkNotNull(quotaManager);
     this.killTaskInitialBackoff = checkNotNull(initialBackoff);
     this.killTaskMaxBackoff = checkNotNull(maxBackoff);
   }
@@ -308,7 +313,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       SanitizedConfiguration sanitized =
           SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(description));
 
-      // TODO(maximk): Consider moving job validation logic into a dedicated RPC. MESOS-4476.
+      // TODO(maximk): Drop it once migration to client quota checks is completed.
       if (validation != null && validation == JobConfigValidation.RUN_FILTERS) {
         schedulerCore.validateJobResources(sanitized);
       }
@@ -590,16 +595,28 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response getQuota(final String ownerRole) {
     checkNotBlank(ownerRole);
 
-    IQuota quota = storage.consistentRead(new Work.Quiet<IQuota>() {
-      @Override public IQuota apply(StoreProvider storeProvider) {
-        return storeProvider.getQuotaStore().fetchQuota(ownerRole).or(Quotas.noQuota());
-      }
-    });
+    QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ownerRole);
+    GetQuotaResult result = new GetQuotaResult(quotaInfo.guota().newBuilder())
+        .setConsumed(quotaInfo.prodConsumption().newBuilder());
 
-    return new Response()
-        .setResponseCode(OK)
-        .setResult(Result.getQuotaResult(new GetQuotaResult()
-            .setQuota(quota.newBuilder())));
+    return new Response().setResponseCode(OK).setResult(Result.getQuotaResult(result));
+  }
+
+
+  @Requires(whitelist = Capability.PROVISIONER)
+  @Override
+  public Response setQuota(final String ownerRole, final Quota quota, SessionKey session) {
+    checkNotBlank(ownerRole);
+    checkNotNull(quota);
+    checkNotNull(session);
+
+    Response response = new Response();
+    try {
+      quotaManager.saveQuota(ownerRole, IQuota.build(quota));
+      return response.setResponseCode(OK).setMessage("Quota applied.");
+    } catch (QuotaException e) {
+      return response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());
+    }
   }
 
   @Override
@@ -632,24 +649,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           .setResponseCode(OK)
           .setResult(Result.endMaintenanceResult(new EndMaintenanceResult()
               .setStatuses(maintenance.endMaintenance(hosts.getHostNames()))));
-  }
-
-  @Requires(whitelist = Capability.PROVISIONER)
-  @Override
-  public Response setQuota(final String ownerRole, final Quota quota, SessionKey session) {
-    checkNotBlank(ownerRole);
-    checkNotNull(quota);
-    checkNotNull(session);
-
-    // TODO(Kevin Sweeney): Input validation for Quota.
-
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getQuotaStore().saveQuota(ownerRole, IQuota.build(quota));
-      }
-    });
-
-    return new Response().setResponseCode(OK).setMessage("Quota applied.");
   }
 
   @Override

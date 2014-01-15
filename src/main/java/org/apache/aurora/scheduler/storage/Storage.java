@@ -20,13 +20,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.BindingAnnotation;
 
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.SchedulerException;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 /**
@@ -299,22 +297,6 @@ public interface Storage {
       return storage.weaklyConsistentRead(new Work.Quiet<ImmutableSet<IScheduledTask>>() {
         @Override public ImmutableSet<IScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(query);
-        }
-      });
-    }
-
-    /**
-     * Fetch quota for {@code role} from {@code storage} in a consistent read operation.
-     *
-     * @param storage Storage instance to fetch quota from.
-     * @param role Role to fetch quota for.
-     * @return Quota returned from the fetch operation.
-     * @see QuotaStore#fetchQuota(String)
-     */
-    public static Optional<IQuota> consistentFetchQuota(Storage storage, final String role) {
-      return storage.consistentRead(new Work.Quiet<Optional<IQuota>>() {
-        @Override public Optional<IQuota> apply(StoreProvider storeProvider) {
-          return storeProvider.getQuotaStore().fetchQuota(role);
         }
       });
     }

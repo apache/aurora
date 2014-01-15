@@ -36,7 +36,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -58,13 +57,12 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.cron.CronPredictor;
+import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
-import org.apache.aurora.scheduler.quota.Quotas;
 import org.apache.aurora.scheduler.state.CronJobManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -152,24 +150,12 @@ public class SchedulerzRole extends JerseyTemplateServlet {
         template.setAttribute("cronJobs", cronJobs.values());
 
         // TODO(Suman Karumuri): In future compute consumption for role and environment.
-        template.setAttribute("prodResourcesUsed", quotaManager.getConsumption(role.get()));
-        template.setAttribute("nonProdResourcesUsed", getNonProdConsumption(role.get()));
-        template.setAttribute("resourceQuota", getQuota(role.get()));
+        QuotaInfo quotaInfo = quotaManager.getQuotaInfo(role.get());
+        template.setAttribute("prodResourcesUsed", quotaInfo.prodConsumption());
+        template.setAttribute("nonProdResourcesUsed", quotaInfo.nonProdConsumption());
+        template.setAttribute("resourceQuota", quotaInfo.guota());
       }
     });
-  }
-
-  private IQuota getQuota(final String role) {
-    return Storage.Util.consistentFetchQuota(storage, role).or(Quotas.noQuota());
-  }
-
-  private IQuota getNonProdConsumption(String role) {
-    FluentIterable<ITaskConfig> tasks = FluentIterable
-        .from(Storage.Util.weaklyConsistentFetchTasks(storage, Query.roleScoped(role).active()))
-        .transform(Tasks.SCHEDULED_TO_INFO)
-        .filter(Predicates.not(Tasks.IS_PRODUCTION));
-
-    return Quotas.fromTasks(tasks);
   }
 
   /**

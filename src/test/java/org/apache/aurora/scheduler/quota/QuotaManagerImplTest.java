@@ -25,26 +25,32 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
-import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class QuotaManagerImplTest extends EasyMockTest {
-  private static final String ROLE = "foo";
+  private static final String ROLE = "test";
+  private static final String ENV = "test_env";
+  private static final IQuota QUOTA = IQuota.build(new Quota()
+      .setNumCpus(1.0)
+      .setRamMb(100L)
+      .setDiskMb(200L));
   private static final Query.Builder ACTIVE_QUERY = Query.roleScoped(ROLE).active();
 
   private StorageTestUtil storageUtil;
-  // TODO(maximk): Move checkQuota to QuotaFilter along with tests.
   private QuotaManagerImpl quotaManager;
 
   @Before
@@ -54,125 +60,172 @@ public class QuotaManagerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testGetEmptyQuota() {
+  public void testGetQuotaInfo() {
+    IScheduledTask prodTask = createTask("foo", "id1", 3, 3, 3, true);
+    IScheduledTask nonProdTask = createTask("bar", "id1", 2, 2, 2, false);
+    IQuota quota = IQuota.build(new Quota(4, 4, 4));
+
+    expectQuota(quota);
+    expectTasks(prodTask, nonProdTask);
     storageUtil.expectOperations();
-    returnNoTasks();
 
     control.replay();
 
-    assertEquals(Quotas.noQuota(), quotaManager.getConsumption(ROLE));
+    QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ROLE);
+    assertEquals(quota, quotaInfo.guota());
+    assertEquals(IQuota.build(new Quota(3, 3, 3)), quotaInfo.prodConsumption());
+    assertEquals(IQuota.build(new Quota(2, 2, 2)), quotaInfo.nonProdConsumption());
   }
 
   @Test
-  public void testConsumeNoQuota() {
+  public void testGetQuotaInfoNoTasks() {
+    IQuota quota = IQuota.build(new Quota(4, 4, 4));
+
+    expectQuota(quota);
+    expectNoTasks();
     storageUtil.expectOperations();
-    applyQuota(new Quota(1, 1, 1));
-    returnNoTasks();
 
     control.replay();
 
-    assertEquals(SUFFICIENT_QUOTA, quotaManager.checkQuota(ROLE, Quotas.noQuota()).result());
+    QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ROLE);
+    assertEquals(quota, quotaInfo.guota());
+    assertEquals(Quotas.noQuota(), quotaInfo.prodConsumption());
+    assertEquals(Quotas.noQuota(), quotaInfo.nonProdConsumption());
   }
 
   @Test
-  public void testNoQuotaExhausted() {
+  public void testCheckQuotaPasses() {
+    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectTasks(createTask("foo", "id1", 3, 3, 3, true));
     storageUtil.expectOperations();
-    returnNoTasks();
+
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 1, true), 1);
+    assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
+  }
+
+  @Test
+  public void testCheckQuotaPassesNoTasks() {
+    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectNoTasks();
+    storageUtil.expectOperations();
+
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 1, true), 1);
+    assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
+  }
+
+  @Test
+  public void testCheckQuotaPassesNonProdUnaccounted() {
+    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectTasks(createTask("foo", "id1", 3, 3, 3, true), createTask("bar", "id2", 5, 5, 5, false));
+    storageUtil.expectOperations();
+
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 1, true), 1);
+    assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
+  }
+
+  @Test
+  public void testCheckQuotaSkippedForNonProdRequest() {
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 1, false), 1);
+    assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
+  }
+
+  @Test
+  public void testCheckQuotaNoQuotaSet() {
     expect(storageUtil.quotaStore.fetchQuota(ROLE)).andReturn(Optional.<IQuota>absent());
+    expectNoTasks();
+    storageUtil.expectOperations();
 
     control.replay();
-
-    QuotaComparisonResult result =
-        quotaManager.checkQuota(ROLE, IQuota.build(new Quota(1, 1, 1)));
-
-    assertEquals(INSUFFICIENT_QUOTA, result.result());
-    assertTrue(result.details().length() > 0);
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 1, true), 1);
+    assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
   @Test
-  public void testUseAllQuota() {
-    IScheduledTask task1 = createTask("foo", "id1", 1, 1, 1);
-    IScheduledTask task2 = createTask("foo", "id2", 1, 1, 1);
-
+  public void testCheckQuotaExceedsCpu() {
+    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectTasks(createTask("foo", "id1", 3, 3, 3, true));
     storageUtil.expectOperations();
-    applyQuota(new Quota(2, 2, 2)).anyTimes();
-    returnTasks(task1);
-    returnTasks(task1, task2);
 
     control.replay();
-
-    IQuota half = IQuota.build(new Quota(1, 1, 1));
-    assertEquals(SUFFICIENT_QUOTA, quotaManager.checkQuota(ROLE, half).result());
-    assertEquals(INSUFFICIENT_QUOTA, quotaManager.checkQuota(ROLE, half).result());
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(2, 1, 1, true), 1);
+    assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
+    assertTrue(checkQuota.getDetails().get().contains("CPU"));
   }
 
   @Test
-  public void testExhaustCpu() {
+  public void testCheckQuotaExceedsRam() {
+    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectTasks(createTask("foo", "id1", 3, 3, 3, true));
     storageUtil.expectOperations();
-    applyQuota(new Quota(2, 2, 2));
-    returnTasks(createTask("foo", "id1", 1, 1, 1));
 
     control.replay();
-
-    assertEquals(
-        INSUFFICIENT_QUOTA,
-        quotaManager.checkQuota(ROLE, IQuota.build(new Quota(2, 1, 1))).result());
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 2, 1, true), 1);
+    assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
+    assertTrue(checkQuota.getDetails().get().contains("RAM"));
   }
 
   @Test
-  public void testExhaustRam() {
+  public void testCheckQuotaExceedsDisk() {
+    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectTasks(createTask("foo", "id1", 3, 3, 3, true));
     storageUtil.expectOperations();
-    applyQuota(new Quota(2, 2, 2));
-    returnTasks(createTask("foo", "id1", 1, 1, 1));
 
     control.replay();
-
-    assertEquals(
-        INSUFFICIENT_QUOTA,
-        quotaManager.checkQuota(ROLE, IQuota.build(new Quota(1, 2, 1))).result());
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 2, true), 1);
+    assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
+    assertTrue(checkQuota.getDetails().get().contains("DISK"));
   }
 
   @Test
-  public void testExhaustDisk() {
+  public void testSaveQuotaPasses() throws Exception {
+    storageUtil.quotaStore.saveQuota(ROLE, QUOTA);
     storageUtil.expectOperations();
-    applyQuota(new Quota(2, 2, 2));
-    returnTasks(createTask("foo", "id1", 1, 1, 1));
 
     control.replay();
-
-    assertEquals(
-        INSUFFICIENT_QUOTA,
-        quotaManager.checkQuota(ROLE, IQuota.build(new Quota(1, 1, 2))).result());
+    quotaManager.saveQuota(ROLE, QUOTA);
   }
 
-  @Test
-  public void testNonproductionUnaccounted() {
-    ScheduledTask builder = createTask("foo", "id1", 3, 3, 3).newBuilder();
-    builder.getAssignedTask().getTask().setProduction(false);
-    IScheduledTask task = IScheduledTask.build(builder);
-
+  @Test(expected = QuotaException.class)
+  public void testSaveQuotaFailsMissingSpecs() throws Exception {
     storageUtil.expectOperations();
-    applyQuota(new Quota(2, 2, 2));
-    returnTasks(task);
 
     control.replay();
-
-    assertEquals(
-        SUFFICIENT_QUOTA,
-        quotaManager.checkQuota(ROLE, IQuota.build(new Quota(2, 2, 2))).result());
+    quotaManager.saveQuota(ROLE, IQuota.build(new Quota()));
   }
 
-  private IExpectationSetters<?> returnTasks(IScheduledTask... tasks) {
+  @Test(expected = QuotaException.class)
+  public void testSaveQuotaFailsNegativeValues() throws Exception {
+    storageUtil.expectOperations();
+
+    control.replay();
+    quotaManager.saveQuota(ROLE, IQuota.build(new Quota(-2.0, 4, 5)));
+  }
+
+  private IExpectationSetters<?> expectTasks(IScheduledTask... tasks) {
     return storageUtil.expectTaskFetch(ACTIVE_QUERY, tasks);
   }
 
-  private IExpectationSetters<?> returnNoTasks() {
-    return returnTasks();
+  private IExpectationSetters<?> expectNoTasks() {
+    return expectTasks();
   }
 
-  private IExpectationSetters<Optional<IQuota>> applyQuota(Quota quota) {
+  private IExpectationSetters<Optional<IQuota>> expectQuota(IQuota quota) {
     return expect(storageUtil.quotaStore.fetchQuota(ROLE))
-        .andReturn(Optional.of(IQuota.build(quota)));
+        .andReturn(Optional.of(quota));
+  }
+
+  private ITaskConfig createTaskConfig(int cpus, int ramMb, int diskMb, boolean production) {
+    return createTask("newTask", "newId", cpus, ramMb, diskMb, production)
+        .getAssignedTask()
+        .getTask();
   }
 
   private IScheduledTask createTask(
@@ -180,23 +233,21 @@ public class QuotaManagerImplTest extends EasyMockTest {
       String taskId,
       int cpus,
       int ramMb,
-      int diskMb) {
+      int diskMb,
+      boolean production) {
 
     return IScheduledTask.build(new ScheduledTask()
         .setStatus(ScheduleStatus.RUNNING)
         .setAssignedTask(
             new AssignedTask()
                 .setTaskId(taskId)
-                .setTask(createTaskConfig(jobName, cpus, ramMb, diskMb))));
-  }
-
-  private TaskConfig createTaskConfig(String jobName, int cpus, int ramMb, int diskMb) {
-    return new TaskConfig()
-        .setOwner(new Identity(ROLE, ROLE))
-        .setJobName(jobName)
-        .setNumCpus(cpus)
-        .setRamMb(ramMb)
-        .setDiskMb(diskMb)
-        .setProduction(true);
+                .setTask(new TaskConfig()
+                    .setOwner(new Identity(ROLE, ROLE))
+                    .setEnvironment(ENV)
+                    .setJobName(jobName)
+                    .setNumCpus(cpus)
+                    .setRamMb(ramMb)
+                    .setDiskMb(diskMb)
+                    .setProduction(production))));
   }
 }

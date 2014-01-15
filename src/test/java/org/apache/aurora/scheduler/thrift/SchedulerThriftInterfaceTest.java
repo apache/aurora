@@ -70,6 +70,8 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
+import org.apache.aurora.scheduler.quota.QuotaInfo;
+import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.CronJobManager;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
@@ -125,6 +127,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final ILock LOCK = ILock.build(new Lock().setKey(LOCK_KEY.newBuilder()));
   private static final JobConfiguration CRON_JOB = makeJob().setCronSchedule("test");
   private static final Lock DEFAULT_LOCK = null;
+  private static final IQuota QUOTA = IQuota.build(new Quota(10.0, 1024, 2048));
+  private static final IQuota CONSUMED = IQuota.build(new Quota(0.0, 0, 0));
 
   private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
@@ -136,6 +140,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private MaintenanceController maintenance;
   private AuroraAdmin.Iface thrift;
   private CronJobManager cronJobManager;
+  private QuotaManager quotaManager;
 
   @Before
   public void setUp() throws Exception {
@@ -150,6 +155,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     recovery = createMock(Recovery.class);
     maintenance = createMock(MaintenanceController.class);
     cronJobManager = createMock(CronJobManager.class);
+    quotaManager = createMock(QuotaManager.class);
 
     // Use guice and install AuthModule to apply AOP-style auth layer.
     Module testModule = new AbstractModule() {
@@ -163,6 +169,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(Recovery.class).toInstance(recovery);
         bind(MaintenanceController.class).toInstance(maintenance);
         bind(CronJobManager.class).toInstance(cronJobManager);
+        bind(QuotaManager.class).toInstance(quotaManager);
         bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
       }
     };
@@ -194,7 +201,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testPopulateJobConfigFailFilter() throws Exception {
+  public void testPopulateJobConfigFailQuotaCheck() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
     scheduler.validateJobResources(anyObject(SanitizedConfiguration.class));
     expectLastCall().andThrow(new ScheduleException("err"));
@@ -430,12 +437,28 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setDiskMb(100)
         .setRamMb(200);
     expectAuth(ROOT, true);
-    storageUtil.quotaStore.saveQuota(ROLE, IQuota.build(quota));
+    quotaManager.saveQuota(ROLE, IQuota.build(quota));
 
     control.replay();
 
     Response response = thrift.setQuota(ROLE, quota, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
+  }
+
+  @Test
+  public void testSetQuotaFails() throws Exception {
+    Quota quota = new Quota()
+        .setNumCpus(10)
+        .setDiskMb(100)
+        .setRamMb(200);
+    expectAuth(ROOT, true);
+    quotaManager.saveQuota(ROLE, IQuota.build(quota));
+    expectLastCall().andThrow(new QuotaManager.QuotaException("fail"));
+
+    control.replay();
+
+    Response response = thrift.setQuota(ROLE, quota, SESSION);
+    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test
@@ -446,7 +469,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setRamMb(200);
     expectAuth(ROOT, false);
     expectAuth(Capability.PROVISIONER, true);
-    storageUtil.quotaStore.saveQuota(ROLE, IQuota.build(quota));
+    quotaManager.saveQuota(ROLE, IQuota.build(quota));
 
     control.replay();
 
@@ -1317,6 +1340,20 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Response response = thrift.releaseLock(LOCK.newBuilder(), CHECKED, SESSION);
     assertEquals(ResponseCode.LOCK_ERROR, response.getResponseCode());
+  }
+
+  @Test
+  public void testGetQuota() throws Exception {
+    QuotaInfo infoMock = createMock(QuotaInfo.class);
+    expect(quotaManager.getQuotaInfo(ROLE)).andReturn(infoMock);
+    expect(infoMock.guota()).andReturn(QUOTA);
+    expect(infoMock.prodConsumption()).andReturn(CONSUMED);
+    control.replay();
+
+    Response response = thrift.getQuota(ROLE);
+    assertEquals(ResponseCode.OK, response.getResponseCode());
+    assertEquals(QUOTA.newBuilder(), response.getResult().getGetQuotaResult().getQuota());
+    assertEquals(CONSUMED.newBuilder(), response.getResult().getGetQuotaResult().getConsumed());
   }
 
   private static JobConfiguration makeJob() {

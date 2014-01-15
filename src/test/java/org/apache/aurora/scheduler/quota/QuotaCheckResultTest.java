@@ -19,12 +19,12 @@ import org.apache.aurora.gen.Quota;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.INSUFFICIENT_QUOTA;
-import static org.apache.aurora.scheduler.quota.QuotaComparisonResult.Result.SUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-public class QuotaComparisonResultTest {
+public class QuotaCheckResultTest {
 
   @Test
   public void testGreaterOrEqualPass() {
@@ -36,7 +36,7 @@ public class QuotaComparisonResultTest {
             .setNumCpus(1.0)
             .setRamMb(256L)
             .setDiskMb(512L));
-    assertEquals(SUFFICIENT_QUOTA, QuotaComparisonResult.greaterOrEqual(quota, request).result());
+    assertEquals(SUFFICIENT_QUOTA, QuotaCheckResult.greaterOrEqual(quota, request).getResult());
   }
 
   @Test
@@ -49,9 +49,9 @@ public class QuotaComparisonResultTest {
             .setNumCpus(2.0)
             .setRamMb(256L)
             .setDiskMb(512L));
-    QuotaComparisonResult result = QuotaComparisonResult.greaterOrEqual(quota, request);
-    assertEquals(INSUFFICIENT_QUOTA, result.result());
-    assertTrue(result.details().contains("CPU"));
+    QuotaCheckResult result = QuotaCheckResult.greaterOrEqual(quota, request);
+    assertEquals(INSUFFICIENT_QUOTA, result.getResult());
+    assertTrue(result.getDetails().get().contains("CPU"));
   }
 
   @Test
@@ -64,10 +64,10 @@ public class QuotaComparisonResultTest {
             .setNumCpus(1.0)
             .setRamMb(512L)
             .setDiskMb(512L));
-    QuotaComparisonResult result = QuotaComparisonResult.greaterOrEqual(quota, request);
-    assertEquals(INSUFFICIENT_QUOTA, result.result());
-    assertTrue(result.details().length() > 0);
-    assertTrue(result.details().contains("RAM"));
+    QuotaCheckResult result = QuotaCheckResult.greaterOrEqual(quota, request);
+    assertEquals(INSUFFICIENT_QUOTA, result.getResult());
+    assertTrue(result.getDetails().get().length() > 0);
+    assertTrue(result.getDetails().get().contains("RAM"));
   }
 
   @Test
@@ -80,9 +80,9 @@ public class QuotaComparisonResultTest {
             .setNumCpus(1.0)
             .setRamMb(256L)
             .setDiskMb(1024L));
-    QuotaComparisonResult result = QuotaComparisonResult.greaterOrEqual(quota, request);
-    assertEquals(INSUFFICIENT_QUOTA, result.result());
-    assertTrue(result.details().length() > 0);
-    assertTrue(result.details().contains("DISK"));
+    QuotaCheckResult result = QuotaCheckResult.greaterOrEqual(quota, request);
+    assertEquals(INSUFFICIENT_QUOTA, result.getResult());
+    assertTrue(result.getDetails().get().length() > 0);
+    assertTrue(result.getDetails().get().contains("DISK"));
   }
 }

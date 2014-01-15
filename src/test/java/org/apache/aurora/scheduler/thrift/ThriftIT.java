@@ -34,6 +34,7 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Quota;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.scheduler.cron.CronScheduler;
+import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.SchedulerCore;
@@ -66,6 +67,7 @@ public class ThriftIT extends EasyMockTest {
   private AuroraAdmin.Iface thrift;
   private StorageTestUtil storageTestUtil;
   private SessionContext context;
+  private QuotaManager quotaManager;
 
   private final SessionValidator validator = new SessionValidator() {
     @Override public SessionContext checkAuthenticated(
@@ -120,6 +122,7 @@ public class ThriftIT extends EasyMockTest {
   @Before
   public void setUp() {
     context = createMock(SessionContext.class);
+    quotaManager = createMock(QuotaManager.class);
     createThrift(CAPABILITIES);
   }
 
@@ -146,6 +149,7 @@ public class ThriftIT extends EasyMockTest {
             bind(Storage.class).toInstance(storageTestUtil.storage);
             bindMock(StorageBackup.class);
             bindMock(ThriftConfiguration.class);
+            bind(QuotaManager.class).toInstance(quotaManager);
             bind(SessionValidator.class).toInstance(validator);
             bind(CapabilityValidator.class).toInstance(new CapabilityValidatorFake(validator));
           }
@@ -163,8 +167,7 @@ public class ThriftIT extends EasyMockTest {
 
   @Test
   public void testProvisionAccess() throws Exception {
-    storageTestUtil.expectOperations();
-    storageTestUtil.quotaStore.saveQuota(USER, QUOTA);
+    quotaManager.saveQuota(USER, QUOTA);
     expectLastCall().times(2);
 
     control.replay();

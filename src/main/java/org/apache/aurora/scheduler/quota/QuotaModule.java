@@ -20,7 +20,6 @@ import javax.inject.Singleton;
 import com.google.inject.AbstractModule;
 
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
-import org.apache.aurora.scheduler.state.JobFilter;
 import org.apache.aurora.scheduler.storage.Storage;
 
 /**
@@ -34,8 +33,5 @@ public class QuotaModule extends AbstractModule {
 
     bind(QuotaManager.class).to(QuotaManagerImpl.class);
     bind(QuotaManagerImpl.class).in(Singleton.class);
-
-    bind(JobFilter.class).to(QuotaFilter.class);
-    bind(QuotaFilter.class).in(Singleton.class);
   }
 }

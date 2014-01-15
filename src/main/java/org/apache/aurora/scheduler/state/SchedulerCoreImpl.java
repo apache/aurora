@@ -43,6 +43,8 @@ import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
+import org.apache.aurora.scheduler.quota.QuotaCheckResult;
+import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -57,6 +59,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.scheduler.base.Tasks.ACTIVE_STATES;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 
 /**
  * Implementation of the scheduler core.
@@ -79,7 +82,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   private final StateManager stateManager;
 
   private final TaskIdGenerator taskIdGenerator;
-  private final JobFilter jobFilter;
+  private final QuotaManager quotaManager;
 
   /**
    * Creates a new core scheduler.
@@ -89,7 +92,7 @@ class SchedulerCoreImpl implements SchedulerCore {
    * @param immediateScheduler Immediate scheduler.
    * @param stateManager Persistent state manager.
    * @param taskIdGenerator Task ID generator.
-   * @param jobFilter Job filter.
+   * @param quotaManager Quota manager.
    */
   @Inject
   public SchedulerCoreImpl(
@@ -98,7 +101,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       ImmediateJobManager immediateScheduler,
       StateManager stateManager,
       TaskIdGenerator taskIdGenerator,
-      JobFilter jobFilter) {
+      QuotaManager quotaManager) {
 
     this.storage = checkNotNull(storage);
 
@@ -108,7 +111,7 @@ class SchedulerCoreImpl implements SchedulerCore {
     this.cronScheduler = cronScheduler;
     this.stateManager = checkNotNull(stateManager);
     this.taskIdGenerator = checkNotNull(taskIdGenerator);
-    this.jobFilter = checkNotNull(jobFilter);
+    this.quotaManager = checkNotNull(quotaManager);
   }
 
   private boolean hasActiveJob(IJobConfiguration job) {
@@ -123,30 +126,38 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void createJob(SanitizedConfiguration sanitizedConfiguration)
+  public synchronized void createJob(final SanitizedConfiguration sanitizedConfiguration)
       throws ScheduleException {
 
-    IJobConfiguration job = sanitizedConfiguration.getJobConfig();
-    if (hasActiveJob(job)) {
-      throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
-    }
+    storage.write(new MutateWork.NoResult<ScheduleException>() {
+      @Override protected void execute(MutableStoreProvider storeProvider)
+          throws ScheduleException {
 
-    runJobFilters(job.getKey(), job.getTaskConfig(), job.getInstanceCount(), false);
+        final IJobConfiguration job = sanitizedConfiguration.getJobConfig();
+        if (hasActiveJob(job)) {
+          throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
+        }
 
-    boolean accepted = false;
-    for (final JobManager manager : jobManagers) {
-      if (manager.receiveJob(sanitizedConfiguration)) {
-        LOG.info("Job accepted by manager: " + manager.getUniqueKey());
-        accepted = true;
-        break;
+        validateTaskLimits(job.getTaskConfig(), job.getInstanceCount());
+
+        boolean accepted = false;
+        // TODO(wfarner): Remove the JobManager abstraction, and directly invoke addInstances
+        // here for non-cron jobs.
+        for (final JobManager manager : jobManagers) {
+          if (manager.receiveJob(sanitizedConfiguration)) {
+            LOG.info("Job accepted by manager: " + manager.getUniqueKey());
+            accepted = true;
+            break;
+          }
+        }
+
+        if (!accepted) {
+          LOG.severe("Job was not accepted by any of the configured schedulers, discarding.");
+          LOG.severe("Discarded job: " + job);
+          throw new ScheduleException("Job not accepted, discarding.");
+        }
       }
-    }
-
-    if (!accepted) {
-      LOG.severe("Job was not accepted by any of the configured schedulers, discarding.");
-      LOG.severe("Discarded job: " + job);
-      throw new ScheduleException("Job not accepted, discarding.");
-    }
+    });
   }
 
   // This number is derived from the maximum file name length limit on most UNIX systems, less
@@ -155,31 +166,32 @@ class SchedulerCoreImpl implements SchedulerCore {
   @VisibleForTesting
   static final int MAX_TASK_ID_LENGTH = 255 - 90;
 
-  // TODO(maximk): Consider a better approach to quota checking. MESOS-4476.
-  private void runJobFilters(IJobKey jobKey, ITaskConfig task, int count, boolean incremental)
+  /**
+   * Validates task specific requirements including name, count and quota checks.
+   * Must be performed inside of a write storage transaction along with state mutation change
+   * to avoid any data race conditions.
+   *
+   * @param task Task configuration.
+   * @param instances Number of task instances
+   * @throws ScheduleException If validation fails.
+   */
+  private void validateTaskLimits(ITaskConfig task, int instances)
       throws ScheduleException {
-
-    int instanceCount = count;
-    if (incremental) {
-      instanceCount +=
-          Storage.Util.weaklyConsistentFetchTasks(storage, Query.jobScoped(jobKey).active()).size();
-    }
 
     // TODO(maximk): This is a short-term hack to stop the bleeding from
     //               https://issues.apache.org/jira/browse/MESOS-691
-    if (taskIdGenerator.generate(task, instanceCount).length() > MAX_TASK_ID_LENGTH) {
+    if (taskIdGenerator.generate(task, instances).length() > MAX_TASK_ID_LENGTH) {
       throw new ScheduleException(
           "Task ID is too long, please shorten your role or job name.");
     }
 
-    JobFilter.JobFilterResult filterResult = jobFilter.filter(task, instanceCount);
-    // TODO(maximk): Consider deprecating JobFilterResult in favor of custom exception.
-    if (!filterResult.isPass()) {
-      throw new ScheduleException(filterResult.getReason());
+    if (instances > MAX_TASKS_PER_JOB.get()) {
+      throw new ScheduleException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
     }
 
-    if (instanceCount > MAX_TASKS_PER_JOB.get()) {
-      throw new ScheduleException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
+    QuotaCheckResult quotaCheck = quotaManager.checkQuota(task, instances);
+    if (quotaCheck.getResult() == INSUFFICIENT_QUOTA) {
+      throw new ScheduleException("Insufficient resource quota: " + quotaCheck.getDetails());
     }
   }
 
@@ -188,7 +200,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       throws ScheduleException {
 
     IJobConfiguration job = sanitizedConfiguration.getJobConfig();
-    runJobFilters(job.getKey(), job.getTaskConfig(), job.getInstanceCount(), false);
+    validateTaskLimits(job.getTaskConfig(), job.getInstanceCount());
   }
 
   @Override
@@ -197,11 +209,11 @@ class SchedulerCoreImpl implements SchedulerCore {
       final ImmutableSet<Integer> instanceIds,
       final ITaskConfig config) throws ScheduleException {
 
-    runJobFilters(jobKey, config, instanceIds.size(), true);
     storage.write(new MutateWork.NoResult<ScheduleException>() {
-      @Override
-      protected void execute(MutableStoreProvider storeProvider)
+      @Override protected void execute(MutableStoreProvider storeProvider)
           throws ScheduleException {
+
+        validateTaskLimits(config, instanceIds.size());
 
         ImmutableSet<IScheduledTask> tasks =
             storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active());

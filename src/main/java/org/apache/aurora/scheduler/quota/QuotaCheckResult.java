@@ -16,15 +16,33 @@
 package org.apache.aurora.scheduler.quota;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.storage.entities.IQuota;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Calculates and formats detailed quota comparison result.
  */
-class QuotaComparisonResult {
+public class QuotaCheckResult {
 
-  private enum Resource {
+  /**
+   * Quota check result.
+   */
+  public static enum Result {
+    /**
+     * There is sufficient quota for the requested operation.
+     */
+    SUFFICIENT_QUOTA,
+
+    /**
+     * There is not enough allocated quota for the requested operation.
+     */
+    INSUFFICIENT_QUOTA
+  }
+
+  private static enum Resource {
     CPU("core(s)"),
     RAM("MB"),
     DISK("MB");
@@ -35,37 +53,46 @@ class QuotaComparisonResult {
     }
   }
 
-  enum Result {
-    SUFFICIENT_QUOTA,
-    INSUFFICIENT_QUOTA
-  }
-
-  private final String details;
+  private final Optional<String> details;
   private final Result result;
 
   @VisibleForTesting
-  QuotaComparisonResult(Result result, String details) {
-    this.result = result;
-    this.details = details;
+  public QuotaCheckResult(Result result) {
+    this(result, Optional.<String>absent());
   }
 
-  Result result() {
+  private QuotaCheckResult(Result result, Optional<String> details) {
+    this.result = checkNotNull(result);
+    this.details = checkNotNull(details);
+  }
+
+  /**
+   * Gets quota check result.
+   *
+   * @return Quota check result.
+   */
+  public Result getResult() {
     return result;
   }
 
-  String details() {
+  /**
+   * Gets detailed quota violation description in case quota check fails.
+   *
+   * @return Quota check details.
+   */
+  public Optional<String> getDetails() {
     return details;
   }
 
-  static QuotaComparisonResult greaterOrEqual(IQuota a, IQuota b) {
+  static QuotaCheckResult greaterOrEqual(IQuota a, IQuota b) {
     StringBuilder details = new StringBuilder();
     boolean result = compare(a.getNumCpus(), b.getNumCpus(), Resource.CPU, details)
         & compare(a.getRamMb(), b.getRamMb(), Resource.RAM, details)
         & compare(a.getDiskMb(), b.getDiskMb(), Resource.DISK, details);
 
-    return new QuotaComparisonResult(
+    return new QuotaCheckResult(
         result ? Result.SUFFICIENT_QUOTA : Result.INSUFFICIENT_QUOTA,
-        details.toString());
+        Optional.of(details.toString()));
   }
 
   private static boolean compare(

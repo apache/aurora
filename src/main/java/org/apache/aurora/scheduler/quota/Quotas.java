@@ -15,16 +15,10 @@
  */
 package org.apache.aurora.scheduler.quota;
 
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
 
 import org.apache.aurora.gen.Quota;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Convenience class for normalizing resource measures between tasks and offers.
@@ -43,79 +37,6 @@ public final class Quotas {
    */
   public static IQuota noQuota() {
     return NO_QUOTA;
-  }
-
-  /**
-   * Determines the amount of quota required for a set of job tasks.
-   *
-   * @param taskConfig Task template to count quota from.
-   * @return Quota requirement to run {@code job}.
-   */
-  public static IQuota fromTasks(ITaskConfig taskConfig, int instanceCount) {
-    return scale(fromProductionTasks(ImmutableSet.of(taskConfig)), instanceCount);
-  }
-
-  // TODO(Suman Karumuri): Refactor this function in to a new class.
-  // TODO(Suman Karumuri): Rename Quota to something more meaningful (ex: ResourceAggregate)
-  /**
-   * Determines the amount of quota required for production tasks among {@code tasks}.
-   *
-   * @param tasks Tasks to count quota from.
-   * @return Quota requirement to run {@code tasks}.
-   */
-  public static IQuota fromProductionTasks(Iterable<ITaskConfig> tasks) {
-    checkNotNull(tasks);
-
-    return fromTasks(Iterables.filter(tasks, Tasks.IS_PRODUCTION));
-  }
-
-  /**
-   * Determines the amount of quota required for the given tasks.
-   *
-   * @param tasks Tasks to count quota from.
-   * @return Quota requirement to run {@code tasks}.
-   */
-  public static IQuota fromTasks(Iterable<ITaskConfig> tasks) {
-    double cpu = 0;
-    int ramMb = 0;
-    int diskMb = 0;
-    for (ITaskConfig task : tasks) {
-      cpu += task.getNumCpus();
-      ramMb += task.getRamMb();
-      diskMb += task.getDiskMb();
-    }
-
-    return IQuota.build(new Quota()
-        .setNumCpus(cpu)
-        .setRamMb(ramMb)
-        .setDiskMb(diskMb));
-  }
-
-  /**
-   * a >= b
-   */
-  public static QuotaComparisonResult greaterOrEqual(IQuota a, IQuota b) {
-    return QuotaComparisonResult.greaterOrEqual(a, b);
-  }
-
-  /**
-   * a + b
-   */
-  public static IQuota add(IQuota a, IQuota b) {
-    return IQuota.build(new Quota()
-        .setNumCpus(a.getNumCpus() + b.getNumCpus())
-        .setRamMb(a.getRamMb() + b.getRamMb())
-        .setDiskMb(a.getDiskMb() + b.getDiskMb()));
-  }
-
-  /**
-   * a - b
-   */
-  public static IQuota subtract(IQuota a, IQuota b) {
-    return IQuota.build(new Quota()
-        .setNumCpus(a.getNumCpus() - b.getNumCpus())
-        .setRamMb(a.getRamMb() - b.getRamMb())
-        .setDiskMb(a.getDiskMb() - b.getDiskMb()));
   }
 
   /**
@@ -140,16 +61,5 @@ public final class Quotas {
         (double) a.getRamMb() / b.getRamMb(),
         (double) a.getDiskMb() / b.getDiskMb()
     ).intValue();
-  }
-
-  /**
-   * sum(qs)
-   */
-  public static IQuota sum(Iterable<IQuota> qs) {
-    IQuota sum = noQuota();
-    for (IQuota q : qs) {
-      sum = Quotas.add(sum, q);
-    }
-    return sum;
   }
 }
