@@ -330,7 +330,7 @@ def scheduler_print_recovery_tasks(cluster):
       TaskQuery(statuses=ACTIVE_STATES))
   check_and_log_response(resp)
   log.info('Role\tJob\tShard\tStatus\tTask ID')
-  for task in resp.tasks:
+  for task in resp.result.queryRecoveryResult.tasks:
     assigned = task.assignedTask
     conf = assigned.task
     log.info('\t'.join((conf.owner.role,
