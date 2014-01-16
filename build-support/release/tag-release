@@ -46,7 +46,8 @@ cat <<EOF
 !! Looks like something failed. That's okay, the world doesn't need to know.
 
 To roll back your local repo you might need to run:
-  git reset --hard master $current_rev
+  git checkout master
+  git reset --hard $current_rev
   git tag -d $new_tagged_version
   git branch -D $release_branch_name
 EOF
@@ -67,7 +68,8 @@ git add .auroraversion
 git commit -m "aurora-$new_tagged_version release."
 
 echo == Creating tag $new_tagged_version.
-git tag -s -m "aurora-$new_tagged_version release." $new_tagged_version
+git tag -u `git config user.email` -s -m "aurora-$new_tagged_version release." $new_tagged_version
+
 
 cat <<EOF
 == Tag created.
