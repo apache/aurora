@@ -123,9 +123,9 @@ class TestJobStatus(AuroraClientCommandTest):
     # Wildcard should have expanded to two jobs, so there should be two calls
     # to check_status.
     assert mock_api.check_status.call_count == 2
-    assert (call(AuroraJobKey('example', 'RoleA', 'test', 'hithere')) in
+    assert (call(AuroraJobKey('west', 'RoleA', 'test', 'hithere')) in
         mock_api.check_status.call_args_list)
-    assert (call(AuroraJobKey('example', 'bozo', 'test', 'hello')) in
+    assert (call(AuroraJobKey('west', 'bozo', 'test', 'hello')) in
         mock_api.check_status.call_args_list)
 
   def test_status_wildcard_two(self):
