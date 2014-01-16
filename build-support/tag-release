@@ -1,0 +1,81 @@
+#!/bin/bash
+# Cuts a release tag (non -snapshot) from the current master and prints instructions for publishing
+# it. The generated tag object is PGP-signed. Given a current master on 0.3.0-snapshot it will
+# create a git history that looks like this:
+# master~1 (0.3.0-snapshot) ----- master (0.4.0-snapshot)
+#                            \--- release-0.4.0 (0.4.0) tag: 0.4.0 (0.4.0)
+set -o errexit
+set -o nounset
+
+if [[ -n "`git status --porcelain`" ]]; then
+  echo "!! Please run from a clean master."
+  exit 1
+elif [[ "`git rev-parse --abbrev-ref HEAD`" != master ]]; then
+  echo "!! This script must be run from master."
+  exit 1
+elif [[ "`git rev-parse --show-toplevel`" != "$PWD" ]]; then
+  echo "!! This script must be run from the root of the repository."
+  exit 1
+fi
+
+echo == Updating to latest master.
+git pull
+git fetch --tags
+
+current_version=$(cat .auroraversion | tr '[a-z]' '[A-Z]')
+if ! [[ $current_version =~ .*-SNAPSHOT ]]; then
+  echo "!! This is not a SNAPSHOT branch (.auroraversion is $current_version)."
+  exit 1
+else
+  major=`echo $current_version | cut -d. -f1`
+  minor=`echo $current_version | cut -d. -f2`
+  patch=`echo $current_version | cut -d. -f3 | cut -d- -f1`
+  new_tagged_version="$major.$minor.$patch"
+  new_snapshot_version="$major.$((minor + 1)).$patch-SNAPSHOT"
+  release_branch_name="release-$major.$minor.x"
+fi
+
+if git rev-parse $new_tagged_version >/dev/null 2>&1; then
+  echo "Tag $new_tagged_version already exists, aborting."
+  exit 1
+fi
+
+current_rev=`git rev-parse HEAD`
+function print_rollback_instructions {
+cat <<EOF
+!! Looks like something failed. That's okay, the world doesn't need to know.
+
+To roll back your local repo you might need to run:
+  git reset --hard master $current_rev
+  git tag -d $new_tagged_version
+  git branch -D $release_branch_name
+EOF
+}
+trap print_rollback_instructions EXIT
+
+echo == Incrementing snapshot version on master.
+echo $new_snapshot_version > .auroraversion
+git add .auroraversion
+git commit -m "Incrementing snapshot version from $current_version to $new_snapshot_version."
+
+echo == Creating $release_branch_name branch.
+git checkout -b $release_branch_name $current_rev
+
+echo == Committing updated .auroraversion.
+echo $new_tagged_version > .auroraversion
+git add .auroraversion
+git commit -m "aurora-$new_tagged_version release."
+
+echo == Creating tag $new_tagged_version.
+git tag -s -m "aurora-$new_tagged_version release." $new_tagged_version
+
+cat <<EOF
+== Tag created.
+
+After you've verified that everything looks good, publish the new tag by running:
+  git push origin master
+  git push $new_tagged_version master
+EOF
+trap '' EXIT # Unset error message handler.
+
+exit 0
