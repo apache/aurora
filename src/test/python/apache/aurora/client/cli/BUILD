@@ -14,12 +14,11 @@ python_library(
 
 python_tests(
   name = 'job',
-  sources = [ 'test_create.py', 'test_kill.py', 'test_status.py' ],
+  sources = [ 'test_create.py', 'test_kill.py', 'test_status.py', 'test_diff.py' ],
   dependencies = [
     pants(':util'),
     pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),
     pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
-    pants('src/main/python/apache/aurora/client/cli'),
     pants('src/main/python/apache/aurora/client/cli'),
     pants('src/test/python/apache/aurora/client/commands:util')
   ]

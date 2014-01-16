@@ -23,7 +23,6 @@ from mock import call, Mock, patch
 
 
 class TestJobStatus(AuroraClientCommandTest):
-
   @classmethod
   def create_mock_scheduled_tasks(cls):
     jobs = []
@@ -116,7 +115,8 @@ class TestJobStatus(AuroraClientCommandTest):
     mock_api.check_status.return_value = self.create_status_response()
     mock_api.get_jobs.return_value = self.create_getjobs_response()
     with contextlib.nested(
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.cli.context.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', '*'])
 

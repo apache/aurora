@@ -8,18 +8,13 @@ import sys
 from tempfile import NamedTemporaryFile
 
 from apache.aurora.client.api.job_monitor import JobMonitor
-
-from gen.apache.aurora.constants import ACTIVE_STATES
-from gen.apache.aurora.ttypes import ResponseCode, ScheduleStatus
-
-from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER,
     EXIT_OK,
     Noun,
-    Verb
+    Verb,
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
@@ -27,9 +22,16 @@ from apache.aurora.client.cli.options import (
     BROWSER_OPTION,
     CONFIG_ARGUMENT,
     JOBSPEC_ARGUMENT,
-    JSON_OPTION
+    JSON_OPTION,
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
+
+from gen.apache.aurora.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME
+from gen.apache.aurora.ttypes import (
+    ExecutorConfig,
+    ResponseCode,
+    ScheduleStatus,
+)
 
 from pystachio.config import Config
 from thrift.TSerialization import serialize
