@@ -30,6 +30,7 @@ import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
+import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.SchedulerDriver;
@@ -40,6 +41,7 @@ import org.junit.Test;
 
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.fail;
 
 public class SchedulerLifecycleTest extends EasyMockTest {
@@ -85,7 +87,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   }
 
   @Test
-  public void testAutoFailover() throws Throwable {
+  public void testAutoFailover() throws Exception {
     // Test that when timed failover is initiated, cleanup is done in a way that should allow the
     // application to tear down cleanly.  Specifically, neglecting to call leaderControl.leave()
     // can result in a lame duck scheduler process.
@@ -121,7 +123,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   }
 
   @Test
-  public void testDefeatedBeforeRegistered() throws Throwable {
+  public void testDefeatedBeforeRegistered() throws Exception {
     storageUtil.storage.prepare();
     storageUtil.storage.start(EasyMock.<Quiet>anyObject());
     storageUtil.expectOperations();
@@ -143,5 +145,30 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     LeadershipListener leaderListener = schedulerLifecycle.prepare();
     leaderListener.onLeading(leaderControl);
     leaderListener.onDefeated(null);
+  }
+
+  @Test
+  public void testStorageStartFails() throws Exception {
+    storageUtil.storage.prepare();
+
+    storageUtil.expectOperations();
+    storageUtil.storage.start(EasyMock.<Quiet>anyObject());
+    expectLastCall().andThrow(new StorageException("Recovery failed."));
+
+    leaderControl.leave();
+    driver.stop();
+    storageUtil.storage.stop();
+    shutdownRegistry.execute();
+
+    control.replay();
+
+    LeadershipListener leaderListener = schedulerLifecycle.prepare();
+
+    try {
+      leaderListener.onLeading(leaderControl);
+      fail();
+    } catch (StorageException e) {
+      // Expected.
+    }
   }
 }

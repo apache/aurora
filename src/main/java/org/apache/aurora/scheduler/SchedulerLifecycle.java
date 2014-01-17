@@ -224,13 +224,8 @@ public class SchedulerLifecycle implements EventSubscriber {
 
     final Closure<Transition<State>> prepareStorage = new Closure<Transition<State>>() {
       @Override public void execute(Transition<State> transition) {
-        try {
-          storage.prepare();
-          stateMachine.transition(State.STORAGE_PREPARED);
-        } catch (RuntimeException e) {
-          stateMachine.transition(State.DEAD);
-          throw e;
-        }
+        storage.prepare();
+        stateMachine.transition(State.STORAGE_PREPARED);
       }
     };
 
@@ -365,18 +360,18 @@ public class SchedulerLifecycle implements EventSubscriber {
         .initialState(State.IDLE)
         .logTransitions()
         .addState(
-            Closures.filter(NOT_DEAD, prepareStorage),
+            dieOnError(Closures.filter(NOT_DEAD, prepareStorage)),
             State.IDLE,
             State.PREPARING_STORAGE, State.DEAD)
         .addState(
             State.PREPARING_STORAGE,
             State.STORAGE_PREPARED, State.DEAD)
         .addState(
-            Closures.filter(NOT_DEAD, handleLeading),
+            dieOnError(Closures.filter(NOT_DEAD, handleLeading)),
             State.STORAGE_PREPARED,
             State.LEADER_AWAITING_REGISTRATION, State.DEAD)
         .addState(
-            Closures.filter(NOT_DEAD, handleRegistered),
+            dieOnError(Closures.filter(NOT_DEAD, handleRegistered)),
             State.LEADER_AWAITING_REGISTRATION,
             State.REGISTERED_LEADER, State.DEAD)
         .addState(
@@ -395,6 +390,19 @@ public class SchedulerLifecycle implements EventSubscriber {
         .build();
 
     this.leadershipListener = new SchedulerCandidateImpl(stateMachine, leaderControl);
+  }
+
+  private Closure<Transition<State>> dieOnError(final Closure<Transition<State>> closure) {
+    return new Closure<Transition<State>>() {
+      @Override public void execute(Transition<State> transition) {
+        try {
+          closure.execute(transition);
+        } catch (RuntimeException e) {
+          stateMachine.transition(State.DEAD);
+          throw e;
+        }
+      }
+    };
   }
 
   /**

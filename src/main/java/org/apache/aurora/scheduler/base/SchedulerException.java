@@ -17,6 +17,8 @@ package org.apache.aurora.scheduler.base;
 
 /**
  * Indicates some form of unexpected scheduler exception.
+ * TOOO(wfarner): This really should be a checked exception, or the semantics of its
+ * use should change.
  */
 public class SchedulerException extends RuntimeException {
   public SchedulerException(String message) {
