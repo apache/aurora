@@ -33,24 +33,27 @@ class AuroraClientCommandTest(unittest.TestCase):
   @classmethod
   def create_mock_api(cls):
     """Builds up a mock API object, with a mock SchedulerProxy"""
+    # This looks strange, but we set up the same object to use as both
+    # the SchedulerProxy and the SchedulerClient. These tests want to observe
+    # what API calls get made against the scheduler, and both of these objects
+    # delegate calls to the scheduler. It doesn't matter which one is used:
+    # what we care about is that the right API calls get made.
     mock_api = Mock(spec=HookedAuroraClientAPI)
-    mock_scheduler = Mock()
-    mock_scheduler.url = "http://something_or_other"
-    mock_scheduler_client = Mock()
-    mock_scheduler_client.scheduler.return_value = mock_scheduler
-    mock_scheduler_client.url = "http://something_or_other"
+    mock_scheduler_proxy = Mock()
+    mock_scheduler_proxy.url = "http://something_or_other"
+    mock_scheduler_proxy.scheduler_client.return_value = mock_scheduler_proxy
     mock_api = Mock(spec=HookedAuroraClientAPI)
-    mock_api.scheduler = mock_scheduler_client
-    return (mock_api, mock_scheduler_client)
+    mock_api.scheduler_proxy = mock_scheduler_proxy
+    return (mock_api, mock_scheduler_proxy)
 
   @classmethod
   def create_mock_api_factory(cls):
     """Create a collection of mocks for a test that wants to mock out the client API
     by patching the api factory."""
-    mock_api, mock_scheduler_client = cls.create_mock_api()
+    mock_api, mock_scheduler_proxy = cls.create_mock_api()
     mock_api_factory = Mock()
     mock_api_factory.return_value = mock_api
-    return mock_api_factory, mock_scheduler_client
+    return mock_api_factory, mock_scheduler_proxy
 
   FAKE_TIME = 42131
 

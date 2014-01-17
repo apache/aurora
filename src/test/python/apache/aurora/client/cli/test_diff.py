@@ -93,14 +93,14 @@ class TestDiffCommand(AuroraClientCommandTest):
 
   def test_successful_diff(self):
     """Test the diff command."""
-    (mock_api, mock_scheduler) = self.setup_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('subprocess.call', return_value=0),
         patch('json.loads', return_value=Mock())) as (_, _, subprocess_patch, _):
-      mock_scheduler.getTasksStatus.return_value = self.create_status_response()
-      self.setup_populate_job_config(mock_scheduler)
+      mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
+      self.setup_populate_job_config(mock_scheduler_proxy)
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -108,12 +108,12 @@ class TestDiffCommand(AuroraClientCommandTest):
         cmd.execute(['job', 'diff', 'west/bozo/test/hello', fp.name])
 
         # Diff should get the task status, populate a config, and run diff.
-        mock_scheduler.getTasksStatus.assert_called_with(
+        mock_scheduler_proxy.getTasksStatus.assert_called_with(
             TaskQuery(jobName='hello', environment='test', owner=Identity(role='bozo'),
                 statuses=ACTIVE_STATES))
-        assert mock_scheduler.populateJobConfig.call_count == 1
-        assert isinstance(mock_scheduler.populateJobConfig.call_args[0][0], JobConfiguration)
-        assert (mock_scheduler.populateJobConfig.call_args[0][0].key ==
+        assert mock_scheduler_proxy.populateJobConfig.call_count == 1
+        assert isinstance(mock_scheduler_proxy.populateJobConfig.call_args[0][0], JobConfiguration)
+        assert (mock_scheduler_proxy.populateJobConfig.call_args[0][0].key ==
             JobKey(environment=u'test', role=u'bozo', name=u'hello'))
         # Subprocess should have been used to invoke diff with two parameters.
         assert subprocess_patch.call_count == 1
@@ -123,11 +123,11 @@ class TestDiffCommand(AuroraClientCommandTest):
   def test_diff_invalid_config(self):
     """Test the diff command if the user passes a config with an error in it."""
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.create_mock_api()
-    mock_scheduler.getTasksStatus.return_value = self.create_status_response()
-    self.setup_populate_job_config(mock_scheduler)
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
+    self.setup_populate_job_config(mock_scheduler_proxy)
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('subprocess.call', return_value=0),
@@ -143,18 +143,18 @@ class TestDiffCommand(AuroraClientCommandTest):
         cmd = AuroraCommandLine()
         result = cmd.execute(['job', 'diff', 'west/bozo/test/hello', fp.name])
         assert result == EXIT_INVALID_CONFIGURATION
-        assert mock_scheduler.getTasksStatus.call_count == 0
-        assert mock_scheduler.populateJobConfig.call_count == 0
+        assert mock_scheduler_proxy.getTasksStatus.call_count == 0
+        assert mock_scheduler_proxy.populateJobConfig.call_count == 0
         assert subprocess_patch.call_count == 0
 
   def test_diff_server_error(self):
     """Test the diff command if the user passes a config with an error in it."""
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.create_mock_api()
-    mock_scheduler.getTasksStatus.return_value = self.create_failed_status_response()
-    self.setup_populate_job_config(mock_scheduler)
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_failed_status_response()
+    self.setup_populate_job_config(mock_scheduler_proxy)
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('subprocess.call', return_value=0),
@@ -172,8 +172,8 @@ class TestDiffCommand(AuroraClientCommandTest):
         assert result == EXIT_INVALID_PARAMETER
         # In this error case, we should have called the server getTasksStatus;
         # but since it fails, we shouldn't call populateJobConfig or subprocess.
-        mock_scheduler.getTasksStatus.assert_called_with(
+        mock_scheduler_proxy.getTasksStatus.assert_called_with(
             TaskQuery(jobName='hello', environment='test', owner=Identity(role='bozo'),
                 statuses=ACTIVE_STATES))
-        assert mock_scheduler.populateJobConfig.call_count == 0
+        assert mock_scheduler_proxy.populateJobConfig.call_count == 0
         assert subprocess_patch.call_count == 0

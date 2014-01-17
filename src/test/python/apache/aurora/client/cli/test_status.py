@@ -97,14 +97,14 @@ class TestJobStatus(AuroraClientCommandTest):
   def test_successful_status_deep(self):
     """Test the status command more deeply: in a request with a fully specified
     job, it should end up doing a query using getTasksStatus."""
-    (mock_api, mock_scheduler) = self.setup_mock_api()
-    mock_scheduler.query.return_value = self.create_status_response()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.query.return_value = self.create_status_response()
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
-      mock_scheduler.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='bozo')))
 
   def test_status_wildcard(self):
@@ -123,10 +123,17 @@ class TestJobStatus(AuroraClientCommandTest):
     # Wildcard should have expanded to two jobs, so there should be two calls
     # to check_status.
     assert mock_api.check_status.call_count == 2
-    assert (call(AuroraJobKey('west', 'RoleA', 'test', 'hithere')) in
-        mock_api.check_status.call_args_list)
-    assert (call(AuroraJobKey('west', 'bozo', 'test', 'hello')) in
-        mock_api.check_status.call_args_list)
+
+    assert mock_api.check_status.call_args_list[0][0][0].cluster == 'west'
+    assert mock_api.check_status.call_args_list[0][0][0].role == 'RoleA'
+    assert mock_api.check_status.call_args_list[0][0][0].env == 'test'
+    assert mock_api.check_status.call_args_list[0][0][0].name == 'hithere'
+
+    assert mock_api.check_status.call_args_list[1][0][0].cluster == 'west'
+    assert mock_api.check_status.call_args_list[1][0][0].role == 'bozo'
+    assert mock_api.check_status.call_args_list[1][0][0].env == 'test'
+    assert mock_api.check_status.call_args_list[1][0][0].name == 'hello'
+
 
   def test_status_wildcard_two(self):
     """Test status using a wildcard. It should first call api.get_jobs, and then do a
@@ -149,11 +156,10 @@ class TestJobStatus(AuroraClientCommandTest):
   def test_unsuccessful_status_shallow(self):
     """Test the status command at the shallowest level: calling status should end up invoking
     the local APIs get_status method."""
-    # Calls api.check_status, which calls scheduler.getJobs
+    # Calls api.check_status, which calls scheduler_proxy.getJobs
     mock_context = FakeAuroraCommandContext()
     mock_api = mock_context.get_api('west')
     mock_api.check_status.return_value = self.create_failed_status_response()
-    #    mock_api.scheduler.getTasksStatus.return_value =
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       cmd = AuroraCommandLine()

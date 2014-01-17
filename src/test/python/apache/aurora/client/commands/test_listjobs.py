@@ -43,10 +43,10 @@ class TestListJobs(AuroraClientCommandTest):
   def test_successful_listjobs(self):
     """Test the list_jobs command."""
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.create_mock_api()
-    mock_scheduler.getJobs.return_value = self.create_listjobs_response()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getJobs.return_value = self.create_listjobs_response()
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (
             mock_scheduler_proxy_class,
@@ -54,15 +54,15 @@ class TestListJobs(AuroraClientCommandTest):
             options):
       list_jobs(['west/mchucarroll'])
 
-      mock_scheduler.getJobs.assert_called_with(self.TEST_ROLE)
+      mock_scheduler_proxy.getJobs.assert_called_with(self.TEST_ROLE)
 
   def test_listjobs_badcluster(self):
     """Test the list_jobs command when the user provides an invalid cluster."""
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.create_mock_api()
-    mock_scheduler.getJobs.return_value = self.create_listjobs_response()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getJobs.return_value = self.create_listjobs_response()
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (
             mock_scheduler_proxy_class,

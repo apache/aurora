@@ -37,15 +37,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     return mock_options
 
   @classmethod
-  def setup_mock_api(cls):
-    """Builds up a mock API object, with a mock SchedulerProxy"""
-    mock_api = Mock(spec=HookedAuroraClientAPI)
-    mock_scheduler = Mock()
-    mock_scheduler.url = "http://something_or_other"
-    mock_api.scheduler = mock_scheduler
-    return (mock_api, mock_scheduler)
-
-  @classmethod
   def create_mock_task(cls, task_id, instance_id, initial_time, status):
     mock_task = Mock(spec=ScheduledTask)
     mock_task.assignedTask = Mock(spec=AssignedTask)
@@ -92,9 +83,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
   @classmethod
   def assert_scheduler_called(cls, mock_api, mock_query, num_queries):
-    print('Calls to getTasksStatus: %s' % mock_api.scheduler.getTasksStatus.call_args_list)
-    assert mock_api.scheduler.getTasksStatus.call_count == num_queries
-    mock_api.scheduler.getTasksStatus.assert_called_with(mock_query)
+    assert mock_api.scheduler_proxy.getTasksStatus.call_count == num_queries
+    mock_api.scheduler_proxy.getTasksStatus.assert_called_with(mock_query)
 
   def test_simple_successful_create_job(self):
     """Run a test of the "create" command against a mocked-out API:
@@ -178,7 +168,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       self.assert_create_job_called(api)
 
       # getTasksStatus was called once, before the create_job
-      assert api.scheduler.getTasksStatus.call_count == 1
+      assert api.scheduler_proxy.getTasksStatus.call_count == 1
 
   def test_create_job_failed_invalid_config(self):
     """Run a test of the "create" command against a mocked-out API, with a configuration
@@ -197,4 +187,4 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Check that create_job was not called.
       api = mock_context.get_api('west')
       assert api.create_job.call_count == 0
-      assert api.scheduler.getTasksStatus.call_count == 0
+      assert api.scheduler_proxy.getTasksStatus.call_count == 0

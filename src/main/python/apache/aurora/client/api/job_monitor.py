@@ -35,7 +35,7 @@ class JobMonitor(object):
 
   def iter_query(self):
     try:
-      res = self._client.scheduler.getTasksStatus(self._query)
+      res = self._client.scheduler_proxy.getTasksStatus(self._query)
     except TTransport.TTransportException as e:
       print('Failed to query slaves from scheduler: %s' % e)
       return
