@@ -1,0 +1,50 @@
+Apache Aurora
+Copyright 2013 The Apache Software Foundation
+
+This product includes software developed by The Apache Software
+Foundation (http://www.apache.org/).
+
+
+From: 'An unknown organization'
+  - AOP alliance (http://aopalliance.sourceforge.net)
+    License: Public Domain
+  - FindBugs (http://findbugs.sourceforge.net/)
+    License: The Apache Software License, Version 2.0
+
+From: 'Antlr' (http://www.antlr.org/)
+  - Antlr (http://www.antlr.org/)
+    License: BSD License
+
+From: 'The Apache Software Foundation' (http://www.apache.org)
+  - Apache Commons Lang (http://commons.apache.org/)
+    License: The Apache Software License, Version 2.0
+  - Apache Log4j (http://logging.apache.org/)
+    License: The Apache Software License, Version 2.0
+  - Apache Mesos (http://mesos.apache.org/)
+    License: The Apache Software License, Version 2.0
+  - Apache Thrift (http://thrift.apache.org/)
+    License: The Apache Software License, Version 2.0
+  - Apache Zookeeper (http://zookeeper.apache.org/)
+    License: The Apache Software License, Version 2.0
+
+From: 'Google, Inc.' (http://www.google.com)
+  - Google Guava (http://code.google.com/p/guava-libraries)
+    License: The Apache Software License, Version 2.0
+  - Google Guice (http://code.google.com/p/google-guice/)
+    License: The Apache Software License, Version 2.0
+  - Google Protocol Buffers (http://code.google.com/p/protobuf)
+    License: BSD 3 License
+
+From: 'Oracle, Inc.' (http://www.oracle.com)
+  - Jersey (https://jersey.java.net/)
+    License: Common Development and Distrobution License (CDDL - Version 1.1)
+
+From: 'Twitter, Inc.' (http://www.twitter.com)
+  - Twitter Commons (https://github.com/twitter/commons)
+    License: The Apache Software License, Version 2.0
+
+From: 'QOS.ch' (http://www.qos.ch)
+  - Log4j Implemented Over SLF4J (http://www.slf4j.org)
+    License: Apache Software Licenses
+  - SLF4J (http://www.slf4j.org)
+    License: MIT License
