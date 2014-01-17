@@ -48,7 +48,6 @@ import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -349,18 +348,5 @@ class SchedulerCoreImpl implements SchedulerCore {
         }
       }
     });
-  }
-
-  @Override
-  public synchronized void preemptTask(IAssignedTask task, IAssignedTask preemptingTask) {
-    checkNotNull(task);
-    checkNotNull(preemptingTask);
-    // TODO(William Farner): Throw SchedulingException if either task doesn't exist, etc.
-
-    stateManager.changeState(
-        task.getTaskId(),
-        Optional.<ScheduleStatus>absent(),
-        ScheduleStatus.PREEMPTING,
-        Optional.of("Preempting in favor of " + preemptingTask.getTaskId()));
   }
 }

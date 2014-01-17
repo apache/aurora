@@ -25,7 +25,6 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
-import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -108,15 +107,6 @@ public interface SchedulerCore {
    */
   void restartShards(IJobKey jobKey, Set<Integer> shards, String requestingUser)
       throws ScheduleException;
-
-  /**
-   * Preempts a task in favor of another.
-   *
-   * @param task Task being preempted.
-   * @param preemptingTask Task we are preempting in favor of.
-   * @throws ScheduleException If a problem occurs while trying to perform the preemption.
-   */
-  void preemptTask(IAssignedTask task, IAssignedTask preemptingTask) throws ScheduleException;
 
   /**
    * Indicates to the scheduler that tasks were deleted on the assigned host.

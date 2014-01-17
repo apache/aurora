@@ -22,8 +22,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -46,12 +44,12 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
-import org.apache.aurora.scheduler.state.SchedulerCore;
+import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -103,8 +101,6 @@ public interface Preemptor {
     static final Query.Builder CANDIDATE_QUERY = Query.statusScoped(
         EnumSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(PENDING, PREEMPTING))));
 
-    private static final Logger LOG = Logger.getLogger(PreemptorImpl.class.getName());
-
     private static final Function<IAssignedTask, Integer> GET_PRIORITY =
         new Function<IAssignedTask, Integer>() {
           @Override public Integer apply(IAssignedTask task) {
@@ -113,7 +109,6 @@ public interface Preemptor {
         };
 
     private final AtomicLong tasksPreempted = Stats.exportLong("preemptor_tasks_preempted");
-    private final AtomicLong failedPreemptions = Stats.exportLong("preemptor_failed_preemptions");
     // Incremented every time the preemptor is invoked and finds tasks pending and preemptable tasks
     private final AtomicLong attemptedPreemptions = Stats.exportLong("preemptor_attempts");
     // Incremented every time we fail to find tasks to preempt for a pending task.
@@ -127,7 +122,7 @@ public interface Preemptor {
     };
 
     private final Storage storage;
-    private final SchedulerCore scheduler;
+    private final StateManager stateManager;
     private final OfferQueue offerQueue;
     private final SchedulingFilter schedulingFilter;
     private final Amount<Long, Time> preemptionCandidacyDelay;
@@ -137,8 +132,7 @@ public interface Preemptor {
      * Creates a new preemptor.
      *
      * @param storage Backing store for tasks.
-     * @param scheduler Scheduler to fetch task information from, and instruct when preempting
-     *                  tasks.
+     * @param stateManager Scheduler state controller to instruct when preempting tasks.
      * @param offerQueue Queue that contains available Mesos resource offers.
      * @param schedulingFilter Filter to identify whether tasks may reside on given slaves.
      * @param preemptionCandidacyDelay Time a task must be PENDING before it may preempt other
@@ -148,14 +142,14 @@ public interface Preemptor {
     @Inject
     PreemptorImpl(
         Storage storage,
-        SchedulerCore scheduler,
+        StateManager stateManager,
         OfferQueue offerQueue,
         SchedulingFilter schedulingFilter,
         @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
         Clock clock) {
 
       this.storage = checkNotNull(storage);
-      this.scheduler = checkNotNull(scheduler);
+      this.stateManager = checkNotNull(stateManager);
       this.offerQueue = checkNotNull(offerQueue);
       this.schedulingFilter = checkNotNull(schedulingFilter);
       this.preemptionCandidacyDelay = checkNotNull(preemptionCandidacyDelay);
@@ -338,16 +332,15 @@ public interface Preemptor {
             pendingTask);
 
         if (toPreemptTasks.isPresent()) {
-          try {
-            for (IAssignedTask toPreempt : toPreemptTasks.get()) {
-              scheduler.preemptTask(toPreempt, pendingTask);
-              tasksPreempted.incrementAndGet();
-            }
-            return Optional.of(slaveID);
-          } catch (ScheduleException e) {
-            LOG.log(Level.SEVERE, "Preemption failed", e);
-            failedPreemptions.incrementAndGet();
+          for (IAssignedTask toPreempt : toPreemptTasks.get()) {
+            stateManager.changeState(
+                toPreempt.getTaskId(),
+                Optional.<ScheduleStatus>absent(),
+                ScheduleStatus.PREEMPTING,
+                Optional.of("Preempting in favor of " + pendingTask.getTaskId()));
+            tasksPreempted.incrementAndGet();
           }
+          return Optional.of(slaveID);
         }
       }
 

@@ -47,8 +47,7 @@ import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.state.MaintenanceController;
-import org.apache.aurora.scheduler.state.SchedulerCore;
-import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -65,6 +64,7 @@ import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl;
 import static org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import static org.apache.mesos.Protos.Offer;
 import static org.apache.mesos.Protos.Resource;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 
 public class PreemptorImplTest extends EasyMockTest {
@@ -75,15 +75,12 @@ public class PreemptorImplTest extends EasyMockTest {
   private static final String JOB_A = "job_a";
   private static final String JOB_B = "job_b";
   private static final String JOB_C = "job_c";
-  private static final String JOB_D = "job_d";
   private static final String TASK_ID_A = "task_a";
   private static final String TASK_ID_B = "task_b";
   private static final String TASK_ID_C = "task_c";
   private static final String TASK_ID_D = "task_d";
   private static final String HOST_A = "host_a";
-  private static final String HOST_B = "host_b";
   private static final String RACK_A = "rackA";
-  private static final String RACK_B = "rackB";
   private static final String RACK_ATTRIBUTE = "rack";
   private static final String HOST_ATTRIBUTE = "host";
   private static final String OFFER_A = "offer_a";
@@ -91,7 +88,7 @@ public class PreemptorImplTest extends EasyMockTest {
   private static final Amount<Long, Time> PREEMPTION_DELAY = Amount.of(30L, Time.SECONDS);
 
   private StorageTestUtil storageUtil;
-  private SchedulerCore scheduler;
+  private StateManager stateManager;
   private SchedulingFilter schedulingFilter;
   private FakeClock clock;
   private MaintenanceController maintenance;
@@ -101,7 +98,7 @@ public class PreemptorImplTest extends EasyMockTest {
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
-    scheduler = createMock(SchedulerCore.class);
+    stateManager = createMock(StateManager.class);
     maintenance = createMock(MaintenanceController.class);
     clock = new FakeClock();
     offerQueue = createMock(OfferQueue.class);
@@ -110,7 +107,7 @@ public class PreemptorImplTest extends EasyMockTest {
   private void runPreemptor(ScheduledTask pendingTask) {
     PreemptorImpl preemptor = new PreemptorImpl(
         storageUtil.storage,
-        scheduler,
+        stateManager,
         offerQueue,
         schedulingFilter,
         PREEMPTION_DELAY,
@@ -151,7 +148,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetActiveTasks(lowPriority);
 
     expectFiltering();
-    expectPreempted(lowPriority, highPriority);
+    expectPreempted(lowPriority);
 
     control.replay();
     runPreemptor(highPriority);
@@ -175,7 +172,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetActiveTasks(lowerPriority, lowerPriority);
 
     expectFiltering();
-    expectPreempted(lowerPriority, highPriority);
+    expectPreempted(lowerPriority);
 
     control.replay();
     runPreemptor(highPriority);
@@ -202,7 +199,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetActiveTasks(highPriority, lowerPriority, lowestPriority);
 
     expectFiltering();
-    expectPreempted(lowestPriority, pendingPriority);
+    expectPreempted(lowestPriority);
 
     control.replay();
     runPreemptor(pendingPriority);
@@ -242,7 +239,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetActiveTasks(a1);
 
     expectFiltering();
-    expectPreempted(a1, p1);
+    expectPreempted(a1);
 
     control.replay();
     runPreemptor(p1);
@@ -264,7 +261,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetActiveTasks(a1);
 
     expectFiltering();
-    expectPreempted(a1, p1);
+    expectPreempted(a1);
 
     control.replay();
     runPreemptor(p1);
@@ -313,8 +310,8 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetPendingTasks(p1);
     expectGetActiveTasks(a1, b1);
 
-    expectPreempted(a1, p1);
-    expectPreempted(b1, p1);
+    expectPreempted(a1);
+    expectPreempted(b1);
 
     control.replay();
     runPreemptor(p1);
@@ -349,7 +346,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetPendingTasks(p1);
     expectGetActiveTasks(b1, b2, a1);
 
-    expectPreempted(a1, p1);
+    expectPreempted(a1);
 
     control.replay();
     runPreemptor(p1);
@@ -402,7 +399,7 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetActiveTasks(a1);
     expectGetPendingTasks(p1);
 
-    expectPreempted(a1, p1);
+    expectPreempted(a1);
 
     control.replay();
     runPreemptor(p1);
@@ -434,8 +431,8 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetActiveTasks(a1, a2);
     expectGetPendingTasks(p1);
 
-    expectPreempted(a1, p1);
-    expectPreempted(a2, p1);
+    expectPreempted(a1);
+    expectPreempted(a2);
 
     control.replay();
     runPreemptor(p1);
@@ -509,10 +506,13 @@ public class PreemptorImplTest extends EasyMockTest {
     );
   }
 
-  private void expectPreempted(ScheduledTask preempted, ScheduledTask preempting) throws Exception {
-    scheduler.preemptTask(
-        IAssignedTask.build(preempted.getAssignedTask()),
-        IAssignedTask.build(preempting.getAssignedTask()));
+  private void expectPreempted(ScheduledTask preempted) throws Exception {
+    expect(stateManager.changeState(
+        eq(Tasks.id(preempted)),
+        eq(Optional.<ScheduleStatus>absent()),
+        eq(ScheduleStatus.PREEMPTING),
+        EasyMock.<Optional<String>>anyObject()))
+        .andReturn(true);
   }
 
   private ScheduledTask makeProductionTask(String role, String job, String taskId) {
