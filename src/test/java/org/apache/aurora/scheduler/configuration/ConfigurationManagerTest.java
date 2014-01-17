@@ -28,6 +28,8 @@ import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
+import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
@@ -37,11 +39,10 @@ import static org.apache.aurora.scheduler.configuration.ConfigurationManager.isG
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-// TODO(Sathya): Improve test coverage for this class.
+// TODO(kevints): Improve test coverage for this class.
 public class ConfigurationManagerTest {
-  // This job caused a crash when loaded in MESOS-3062
-  // TODO(ksweeney): Create a test fixtures resource file and move this to it.
   private static final JobConfiguration UNSANITIZED_JOB_CONFIGURATION = new JobConfiguration()
       .setKey(new JobKey("owner-role", DEFAULT_ENVIRONMENT, "email_stats"))
       .setCronSchedule("0 2 * * *")
@@ -98,5 +99,18 @@ public class ConfigurationManagerTest {
     ConfigurationManager.applyDefaultsIfUnset(copy);
     assertTrue(copy.isSetKey());
     assertEquals(DEFAULT_ENVIRONMENT, copy.getKey().getEnvironment());
+  }
+
+  @Test
+  public void testRunOverlapRejected() {
+    JobConfiguration copy = UNSANITIZED_JOB_CONFIGURATION.deepCopy();
+    ConfigurationManager.applyDefaultsIfUnset(copy);
+    copy.setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP);
+    try {
+      ConfigurationManager.validateAndPopulate(IJobConfiguration.build(copy));
+      fail("CronCollisionPolicy.RUN_OVERLAP was allowed.");
+    } catch (TaskDescriptionException e) {
+      // Expected.
+    }
   }
 }

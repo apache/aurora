@@ -32,12 +32,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.twitter.common.application.ShutdownRegistry;
@@ -51,11 +48,9 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffHelper;
 
 import org.apache.aurora.gen.CronCollisionPolicy;
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ScheduleException;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.cron.CronException;
@@ -73,8 +68,6 @@ import org.apache.commons.lang.StringUtils;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-
-import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 
 /**
  * A job scheduler that receives jobs that should be run periodically on a cron schedule.
@@ -304,24 +297,9 @@ public class CronJobManager extends JobManager implements EventSubscriber {
           break;
 
         case RUN_OVERLAP:
-          Map<Integer, IScheduledTask> byInstance =
-              Maps.uniqueIndex(activeTasks, Tasks.SCHEDULED_TO_INSTANCE_ID);
-          Map<Integer, ScheduleStatus> existingTasks =
-              Maps.transformValues(byInstance, Tasks.GET_STATUS);
-          if (existingTasks.isEmpty()) {
-            builder.putAll(config.getTaskConfigs());
-          } else if (Iterables.any(existingTasks.values(), Predicates.equalTo(PENDING))) {
-            LOG.info("Job " + JobKeys.toPath(job) + " has pending tasks, suppressing run.");
-          } else {
-            // To safely overlap this run, we need to adjust the instance IDs of the overlapping
-            // run (maintaining the role/job/instance UUID invariant).
-            int instanceOffset = Ordering.natural().max(existingTasks.keySet()) + 1;
-            LOG.info("Adjusting instance IDs of " + JobKeys.toPath(job) + " by " + instanceOffset
-                + " for overlapping cron run.");
-            for (Map.Entry<Integer, ITaskConfig> entry : config.getTaskConfigs().entrySet()) {
-              builder.put(entry.getKey() + instanceOffset, entry.getValue());
-            }
-          }
+          LOG.severe("Ignoring trigger for job "
+              + JobKeys.toPath(job)
+              + " with deprecated collision policy RUN_OVERLAP due to unterminated active tasks.");
           break;
 
         default:

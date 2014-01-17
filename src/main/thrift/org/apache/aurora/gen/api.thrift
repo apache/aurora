@@ -176,7 +176,8 @@ struct TaskConfig {
 enum CronCollisionPolicy {
   KILL_EXISTING = 0,  // Kills the existing job with the colliding name, and runs the new cron job.
   CANCEL_NEW    = 1,  // Cancels execution of the new job, leaving the running job in tact.
-  RUN_OVERLAP   = 2   // Runs both jobs, effectively adding more tasks to the existing job.
+  RUN_OVERLAP   = 2   // DEPRECATED. For existing jobs, treated the same as CANCEL_NEW. createJob
+                      // will reject jobs with this policy.
 }
 
 // Description of an aurora job.

@@ -554,44 +554,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testStartRunningOverlapCronJob() throws Exception {
-    // Start a cron job that is already started by an earlier
-    // call and is PENDING. Make sure it follows the cron collision policy.
-    SanitizedConfiguration sanitizedConfiguration =
-        makeCronJob(KEY_A, 1, "1 1 1 1 1", CronCollisionPolicy.RUN_OVERLAP);
-    expect(cronScheduler.schedule(eq(sanitizedConfiguration.getJobConfig().getCronSchedule()),
-        EasyMock.<Runnable>anyObject()))
-        .andReturn("key");
-
-    control.replay();
-    buildScheduler();
-
-    scheduler.createJob(sanitizedConfiguration);
-    assertTaskCount(0);
-    assertTrue(cron.hasJob(KEY_A));
-
-    scheduler.startCronJob(KEY_A);
-    assertTaskCount(1);
-
-    String taskId = Tasks.id(getOnlyTask(Query.jobScoped(KEY_A)));
-
-    // Now start the same cron job immediately.
-    scheduler.startCronJob(KEY_A);
-
-    // Since the task never left PENDING, the second run should have been suppressed.
-    assertTaskCount(1);
-    assertEquals(PENDING, getTask(taskId).getStatus());
-
-    changeStatus(taskId, ASSIGNED);
-
-    scheduler.startCronJob(KEY_A);
-    assertTaskCount(2);
-    assertEquals(ASSIGNED, getTask(taskId).getStatus());
-
-    getOnlyTask(Query.unscoped().byStatus(ScheduleStatus.PENDING));
-  }
-
-  @Test
   public void testKillCreateCronJob() throws Exception {
     SanitizedConfiguration sanitizedConfiguration = makeCronJob(KEY_A, 1, "1 1 1 1 1");
     IJobConfiguration job = sanitizedConfiguration.getJobConfig();
