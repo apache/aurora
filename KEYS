@@ -1,0 +1,142 @@
+This file contains the GPG keys of Apache Aurora developers.
+
+Users:    gpg --import KEYS
+
+Developers:
+  Create a key:
+    gpg --gen-key
+
+  Adding you key to this file:
+    gpg --list-sigs <key id> && gpg --armor --export <key id>) >> this file.
+
+  Publish the key:
+    gpg --keyserver pgp.mit.edu --send-keys <key id>
+
+  Signing another developers key:
+    gpg --keyserver pgp.mit.edu --search-keys <name or email>
+    gpg --keyserver pgp.mit.edu --recv-keys <key id>
+    gpg --sign-key <key id>
+    gpg --keyserver pgp.mit.edu --send-keys <key id>
+
+  Additional Information:
+    http://www.apache.org/dev/openpgp.html#generate-key
+
+********************************* PLEASE NOTE **********************************
+
+  Releases will be signed using one of these keys in this file. This file will
+  be available with the distributed Apache Aurora releases at:
+
+      https://dist.apache.org/repos/dist/release/incubator/aurora/KEYS
+
+********************************************************************************
+
+-----END PGP PUBLIC KEY BLOCK-----
+pub   2048D/66B778F9 2011-04-13
+uid                  Jake Farrell <jfarrell@apache.org>
+sig 3        66B778F9 2011-04-13  Jake Farrell <jfarrell@apache.org>
+sub   2048g/0099A2AD 2011-04-13
+sig          66B778F9 2011-04-13  Jake Farrell <jfarrell@apache.org>
+
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: GnuPG v1.4.10 (Darwin)
+
+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
+GXyWtMaVRXblIJmign/QfUX/XIg=
+=1z2d
+-----END PGP PUBLIC KEY BLOCK-----
+
+pub   4096R/3E99BEF3 2013-10-17
+uid                  William Farner (CODE SIGNING KEY) <wfarner@apache.org>
+sig          866B1734 2014-01-06  Kevin Sweeney <kevin@ack.berkeley.edu>
+sig 3        3E99BEF3 2013-10-17  William Farner (CODE SIGNING KEY) <wfarner@apache.org>
+sig          66B778F9 2014-01-16  Jake Farrell <jfarrell@apache.org>
+sub   4096R/1A736A0F 2013-10-17
+sig          3E99BEF3 2013-10-17  William Farner (CODE SIGNING KEY) <wfarner@apache.org>
+
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+Version: GnuPG v1.4.14 (Darwin)
+
+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
+=tkZ5
+-----END PGP PUBLIC KEY BLOCK-----
