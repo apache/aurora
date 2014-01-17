@@ -117,7 +117,7 @@ def create(job_spec, config_file):
   monitor = JobMonitor(api, config.role(), config.environment(), config.name())
   resp = api.create_job(config)
   check_and_log_response(resp)
-  handle_open(api.scheduler_proxy.scheduler_client().url, config.role(), config.environment(), config.name())
+  handle_open(api.scheduler.scheduler().url, config.role(), config.environment(), config.name())
   if options.wait_until == 'RUNNING':
     monitor.wait_until(monitor.running_or_finished)
   elif options.wait_until == 'FINISHED':
@@ -213,7 +213,7 @@ def do_open(args, _):
   api = make_client(cluster_name)
 
   import webbrowser
-  webbrowser.open_new_tab(synthesize_url(api.scheduler_proxy.scheduler_client().url, role, env, job))
+  webbrowser.open_new_tab(synthesize_url(api.scheduler.scheduler().url, role, env, job))
 
 
 @app.command
@@ -298,7 +298,7 @@ def start_cron(args, options):
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
   resp = api.start_cronjob(job_key, config=config)
   check_and_log_response(resp)
-  handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
+  handle_open(api.scheduler.scheduler().url, job_key.role, job_key.env, job_key.name)
 
 
 @app.command
@@ -369,7 +369,7 @@ def kill(args, options):
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
   resp = api.kill_job(job_key, options.shards, config=config)
   check_and_log_response(resp)
-  handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
+  handle_open(api.scheduler.scheduler().url, job_key.role, job_key.env, job_key.name)
 
 
 @app.command
@@ -560,7 +560,7 @@ def restart(args, options):
   resp = api.restart(job_key, options.shards, updater_config,
       options.health_check_interval_seconds, config=config)
   check_and_log_response(resp)
-  handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
+  handle_open(api.scheduler.scheduler().url, job_key.role, job_key.env, job_key.name)
 
 
 @app.command

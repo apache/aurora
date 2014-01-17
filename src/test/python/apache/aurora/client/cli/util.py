@@ -19,7 +19,7 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     super(FakeAuroraCommandContext, self).__init__()
     self.options = None
     self.status = []
-    self.fake_api = self.create_mock_api()
+    self.fake_api = self.setup_fake_api()
     self.task_status = []
     self.showed_urls = []
 
@@ -27,21 +27,29 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     return self.fake_api
 
   @classmethod
-  def create_mock_api(cls):
+  def setup_mock_api(cls):
     """Builds up a mock API object, with a mock SchedulerProxy.
     Returns the API and the proxy"""
-    # This looks strange, but we set up the same object to use as both
-    # the SchedulerProxy and the SchedulerClient. These tests want to observe
-    # what API calls get made against the scheduler, and both of these objects
-    # delegate calls to the scheduler. It doesn't matter which one is used:
-    # what we care about is that the right API calls get made.
+
+    mock_scheduler = Mock()
+    mock_scheduler.url = "http://something_or_other"
+    mock_scheduler_client = Mock()
+    mock_scheduler_client.scheduler.return_value = mock_scheduler
+    mock_scheduler_client.url = "http://something_or_other"
     mock_api = Mock(spec=HookedAuroraClientAPI)
-    mock_scheduler_proxy = Mock()
-    mock_scheduler_proxy.url = "http://something_or_other"
-    mock_scheduler_proxy.scheduler_client.return_value = mock_scheduler_proxy
-    mock_api = Mock(spec=HookedAuroraClientAPI)
-    mock_api.scheduler_proxy = mock_scheduler_proxy
-    return mock_api
+    mock_api.scheduler = mock_scheduler_client
+    return (mock_api, mock_scheduler_client)
+
+  def setup_fake_api(self):
+    # In here, we'd like to get it mocked so that the HookedAuroraClientAPI
+    # object, and its underlying AuroraClientAPI objects are not
+    # mocked, but the scheduler object is.
+    new_fake = Mock(spec=HookedAuroraClientAPI)
+    new_fake.scheduler = Mock()
+    new_fake.scheduler.url = 'http://something_or_other'
+#    new_fake.scheduler.getTasksStatus.side_effect = []
+    self.fake_api = new_fake
+    return self.fake_api
 
   def open_page(self, url):
     self.showed_urls.append(url)
@@ -52,7 +60,7 @@ class FakeAuroraCommandContext(AuroraCommandContext):
   def add_expected_status_query_result(self, expected_result):
     self.task_status.append(expected_result)
     # each call adds an expected query result, in order.
-    self.fake_api.scheduler_proxy.getTasksStatus.side_effect = self.task_status
+    self.fake_api.scheduler.getTasksStatus.side_effect = self.task_status
 
 
 class AuroraClientCommandTest(unittest.TestCase):
@@ -63,6 +71,20 @@ class AuroraClientCommandTest(unittest.TestCase):
     response.message = msg
     response.result = Mock(spec=Result)
     return response
+
+  @classmethod
+  def setup_mock_api(cls):
+    """Builds up a mock API object, with a mock SchedulerProxy.
+    Returns the API and the proxy"""
+    # TODO: merge this with setup_fake_api (MESOS-4861)
+    mock_scheduler = Mock()
+    mock_scheduler.url = "http://something_or_other"
+    mock_scheduler_client = Mock()
+    mock_scheduler_client.scheduler.return_value = mock_scheduler
+    mock_scheduler_client.url = "http://something_or_other"
+    mock_api = Mock(spec=HookedAuroraClientAPI)
+    mock_api.scheduler = mock_scheduler_client
+    return (mock_api, mock_scheduler_client)
 
 
   @classmethod

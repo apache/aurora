@@ -183,27 +183,27 @@ class SchedulerProxy(object):
     # TODO(Sathya): Make this a part of cluster trait when authentication is pushed to the transport
     # layer.
     self._session_key_factory = session_key_factory
-    self._client = self._scheduler_client = None
+    self._client = self._scheduler = None
     self.verbose = verbose
 
   def with_scheduler(method):
     """Decorator magic to make sure a connection is made to the scheduler"""
     def _wrapper(self, *args, **kwargs):
-      if not self._scheduler_client:
+      if not self._scheduler:
         self._construct_scheduler()
       return method(self, *args, **kwargs)
     return _wrapper
 
   def invalidate(self):
-    self._client = self._scheduler_client = None
+    self._client = self._scheduler = None
 
   @with_scheduler
   def client(self):
     return self._client
 
   @with_scheduler
-  def scheduler_client(self):
-    return self._scheduler_client
+  def scheduler(self):
+    return self._scheduler
 
   def session_key(self):
     try:
@@ -214,15 +214,15 @@ class SchedulerProxy(object):
   def _construct_scheduler(self):
     """
       Populates:
-        self._scheduler_client
+        self._scheduler
         self._client
     """
-    self._scheduler_client = SchedulerClient.get(self.cluster, verbose=self.verbose)
-    assert self._scheduler_client, "Could not find scheduler (cluster = %s)" % self.cluster.name
+    self._scheduler = SchedulerClient.get(self.cluster, verbose=self.verbose)
+    assert self._scheduler, "Could not find scheduler (cluster = %s)" % self.cluster.name
     start = time.time()
     while (time.time() - start) < self.CONNECT_MAXIMUM_WAIT.as_(Time.SECONDS):
       try:
-        self._client = self._scheduler_client.get_thrift_client()
+        self._client = self._scheduler.get_thrift_client()
         break
       except SchedulerClient.CouldNotConnect as e:
         log.warning('Could not connect to scheduler: %s' % e)
