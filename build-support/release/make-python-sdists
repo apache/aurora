@@ -1,0 +1,43 @@
+#!/bin/bash
+# make-python-sdists: Generate sdists for Aurora Python code for use with pip or upload to PyPI.
+# Usage:
+#   ./build-support/make-python-sdists
+#
+# Examples:
+#   Install the aurora client in a virtualenv:
+#     ./build-support/virtualenv ~/aurora-virtualenv
+#     source ~/aurora-virtualenv/bin/activate
+#     pip install -f dist apache.aurora.client
+#     aurora --help
+#     aurora_admin --help
+set -o errexit
+
+TARGETS=(
+  src/main/python/apache/aurora/client:client-packaged
+  src/main/python/apache/aurora/common
+  src/main/python/apache/aurora/config:config-packaged
+  src/main/python/apache/aurora/executor:executor-packaged
+  src/main/python/apache/thermos
+  src/main/python/apache/thermos/common
+  src/main/python/apache/thermos/config
+  src/main/python/apache/thermos/core
+  src/main/python/apache/thermos/monitoring
+  src/main/python/apache/thermos/observer
+  src/main/thrift/org/apache/aurora/gen:py-thrift-packaged
+  src/main/thrift/org/apache/thermos:py-thrift
+)
+
+cd "`git rev-parse --show-toplevel`"
+# Run in a virtualenv so that we use a consistent version of setuptools to generate the sdist.
+# Without this indirection pants will use the system setuptools, which on Ubuntu 12.04 is old,
+# buggy, and produces a broken apache.thermos.observer.
+# TODO(ksweeney): Remove this indirection when pants supports this natively.
+if [[ ! -f build-support/make-python-sdists.virtualenv/BOOTSTRAPPED ]]; then
+  ./build-support/virtualenv build-support/make-python-sdists.virtualenv
+  touch build-support/make-python-sdists.virtualenv/BOOTSTRAPPED
+fi
+source build-support/make-python-sdists.virtualenv/bin/activate
+
+for t in "${TARGETS[@]}"; do
+  ./pants setup_py $t
+done

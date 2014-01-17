@@ -10,6 +10,7 @@
 build/
 build-support/rbtools/
 build-support/virtualenv-*
+build-support/make-python-sdists.virtualenv
 dist/
 gradle-app.setting
 out/
