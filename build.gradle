@@ -289,3 +289,10 @@ jacocoTestReport {
 }
 
 test.finalizedBy jacocoTestReport
+
+task FlagSchemaChanges(type: Test) {
+  exec {
+    executable = 'bash'
+    args = ['src/test/org/apache/aurora/verify_thrift_checksum.sh']
+  }
+}
