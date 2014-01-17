@@ -7,31 +7,31 @@ The most up-to-date reference is in the client itself: use the
 functionality. Note that `aurora help open` does not work, due to underlying issues with
 reflection.
 
-[Introduction](#Introduction)
-[Job Keys](#Job_Keys)
-[Modifying Aurora Client Commands](#Modifying)
-[Regular Jobs](#Regular)
-&nbsp;&nbsp;&nbsp;&nbsp;[Creating and Running a Job](#Creating)
-&nbsp;&nbsp;&nbsp;&nbsp;[Running a Command On a Running Job](#Running)
-&nbsp;&nbsp;&nbsp;&nbsp;[Killing a Job](#Killing)
-&nbsp;&nbsp;&nbsp;&nbsp;[Updating a Job](#Updating)
-&nbsp;&nbsp;&nbsp;&nbsp;[Renaming a Job](#Renaming)
-&nbsp;&nbsp;&nbsp;&nbsp;[Restarting Jobs](#Restarting)
-[Cron Jobs](#Cron)
-[Comparing Jobs](#Comparing)
-[Viewing/Examining Jobs](#Viewing)
-&nbsp;&nbsp;&nbsp;&nbsp;[Listing Jobs](#Listing)
-&nbsp;&nbsp;&nbsp;&nbsp;[Inspecting a Job](#Inspecting)
-&nbsp;&nbsp;&nbsp;&nbsp;[Versions](#Versions)
-&nbsp;&nbsp;&nbsp;&nbsp;[Checking Your Quota](#Checking)
-&nbsp;&nbsp;&nbsp;&nbsp;[Finding a Job on Web UI](#Finding)
-&nbsp;&nbsp;&nbsp;&nbsp;[Getting Job Status](#Status)
-&nbsp;&nbsp;&nbsp;&nbsp;[Opening the Web UI](#Opening)
-&nbsp;&nbsp;&nbsp;&nbsp;[SSHing to a Specific Task Machine](#SSHing)
-&nbsp;&nbsp;&nbsp;&nbsp;[Templating Command Arguments](#Templating)
+- [Aurora Client Commands](#aurora-client-commands)
+    - [Introduction](#introduction)
+    - [Cluster Configuration](#cluster-configuration)
+    - [Job Keys](#job-keys)
+    - [Modifying Aurora Client Commands](#modifying-aurora-client-commands)
+    - [Regular Jobs](#regular-jobs)
+        - [Creating and Running a Job](#creating-and-running-a-job)
+        - [Killing a Job](#killing-a-job)
+        - [Updating a Job](#updating-a-job)
+        - [Renaming a Job](#renaming-a-job)
+        - [Restarting Jobs](#restarting-jobs)
+    - [Cron Jobs](#cron-jobs)
+    - [Comparing Jobs](#comparing-jobs)
+    - [Viewing/Examining Jobs](#viewingexamining-jobs)
+        - [Listing Jobs](#listing-jobs)
+        - [Inspecting a Job](#inspecting-a-job)
+        - [Checking Your Quota](#checking-your-quota)
+        - [Finding a Job on Web UI](#finding-a-job-on-web-ui)
+        - [Getting Job Status](#getting-job-status)
+        - [Opening the Web UI](#opening-the-web-ui)
+        - [SSHing to a Specific Task Machine](#sshing-to-a-specific-task-machine)
+        - [Templating Command Arguments](#templating-command-arguments)
 
-<a name="Introduction"></a>Introduction
----------------------------------------
+Introduction
+------------
 
 Once you have written an `.aurora` configuration file that describes
 your Job and its parameters and functionality, you interact with Aurora
@@ -53,8 +53,37 @@ After that are sections on Comparing Jobs and Viewing/Examining Jobs. In
 other words, various commands for getting information and metadata about
 Aurora Jobs.
 
-<a name-"Job_Keys"></a>Job Keys
--------------------------------
+Cluster Configuration
+---------------------
+
+The client must be able to find a configuration file that speciies available clusters. This file
+declares shorthand names for clusters, which are in turn referenced by job configuration files
+and client commands.
+
+The client will load at most two configuration files, making both of their defined clusters
+available. The first is intended to be a system-installed cluster, using the path specified in
+the environment variable `AURORA_CONFIG_ROOT`, defaulting to `/etc/aurora/clusters.json` if the
+environment variable is not set. The second is a user-installed file, located at
+`~/.aurora/clusters.json`.
+
+A cluster configuration is formatted as JSON.  The simplest cluster configuration is one that
+communicates with a single (non-leader-elected) scheduler.  For example:
+
+    [{
+      "name": "example",
+      "scheduler_uri": "localhost:55555",
+    }]
+
+A configuration for a leader-elected scheduler would contain something like:
+
+    [{
+      "name": "example",
+      "zk": "192.168.33.2",
+      "scheduler_zk_path": "/aurora/scheduler"
+    }]
+
+Job Keys
+--------
 
 A job key is a unique system-wide identifier for an Aurora-managed
 Job, for example `cluster1/web-team/test/experiment204`. It is a 4-tuple
@@ -73,16 +102,13 @@ refer to different Jobs. For example, job key
 `cluster2/foo/prod/workhorse` is different from
 `cluster1/tyg/test/workhorse.`
 
-The list of available clusters is defined in
-`/etc/aurora/clusters.json` or `~/.clusters.json`
-
 Role names are user accounts existing on the slave machines. If you don't know what accounts
 are available, contact your sysadmin.
 
 Environment names are namespaces; you can count on `prod`, `devel` and `test` existing.
 
-<a name="Modifying"></a>Modifying Aurora Client Commands
---------------------------------------------------------
+Modifying Aurora Client Commands
+--------------------------------
 
 For certain Aurora Client commands, you can define hook methods that run
 either before or after an action that takes place during the command's
@@ -102,15 +128,15 @@ Hooks can be associated with these Aurora Client commands.
 The process for writing and activating them is complex enough
 that we explain it in a devoted document, [Hooks for Aurora Client API](hooks.md).
 
-<a name="Regular"></a>Regular Jobs
-----------------------------------
+Regular Jobs
+------------
 
 This section covers Aurora commands related to running, killing,
 renaming, updating, and restarting a basic Aurora Job.
 
-### <a name="Creating"></a>Creating and Running a Job
+### Creating and Running a Job
 
-> `aurora create <job key> <configuration file>`
+    aurora create <job key> <configuration file>
 
 Creates and then runs a Job with the specified job key based on a `.aurora` configuration file.
 The configuration file may also contain and activate hook definitions.
@@ -129,9 +155,9 @@ The configuration file may also contain and activate hook definitions.
     transitioned into the requested state. Possible values are: `PENDING`,
     `RUNNING`, `FINISHED`. Default: `PENDING`
 
-### <a name="Running></a>Running a Command On a Running Job
+### Running a Command On a Running Job
 
-> `aurora run <job_key> <cmd>`
+    aurora run <job_key> <cmd>
 
 Runs a shell command on all machines currently hosting shards of a
 single Job.
@@ -151,7 +177,7 @@ namespaces.
 
 ### <a name="Killing"></a>Killing a Job
 
-> `aurora kill <job key> <configuration file>`
+    aurora kill <job key> <configuration file>
 
 Kills all Tasks associated with the specified Job, blocking until all
 are terminated. Defaults to killing all shards in the Job.
@@ -171,11 +197,10 @@ kill command.
     combination of the two (e.g. 0-2,5,7-9). Defaults to acting on all
     shards.
 
-### <a name="Updating"></a>Updating a Job
+### Updating a Job
 
-> `aurora update [--shards=ids] <job key> <configuration file>`
->
-> `aurora cancel_update <job key> <configuration file>`
+    aurora update [--shards=ids] <job key> <configuration file>
+    aurora cancel_update <job key> <configuration file>
 
 Given a running job, does a rolling update to reflect a new
 configuration version. Only updates Tasks in the Job with a changed
@@ -212,7 +237,7 @@ used to define and activate hooks for `update`.
     Time interval between subsequent shard status checks. Defaults to
     `3`.
 
-### <a name="Renaming"></a>Renaming a Job
+### Renaming a Job
 
 Renaming is a tricky operation as downstream clients must be informed of
 the new name. A conservative approach
@@ -229,7 +254,7 @@ to renaming suitable for production services is:
 3.  Create the (identical) job at the new key. You may need to request a
     temporary quota increase.
 
-         aurora create <new_job_key> <job_configuration>
+        aurora create <new_job_key> <job_configuration>
 
 4.  Migrate all clients over to the new job key. Update all links and
     dashboards. Ensure that both job keys run identical versions of the
@@ -242,11 +267,11 @@ to renaming suitable for production services is:
 6.  If you received a temporary quota increase, be sure to let the
     powers that be know you no longer need the additional capacity.
 
-### <a name="Restarting"></a>Restarting Jobs
+### Restarting Jobs
 
 `restart` restarts all of a job key identified Job's shards:
 
-        aurora restart <job_key> <configuration file>
+    aurora restart <job_key> <configuration file>
 
 Restarts are controlled on the client side, so aborting
 the `restart` command halts the restart operation.
@@ -293,18 +318,18 @@ In addition to the required job key argument, there are eight
 -   `--watch_secs`: Defaults to `30`, the minimum number of seconds a
     shard must remain in `RUNNING` state before considered a success.
 
-<a name="Cron"></a>Cron Jobs
-----------------------------
+Cron Jobs
+---------
 
 You will see various commands and options relating to cron jobs in
 `aurora -help` and similar. Ignore them, as they're not yet implemented.
 You might be able to use them without causing an error, but nothing happens
 if you do.
 
-<a name="Comparing"></a>Comparing Jobs
---------------------------------------
+Comparing Jobs
+--------------
 
-> `aurora diff <job_key> config`
+    aurora diff <job_key> config
 
 Compares a job configuration against a running job. By default the diff
 is determined using `diff`, though you may choose an alternate
@@ -318,16 +343,16 @@ There are two named parameters:
 -   `-j, --json` Read the configuration argument in JSON format.
     Defaults to `False`.
 
-<a name="Viewing"></a>Viewing/Examining Jobs
---------------------------------------------
+Viewing/Examining Jobs
+----------------------
 
 Above we discussed creating, killing, and updating Jobs. Here we discuss
 how to view and examine Jobs.
 
-### <a name="Listing"></a>Listing Jobs
+### Listing Jobs
 
-> `aurora list_jobs ` \
-> Usage: `aurora list_jobs cluster/role`
+    aurora list_jobs
+    Usage: `aurora list_jobs cluster/role
 
 Lists all Jobs registered with the Aurora scheduler in the named cluster for the named role.
 
@@ -338,9 +363,9 @@ It has two named parameters:
 -   `-c`, `--show-cron`: Shows cron schedule for jobs. Defaults to
     `False`. Do not use, as it's not yet implemented.
 
-### <a name="Inspecting"></a>Inspecting a Job
+### Inspecting a Job
 
-> `aurora inspect <job_key> config`
+    aurora inspect <job_key> config
 
 `inspect` verifies that its specified job can be parsed from a
 configuration file, and displays the parsed configuration. It has four
@@ -355,20 +380,20 @@ named parameters:
     You can use multiple flags to specify multiple values. Defaults
     to `[]`
 
-### <a name="Versions></a>Versions
+### Versions
 
->     aurora version
+    aurora version
 
 Lists client build information and what Aurora API version it supports.
 
-### <a name="Checking"></a>Checking Your Quota
+### Checking Your Quota
 
-> `aurora get_quota --cluster=CLUSTER role`
+    aurora get_quota --cluster=CLUSTER role
 
   Prints the production quota allocated to the role's value at the given
 cluster.
 
-### <a name="Finding"></a>Finding a Job on Web UI
+### Finding a Job on Web UI
 
 When you create a job, part of the output response contains a URL that goes
 to the job's scheduler UI page. For example:
@@ -386,31 +411,31 @@ separately by pending jobs, active jobs and finished jobs.
 Jobs are arranged by role, typically a service account for
 production jobs and user accounts for test or development jobs.
 
-### <a name="Status"></a>Getting Job Status
+### Getting Job Status
 
-> `aurora status <job_key>     `
+    aurora status <job_key>
 
 Returns the status of recent tasks associated with the
 `job_key` specified Job in its supplied cluster. Typically this includes
 a mix of active tasks (running or assigned) and inactive tasks
 (successful, failed, and lost.)
 
-### <a name="Opening"></a>Opening the Web UI
+### Opening the Web UI
 
 Use the Job's web UI scheduler URL or the `aurora status` command to find out on which
 machines individual tasks are scheduled. You can open the web UI via the
 `open` command line command if invoked from your machine:
 
-> `aurora open [<cluster>[/<role>[/<env>/<job_name>]]]`
+    aurora open [<cluster>[/<role>[/<env>/<job_name>]]]
 
 If only the cluster is specified, it goes directly to that cluster's
 scheduler main page. If the role is specified, it goes to the top-level
 role page. If the full job key is specified, it goes directly to the job
 page where you can inspect individual tasks.
 
-### <a name="SSHing"></a>SSHing to a Specific Task Machine
+### SSHing to a Specific Task Machine
 
-> `aurora ssh <job_key> <shard number>`
+    aurora ssh <job_key> <shard number>
 
 You can have the Aurora client ssh directly to the machine that has been
 assigned a particular Job/shard number. This may be useful for quickly
@@ -426,9 +451,9 @@ It can take three named parameters:
 -   `-L PORT:NAME`: Add tunnel from local port `PORT` to the remote
     named port  `NAME`. Defaults to `[]`.
 
-### <a name="Templating"></a>Templating Command Arguments
+### Templating Command Arguments
 
-> `aurora run [-e] [-t THREADS] <job_key> -- <<command-line>> `
+    aurora run [-e] [-t THREADS] <job_key> -- <<command-line>>
 
 Given a job specification, run the supplied command on all hosts and
 return the output. You may use the standard Mustache templating rules:
@@ -443,12 +468,8 @@ return the output. You may use the standard Mustache templating rules:
 For example, the following type of pattern can be a powerful diagnostic
 tool:
 
->
->
-> aurora run -t5 cluster1/tyg/devel/seizure -- 'curl -s -m1
-> localhost:{{thermos.ports[http]}}/vars | grep uptime'
->
->
+    aurora run -t5 cluster1/tyg/devel/seizure -- \
+      'curl -s -m1 localhost:{{thermos.ports[http]}}/vars | grep uptime'
 
 By default, the command runs in the Task's sandbox. The `-e` option can
 run the command in the executor's sandbox. This is mostly useful for
