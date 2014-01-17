@@ -9,19 +9,22 @@ a JVM (Java 7 or higher) and libmesos (0.15.0) installed.
 
 Creating the Distribution .zip File (Optional)
 ----------------------------------------------
-To create a distribution for installation.
+To create a distribution for installation you will need build tools installed. On Ubuntu this can be
+done with `sudo apt-get install build-essential default-jdk`.
 
     git clone http://git-wip-us.apache.org/repos/asf/incubator-aurora.git
+    cd incubator-aurora
     ./gradlew distZip
 
-Copy the generated `build/distribution/aurora-scheduler.zip` to each node that will run a scheduler.
+Copy the generated `dist/distributions/aurora-scheduler-*.zip` to each node that will run a scheduler.
 
 Installing Aurora
 -----------------
-Extract the `aurora-scheduler.zip` file. The example configurations assume it is extracted to
+Extract the aurora-scheduler zip file. The example configurations assume it is extracted to
 `/usr/local/aurora-scheduler`.
 
-    unzip aurora-scheduler.zip -d /usr/local
+    sudo unzip dist/distributions/aurora-scheduler-*.zip -d /usr/local
+    sudo ln -nfs "$(ls -dt /usr/local/aurora-scheduler-* | head -1)" /usr/local/aurora-scheduler
 
 Configuring Aurora
 ==================
@@ -48,7 +51,7 @@ Like Mesos, Aurora uses command-line flags for runtime configuration. As such th
       # Log configuration, etc.
     )
 
-   # Environment variables controlling libmesos
+    # Environment variables controlling libmesos
     export JAVA_HOME=...
     export GLOG_v=1
     export LIBPROCESS_PORT=8083
@@ -129,7 +132,7 @@ restarted.
 
 For example, monit can be configured with
 
-   if failed port 8081 send "GET /health HTTP/1.0\r\n" expect "OK\n" with timeout 2 seconds for 10 cycles then restart
+    if failed port 8081 send "GET /health HTTP/1.0\r\n" expect "OK\n" with timeout 2 seconds for 10 cycles then restart
 
 assuming you set `-http_port=8081`.
 
