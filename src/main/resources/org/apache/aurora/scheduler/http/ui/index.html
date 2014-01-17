@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" ng-app="auroraUI">
+<head>
+  <meta charset="utf-8">
+  <title>Aurora UI</title>
+  <link rel="stylesheet" href="/css/app.css"/>
+</head>
+<body class='ng-cloak'>
+
+<div class='container'>
+  <div ng-controller='JobSummaryController'>
+    <div class='page-header'>
+      <h2 class="text-center">{{title}}</h2>
+    </div>
+    <div>
+      <smart-table config="globalConfig" columns="columnCollection" rows="rowCollection"
+                   class='table table-striped table-hover table-bordered table-condensed'>
+      </smart-table>
+    </div>
+  </div>
+</div>
+
+<!-- Thrift -->
+<script src="/js/thrift.js"></script>
+<script src="/js/apiTypes.js"></script>
+<script src="/js/readOnlyScheduler.js"></script>
+
+<!-- Angular -->
+<script src="/js/angular.js"></script>
+<script src="/js/app.js"></script>
+<script src="/js/controllers.js"></script>
+<script src="/js/directives.js"></script>
+<script src="/js/services.js"></script>
+
+<!-- Bootstrap -->
+<script src="/js/bootstrap.min.js"></script>
+<link href="/css/bootstrap.min.css" rel="stylesheet">
+<link href="/js/jquery.min.js" rel="stylesheet">
+
+<!--smart table-->
+<script src="/js/smartTable.js"></script>
+</body>
+</html>

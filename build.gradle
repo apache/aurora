@@ -20,6 +20,7 @@ buildscript {
 buildDir = 'dist'
 def generatedDir = "$buildDir/generated-src"
 def generatedJavaDir = "$generatedDir/gen-java"
+def generatedJSDir = "$generatedDir/gen-js"
 
 compileJava {
   sourceCompatibility = 1.7
@@ -87,6 +88,7 @@ sourceSets {
     compileClasspath += sourceSets.generated.output
     resources {
       srcDir '3rdparty/javascript'
+      srcDir generatedJSDir
     }
   }
   test {
@@ -205,7 +207,7 @@ task generateSources(dependsOn: 'bootstrapThrift') {
     inputFiles.each { File file ->
       exec {
         executable = thriftBinary
-        args = ['--gen', 'java:hashcode', '-o', outputDir, file]
+        args = ['--gen', 'java:hashcode', '--gen', 'js', '-o', outputDir, file]
       }
     }
     // These are the 'root' structs, the tool recursively generates all composed structs.

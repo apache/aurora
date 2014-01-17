@@ -81,18 +81,20 @@ public class ServletModule extends AbstractModule {
       @Override protected void configureServlets() {
         bind(HttpStatsFilter.class).in(Singleton.class);
         filter("/scheduler*").through(HttpStatsFilter.class);
+        // Servlets may assign a special meaning to trailing /, but this confuses AngularJS's
+        // resource loader. So, removing them for /scheduler* URLs using a UIRedirectFilter.
+        // TODO (skarumuri): Remove UIRedirectFilter when the /scheduler servlets are removed.
+        bind(UIRedirectFilter.class).in(Singleton.class);
+        filter("/scheduler*").through(UIRedirectFilter.class);
         bind(LeaderRedirectFilter.class).in(Singleton.class);
+
         registerJerseyEndpoint("/cron", Cron.class);
         registerJerseyEndpoint("/maintenance", Maintenance.class);
         registerJerseyEndpoint("/mname", Mname.class);
         registerJerseyEndpoint("/offers", Offers.class);
         registerJerseyEndpoint("/pendingtasks", PendingTasks.class);
         registerJerseyEndpoint("/quotas", Quotas.class);
-        registerJerseyEndpoint(
-            "/scheduler",
-            SchedulerzHome.class,
-            SchedulerzRole.class,
-            SchedulerzJob.class);
+        registerJerseyEndpoint("/scheduler/", SchedulerzRole.class, SchedulerzJob.class);
         registerJerseyEndpoint("/slaves", Slaves.class);
         registerJerseyEndpoint("/structdump", StructDump.class);
         registerJerseyEndpoint("/utilization", Utilization.class);
@@ -146,6 +148,8 @@ public class ServletModule extends AbstractModule {
         "assets/datatables/js/dataTables.htmlNumberType.js",
         "/js/dataTables.htmlNumberType.js");
 
+    registerUIClient();
+
     bind(LeaderRedirect.class).in(Singleton.class);
     LifecycleModule.bindStartupAction(binder(), RedirectMonitor.class);
   }
@@ -170,12 +174,34 @@ public class ServletModule extends AbstractModule {
         false);
   }
 
+  /**
+   * A function to handle all assets related to the UI client.
+   */
+  private void registerUIClient() {
+    registerAsset("bower_components/smart-table/Smart-Table.debug.js", "/js/smartTable.js", false);
+    registerAsset("bower_components/angular/angular.js", "/js/angular.js", false);
+
+    registerAsset("ReadOnlyScheduler.js", "/js/readOnlyScheduler.js", false);
+    registerAsset("api_types.js", "/js/apiTypes.js", false);
+    registerAsset("thrift.js", "/js/thrift.js", false);
+
+    registerAsset("ui/index.html", "/scheduler");
+    registerAsset("ui/roleLink.html", "/roleLink.html");
+
+    registerAsset("ui/css/app.css", "/css/app.css");
+
+    registerAsset("ui/js/app.js", "/js/app.js");
+    registerAsset("ui/js/controllers.js", "/js/controllers.js");
+    registerAsset("ui/js/directives.js", "/js/directives.js");
+    registerAsset("ui/js/services.js", "/js/services.js");
+  }
+
   private void registerAsset(String resourceLocation, String registerLocation) {
     registerAsset(resourceLocation, registerLocation, true);
   }
 
   private void registerAsset(String resourceLocation, String registerLocation, boolean isRelative) {
-    String mediaType = getMediaType(registerLocation).toString();
+    String mediaType = getMediaType(resourceLocation).toString();
 
     if (isRelative) {
       Registration.registerHttpAsset(

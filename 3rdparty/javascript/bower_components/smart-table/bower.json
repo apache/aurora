@@ -1,0 +1,15 @@
+{
+    "author": "Laurent Renard",
+    "name": "smart-table",
+    "description": "A grid/table module for angular js",
+    "version": "0.1.5",
+    "homepage": "http://lorenzofox3.github.io/smart-table-website/",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/lorenzofox3/bower-smart-table.git"
+    },
+    "main": "./Smart-Table.min.js",
+    "dependencies": {
+        "angular": "1.0.7"
+    }
+}
