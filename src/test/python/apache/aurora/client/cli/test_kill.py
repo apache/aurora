@@ -39,14 +39,14 @@ class TestClientKillCommand(AuroraClientCommandTest):
   def test_kill_job(self):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
-    mock_scheduler = Mock()
+    mock_scheduler_proxy = Mock()
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
 
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.get_kill_job_response()
-      mock_scheduler.scheduler.killTasks.return_value = self.get_kill_job_response()
+      mock_scheduler_proxy.killTasks.return_value = self.get_kill_job_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -79,11 +79,11 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
   def test_kill_job_with_instances_deep_api(self):
     """Test kill client-side API logic."""
-    (mock_api, mock_scheduler) = self.setup_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_scheduler.killTasks.return_value = self.get_kill_job_response()
+      mock_scheduler_proxy.killTasks.return_value = self.get_kill_job_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -91,7 +91,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
         cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--instances=0,2,4-6',
            'west/bozo/test/hello'])
       # Now check that the right API calls got made.
-      assert mock_scheduler.killTasks.call_count == 1
-      mock_scheduler.killTasks.assert_called_with(
+      assert mock_scheduler_proxy.killTasks.call_count == 1
+      mock_scheduler_proxy.killTasks.assert_called_with(
         TaskQuery(jobName='hello', environment='test', instanceIds=frozenset([0, 2, 4, 5, 6]),
             owner=Identity(role='bozo')), None)

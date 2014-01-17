@@ -17,7 +17,7 @@ class JobMonitorTest(MoxTestBase):
     super(JobMonitorTest, self).setUp()
     self.mock_api = self.mox.CreateMock(AuroraClientAPI)
     self.mock_scheduler = self.mox.CreateMock(Client)
-    self.mock_api.scheduler = self.mock_scheduler
+    self.mock_api.scheduler_proxy = self.mock_scheduler
 
   def test_init(self):
     result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[]))

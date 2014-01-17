@@ -39,15 +39,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     return mock_options
 
   @classmethod
-  def setup_mock_api(cls):
-    """Builds up a mock API object, with a mock SchedulerProxy"""
-    mock_api = Mock(spec=HookedAuroraClientAPI)
-    mock_scheduler = Mock()
-    mock_scheduler.url = "http://something_or_other"
-    mock_api.scheduler = mock_scheduler
-    return (mock_api, mock_scheduler)
-
-  @classmethod
   def create_mock_task(cls, task_id, instance_id, initial_time, status):
     mock_task = Mock(spec=ScheduledTask)
     mock_task.assignedTask = Mock(spec=AssignedTask)
@@ -95,9 +86,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
   @classmethod
   def assert_scheduler_called(cls, mock_api, mock_query, num_queries):
     # scheduler.scheduler() is called once, as a part of the handle_open call.
-    assert mock_api.scheduler.scheduler.call_count == 1
-    assert mock_api.scheduler.getTasksStatus.call_count == num_queries
-    mock_api.scheduler.getTasksStatus.assert_called_with(mock_query)
+    assert mock_api.scheduler_proxy.getTasksStatus.call_count == num_queries
+    mock_api.scheduler_proxy.getTasksStatus.assert_called_with(mock_query)
 
   def test_simple_successful_create_job(self):
     """Run a test of the "create" command against a mocked-out API:
@@ -109,7 +99,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     # set up correctly, this should work.
 
     # Next, create gets an API object via make_client. We need to replace that with a mock API.
-    (mock_api, mock_scheduler) = self.setup_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (make_client,
@@ -119,16 +109,13 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # The monitor uses TaskQuery to get the tasks. It's called at least twice:once before
       # the job is created, and once after. So we need to set up mocks for the query results.
       mock_query = self.create_mock_query()
-      mock_scheduler.getTasksStatus.side_effect = [
+      mock_scheduler_proxy.getTasksStatus.side_effect = [
         self.create_mock_status_query_result(ScheduleStatus.INIT),
         self.create_mock_status_query_result(ScheduleStatus.RUNNING)
       ]
 
       # With the monitor set up, create finally gets around to calling create_job.
       mock_api.create_job.return_value = self.get_createjob_response()
-
-      # Then it calls handle_open; we need to provide a mock for the API calls it uses.
-      mock_api.scheduler.scheduler.return_value = mock_scheduler
 
       # Finally, it calls the monitor to watch and make sure the jobs started;
       # but we already set that up in the side-effects list for the query mock.
@@ -151,7 +138,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     this time, make the monitor check status several times before successful completion.
     """
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.setup_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
@@ -165,9 +152,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
           self.create_mock_status_query_result(ScheduleStatus.RUNNING),
           self.create_mock_status_query_result(ScheduleStatus.FINISHED)
       ]
-      mock_scheduler.getTasksStatus.side_effect = mock_query_results
+      mock_scheduler_proxy.getTasksStatus.side_effect = mock_query_results
       mock_api.create_job.return_value = self.get_createjob_response()
-      mock_api.scheduler.scheduler.return_value = mock_scheduler
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -185,7 +171,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     this time, make the monitor check status several times before successful completion.
     """
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.setup_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (make_client,
@@ -194,7 +180,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       mock_query_results = [
           self.create_mock_status_query_result(ScheduleStatus.INIT)
       ]
-      mock_scheduler.getTasksStatus.side_effect = mock_query_results
+      mock_scheduler_proxy.getTasksStatus.side_effect = mock_query_results
       mock_api.create_job.return_value = self.get_failed_createjob_response()
       # This is the real test: invoke create as if it had been called by the command line.
       with temporary_file() as fp:
@@ -206,11 +192,9 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       self.assert_create_job_called(mock_api)
 
-      # scheduler.scheduler() should not have been called, because the create_job failed.
-      assert mock_api.scheduler.scheduler.call_count == 0
       # getTasksStatus was called once, before the create_job
-      assert mock_scheduler.getTasksStatus.call_count == 1
-      mock_scheduler.getTasksStatus.assert_called_with(mock_query)
+      assert mock_scheduler_proxy.getTasksStatus.call_count == 1
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(mock_query)
       # make_client should have been called once.
       make_client.assert_called_with('west')
 
@@ -219,7 +203,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     this time, make the monitor check status several times before successful completion.
     """
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.setup_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
@@ -233,9 +217,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
           self.create_mock_status_query_result(ScheduleStatus.RUNNING),
           self.create_mock_status_query_result(ScheduleStatus.FINISHED)
       ]
-      mock_scheduler.getTasksStatus.side_effect = mock_query_results
+      mock_scheduler_proxy.getTasksStatus.side_effect = mock_query_results
       mock_api.create_job.return_value = self.get_createjob_response()
-      mock_api.scheduler.scheduler.return_value = mock_scheduler
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -251,7 +234,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     """Run a test of the "create" command against a mocked-out API, with a configuration
     containing a syntax error"""
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.setup_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (make_client,
@@ -265,10 +248,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Now check that the right API calls got made.
       # Check that create_job was not called.
       assert mock_api.create_job.call_count == 0
-      # scheduler.scheduler() should not have been called, because the config was invalid.
-      assert mock_api.scheduler.scheduler.call_count == 0
 
-      assert mock_scheduler.getTasksStatus.call_count == 0
+      assert mock_scheduler_proxy.getTasksStatus.call_count == 0
       # make_client should not have been called.
       assert make_client.call_count == 0
 
@@ -277,7 +258,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     this time, make the monitor check status several times before successful completion.
     """
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.setup_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (make_client,
@@ -290,9 +271,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Now check that the right API calls got made.
       # Check that create_job was not called.
       assert mock_api.create_job.call_count == 0
-      # scheduler.scheduler() should not have been called, because the config was invalid.
-      assert mock_api.scheduler.scheduler.call_count == 0
       # getTasksStatus was called once, before the create_job
-      assert mock_scheduler.getTasksStatus.call_count == 0
+      assert mock_scheduler_proxy.getTasksStatus.call_count == 0
       # make_client should not have been called.
       assert make_client.call_count == 0

@@ -58,7 +58,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
   # that the client makes the right API calls.
   def test_update_command_line_succeeds(self):
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.create_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options),
@@ -81,7 +81,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
   def test_update_invalid_config(self):
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.create_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     # Set up the context to capture the make_client and get_options calls.
     with contextlib.nested(
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
@@ -100,7 +100,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_scheduler_for_simple_update(cls, api):
     """Set up all of the API mocks for scheduler calls during a simple update"""
-    sched_proxy = api.scheduler.scheduler
+    sched_proxy = api.scheduler_proxy
     # First, the updater acquires a lock
     sched_proxy.acquireLock.return_value = cls.create_acquire_lock_response(ResponseCode.OK,
          'OK', 'token', False)
@@ -156,9 +156,9 @@ class TestUpdateCommand(AuroraClientCommandTest):
     return release_lock_response
 
   @classmethod
-  def setup_get_tasks_status_calls(cls, scheduler):
+  def setup_get_tasks_status_calls(cls, scheduler_proxy):
     status_response = cls.create_simple_success_response()
-    scheduler.getTasksStatus.return_value = status_response
+    scheduler_proxy.getTasksStatus.return_value = status_response
     schedule_status = Mock(spec=ScheduleStatusResult)
     status_response.result.scheduleStatusResult = schedule_status
     task_config = TaskConfig(numCpus=1.0, ramMb=10, diskMb=1)
@@ -175,9 +175,9 @@ class TestUpdateCommand(AuroraClientCommandTest):
       schedule_status.tasks.append(task_status)
 
   @classmethod
-  def assert_start_update_called(cls, mock_scheduler):
-    assert mock_scheduler.scheduler.startUpdate.call_count == 1
-    assert isinstance(mock_scheduler.scheduler.startUpdate.call_args[0][0], JobConfiguration)
+  def assert_start_update_called(cls, mock_scheduler_proxy):
+    assert mock_scheduler_proxy.startUpdate.call_count == 1
+    assert isinstance(mock_scheduler_proxy.startUpdate.call_args[0][0], JobConfiguration)
 
   @classmethod
   def setup_health_checks(cls, mock_api):
@@ -194,13 +194,13 @@ class TestUpdateCommand(AuroraClientCommandTest):
     # Test the client-side updater logic in its simplest case: everything succeeds, and no rolling
     # updates.
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.create_mock_api()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
     mock_quota_check = self.setup_quota_check()
 
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler.scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
             return_value=mock_health_check),
@@ -225,11 +225,11 @@ class TestUpdateCommand(AuroraClientCommandTest):
       # and finally release the lock.
       # The kill/start should happen in rolling batches.
       assert options.call_count == 2
-      assert mock_scheduler.scheduler.acquireLock.call_count == 1
-      self.assert_correct_killtask_calls(mock_scheduler.scheduler)
-      self.assert_correct_addinstance_calls(mock_scheduler.scheduler)
-      self.assert_correct_status_calls(mock_scheduler.scheduler)
-      assert mock_scheduler.scheduler.releaseLock.call_count == 1
+      assert mock_scheduler_proxy.acquireLock.call_count == 1
+      self.assert_correct_killtask_calls(mock_scheduler_proxy)
+      self.assert_correct_addinstance_calls(mock_scheduler_proxy)
+      self.assert_correct_status_calls(mock_scheduler_proxy)
+      assert mock_scheduler_proxy.releaseLock.call_count == 1
 
   @classmethod
   def assert_correct_addinstance_calls(cls, api):

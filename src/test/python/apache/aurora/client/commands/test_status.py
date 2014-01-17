@@ -72,12 +72,12 @@ class TestListJobs(AuroraClientCommandTest):
 
   def test_successful_status(self):
     """Test the status command."""
-    # Calls api.check_status, which calls scheduler.getJobs
+    # Calls api.check_status, which calls scheduler_proxy.getJobs
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.create_mock_api()
-    mock_scheduler.getTasksStatus.return_value = self.create_status_response()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (
             mock_scheduler_proxy_class,
@@ -87,17 +87,17 @@ class TestListJobs(AuroraClientCommandTest):
 
       # The status command sends a getTasksStatus query to the scheduler,
       # and then prints the result.
-      mock_scheduler.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll')))
 
   def test_unsuccessful_status(self):
     """Test the status command when the user asks the status of a job that doesn't exist."""
-    # Calls api.check_status, which calls scheduler.getJobs
+    # Calls api.check_status, which calls scheduler_proxy.getJobs
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.create_mock_api()
-    mock_scheduler.getTasksStatus.return_value = self.create_failed_status_response()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_failed_status_response()
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (
             mock_scheduler_proxy_class,
@@ -105,5 +105,5 @@ class TestListJobs(AuroraClientCommandTest):
             options):
       self.assertRaises(SystemExit, status, ['west/mchucarroll/test/hello'], mock_options)
 
-      mock_scheduler.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll')))

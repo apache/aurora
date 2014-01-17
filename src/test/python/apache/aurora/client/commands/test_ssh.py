@@ -73,13 +73,12 @@ class TestSshCommand(AuroraClientCommandTest):
 
   def test_successful_ssh(self):
     """Test the ssh command."""
-    # Calls api.check_status, which calls scheduler.getJobs
     mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler) = self.create_mock_api()
-    mock_scheduler.getTasksStatus.return_value = self.create_status_response()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
     sandbox_args = {'slave_root': '/slaveroot', 'slave_run_directory': 'slaverun'}
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
@@ -94,7 +93,7 @@ class TestSshCommand(AuroraClientCommandTest):
 
       # The status command sends a getTasksStatus query to the scheduler,
       # and then prints the result.
-      mock_scheduler.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll'), instanceIds=set([1]),
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
               ScheduleStatus.PREEMPTING])))

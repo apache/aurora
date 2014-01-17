@@ -69,9 +69,6 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
         AuroraJobKey(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB),
         config=None)
 
-  @classmethod
-  def assert_scheduler_called(cls, mock_api):
-    assert mock_api.scheduler.scheduler.call_count == 1
 
   def test_simple_successful_cancel_update(self):
     """Run a test of the "kill" command against a mocked-out API:
@@ -92,20 +89,6 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
       self.assert_cancel_update_called(mock_api)
 
   @classmethod
-  def setup_mock_api(cls):
-    """Builds up a mock API object, with a mock SchedulerProxy.
-    Returns the API and the proxy"""
-
-    mock_scheduler = Mock()
-    mock_scheduler.url = "http://something_or_other"
-    mock_scheduler_client = Mock()
-    mock_scheduler_client.scheduler.return_value = mock_scheduler
-    mock_scheduler_client.url = "http://something_or_other"
-    mock_api = Mock(spec=HookedAuroraClientAPI)
-    mock_api.scheduler = mock_scheduler_client
-    return (mock_api, mock_scheduler_client)
-
-  @classmethod
   def get_expected_task_query(cls, shards=None):
     instance_ids = frozenset(shards) if shards is not None else None
     # Helper to create the query that will be a parameter to job kill.
@@ -124,10 +107,10 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
     mock_config = Mock()
     mock_config.hooks = []
     mock_config.raw.return_value.enable_hooks.return_value.get.return_value = False
-    (mock_api, mock_scheduler) = self.setup_mock_api()
-    mock_scheduler.releaseLock.return_value = self.get_release_lock_response()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.releaseLock.return_value = self.get_release_lock_response()
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
@@ -139,6 +122,6 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
 
       # All that cancel_update really does is release the update lock.
       # So that's all we really need to check.
-      assert mock_scheduler.releaseLock.call_count == 1
-      assert mock_scheduler.releaseLock.call_args[0][0].key.job == JobKey(environment='test',
+      assert mock_scheduler_proxy.releaseLock.call_count == 1
+      assert mock_scheduler_proxy.releaseLock.call_args[0][0].key.job == JobKey(environment='test',
           role='mchucarroll', name='hello')
