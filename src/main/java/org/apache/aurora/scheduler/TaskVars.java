@@ -15,6 +15,7 @@
  */
 package org.apache.aurora.scheduler;
 
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
@@ -24,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
+import com.google.common.base.Supplier;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -52,23 +54,21 @@ import static com.google.common.base.Preconditions.checkNotNull;
 class TaskVars implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(TaskVars.class.getName());
 
-  private final LoadingCache<String, AtomicLong> countersByStatus;
-  private final LoadingCache<String, AtomicLong> countersByRack;
-
+  private final LoadingCache<String, Counter> counters;
   private final Storage storage;
+  private volatile boolean exporting = false;
 
   @Inject
   TaskVars(Storage storage, final StatsProvider statProvider) {
     this.storage = checkNotNull(storage);
     checkNotNull(statProvider);
-    countersByStatus = CacheBuilder.newBuilder().build(new CacheLoader<String, AtomicLong>() {
-      @Override public AtomicLong load(String statName) {
-        return statProvider.makeCounter(statName);
-      }
-    });
-    countersByRack = CacheBuilder.newBuilder().build(new CacheLoader<String, AtomicLong>() {
-      @Override public AtomicLong load(String rack) {
-        return statProvider.makeCounter(rackStatName(rack));
+    counters = CacheBuilder.newBuilder().build(new CacheLoader<String, Counter>() {
+      @Override public Counter load(String statName) {
+        Counter counter = new Counter(statProvider);
+        if (exporting) {
+          counter.exportAs(statName);
+        }
+        return counter;
       }
     });
   }
@@ -95,16 +95,16 @@ class TaskVars implements EventSubscriber {
     }
   };
 
-  private AtomicLong getCounter(ScheduleStatus status) {
-    return countersByStatus.getUnchecked(getVarName(status));
+  private Counter getCounter(ScheduleStatus status) {
+    return counters.getUnchecked(getVarName(status));
   }
 
   private void incrementCount(ScheduleStatus status) {
-    getCounter(status).incrementAndGet();
+    getCounter(status).increment();
   }
 
   private void decrementCount(ScheduleStatus status) {
-    getCounter(status).decrementAndGet();
+    getCounter(status).decrement();
   }
 
   @Subscribe
@@ -129,7 +129,7 @@ class TaskVars implements EventSubscriber {
       });
 
       if (rack.isPresent()) {
-        countersByRack.getUnchecked(rack.get()).incrementAndGet();
+        counters.getUnchecked(rackStatName(rack.get())).increment();
       } else {
         LOG.warning("Failed to find rack attribute associated with host " + host);
       }
@@ -138,14 +138,18 @@ class TaskVars implements EventSubscriber {
 
   @Subscribe
   public void schedulerActive(SchedulerActive event) {
-    // TODO(wfarner): This should probably induce the initial 'export' of stats, so that incomplete
-    // values are not surfaced while storage is recovering.
-
     // Dummy read the counter for each status counter. This is important to guarantee a stat with
     // value zero is present for each state, even if all states are not represented in the task
     // store.
     for (ScheduleStatus status : ScheduleStatus.values()) {
       getCounter(status);
+    }
+
+    // Initiate export of all counters.  This is not done initially to avoid exporting values that
+    // do not represent the entire storage contents.
+    exporting = true;
+    for (Map.Entry<String, Counter> entry : counters.asMap().entrySet()) {
+      entry.getValue().exportAs(entry.getKey());
     }
   }
 
@@ -153,6 +157,36 @@ class TaskVars implements EventSubscriber {
   public void tasksDeleted(final TasksDeleted event) {
     for (IScheduledTask task : event.getTasks()) {
       decrementCount(task.getStatus());
+    }
+  }
+
+  private static class Counter implements Supplier<Long> {
+    private final AtomicLong value = new AtomicLong();
+    private boolean exported = false;
+    private final StatsProvider stats;
+
+    Counter(StatsProvider stats) {
+      this.stats = stats;
+    }
+
+    @Override
+    public Long get() {
+      return value.get();
+    }
+
+    private synchronized void exportAs(String name) {
+      if (!exported) {
+        stats.makeGauge(name, this);
+        exported = true;
+      }
+    }
+
+    private void increment() {
+      value.incrementAndGet();
+    }
+
+    private void decrement() {
+      value.decrementAndGet();
     }
   }
 }
