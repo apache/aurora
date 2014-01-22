@@ -15,8 +15,6 @@
  */
 package org.apache.aurora.scheduler;
 
-import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.Driver.DriverImpl;
@@ -28,7 +26,6 @@ import org.junit.Test;
 import static org.apache.mesos.Protos.Status.DRIVER_ABORTED;
 import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
 import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertEquals;
 
 public class DriverTest extends EasyMockTest {
 
@@ -36,8 +33,6 @@ public class DriverTest extends EasyMockTest {
   private static final String TASK_2 = "2";
 
   private SchedulerDriver schedulerDriver;
-
-  private Supplier<Optional<SchedulerDriver>>  driverSupplier;
   private DriverImpl driver;
 
   private static Protos.TaskID createTaskId(String taskId) {
@@ -47,8 +42,7 @@ public class DriverTest extends EasyMockTest {
   @Before
   public void setUp() {
     schedulerDriver = createMock(SchedulerDriver.class);
-    driverSupplier = createMock(new Clazz<Supplier<Optional<SchedulerDriver>>>() { });
-    driver = new DriverImpl(driverSupplier);
+    driver = new DriverImpl();
   }
 
   @Test
@@ -60,37 +54,31 @@ public class DriverTest extends EasyMockTest {
 
   @Test
   public void testMultipleStops() {
-    expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver)).times(2);
-    expect(schedulerDriver.start()).andReturn(DRIVER_RUNNING);
     expect(schedulerDriver.stop(true)).andReturn(DRIVER_ABORTED);
     control.replay();
 
-    assertEquals(DRIVER_RUNNING, driver.start());
+    driver.initialize(schedulerDriver);
     driver.stop();
     driver.stop();
   }
 
   @Test
   public void testStop() {
-    expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver)).times(2);
-    expect(schedulerDriver.start()).andReturn(DRIVER_RUNNING);
     expect(schedulerDriver.stop(true)).andReturn(DRIVER_ABORTED);
     control.replay();
 
-    assertEquals(DRIVER_RUNNING, driver.start());
+    driver.initialize(schedulerDriver);
     driver.stop();
   }
 
   @Test
   public void testNormalLifecycle() {
-    expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver)).times(4);
-    expect(schedulerDriver.start()).andReturn(DRIVER_RUNNING);
     expect(schedulerDriver.killTask(createTaskId(TASK_1))).andReturn(DRIVER_RUNNING);
     expect(schedulerDriver.killTask(createTaskId(TASK_2))).andReturn(DRIVER_RUNNING);
     expect(schedulerDriver.stop(true)).andReturn(DRIVER_ABORTED);
     control.replay();
 
-    assertEquals(DRIVER_RUNNING, driver.start());
+    driver.initialize(schedulerDriver);
     driver.killTask(TASK_1);
     driver.killTask(TASK_2);
     driver.stop();
@@ -104,12 +92,10 @@ public class DriverTest extends EasyMockTest {
   }
 
   @Test(expected = IllegalStateException.class)
-  public void testOnlyOneRunAllowed() {
-    expect(driverSupplier.get()).andReturn(Optional.of(schedulerDriver));
-    expect(schedulerDriver.start()).andReturn(DRIVER_RUNNING);
+  public void testOnlyOneSetAllowed() {
     control.replay();
 
-    assertEquals(DRIVER_RUNNING, driver.start());
-    driver.start();
+    driver.initialize(schedulerDriver);
+    driver.initialize(schedulerDriver);
   }
 }

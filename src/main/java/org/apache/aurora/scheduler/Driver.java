@@ -16,19 +16,19 @@
 package org.apache.aurora.scheduler;
 
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Atomics;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.StateMachine;
 
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.SchedulerDriver;
 
@@ -71,24 +71,14 @@ public interface Driver {
    */
   void stop();
 
-  /**
-   * Starts the underlying driver.  Can only be called once.
-   *
-   * @return The status of the underlying driver run request.
-   */
-  Protos.Status start();
-
-  /**
-   * Blocks until the underlying driver is stopped or aborted.
-   *
-   * @return The status of the underlying driver upon exit.
-   */
-  Protos.Status join();
+  interface SettableDriver extends Driver {
+    void initialize(SchedulerDriver driver);
+  }
 
   /**
    * Mesos driver implementation.
    */
-  static class DriverImpl implements Driver {
+  static class DriverImpl implements SettableDriver {
     private static final Logger LOG = Logger.getLogger(Driver.class.getName());
 
     /**
@@ -101,18 +91,15 @@ public interface Driver {
     }
 
     private final StateMachine<State> stateMachine;
-    private final Supplier<Optional<SchedulerDriver>> driverSupplier;
+    private final AtomicReference<SchedulerDriver> driverRef = Atomics.newReference();
     private final AtomicLong killFailures = Stats.exportLong("scheduler_driver_kill_failures");
 
     /**
      * Creates a driver manager that will only ask for the underlying mesos driver when actually
      * needed.
-     *
-     * @param driverSupplier A factory for the underlying driver.
      */
     @Inject
-    DriverImpl(Supplier<Optional<SchedulerDriver>> driverSupplier) {
-      this.driverSupplier = driverSupplier;
+    DriverImpl() {
       this.stateMachine =
           StateMachine.<State>builder("scheduler_driver")
               .initialState(State.INIT)
@@ -126,8 +113,7 @@ public interface Driver {
     private synchronized SchedulerDriver get(State expected) {
       // TODO(William Farner): Formalize the failure case here by throwing a checked exception.
       stateMachine.checkState(expected);
-      // This will and should fail if the driver is not present.
-      return driverSupplier.get().get();
+      return Preconditions.checkNotNull(driverRef.get());
     }
 
     @Override
@@ -141,15 +127,11 @@ public interface Driver {
     }
 
     @Override
-    public Protos.Status start() {
-      SchedulerDriver driver = get(State.INIT);
+    public void initialize(SchedulerDriver driver) {
+      Preconditions.checkNotNull(driver);
+      stateMachine.checkState(State.INIT);
+      Preconditions.checkState(driverRef.compareAndSet(null, driver));
       stateMachine.transition(State.RUNNING);
-      return driver.start();
-    }
-
-    @Override
-    public Status join() {
-      return get(State.RUNNING).join();
     }
 
     @Override

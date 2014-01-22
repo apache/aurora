@@ -24,8 +24,8 @@ import com.twitter.common.util.Clock;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 
+import org.apache.aurora.scheduler.Driver.SettableDriver;
 import org.apache.aurora.scheduler.SchedulerLifecycle.DelayedActions;
-import org.apache.aurora.scheduler.SchedulerLifecycle.DriverReference;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
@@ -51,8 +51,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   private DriverFactory driverFactory;
   private StorageTestUtil storageUtil;
   private Command shutdownRegistry;
-  private Driver driver;
-  private DriverReference driverRef;
+  private SettableDriver driver;
   private LeaderControl leaderControl;
   private SchedulerDriver schedulerDriver;
   private DelayedActions delayedActions;
@@ -65,8 +64,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     driverFactory = createMock(DriverFactory.class);
     storageUtil = new StorageTestUtil(this);
     shutdownRegistry = createMock(Command.class);
-    driver = createMock(Driver.class);
-    driverRef = new DriverReference();
+    driver = createMock(SettableDriver.class);
     leaderControl = createMock(LeaderControl.class);
     schedulerDriver = createMock(SchedulerDriver.class);
     delayedActions = createMock(DelayedActions.class);
@@ -80,7 +78,6 @@ public class SchedulerLifecycleTest extends EasyMockTest {
           }
         }),
         driver,
-        driverRef,
         delayedActions,
         createMock(Clock.class),
         eventSink);
@@ -101,7 +98,8 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     Capture<Runnable> triggerFailoverCapture = createCapture();
     delayedActions.onAutoFailover(capture(triggerFailoverCapture));
     delayedActions.onRegistrationTimeout(EasyMock.<Runnable>anyObject());
-    expect(driver.start()).andReturn(Status.DRIVER_RUNNING);
+    driver.initialize(schedulerDriver);
+    expect(schedulerDriver.start()).andReturn(Status.DRIVER_RUNNING);
     delayedActions.blockingDriverJoin(EasyMock.<Runnable>anyObject());
 
     Capture<Runnable> handleRegisteredCapture = createCapture();
@@ -131,8 +129,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     expect(driverFactory.apply(FRAMEWORK_ID)).andReturn(schedulerDriver);
     delayedActions.onAutoFailover(EasyMock.<Runnable>anyObject());
     delayedActions.onRegistrationTimeout(EasyMock.<Runnable>anyObject());
-    expect(driver.start()).andReturn(Status.DRIVER_RUNNING);
-    delayedActions.blockingDriverJoin(EasyMock.<Runnable>anyObject());
+    expect(schedulerDriver.start()).andReturn(Status.DRIVER_RUNNING);
 
     // Important piece here is what's absent - leader presence is not advertised.
     leaderControl.leave();

@@ -22,27 +22,24 @@ import java.util.concurrent.ScheduledExecutorService;
 import javax.inject.Singleton;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
-import com.google.inject.TypeLiteral;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.scheduler.Driver.DriverImpl;
-import org.apache.aurora.scheduler.SchedulerLifecycle.DriverReference;
+import org.apache.aurora.scheduler.Driver.SettableDriver;
 import org.apache.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
 import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.periodic.GcExecutorLauncher;
 import org.apache.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutorSettings;
 import org.apache.mesos.Scheduler;
-import org.apache.mesos.SchedulerDriver;
 
 /**
  * Binding module for top-level scheduling logic.
@@ -70,9 +67,8 @@ public class SchedulerModule extends AbstractModule {
   @Override
   protected void configure() {
     bind(Driver.class).to(DriverImpl.class);
+    bind(SettableDriver.class).to(DriverImpl.class);
     bind(DriverImpl.class).in(Singleton.class);
-    bind(new TypeLiteral<Supplier<Optional<SchedulerDriver>>>() { }).to(DriverReference.class);
-    bind(DriverReference.class).in(Singleton.class);
 
     bind(Scheduler.class).to(MesosSchedulerImpl.class);
     bind(MesosSchedulerImpl.class).in(Singleton.class);
