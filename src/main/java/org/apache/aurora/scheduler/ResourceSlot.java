@@ -92,6 +92,21 @@ public final class ResourceSlot {
     return new ResourceSlot(new Resources(totalCPU, totalRAM, disk, ports));
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof ResourceSlot)) {
+      return false;
+    }
+
+    ResourceSlot other = (ResourceSlot) o;
+    return resources.equals(other.resources);
+  }
+
+  @Override
+  public int hashCode() {
+    return resources.hashCode();
+  }
+
   public static ResourceSlot sum(ResourceSlot... rs) {
     return sum(Arrays.asList(rs));
   }
