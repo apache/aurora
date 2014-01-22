@@ -147,13 +147,13 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     Stats.exportSize("cron_num_pending_runs", pendingRuns);
   }
 
-  private void mapScheduledJob(IJobConfiguration job, String scheduledJobKey) {
-    IJobKey jobKey = job.getKey();
+  private void mapScheduledJob(SanitizedCronJob cronJob) throws ScheduleException {
+    IJobKey jobKey = cronJob.config.getJobConfig().getKey();
     synchronized (scheduledJobs) {
       Preconditions.checkState(
           !scheduledJobs.containsKey(jobKey),
           "Illegal state - cron schedule already exists for " + JobKeys.toPath(jobKey));
-      scheduledJobs.put(jobKey, scheduledJobKey);
+      scheduledJobs.put(jobKey, scheduleJob(cronJob));
     }
   }
 
@@ -181,7 +181,7 @@ public class CronJobManager extends JobManager implements EventSubscriber {
 
     for (IJobConfiguration job : crons) {
       try {
-        mapScheduledJob(job, scheduleJob(SanitizedConfiguration.fromUnsanitized(job)));
+        mapScheduledJob(new SanitizedCronJob(job, cron));
       } catch (ScheduleException | TaskDescriptionException e) {
         logLaunchFailure(job, e);
       }
@@ -197,14 +197,17 @@ public class CronJobManager extends JobManager implements EventSubscriber {
    * Triggers execution of a job.
    *
    * @param jobKey Key of the job to start.
+   * @throws ScheduleException If the job could not be started with the cron system.
+   * @throws TaskDescriptionException If the stored job associated with {@code jobKey} has field
+   *         validation problems.
    */
-  public void startJobNow(IJobKey jobKey) throws TaskDescriptionException {
+  public void startJobNow(IJobKey jobKey) throws TaskDescriptionException, ScheduleException {
     checkNotNull(jobKey);
 
     Optional<IJobConfiguration> jobConfig = fetchJob(jobKey);
     checkArgument(jobConfig.isPresent(), "No such cron job " + JobKeys.toPath(jobKey));
 
-    cronTriggered(SanitizedConfiguration.fromUnsanitized(jobConfig.get()));
+    cronTriggered(new SanitizedCronJob(jobConfig.get(), cron));
   }
 
   private void delayedRun(final Query.Builder query, final SanitizedConfiguration config) {
@@ -258,10 +261,10 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   /**
    * Triggers execution of a cron job, depending on the cron collision policy for the job.
    *
-   * @param config The config of the job to be triggered.
+   * @param cronJob The job to be triggered.
    */
-  @VisibleForTesting
-  void cronTriggered(SanitizedConfiguration config) {
+  private void cronTriggered(SanitizedCronJob cronJob) {
+    SanitizedConfiguration config = cronJob.config;
     IJobConfiguration job = config.getJobConfig();
     LOG.info(String.format("Cron triggered for %s at %s with policy %s",
         JobKeys.toPath(job), new Date(), job.getCronCollisionPolicy()));
@@ -347,36 +350,27 @@ public class CronJobManager extends JobManager implements EventSubscriber {
       return false;
     }
 
-    String scheduledJobKey = scheduleJob(config);
+    SanitizedCronJob cronJob = new SanitizedCronJob(config, cron);
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(MANAGER_KEY, job);
       }
     });
-    mapScheduledJob(job, scheduledJobKey);
+    mapScheduledJob(cronJob);
 
     return true;
   }
 
-  private String scheduleJob(final SanitizedConfiguration config) throws ScheduleException {
-    final IJobConfiguration job = config.getJobConfig();
+  private String scheduleJob(final SanitizedCronJob cronJob) throws ScheduleException {
+    IJobConfiguration job = cronJob.config.getJobConfig();
     final String jobPath = JobKeys.toPath(job);
-    if (!hasCronSchedule(job)) {
-      throw new ScheduleException(
-          String.format("Not a valid cronjob, %s has no cron schedule", jobPath));
-    }
-
-    if (!cron.isValidSchedule(job.getCronSchedule())) {
-      throw new ScheduleException("Invalid cron schedule: " + job.getCronSchedule());
-    }
-
     LOG.info(String.format("Scheduling cron job %s: %s", jobPath, job.getCronSchedule()));
     try {
       return cron.schedule(job.getCronSchedule(), new Runnable() {
         @Override public void run() {
           // TODO(William Farner): May want to record information about job runs.
           LOG.info("Running cron job: " + jobPath);
-          cronTriggered(config);
+          cronTriggered(cronJob);
         }
       });
     } catch (CronException e) {
@@ -444,6 +438,33 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   public Set<IJobKey> getPendingRuns() {
     synchronized (pendingRuns) {
       return ImmutableSet.copyOf(pendingRuns.keySet());
+    }
+  }
+
+  /**
+   * Used by functions that expect field validation before being called.
+   */
+  private static class SanitizedCronJob {
+    private final SanitizedConfiguration config;
+
+    SanitizedCronJob(IJobConfiguration unsanitized, CronScheduler cron)
+        throws ScheduleException, TaskDescriptionException {
+
+      this(SanitizedConfiguration.fromUnsanitized(unsanitized), cron);
+    }
+
+    SanitizedCronJob(SanitizedConfiguration config, CronScheduler cron) throws ScheduleException {
+      final IJobConfiguration job = config.getJobConfig();
+      if (!hasCronSchedule(job)) {
+        throw new ScheduleException(
+            String.format("Not a valid cronjob, %s has no cron schedule", JobKeys.toPath(job)));
+      }
+
+      if (!cron.isValidSchedule(job.getCronSchedule())) {
+        throw new ScheduleException("Invalid cron schedule: " + job.getCronSchedule());
+      }
+
+      this.config = config;
     }
   }
 }
