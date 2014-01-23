@@ -20,6 +20,8 @@ import os
 import re
 import sys
 
+from optparse import OptionParser
+
 
 class Type(object):
   '''A data type.'''
@@ -152,6 +154,7 @@ package %(package)s;
  */
 public final class %(name)s {
   private final %(wrapped)s wrapped;
+  private int cachedHashCode = 0;
 %(fields)s
   private %(name)s(%(wrapped)s wrapped) {
     this.wrapped = Preconditions.checkNotNull(wrapped);%(assignments)s
@@ -214,7 +217,14 @@ public final class %(name)s {
 
   @Override
   public int hashCode() {
-    return wrapped.hashCode();
+    // Following java.lang.String's example of caching hashCode.
+    // This is thread safe in that multiple threads may wind up
+    // computing the value, which is apparently favorable to constant
+    // synchronization overhead.
+    if (cachedHashCode == 0) {
+      cachedHashCode = wrapped.hashCode();
+    }
+    return cachedHashCode;
   }
 
   @Override
@@ -232,9 +242,6 @@ class GeneratedCode(object):
     self._accessors = []
     self._fields = []
     self._assignments = []
-
-  def add(self, s, end='\n'):
-    print('This no longer does anything.')
 
   def add_import(self, import_class):
     self._imports.add(import_class)
@@ -422,13 +429,24 @@ THRIFT_ALIASES = {
 }
 
 
-def main(args):
-  if len(args) != 4:
+if __name__ == '__main__':
+  parser = OptionParser()
+  parser.add_option('-v', '--verbose',
+                    dest='verbose',
+                    action='store_true',
+                    help='Display extra information about code generation.')
+  options, args = parser.parse_args()
+
+  def log(value):
+    if options.verbose:
+      print(value)
+
+  if len(args) != 3:
     print('usage: %s thrift_file struct_name output_directory' % sys.argv[0])
     sys.exit(1)
 
   thrift_file, struct_name, output_directory = sys.argv[1:]
-  print('Searching for %s in %s' % (sys.argv[2], sys.argv[1]))
+  log('Searching for %s in %s' % (sys.argv[2], sys.argv[1]))
   with open(sys.argv[1]) as f:
     # Load all structs found in the thrift file.
     structs = parse_structs(f.read())
@@ -466,24 +484,20 @@ def main(args):
       return symbol
 
     find_symbol(sys.argv[2])
-    print('Symbol table:')
+    log('Symbol table:')
     for _, symbol in symbol_table.items():
-      print('    %s' % symbol)
+      log('    %s' % symbol)
 
     for _, symbol in symbol_table.items():
       if isinstance(symbol, StructType):
         if symbol.kind == 'enum':
-          print('Skipping code generation for %s, since it is immutable' % symbol.name)
+          log('Skipping code generation for %s, since it is immutable' % symbol.name)
         else:
           package_dir = os.path.join(sys.argv[3], PACKAGE_NAME.replace('.', os.path.sep))
           if not os.path.isdir(package_dir):
             os.makedirs(package_dir)
           gen_file = os.path.join(package_dir, '%s.java' % symbol.codegen_name)
-          print('Generating %s' % gen_file)
+          log('Generating %s' % gen_file)
           with open(gen_file, 'w') as f:
             code = generate_java(symbol)
             code.dump(f)
-
-
-if __name__ == '__main__':
-  main(sys.argv)
