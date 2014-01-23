@@ -2,6 +2,20 @@ Getting your ReviewBoard Account
 --------------------------------
 Go to https://reviews.apache.org and create an account.
 
+Setting up your email account (committers)
+------------------------------------------
+Once your Apache ID has been set up you can configure your account and add ssh keys and
+setup an email forwarding address at
+
+  http://id.apache.org
+
+Additional instructions for setting up your new committer email can be found at
+
+  http://www.apache.org/dev/user-email.html
+
+The recommended setup is to configure all services (mailing lists, JIRA, ReviewBoard) to
+send emails to your @apache.org email address.
+
 Setting up your ReviewBoard Environment
 ---------------------------------------
 Run `./rbt status`. The first time this runs it will bootstrap and you will be asked to login.
