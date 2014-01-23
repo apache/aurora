@@ -9,13 +9,20 @@
 
 <div class='container'>
   <div ng-controller='JobSummaryController'>
-    <div class='page-header'>
-      <h2 class="text-center">{{title}}</h2>
+    <div ng-show="{{error}}">
+      <p class="lead text-center text-warning"> {{reloadMsg}}</p>
+      <p class="text-center text-warning"> {{errorMsg}}</p>
     </div>
-    <div>
-      <smart-table config="globalConfig" columns="columnCollection" rows="rowCollection"
-                   class='table table-striped table-hover table-bordered table-condensed'>
-      </smart-table>
+
+    <div ng-hide="{{error}}">
+      <div class='page-header'>
+        <h2 class="text-center">{{title}}</h2>
+      </div>
+      <div>
+        <smart-table config="globalConfig" columns="columnCollection" rows="rowCollection"
+                     class='table table-striped table-hover table-bordered table-condensed'>
+        </smart-table>
+      </div>
     </div>
   </div>
 </div>
