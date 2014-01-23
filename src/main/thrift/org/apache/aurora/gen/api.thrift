@@ -428,6 +428,19 @@ struct Response {
 service ReadOnlyScheduler {
   // Returns a summary of the jobs grouped by role.
   Response getJobSummary()
+
+  // Fetches the status of tasks.
+  Response getTasksStatus(1: TaskQuery query)
+
+  // Fetches the status of jobs.
+  // ownerRole is optional, in which case all jobs are returned.
+  Response getJobs(1: string ownerRole)
+
+  // Fetches the quota allocated for a user.
+  Response getQuota(1: string ownerRole)
+
+  // Returns the current version of the API implementation
+  Response getVersion()
 }
 
 // Due to assumptions in the client all authenticated RPCs must have a SessionKey as their
@@ -449,25 +462,8 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   // Restarts a batch of shards.
   Response restartShards(5: JobKey job, 3: set<i32> shardIds, 6: Lock lock 4: SessionKey session)
 
-  // TODO(Suman Karumuri): Move this call into read only api
-  // Fetches the status of tasks.
-  Response getTasksStatus(1: TaskQuery query)
-
-  // TODO(Suman Karumuri): Move this call into the read only api
-  // Fetches the status of jobs.
-  // ownerRole is optional, in which case all jobs are returned.
-  Response getJobs(1: string ownerRole)
-
   // Initiates a kill on tasks.
   Response killTasks(1: TaskQuery query, 3: Lock lock, 2: SessionKey session)
-
-  // TODO(Suman Karumuri): Move this call into the read only api
-  // Fetches the quota allocated for a user.
-  Response getQuota(1: string ownerRole)
-
-  // TODO(Suman Karumuri): Move this call into the read only api
-  // Returns the current version of the API implementation
-  Response getVersion()
 
   // Adds new instances specified by the AddInstancesConfig.
   // A job represented by the JobKey must be protected by Lock.
