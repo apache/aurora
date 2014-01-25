@@ -51,7 +51,7 @@ GROUPING_OPTION = optparse.Option(
 
 
 def parse_hosts(options):
-  if not (options.filename or options.hosts):
+  if bool(options.filename) == bool(options.hosts):
     die('Please specify either --filename or --hosts')
   if options.filename:
     with open(options.filename, 'r') as hosts:
@@ -186,8 +186,8 @@ def set_quota(cluster, role, cpu_str, ram_mb_str, disk_mb_str):
     help='Comma separated list of hosts')
 @requires.exactly('cluster')
 def start_maintenance_hosts(cluster):
-  """usage: start_maintenance_hosts cluster [--filename=filename]
-                                            [--hosts=hosts]
+  """usage: start_maintenance_hosts {--filename=filename | --hosts=hosts}
+                                    cluster
   """
   options = app.get_options()
   MesosMaintenance(CLUSTERS[cluster], options.verbosity).start_maintenance(parse_hosts(options))
@@ -200,8 +200,8 @@ def start_maintenance_hosts(cluster):
     help='Comma separated list of hosts')
 @requires.exactly('cluster')
 def end_maintenance_hosts(cluster):
-  """usage: end_maintenance_hosts cluster [--filename=filename]
-                                          [--hosts=hosts]
+  """usage: end_maintenance_hosts {--filename=filename | --hosts=hosts}
+                                  cluster
   """
   options = app.get_options()
   MesosMaintenance(CLUSTERS[cluster], options.verbosity).end_maintenance(parse_hosts(options))
@@ -219,11 +219,11 @@ def end_maintenance_hosts(cluster):
 @app.command_option(GROUPING_OPTION)
 @requires.exactly('cluster')
 def perform_maintenance_hosts(cluster):
-  """usage: perform_maintenance cluster [--filename=filename]
-                                        [--hosts=hosts]
-                                        [--batch_size=num]
-                                        [--post_drain_script=path]
-                                        [--grouping=function]
+  """usage: perform_maintenance_hosts {--filename=filename | --hosts=hosts}
+                                      [--batch_size=num]
+                                      [--post_drain_script=path]
+                                      [--grouping=function]
+                                      cluster
 
   Asks the scheduler to remove any running tasks from the machine and remove it
   from service temporarily, perform some action on them, then return the machines
@@ -254,8 +254,8 @@ def perform_maintenance_hosts(cluster):
     help='Comma separated list of hosts')
 @requires.exactly('cluster')
 def host_maintenance_status(cluster):
-  """usage: host_maintenance_status cluster [--filename=filename]
-                                            [--hosts=hosts]
+  """usage: host_maintenance_status {--filename=filename | --hosts=hosts}
+                                    cluster
 
   Check on the schedulers maintenance status for a list of hosts in the cluster.
   """
