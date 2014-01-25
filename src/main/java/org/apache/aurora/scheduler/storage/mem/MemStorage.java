@@ -21,6 +21,7 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -89,6 +90,12 @@ public class MemStorage implements Storage {
         return attributeStore;
       }
     };
+
+    Stats.export(new StatImpl<Integer>("storage_lock_threads_waiting") {
+      @Override public Integer read() {
+        return lockManager.getQueueLength();
+      }
+    });
   }
 
   /**
