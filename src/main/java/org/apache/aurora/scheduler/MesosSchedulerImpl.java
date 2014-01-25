@@ -141,17 +141,27 @@ class MesosSchedulerImpl implements Scheduler {
 
   @Timed("scheduler_resource_offers")
   @Override
-  public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
+  public void resourceOffers(SchedulerDriver driver, final List<Offer> offers) {
     Preconditions.checkState(registered, "Must be registered before receiving offers.");
 
-    for (final Offer offer : offers) {
-      log(Level.FINE, "Received offer: %s", offer);
-      resourceOffers.incrementAndGet();
-      storage.write(new MutateWork.NoResult.Quiet() {
-        @Override protected void execute(MutableStoreProvider storeProvider) {
+    // Store all host attributes in a single write operation to prevent other threads from
+    // securing the storage lock between saves.  We also save the host attributes before passing
+    // offers elsewhere to ensure that host attributes are available before attempting to
+    // schedule tasks associated with offers.
+    // TODO(wfarner): Reconsider the requirements here, we might be able to save host offers
+    //                asynchronously and augment the task scheduler to skip over offers when the
+    //                host attributes cannot be found. (AURORA-116)
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override protected void execute(MutableStoreProvider storeProvider) {
+        for (final Offer offer : offers) {
           storeProvider.getAttributeStore().saveHostAttributes(Conversions.getAttributes(offer));
         }
-      });
+      }
+    });
+
+    for (Offer offer : offers) {
+      log(Level.FINE, "Received offer: %s", offer);
+      resourceOffers.incrementAndGet();
 
       // Ordering of task launchers is important here, since offers are consumed greedily.
       // TODO(William Farner): Refactor this area of code now that the primary task launcher
