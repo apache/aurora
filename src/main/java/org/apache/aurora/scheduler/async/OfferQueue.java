@@ -220,7 +220,7 @@ public interface OfferQueue extends EventSubscriber {
       return Iterables.removeIf(hostOffers,
           new Predicate<HostOffer>() {
             @Override public boolean apply(HostOffer input) {
-              return input.offer.getId().equals(offerId);
+              return input.offer.getId().getValue().equals(offerId.getValue());
             }
           });
     }
