@@ -168,7 +168,9 @@ public interface OfferQueue extends EventSubscriber {
       List<HostOffer> sameSlave = FluentIterable.from(hostOffers)
           .filter(new Predicate<HostOffer>() {
             @Override public boolean apply(HostOffer hostOffer) {
-              return hostOffer.offer.getSlaveId().equals(offer.getSlaveId());
+              // Intentionally avoid equals() on the SlaveID itself, since protobuf equals
+              // is rather intensive, and we may have thousands of them to do.
+              return hostOffer.offer.getSlaveId().getValue().equals(offer.getSlaveId().getValue());
             }
           })
           .toList();
