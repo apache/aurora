@@ -173,13 +173,6 @@ public interface Preemptor {
           }
         };
 
-    private static final Function<IAssignedTask, String> TASK_TO_HOST =
-        new Function<IAssignedTask, String>() {
-          @Override public String apply(IAssignedTask input) {
-            return input.getSlaveHost();
-          }
-        };
-
     private static Predicate<IAssignedTask> canPreempt(final IAssignedTask pending) {
       return new Predicate<IAssignedTask>() {
         @Override public boolean apply(IAssignedTask possibleVictim) {
@@ -227,7 +220,7 @@ public interface Preemptor {
       // This enforces the precondition that all of the resources are from the same host. We need to
       // get the host for the schedulingFilter.
       Set<String> hosts = ImmutableSet.<String>builder()
-          .addAll(Iterables.transform(possibleVictims, TASK_TO_HOST))
+          .addAll(Iterables.transform(possibleVictims, Tasks.ASSIGNED_TO_SLAVE_HOST))
           .addAll(Iterables.transform(offers, OFFER_TO_HOST)).build();
 
       String host = Iterables.getOnlyElement(hosts);

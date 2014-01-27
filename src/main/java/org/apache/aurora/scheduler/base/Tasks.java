@@ -94,6 +94,16 @@ public final class Tasks {
   public static final Function<IScheduledTask, IJobKey> SCHEDULED_TO_JOB_KEY =
       Functions.compose(ASSIGNED_TO_JOB_KEY, SCHEDULED_TO_ASSIGNED);
 
+  public static final Function<IAssignedTask, String> ASSIGNED_TO_SLAVE_HOST =
+      new Function<IAssignedTask, String>() {
+        @Override public String apply(IAssignedTask task) {
+          return task.getSlaveHost();
+        }
+      };
+
+  public static final Function<IScheduledTask, String> SCHEDULED_TO_SLAVE_HOST =
+      Functions.compose(ASSIGNED_TO_SLAVE_HOST, SCHEDULED_TO_ASSIGNED);
+
   /**
    * Different states that an active task may be in.
    */

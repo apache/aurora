@@ -18,6 +18,8 @@ package org.apache.aurora.scheduler.storage.mem;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -240,6 +242,69 @@ public class MemTaskStoreTest {
     assertEquals(
         ImmutableMap.of(Tasks.SCHEDULED_TO_INFO.apply(a), Tasks.SCHEDULED_TO_INFO.apply(a)),
         identityMap);
+  }
+
+  private static IScheduledTask setHost(IScheduledTask task, Optional<String> host) {
+    ScheduledTask builder = task.newBuilder();
+    builder.getAssignedTask().setSlaveHost(host.orNull());
+    return IScheduledTask.build(builder);
+  }
+
+  @Test
+  public void testAddSlaveHost() {
+    final IScheduledTask a = makeTask("a", "role", "env", "job");
+    store.saveTasks(ImmutableSet.of(a));
+    String host = "slaveA";
+    assertQueryResults(Query.slaveScoped(host));
+
+    final IScheduledTask b = setHost(a, Optional.of(host));
+    Set<IScheduledTask> result = store.mutateTasks(Query.taskScoped(Tasks.id(a)),
+        new Function<IScheduledTask, IScheduledTask>() {
+          @Override public IScheduledTask apply(IScheduledTask task) {
+            assertEquals(a, task);
+            return b;
+          }
+        });
+    assertEquals(ImmutableSet.of(b), result);
+    assertQueryResults(Query.slaveScoped(host), b);
+
+    // Unrealistic behavior, but proving that the secondary index can handle key mutations.
+    String host2 = "slaveA2";
+    final IScheduledTask c = setHost(b, Optional.of(host2));
+    Set<IScheduledTask> result2 = store.mutateTasks(Query.taskScoped(Tasks.id(a)),
+        new Function<IScheduledTask, IScheduledTask>() {
+          @Override public IScheduledTask apply(IScheduledTask task) {
+            assertEquals(b, task);
+            return c;
+          }
+        });
+    assertEquals(ImmutableSet.of(c), result2);
+    assertQueryResults(Query.slaveScoped(host2), c);
+
+    store.deleteTasks(ImmutableSet.of(Tasks.id(a)));
+    assertQueryResults(Query.slaveScoped(host));
+  }
+
+  @Test
+  public void testUnsetSlaveHost() {
+    // Unrealistic behavior, but proving that the secondary index does not become stale.
+
+    String host = "slaveA";
+    final IScheduledTask a = setHost(makeTask("a", "role", "env", "job"), Optional.of(host));
+    store.saveTasks(ImmutableSet.of(a));
+    assertQueryResults(Query.slaveScoped(host), a);
+
+    final IScheduledTask b = setHost(a, Optional.<String>absent());
+    Set<IScheduledTask> result = store.mutateTasks(Query.taskScoped(Tasks.id(a)),
+        new Function<IScheduledTask, IScheduledTask>() {
+          @Override public IScheduledTask apply(IScheduledTask task) {
+            assertEquals(a, task);
+            return b;
+          }
+        });
+    assertEquals(ImmutableSet.of(b), result);
+    assertQueryResults(Query.slaveScoped(host));
+    assertQueryResults(Query.taskScoped(Tasks.id(b)), b);
   }
 
   private void assertStoreContents(IScheduledTask... tasks) {

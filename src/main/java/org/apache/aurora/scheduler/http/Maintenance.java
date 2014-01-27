@@ -81,16 +81,9 @@ public class Maintenance {
       drainingTasks.addAll(provider.getTaskStore().fetchTasks(Query.slaveScoped(host).active()));
     }
     return Multimaps.transformValues(
-        Multimaps.index(drainingTasks.build(), TASK_TO_HOST),
+        Multimaps.index(drainingTasks.build(), Tasks.SCHEDULED_TO_SLAVE_HOST),
         Tasks.SCHEDULED_TO_ID);
   }
-
-  private static final Function<IScheduledTask, String> TASK_TO_HOST =
-      new Function<IScheduledTask, String>() {
-        @Override public String apply(IScheduledTask task) {
-          return task.getAssignedTask().getSlaveHost();
-        }
-      };
 
   private static final Function<HostAttributes, String> HOST_NAME =
       new Function<HostAttributes, String>() {
