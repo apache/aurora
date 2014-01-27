@@ -42,17 +42,6 @@ from mock import Mock, patch
 class TestClientCreateCommand(AuroraClientCommandTest):
 
   @classmethod
-  def setup_mock_options(cls):
-    """set up to get a mock options object."""
-    mock_options = Mock()
-    mock_options.json = False
-    mock_options.bindings = {}
-    mock_options.open_browser = False
-    mock_options.cluster = None
-    mock_options.wait_until = 'RUNNING'  # or 'FINISHED' for other tests
-    return mock_options
-
-  @classmethod
   def create_mock_task(cls, task_id, instance_id, initial_time, status):
     mock_task = Mock(spec=ScheduledTask)
     mock_task.assignedTask = Mock(spec=AssignedTask)

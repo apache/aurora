@@ -133,7 +133,8 @@ def create(job_spec, config_file):
   monitor = JobMonitor(api, config.role(), config.environment(), config.name())
   resp = api.create_job(config)
   check_and_log_response(resp)
-  handle_open(api.scheduler_proxy.scheduler_client().url, config.role(), config.environment(), config.name())
+  handle_open(api.scheduler_proxy.scheduler_client().url, config.role(), config.environment(),
+      config.name())
   if options.wait_until == 'RUNNING':
     monitor.wait_until(monitor.running_or_finished)
   elif options.wait_until == 'FINISHED':
@@ -229,7 +230,8 @@ def do_open(args, _):
   api = make_client(cluster_name)
 
   import webbrowser
-  webbrowser.open_new_tab(synthesize_url(api.scheduler_proxy.scheduler_client().url, role, env, job))
+  webbrowser.open_new_tab(
+      synthesize_url(api.scheduler_proxy.scheduler_client().url, role, env, job))
 
 
 @app.command

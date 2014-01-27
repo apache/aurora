@@ -150,7 +150,6 @@ class TestJobStatus(AuroraClientCommandTest):
     assert mock_api.check_status.call_args_list[1][0][0].env == 'test'
     assert mock_api.check_status.call_args_list[1][0][0].name == 'hello'
 
-
   def test_status_wildcard_two(self):
     """Test status using a wildcard. It should first call api.get_jobs, and then do a
     getTasksStatus on each job. This time, use a pattern that doesn't match all of the jobs."""

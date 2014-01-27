@@ -30,7 +30,15 @@ python_library(
 
 python_tests(
   name = 'job',
-  sources = [ 'test_create.py', 'test_kill.py', 'test_status.py', 'test_diff.py' ],
+  sources = [
+    'test_cancel_update.py',
+    'test_create.py',
+    'test_diff.py',
+    'test_kill.py',
+    'test_restart.py',
+    'test_status.py',
+    'test_update.py',
+  ],
   dependencies = [
     pants(':util'),
     pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),

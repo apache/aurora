@@ -22,8 +22,10 @@ import pprint
 import subprocess
 import sys
 from tempfile import NamedTemporaryFile
+import time
 
 from apache.aurora.client.api.job_monitor import JobMonitor
+from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION,
@@ -34,11 +36,17 @@ from apache.aurora.client.cli import (
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
+    BATCH_OPTION,
     BIND_OPTION,
     BROWSER_OPTION,
     CONFIG_ARGUMENT,
+    FORCE_OPTION,
+    HEALTHCHECK_OPTION,
+    INSTANCES_OPTION,
     JOBSPEC_ARGUMENT,
-    JSON_OPTION,
+    JSON_READ_OPTION,
+    JSON_WRITE_OPTION,
+    WATCH_OPTION,
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
@@ -54,24 +62,34 @@ from thrift.TSerialization import serialize
 from thrift.protocol import TJSONProtocol
 
 
-def parse_instances(instances):
-  """Parse lists of instances or instance ranges into a set().
-     Examples:
-       0-2
-       0,1-3,5
-       1,3,5
-  """
-  if instances is None or instances == '':
-    return None
-  result = set()
-  for part in instances.split(','):
-    x = part.split('-')
-    result.update(range(int(x[0]), int(x[-1]) + 1))
-  return sorted(result)
-
-
 def arg_type_jobkey(key):
   return AuroraCommandContext.parse_partial_jobkey(key)
+
+
+class CancelUpdateCommand(Verb):
+  @property
+  def name(self):
+    return 'cancel_update'
+
+  @property
+  def help(self):
+    return """Usage: aurora job cancel_update [--config_file=path [--json]] cluster/role/env/name
+
+    Cancels an in-progress update operation, releasing the update lock
+    """
+
+  def setup_options_parser(self, parser):
+    self.add_option(parser, JSON_READ_OPTION)
+    parser.add_argument('--config', type=str, default=None, dest='config_file',
+         help='Config file for the job, possibly containing hooks')
+    self.add_option(parser, JOBSPEC_ARGUMENT)
+
+  def execute(self, context):
+    api = context.get_api(context.options.jobspec.cluster)
+    config = (context.get_job_config(context.options.jobspec, context.options.config_file)
+        if context.options.config_file else None)
+    resp = api.cancel_update(context.options.jobspec, config=config)
+    context.check_and_log_response(resp)
 
 
 class CreateJobCommand(Verb):
@@ -81,17 +99,17 @@ class CreateJobCommand(Verb):
 
   @property
   def help(self):
-    return '''Usage: aurora create cluster/role/env/job config.aurora
+    return """Usage: aurora create cluster/role/env/job config.aurora
 
     Create a job using aurora
-    '''
+    """
 
   CREATE_STATES = ('PENDING', 'RUNNING', 'FINISHED')
 
   def setup_options_parser(self, parser):
     self.add_option(parser, BIND_OPTION)
     self.add_option(parser, BROWSER_OPTION)
-    self.add_option(parser, JSON_OPTION)
+    self.add_option(parser, JSON_READ_OPTION)
     parser.add_argument('--wait_until', choices=self.CREATE_STATES,
         default='PENDING',
         help=('Block the client until all the tasks have transitioned into the requested state. '
@@ -99,12 +117,9 @@ class CreateJobCommand(Verb):
     self.add_option(parser, JOBSPEC_ARGUMENT)
     self.add_option(parser, CONFIG_ARGUMENT)
 
+
   def execute(self, context):
-    try:
-      config = context.get_job_config(context.options.jobspec, context.options.config_file)
-    except Config.InvalidConfigError as e:
-      raise context.CommandError(EXIT_INVALID_CONFIGURATION,
-          'Error loading job configuration: %s' % e)
+    config = context.get_job_config(context.options.jobspec, context.options.config_file)
     api = context.get_api(config.cluster())
     monitor = JobMonitor(api, config.role(), config.environment(), config.name())
     resp = api.create_job(config)
@@ -121,137 +136,14 @@ class CreateJobCommand(Verb):
     return EXIT_OK
 
 
-class KillJobCommand(Verb):
-  @property
-  def name(self):
-    return 'kill'
-
-  @property
-  def help(self):
-    return '''Usage: kill cluster/role/env/job
-
-    Kill a scheduled job
-    '''
-
-  def setup_options_parser(self, parser):
-    self.add_option(parser, BROWSER_OPTION)
-    parser.add_argument('--instances', type=parse_instances, dest='instances', default=None,
-        help='A list of instance ids to act on. Can either be a comma-separated list (e.g. 0,1,2) '
-            'or a range (e.g. 0-2) or any combination of the two (e.g. 0-2,5,7-9). If not set, '
-            'all instances will be acted on.')
-    parser.add_argument('--config', type=str, default=None, dest='config',
-         help='Config file for the job, possibly containing hooks')
-    self.add_option(parser, JOBSPEC_ARGUMENT)
-
-  def execute(self, context):
-    # TODO: Check for wildcards; we don't allow wildcards for job kill.
-    api = context.get_api(context.options.jobspec.cluster)
-    resp = api.kill_job(context.options.jobspec, context.options.instances)
-    if resp.responseCode != ResponseCode.OK:
-      context.print_err('Job %s not found' % context.options.jobspec, file=sys.stderr)
-      return EXIT_INVALID_PARAMETER
-    if context.options.open_browser:
-      context.open_job_page(api, context.options.jobspec)
-
-
-class StatusCommand(Verb):
-  @property
-  def help(self):
-    return '''Usage: aurora status jobspec
-
-    Get status information about a scheduled job or group of jobs. The
-    jobspec parameter can ommit parts of the jobkey, or use shell-style globs.
-    '''
-
-  @property
-  def name(self):
-    return 'status'
-
-  def setup_options_parser(self, parser):
-    parser.add_argument('--json', default=False, action='store_true',
-        help='Show status information in machine-processable JSON format')
-    parser.add_argument('jobspec', type=arg_type_jobkey)
-
-  def render_tasks_json(self, jobkey, active_tasks, inactive_tasks):
-    """Render the tasks running for a job in machine-processable JSON format."""
-    def render_task_json(scheduled_task):
-      """Render a single task into json. This is baroque, but it uses thrift to
-      give us all of the job status data, while allowing us to compose it with
-      other stuff and pretty-print it.
-      """
-      return json.loads(serialize(scheduled_task,
-          protocol_factory=TJSONProtocol.TSimpleJSONProtocolFactory()))
-
-    return {'job': str(jobkey),
-        'active': [render_task_json(task) for task in active_tasks],
-        'inactive': [render_task_json(task) for task in inactive_tasks]}
-
-  def render_tasks_pretty(self, jobkey, active_tasks, inactive_tasks):
-    """Render the tasks for a job in human-friendly format"""
-    def render_task_pretty(scheduled_task):
-      assigned_task = scheduled_task.assignedTask
-      task_info = assigned_task.task
-      task_strings = []
-      if task_info:
-        task_strings.append('''\tcpus: %s, ram: %s MB, disk: %s MB''' % (
-            task_info.numCpus, task_info.ramMb, task_info.diskMb))
-      if assigned_task.assignedPorts:
-        task_strings.append('ports: %s' % assigned_task.assignedPorts)
-        # TODO: only add the max if taskInfo is filled in!
-        task_strings.append('failure count: %s (max %s)' % (scheduled_task.failureCount,
-            task_info.maxTaskFailures))
-        task_strings.append('events:')
-      for event in scheduled_task.taskEvents:
-        task_strings.append('\t %s %s: %s' % (datetime.fromtimestamp(event.timestamp / 1000),
-            ScheduleStatus._VALUES_TO_NAMES[event.status], event.message))
-        task_strings.append('packages:')
-        for pkg in assigned_task.task.packages:
-          task_strings.append('\trole: %s, package: %s, version: %s' %
-              (pkg.role, pkg.name, pkg.version))
-      return '\n\t'.join(task_strings)
-
-    result = ["Active tasks (%s):\n" % len(active_tasks)]
-    for t in active_tasks:
-      result.append(render_task_pretty(t))
-    result.append("Inactive tasks (%s):\n" % len(inactive_tasks))
-    for t in inactive_tasks:
-      result.append(render_task_pretty(t))
-    return ''.join(result)
-
-  def get_status_for_jobs(self, jobkeys, context):
-    """Retrieve and render the status information for a collection of jobs"""
-    def is_active(task):
-      return task.status in ACTIVE_STATES
-
-    result = []
-    for jk in jobkeys:
-      job_tasks = context.get_job_status(jk)
-      active_tasks = [t for t in job_tasks if is_active(t)]
-      inactive_tasks = [t for t in job_tasks if not is_active(t)]
-      if context.options.json:
-        result.append(self.render_tasks_json(jk, active_tasks, inactive_tasks))
-      else:
-        result.append(self.render_tasks_pretty(jk, active_tasks, inactive_tasks))
-    if context.options.json:
-      return json.dumps(result, indent=2, separators=[',', ': '], sort_keys=False)
-    else:
-      return ''.join(result)
-
-  def execute(self, context):
-    jobs = context.get_jobs_matching_key(context.options.jobspec)
-    result = self.get_status_for_jobs(jobs, context)
-    context.print_out(result)
-
-
 class DiffCommand(Verb):
-
   def __init__(self):
     super(DiffCommand, self).__init__()
     self.prettyprinter = pprint.PrettyPrinter(indent=2)
 
   @property
   def help(self):
-    return """usage: diff cluster/role/env/job config
+    return """Usage: diff cluster/role/env/job config
 
   Compares a job configuration against a running job.
   By default the diff will be displayed using 'diff', though you may choose an alternate
@@ -264,7 +156,7 @@ class DiffCommand(Verb):
 
   def setup_options_parser(self, parser):
     self.add_option(parser, BIND_OPTION)
-    self.add_option(parser, JSON_OPTION)
+    self.add_option(parser, JSON_READ_OPTION)
     parser.add_argument('--from', dest='rename_from', type=AuroraJobKey.from_path, default=None,
         help='If specified, the job key to diff against.')
     self.add_option(parser, JOBSPEC_ARGUMENT)
@@ -286,11 +178,7 @@ class DiffCommand(Verb):
     out_file.flush()
 
   def execute(self, context):
-    try:
-      config = context.get_job_config(context.options.jobspec, context.options.config_file)
-    except Config.InvalidConfigError as e:
-      raise context.CommandError(EXIT_INVALID_CONFIGURATION,
-          'Error loading job configuration: %s' % e)
+    config = context.get_job_config(context.options.jobspec, context.options.config_file)
     if context.options.rename_from is not None:
       cluster = context.options.rename_from.cluster
       role = context.options.rename_from.role
@@ -328,7 +216,7 @@ class DiffCommand(Verb):
 class InspectCommand(Verb):
   @property
   def help(self):
-    return """usage: inspect cluster/role/env/job config
+    return """Usage: inspect cluster/role/env/job config
 
   Verifies that a job can be parsed from a configuration file, and displays
   the parsed configuration.
@@ -340,63 +228,332 @@ class InspectCommand(Verb):
 
   def setup_options_parser(self, parser):
     self.add_option(parser, BIND_OPTION)
-    self.add_option(parser, JSON_OPTION)
+    self.add_option(parser, JSON_READ_OPTION)
     parser.add_argument('--local', dest='local', default=False, action='store_true',
         help='Inspect the configuration as would be created by the "spawn" command.')
     parser.add_argument('--raw', dest='raw', default=False, action='store_true',
         help='Show the raw configuration.')
-
     self.add_option(parser, JOBSPEC_ARGUMENT)
     self.add_option(parser, CONFIG_ARGUMENT)
 
   def execute(self, context):
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
     if context.options.raw:
-      print(config.job())
+      context.print(config.job())
       return EXIT_OK
-    job_thrift = config.job()
+
     job = config.raw()
     job_thrift = config.job()
-    print('Job level information')
-    print('  name:       %s' % job.name())
-    print('  role:       %s' % job.role())
-    print('  contact:    %s' % job.contact())
-    print('  cluster:    %s' % job.cluster())
-    print('  instances:  %s' % job.instances())
+    context.print_out('Job level information')
+    context.print_out('name:       %s' % job.name(), indent=2)
+    context.print_out('role:       %s' % job.role(), indent=2)
+    context.print_out('contact:    %s' % job.contact(), indent=2)
+    context.print_out('cluster:    %s' % job.cluster(), indent=2)
+    context.print_out('instances:  %s' % job.instances(), indent=2)
     if job.has_cron_schedule():
-      print('  cron:')
-      print('     schedule: %s' % job.cron_schedule())
-      print('     policy:   %s' % job.cron_collision_policy())
+      context.print_out('cron:', indent=2)
+      context.print_out('schedule: %s' % job.cron_schedule(), ident=4)
+      context.print_out('policy:   %s' % job.cron_collision_policy(), indent=4)
     if job.has_constraints():
-      print('  constraints:')
+      context.print_out('constraints:', indent=2)
       for constraint, value in job.constraints().get().items():
-        print('    %s: %s' % (constraint, value))
-    print('  service:    %s' % job_thrift.taskConfig.isService)
-    print('  production: %s' % bool(job.production().get()))
-    print()
+        context.print_out('%s: %s' % (constraint, value), indent=4)
+    context.print_out('service:    %s' % job_thrift.taskConfig.isService, indent=2)
+    context.print_out('production: %s' % bool(job.production().get()), indent=2)
+    context.print()
 
     task = job.task()
-    print('Task level information')
-    print('  name: %s' % task.name())
+    context.print_out('Task level information')
+    context.print_out('name: %s' % task.name(), indent=2)
+
     if len(task.constraints().get()) > 0:
-      print('  constraints:')
+      context.print_out('constraints:', indent=2)
       for constraint in task.constraints():
-        print('    %s' % (' < '.join(st.get() for st in constraint.order() or [])))
-    print()
+        context.print_out('%s' % (' < '.join(st.get() for st in constraint.order() or [])),
+            indent=2)
+    context.print_out()
 
     processes = task.processes()
     for process in processes:
-      print('Process %s:' % process.name())
+      context.print_out('Process %s:' % process.name())
       if process.daemon().get():
-        print('  daemon')
+        context.print_out('daemon', indent=2)
       if process.ephemeral().get():
-        print('  ephemeral')
+        context.print_out('ephemeral', indent=2)
       if process.final().get():
-        print('  final')
-      print('  cmdline:')
+        context.print_out('final', indent=2)
+      context.print_out('cmdline:', indent=2)
       for line in process.cmdline().get().splitlines():
-        print('    ' + line)
-      print()
+        context.print_out(line, indent=4)
+      context.print_out()
+
+
+class KillJobCommand(Verb):
+  @property
+  def name(self):
+    return 'kill'
+
+  @property
+  def help(self):
+    return """Usage: kill cluster/role/env/job
+
+    Kill a scheduled job
+    """
+
+  def setup_options_parser(self, parser):
+    self.add_option(parser, BROWSER_OPTION)
+    self.add_option(parser, INSTANCES_OPTION)
+    parser.add_argument('--config', type=str, default=None, dest='config',
+         help='Config file for the job, possibly containing hooks')
+    self.add_option(parser, JOBSPEC_ARGUMENT)
+
+  def execute(self, context):
+    # TODO(mchucarroll): Check for wildcards; we don't allow wildcards for job kill.
+    api = context.get_api(context.options.jobspec.cluster)
+    resp = api.kill_job(context.options.jobspec, context.options.instances)
+    if resp.responseCode != ResponseCode.OK:
+      context.print_err('Job %s not found' % context.options.jobspec, file=sys.stderr)
+      return EXIT_INVALID_PARAMETER
+    if context.options.open_browser:
+      context.open_job_page(api, context.options.jobspec)
+
+
+class ListJobsCommand(Verb):
+  @property
+  def help(self):
+    return """Usage: aurora job list jobspec
+
+    Lists jobs that match a jobkey or jobkey pattern.
+    """
+
+  @property
+  def name(self):
+    return 'list'
+
+  def setup_options_parser(self, parser):
+    parser.add_argument('jobspec', type=arg_type_jobkey)
+
+  def execute(self, context):
+    jobs = context.get_jobs_matching_key(context.options.jobspec)
+    for j in jobs:
+      context.print('%s/%s/%s/%s' % (j.cluster, j.role, j.env, j.name))
+    result = self.get_status_for_jobs(jobs, context)
+    context.print_out(result)
+
+
+class RestartCommand(Verb):
+  @property
+  def name(self):
+    return 'restart'
+
+  def setup_options_parser(self, parser):
+    self.add_option(parser, BATCH_OPTION)
+    self.add_option(parser, BIND_OPTION)
+    self.add_option(parser, BROWSER_OPTION)
+    self.add_option(parser, FORCE_OPTION)
+    self.add_option(parser, HEALTHCHECK_OPTION)
+    self.add_option(parser, INSTANCES_OPTION)
+    self.add_option(parser, JSON_READ_OPTION)
+    self.add_option(parser, WATCH_OPTION)
+    parser.add_argument('--max_per_shard_failures', type=int, default=0,
+        help='Maximum number of restarts per shard during restart. Increments total failure '
+            'count when this limit is exceeded.')
+    parser.add_argument('--restart_threshold', type=int, default=60,
+        help='Maximum number of seconds before a shard must move into the RUNNING state before '
+             'considered a failure.')
+    parser.add_argument('--max_total_failures', type=int, default=0,
+        help='Maximum number of shard failures to be tolerated in total during restart.')
+    self.add_option(parser, JOBSPEC_ARGUMENT)
+    self.add_option(parser, CONFIG_ARGUMENT)
+
+  @property
+  def help(self):
+    return """Usage: restart cluster/role/env/job
+    [--shards=SHARDS]
+    [--batch_size=INT]
+    [--updater_health_check_interval_seconds=SECONDS]
+    [--max_per_shard_failures=INT]
+    [--max_total_failures=INT]
+    [--restart_threshold=INT]
+    [--watch_secs=SECONDS]
+    [--open_browser]
+
+  Performs a rolling restart of shards within a job.
+
+  Restarts are fully controlled client-side, so aborting halts the restart.
+  """
+
+  def execute(self, context):
+    api = context.get_api(context.options.jobspec.cluster)
+    config = (context.get_job_config(context.options.jobspec, context.options.config_file)
+        if context.options.config_file else None)
+    updater_config = UpdaterConfig(
+        context.options.batch_size,
+        context.options.restart_threshold,
+        context.options.watch_secs,
+        context.options.max_per_shard_failures,
+        context.options.max_total_failures)
+    resp = api.restart(context.options.jobspec, context.options.instances, updater_config,
+        context.options.healthcheck_interval_seconds, config=config)
+
+    context.check_and_log_response(resp)
+    if context.options.open_browser:
+      context.open_job_page(api, context.options.jobspec)
+
+
+class StatusCommand(Verb):
+  @property
+  def help(self):
+    return """Usage: aurora status jobspec
+
+    Get status information about a scheduled job or group of jobs. The
+    jobspec parameter can ommit parts of the jobkey, or use shell-style globs.
+    """
+
+  @property
+  def name(self):
+    return 'status'
+
+  def setup_options_parser(self, parser):
+    self.add_option(parser, JSON_WRITE_OPTION)
+    parser.add_argument('jobspec', type=arg_type_jobkey)
+
+  def render_tasks_json(self, jobkey, active_tasks, inactive_tasks):
+    """Render the tasks running for a job in machine-processable JSON format."""
+    def render_task_json(scheduled_task):
+      """Render a single task into json. This is baroque, but it uses thrift to
+      give us all of the job status data, while allowing us to compose it with
+      other stuff and pretty-print it.
+      """
+      return json.loads(serialize(scheduled_task,
+          protocol_factory=TJSONProtocol.TSimpleJSONProtocolFactory()))
+
+    return {'job': str(jobkey),
+        'active': [render_task_json(task) for task in active_tasks],
+        'inactive': [render_task_json(task) for task in inactive_tasks]}
+
+  def render_tasks_pretty(self, jobkey, active_tasks, inactive_tasks):
+    """Render the tasks for a job in human-friendly format"""
+    def render_task_pretty(scheduled_task):
+      assigned_task = scheduled_task.assignedTask
+      task_info = assigned_task.task
+      task_strings = []
+      if task_info:
+        task_strings.append('''\tcpus: %s, ram: %s MB, disk: %s MB''' % (
+            task_info.numCpus, task_info.ramMb, task_info.diskMb))
+      if assigned_task.assignedPorts:
+        task_strings.append('ports: %s' % assigned_task.assignedPorts)
+        # TODO(mchucarroll): only add the max if taskInfo is filled in!
+        task_strings.append('failure count: %s (max %s)' % (scheduled_task.failureCount,
+            task_info.maxTaskFailures))
+        task_strings.append('events:')
+      for event in scheduled_task.taskEvents:
+        task_strings.append('\t %s %s: %s' % (datetime.fromtimestamp(event.timestamp / 1000),
+            ScheduleStatus._VALUES_TO_NAMES[event.status], event.message))
+        task_strings.append('packages:')
+        for pkg in assigned_task.task.packages:
+          task_strings.append('\trole: %s, package: %s, version: %s' %
+              (pkg.role, pkg.name, pkg.version))
+      return '\n\t'.join(task_strings)
+
+    result = ["Active tasks (%s):\n" % len(active_tasks)]
+    for t in active_tasks:
+      result.append(render_task_pretty(t))
+    result.append("Inactive tasks (%s):\n" % len(inactive_tasks))
+    for t in inactive_tasks:
+      result.append(render_task_pretty(t))
+    return ''.join(result)
+
+  def get_status_for_jobs(self, jobkeys, context):
+    """Retrieve and render the status information for a collection of jobs"""
+    def is_active(task):
+      return task.status in ACTIVE_STATES
+
+    result = []
+    for jk in jobkeys:
+      job_tasks = context.get_job_status(jk)
+      active_tasks = [t for t in job_tasks if is_active(t)]
+      inactive_tasks = [t for t in job_tasks if not is_active(t)]
+      if context.options.write_json:
+        result.append(self.render_tasks_json(jk, active_tasks, inactive_tasks))
+      else:
+        result.append(self.render_tasks_pretty(jk, active_tasks, inactive_tasks))
+    if context.options.write_json:
+      return json.dumps(result, indent=2, separators=[',', ': '], sort_keys=False)
+    else:
+      return ''.join(result)
+
+  def execute(self, context):
+    jobs = context.get_jobs_matching_key(context.options.jobspec)
+    result = self.get_status_for_jobs(jobs, context)
+    context.print_out(result)
+
+
+class UpdateCommand(Verb):
+  @property
+  def name(self):
+    return 'update'
+
+  def setup_options_parser(self, parser):
+    self.add_option(parser, FORCE_OPTION)
+    self.add_option(parser, BIND_OPTION)
+    self.add_option(parser, JSON_READ_OPTION)
+    self.add_option(parser, INSTANCES_OPTION)
+    self.add_option(parser, HEALTHCHECK_OPTION)
+    self.add_option(parser, JOBSPEC_ARGUMENT)
+    self.add_option(parser, CONFIG_ARGUMENT)
+
+  @property
+  def help(self):
+    return """Usage: update cluster/role/env/job config
+
+  Performs a rolling upgrade on a running job, using the update configuration
+  within the config file as a control for update velocity and failure tolerance.
+
+  Updates are fully controlled client-side, so aborting an update halts the
+  update and leaves the job in a 'locked' state on the scheduler.
+  Subsequent update attempts will fail until the update is 'unlocked' using the
+  'cancel_update' command.
+
+  The updater only takes action on shards in a job that have changed, meaning
+  that changing a single shard will only induce a restart on the changed shard.
+
+  You may want to consider using the 'diff' subcommand before updating,
+  to preview what changes will take effect.
+  """
+
+  def warn_if_dangerous_change(self, context, api, job_spec, config):
+    # Get the current job status, so that we can check if there's anything
+    # dangerous about this update.
+    resp = api.query(api.build_query(config.role(), config.name(),
+        statuses=ACTIVE_STATES, env=config.environment()))
+    if resp.responseCode != ResponseCode.OK:
+      # NOTE(mchucarroll): we assume here that updating a cron schedule and updating a
+      # running job are different operations; in client v1, they were both done with update.
+      raise context.CommandError(EXIT_COMMAND_FAILURE,
+          'Server could not find running job to update: %s' % resp.message)
+    remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
+    resp = api.populate_job_config(config)
+    if resp.responseCode != ResponseCode.OK:
+      raise context.CommandError(EXIT_COMMAND_FAILURE,
+          'Server could not populate job config for comparison: %s' % resp.message)
+    local_task_count = len(resp.result.populateJobResult.populated)
+    remote_task_count = len(remote_tasks)
+    if (local_task_count >= 4 * remote_task_count or
+        local_task_count <= 4 * remote_task_count or
+        local_task_count == 0):
+      context.print_out('Warning: this update is a large change. Press ^C within 5 seconds to abort')
+      time.sleep(5)
+
+  def execute(self, context):
+    config = context.get_job_config(context.options.jobspec, context.options.config_file)
+    api = context.get_api(config.cluster())
+    if not context.options.force:
+      self.warn_if_dangerous_change(context, api, context.options.jobspec, config)
+    resp = api.update_job(config, context.options.healthcheck_interval_seconds,
+        context.options.instances)
+    if resp.responseCode != ResponseCode.OK:
+      raise context.CommandError(EXIT_COMMAND_FAILURE, 'Update failed: %s' % resp.message)
 
 
 class Job(Noun):
@@ -414,8 +571,12 @@ class Job(Noun):
 
   def __init__(self):
     super(Job, self).__init__()
+    self.register_verb(CancelUpdateCommand())
     self.register_verb(CreateJobCommand())
-    self.register_verb(KillJobCommand())
-    self.register_verb(StatusCommand())
     self.register_verb(DiffCommand())
     self.register_verb(InspectCommand())
+    self.register_verb(KillJobCommand())
+    self.register_verb(ListJobsCommand())
+    self.register_verb(RestartCommand())
+    self.register_verb(StatusCommand())
+    self.register_verb(UpdateCommand())

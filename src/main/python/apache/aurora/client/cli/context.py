@@ -24,9 +24,9 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.client.base import synthesize_url
 from apache.aurora.client.cli import (
     Context,
-    EXIT_NETWORK_ERROR,
+    EXIT_API_ERROR,
+    EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER,
-    EXIT_NETWORK_ERROR
 )
 from apache.aurora.client.config import get_config
 from apache.aurora.client.factory import make_client
@@ -61,39 +61,44 @@ class AuroraCommandContext(Context):
   def get_job_config(self, jobkey, config_file):
     """Loads a job configuration from a config file."""
     jobname = jobkey.name
-    return get_config(
-      jobname,
-      config_file,
-      self.options.json,
-      self.options.bindings,
-      select_cluster=jobkey.cluster,
-      select_role=jobkey.role,
-      select_env=jobkey.env)
+    try:
+      return get_config(
+        jobname,
+        config_file,
+        self.options.read_json,
+        self.options.bindings,
+        select_cluster=jobkey.cluster,
+        select_role=jobkey.role,
+        select_env=jobkey.env)
+    except Exception as e:
+      raise self.CommandError(EXIT_INVALID_CONFIGURATION, 'Error loading configuration: %s' % e)
 
-  def print_out(self, str):
+  def print_out(self, str, indent=0):
     """Prints output. For debugging purposes, it's nice to be able to patch this
     and capture output.
     """
-    print(str)
+    indent_str = ' ' * indent
+    print('%s%s' % (indent_str, str))
 
-  def print_err(self, str):
+  def print_err(self, str, indent=0):
     """Prints output to standard error."""
-    print(str, file=sys.stderr)
+    indent_str = ' ' * indent
+    print('%s%s' % (indent_str, str), file=sys.stderr)
 
   def open_page(self, url):
     import webbrowser
     webbrowser.open_new_tab(url)
 
   def open_job_page(self, api, jobkey):
-    """Open the page for a job in the system web browser."""
-    self.open_page(synthesize_url(api.scheduler.scheduler().url, jobkey.role,
+    """Opens the page for a job in the system web browser."""
+    self.open_page(synthesize_url(api.scheduler_proxy.scheduler_client().url, jobkey.role,
         jobkey.env, jobkey.name))
 
   def check_and_log_response(self, resp):
     log.info('Response from scheduler: %s (message: %s)'
         % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
     if resp.responseCode != ResponseCode.OK:
-      raise self.CommandError(EXIT_NETWORK_ERROR, resp.message)
+      raise self.CommandError(EXIT_API_ERROR, resp.message)
 
   @classmethod
   def parse_partial_jobkey(cls, key):
@@ -110,7 +115,7 @@ class AuroraCommandContext(Context):
     return PartialJobKey(*parts)
 
   def get_job_list(self, clusters, role=None):
-    """Get a list of all jobs from a group of clusters.
+    """Get a list of jobs from a group of clusters.
     :param clusters: the clusters to query for jobs
     :param role: if specified, only return jobs for the role; otherwise, return all jobs.
     """
@@ -129,7 +134,7 @@ class AuroraCommandContext(Context):
   def get_jobs_matching_key(self, key):
     """Finds all jobs matching a key containing wildcard segments.
     This is potentially slow!
-    TODO: insert a warning to users about slowness if the key contains wildcards!
+    TODO(mchucarroll): insert a warning to users about slowness if the key contains wildcards!
     """
 
     def is_fully_bound(key):
