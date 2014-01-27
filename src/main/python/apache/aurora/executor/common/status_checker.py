@@ -107,7 +107,6 @@ class ChainedStatusChecker(StatusChecker):
   def status(self):
     if self._status is None:
       for status_checker in self._status_checkers:
-        log.debug('Checking status from %s' % status_checker.__class__.__name__)
         status_checker_status = status_checker.status
         if status_checker_status is not None:
           log.info('%s reported %s' % (status_checker.__class__.__name__, status_checker_status))
