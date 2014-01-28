@@ -89,18 +89,19 @@ class MemTaskStore implements TaskStore.Mutable {
   // thread-safe but not necessarily strongly-consistent unless the externally-controlled storage
   // lock is secured.  To adhere to that, these data structures are individually thread-safe, but
   // we don't lock across them because of the relaxed consistency guarantees.
-  // For this reason, the secondary indices store references to Task objects (as opposed to storing
-  // secondary to primary key mappings).  This ensures that in the face of weak consistency, query
-  // results are sane.  Otherwise, you could query for seconary key = v1 and get a result with
-  // secondary key value = v2.
+  // Note that this behavior makes it possible to receive query results that are not sane,
+  // specifically when a secondary key value is changed.  In other words, we currently don't always
+  // support the invariant that a query by slave host yields a result with all tasks matching that
+  // slave host.  This is deemed acceptable due to the fact that secondary key values are rarely
+  // mutated in practice, and mutated in ways that are not impacted by this behavior.
   private final Map<String, Task> tasks = Maps.newConcurrentMap();
   private final List<SecondaryIndex<?>> secondaryIndices = ImmutableList.of(
       new SecondaryIndex<>(
-          Functions.compose(Tasks.SCHEDULED_TO_JOB_KEY, TO_SCHEDULED),
+          Tasks.SCHEDULED_TO_JOB_KEY,
           QUERY_TO_JOB_KEY,
           Stats.exportLong("task_queries_by_job")),
       new SecondaryIndex<>(
-          Functions.compose(Tasks.SCHEDULED_TO_SLAVE_HOST, TO_SCHEDULED),
+          Tasks.SCHEDULED_TO_SLAVE_HOST,
           QUERY_TO_SLAVE_HOST,
           Stats.exportLong("task_queries_by_host")));
 
@@ -146,7 +147,7 @@ class MemTaskStore implements TaskStore.Mutable {
     Iterable<Task> canonicalized = Iterables.transform(newTasks, toTask);
     tasks.putAll(Maps.uniqueIndex(canonicalized, TO_ID));
     for (SecondaryIndex<?> index : secondaryIndices) {
-      index.insert(canonicalized);
+      index.insert(Iterables.transform(canonicalized, TO_SCHEDULED));
     }
   }
 
@@ -169,7 +170,7 @@ class MemTaskStore implements TaskStore.Mutable {
       Task removed = tasks.remove(id);
       if (removed != null) {
         for (SecondaryIndex<?> index : secondaryIndices) {
-          index.remove(removed);
+          index.remove(removed.task);
         }
         configInterner.removeAssociation(removed.task.getAssignedTask().getTask().newBuilder(), id);
       }
@@ -192,10 +193,9 @@ class MemTaskStore implements TaskStore.Mutable {
         Preconditions.checkState(
             Tasks.id(original.task).equals(Tasks.id(maybeMutated)),
             "A task's ID may not be mutated.");
-        Task newCanonicalTask = toTask.apply(maybeMutated);
-        tasks.put(Tasks.id(maybeMutated), newCanonicalTask);
+        tasks.put(Tasks.id(maybeMutated), toTask.apply(maybeMutated));
         for (SecondaryIndex<?> index : secondaryIndices) {
-          index.replace(original, newCanonicalTask);
+          index.replace(original.task, maybeMutated);
         }
 
         mutated.add(maybeMutated);
@@ -292,11 +292,12 @@ class MemTaskStore implements TaskStore.Mutable {
       from = Optional.of(fromIdIndex(query.get().getTaskIds()));
     } else {
       for (SecondaryIndex<?> index : secondaryIndices) {
-        from = index.getMatches(query);
-        if (from.isPresent()) {
+        Optional<Iterable<String>> indexMatch = index.getMatches(query);
+        if (indexMatch.isPresent()) {
           // Note: we could leverage multiple indexes here if the query applies to them, by
           // choosing to intersect the results.  Given current indexes and query profile, this is
           // unlikely to offer much improvement, though.
+          from = Optional.of(fromIdIndex(indexMatch.get()));
           break;
         }
       }
@@ -356,9 +357,9 @@ class MemTaskStore implements TaskStore.Mutable {
    * @param <K> Key type.
    */
   private static class SecondaryIndex<K> {
-    private final Multimap<K, Task> index =
-        Multimaps.synchronizedSetMultimap(HashMultimap.<K, Task>create());
-    private final Function<Task, K> indexer;
+    private final Multimap<K, String> index =
+        Multimaps.synchronizedSetMultimap(HashMultimap.<K, String>create());
+    private final Function<IScheduledTask, K> indexer;
     private final Function<Query.Builder, Optional<K>> queryExtractor;
     private final AtomicLong hitCount;
 
@@ -370,7 +371,7 @@ class MemTaskStore implements TaskStore.Mutable {
      * @param hitCount Counter for number of times the seconary index applies to a query.
      */
     SecondaryIndex(
-        Function<Task, K> indexer,
+        Function<IScheduledTask, K> indexer,
         Function<Query.Builder, Optional<K>> queryExtractor,
         AtomicLong hitCount) {
 
@@ -379,16 +380,16 @@ class MemTaskStore implements TaskStore.Mutable {
       this.hitCount = hitCount;
     }
 
-    void insert(Iterable<Task> tasks) {
-      for (Task task : tasks) {
+    void insert(Iterable<IScheduledTask> tasks) {
+      for (IScheduledTask task : tasks) {
         insert(task);
       }
     }
 
-    void insert(Task task) {
+    void insert(IScheduledTask task) {
       K key = indexer.apply(task);
       if (key != null) {
-        index.put(key, task);
+        index.put(key, Tasks.id(task));
       }
     }
 
@@ -396,28 +397,28 @@ class MemTaskStore implements TaskStore.Mutable {
       index.clear();
     }
 
-    void remove(Task task) {
+    void remove(IScheduledTask task) {
       K key = indexer.apply(task);
       if (key != null) {
         index.remove(key, task);
       }
     }
 
-    void replace(Task old, Task replacement) {
+    void replace(IScheduledTask old, IScheduledTask replacement) {
       synchronized (index) {
         remove(old);
         insert(replacement);
       }
     }
 
-    private final Function<K, Iterable<Task>> lookup = new Function<K, Iterable<Task>>() {
-      @Override public Iterable<Task> apply(K key) {
+    private final Function<K, Iterable<String>> lookup = new Function<K, Iterable<String>>() {
+      @Override public Iterable<String> apply(K key) {
         hitCount.incrementAndGet();
         return index.get(key);
       }
     };
 
-    Optional<Iterable<Task>> getMatches(Query.Builder query) {
+    Optional<Iterable<String>> getMatches(Query.Builder query) {
       return queryExtractor.apply(query).transform(lookup);
     }
   }

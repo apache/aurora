@@ -250,6 +250,12 @@ public class MemTaskStoreTest {
     return IScheduledTask.build(builder);
   }
 
+  private static IScheduledTask setConfigData(IScheduledTask task, String configData) {
+    ScheduledTask builder = task.newBuilder();
+    builder.getAssignedTask().getTask().getExecutorConfig().setData(configData);
+    return IScheduledTask.build(builder);
+  }
+
   @Test
   public void testAddSlaveHost() {
     final IScheduledTask a = makeTask("a", "role", "env", "job");
@@ -307,6 +313,30 @@ public class MemTaskStoreTest {
     assertQueryResults(Query.taskScoped(Tasks.id(b)), b);
   }
 
+  @Test
+  public void testTasksOnSameHost() {
+    String host = "slaveA";
+    final IScheduledTask a = setHost(makeTask("a", "role", "env", "job"), Optional.of(host));
+    final IScheduledTask b = setHost(makeTask("b", "role", "env", "job"), Optional.of(host));
+    store.saveTasks(ImmutableSet.of(a, b));
+    assertQueryResults(Query.slaveScoped(host), a, b);
+  }
+
+  @Test
+  public void testSaveOverwrites() {
+    // Ensures that saving a task with an existing task ID is effectively the same as a mutate,
+    // and does not result in a duplicate object in the primary or secondary index.
+
+    String host = "slaveA";
+    final IScheduledTask a = setHost(makeTask("a", "role", "env", "job"), Optional.of(host));
+    store.saveTasks(ImmutableSet.of(a));
+
+    final IScheduledTask updated = setConfigData(a, "new config data");
+    store.saveTasks(ImmutableSet.of(updated));
+    assertQueryResults(Query.taskScoped(Tasks.id(a)), updated);
+    assertQueryResults(Query.slaveScoped(host), updated);
+  }
+
   private void assertStoreContents(IScheduledTask... tasks) {
     assertQueryResults(Query.unscoped(), tasks);
   }
@@ -330,7 +360,8 @@ public class MemTaskStoreTest {
             .setTask(new TaskConfig()
                 .setJobName(jobName)
                 .setEnvironment(env)
-                .setOwner(new Identity(role, role)))));
+                .setOwner(new Identity(role, role))
+                .setExecutorConfig(new ExecutorConfig().setData("executor config")))));
   }
 
   private static IScheduledTask makeTask(String id) {
