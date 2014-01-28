@@ -20,8 +20,8 @@ python_library(
   name = 'ckpt',
   sources = ['ckpt.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python:twitter.common.recordio'),
     pants('src/main/thrift/org/apache/thermos:py-thrift')
   ]
 )
@@ -40,7 +40,7 @@ python_library(
   name = 'options',
   sources = ['options.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos:pystachio'),
+    pants('3rdparty/python:pystachio'),
     pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
 )

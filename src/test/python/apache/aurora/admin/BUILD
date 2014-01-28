@@ -23,9 +23,9 @@ python_test_suite(name = 'all',
 python_tests(name = 'mesos_maintenance',
   sources = ['test_mesos_maintenance.py'],
   dependencies = [
+    pants('3rdparty/python:mock'),
     pants('src/main/python/apache/aurora/common:cluster'),
     pants('src/main/python/apache/aurora/admin:mesos_maintenance'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),
   ],
 )

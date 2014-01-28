@@ -18,9 +18,9 @@ python_library(
   name = 'status_checker',
   sources = ['status_checker.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('aurora/twitterdeps/src/python/twitter/common/metrics'),
+    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python:twitter.common.metrics'),
   ]
 )
 
@@ -29,7 +29,7 @@ python_library(
   sources = ['task_runner.py'],
   dependencies = [
     pants(':status_checker'),
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
+    pants('3rdparty/python:twitter.common.lang'),
   ]
 )
 
@@ -39,8 +39,8 @@ python_library(
   dependencies = [
     pants(':status_checker'),
     pants(':task_info'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python:twitter.common.exceptions'),
     pants('src/main/python/apache/aurora/common:http_signaler'),
   ]
 )
@@ -49,9 +49,9 @@ python_library(
   name = 'executor_timeout',
   sources = ['executor_timeout.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
+    pants('3rdparty/python:twitter.common.exceptions'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python:twitter.common.quantity'),
   ]
 )
 
@@ -67,8 +67,8 @@ python_library(
   name = 'sandbox',
   sources = ['sandbox.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/dirutil'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.log'),
   ]
 )
 
@@ -76,8 +76,8 @@ python_library(
   name = 'task_info',
   sources = ['task_info.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:pystachio'),
+    pants('3rdparty/python:twitter.common.log'),
     pants('src/main/python/apache/aurora/config'),
     pants('src/main/python/apache/aurora/config/schema'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),

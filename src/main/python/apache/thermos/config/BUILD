@@ -20,8 +20,8 @@ python_library(
   name = 'schema',
   sources = globs('*.py'),
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('src/main/python/apache/thermos:pystachio'),
+    pants('3rdparty/python:pystachio'),
+    pants('3rdparty/python:twitter.common.lang'),
     pants('src/main/python/apache/thermos/common:planner')
   ],
 )

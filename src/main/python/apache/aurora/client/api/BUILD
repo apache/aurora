@@ -21,8 +21,8 @@ python_library(
     pants(':restarter'),
     pants(':scheduler_client'),
     pants(':updater'),
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.log'),
     pants('src/main/python/apache/aurora/common'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
@@ -32,8 +32,8 @@ python_library(
   name = 'command_runner',
   sources = ['command_runner.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
     pants(':api'),
+    pants('3rdparty/python:pystachio'),
     pants('src/main/python/apache/thermos/config:schema'),
     pants('src/main/python/apache/aurora/common:cluster'),
     pants('src/main/python/apache/aurora/config:schema'),
@@ -46,7 +46,7 @@ python_library(
   sources = ['disambiguator.py'],
   dependencies = [
     pants(':api'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:twitter.common.log'),
     pants('src/main/python/apache/aurora/client:base'),
     pants('src/main/python/apache/aurora/common'),
   ]
@@ -56,7 +56,7 @@ python_library(
   name = 'job_monitor',
   sources = ['job_monitor.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
+    pants('3rdparty/python:twitter.common.quantity'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
@@ -67,7 +67,7 @@ python_library(
   dependencies = [
     pants(':instance_watcher'),
     pants(':updater_util'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:twitter.common.log'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
@@ -76,11 +76,10 @@ python_library(
   name = 'scheduler_client',
   sources = ['scheduler_client.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
-    pants('aurora/twitterdeps/src/python/twitter/common/rpc/transports:tsslsocket'),
-    pants('aurora/twitterdeps/src/python/twitter/common/zookeeper/serverset:kazoo_serverset'),
-    pants('aurora/twitterdeps/src/python/twitter/common/zookeeper:kazoo_client'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python:twitter.common.quantity'),
+    pants('3rdparty/python:twitter.common.rpc'),
+    pants('3rdparty/python:twitter.common.zookeeper'),
     pants('src/main/python/apache/aurora/common/auth'),
     pants('src/main/python/apache/aurora/common:cluster'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
@@ -92,8 +91,8 @@ python_library(
   sources = ['instance_watcher.py', 'health_check.py'],
   dependencies = [
     pants(':scheduler_client'),
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.log'),
     pants('src/main/python/apache/aurora/common:http_signaler'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
@@ -104,7 +103,7 @@ python_library(
   sources = ['quota_check.py'],
   dependencies = [
     pants(':scheduler_client'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:twitter.common.log'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
@@ -117,7 +116,7 @@ python_library(
     pants(':instance_watcher'),
     pants(':updater_util'),
     pants(':quota_check'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:twitter.common.log'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
@@ -126,6 +125,6 @@ python_library(
   name = 'updater_util',
   sources = ['updater_util.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:twitter.common.log'),
   ]
 )

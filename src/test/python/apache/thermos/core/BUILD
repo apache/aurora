@@ -92,8 +92,8 @@ python_tests(name = 'test_failure_limit',
 python_tests(name = 'test_helper',
   sources = ['test_helper.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/BUILD.thirdparty:mock'),
-    pants('src/main/python/apache/thermos/BUILD.thirdparty:psutil'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:psutil'),
     pants('src/main/python/apache/thermos/core:helper'),
   ]
 )
@@ -101,17 +101,17 @@ python_tests(name = 'test_helper',
 python_tests(name = 'test_process',
   sources = ['test_process.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/BUILD.thirdparty:mock'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/thermos/testing:runner'),
-    pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
   ],
 )
 
 python_tests(name = 'test_staged_kill',
   sources = ['test_staged_kill.py'],
   dependencies = [
+     pants('3rdparty/python:twitter.common.process'),
      pants('src/main/python/apache/thermos/testing:runner'),
-     pants('aurora/twitterdeps/src/python/twitter/common/process'),
      pants('src/main/python/apache/thermos/monitoring:monitor'),
   ]
 )

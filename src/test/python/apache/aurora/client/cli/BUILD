@@ -23,7 +23,7 @@ python_library(
   name = 'util',
   sources = [ 'util.py' ],
   dependencies = [
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),
+    pants('3rdparty/python:mock'),
     pants('src/main/python/apache/aurora/client/cli'),
   ]
 )
@@ -41,8 +41,8 @@ python_tests(
   ],
   dependencies = [
     pants(':util'),
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),
-    pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/client/cli'),
     pants('src/test/python/apache/aurora/client/commands:util')
   ]

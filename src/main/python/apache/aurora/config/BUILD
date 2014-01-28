@@ -33,8 +33,8 @@ python_library(
     'thrift.py',
   ),
   dependencies = [
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
+    pants('3rdparty/python:pystachio'),
+    pants('3rdparty/python:twitter.common.lang'),
     pants('src/main/python/apache/aurora/common'),
     pants('src/main/python/apache/aurora/config/schema'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),

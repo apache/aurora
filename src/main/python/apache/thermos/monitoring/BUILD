@@ -29,9 +29,9 @@ python_library(
   sources = ['garbage.py'],
   dependencies = [
     pants(':detector'),
-    pants('aurora/twitterdeps/src/python/twitter/common/dirutil'),
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
+    pants('3rdparty/python:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.quantity'),
     pants('src/main/python/apache/thermos/common:ckpt'),
     pants('src/main/python/apache/thermos/common:path'),
   ]
@@ -41,8 +41,8 @@ python_library(
   name = 'monitor',
   sources = ['monitor.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('aurora/twitterdeps/src/python/twitter/common/recordio:recordio-thrift'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python:twitter.common.recordio'),
     pants('src/main/python/apache/thermos/common:ckpt'),
     pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
@@ -52,12 +52,12 @@ python_library(
   name = 'disk',
   sources = ['disk.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/dirutil'),
-    pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
-    python_requirement('watchdog'),
+    pants('3rdparty/python:watchdog'),
+    pants('3rdparty/python:twitter.common.dirutil'),
+    pants('3rdparty/python:twitter.common.exceptions'),
+    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python:twitter.common.quantity'),
   ]
 )
 
@@ -71,8 +71,8 @@ python_library(
   sources = ['process_collector_psutil.py'],
   dependencies = [
     pants(':process'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/apache/thermos:psutil'),
+    pants('3rdparty/python:psutil'),
+    pants('3rdparty/python:twitter.common.log'),
   ]
 )
 
@@ -84,11 +84,11 @@ python_library(
     pants(':monitor'),
     pants(':process'),
     pants(':process_collector_psutil'),
-    pants('aurora/twitterdeps/src/python/twitter/common/collections'),
-    pants('aurora/twitterdeps/src/python/twitter/common/concurrent'),
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
+    pants('3rdparty/python:twitter.common.collections'),
+    pants('3rdparty/python:twitter.common.concurrent'),
+    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python:twitter.common.quantity'),
   ]
 )
 

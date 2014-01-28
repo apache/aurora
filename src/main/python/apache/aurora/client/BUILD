@@ -28,8 +28,8 @@ python_library(
   name = 'base',
   sources = ['base.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/app'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:twitter.common.app'),
+    pants('3rdparty/python:twitter.common.log'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
@@ -38,7 +38,7 @@ python_library(
   name = 'binding_helper',
   sources = ['binding_helper.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
+    pants('3rdparty/python:twitter.common.lang'),
   ]
 )
 
@@ -46,11 +46,11 @@ python_library(
   name = 'config',
   sources = ['config.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
     pants(':base'),
     pants(':binding_helper'),
-    pants('aurora/twitterdeps/src/python/twitter/common/app'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:pystachio'),
+    pants('3rdparty/python:twitter.common.app'),
+    pants('3rdparty/python:twitter.common.log'),
     pants('src/main/python/apache/aurora/config'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
@@ -61,7 +61,7 @@ python_library(
   sources = ['factory.py'],
   dependencies = [
     pants(':base'),
-    pants('aurora/twitterdeps/src/python/twitter/common/app'),
+    pants('3rdparty/python:twitter.common.app'),
     pants('src/main/python/apache/aurora/client/hooks'),
     pants('src/main/python/apache/aurora/common:cluster'),
     pants('src/main/python/apache/aurora/common:clusters'),

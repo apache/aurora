@@ -26,7 +26,7 @@ python_test_suite(name = 'all',
 python_tests(name = 'test_base',
   sources = ['test_base.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/config'),
   ]
 )
@@ -34,7 +34,7 @@ python_tests(name = 'test_base',
 python_tests(name = 'test_loader',
   sources = ['test_loader.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
+    pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/config'),
   ],
   coverage = [

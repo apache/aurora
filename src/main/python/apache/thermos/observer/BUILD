@@ -20,9 +20,9 @@ python_library(
   name = 'observed_task',
   sources = ['observed_task.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('src/main/python/apache/thermos:pystachio'),
+    pants('3rdparty/python:pystachio'),
+    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.log'),
     pants('src/main/python/apache/thermos/common:ckpt'),
     pants('src/main/python/apache/thermos/config'),
   ]
@@ -33,10 +33,10 @@ python_library(
   sources = ['task_observer.py'],
   dependencies = [
     pants(':observed_task'),
-    pants('aurora/twitterdeps/src/python/twitter/common/exceptions'),
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
-    pants('aurora/twitterdeps/src/python/twitter/common/quantity'),
+    pants('3rdparty/python:twitter.common.exceptions'),
+    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python:twitter.common.quantity'),
     pants('src/main/python/apache/thermos/common:path'),
     pants('src/main/python/apache/thermos/monitoring:detector'),
     pants('src/main/python/apache/thermos/monitoring:monitor'),

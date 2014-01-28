@@ -44,8 +44,8 @@ python_tests(
   name = 'test_clusters',
   sources = ['test_clusters.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:pyyaml'),
-    pants('aurora/twitterdeps/src/python/twitter/common/contextutil'),
+    pants('3rdparty/python:pyyaml'),
+    pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/common:clusters'),
   ]
 )
@@ -54,7 +54,7 @@ python_tests(
   name = 'test_cluster_option',
   sources = ['test_cluster_option.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/options'),
+    pants('3rdparty/python:twitter.common.options'),
     pants('src/main/python/apache/aurora/common:cluster'),
     pants('src/main/python/apache/aurora/common:cluster_option'),
     pants('src/main/python/apache/aurora/common:clusters'),
@@ -65,7 +65,7 @@ python_tests(
   name = 'test_http_signaler',
   sources = ['test_http_signaler.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:mox'),
+    pants('3rdparty/python:mox'),
     pants('src/main/python/apache/aurora/common:http_signaler'),
   ]
 )

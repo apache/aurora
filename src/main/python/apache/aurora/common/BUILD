@@ -20,7 +20,7 @@ python_library(
   name = 'aurora_job_key',
   sources = ['aurora_job_key.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
+    pants('3rdparty/python:twitter.common.lang'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
@@ -29,7 +29,7 @@ python_library(
   name = 'cluster',
   sources = ['cluster.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
+    pants('3rdparty/python:pystachio'),
   ]
 )
 
@@ -38,8 +38,8 @@ python_library(
   sources = ['clusters.py'],
   dependencies = [
     pants(':cluster'),
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:pystachio'),
-    pants('aurora/twitterdeps/src/python/twitter/common/collections'),
+    pants('3rdparty/python:pystachio'),
+    pants('3rdparty/python:twitter.common.collections'),
   ]
 )
 
@@ -47,7 +47,7 @@ python_library(
   name = 'cluster_option',
   sources = ['cluster_option.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
+    pants('3rdparty/python:twitter.common.lang'),
   ]
 )
 
@@ -55,8 +55,8 @@ python_library(
   name = 'http_signaler',
   sources = ['http_signaler.py'],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/lang'),
-    pants('aurora/twitterdeps/src/python/twitter/common/log'),
+    pants('3rdparty/python:twitter.common.lang'),
+    pants('3rdparty/python:twitter.common.log'),
   ]
 )
 

@@ -17,14 +17,17 @@
 python_binary(
   name='client',
   entry_point = 'apache.aurora.cli:main',
-  dependencies = [ pants(':cli') ],
-  )
+  dependencies = [
+    pants(':cli'),
+  ],
+)
 
 python_library(
   name='cli',
   sources = [ '__init__.py', 'context.py', 'jobs.py', 'options.py' ],
   dependencies = [
-    pants('aurora/twitterdeps/src/python/twitter/common/python'),
+    pants('3rdparty/python:argparse'),
+    pants('3rdparty/python:twitter.common.python'),
     pants('src/main/python/apache/aurora/client/api:command_runner'),
     pants('src/main/python/apache/aurora/client/api:disambiguator'),
     pants('src/main/python/apache/aurora/client/api:job_monitor'),
@@ -36,6 +39,5 @@ python_library(
     pants('src/main/python/apache/aurora/client:options'),
     pants('src/main/python/apache/aurora/common'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
-    pants('src/main/python/apache/aurora:argparse')
-    ]
-  )
+  ],
+)

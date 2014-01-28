@@ -24,10 +24,10 @@ python_test_suite(name = 'all',
 python_tests(name = 'hooked_api',
   sources = ['test_hooked_api.py'],
   dependencies = [
+    pants('3rdparty/python:mock'),
     pants('src/main/python/apache/aurora/common:cluster'),
     pants('src/main/python/apache/aurora/client:api'),
     pants('src/main/python/apache/aurora/client/hooks'),
-    pants('src/main/python/apache/aurora/BUILD.thirdparty:mock'),
   ]
 )
 
