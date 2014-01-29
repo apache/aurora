@@ -15,23 +15,26 @@
  */
 package org.apache.aurora.scheduler.state;
 
+import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Function;
-import com.twitter.common.testing.easymock.EasyMockTest;
-import com.twitter.common.util.testing.FakeClock;
+import com.google.common.base.Objects;
+import com.google.common.base.Optional;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.state.TaskStateMachine.WorkSink;
+import org.apache.aurora.scheduler.state.SideEffect.Action;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.easymock.EasyMock;
-import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -43,76 +46,43 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.gen.ScheduleStatus.PREEMPTING;
 import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.apache.aurora.gen.ScheduleStatus.UNKNOWN;
-import static org.apache.aurora.scheduler.state.WorkCommand.DELETE;
-import static org.apache.aurora.scheduler.state.WorkCommand.INCREMENT_FAILURES;
-import static org.apache.aurora.scheduler.state.WorkCommand.KILL;
-import static org.apache.aurora.scheduler.state.WorkCommand.RESCHEDULE;
-import static org.apache.aurora.scheduler.state.WorkCommand.UPDATE_STATE;
-
-import static org.easymock.EasyMock.eq;
-import static org.easymock.EasyMock.expectLastCall;
-import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-public class TaskStateMachineTest extends EasyMockTest {
+// TODO(wfarner): At this rate, it's probably best to exhaustively cover this class with a matrix
+// from every state to every state.
+public class TaskStateMachineTest {
 
-  private WorkSink workSink;
-  private FakeClock clock;
   private TaskStateMachine stateMachine;
 
   @Before
   public void setUp() {
-    workSink = createMock(WorkSink.class);
-    clock = new FakeClock();
-    stateMachine = makeStateMachine("test", makeTask(false));
+    stateMachine = makeStateMachine(makeTask(false));
   }
 
-  private TaskStateMachine makeStateMachine(String taskId, ScheduledTask builder) {
-    return new TaskStateMachine(
-        taskId,
-        IScheduledTask.build(builder),
-        workSink,
-        clock,
-        INIT);
+  private TaskStateMachine makeStateMachine(ScheduledTask builder) {
+    return new TaskStateMachine(IScheduledTask.build(builder));
   }
 
   @Test
   public void testSimpleTransition() {
-    expectWork(UPDATE_STATE).times(5);
-    expectWork(DELETE);
-
-    control.replay();
-
-    transition(stateMachine, PENDING);
-    assertEquals(INIT, stateMachine.getPreviousState());
-    transition(stateMachine, ASSIGNED);
-    assertEquals(PENDING, stateMachine.getPreviousState());
-    transition(stateMachine, STARTING);
-    assertEquals(ASSIGNED, stateMachine.getPreviousState());
-    transition(stateMachine, RUNNING);
-    assertEquals(STARTING, stateMachine.getPreviousState());
-    transition(stateMachine, FINISHED);
-    assertEquals(RUNNING, stateMachine.getPreviousState());
-    transition(stateMachine, UNKNOWN);
-    assertEquals(FINISHED, stateMachine.getPreviousState());
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING, FINISHED);
+    legalTransition(UNKNOWN, Action.DELETE);
   }
 
   @Test
   public void testServiceRescheduled() {
-    stateMachine = makeStateMachine("test", makeTask(true));
-    expectWork(UPDATE_STATE).times(5);
-    expectWork(RESCHEDULE);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, FINISHED);
+    stateMachine = makeStateMachine(makeTask(true));
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(FINISHED, Action.SAVE_STATE, Action.RESCHEDULE);
   }
 
   @Test
@@ -120,12 +90,12 @@ public class TaskStateMachineTest extends EasyMockTest {
     Set<ScheduleStatus> terminalStates = Tasks.TERMINAL_STATES;
 
     for (ScheduleStatus endState : terminalStates) {
-      stateMachine = makeStateMachine("test", makeTask(false));
-      expectWork(UPDATE_STATE).times(5);
+      stateMachine = makeStateMachine(makeTask(false));
+      Set<SideEffect.Action> finalActions = Sets.newHashSet(Action.SAVE_STATE);
 
       switch (endState) {
         case FAILED:
-          expectWork(INCREMENT_FAILURES);
+          finalActions.add(Action.INCREMENT_FAILURES);
           break;
 
         case FINISHED:
@@ -133,138 +103,88 @@ public class TaskStateMachineTest extends EasyMockTest {
 
         case KILLED:
         case LOST:
-          expectWork(RESCHEDULE);
+          finalActions.add(Action.RESCHEDULE);
           break;
 
         case KILLING:
-          expectWork(KILL);
+          finalActions.add(Action.KILL);
           break;
 
         default:
           fail("Unknown state " + endState);
       }
 
-      control.replay();
-
-      transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, endState);
+      expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+      legalTransition(endState, finalActions);
 
       for (ScheduleStatus badTransition : terminalStates) {
-        transition(stateMachine, badTransition);
+        illegalTransition(badTransition);
       }
-
-      control.verify();
-      control.reset();
     }
-
-    control.replay();  // Needed so the teardown verify doesn't break.
   }
 
   @Test
   public void testUnknownTask() {
-    expectWork(KILL);
+    stateMachine = new TaskStateMachine("id");
 
-    control.replay();
-
-    transition(stateMachine, UNKNOWN, RUNNING);
+    illegalTransition(RUNNING, Action.KILL);
   }
 
   @Test
   public void testLostTask() {
-    expectWork(UPDATE_STATE).times(5);
-    expectWork(RESCHEDULE);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, LOST);
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(LOST, Action.SAVE_STATE, Action.RESCHEDULE);
   }
 
   @Test
   public void testKilledPending() {
-    expectWork(UPDATE_STATE);
-    expectWork(DELETE);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, KILLING);
+    expectUpdateStateOnTransitionTo(PENDING);
+    legalTransition(KILLING, Action.DELETE);
   }
 
   @Test
   public void testMissingStartingRescheduledImmediately() {
-    ScheduledTask task = makeTask(false);
-    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING));
-    stateMachine = makeStateMachine("test", task);
-
-    expectWork(UPDATE_STATE).times(4);
-    expectWork(RESCHEDULE);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, UNKNOWN);
-    assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING);
+    illegalTransition(UNKNOWN,
+        ImmutableSet.of(new SideEffect(Action.STATE_CHANGE, Optional.of(LOST))));
   }
 
   @Test
   public void testMissingRunningRescheduledImmediately() {
-    ScheduledTask task = makeTask(false);
-    task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.PENDING));
-    stateMachine = makeStateMachine("test", task);
-
-    expectWork(UPDATE_STATE).times(5);
-    expectWork(RESCHEDULE);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, UNKNOWN);
-    assertThat(stateMachine.getState(), is(ScheduleStatus.LOST));
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    illegalTransition(UNKNOWN,
+        ImmutableSet.of(new SideEffect(Action.STATE_CHANGE, Optional.of(LOST))));
   }
 
   @Test
   public void testRestartedTask() {
-    expectWork(UPDATE_STATE).times(6);
-    expectWork(KILL);
-    expectWork(RESCHEDULE);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, FINISHED);
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(RESTARTING, Action.SAVE_STATE, Action.KILL);
+    legalTransition(FINISHED, Action.SAVE_STATE, Action.RESCHEDULE);
   }
 
   @Test
   public void testRogueRestartedTask() {
-    expectWork(UPDATE_STATE).times(5);
-    expectWork(KILL).times(2);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, RESTARTING, RUNNING);
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(RESTARTING, Action.SAVE_STATE, Action.KILL);
+    illegalTransition(RUNNING, Action.KILL);
   }
 
   @Test
   public void testPendingRestartedTask() {
-    expectWork(UPDATE_STATE).times(1);
-
-    control.replay();
-
+    expectUpdateStateOnTransitionTo(PENDING);
     // PENDING -> RESTARTING should not be allowed.
-    transition(stateMachine, PENDING, RESTARTING);
+    illegalTransition(RESTARTING);
   }
 
   @Test
   public void testAllowsSkipStartingAndRunning() {
-    expectWork(UPDATE_STATE).times(3);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, FINISHED);
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, FINISHED);
   }
 
   @Test
   public void testAllowsSkipRunning() {
-    expectWork(UPDATE_STATE).times(4);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, FINISHED);
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, FINISHED);
   }
 
   @Test
@@ -272,23 +192,15 @@ public class TaskStateMachineTest extends EasyMockTest {
     ScheduledTask task = makeTask(false);
     task.getAssignedTask().getTask().setMaxTaskFailures(10);
     task.setFailureCount(8);
-    stateMachine = makeStateMachine("test", task);
-
-    expectWork(UPDATE_STATE).times(5);
-    expectWork(RESCHEDULE);
-    expectWork(INCREMENT_FAILURES);
+    stateMachine = makeStateMachine(task);
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(FAILED, Action.SAVE_STATE, Action.RESCHEDULE, Action.INCREMENT_FAILURES);
 
     ScheduledTask rescheduled = task.deepCopy();
     rescheduled.setFailureCount(9);
-    TaskStateMachine rescheduledMachine = makeStateMachine("test2", rescheduled);
-    expectWork(UPDATE_STATE, rescheduledMachine).times(5);
-    expectWork(INCREMENT_FAILURES, rescheduledMachine);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
-
-    transition(rescheduledMachine, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
+    stateMachine = makeStateMachine(rescheduled);
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(FAILED, Action.SAVE_STATE, Action.INCREMENT_FAILURES);
   }
 
   @Test
@@ -296,62 +208,314 @@ public class TaskStateMachineTest extends EasyMockTest {
     ScheduledTask task = makeTask(false);
     task.getAssignedTask().getTask().setMaxTaskFailures(-1);
     task.setFailureCount(1000);
-    stateMachine = makeStateMachine("test", task);
+    stateMachine = makeStateMachine(task);
 
-    expectWork(UPDATE_STATE).times(5);
-    expectWork(RESCHEDULE);
-    expectWork(INCREMENT_FAILURES);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(FAILED, Action.SAVE_STATE, Action.RESCHEDULE, Action.INCREMENT_FAILURES);
   }
 
   @Test
   public void testKillingRequest() {
-    expectWork(UPDATE_STATE).times(6);
-    expectWork(KILL);
-
-    control.replay();
-
-    transition(stateMachine, PENDING, ASSIGNED, STARTING, RUNNING, KILLING, KILLED);
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(KILLING, Action.KILL, Action.SAVE_STATE);
+    expectUpdateStateOnTransitionTo(KILLED);
   }
 
   @Test
   public void testThrottledTask() {
-    expectWork(UPDATE_STATE).times(2);
-
-    control.replay();
-
-    transition(stateMachine, THROTTLED, PENDING);
+    expectUpdateStateOnTransitionTo(THROTTLED, PENDING);
   }
 
-  private static void transition(TaskStateMachine stateMachine, ScheduleStatus... states) {
+  private static final Function<Action, SideEffect> TO_SIDE_EFFECT =
+      new Function<Action, SideEffect>() {
+        @Override public SideEffect apply(Action action) {
+          return new SideEffect(action, Optional.<ScheduleStatus>absent());
+        }
+      };
+
+  private void legalTransition(ScheduleStatus state, SideEffect.Action... expectedActions) {
+    legalTransition(state, ImmutableSet.copyOf(expectedActions));
+  }
+
+  private void legalTransition(ScheduleStatus state, Set<SideEffect.Action> expectedActions) {
+    ScheduleStatus initialStatus = stateMachine.getState();
+    TransitionResult result = stateMachine.updateState(state);
+    assertTrue("Transition to " + state + " was not successful", result.isSuccess());
+    assertEquals(initialStatus, stateMachine.getPreviousState());
+    assertEquals(state, stateMachine.getState());
+    assertEquals(
+        FluentIterable.from(expectedActions).transform(TO_SIDE_EFFECT).toSet(),
+        result.getSideEffects());
+  }
+
+  private void expectUpdateStateOnTransitionTo(ScheduleStatus... states) {
     for (ScheduleStatus status : states) {
-      stateMachine.updateState(status);
+      legalTransition(status, Action.SAVE_STATE);
     }
   }
 
-  private IExpectationSetters<Void> expectWork(WorkCommand work) {
-    return expectWork(work, stateMachine);
+  private void illegalTransition(ScheduleStatus state, SideEffect.Action... expectedActions) {
+    illegalTransition(
+        state,
+        FluentIterable.from(
+            ImmutableSet.copyOf(expectedActions)).transform(TO_SIDE_EFFECT).toSet());
   }
 
-  private IExpectationSetters<Void> expectWork(WorkCommand work, TaskStateMachine machine) {
-    workSink.addWork(
-        eq(work),
-        eq(machine),
-        EasyMock.<Function<IScheduledTask, IScheduledTask>>anyObject());
-    return expectLastCall();
+  private void illegalTransition(ScheduleStatus state, Set<SideEffect> sideEffects) {
+    ScheduleStatus initialStatus = stateMachine.getState();
+    TransitionResult result = stateMachine.updateState(state);
+    assertEquals(initialStatus, stateMachine.getState());
+    assertFalse(result.isSuccess());
+    assertEquals(sideEffects, result.getSideEffects());
   }
 
   private static ScheduledTask makeTask(boolean service) {
     return new ScheduledTask()
+        .setStatus(INIT)
         .setAssignedTask(
             new AssignedTask()
+                .setTaskId("test")
                 .setTask(
                     new TaskConfig()
                         .setOwner(new Identity().setRole("roleA"))
                         .setJobName("jobA")
                         .setIsService(service)));
+  }
+
+  private static final TransitionResult LEGAL_NO_ACTION =
+      new TransitionResult(true, ImmutableSet.<SideEffect>of());
+  private static final TransitionResult SAVE = new TransitionResult(
+      true,
+      ImmutableSet.of(new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent())));
+  private static final TransitionResult SAVE_AND_KILL = new TransitionResult(
+      true,
+      ImmutableSet.of(
+          new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
+          new SideEffect(Action.KILL, Optional.<ScheduleStatus>absent())));
+  private static final TransitionResult SAVE_AND_RESCHEDULE = new TransitionResult(
+      true,
+      ImmutableSet.of(
+          new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
+          new SideEffect(Action.RESCHEDULE, Optional.<ScheduleStatus>absent())));
+  private static final TransitionResult SAVE_KILL_AND_RESCHEDULE = new TransitionResult(
+      true,
+      ImmutableSet.of(
+          new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
+          new SideEffect(Action.KILL, Optional.<ScheduleStatus>absent()),
+          new SideEffect(Action.RESCHEDULE, Optional.<ScheduleStatus>absent())));
+  private static final TransitionResult ILLEGAL_KILL = new TransitionResult(
+      false,
+      ImmutableSet.of(new SideEffect(Action.KILL, Optional.<ScheduleStatus>absent())));
+  private static final TransitionResult RECORD_FAILURE = new TransitionResult(
+      true,
+      ImmutableSet.of(
+          new SideEffect(Action.SAVE_STATE, Optional.<ScheduleStatus>absent()),
+          new SideEffect(Action.INCREMENT_FAILURES, Optional.<ScheduleStatus>absent())));
+  private static final TransitionResult DELETE_TASK = new TransitionResult(
+      true,
+      ImmutableSet.of(new SideEffect(Action.DELETE, Optional.<ScheduleStatus>absent())));
+  private static final TransitionResult MARK_LOST = new TransitionResult(
+      false,
+      ImmutableSet.of(new SideEffect(Action.STATE_CHANGE, Optional.of(LOST))));
+
+  private static final class TestCase {
+    private final boolean taskPresent;
+    private final ScheduleStatus from;
+    private final ScheduleStatus to;
+
+    private TestCase(boolean taskPresent, ScheduleStatus from, ScheduleStatus to) {
+      this.taskPresent = taskPresent;
+      this.from = from;
+      this.to = to;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(taskPresent, from, to);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof TestCase)) {
+        return false;
+      }
+
+      TestCase other = (TestCase) o;
+      return (taskPresent == other.taskPresent)
+          && (from == other.from)
+          && (to == other.to);
+    }
+
+    @Override
+    public String toString() {
+      return Objects.toStringHelper(this)
+          .add("taskPresent", taskPresent)
+          .add("from", from)
+          .add("to", to)
+          .toString();
+    }
+  }
+
+  private static final Map<TestCase, TransitionResult> EXPECTATIONS =
+      ImmutableMap.<TestCase, TransitionResult>builder()
+          .put(new TestCase(true, INIT, THROTTLED), SAVE)
+          .put(new TestCase(true, INIT, PENDING), SAVE)
+          .put(new TestCase(false, INIT, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, INIT, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, INIT, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, INIT, UNKNOWN), LEGAL_NO_ACTION)
+          .put(new TestCase(true, THROTTLED, PENDING), SAVE)
+          .put(new TestCase(true, THROTTLED, KILLING), DELETE_TASK)
+          .put(new TestCase(false, THROTTLED, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, THROTTLED, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, THROTTLED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, PENDING, ASSIGNED), SAVE)
+          .put(new TestCase(false, PENDING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, PENDING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, PENDING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, PENDING, KILLING), DELETE_TASK)
+          .put(new TestCase(false, ASSIGNED, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(true, ASSIGNED, STARTING), SAVE)
+          .put(new TestCase(false, ASSIGNED, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, ASSIGNED, RUNNING), SAVE)
+          .put(new TestCase(false, ASSIGNED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, ASSIGNED, FINISHED), SAVE)
+          .put(new TestCase(true, ASSIGNED, PREEMPTING), SAVE_AND_KILL)
+          .put(new TestCase(true, ASSIGNED, RESTARTING), SAVE_AND_KILL)
+          .put(new TestCase(true, ASSIGNED, FAILED), RECORD_FAILURE)
+          .put(new TestCase(true, ASSIGNED, KILLED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, ASSIGNED, KILLING), SAVE_AND_KILL)
+          .put(new TestCase(true, ASSIGNED, LOST), SAVE_KILL_AND_RESCHEDULE)
+          .put(new TestCase(false, STARTING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, STARTING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, STARTING, RUNNING), SAVE)
+          .put(new TestCase(false, STARTING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, STARTING, FINISHED), SAVE)
+          .put(new TestCase(true, STARTING, PREEMPTING), SAVE_AND_KILL)
+          .put(new TestCase(true, STARTING, RESTARTING), SAVE_AND_KILL)
+          .put(new TestCase(true, STARTING, FAILED), RECORD_FAILURE)
+          .put(new TestCase(true, STARTING, KILLED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, STARTING, KILLING), SAVE_AND_KILL)
+          .put(new TestCase(true, STARTING, LOST), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, STARTING, UNKNOWN), MARK_LOST)
+          .put(new TestCase(false, RUNNING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, RUNNING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, RUNNING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, RUNNING, FINISHED), SAVE)
+          .put(new TestCase(true, RUNNING, PREEMPTING), SAVE_AND_KILL)
+          .put(new TestCase(true, RUNNING, RESTARTING), SAVE_AND_KILL)
+          .put(new TestCase(true, RUNNING, FAILED), RECORD_FAILURE)
+          .put(new TestCase(true, RUNNING, KILLED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, RUNNING, KILLING), SAVE_AND_KILL)
+          .put(new TestCase(true, RUNNING, LOST), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, RUNNING, UNKNOWN), MARK_LOST)
+          .put(new TestCase(true, FINISHED, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, FINISHED, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(true, FINISHED, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, FINISHED, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, FINISHED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, FINISHED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, FINISHED, UNKNOWN), DELETE_TASK)
+          .put(new TestCase(true, PREEMPTING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, PREEMPTING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(true, PREEMPTING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, PREEMPTING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, PREEMPTING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, PREEMPTING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, PREEMPTING, FINISHED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, PREEMPTING, FAILED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, PREEMPTING, KILLED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, PREEMPTING, KILLING), SAVE)
+          .put(new TestCase(true, PREEMPTING, LOST), SAVE_KILL_AND_RESCHEDULE)
+          .put(new TestCase(true, PREEMPTING, UNKNOWN), MARK_LOST)
+          .put(new TestCase(true, RESTARTING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, RESTARTING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(true, RESTARTING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, RESTARTING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, RESTARTING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, RESTARTING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, RESTARTING, FINISHED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, RESTARTING, FAILED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, RESTARTING, KILLED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, RESTARTING, KILLING), SAVE)
+          .put(new TestCase(true, RESTARTING, LOST), SAVE_KILL_AND_RESCHEDULE)
+          .put(new TestCase(true, RESTARTING, UNKNOWN), MARK_LOST)
+          .put(new TestCase(true, FAILED, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, FAILED, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(true, FAILED, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, FAILED, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, FAILED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, FAILED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, FAILED, UNKNOWN), DELETE_TASK)
+          .put(new TestCase(true, KILLED, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, KILLED, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(true, KILLED, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, KILLED, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, KILLED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, KILLED, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, KILLED, UNKNOWN), DELETE_TASK)
+          .put(new TestCase(true, KILLING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, KILLING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(true, KILLING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, KILLING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, KILLING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, KILLING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, KILLING, FINISHED), SAVE)
+          .put(new TestCase(true, KILLING, FAILED), SAVE)
+          .put(new TestCase(true, KILLING, KILLED), SAVE)
+          .put(new TestCase(true, KILLING, LOST), SAVE)
+          .put(new TestCase(true, KILLING, UNKNOWN), DELETE_TASK)
+          .put(new TestCase(true, LOST, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, LOST, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(true, LOST, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, LOST, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, LOST, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, LOST, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, LOST, UNKNOWN), DELETE_TASK)
+          .put(new TestCase(false, UNKNOWN, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, UNKNOWN, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, UNKNOWN, RUNNING), ILLEGAL_KILL)
+          .build();
+
+  @Test
+  public void testAllTransitions() {
+    for (ScheduleStatus from : ScheduleStatus.values()) {
+      for (ScheduleStatus to : ScheduleStatus.values()) {
+        for (Boolean taskPresent : ImmutableList.of(Boolean.TRUE, Boolean.FALSE)) {
+          TestCase testCase = new TestCase(taskPresent, from, to);
+
+          TransitionResult expectation = EXPECTATIONS.get(testCase);
+          if (expectation == null) {
+            expectation = new TransitionResult(false, ImmutableSet.<SideEffect>of());
+          }
+
+          TaskStateMachine machine;
+          if (taskPresent) {
+            // Cannot create a state machine for an UNKNOWN task that is in the store.
+            boolean expectException = from == UNKNOWN;
+            try {
+              machine =
+                  new TaskStateMachine(IScheduledTask.build(makeTask(false).setStatus(from)));
+              if (expectException) {
+                fail();
+              }
+            } catch (IllegalStateException e) {
+              if (!expectException) {
+                throw e;
+              } else {
+                continue;
+              }
+            }
+          } else {
+            machine = new TaskStateMachine("name");
+          }
+
+          assertEquals(
+              "Unexpected behavor for " + testCase,
+              expectation,
+              machine.updateState(to));
+        }
+      }
+    }
   }
 }

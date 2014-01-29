@@ -23,6 +23,7 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -51,7 +52,6 @@ import org.apache.mesos.Protos.SlaveID;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.easymock.IArgumentMatcher;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -59,6 +59,7 @@ import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
+import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
@@ -67,6 +68,7 @@ import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class StateManagerImplTest extends EasyMockTest {
@@ -98,11 +100,6 @@ public class StateManagerImplTest extends EasyMockTest {
         taskIdGenerator,
         eventSink,
         rescheduleCalculator);
-  }
-
-  @After
-  public void validateCompletion() {
-    assertTrue(stateManager.getStorage().getEvents().isEmpty());
   }
 
   private static class StateChangeMatcher implements IArgumentMatcher {
@@ -181,7 +178,7 @@ public class StateManagerImplTest extends EasyMockTest {
         .setStatus(PENDING)
         .setTaskEvents(ImmutableList.of(new TaskEvent()
             .setTimestamp(clock.nowMillis())
-            .setScheduler(TaskStateMachine.LOCAL_HOST_SUPPLIER.get())
+            .setScheduler(StateManagerImpl.LOCAL_HOST_SUPPLIER.get())
             .setStatus(PENDING)))
         .setAssignedTask(new AssignedTask()
             .setInstanceId(3)
@@ -292,6 +289,92 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     changeState(unknownTask, RUNNING);
+  }
+
+  private void noFlappingPenalty() {
+    expect(rescheduleCalculator.getFlappingPenaltyMs(EasyMock.<IScheduledTask>anyObject()))
+        .andReturn(0L);
+  }
+
+  @Test
+  public void testIncrementFailureCount() {
+    ITaskConfig task = ITaskConfig.build(makeTask(JIM, MY_JOB).newBuilder().setIsService(true));
+    String taskId = "a";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, FAILED);
+
+    String taskId2 = "a2";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId2);
+    noFlappingPenalty();
+    expectStateTransitions(taskId2, INIT, PENDING);
+
+    control.replay();
+
+    insertTask(task, 0);
+
+    assignTask(taskId, HOST_A);
+    changeState(taskId, RUNNING);
+    changeState(taskId, FAILED);
+    IScheduledTask rescheduledTask = Iterables.getOnlyElement(
+        Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId2)));
+    assertEquals(1, rescheduledTask.getFailureCount());
+  }
+
+  @Test
+  public void testDoubleTransition() {
+    // Tests that a transition inducing another transition (STATE_CHANGE action) is performed.
+
+    ITaskConfig task = makeTask(JIM, MY_JOB);
+    String taskId = "a";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, LOST);
+
+    String taskId2 = "a2";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId2);
+    noFlappingPenalty();
+    expectStateTransitions(taskId2, INIT, PENDING);
+
+    control.replay();
+
+    insertTask(task, 0);
+
+    assignTask(taskId, HOST_A);
+    changeState(taskId, RUNNING);
+    changeState(taskId, UNKNOWN);
+  }
+
+  @Test
+  public void testCasTaskPresent() {
+    ITaskConfig task = makeTask(JIM, MY_JOB);
+    String taskId = "a";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, FAILED);
+
+    control.replay();
+
+    insertTask(task, 0);
+    assignTask(taskId, HOST_A);
+    assertFalse(stateManager.changeState(
+        taskId,
+        Optional.of(PENDING),
+        RUNNING,
+        Optional.<String>absent()));
+    assertTrue(stateManager.changeState(
+        taskId,
+        Optional.of(ASSIGNED),
+        FAILED,
+        Optional.<String>absent()));
+  }
+
+  @Test
+  public void testCasTaskNotFound() {
+    control.replay();
+
+    assertFalse(stateManager.changeState(
+        "a",
+        Optional.of(PENDING),
+        ASSIGNED,
+        Optional.<String>absent()));
   }
 
   private void expectStateTransitions(

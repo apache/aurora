@@ -15,38 +15,53 @@
  */
 package org.apache.aurora.scheduler.state;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
-import com.google.common.base.Throwables;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.stats.Stats;
-import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
 import com.twitter.common.util.StateMachine.Rule;
 import com.twitter.common.util.StateMachine.Transition;
 
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.commons.lang.builder.HashCodeBuilder;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
+import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
+import static org.apache.aurora.gen.ScheduleStatus.FAILED;
+import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
+import static org.apache.aurora.gen.ScheduleStatus.INIT;
+import static org.apache.aurora.gen.ScheduleStatus.KILLED;
+import static org.apache.aurora.gen.ScheduleStatus.KILLING;
+import static org.apache.aurora.gen.ScheduleStatus.LOST;
+import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.gen.ScheduleStatus.PREEMPTING;
+import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
+import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.gen.ScheduleStatus.STARTING;
+import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
+import static org.apache.aurora.gen.ScheduleStatus.UNKNOWN;
+import static org.apache.aurora.scheduler.state.SideEffect.Action;
+import static org.apache.aurora.scheduler.state.SideEffect.Action.DELETE;
+import static org.apache.aurora.scheduler.state.SideEffect.Action.INCREMENT_FAILURES;
+import static org.apache.aurora.scheduler.state.SideEffect.Action.KILL;
+import static org.apache.aurora.scheduler.state.SideEffect.Action.RESCHEDULE;
+import static org.apache.aurora.scheduler.state.SideEffect.Action.SAVE_STATE;
+import static org.apache.aurora.scheduler.state.SideEffect.Action.STATE_CHANGE;
 
 /**
  * State machine for a task.
@@ -55,8 +70,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * to different state transitions.  These responses are externally communicated by populating a
  * provided work queue.
  * <p>
- * TODO(William Farner): Introduce an interface to allow state machines to be dealt with
- *     abstractly from the consumption side.
+ * TODO(wfarner): Augment this class to force the one-time-use nature.  This is probably best done
+ * by hiding the constructor and exposing only a static function to transition a task and get the
+ * resulting actions.
  */
 class TaskStateMachine {
   private static final Logger LOG = Logger.getLogger(TaskStateMachine.class.getName());
@@ -64,184 +80,104 @@ class TaskStateMachine {
   private static final AtomicLong ILLEGAL_TRANSITIONS =
       Stats.exportLong("scheduler_illegal_task_state_transitions");
 
-  // Re-declarations of statuses as wrapped state objects.
-  private static final State ASSIGNED = State.create(ScheduleStatus.ASSIGNED);
-  private static final State FAILED = State.create(ScheduleStatus.FAILED);
-  private static final State FINISHED = State.create(ScheduleStatus.FINISHED);
-  private static final State INIT = State.create(ScheduleStatus.INIT);
-  private static final State KILLED = State.create(ScheduleStatus.KILLED);
-  private static final State KILLING = State.create(ScheduleStatus.KILLING);
-  private static final State LOST = State.create(ScheduleStatus.LOST);
-  private static final State PENDING = State.create(ScheduleStatus.PENDING);
-  private static final State PREEMPTING = State.create(ScheduleStatus.PREEMPTING);
-  private static final State RESTARTING = State.create(ScheduleStatus.RESTARTING);
-  private static final State RUNNING = State.create(ScheduleStatus.RUNNING);
-  private static final State STARTING = State.create(ScheduleStatus.STARTING);
-  private static final State THROTTLED = State.create(ScheduleStatus.THROTTLED);
-  private static final State UNKNOWN = State.create(ScheduleStatus.UNKNOWN);
-
-  @VisibleForTesting
-  static final Supplier<String> LOCAL_HOST_SUPPLIER = Suppliers.memoize(
-      new Supplier<String>() {
-        @Override public String get() {
-          try {
-            return InetAddress.getLocalHost().getHostName();
-          } catch (UnknownHostException e) {
-            LOG.log(Level.SEVERE, "Failed to get self hostname.");
-            throw Throwables.propagate(e);
-          }
-        }
-      });
-
-  private final String taskId;
-  private final WorkSink workSink;
-  private final StateMachine<State> stateMachine;
+  private final StateMachine<ScheduleStatus> stateMachine;
   private ScheduleStatus previousState = null;
-  private final Clock clock;
+
+  private final Set<SideEffect> sideEffects = Sets.newHashSet();
 
   /**
-   * Composes a schedule status and a state change argument.  Only the ScheduleStatuses in two
-   * States must be equal for them to be considered equal.
-   */
-  private static class State {
-    private final ScheduleStatus state;
-    private final Function<IScheduledTask, IScheduledTask> mutation;
-
-    State(ScheduleStatus state, Function<IScheduledTask, IScheduledTask> mutation) {
-      this.state = state;
-      this.mutation = mutation;
-    }
-
-    static State create(ScheduleStatus status) {
-      return create(status, Functions.<IScheduledTask>identity());
-    }
-
-    static State create(
-        ScheduleStatus status,
-        Function<IScheduledTask, IScheduledTask> mutation) {
-
-      return new State(status, mutation);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof State)) {
-        return false;
-      }
-
-      if (o == this) {
-        return true;
-      }
-
-      State other = (State) o;
-      return state == other.state;
-    }
-
-    @Override
-    public int hashCode() {
-      return new HashCodeBuilder()
-          .append(state)
-          .toHashCode();
-    }
-
-    @Override
-    public String toString() {
-      return state.toString();
-    }
-
-    private ScheduleStatus getState() {
-      return state;
-    }
-
-    private Function<IScheduledTask, IScheduledTask> getMutation() {
-      return mutation;
-    }
-  }
-
-  /**
-   * A write-only work acceptor.
-   */
-  public interface WorkSink {
-    /**
-     * Appends external work that must be performed for a state machine transition to be fully
-     * complete.
-     *
-     * @param work Description of the work to be performed.
-     * @param stateMachine The state machine that the work is associated with.
-     * @param mutation Mutate operation to perform along with the state transition.
-     */
-    void addWork(
-        WorkCommand work,
-        TaskStateMachine stateMachine,
-        Function<IScheduledTask, IScheduledTask> mutation);
-  }
-
-  /**
-   * Creates a new task state machine.
+   * Creates a new task state machine representing a non-existent task.  This allows for consistent
+   * state-reconciliation actions when the external system disagrees with the scheduler.
    *
-   * @param taskId ID of the task managed by this state machine.
-   * @param task Read-only task that this state machine manages.
-   * @param workSink Work sink to receive transition response actions
-   * @param clock Clock to use for reading the current time.
-   * @param initialState The state to begin the state machine at.  All legal transitions will be
-   *     added, but this allows the state machine to 'skip' states, for instance when a task is
-   *     loaded from a persistent store.
+   * @param name Name of the state machine, for logging.
    */
-  public TaskStateMachine(
-      final String taskId,
-      final IScheduledTask task,
-      final WorkSink workSink,
-      final Clock clock,
-      final ScheduleStatus initialState) {
+  public TaskStateMachine(String name) {
+    this(name, Optional.<IScheduledTask>absent());
+  }
 
-    this.taskId = MorePreconditions.checkNotBlank(taskId);
-    this.workSink = checkNotNull(workSink);
-    this.clock = checkNotNull(clock);
-    checkNotNull(initialState);
+  /**
+   * Creates a new task state machine representing an existent task.  The state machine will be
+   * named with the tasks ID.
+   *.
+   * @param task Read-only task that this state machine manages.
+   */
+  public TaskStateMachine(IScheduledTask task) {
+    this(Tasks.id(task), Optional.of(task));
+  }
 
-    @SuppressWarnings("unchecked")
-    Closure<Transition<State>> manageTerminatedTasks = Closures.combine(
-        /* Kill a task that we believe to be terminated when an attempt is made to revive. */
-        Closures.filter(Transition.to(ASSIGNED, STARTING, RUNNING),
-            addWorkClosure(WorkCommand.KILL)),
-        /* Remove a terminated task that is remotely removed. */
-        Closures.filter(Transition.to(UNKNOWN), addWorkClosure(WorkCommand.DELETE)));
+  private TaskStateMachine(final String name, final Optional<IScheduledTask> task) {
+    MorePreconditions.checkNotBlank(name);
+    checkNotNull(task);
 
-    final Closure<Transition<State>> manageRestartingTask = new Closure<Transition<State>>() {
-      @SuppressWarnings("fallthrough")
-      @Override public void execute(Transition<State> transition) {
-        switch (transition.getTo().getState()) {
-          case ASSIGNED:
-          case STARTING:
-          case RUNNING:
-            addWork(WorkCommand.KILL);
-            break;
+    final ScheduleStatus initialState = task.transform(Tasks.GET_STATUS).or(UNKNOWN);
+    if (task.isPresent()) {
+      Preconditions.checkState(
+          initialState != UNKNOWN,
+          "A task that exists may not be in UNKNOWN state.");
+    } else {
+      Preconditions.checkState(
+          initialState == UNKNOWN,
+          "A task that does not exist must start un UNKNOWN state.");
+    }
 
-          case LOST:
-            addWork(WorkCommand.KILL);
-            // fall through
+    Closure<Transition<ScheduleStatus>> manageTerminatedTasks = Closures.combine(
+        ImmutableList.<Closure<Transition<ScheduleStatus>>>builder()
+            // Kill a task that we believe to be terminated when an attempt is made to revive.
+            .add(
+                Closures.filter(Transition.to(ASSIGNED, STARTING, RUNNING),
+                addFollowupClosure(KILL)))
+            // Remove a terminated task that is remotely removed.
+            .add(Closures.filter(Transition.to(UNKNOWN), addFollowupClosure(DELETE)))
+            .build());
 
-          case FINISHED:
-          case FAILED:
-          case KILLED:
-            addWork(WorkCommand.RESCHEDULE, transition.getTo().getMutation());
-            break;
+    final Closure<Transition<ScheduleStatus>> manageRestartingTask =
+        new Closure<Transition<ScheduleStatus>>() {
+          @Override public void execute(Transition<ScheduleStatus> transition) {
+            switch (transition.getTo()) {
+              case ASSIGNED:
+                addFollowup(KILL);
+                break;
 
-          case UNKNOWN:
-            updateState(ScheduleStatus.LOST);
-            break;
+              case STARTING:
+                addFollowup(KILL);
+                break;
 
-          default:
-            // No-op.
-        }
-      }
-    };
+              case RUNNING:
+                addFollowup(KILL);
+                break;
+
+              case LOST:
+                addFollowup(KILL);
+                addFollowup(RESCHEDULE);
+                break;
+
+              case FINISHED:
+                addFollowup(RESCHEDULE);
+                break;
+
+              case FAILED:
+                addFollowup(RESCHEDULE);
+                break;
+
+              case KILLED:
+                addFollowup(RESCHEDULE);
+                break;
+
+              case UNKNOWN:
+                addFollowupTransition(LOST);
+                break;
+
+              default:
+                // No-op.
+            }
+          }
+        };
 
     // To be called on a task transitioning into the FINISHED state.
     final Command rescheduleIfService = new Command() {
       @Override public void execute() {
-        if (task.getAssignedTask().getTask().isIsService()) {
-          addWork(WorkCommand.RESCHEDULE);
+        if (task.get().getAssignedTask().getTask().isIsService()) {
+          addFollowup(RESCHEDULE);
         }
       }
     };
@@ -249,27 +185,29 @@ class TaskStateMachine {
     // To be called on a task transitioning into the FAILED state.
     final Command incrementFailuresMaybeReschedule = new Command() {
       @Override public void execute() {
-        addWork(WorkCommand.INCREMENT_FAILURES);
+        addFollowup(INCREMENT_FAILURES);
 
         // Max failures is ignored for service task.
-        boolean isService = task.getAssignedTask().getTask().isIsService();
+        boolean isService = task.get().getAssignedTask().getTask().isIsService();
 
         // Max failures is ignored when set to -1.
-        int maxFailures = task.getAssignedTask().getTask().getMaxTaskFailures();
-        if (isService || (maxFailures == -1) || (task.getFailureCount() < (maxFailures - 1))) {
-          addWork(WorkCommand.RESCHEDULE);
+        int maxFailures = task.get().getAssignedTask().getTask().getMaxTaskFailures();
+        boolean belowMaxFailures =
+            (maxFailures == -1) || (task.get().getFailureCount() < (maxFailures - 1));
+        if (isService || belowMaxFailures) {
+          addFollowup(RESCHEDULE);
         } else {
-          LOG.info("Task " + getTaskId() + " reached failure limit, not rescheduling");
+          LOG.info("Task " + name + " reached failure limit, not rescheduling");
         }
       }
     };
 
-    final Closure<Transition<State>> deleteIfKilling =
-        Closures.filter(Transition.to(KILLING), addWorkClosure(WorkCommand.DELETE));
+    final Closure<Transition<ScheduleStatus>> deleteIfKilling =
+        Closures.filter(Transition.to(KILLING), addFollowupClosure(DELETE));
 
-    stateMachine = StateMachine.<State>builder(taskId)
+    stateMachine = StateMachine.<ScheduleStatus>builder(name)
         .logTransitions()
-        .initialState(State.create(initialState))
+        .initialState(initialState)
         .addState(
             Rule.from(INIT)
                 .to(PENDING, THROTTLED, UNKNOWN))
@@ -286,16 +224,15 @@ class TaskStateMachine {
                 .to(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, KILLED,
                     KILLING, LOST, PREEMPTING)
                 .withCallback(
-                    new Closure<Transition<State>>() {
-                      @SuppressWarnings("fallthrough")
-                      @Override public void execute(Transition<State> transition) {
-                        switch (transition.getTo().getState()) {
+                    new Closure<Transition<ScheduleStatus>>() {
+                      @Override public void execute(Transition<ScheduleStatus> transition) {
+                        switch (transition.getTo()) {
                           case FINISHED:
                             rescheduleIfService.execute();
                             break;
 
                           case PREEMPTING:
-                            addWork(WorkCommand.KILL);
+                            addFollowup(KILL);
                             break;
 
                           case FAILED:
@@ -303,25 +240,24 @@ class TaskStateMachine {
                             break;
 
                           case RESTARTING:
-                            addWork(WorkCommand.KILL);
+                            addFollowup(KILL);
                             break;
 
                           case KILLED:
-                            addWork(WorkCommand.RESCHEDULE);
+                            addFollowup(RESCHEDULE);
                             break;
 
                           case LOST:
-                            addWork(WorkCommand.RESCHEDULE);
-                            // fall through
+                            addFollowup(RESCHEDULE);
+                            addFollowup(KILL);
+                            break;
+
                           case KILLING:
-                            addWork(WorkCommand.KILL);
+                            addFollowup(KILL);
                             break;
 
-                          case UNKNOWN:
-                            break;
-
-                           default:
-                             // No-op.
+                          default:
+                            // No-op.
                         }
                       }
                     }
@@ -330,20 +266,19 @@ class TaskStateMachine {
             Rule.from(STARTING)
                 .to(RUNNING, FINISHED, FAILED, RESTARTING, KILLING, KILLED, LOST, PREEMPTING)
                 .withCallback(
-                    new Closure<Transition<State>>() {
-                      @SuppressWarnings("fallthrough")
-                      @Override public void execute(Transition<State> transition) {
-                        switch (transition.getTo().getState()) {
+                    new Closure<Transition<ScheduleStatus>>() {
+                      @Override public void execute(Transition<ScheduleStatus> transition) {
+                        switch (transition.getTo()) {
                           case FINISHED:
                             rescheduleIfService.execute();
                             break;
 
                           case RESTARTING:
-                            addWork(WorkCommand.KILL);
+                            addFollowup(KILL);
                             break;
 
                           case PREEMPTING:
-                            addWork(WorkCommand.KILL);
+                            addFollowup(KILL);
                             break;
 
                           case FAILED:
@@ -351,25 +286,25 @@ class TaskStateMachine {
                             break;
 
                           case KILLED:
-                            addWork(WorkCommand.RESCHEDULE);
+                            addFollowup(RESCHEDULE);
                             break;
 
                           case KILLING:
-                            addWork(WorkCommand.KILL);
+                            addFollowup(KILL);
                             break;
 
                           case LOST:
-                            addWork(WorkCommand.RESCHEDULE);
+                            addFollowup(RESCHEDULE);
                             break;
 
                           case UNKNOWN:
                             // The slave previously acknowledged that it had the task, and now
                             // stopped reporting it.
-                            updateState(ScheduleStatus.LOST);
+                            addFollowupTransition(LOST);
                             break;
 
-                           default:
-                             // No-op.
+                          default:
+                            // No-op.
                         }
                       }
                     }
@@ -378,20 +313,19 @@ class TaskStateMachine {
             Rule.from(RUNNING)
                 .to(FINISHED, RESTARTING, FAILED, KILLING, KILLED, LOST, PREEMPTING)
                 .withCallback(
-                    new Closure<Transition<State>>() {
-                      @SuppressWarnings("fallthrough")
-                      @Override public void execute(Transition<State> transition) {
-                        switch (transition.getTo().getState()) {
+                    new Closure<Transition<ScheduleStatus>>() {
+                      @Override public void execute(Transition<ScheduleStatus> transition) {
+                        switch (transition.getTo()) {
                           case FINISHED:
                             rescheduleIfService.execute();
                             break;
 
                           case PREEMPTING:
-                            addWork(WorkCommand.KILL);
+                            addFollowup(KILL);
                             break;
 
                           case RESTARTING:
-                            addWork(WorkCommand.KILL);
+                            addFollowup(KILL);
                             break;
 
                           case FAILED:
@@ -399,19 +333,19 @@ class TaskStateMachine {
                             break;
 
                           case KILLED:
-                            addWork(WorkCommand.RESCHEDULE);
+                            addFollowup(RESCHEDULE);
                             break;
 
                           case KILLING:
-                            addWork(WorkCommand.KILL);
+                            addFollowup(KILL);
                             break;
 
                           case LOST:
-                            addWork(WorkCommand.RESCHEDULE);
+                            addFollowup(RESCHEDULE);
                             break;
 
                           case UNKNOWN:
-                            updateState(ScheduleStatus.LOST);
+                            addFollowupTransition(LOST);
                             break;
 
                            default:
@@ -455,23 +389,26 @@ class TaskStateMachine {
         // Since we want this action to be performed last in the transition sequence, the callback
         // must be the last chained transition callback.
         .onAnyTransition(
-            new Closure<Transition<State>>() {
-              @Override public void execute(final Transition<State> transition) {
-                ScheduleStatus from = transition.getFrom().getState();
-                ScheduleStatus to = transition.getTo().getState();
-
-                if (transition.isValidStateChange() && (to != ScheduleStatus.UNKNOWN)
-                    // Prevent an update when killing a pending task, since the task is deleted
-                    // prior to the update.
-                    && !((from == ScheduleStatus.PENDING) && (to == ScheduleStatus.KILLING))) {
-                  addWork(WorkCommand.UPDATE_STATE, transition.getTo().getMutation());
-                } else if (!transition.isAllowed()) {
-                  LOG.log(Level.SEVERE, "Illegal state transition attempted: " + transition);
-                  ILLEGAL_TRANSITIONS.incrementAndGet();
-                }
-
+            new Closure<Transition<ScheduleStatus>>() {
+              @Override public void execute(final Transition<ScheduleStatus> transition) {
                 if (transition.isValidStateChange()) {
+                  ScheduleStatus from = transition.getFrom();
+                  ScheduleStatus to = transition.getTo();
+
+                  // TODO(wfarner): Clean up this hack.  This is here to suppress unnecessary work
+                  // (save followed by delete), but it shows a wart with this catch-all behavior.
+                  // Strongly consider pushing the SAVE_STATE behavior to each transition handler.
+                  boolean pendingDeleteHack =
+                      !(((from == PENDING) || (from == THROTTLED)) && (to == KILLING));
+
+                  // Don't bother saving state of a task that is being removed.
+                  if ((to != UNKNOWN) && pendingDeleteHack) {
+                    addFollowup(SAVE_STATE);
+                  }
                   previousState = from;
+                } else {
+                  LOG.severe("Illegal state transition attempted: " + transition);
+                  ILLEGAL_TRANSITIONS.incrementAndGet();
                 }
               }
             }
@@ -485,56 +422,25 @@ class TaskStateMachine {
         .build();
   }
 
-  private Closure<Transition<State>> addWorkClosure(final WorkCommand work) {
-    return new Closure<Transition<State>>() {
-      @Override public void execute(Transition<State> item) {
-        addWork(work);
+  private void addFollowup(Action action) {
+    addFollowup(new SideEffect(action, Optional.<ScheduleStatus>absent()));
+  }
+
+  private void addFollowupTransition(ScheduleStatus status) {
+    addFollowup(new SideEffect(STATE_CHANGE, Optional.of(status)));
+  }
+
+  private void addFollowup(SideEffect sideEffect) {
+    LOG.info("Adding work command " + sideEffect + " for " + this);
+    sideEffects.add(sideEffect);
+  }
+
+  private Closure<Transition<ScheduleStatus>> addFollowupClosure(final Action action) {
+    return new Closure<Transition<ScheduleStatus>>() {
+      @Override public void execute(Transition<ScheduleStatus> item) {
+        addFollowup(action);
       }
     };
-  }
-
-  private void addWork(WorkCommand work) {
-    addWork(work, Functions.<IScheduledTask>identity());
-  }
-
-  private void addWork(WorkCommand work, Function<IScheduledTask, IScheduledTask> mutation) {
-    LOG.info("Adding work command " + work + " for " + this);
-    workSink.addWork(work, TaskStateMachine.this, mutation);
-  }
-
-  /**
-   * Same as {@link #updateState(ScheduleStatus, Function)}, but uses a noop mutation.
-   *
-   * @param status Status to apply to the task.
-   * @return {@code true} if the state change was allowed, {@code false} otherwise.
-   */
-  public synchronized boolean updateState(ScheduleStatus status) {
-    return updateState(status, Functions.<IScheduledTask>identity());
-  }
-
-  /**
-   * Same as {@link #updateState(ScheduleStatus, Function, Optional)}, but uses a noop mutation.
-   *
-   * @param status Status to apply to the task.
-   * @param auditMessage The (optional) audit message to associate with the transition.
-   * @return {@code true} if the state change was allowed, {@code false} otherwise.
-   */
-  public synchronized boolean updateState(ScheduleStatus status, Optional<String> auditMessage) {
-    return updateState(status, Functions.<IScheduledTask>identity(), auditMessage);
-  }
-
-  /**
-   * Same as {@link #updateState(ScheduleStatus, Function, Optional)}, but omits the audit message.
-   *
-   * @param status Status to apply to the task.
-   * @param mutation Mutate operation to perform while updating the task.
-   * @return {@code true} if the state change was allowed, {@code false} otherwise.
-   */
-  public synchronized boolean updateState(
-      ScheduleStatus status,
-      Function<IScheduledTask, IScheduledTask> mutation) {
-
-    return updateState(status, mutation, Optional.<String>absent());
   }
 
   /**
@@ -543,59 +449,35 @@ class TaskStateMachine {
    * will be appended to the work queue.
    *
    * @param status Status to apply to the task.
-   * @param auditMessage The audit message to associate with the transition.
-   * @param mutation Mutate operation to perform while updating the task.
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
-  private synchronized boolean updateState(
-      final ScheduleStatus status,
-      Function<IScheduledTask, IScheduledTask> mutation,
-      final Optional<String> auditMessage) {
-
+  public synchronized TransitionResult updateState(final ScheduleStatus status) {
     checkNotNull(status);
-    checkNotNull(mutation);
-    checkNotNull(auditMessage);
+    Preconditions.checkState(sideEffects.isEmpty());
 
     /**
      * Don't bother applying noop state changes.  If we end up modifying task state without a
      * state transition (e.g. storing resource consumption of a running task), we need to find
      * a different way to suppress noop transitions.
      */
-    if (stateMachine.getState().getState() != status) {
-      Function<IScheduledTask, IScheduledTask> operation = Functions.compose(mutation,
-          new Function<IScheduledTask, IScheduledTask>() {
-            @Override public IScheduledTask apply(IScheduledTask task) {
-              ScheduledTask builder = task.newBuilder();
-              builder.addToTaskEvents(new TaskEvent()
-                  .setTimestamp(clock.nowMillis())
-                  .setStatus(status)
-                  .setMessage(auditMessage.orNull())
-                  .setScheduler(LOCAL_HOST_SUPPLIER.get()));
-              return IScheduledTask.build(builder);
-            }
-          });
-      return stateMachine.transition(State.create(status, operation));
+    if (stateMachine.getState() == status) {
+      return new TransitionResult(false, ImmutableSet.<SideEffect>of());
     }
 
-    return false;
+    boolean success = stateMachine.transition(status);
+    ImmutableSet<SideEffect> transitionEffects = ImmutableSet.copyOf(sideEffects);
+    sideEffects.clear();
+    return new TransitionResult(success, transitionEffects);
   }
 
   /**
    * Fetch the current state from the state machine.
+   * TODO(wfarner): Consider removing, the caller should know this.
    *
    * @return The current state.
    */
   public synchronized ScheduleStatus getState() {
-    return stateMachine.getState().getState();
-  }
-
-  /**
-   * Gets the ID for the task that this state machine manages.
-   *
-   * @return The state machine's task ID.
-   */
-  public String getTaskId() {
-    return taskId;
+    return stateMachine.getState();
   }
 
   /**
@@ -611,6 +493,6 @@ class TaskStateMachine {
 
   @Override
   public String toString() {
-    return getTaskId();
+    return stateMachine.getName();
   }
 }

@@ -198,6 +198,10 @@ public interface Storage {
 
   /**
    * Executes the unit of mutating {@code work}.
+   * TODO(wfarner): Add a mechanism by which mutating work can add side-effect operations to be
+   * performed after completion of the outer-most transaction.  As it stands, it's somewhat
+   * futile to try to achieve this within a transaction, since the local code does not know
+   * if the current transaction is nested.
    *
    * @param work The unit of work to execute.
    * @param <T> The type of result this unit of work produces.

@@ -71,6 +71,8 @@ public interface TaskStore {
     /**
      * Offers temporary mutable access to tasks.  If a task ID is not found, it will be silently
      * skipped, and no corresponding task will be returned.
+     * TODO(wfarner): Consider a non-batch variant of this, since that's a more common use case,
+     * and it prevents the caller from worrying about a bad query having broad impact.
      *
      * @param query Query to match tasks against.
      * @param mutator The mutate operation.
