@@ -1068,7 +1068,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setTaskConfig(nonProductionTask());
     JobConfiguration cronJobTwo = makeJob()
         .setCronSchedule("2 * * * *")
-        .setKey(JOB_KEY.newBuilder())
+        .setKey(JOB_KEY.newBuilder().setName("cronJob2"))
         .setTaskConfig(nonProductionTask());
 
     JobConfiguration cronJobThree = makeJob()
@@ -1082,23 +1082,32 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     TaskConfig immediateTaskConfig = defaultTask(false)
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
-    IScheduledTask immediateTask = IScheduledTask.build(new ScheduledTask()
+    IScheduledTask task1 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig)));
+    IScheduledTask task2 = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig.setNumCpus(2))));
 
     TaskConfig immediateTaskConfigTwo = defaultTask(false)
         .setJobName("immediateTwo")
         .setOwner(BAZ_ROLE_IDENTITY);
-    IScheduledTask immediateTaskTwo = IScheduledTask.build(new ScheduledTask()
+    IScheduledTask task3 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfigTwo)));
 
-    storageUtil.expectTaskFetch(Query.unscoped(), immediateTask, immediateTaskTwo);
+    TaskConfig immediateTaskConfigThree = defaultTask(false)
+        .setJobName("immediateThree")
+        .setOwner(BAZ_ROLE_IDENTITY);
+    IScheduledTask task4 = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(immediateTaskConfigThree)));
+
+    storageUtil.expectTaskFetch(Query.unscoped(), task1, task2, task3, task4);
+
     expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(crons));
 
     JobSummaryResult expectedResult = new JobSummaryResult();
     expectedResult.addToSummaries(
         new JobSummary().setRole(ROLE).setCronJobCount(2).setJobCount(1));
     expectedResult.addToSummaries(
-        new JobSummary().setRole(BAZ_ROLE).setCronJobCount(1).setJobCount(1));
+        new JobSummary().setRole(BAZ_ROLE).setCronJobCount(1).setJobCount(2));
 
     control.replay();
 

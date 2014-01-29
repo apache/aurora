@@ -34,6 +34,7 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -380,16 +381,15 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response getJobSummary() {
-    Set<IScheduledTask> tasks = Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped());
-    Multimap<String, IJobKey> jobsByRole = Multimaps.index(
-        FluentIterable.from(tasks).transform(Tasks.SCHEDULED_TO_JOB_KEY),
-        JobKeys.TO_ROLE);
+    Multimap<String, IJobKey> jobsByRole = mapByRole(
+        Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped()),
+        Tasks.SCHEDULED_TO_JOB_KEY);
 
-    Multimap<String, IJobKey> cronJobsByRole = Multimaps.index(
-        FluentIterable.from(cronJobManager.getJobs()).transform(JobKeys.FROM_CONFIG),
-        JobKeys.TO_ROLE);
+    Multimap<String, IJobKey> cronJobsByRole = mapByRole(
+        cronJobManager.getJobs(),
+        JobKeys.FROM_CONFIG);
 
-    List<JobSummary> jobSummaries = Lists.newLinkedList();
+    Set<JobSummary> jobSummaries = Sets.newHashSet();
     for (String role : Sets.union(jobsByRole.keySet(), cronJobsByRole.keySet())) {
       JobSummary summary = new JobSummary();
       summary.setRole(role);
@@ -401,6 +401,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return new Response()
         .setResponseCode(OK)
         .setResult(Result.jobSummaryResult(new JobSummaryResult(jobSummaries)));
+  }
+
+  private static <T> Multimap<String, IJobKey> mapByRole(
+      Iterable<T> tasks,
+      Function<T, IJobKey> keyExtractor) {
+
+    return HashMultimap.create(
+        Multimaps.index(Iterables.transform(tasks, keyExtractor), JobKeys.TO_ROLE));
   }
 
   @Override
