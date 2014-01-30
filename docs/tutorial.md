@@ -4,15 +4,15 @@ Aurora Tutorial
 Before reading this document, you should read over the (short) [README](README.md)
 for the Aurora docs.
 
-[Introduction](#Introduction)
-[Setup: Install Aurora](#Setup)
-[The Script](#Script)
-[Aurora Configuration](#Configuration)
-[What's Going On In That Configuration File?](#What)
-[Creating the Job](#Creating)
-[Watching the Job Run](#Watching)
-[Cleanup](#Cleanup)
-[Next Steps](#Next)
+-   [Introduction](#Introduction)
+-   [Setup: Install Aurora](#Setup)
+-   [The Script](#Script)
+-   [Aurora Configuration](#Configuration)
+-   [What's Going On In That Configuration File?](#What)
+-   [Creating the Job](#Creating)
+-   [Watching the Job Run](#Watching)
+-   [Cleanup](#Cleanup)
+-   [Next Steps](#Next)
 
 ## <a name="Introduction"></a>Introduction
 
@@ -45,20 +45,20 @@ this directory is the same as `/vagrant` inside the Vagrant VMs).
 
 The script has an intentional bug, which we will explain later on.
 
-        import sys
-        import time
+    import sys
+    import time
 
-        def main(argv):
-          SLEEP_DELAY = 10
-          # Python ninjas - ignore this blatant bug.
-          for i in xrang(100):
-            print("Hello world! The time is now: %s. Sleeping for %d secs" % (
-              time.asctime(), SLEEP_DELAY))
-            sys.stdout.flush()
-            time.sleep(SLEEP_DELAY)
+    def main(argv):
+      SLEEP_DELAY = 10
+      # Python ninjas - ignore this blatant bug.
+      for i in xrang(100):
+        print("Hello world! The time is now: %s. Sleeping for %d secs" % (
+          time.asctime(), SLEEP_DELAY))
+        sys.stdout.flush()
+        time.sleep(SLEEP_DELAY)
 
-        if __name__ == "__main__":
-          main(sys.argv)
+    if __name__ == "__main__":
+      main(sys.argv)
 
 ## <a name="Configuration"></a>Aurora Configuration
 
@@ -68,27 +68,27 @@ code in the file `hello_world.aurora` in the same directory as your
 `hello_world.py' file. (all Aurora configuration files end with `.aurora` and
 are written in a Python variant).
 
-        import os
+    import os
 
-        # copy hello_world.py into the local sandbox
-        install = Process(
-          name = 'fetch_package',
-          cmdline = 'cp /vagrant/hello_world.py . && chmod +x hello_world.py')
+    # copy hello_world.py into the local sandbox
+    install = Process(
+      name = 'fetch_package',
+      cmdline = 'cp /vagrant/hello_world.py . && chmod +x hello_world.py')
 
-        # run the script
-        hello_world = Process(
-          name = 'hello_world',
-          cmdline = 'python2.6 hello_world.py')
+    # run the script
+    hello_world = Process(
+      name = 'hello_world',
+      cmdline = 'python2.6 hello_world.py')
 
-        # describe the task
-        hello_world_task = SequentialTask(
-          processes = [install, hello_world],
-          resources = Resources(cpu = 1, ram = 1*MB, disk=8*MB))
+    # describe the task
+    hello_world_task = SequentialTask(
+      processes = [install, hello_world],
+      resources = Resources(cpu = 1, ram = 1*MB, disk=8*MB))
 
-        jobs = [
-          Job(name = 'hello_world', cluster = 'example', role = 'www-data',
-              environment = 'devel', task = hello_world_task)
-        ]
+    jobs = [
+      Job(name = 'hello_world', cluster = 'example', role = 'www-data',
+          environment = 'devel', task = hello_world_task)
+    ]
 
 For more about Aurora configuration files, see the [Configuration
 Tutorial](configurationtutorial.md) and the [Aurora + Thermos
@@ -128,7 +128,7 @@ identical, the job keys identify the same job.
 cluster names. For Vagrant, from the top-level of your Aurora repository clone,
 do:
 
-	$ vagrant ssh aurora-scheduler
+    $ vagrant ssh aurora-scheduler
 
 Followed by:
 
@@ -212,7 +212,7 @@ not `xrang`. Edit the `hello_world.py` script, save as `hello_world_v2.py` and c
 
 Now that we've updated our configuration, let's restart the job:
 
-        $ aurora update example/www-data/devel/hello_world /vagrant/hello_world.aurora
+    $ aurora update example/www-data/devel/hello_world /vagrant/hello_world.aurora
 
 This time, the task comes up, we inspect the page, and see that the
 `hello_world` process is running.
