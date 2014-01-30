@@ -8,8 +8,8 @@ install -m 755 /vagrant/dist/aurora_admin.pex /usr/local/bin/aurora_admin
 
 apt-get update
 apt-get -y install java7-runtime-headless curl
-wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.15.0-rc4_amd64.deb
-dpkg --install mesos_0.15.0-rc4_amd64.deb
+wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.15.0_amd64.deb
+dpkg --install mesos_0.15.0_amd64.deb
 
 # TODO(ksweeney): Make this a be part of the Aurora distribution tarball.
 # Location where aurora-scheduler.zip was unpacked.

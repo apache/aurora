@@ -70,7 +70,7 @@ python_library(
   name = 'thermos_executor_base',
   sources = ['executor_base.py'],
   dependencies = [
-    pants('3rdparty/python:mesos-core'),
+    pants('3rdparty/python:mesos'),
     pants('3rdparty/python:twitter.common.log'),
     pants('src/main/thrift/org/apache/thermos:py-thrift'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
@@ -83,7 +83,7 @@ python_library(
   dependencies = [
     pants(':status_manager'),
     pants(':thermos_executor_base'),
-    pants('3rdparty/python:mesos-core'),
+    pants('3rdparty/python:mesos'),
     pants('3rdparty/python:pystachio'),
     pants('3rdparty/python:twitter.common.app'),
     pants('3rdparty/python:twitter.common.concurrent'),
@@ -114,7 +114,7 @@ python_library(
   dependencies = [
     pants(':executor_detector'),
     pants(':thermos_executor_base'),
-    pants('3rdparty/python:mesos-core'),
+    pants('3rdparty/python:mesos'),
     pants('3rdparty/python:psutil'),
     pants('3rdparty/python:twitter.common.collections'),
     pants('3rdparty/python:twitter.common.exceptions'),

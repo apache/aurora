@@ -13,8 +13,8 @@ pushd aurora
   AURORA_VERSION=$(cat .auroraversion | tr '[a-z]' '[A-Z]')
   mkdir -p third_party
   pushd third_party
-    wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.15.0-rc4_amd64.egg \
-      -O mesos-0.15.0_rc4-py2.7-linux-x86_64.egg
+    wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.15.0_amd64.egg \
+      -O mesos-0.15.0-py2.7-linux-x86_64.egg
   popd
   git pull
 
