@@ -96,7 +96,6 @@ public class SchedulerLifecycle implements EventSubscriber {
     PREPARING_STORAGE,
     STORAGE_PREPARED,
     LEADER_AWAITING_REGISTRATION,
-    REGISTERED_LEADER,
     ACTIVE,
     DEAD
   }
@@ -376,9 +375,6 @@ public class SchedulerLifecycle implements EventSubscriber {
         .addState(
             dieOnError(Closures.filter(NOT_DEAD, handleRegistered)),
             State.LEADER_AWAITING_REGISTRATION,
-            State.REGISTERED_LEADER, State.DEAD)
-        .addState(
-            State.REGISTERED_LEADER,
             State.ACTIVE, State.DEAD)
         .addState(
             State.ACTIVE,
@@ -422,7 +418,7 @@ public class SchedulerLifecycle implements EventSubscriber {
 
   @Subscribe
   public void registered(DriverRegistered event) {
-    stateMachine.transition(State.REGISTERED_LEADER);
+    stateMachine.transition(State.ACTIVE);
   }
 
   private static class SchedulerCandidateImpl implements LeadershipListener {
