@@ -25,6 +25,7 @@ import com.google.inject.BindingAnnotation;
 
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
+import org.apache.aurora.scheduler.filter.CachedJobState;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -60,8 +61,14 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   }
 
   @Override
-  public Set<Veto> filter(ResourceSlot offer, String slaveHost, ITaskConfig task, String taskId) {
-    Set<Veto> vetoes = delegate.filter(offer, slaveHost, task, taskId);
+  public Set<Veto> filter(
+      ResourceSlot offer,
+      String slaveHost,
+      ITaskConfig task,
+      String taskId,
+      CachedJobState jobState) {
+
+    Set<Veto> vetoes = delegate.filter(offer, slaveHost, task, taskId, jobState);
     if (!vetoes.isEmpty()) {
       eventSink.post(new Vetoed(taskId, vetoes));
     }

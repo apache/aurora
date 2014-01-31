@@ -17,6 +17,7 @@ package org.apache.aurora.scheduler.async;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.EnumSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -27,10 +28,14 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import com.google.common.base.Ticker;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.BindingAnnotation;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -40,14 +45,19 @@ import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.filter.CachedJobState;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.TaskStore;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.SlaveID;
@@ -127,6 +137,7 @@ interface TaskScheduler extends EventSubscriber {
     }
 
     private Function<Offer, Optional<TaskInfo>> getAssignerFunction(
+        final CachedJobState cachedJobState,
         final String taskId,
         final IScheduledTask task) {
 
@@ -136,14 +147,14 @@ interface TaskScheduler extends EventSubscriber {
           if (reservedTaskId.isPresent()) {
             if (taskId.equals(reservedTaskId.get())) {
               // Slave is reserved to satisfy this task.
-              return assigner.maybeAssign(offer, task);
+              return assigner.maybeAssign(offer, task, cachedJobState);
             } else {
               // Slave is reserved for another task.
               return Optional.absent();
             }
           } else {
             // Slave is not reserved.
-            return assigner.maybeAssign(offer, task);
+            return assigner.maybeAssign(offer, task, cachedJobState);
           }
         }
       };
@@ -152,6 +163,22 @@ interface TaskScheduler extends EventSubscriber {
     @VisibleForTesting
     static final Optional<String> LAUNCH_FAILED_MSG =
         Optional.of("Unknown exception attempting to schedule task.");
+
+    private static final Iterable<ScheduleStatus> ACTIVE_NOT_PENDING_STATES =
+        EnumSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(ScheduleStatus.PENDING)));
+
+    @VisibleForTesting
+    static Query.Builder activeJobStateQuery(IJobKey jobKey) {
+      return Query.jobScoped(jobKey).byStatus(ACTIVE_NOT_PENDING_STATES);
+    }
+
+    private CachedJobState getJobState(final TaskStore store, final IJobKey jobKey) {
+      return new CachedJobState(Suppliers.memoize(new Supplier<ImmutableSet<IScheduledTask>>() {
+        @Override public ImmutableSet<IScheduledTask> get() {
+          return store.fetchTasks(activeJobStateQuery(jobKey));
+        }
+      }));
+    }
 
     @Timed("task_schedule_attempt")
     @Override
@@ -167,10 +194,12 @@ interface TaskScheduler extends EventSubscriber {
             if (task == null) {
               LOG.warning("Failed to look up task " + taskId + ", it may have been deleted.");
             } else {
+              final CachedJobState cachedJobState =
+                  getJobState(store.getTaskStore(), Tasks.SCHEDULED_TO_JOB_KEY.apply(task));
               try {
-                if (!offerQueue.launchFirst(getAssignerFunction(taskId, task))) {
+                if (!offerQueue.launchFirst(getAssignerFunction(cachedJobState, taskId, task))) {
                   // Task could not be scheduled.
-                  maybePreemptFor(taskId);
+                  maybePreemptFor(taskId, cachedJobState);
                   return TaskSchedulerResult.TRY_AGAIN;
                 }
               } catch (OfferQueue.LaunchException e) {
@@ -198,11 +227,11 @@ interface TaskScheduler extends EventSubscriber {
       }
     }
 
-    private void maybePreemptFor(String taskId) {
+    private void maybePreemptFor(String taskId, CachedJobState cachedJobState) {
       if (reservations.hasReservationForTask(taskId)) {
         return;
       }
-      Optional<String> slaveId = preemptor.findPreemptionSlotFor(taskId);
+      Optional<String> slaveId = preemptor.findPreemptionSlotFor(taskId, cachedJobState);
       if (slaveId.isPresent()) {
         this.reservations.add(SlaveID.newBuilder().setValue(slaveId.get()).build(), taskId);
       }

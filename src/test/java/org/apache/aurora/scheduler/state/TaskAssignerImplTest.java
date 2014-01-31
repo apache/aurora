@@ -16,6 +16,7 @@
 package org.apache.aurora.scheduler.state;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
@@ -26,6 +27,7 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.MesosTaskFactory;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.filter.CachedJobState;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
@@ -73,6 +75,9 @@ public class TaskAssignerImplTest extends EasyMockTest {
       .setSlaveId(OFFER.getSlaveId())
       .build();
 
+  private static final CachedJobState EMPTY_JOB =
+      new CachedJobState(Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()));
+
   private StateManager stateManager;
   private SchedulingFilter filter;
   private MesosTaskFactory taskFactory;
@@ -92,7 +97,8 @@ public class TaskAssignerImplTest extends EasyMockTest {
         ResourceSlot.from(OFFER),
         OFFER.getHostname(),
         TASK.getAssignedTask().getTask(),
-        Tasks.id(TASK)))
+        Tasks.id(TASK),
+        EMPTY_JOB))
         .andReturn(ImmutableSet.<Veto>of());
     expect(stateManager.assignTask(
         Tasks.id(TASK),
@@ -104,7 +110,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(Optional.of(TASK_INFO), assigner.maybeAssign(OFFER, TASK));
+    assertEquals(Optional.of(TASK_INFO), assigner.maybeAssign(OFFER, TASK, EMPTY_JOB));
   }
 
 
@@ -114,11 +120,12 @@ public class TaskAssignerImplTest extends EasyMockTest {
         ResourceSlot.from(OFFER),
         OFFER.getHostname(),
         TASK.getAssignedTask().getTask(),
-        Tasks.id(TASK)))
+        Tasks.id(TASK),
+        EMPTY_JOB))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("denied")));
 
     control.replay();
 
-    assertEquals(Optional.<TaskInfo>absent(), assigner.maybeAssign(OFFER, TASK));
+    assertEquals(Optional.<TaskInfo>absent(), assigner.maybeAssign(OFFER, TASK, EMPTY_JOB));
   }
 }

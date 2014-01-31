@@ -49,6 +49,7 @@ import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculat
 import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
+import org.apache.aurora.scheduler.filter.CachedJobState;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -130,7 +131,10 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Boolean> ENABLE_PREEMPTOR = Arg.create(true);
 
   private static final Preemptor NULL_PREEMPTOR = new Preemptor() {
-    @Override public Optional<String> findPreemptionSlotFor(String taskId) {
+    @Override public Optional<String> findPreemptionSlotFor(
+        String taskId,
+        CachedJobState cachedJobState) {
+
       return Optional.absent();
     }
   };

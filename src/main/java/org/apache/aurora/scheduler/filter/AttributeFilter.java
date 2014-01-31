@@ -24,9 +24,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.Attribute;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
-import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
 
@@ -64,20 +62,15 @@ final class AttributeFilter {
    * Tests whether an attribute matches a limit constraint.
    *
    * @param attributes Attributes to match against.
-   * @param jobKey Key of the job with the limited constraint.
    * @param limit Limit value.
    * @param activeTasks All active tasks in the system.
    * @param attributeFetcher Interface for fetching attributes for hosts in the system.
    * @return {@code true} if the limit constraint is satisfied, {@code false} otherwise.
    */
   static boolean matches(final Set<Attribute> attributes,
-      final IJobKey jobKey,
       int limit,
       Iterable<IScheduledTask> activeTasks,
       final AttributeLoader attributeFetcher) {
-
-    Predicate<IScheduledTask> sameJob =
-        Predicates.compose(Predicates.equalTo(jobKey), Tasks.SCHEDULED_TO_JOB_KEY);
 
     Predicate<IScheduledTask> hasAttribute = new Predicate<IScheduledTask>() {
       @Override public boolean apply(IScheduledTask task) {
@@ -87,7 +80,6 @@ final class AttributeFilter {
       }
     };
 
-    return limit > Iterables.size(
-        Iterables.filter(activeTasks, Predicates.and(sameJob, hasAttribute)));
+    return limit > Iterables.size(Iterables.filter(activeTasks, hasAttribute));
   }
 }

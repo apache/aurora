@@ -109,8 +109,14 @@ public interface SchedulingFilter {
    * @param slaveHost Host that the resources are associated with.
    * @param task Task.
    * @param taskId Canonical ID of the task.
+   * @param cachedJobState Cached information about the job containing {@code task}.
    * @return A set of vetoes indicating reasons the task cannot be scheduled.  If the task may be
    *    scheduled, the set will be empty.
    */
-  Set<Veto> filter(ResourceSlot offer, String slaveHost, ITaskConfig task, String taskId);
+  Set<Veto> filter(
+      ResourceSlot offer,
+      String slaveHost,
+      ITaskConfig task,
+      String taskId,
+      CachedJobState cachedJobState);
 }

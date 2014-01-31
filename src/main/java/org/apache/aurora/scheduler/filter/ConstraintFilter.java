@@ -15,7 +15,6 @@
  */
 package org.apache.aurora.scheduler.filter;
 
-import java.util.Collection;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -23,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
-import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
@@ -32,8 +30,6 @@ import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
-import org.apache.aurora.scheduler.storage.entities.IJobKey;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -45,27 +41,23 @@ class ConstraintFilter implements Function<IConstraint, Optional<Veto>> {
 
   private static final Logger LOG = Logger.getLogger(ConstraintFilter.class.getName());
 
-  private final IJobKey jobKey;
-  private final Supplier<Collection<IScheduledTask>> activeTasksSupplier;
+  private final CachedJobState cachedjobState;
   private final AttributeLoader attributeLoader;
   private final Iterable<Attribute> hostAttributes;
 
   /**
    * Creates a new constraint filer for a given job.
    *
-   * @param jobKey Key for the job.
-   * @param activeTasksSupplier Supplier to fetch active tasks (if necessary).
+   * @param cachedjobState Cached information about the job containing the task being matched.
    * @param attributeLoader Interface to fetch host attributes (if necessary).
    * @param hostAttributes The attributes of the host to test against.
    */
   ConstraintFilter(
-      IJobKey jobKey,
-      Supplier<Collection<IScheduledTask>> activeTasksSupplier,
+      CachedJobState cachedjobState,
       AttributeLoader attributeLoader,
       Iterable<Attribute> hostAttributes) {
 
-    this.jobKey = checkNotNull(jobKey);
-    this.activeTasksSupplier = checkNotNull(activeTasksSupplier);
+    this.cachedjobState = checkNotNull(cachedjobState);
     this.attributeLoader = checkNotNull(attributeLoader);
     this.hostAttributes = checkNotNull(hostAttributes);
   }
@@ -106,9 +98,8 @@ class ConstraintFilter implements Function<IConstraint, Optional<Veto>> {
 
         boolean satisfied = AttributeFilter.matches(
             attributes,
-            jobKey,
             taskConstraint.getLimit().getLimit(),
-            activeTasksSupplier.get(),
+            cachedjobState.getActiveTasks(),
             attributeLoader);
         return satisfied
             ? Optional.<Veto>absent()

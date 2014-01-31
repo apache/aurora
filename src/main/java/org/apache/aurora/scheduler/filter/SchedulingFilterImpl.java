@@ -15,7 +15,6 @@
  */
 package org.apache.aurora.scheduler.filter;
 
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Set;
@@ -25,23 +24,17 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
-import com.google.common.collect.Sets;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.MaintenanceMode;
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
-import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -49,7 +42,6 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -198,10 +190,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         }
       });
 
-  private static final Iterable<ScheduleStatus> ACTIVE_NOT_PENDING_STATES =
-      EnumSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(ScheduleStatus.PENDING)));
-
-  private FilterRule getConstraintFilter(final String slaveHost) {
+  private FilterRule getConstraintFilter(final CachedJobState jobState, final String slaveHost) {
     return new FilterRule() {
       @Override public Iterable<Veto> apply(final ITaskConfig task) {
         if (!task.isSetConstraints()) {
@@ -220,18 +209,8 @@ public class SchedulingFilterImpl implements SchedulingFilter {
               }
             };
 
-            Supplier<Collection<IScheduledTask>> activeTasksSupplier =
-                Suppliers.memoize(new Supplier<Collection<IScheduledTask>>() {
-                  @Override public Collection<IScheduledTask> get() {
-                    return storeProvider.getTaskStore().fetchTasks(
-                        Query.jobScoped(Tasks.INFO_TO_JOB_KEY.apply(task))
-                            .byStatus(ACTIVE_NOT_PENDING_STATES));
-                  }
-                });
-
             ConstraintFilter constraintFilter = new ConstraintFilter(
-                Tasks.INFO_TO_JOB_KEY.apply(task),
-                activeTasksSupplier,
+                jobState,
                 attributeLoader,
                 attributeLoader.apply(slaveHost));
             ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
@@ -281,12 +260,18 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   }
 
   @Override
-  public Set<Veto> filter(ResourceSlot offer, String slaveHost, ITaskConfig task, String taskId) {
+  public Set<Veto> filter(
+      ResourceSlot offer,
+      String slaveHost,
+      ITaskConfig task,
+      String taskId,
+      CachedJobState cachedJobState) {
+
     if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
       return ImmutableSet.of(DEDICATED_HOST_VETO);
     }
     return ImmutableSet.<Veto>builder()
-        .addAll(getConstraintFilter(slaveHost).apply(task))
+        .addAll(getConstraintFilter(cachedJobState, slaveHost).apply(task))
         .addAll(getResourceVetoes(offer, task))
         .addAll(getMaintenanceVeto(slaveHost).asSet())
         .build();

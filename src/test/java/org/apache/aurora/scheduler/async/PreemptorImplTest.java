@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -44,6 +45,7 @@ import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.filter.CachedJobState;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -87,6 +89,9 @@ public class PreemptorImplTest extends EasyMockTest {
 
   private static final Amount<Long, Time> PREEMPTION_DELAY = Amount.of(30L, Time.SECONDS);
 
+  private static final CachedJobState EMPTY_JOB =
+      new CachedJobState(Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()));
+
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private SchedulingFilter schedulingFilter;
@@ -113,7 +118,7 @@ public class PreemptorImplTest extends EasyMockTest {
         PREEMPTION_DELAY,
         clock);
 
-    preemptor.findPreemptionSlotFor(pendingTask.getAssignedTask().getTaskId());
+    preemptor.findPreemptionSlotFor(pendingTask.getAssignedTask().getTaskId(), EMPTY_JOB);
   }
 
   // TODO(zmanji): Put together a SchedulerPreemptorIntegrationTest as well.
@@ -495,9 +500,10 @@ public class PreemptorImplTest extends EasyMockTest {
   private IExpectationSetters<Set<Veto>> expectFiltering() {
     return expect(schedulingFilter.filter(
         EasyMock.<ResourceSlot>anyObject(),
-        EasyMock.<String>anyObject(),
+        EasyMock.eq(HOST_A),
         EasyMock.<ITaskConfig>anyObject(),
-        EasyMock.<String>anyObject())).andAnswer(
+        EasyMock.<String>anyObject(),
+        EasyMock.eq(EMPTY_JOB))).andAnswer(
         new IAnswer<Set<Veto>>() {
           @Override public Set<Veto> answer() {
             return ImmutableSet.of();
