@@ -168,10 +168,10 @@ def set_quota(cluster, role, cpu_str, ram, disk):
   Alters the amount of production quota allocated to a user.
   """
   try:
-      ram_size = parse_data(ram).as_(Data.MB)
-      disk_size = parse_data(disk).as_(Data.MB)
+    ram_size = parse_data(ram).as_(Data.MB)
+    disk_size = parse_data(disk).as_(Data.MB)
   except ValueError:
-      log.error('Invalid unit specification')
+    log.error('Invalid unit specification')
 
   try:
     cpu = float(cpu_str)
