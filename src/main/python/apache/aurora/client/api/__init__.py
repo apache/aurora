@@ -158,10 +158,10 @@ class AuroraClientAPI(object):
     log.info("Getting quota for: %s" % role)
     return self._scheduler_proxy.getQuota(role)
 
-  def set_quota(self, role, cpu, ram_mb, disk_mb):
-    log.info("Setting quota for user:%s cpu:%f ram_mb:%d disk_mb: %d"
-              % (role, cpu, ram_mb, disk_mb))
-    return self._scheduler_proxy.setQuota(role, Quota(cpu, ram_mb, disk_mb))
+  def set_quota(self, role, cpu, ram, disk):
+    log.info("Setting quota for user:%s cpu:%f ram:%d disk: %d"
+              % (role, cpu, ram, disk))
+    return self._scheduler_proxy.setQuota(role, Quota(cpu, ram, disk))
 
   def force_task_state(self, task_id, status):
     log.info("Requesting that task %s transition to state %s" % (task_id, status))

@@ -161,16 +161,22 @@ def query(args, options):
 
 
 @app.command
-@requires.exactly('cluster', 'role', 'cpu', 'ramMb', 'diskMb')
-def set_quota(cluster, role, cpu_str, ram_mb_str, disk_mb_str):
-  """usage: set_quota cluster role cpu ramMb diskMb
+@requires.exactly('cluster', 'role', 'cpu', 'ram', 'disk')
+def set_quota(cluster, role, cpu_str, ram, disk):
+  """usage: set_quota cluster role cpu ram[MGT] disk[MGT]
 
   Alters the amount of production quota allocated to a user.
   """
   try:
+      ram_size = parse_data(ram).as_(Data.MB)
+      disk_size = parse_data(disk).as_(Data.MB)
+  except ValueError:
+      log.error('Invalid unit specification')
+
+  try:
     cpu = float(cpu_str)
-    ram_mb = int(ram_mb_str)
-    disk_mb = int(disk_mb_str)
+    ram_mb = int(ram_size)
+    disk_mb = int(disk_size)
   except ValueError:
     log.error('Invalid value')
 
