@@ -245,6 +245,8 @@ enum ScheduleStatus {
   PREEMPTING       = 13,
   // The task is being restarted in response to a user request.
   RESTARTING       = 12,
+  // The task is being restarted in response to a host maintenance request.
+  DRAINING         = 17,
   // The task terminated with a non-zero exit code.
   FAILED           = 4,
   // Execution of the task was terminated by the system.
