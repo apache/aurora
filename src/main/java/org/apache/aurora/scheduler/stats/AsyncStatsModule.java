@@ -39,8 +39,10 @@ import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.gen.Quota;
 import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.configuration.Resources;
-import org.apache.aurora.scheduler.stats.SlotSizeCounter.ResourceSlotProvider;
+import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
+import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
 import org.apache.mesos.Protos.Offer;
 
@@ -77,7 +79,7 @@ public class AsyncStatsModule extends AbstractModule {
 
     bind(TaskStatCalculator.class).in(Singleton.class);
     bind(CachedCounters.class).in(Singleton.class);
-    bind(ResourceSlotProvider.class).to(OfferAdapter.class);
+    bind(MachineResourceProvider.class).to(OfferAdapter.class);
     bind(SlotSizeCounter.class).in(Singleton.class);
 
     bind(ScheduledExecutorService.class).annotatedWith(StatExecutor.class).toInstance(executor);
@@ -109,16 +111,19 @@ public class AsyncStatsModule extends AbstractModule {
     }
   }
 
-  static class OfferAdapter implements ResourceSlotProvider {
-    private static final Function<Offer, IQuota> TO_QUOTA = new Function<Offer, IQuota>() {
-      @Override public IQuota apply(Offer offer) {
-        Resources resources = Resources.from(offer);
-        return IQuota.build(new Quota()
-            .setNumCpus(resources.getNumCpus())
-            .setRamMb(resources.getRam().as(Data.MB))
-            .setDiskMb(resources.getDisk().as(Data.MB)));
-      }
-    };
+  static class OfferAdapter implements MachineResourceProvider {
+    private static final Function<Offer, MachineResource> TO_RESOURCE =
+        new Function<Offer, MachineResource>() {
+          @Override
+          public MachineResource apply(Offer offer) {
+            Resources resources = Resources.from(offer);
+            IQuota quota = IQuota.build(new Quota()
+                .setNumCpus(resources.getNumCpus())
+                .setRamMb(resources.getRam().as(Data.MB))
+                .setDiskMb(resources.getDisk().as(Data.MB)));
+            return new MachineResource(quota, Conversions.isDedicated(offer));
+          }
+        };
 
     private final OfferQueue offerQueue;
 
@@ -128,9 +133,9 @@ public class AsyncStatsModule extends AbstractModule {
     }
 
     @Override
-    public Iterable<IQuota> get() {
+    public Iterable<MachineResource> get() {
       Iterable<Offer> offers = offerQueue.getOffers();
-      return FluentIterable.from(offers).transform(TO_QUOTA);
+      return FluentIterable.from(offers).transform(TO_RESOURCE);
     }
   }
 }

@@ -25,7 +25,8 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.Quota;
 import org.apache.aurora.scheduler.quota.Quotas;
-import org.apache.aurora.scheduler.stats.SlotSizeCounter.ResourceSlotProvider;
+import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
+import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider;
 import org.apache.aurora.scheduler.storage.entities.IQuota;
 import org.junit.Before;
 import org.junit.Test;
@@ -42,28 +43,34 @@ public class SlotSizeCounterTest extends EasyMockTest {
       "small", SMALL,
       "large", LARGE);
 
-  private ResourceSlotProvider slotProvider;
+  private MachineResourceProvider slotProvider;
   private StatsProvider statsProvider;
   private Runnable slotCounter;
 
   private AtomicLong smallCounter = new AtomicLong();
+  private AtomicLong smallDedicatedCounter = new AtomicLong();
   private AtomicLong largeCounter = new AtomicLong();
+  private AtomicLong largeDedicatedCounter = new AtomicLong();
 
   @Before
   public void setUp() {
-    slotProvider = createMock(ResourceSlotProvider.class);
+    slotProvider = createMock(MachineResourceProvider.class);
     statsProvider = createMock(StatsProvider.class);
     slotCounter = new SlotSizeCounter(SLOT_SIZES, slotProvider, new CachedCounters(statsProvider));
   }
 
   private void expectStatExport() {
-    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("small")))
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("small", false)))
         .andReturn(smallCounter);
-    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("large")))
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("small", true)))
+        .andReturn(smallDedicatedCounter);
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("large", false)))
         .andReturn(largeCounter);
+    expect(statsProvider.makeCounter(SlotSizeCounter.getStatName("large", true)))
+        .andReturn(largeDedicatedCounter);
   }
 
-  private void expectGetSlots(IQuota... returned) {
+  private void expectGetSlots(MachineResource... returned) {
     expect(slotProvider.get()).andReturn(ImmutableList.copyOf(returned));
   }
 
@@ -76,47 +83,58 @@ public class SlotSizeCounterTest extends EasyMockTest {
 
     slotCounter.run();
     assertEquals(0, smallCounter.get());
+    assertEquals(0, smallDedicatedCounter.get());
     assertEquals(0, largeCounter.get());
+    assertEquals(0, largeDedicatedCounter.get());
   }
 
   @Test
   public void testTinyOffers() {
     expectStatExport();
-    expectGetSlots(IQuota.build(new Quota(0.1, 1, 1)));
+    expectGetSlots(new MachineResource(IQuota.build(new Quota(0.1, 1, 1)), false));
 
     control.replay();
 
     slotCounter.run();
     assertEquals(0, smallCounter.get());
+    assertEquals(0, smallDedicatedCounter.get());
     assertEquals(0, largeCounter.get());
+    assertEquals(0, largeDedicatedCounter.get());
   }
 
   @Test
   public void testStarvedResourceVector() {
     expectStatExport();
-    expectGetSlots(IQuota.build(new Quota(1000, 16384, 1)));
+    expectGetSlots(new MachineResource(IQuota.build(new Quota(1000, 16384, 1)), false));
 
     control.replay();
 
     slotCounter.run();
     assertEquals(0, smallCounter.get());
+    assertEquals(0, smallDedicatedCounter.get());
     assertEquals(0, largeCounter.get());
+    assertEquals(0, largeDedicatedCounter.get());
   }
 
   @Test
   public void testCountSlots() {
     expectStatExport();
     expectGetSlots(
-        SMALL,
-        SMALL,
-        LARGE,
-        Quotas.scale(LARGE, 4),
-        IQuota.build(new Quota(1, 1, 1)));
+        new MachineResource(SMALL, false),
+        new MachineResource(SMALL, false),
+        new MachineResource(LARGE, false),
+        new MachineResource(Quotas.scale(LARGE, 4), false),
+        new MachineResource(IQuota.build(new Quota(1, 1, 1)), false),
+        new MachineResource(SMALL, true),
+        new MachineResource(SMALL, true),
+        new MachineResource(Quotas.scale(SMALL, 2), true));
 
     control.replay();
 
     slotCounter.run();
     assertEquals(22, smallCounter.get());
+    assertEquals(4, smallDedicatedCounter.get());
     assertEquals(5, largeCounter.get());
+    assertEquals(0, largeDedicatedCounter.get());
   }
 }

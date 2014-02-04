@@ -31,6 +31,7 @@ import com.google.common.collect.Multimaps;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskState;
@@ -130,5 +131,19 @@ public final class Conversions {
             .transform(ATTRIBUTE_CONVERTER)
             .toSet())
         .setSlaveId(offer.getSlaveId().getValue());
+  }
+
+  /**
+   * Determines whether an offer is associated with a slave that is dedicated, based on the presence
+   * of an attribute named {@link ConfigurationManager#DEDICATED_ATTRIBUTE}.
+   *
+   * @param offer Host resource offer.
+   * @return {@code true} of {@code offer} is associated with a dedicated slave, otherwise
+   *         {@code false}.
+   */
+  public static boolean isDedicated(Offer offer) {
+    return FluentIterable.from(offer.getAttributesList())
+        .transform(ATTRIBUTE_NAME)
+        .anyMatch(Predicates.equalTo(ConfigurationManager.DEDICATED_ATTRIBUTE));
   }
 }
