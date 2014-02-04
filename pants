@@ -14,73 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-PANTS_ROOT=$(dirname "$0")
-PANTS_VERSION=$(cat "$PANTS_ROOT/.pantsversion")
+set -o errexit
+set -o nounset
 
-if [[ -e "$PANTS_ROOT/pants.pex" ]]; then
-  cat <<EOF | PANTS_ROOT="$PANTS_ROOT" PANTS_VERSION=$PANTS_VERSION python
-from contextlib import closing
-import json
-import os
-import sys
-import zipfile
-
-with closing(zipfile.ZipFile(os.path.join(os.environ['PANTS_ROOT'], 'pants.pex'))) as zf:
-  pex_info = json.loads(zf.read('PEX-INFO'))
-
-for requirement, _, _ in pex_info['requirements']:
-  if '==' in requirement:
-    req, version = requirement.split('==', 2)
-    if req == 'twitter.pants' and version == os.environ['PANTS_VERSION']:
-      sys.exit(0)
-
-sys.exit(1)
-EOF
-
-  if [ $? -eq 0 ]; then
-    exec "$PANTS_ROOT/pants.pex" "$@"
-  fi
+PANTS_VERSION=0.0.13
+if ! [[ -e build-support/pants-$PANTS_VERSION.pex ]]; then
+  echo "Building pants.pex @ $PANTS_VERSION"
+  ./build-support/pex \
+    --requirement "twitter.pants==$PANTS_VERSION" \
+    --entry-point twitter.pants.bin.pants_exe:main \
+    -p build-support/pants-$PANTS_VERSION.pex.tmp
+  mv build-support/pants-$PANTS_VERSION.pex.tmp build-support/pants-$PANTS_VERSION.pex  # 2PC
+  echo "Built pants-$PANTS_VERSION.pex"
 fi
 
-PANTS_TEMP=$(mktemp -d /tmp/pants.XXXXXX)
-
-./build-support/virtualenv "$PANTS_TEMP/tcp"
-pushd "$PANTS_TEMP"
-
-source tcp/bin/activate
-
-pip install twitter.common.python==0.2.0
-
-PYTHON_VERBOSE=1 PEX_VERBOSE=1 python <<EOF
-from twitter.common.python.fetcher import Fetcher, PyPIFetcher
-from twitter.common.python.http import Crawler
-from twitter.common.python.obtainer import Obtainer
-from twitter.common.python.pex_builder import PEXBuilder
-from twitter.common.python.resolver import Resolver
-from twitter.common.python.translator import Translator
-
-pb = PEXBuilder()
-resolver = Resolver(crawler=Crawler(), fetchers=[PyPIFetcher()])
-req = 'twitter.pants==$PANTS_VERSION'
-pb.add_requirement(req)
-for dist in resolver.resolve(req):
-  pb.add_distribution(dist)
-pb.info.entry_point = 'twitter.pants.bin.pants_exe:main'
-pb.build('dist/pants.pex')
-EOF
-
-BUILD_SUCCESS=$?
-
-deactivate
-
-popd
-
-if [ $BUILD_SUCCESS -ne 0 ]; then
-  echo 'Failed to build pants.'
-  exit 1
-fi
-
-cp -f -- "$PANTS_TEMP/dist/pants.pex" "$PANTS_ROOT"
-rm -rf "$PANTS_TEMP"
-
-exec "$PANTS_ROOT/pants.pex" "$@"
+exec ./build-support/pants-$PANTS_VERSION.pex "$@"

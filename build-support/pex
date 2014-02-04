@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# Copyright 2013 Apache Software Foundation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Wrapper script for self-bootstrapping pex.
+set -e
+
+TWITTER_COMMON_PYTHON_VERSION=0.3.0
+
+if ! [ -f build-support/pex.venv/BOOTSTRAPPED ] || \
+    [ $(< build-support/pex.venv/BOOTSTRAPPED) != $TWITTER_COMMON_PYTHON_VERSION ]; then
+
+  echo Bootstrapping twitter.common.python @ $TWITTER_COMMON_PYTHON_VERSION
+  rm -fr build-support/pex.venv
+  ./build-support/virtualenv build-support/pex.venv
+  source build-support/pex.venv/bin/activate
+  pip install "twitter.common.python==$TWITTER_COMMON_PYTHON_VERSION"
+  echo $TWITTER_COMMON_PYTHON_VERSION > build-support/pex.venv/BOOTSTRAPPED
+fi
+source build-support/pex.venv/bin/activate
+exec pex "$@"

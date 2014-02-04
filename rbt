@@ -18,16 +18,16 @@
 set -e
 
 RBTOOLS_VERSION=0.5.5
-if ! [ -f build-support/rbtools/BOOTSTRAPPED ] || \
-    [ x`cat build-support/rbtools/BOOTSTRAPPED` != x$RBTOOLS_VERSION ]; then
+if ! [ -f build-support/rbt.venv/BOOTSTRAPPED ] || \
+    [ x`cat build-support/rbt.venv/BOOTSTRAPPED` != x$RBTOOLS_VERSION ]; then
 
   echo Bootstrapping rbtools @ $RBTOOLS_VERSION
-  rm -fr build-support/rbtools
-  ./build-support/virtualenv build-support/rbtools
-  source build-support/rbtools/bin/activate
+  rm -fr build-support/rbt.venv
+  ./build-support/virtualenv build-support/rbt.venv
+  source build-support/rbt.venv/bin/activate
   pip install "RBTools==$RBTOOLS_VERSION"
-  echo $RBTOOLS_VERSION > build-support/rbtools/BOOTSTRAPPED
+  echo $RBTOOLS_VERSION > build-support/rbt.venv/BOOTSTRAPPED
 fi
-source build-support/rbtools/bin/activate
+source build-support/rbt.venv/bin/activate
 # TODO(kevints): Use ./pants py here instead of virtualenv.
 exec rbt "$@"

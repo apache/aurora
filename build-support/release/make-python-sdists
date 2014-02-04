@@ -32,11 +32,11 @@ cd "`git rev-parse --show-toplevel`"
 # Without this indirection pants will use the system setuptools, which on Ubuntu 12.04 is old,
 # buggy, and produces a broken apache.thermos.observer.
 # TODO(ksweeney): Remove this indirection when pants supports this natively.
-if [[ ! -f build-support/make-python-sdists.virtualenv/BOOTSTRAPPED ]]; then
-  ./build-support/virtualenv build-support/make-python-sdists.virtualenv
-  touch build-support/make-python-sdists.virtualenv/BOOTSTRAPPED
+if [[ ! -f build-support/make-python-sdists.venv/BOOTSTRAPPED ]]; then
+  ./build-support/virtualenv build-support/make-python-sdists.venv
+  touch build-support/make-python-sdists.venv/BOOTSTRAPPED
 fi
-source build-support/make-python-sdists.virtualenv/bin/activate
+source build-support/make-python-sdists.venv/bin/activate
 
 for t in "${TARGETS[@]}"; do
   ./pants setup_py $t
