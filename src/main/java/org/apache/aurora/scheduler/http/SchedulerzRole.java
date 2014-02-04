@@ -257,6 +257,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
             for (IScheduledTask task : tasks) {
               switch (task.getStatus()) {
                 case INIT:
+                case THROTTLED:
                 case PENDING:
                   job.pendingTaskCount++;
                   break;
