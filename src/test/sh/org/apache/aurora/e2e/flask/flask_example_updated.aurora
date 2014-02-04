@@ -1,0 +1,32 @@
+import getpass
+
+run_server = Process(
+  name = 'run_server',
+  cmdline = '''
+    chmod +x ./flask_example.pex &&
+      ./flask_example.pex {{thermos.ports[http]}}
+  ''')
+
+stage_server = Process(
+  name = 'stage_server',
+  cmdline = "cp /vagrant/deploy_test/flask_example.pex ."
+)
+
+test_task = Task(
+  name = 'flask_example',
+  resources = Resources(cpu=1.0, ram=64*MB, disk=96*MB),
+  processes = [stage_server, run_server],
+  constraints = order(stage_server, run_server))
+
+job = Job(
+  name = 'flask_example',
+  cluster = 'example',
+  instances = 2,
+  task = test_task,
+  role = getpass.getuser(),
+  environment = 'test',
+  contact = '{{role}}@localhost',
+  announce = Announcer())
+
+jobs = [ job ]
+

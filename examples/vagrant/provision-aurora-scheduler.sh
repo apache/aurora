@@ -60,7 +60,7 @@ AURORA_FLAGS=(
 # Environment variables control the behavior of the Mesos scheduler driver (libmesos).
 export GLOG_v=0
 export LIBPROCESS_PORT=8083
-export LIBPROCESS_IP=192.168.33.5
+export LIBPROCESS_IP=192.168.33.6
 
 (
   while true
@@ -78,7 +78,9 @@ cat > /etc/aurora/clusters.json <<EOF
   "name": "example",
   "zk": "192.168.33.2",
   "scheduler_zk_path": "/aurora/scheduler",
-  "auth_mechanism": "UNAUTHENTICATED"
+  "auth_mechanism": "UNAUTHENTICATED",
+  "slave_run_directory": "latest",
+  "slave_root": "/var/lib/mesos"
 }]
 EOF
 
