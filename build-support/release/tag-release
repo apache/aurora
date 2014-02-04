@@ -134,8 +134,9 @@ cat <<EOF
 == Tag created.
 
 After you've verified that everything looks good, publish the new tag by running:
-  git push origin master
-  git push $new_tagged_version master
+   git checkout master
+   git push origin master
+   git push origin $new_tagged_version
 EOF
 trap '' EXIT # Unset error message handler.
 
