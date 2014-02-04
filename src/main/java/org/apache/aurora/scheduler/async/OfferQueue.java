@@ -16,7 +16,7 @@
 package org.apache.aurora.scheduler.async;
 
 import java.util.Comparator;
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
@@ -30,17 +30,16 @@ import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 
-import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
@@ -49,6 +48,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.HostMaintenanceStateChange
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
+import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskInfo;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
@@ -125,17 +125,7 @@ public interface OfferQueue extends EventSubscriber {
   class OfferQueueImpl implements OfferQueue {
     private static final Logger LOG = Logger.getLogger(OfferQueueImpl.class.getName());
 
-    static final Comparator<HostOffer> PREFERENCE_COMPARATOR =
-        // Currently, the only preference is based on host maintenance status.
-        Ordering.explicit(NONE, SCHEDULED, DRAINING, DRAINED)
-            .onResultOf(new Function<HostOffer, MaintenanceMode>() {
-              @Override public MaintenanceMode apply(HostOffer offer) {
-                return offer.mode;
-              }
-            })
-            .compound(Ordering.arbitrary());
-
-    private final Set<HostOffer> hostOffers = new ConcurrentSkipListSet<>(PREFERENCE_COMPARATOR);
+    private final HostOffers hostOffers = new HostOffers();
     private final AtomicLong offerRaces = Stats.exportLong("offer_accept_races");
 
     private final Driver driver;
@@ -153,9 +143,6 @@ public interface OfferQueue extends EventSubscriber {
       this.returnDelay = returnDelay;
       this.executor = executor;
       this.maintenance = maintenance;
-      // Potential gotcha - since this is now a ConcurrentSkipListSet, size() is more expensive.
-      // Could track this separately if it turns out to pose problems.
-      Stats.exportSize("outstanding_offers", hostOffers);
     }
 
     @Override
@@ -165,16 +152,8 @@ public interface OfferQueue extends EventSubscriber {
       // them after the return delay.
       // There's also a chance that we return an offer for compaction ~simultaneously with the
       // same-host offer being canceled/returned.  This is also fine.
-      List<HostOffer> sameSlave = FluentIterable.from(hostOffers)
-          .filter(new Predicate<HostOffer>() {
-            @Override public boolean apply(HostOffer hostOffer) {
-              // Intentionally avoid equals() on the SlaveID itself, since protobuf equals
-              // is rather intensive, and we may have thousands of them to do.
-              return hostOffer.offer.getSlaveId().getValue().equals(offer.getSlaveId().getValue());
-            }
-          })
-          .toList();
-      if (sameSlave.isEmpty()) {
+      Optional<HostOffer> sameSlave = hostOffers.get(offer.getSlaveId());
+      if (!sameSlave.isPresent()) {
         hostOffers.add(new HostOffer(offer, maintenance.getMode(offer.getHostname())));
         executor.schedule(
             new Runnable() {
@@ -187,12 +166,9 @@ public interface OfferQueue extends EventSubscriber {
       } else {
         // If there are existing offers for the slave, decline all of them so the master can
         // compact all of those offers into a single offer and send them back.
-        LOG.info("Returning " + (sameSlave.size() + 1)
-            + " offers for " + offer.getSlaveId().getValue() + " for compaction.");
+        LOG.info("Returning offers for " + offer.getSlaveId().getValue() + " for compaction.");
         decline(offer.getId());
-        for (HostOffer sameSlaveOffer : sameSlave) {
-          removeAndDecline(sameSlaveOffer.offer.getId());
-        }
+        removeAndDecline(sameSlave.get().offer.getId());
       }
     }
 
@@ -217,23 +193,17 @@ public interface OfferQueue extends EventSubscriber {
 
       // The small risk of inconsistency is acceptable here - if we have an accept/remove race
       // on an offer, the master will mark the task as LOST and it will be retried.
-      return Iterables.removeIf(hostOffers,
-          new Predicate<HostOffer>() {
-            @Override public boolean apply(HostOffer input) {
-              return input.offer.getId().getValue().equals(offerId.getValue());
-            }
-          });
+      return hostOffers.remove(offerId);
     }
 
     @Override
     public Iterable<Offer> getOffers() {
-      return Iterables.unmodifiableIterable(
-          FluentIterable.from(hostOffers)
-              .transform(new Function<HostOffer, Offer>() {
-                @Override public Offer apply(HostOffer offer) {
-                  return offer.offer;
-                }
-              }));
+      return FluentIterable.from(hostOffers.getWeaklyConsistentOffers())
+          .transform(new Function<HostOffer, Offer>() {
+            @Override public Offer apply(HostOffer offer) {
+              return offer.offer;
+            }
+          });
     }
 
     /**
@@ -243,25 +213,7 @@ public interface OfferQueue extends EventSubscriber {
      */
     @Subscribe
     public void hostChangedState(HostMaintenanceStateChange change) {
-      final HostStatus hostStatus = change.getStatus();
-
-      // Remove and re-add a host's offers to re-sort based on its new hostStatus
-      Set<HostOffer> changedOffers = FluentIterable.from(hostOffers)
-          .filter(new Predicate<HostOffer>() {
-            @Override public boolean apply(HostOffer hostOffer) {
-              return hostOffer.offer.getHostname().equals(hostStatus.getHost());
-            }
-          })
-          .toSet();
-      hostOffers.removeAll(changedOffers);
-      hostOffers.addAll(
-          FluentIterable.from(changedOffers)
-              .transform(new Function<HostOffer, HostOffer>() {
-                @Override public HostOffer apply(HostOffer hostOffer) {
-                  return new HostOffer(hostOffer.offer, hostStatus.getMode());
-                }
-              })
-              .toSet());
+      hostOffers.updateHostMode(change.getStatus().getHost(), change.getStatus().getMode());
     }
 
     /**
@@ -305,6 +257,74 @@ public interface OfferQueue extends EventSubscriber {
       }
     }
 
+    /**
+     * A container for the data structures used by this class, to make it easier to reason about
+     * the different indices used and their consistency.
+     */
+    private static class HostOffers {
+      private static final Comparator<HostOffer> PREFERENCE_COMPARATOR =
+          // Currently, the only preference is based on host maintenance status.
+          Ordering.explicit(NONE, SCHEDULED, DRAINING, DRAINED)
+              .onResultOf(new Function<HostOffer, MaintenanceMode>() {
+                @Override public MaintenanceMode apply(HostOffer offer) {
+                  return offer.mode;
+                }
+              })
+              .compound(Ordering.arbitrary());
+
+      private final Set<HostOffer> hostOffers = new ConcurrentSkipListSet<>(PREFERENCE_COMPARATOR);
+      private final Map<OfferID, HostOffer> offersById = Maps.newHashMap();
+      private final Map<SlaveID, HostOffer> offersBySlave = Maps.newHashMap();
+      private final Map<String, HostOffer> offersByHost = Maps.newHashMap();
+
+      HostOffers() {
+        // Potential gotcha - since this is a ConcurrentSkipListSet, size() is more expensive.
+        // Could track this separately if it turns out to pose problems.
+        Stats.exportSize("outstanding_offers", hostOffers);
+      }
+
+      synchronized Optional<HostOffer> get(SlaveID slaveId) {
+        return Optional.fromNullable(offersBySlave.get(slaveId));
+      }
+
+      synchronized void add(HostOffer offer) {
+        hostOffers.add(offer);
+        offersById.put(offer.offer.getId(), offer);
+        offersBySlave.put(offer.offer.getSlaveId(), offer);
+        offersByHost.put(offer.offer.getHostname(), offer);
+      }
+
+      synchronized boolean remove(OfferID id) {
+        HostOffer removed = offersById.remove(id);
+        if (removed != null) {
+          hostOffers.remove(removed);
+          offersBySlave.remove(removed.offer.getSlaveId());
+          offersByHost.remove(removed.offer.getHostname());
+        }
+        return removed != null;
+      }
+
+      synchronized void updateHostMode(String hostName, MaintenanceMode mode) {
+        HostOffer offer = offersByHost.remove(hostName);
+        if (offer != null) {
+          // Remove and re-add a host's offer to re-sort based on its new hostStatus
+          remove(offer.offer.getId());
+          add(new HostOffer(offer.offer, mode));
+        }
+      }
+
+      synchronized Iterable<HostOffer> getWeaklyConsistentOffers() {
+        return Iterables.unmodifiableIterable(hostOffers);
+      }
+
+      synchronized void clear() {
+        hostOffers.clear();
+        offersById.clear();
+        offersBySlave.clear();
+        offersByHost.clear();
+      }
+    }
+
     @Override
     public boolean launchFirst(Function<Offer, Optional<TaskInfo>> acceptor)
         throws LaunchException {
@@ -312,13 +332,15 @@ public interface OfferQueue extends EventSubscriber {
       // It's important that this method is not called concurrently - doing so would open up the
       // possibility of a race between the same offers being accepted by different threads.
 
-      for (HostOffer hostOffer : hostOffers) {
+      for (HostOffer hostOffer : hostOffers.getWeaklyConsistentOffers()) {
         Optional<TaskInfo> assignment = acceptor.apply(hostOffer.offer);
         if (assignment.isPresent()) {
           // Guard against an offer being removed after we grabbed it from the iterator.
           // If that happens, the offer will not exist in hostOffers, and we can immediately
           // send it back to LOST for quick reschedule.
-          if (hostOffers.remove(hostOffer)) {
+          // Removing while iterating counts on the use of a weakly-consistent iterator being used,
+          // which is a feature of ConcurrentSkipListSet.
+          if (hostOffers.remove(hostOffer.offer.getId())) {
             try {
               driver.launchTask(hostOffer.offer.getId(), assignment.get());
               return true;
