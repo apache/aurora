@@ -153,7 +153,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @CmdLine(name = "kill_task_max_backoff",
       help = "Max backoff delay while waiting for the tasks to transition to KILLED.")
   private static final Arg<Amount<Long, Time>> KILL_TASK_MAX_BACKOFF =
-      Arg.create(Amount.of(30L, Time.SECONDS));
+      Arg.create(Amount.of(1L, Time.MINUTES));
 
   private static final Function<IScheduledTask, String> GET_ROLE = Functions.compose(
       new Function<ITaskConfig, String>() {
