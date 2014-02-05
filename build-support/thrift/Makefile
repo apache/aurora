@@ -1,4 +1,4 @@
-# Copyright 2013 Twitter, Inc.
+# Copyright 2013 Apache Software Foundation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 THRIFT_VERSION = 0.9.1
 THRIFT_DISTNAME = thrift-$(THRIFT_VERSION)
 THRIFT_URL = http://www.us.apache.org/dist/thrift/$(THRIFT_VERSION)/$(THRIFT_DISTNAME).tar.gz
