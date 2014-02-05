@@ -59,11 +59,13 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   private static final Logger LOG = Logger.getLogger(SnapshotStoreImpl.class.getName());
 
   private static final SnapshotField ATTRIBUTE_FIELD = new SnapshotField() {
-    @Override public void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
+    @Override
+    public void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
       snapshot.setHostAttributes(storeProvider.getAttributeStore().getHostAttributes());
     }
 
-    @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+    @Override
+    public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
       store.getAttributeStore().deleteHostAttributes();
 
       if (snapshot.isSetHostAttributes()) {
@@ -77,12 +79,14 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   private static final Iterable<SnapshotField> SNAPSHOT_FIELDS = Arrays.asList(
       ATTRIBUTE_FIELD,
       new SnapshotField() {
-        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        @Override
+        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           snapshot.setTasks(
               IScheduledTask.toBuildersSet(store.getTaskStore().fetchTasks(Query.unscoped())));
         }
 
-        @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        @Override
+        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           store.getUnsafeTaskStore().deleteAllTasks();
 
           if (snapshot.isSetTasks()) {
@@ -92,7 +96,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
       },
       new SnapshotField() {
-        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        @Override
+        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<StoredJob> jobs = ImmutableSet.builder();
           for (String managerId : store.getJobStore().fetchManagerIds()) {
             for (IJobConfiguration config : store.getJobStore().fetchJobs(managerId)) {
@@ -102,7 +107,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
           snapshot.setJobs(jobs.build());
         }
 
-        @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        @Override
+        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           store.getJobStore().deleteJobs();
 
           if (snapshot.isSetJobs()) {
@@ -115,7 +121,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
       },
       new SnapshotField() {
-        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        @Override
+        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           Properties props = new BuildInfo().getProperties();
 
           snapshot.setSchedulerMetadata(
@@ -129,7 +136,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
                   .setVersion(CURRENT_API_VERSION));
         }
 
-        @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        @Override
+        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           if (snapshot.isSetSchedulerMetadata()) {
             // No delete necessary here since this is a single value.
 
@@ -139,7 +147,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
       },
       new SnapshotField() {
-        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        @Override
+        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<QuotaConfiguration> quotas = ImmutableSet.builder();
           for (Map.Entry<String, IQuota> entry : store.getQuotaStore().fetchQuotas().entrySet()) {
             quotas.add(new QuotaConfiguration(entry.getKey(), entry.getValue().newBuilder()));
@@ -148,7 +157,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
           snapshot.setQuotaConfigurations(quotas.build());
         }
 
-        @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        @Override
+        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           store.getQuotaStore().deleteQuotas();
 
           if (snapshot.isSetQuotaConfigurations()) {
@@ -159,11 +169,13 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         }
       },
       new SnapshotField() {
-        @Override public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+        @Override
+        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           snapshot.setLocks(ILock.toBuildersSet(store.getLockStore().fetchLocks()));
         }
 
-        @Override public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+        @Override
+        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
           store.getLockStore().deleteLocks();
 
           if (snapshot.isSetLocks()) {
@@ -185,9 +197,11 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   }
 
   @Timed("snapshot_create")
-  @Override public Snapshot createSnapshot() {
+  @Override
+  public Snapshot createSnapshot() {
     return storage.consistentRead(new Work.Quiet<Snapshot>() {
-      @Override public Snapshot apply(StoreProvider storeProvider) {
+      @Override
+      public Snapshot apply(StoreProvider storeProvider) {
         Snapshot snapshot = new Snapshot();
 
         // Capture timestamp to signify the beginning of a snapshot operation, apply after in case
@@ -203,11 +217,13 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   }
 
   @Timed("snapshot_apply")
-  @Override public void applySnapshot(final Snapshot snapshot) {
+  @Override
+  public void applySnapshot(final Snapshot snapshot) {
     checkNotNull(snapshot);
 
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         LOG.info("Restoring snapshot.");
 
         for (SnapshotField field : SNAPSHOT_FIELDS) {

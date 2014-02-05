@@ -149,7 +149,8 @@ public class LeaderRedirect {
    * Monitor to track scheduler leader changes.
    */
   private class SchedulerMonitor implements HostChangeMonitor<ServiceInstance> {
-    @Override public void onChange(ImmutableSet<ServiceInstance> hostSet) {
+    @Override
+    public void onChange(ImmutableSet<ServiceInstance> hostSet) {
       switch (hostSet.size()) {
         case 0:
           LOG.warning("No schedulers in host set, will not redirect despite not being leader.");

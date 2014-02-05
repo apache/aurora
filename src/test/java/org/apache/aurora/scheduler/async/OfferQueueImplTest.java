@@ -71,7 +71,8 @@ public class OfferQueueImplTest extends EasyMockTest {
     executor = Executors.newSingleThreadScheduledExecutor(threadFactory);
     testExecutor = Executors.newCachedThreadPool(threadFactory);
     addTearDown(new TearDown() {
-      @Override public void tearDown() throws Exception {
+      @Override
+      public void tearDown() throws Exception {
         new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
         new ExecutorServiceShutdown(testExecutor, Amount.of(1L, Time.SECONDS)).execute();
       }
@@ -79,7 +80,8 @@ public class OfferQueueImplTest extends EasyMockTest {
     maintenanceController = createMock(MaintenanceController.class);
     offerAcceptor = createMock(new Clazz<Function<Offer, Optional<TaskInfo>>>() { });
     OfferReturnDelay returnDelay = new OfferReturnDelay() {
-      @Override public Amount<Integer, Time> get() {
+      @Override
+      public Amount<Integer, Time> get() {
         return RETURN_DELAY;
       }
     };
@@ -92,7 +94,8 @@ public class OfferQueueImplTest extends EasyMockTest {
     // the intrinsic lock and the storage lock.
     final CountDownLatch launchAttempted = new CountDownLatch(1);
     expect(maintenanceController.getMode(HOST_A)).andAnswer(new IAnswer<MaintenanceMode>() {
-      @Override public MaintenanceMode answer() throws InterruptedException {
+      @Override
+      public MaintenanceMode answer() throws InterruptedException {
         launchAttempted.await();
         return MaintenanceMode.NONE;
       }
@@ -102,13 +105,15 @@ public class OfferQueueImplTest extends EasyMockTest {
 
     final CountDownLatch offerAdded = new CountDownLatch(1);
     testExecutor.submit(new Runnable() {
-      @Override public void run() {
+      @Override
+      public void run() {
         offerQueue.addOffer(OFFER_A);
         offerAdded.countDown();
       }
     });
     testExecutor.submit(new Runnable() {
-      @Override public void run() {
+      @Override
+      public void run() {
         try {
           offerQueue.launchFirst(offerAcceptor);
           launchAttempted.countDown();

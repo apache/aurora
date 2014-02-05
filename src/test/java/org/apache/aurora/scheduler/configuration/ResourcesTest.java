@@ -170,7 +170,8 @@ public class ResourcesTest {
     Set<Pair<Long, Long>> actual = ImmutableSet.copyOf(Iterables.transform(
         resource.getRanges().getRangeList(),
         new Function<Range, Pair<Long, Long>>() {
-          @Override public Pair<Long, Long> apply(Range range) {
+          @Override
+          public Pair<Long, Long> apply(Range range) {
             return Pair.of(range.getBegin(), range.getEnd());
           }
         }));

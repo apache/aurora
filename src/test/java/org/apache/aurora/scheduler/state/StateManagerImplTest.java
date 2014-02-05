@@ -232,7 +232,8 @@ public class StateManagerImplTest extends EasyMockTest {
     // Trigger an event that produces a side-effect and a PubSub event .
     eventSink.post(matchStateChange(id, INIT, PENDING));
     expectLastCall().andAnswer(new IAnswer<Void>() {
-      @Override public Void answer() throws Throwable {
+      @Override
+      public Void answer() throws Throwable {
         changeState(id, ASSIGNED);
         return null;
       }

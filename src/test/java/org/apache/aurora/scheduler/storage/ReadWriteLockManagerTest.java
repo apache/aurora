@@ -71,7 +71,8 @@ public class ReadWriteLockManagerTest extends TearDownTestCase {
     final CountDownLatch fastReadFinished = new CountDownLatch(1);
 
     Future<String> slowReadResult = executor.submit(new Callable<String>() {
-      @Override public String call() throws Exception {
+      @Override
+      public String call() throws Exception {
         lockManager.readLock();
         slowReadStarted.countDown();
         fastReadFinished.await();

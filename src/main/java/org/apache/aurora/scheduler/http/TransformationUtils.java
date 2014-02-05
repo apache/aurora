@@ -31,14 +31,16 @@ import org.apache.aurora.scheduler.storage.entities.IPackage;
 final class TransformationUtils {
   public static final Function<IPackage, String> PACKAGE_TOSTRING =
       new Function<IPackage, String>() {
-        @Override public String apply(IPackage pkg) {
+        @Override
+        public String apply(IPackage pkg) {
           return pkg.getRole() + "/" + pkg.getName() + " v" + pkg.getVersion();
         }
       };
 
   public static final Function<Range<Integer>, String> RANGE_TOSTRING =
       new Function<Range<Integer>, String>() {
-        @Override public String apply(Range<Integer> range) {
+        @Override
+        public String apply(Range<Integer> range) {
           int lower = range.lowerEndpoint();
           int upper = range.upperEndpoint();
           return (lower == upper) ? String.valueOf(lower) : (lower + " - " + upper);
@@ -47,7 +49,8 @@ final class TransformationUtils {
 
   public static final Function<Collection<Integer>, String> INSTANCES_TOSTRING =
       new Function<Collection<Integer>, String>() {
-        @Override public String apply(Collection<Integer> instances) {
+        @Override
+        public String apply(Collection<Integer> instances) {
           return Joiner.on(", ")
               .join(Iterables.transform(Numbers.toRanges(instances), RANGE_TOSTRING));
         }

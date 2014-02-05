@@ -76,7 +76,8 @@ public final class ConfigurationManager {
       this.defaultValue = defaultValue;
     }
 
-    @Override public void execute(TaskConfig task) {
+    @Override
+    public void execute(TaskConfig task) {
       if (!task.isSet(field)) {
         task.setFieldValue(field, defaultValue);
       }
@@ -96,7 +97,8 @@ public final class ConfigurationManager {
       this.label = label;
     }
 
-    @Override public void validate(Number value) throws TaskDescriptionException {
+    @Override
+    public void validate(Number value) throws TaskDescriptionException {
       if (this.min >= value.doubleValue()) {
         throw new TaskDescriptionException(label + " must be greater than " + this.min);
       }
@@ -133,14 +135,16 @@ public final class ConfigurationManager {
           new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()),
           new DefaultField(_Fields.ENVIRONMENT, DEFAULT_ENVIRONMENT),
           new Closure<TaskConfig>() {
-            @Override public void execute(TaskConfig task) {
+            @Override
+            public void execute(TaskConfig task) {
               if (!Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT))) {
                 task.addToConstraints(hostLimitConstraint(1));
               }
             }
           },
           new Closure<TaskConfig>() {
-            @Override public void execute(TaskConfig task) {
+            @Override
+            public void execute(TaskConfig task) {
               if (!isDedicated(ITaskConfig.build(task))
                   && task.isProduction()
                   && task.isIsService()
@@ -344,7 +348,8 @@ public final class ConfigurationManager {
    */
   public static Predicate<IConstraint> getConstraintByName(final String name) {
     return new Predicate<IConstraint>() {
-      @Override public boolean apply(IConstraint constraint) {
+      @Override
+      public boolean apply(IConstraint constraint) {
         return constraint.getName().equals(name);
       }
     };
@@ -363,7 +368,8 @@ public final class ConfigurationManager {
   private static Predicate<Constraint> hasName(final String name) {
     MorePreconditions.checkNotBlank(name);
     return new Predicate<Constraint>() {
-      @Override public boolean apply(Constraint constraint) {
+      @Override
+      public boolean apply(Constraint constraint) {
         return name.equals(constraint.getName());
       }
     };

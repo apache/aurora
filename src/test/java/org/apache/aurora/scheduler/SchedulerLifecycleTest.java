@@ -73,7 +73,8 @@ public class SchedulerLifecycleTest extends EasyMockTest {
         driverFactory,
         storageUtil.storage,
         new Lifecycle(shutdownRegistry, new UncaughtExceptionHandler() {
-          @Override public void uncaughtException(Thread t, Throwable e) {
+          @Override
+          public void uncaughtException(Thread t, Throwable e) {
             fail(e.getMessage());
           }
         }),

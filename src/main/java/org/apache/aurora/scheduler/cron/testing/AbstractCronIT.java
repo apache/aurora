@@ -62,7 +62,8 @@ public abstract class AbstractCronIT extends EasyMockTest {
     scheduler.start();
     final CountDownLatch cronRan = new CountDownLatch(1);
     scheduler.schedule("* * * * *", new Runnable() {
-      @Override public void run() {
+      @Override
+      public void run() {
         cronRan.countDown();
       }
     });

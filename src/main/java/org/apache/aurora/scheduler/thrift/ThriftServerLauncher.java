@@ -73,7 +73,8 @@ class ThriftServerLauncher implements ServiceRunner {
         new AuroraAdmin.Processor<>(schedulerThriftInterface));
 
     Command shutdown = new Command() {
-      @Override public void execute() {
+      @Override
+      public void execute() {
         LOG.info("Stopping thrift server.");
         schedulerThriftServer.shutdown();
       }

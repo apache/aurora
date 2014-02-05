@@ -59,7 +59,8 @@ public class NearestFit implements EventSubscriber {
         .expireAfterWrite(EXPIRATION.getValue(), EXPIRATION.getUnit().getTimeUnit())
         .ticker(ticker)
         .build(new CacheLoader<String, Fit>() {
-          @Override public Fit load(String taskId) {
+          @Override
+          public Fit load(String taskId) {
             return new Fit();
           }
         });
@@ -106,7 +107,8 @@ public class NearestFit implements EventSubscriber {
   }
 
   private static final Predicate<Veto> IS_CONSTRAINT_MISMATCH = new Predicate<Veto>() {
-    @Override public boolean apply(Veto veto) {
+    @Override
+    public boolean apply(Veto veto) {
       return veto.isConstraintMismatch();
     }
   };

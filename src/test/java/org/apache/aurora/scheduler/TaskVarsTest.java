@@ -80,7 +80,8 @@ public class TaskVarsTest extends EasyMockTest {
     expect(trackedStats.makeGauge(EasyMock.eq(name), EasyMock.<Supplier<Long>>anyObject()))
         .andAnswer(new IAnswer<Stat<Long>>() {
           @SuppressWarnings("unchecked")
-          @Override public Stat<Long> answer() {
+          @Override
+          public Stat<Long> answer() {
             assertFalse(globalCounters.containsKey(name));
             globalCounters.put(name, (Supplier<Long>) EasyMock.getCurrentArguments()[1]);
             return null;

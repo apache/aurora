@@ -254,7 +254,8 @@ public class HistoryPrunerTest extends EasyMockTest {
 
     pruner = prunerWithRealExecutor();
     Command onDeleted = new Command() {
-      @Override public void execute() {
+      @Override
+      public void execute() {
         // The goal is to verify that the call does not deadlock. We do not care about the outcome.
         changeState("b", ASSIGNED, STARTING);
       }
@@ -277,7 +278,8 @@ public class HistoryPrunerTest extends EasyMockTest {
 
     pruner = prunerWithRealExecutor();
     Command onDeleted = new Command() {
-      @Override public void execute() {
+      @Override
+      public void execute() {
         // The goal is to verify that the call does not deadlock. We do not care about the outcome.
         pruner.tasksDeleted(
             new TasksDeleted(ImmutableSet.of(makeTask("a", ScheduleStatus.KILLED))));
@@ -311,7 +313,8 @@ public class HistoryPrunerTest extends EasyMockTest {
     final CountDownLatch eventDelivered = new CountDownLatch(1);
 
     Thread eventDispatch = new Thread() {
-      @Override public void run() {
+      @Override
+      public void run() {
         try {
           deleteCalled.await();
         } catch (InterruptedException e) {
@@ -329,7 +332,8 @@ public class HistoryPrunerTest extends EasyMockTest {
 
     stateManager.deleteTasks(ImmutableSet.of(taskId));
     expectLastCall().andAnswer(new IAnswer<Void>() {
-      @Override public Void answer() {
+      @Override
+      public Void answer() {
         deleteCalled.countDown();
         try {
           eventDelivered.await();

@@ -90,7 +90,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     preemptor = createMock(Preemptor.class);
 
     Injector injector = Guice.createInjector(new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         PubsubTestUtil.installPubsub(binder());
         bind(AsyncModule.PREEMPTOR_KEY).toInstance(preemptor);
         AsyncModule.bindTaskScheduler(binder(), AsyncModule.PREEMPTOR_KEY, reservationDuration);

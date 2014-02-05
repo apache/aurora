@@ -86,7 +86,8 @@ public class ResourceCounter {
    */
   public Metric computeQuotaAllocationTotals() throws StorageException {
     return storage.weaklyConsistentRead(new Work.Quiet<Metric>() {
-      @Override public Metric apply(StoreProvider storeProvider) {
+      @Override
+      public Metric apply(StoreProvider storeProvider) {
         Metric allocation = new Metric();
         for (IQuota quota : storeProvider.getQuotaStore().fetchQuotas().values()) {
           allocation.accumulate(quota);
@@ -113,7 +114,8 @@ public class ResourceCounter {
 
     LoadingCache<K, Metric> metrics = CacheBuilder.newBuilder()
         .build(new CacheLoader<K, Metric>() {
-          @Override public Metric load(K key) {
+          @Override
+          public Metric load(K key) {
             return new Metric();
           }
         });
@@ -126,17 +128,20 @@ public class ResourceCounter {
   public enum MetricType {
     TOTAL_CONSUMED(Predicates.<ITaskConfig>alwaysTrue()),
     DEDICATED_CONSUMED(new Predicate<ITaskConfig>() {
-      @Override public boolean apply(ITaskConfig task) {
+      @Override
+      public boolean apply(ITaskConfig task) {
         return ConfigurationManager.isDedicated(task);
       }
     }),
     QUOTA_CONSUMED(new Predicate<ITaskConfig>() {
-      @Override public boolean apply(ITaskConfig task) {
+      @Override
+      public boolean apply(ITaskConfig task) {
         return task.isProduction();
       }
     }),
     FREE_POOL_CONSUMED(new Predicate<ITaskConfig>() {
-      @Override public boolean apply(ITaskConfig task) {
+      @Override
+      public boolean apply(ITaskConfig task) {
         return !ConfigurationManager.isDedicated(task) && !task.isProduction();
       }
     });

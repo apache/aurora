@@ -114,7 +114,8 @@ public class BackupModule extends PrivateModule {
       this.lifecycle = checkNotNull(lifecycle);
     }
 
-    @Override public void execute() {
+    @Override
+    public void execute() {
       lifecycle.shutdown();
     }
   }

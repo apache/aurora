@@ -74,13 +74,15 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private static final Function<Query.Builder, Optional<IJobKey>> QUERY_TO_JOB_KEY =
       new Function<Query.Builder, Optional<IJobKey>>() {
-        @Override public Optional<IJobKey> apply(Query.Builder query) {
+        @Override
+        public Optional<IJobKey> apply(Query.Builder query) {
           return JobKeys.from(query);
         }
       };
   private static final Function<Query.Builder, Optional<String>> QUERY_TO_SLAVE_HOST =
       new Function<Query.Builder, Optional<String>>() {
-        @Override public Optional<String> apply(Query.Builder query) {
+        @Override
+        public Optional<String> apply(Query.Builder query) {
           return Optional.fromNullable(query.get().getSlaveHost());
         }
       };
@@ -132,7 +134,8 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private final Function<IScheduledTask, Task> toTask =
       new Function<IScheduledTask, Task>() {
-        @Override public Task apply(IScheduledTask task) {
+        @Override
+        public Task apply(IScheduledTask task) {
           return new Task(task, configInterner);
         }
       };
@@ -224,7 +227,8 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private static Predicate<Task> queryFilter(final TaskQuery query) {
     return new Predicate<Task>() {
-      @Override public boolean apply(Task canonicalTask) {
+      @Override
+      public boolean apply(Task canonicalTask) {
         IScheduledTask task = canonicalTask.task;
         ITaskConfig config = task.getAssignedTask().getTask();
         if (query.getOwner() != null) {
@@ -314,7 +318,8 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private static final Function<Task, IScheduledTask> TO_SCHEDULED =
       new Function<Task, IScheduledTask>() {
-        @Override public IScheduledTask apply(Task task) {
+        @Override
+        public IScheduledTask apply(Task task) {
           return task.task;
         }
       };
@@ -412,7 +417,8 @@ class MemTaskStore implements TaskStore.Mutable {
     }
 
     private final Function<K, Iterable<String>> lookup = new Function<K, Iterable<String>>() {
-      @Override public Iterable<String> apply(K key) {
+      @Override
+      public Iterable<String> apply(K key) {
         hitCount.incrementAndGet();
         return index.get(key);
       }

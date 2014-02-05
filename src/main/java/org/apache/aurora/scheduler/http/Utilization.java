@@ -67,7 +67,8 @@ public class Utilization {
   private String fillTemplate(Map<Display, Metric> metrics) {
     Function<Entry<Display, Metric>, DisplayMetric> transform =
         new Function<Entry<Display, Metric>, DisplayMetric>() {
-          @Override public DisplayMetric apply(Entry<Display, Metric> entry) {
+          @Override
+          public DisplayMetric apply(Entry<Display, Metric> entry) {
             return new DisplayMetric(entry.getKey(), entry.getValue());
           }
         };
@@ -78,7 +79,8 @@ public class Utilization {
     StringWriter output = new StringWriter();
     try {
       templateHelper.writeTemplate(output, new Closure<StringTemplate>() {
-        @Override public void execute(StringTemplate template) {
+        @Override
+        public void execute(StringTemplate template) {
           template.setAttribute("cluster_name", clusterName);
           template.setAttribute("metrics", metrics);
         }
@@ -135,7 +137,8 @@ public class Utilization {
 
   private static final Function<GlobalMetric, DisplayMetric> TO_DISPLAY =
       new Function<GlobalMetric, DisplayMetric>() {
-        @Override public DisplayMetric apply(GlobalMetric count) {
+        @Override
+        public DisplayMetric apply(GlobalMetric count) {
           return new DisplayMetric(
               new Display(
                   count.type.name().replace('_', ' ').toLowerCase(),
@@ -179,7 +182,8 @@ public class Utilization {
     final MetricType type = getTypeByName(metric);
 
     Function<ITaskConfig, Display> toKey = new Function<ITaskConfig, Display>() {
-      @Override public Display apply(ITaskConfig task) {
+      @Override
+      public Display apply(ITaskConfig task) {
         String role = task.getOwner().getRole();
         return new Display(role, metric + "/" + role);
       }
@@ -205,7 +209,8 @@ public class Utilization {
 
     MetricType type = getTypeByName(metric);
     Function<ITaskConfig, Display> toKey = new Function<ITaskConfig, Display>() {
-      @Override public Display apply(ITaskConfig task) {
+      @Override
+      public Display apply(ITaskConfig task) {
         return new Display(task.getJobName(), null);
       }
     };

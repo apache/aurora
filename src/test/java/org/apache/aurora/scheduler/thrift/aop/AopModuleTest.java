@@ -56,7 +56,8 @@ public class AopModuleTest extends EasyMockTest {
   private Iface getIface(Map<String, Boolean> toggledMethods) {
     Injector injector = Guice.createInjector(
         new AbstractModule() {
-          @Override protected void configure() {
+          @Override
+          protected void configure() {
             bind(CapabilityValidator.class).toInstance(capabilityValidator);
             MockDecoratedThrift.bindForwardedMock(binder(), mockThrift);
           }

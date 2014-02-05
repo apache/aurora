@@ -128,7 +128,8 @@ public class SchedulerzRole extends JerseyTemplateServlet {
 
   private Response processRequest(final Optional<String> role, final Optional<String> environment) {
     return fillTemplate(new Closure<StringTemplate>() {
-      @Override public void execute(StringTemplate template) {
+      @Override
+      public void execute(StringTemplate template) {
 
         if (!role.isPresent()) {
           template.setAttribute("exception", "Please specify a user.");
@@ -181,7 +182,8 @@ public class SchedulerzRole extends JerseyTemplateServlet {
       final Optional<String> environment) {
 
     Predicate<IJobConfiguration> byRoleEnv = new Predicate<IJobConfiguration>() {
-      @Override public boolean apply(IJobConfiguration job) {
+      @Override
+      public boolean apply(IJobConfiguration job) {
         boolean roleMatch = job.getOwner().getRole().equals(role);
         boolean envMatch = !environment.isPresent()
             || job.getKey().getEnvironment().equals(environment.get());
@@ -195,7 +197,8 @@ public class SchedulerzRole extends JerseyTemplateServlet {
 
     return Maps.transformValues(Maps.uniqueIndex(jobs, JobKeys.FROM_CONFIG),
         new Function<IJobConfiguration, Map<?, ?>>() {
-          @Override public Map<?, ?> apply(IJobConfiguration job) {
+          @Override
+          public Map<?, ?> apply(IJobConfiguration job) {
             return ImmutableMap.<Object, Object>builder()
                 .put("jobKey", job.getKey())
                 .put("name", job.getKey().getName())
@@ -233,7 +236,8 @@ public class SchedulerzRole extends JerseyTemplateServlet {
 
     final Function<Map.Entry<IJobKey, Collection<IScheduledTask>>, Job> toJob =
         new Function<Map.Entry<IJobKey, Collection<IScheduledTask>>, Job>() {
-          @Override public Job apply(Map.Entry<IJobKey, Collection<IScheduledTask>> tasksByJobKey) {
+          @Override
+          public Job apply(Map.Entry<IJobKey, Collection<IScheduledTask>> tasksByJobKey) {
             IJobKey jobKey = tasksByJobKey.getKey();
             Collection<IScheduledTask> tasks = tasksByJobKey.getValue();
 

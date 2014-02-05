@@ -59,7 +59,8 @@ public class ReadWriteLockManager {
   }
 
   private final ThreadLocal<LockState> lockState = new ThreadLocal<LockState>() {
-    @Override protected LockState initialValue() {
+    @Override
+    protected LockState initialValue() {
       return new LockState();
     }
   };

@@ -177,7 +177,8 @@ public class RescheduleCalculatorImplTest extends EasyMockTest {
 
   private static final Function<Map.Entry<ScheduleStatus, Long>, TaskEvent> TO_EVENT =
       new Function<Entry<ScheduleStatus, Long>, TaskEvent>() {
-        @Override public TaskEvent apply(Entry<ScheduleStatus, Long> input) {
+        @Override
+        public TaskEvent apply(Entry<ScheduleStatus, Long> input) {
           return new TaskEvent().setStatus(input.getKey()).setTimestamp(input.getValue());
         }
       };

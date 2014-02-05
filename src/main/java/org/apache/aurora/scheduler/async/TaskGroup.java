@@ -38,7 +38,8 @@ class TaskGroup {
   private final BackoffStrategy backoffStrategy;
 
   private static final Function<Task, Long> TO_TIMESTAMP = new Function<Task, Long>() {
-    @Override public Long apply(Task item) {
+    @Override
+    public Long apply(Task item) {
       return item.readyTimestampMs;
     }
   };
@@ -63,7 +64,8 @@ class TaskGroup {
 
   private static final Function<Task, String> TO_TASK_ID =
       new Function<Task, String>() {
-        @Override public String apply(Task item) {
+        @Override
+        public String apply(Task item) {
           return item.taskId;
         }
       };

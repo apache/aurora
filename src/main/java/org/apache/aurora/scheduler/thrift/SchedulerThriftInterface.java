@@ -157,7 +157,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   private static final Function<IScheduledTask, String> GET_ROLE = Functions.compose(
       new Function<ITaskConfig, String>() {
-        @Override public String apply(ITaskConfig task) {
+        @Override
+        public String apply(ITaskConfig task) {
           return task.getOwner().getRole();
         }
       },
@@ -542,7 +543,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     final Query.Builder activeQuery = Query.arbitrary(query.setStatuses(Tasks.ACTIVE_STATES));
     try {
       backoff.doUntilSuccess(new Supplier<Boolean>() {
-        @Override public Boolean get() {
+        @Override
+        public Boolean get() {
           Set<IScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, activeQuery);
           if (tasks.isEmpty()) {
             LOG.info("Tasks all killed, done waiting.");
@@ -792,7 +794,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {
-      @Override public Response apply(MutableStoreProvider storeProvider) {
+      @Override
+      public Response apply(MutableStoreProvider storeProvider) {
         List<String> errors = Lists.newArrayList();
 
         for (ConfigRewrite command : request.getRewriteCommands()) {

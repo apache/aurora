@@ -198,7 +198,8 @@ public class MemTaskStoreTest {
     assertQueryResults(joesJob, d);
 
     store.mutateTasks(jimsJob, new TaskMutation() {
-      @Override public IScheduledTask apply(IScheduledTask task) {
+      @Override
+      public IScheduledTask apply(IScheduledTask task) {
         return IScheduledTask.build(task.newBuilder().setStatus(RUNNING));
       }
     });
@@ -266,7 +267,8 @@ public class MemTaskStoreTest {
     final IScheduledTask b = setHost(a, Optional.of(host));
     Set<IScheduledTask> result = store.mutateTasks(Query.taskScoped(Tasks.id(a)),
         new Function<IScheduledTask, IScheduledTask>() {
-          @Override public IScheduledTask apply(IScheduledTask task) {
+          @Override
+          public IScheduledTask apply(IScheduledTask task) {
             assertEquals(a, task);
             return b;
           }
@@ -279,7 +281,8 @@ public class MemTaskStoreTest {
     final IScheduledTask c = setHost(b, Optional.of(host2));
     Set<IScheduledTask> result2 = store.mutateTasks(Query.taskScoped(Tasks.id(a)),
         new Function<IScheduledTask, IScheduledTask>() {
-          @Override public IScheduledTask apply(IScheduledTask task) {
+          @Override
+          public IScheduledTask apply(IScheduledTask task) {
             assertEquals(b, task);
             return c;
           }
@@ -303,7 +306,8 @@ public class MemTaskStoreTest {
     final IScheduledTask b = setHost(a, Optional.<String>absent());
     Set<IScheduledTask> result = store.mutateTasks(Query.taskScoped(Tasks.id(a)),
         new Function<IScheduledTask, IScheduledTask>() {
-          @Override public IScheduledTask apply(IScheduledTask task) {
+          @Override
+          public IScheduledTask apply(IScheduledTask task) {
             assertEquals(a, task);
             return b;
           }

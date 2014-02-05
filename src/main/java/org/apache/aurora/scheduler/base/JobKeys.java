@@ -40,28 +40,32 @@ public final class JobKeys {
 
   public static final Function<IJobConfiguration, IJobKey> FROM_CONFIG =
       new Function<IJobConfiguration, IJobKey>() {
-        @Override public IJobKey apply(IJobConfiguration job) {
+        @Override
+        public IJobKey apply(IJobConfiguration job) {
           return job.getKey();
         }
       };
 
   public static final Function<IJobKey, String> TO_ROLE =
       new Function<IJobKey, String>() {
-        @Override public String apply(IJobKey jobKey) {
+        @Override
+        public String apply(IJobKey jobKey) {
           return jobKey.getRole();
         }
       };
 
   public static final Function<IJobKey, String> TO_ENVIRONMENT =
       new Function<IJobKey, String>() {
-        @Override public String apply(IJobKey jobKey) {
+        @Override
+        public String apply(IJobKey jobKey) {
           return jobKey.getEnvironment();
         }
       };
 
   public static final Function<IJobKey, String> TO_JOB_NAME =
       new Function<IJobKey, String>() {
-        @Override public String apply(IJobKey jobKey) {
+        @Override
+        public String apply(IJobKey jobKey) {
           return jobKey.getName();
         }
       };

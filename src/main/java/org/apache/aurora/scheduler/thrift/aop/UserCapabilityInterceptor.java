@@ -52,7 +52,8 @@ class UserCapabilityInterceptor implements MethodInterceptor {
   @Inject private CapabilityValidator capabilityValidator;
 
   private static final Function<Object, SessionKey> CAST = new Function<Object, SessionKey>() {
-    @Override public SessionKey apply(Object o) {
+    @Override
+    public SessionKey apply(Object o) {
       return (SessionKey) o;
     }
   };

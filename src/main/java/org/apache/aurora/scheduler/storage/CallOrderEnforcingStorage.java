@@ -94,7 +94,8 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
     wrapped.start(initializationLogic);
     stateMachine.transition(State.READY);
     wrapped.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         Iterable<IScheduledTask> tasks = Tasks.LATEST_ACTIVITY.sortedCopy(
             storeProvider.getTaskStore().fetchTasks(Query.unscoped()));
         for (IScheduledTask task : tasks) {
@@ -146,7 +147,8 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
    */
   public static Module wrappingModule(final Class<? extends NonVolatileStorage> storageClass) {
     return new PrivateModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         bind(Storage.class).to(CallOrderEnforcingStorage.class);
         bind(NonVolatileStorage.class).to(CallOrderEnforcingStorage.class);
         bind(CallOrderEnforcingStorage.class).in(Singleton.class);

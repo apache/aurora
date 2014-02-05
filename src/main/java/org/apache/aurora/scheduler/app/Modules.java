@@ -54,7 +54,8 @@ final class Modules {
 
     final Module module = instantiateModule(moduleClass);
     return new PrivateModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         install(module);
         for (Class<?> klass : exposedClasses) {
           expose(klass);

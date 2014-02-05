@@ -129,7 +129,8 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private void expectReads() throws Exception {
     expect(storage.weaklyConsistentRead(EasyMock.<Quiet<?>>anyObject()))
         .andAnswer(new IAnswer<Object>() {
-          @Override public Object answer() throws Exception {
+          @Override
+          public Object answer() throws Exception {
             Quiet<?> arg = (Quiet<?>) EasyMock.getCurrentArguments()[0];
             return arg.apply(storeProvider);
           }

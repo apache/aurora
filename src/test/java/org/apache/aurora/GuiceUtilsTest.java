@@ -65,7 +65,8 @@ public class GuiceUtilsTest {
       throw new RuntimeException("Call failed");
     }
 
-    @Override public void get() {
+    @Override
+    public void get() {
       throw new RuntimeException("Call failed");
     }
   }
@@ -73,7 +74,8 @@ public class GuiceUtilsTest {
   @Test
   public void testExceptionTrapping() {
     Injector injector = Guice.createInjector(new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         GuiceUtils.bindExceptionTrap(binder(), Flaky.class);
         bind(Flaky.class).to(NotSoFlakyImpl.class);
         bind(AlsoFlaky.class).to(NotSoFlakyImpl.class);
@@ -114,7 +116,8 @@ public class GuiceUtilsTest {
   @Test(expected = CreationException.class)
   public void testNoTrappingNonVoidMethods() {
     Guice.createInjector(new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         GuiceUtils.bindExceptionTrap(binder(), NonVoid.class);
         fail("Bind should have failed.");
       }
@@ -129,7 +132,8 @@ public class GuiceUtilsTest {
   @Test
   public void testWhitelistNonVoidMethods() {
     Guice.createInjector(new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         GuiceUtils.bindExceptionTrap(binder(), NonVoidWhitelisted.class);
       }
     });

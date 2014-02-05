@@ -72,7 +72,8 @@ class FileLog implements Log {
         logContents = ThriftBinaryCodec.decode(FileLogContents.class, Files.toByteArray(logFile));
       }
       Closure<FileLogContents> logWriter = new Closure<FileLogContents>() {
-        @Override public void execute(FileLogContents logContents) {
+        @Override
+        public void execute(FileLogContents logContents) {
           try {
             Files.write(ThriftBinaryCodec.encode(logContents), logFile);
           } catch (IOException | CodingException e) {
@@ -109,9 +110,11 @@ class FileLog implements Log {
     }
 
     private static final Function<LogRecord, Entry> TO_ENTRY = new Function<LogRecord, Entry>() {
-      @Override public Entry apply(final LogRecord record) {
+      @Override
+      public Entry apply(final LogRecord record) {
         return new Entry() {
-          @Override public byte[] contents() {
+          @Override
+          public byte[] contents() {
             return record.getContents();
           }
         };
@@ -136,7 +139,8 @@ class FileLog implements Log {
 
       final long truncateBefore = ((CounterPosition) position).value;
       Iterables.removeIf(logContents.getRecords().keySet(), new Predicate<Long>() {
-        @Override public boolean apply(Long recordPosition) {
+        @Override
+        public boolean apply(Long recordPosition) {
           return recordPosition < truncateBefore;
         }
       });

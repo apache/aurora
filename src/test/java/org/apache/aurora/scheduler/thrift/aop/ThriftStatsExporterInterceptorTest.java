@@ -50,7 +50,8 @@ public class ThriftStatsExporterInterceptorTest extends EasyMockTest {
     statsInterceptor = new ThriftStatsExporterInterceptor();
     realThrift = createMock(AuroraAdmin.Iface.class);
     Injector injector = Guice.createInjector(new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         MockDecoratedThrift.bindForwardedMock(binder(), realThrift);
         AopModule.bindThriftDecorator(
             binder(),

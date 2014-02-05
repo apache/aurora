@@ -83,7 +83,8 @@ public class SchedulerModule extends AbstractModule {
     bind(UserTaskLauncher.class).in(Singleton.class);
 
     install(new PrivateModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         bind(LeadingOptions.class).toInstance(
             new LeadingOptions(MAX_REGISTRATION_DELAY.get(), MAX_LEADING_DURATION.get()));
 

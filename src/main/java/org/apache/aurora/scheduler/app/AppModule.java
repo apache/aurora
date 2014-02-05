@@ -112,7 +112,8 @@ class AppModule extends AbstractModule {
   private static class RegisterShutdownStackPrinter implements Command {
     private static final Function<StackTraceElement, String> STACK_ELEM_TOSTRING =
         new Function<StackTraceElement, String>() {
-          @Override public String apply(StackTraceElement element) {
+          @Override
+          public String apply(StackTraceElement element) {
             return element.getClassName() + "." + element.getMethodName()
                 + String.format("(%s:%s)", element.getFileName(), element.getLineNumber());
           }
@@ -128,7 +129,8 @@ class AppModule extends AbstractModule {
     @Override
     public void execute() {
       shutdownRegistry.addAction(new Command() {
-        @Override public void execute() {
+        @Override
+        public void execute() {
           Thread thread = Thread.currentThread();
           String message = new StringBuilder()
               .append("Thread: ").append(thread.getName())

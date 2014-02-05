@@ -78,7 +78,8 @@ public class StructDump extends JerseyTemplateServlet {
       @PathParam("task") final String taskId) {
 
     return dumpEntity("Task " + taskId, new Work.Quiet<Optional<? extends TBase<?, ?>>>() {
-      @Override public Optional<? extends TBase<?, ?>> apply(StoreProvider storeProvider) {
+      @Override
+      public Optional<? extends TBase<?, ?>> apply(StoreProvider storeProvider) {
         // Deep copy the struct to sidestep any subclass trickery inside the storage system.
         return Optional.fromNullable(Iterables.getOnlyElement(
                 storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskId)),
@@ -104,7 +105,8 @@ public class StructDump extends JerseyTemplateServlet {
     final IJobKey jobKey = JobKeys.from(role, environment, job);
     return dumpEntity("Cron job " + JobKeys.toPath(jobKey),
         new Work.Quiet<Optional<? extends TBase<?, ?>>>() {
-          @Override public Optional<JobConfiguration> apply(StoreProvider storeProvider) {
+          @Override
+          public Optional<JobConfiguration> apply(StoreProvider storeProvider) {
             return storeProvider.getJobStore().fetchJob(CronJobManager.MANAGER_KEY, jobKey)
                 .transform(IJobConfiguration.TO_BUILDER);
           }
@@ -113,7 +115,8 @@ public class StructDump extends JerseyTemplateServlet {
 
   private Response dumpEntity(final String id, final Quiet<Optional<? extends TBase<?, ?>>> work) {
     return fillTemplate(new Closure<StringTemplate>() {
-      @Override public void execute(StringTemplate template) {
+      @Override
+      public void execute(StringTemplate template) {
         template.setAttribute("id", id);
         Optional<? extends TBase<?, ?>> struct = storage.weaklyConsistentRead(work);
         if (!struct.isPresent()) {

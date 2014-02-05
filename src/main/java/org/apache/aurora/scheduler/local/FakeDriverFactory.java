@@ -57,7 +57,8 @@ class FakeDriverFactory implements DriverFactory {
   @Override
   public SchedulerDriver apply(@Nullable final String frameworkId) {
     return new FakeSchedulerDriver() {
-      @Override public Status run() {
+      @Override
+      public Status run() {
         scheduler.get().registered(
             this,
             FrameworkID.newBuilder().setValue(
@@ -70,61 +71,73 @@ class FakeDriverFactory implements DriverFactory {
   }
 
   static class FakeSchedulerDriver implements SchedulerDriver {
-    @Override public Status start() {
+    @Override
+    public Status start() {
       return null;
     }
 
-    @Override public Status stop(boolean b) {
+    @Override
+    public Status stop(boolean b) {
       return null;
     }
 
-    @Override public Status stop() {
+    @Override
+    public Status stop() {
       return null;
     }
 
-    @Override public Status abort() {
+    @Override
+    public Status abort() {
       return null;
     }
 
-    @Override public Status join() {
+    @Override
+    public Status join() {
       return run();
     }
 
-    @Override public Status run() {
+    @Override
+    public Status run() {
       return null;
     }
 
-    @Override public Status requestResources(Collection<Request> requests) {
+    @Override
+    public Status requestResources(Collection<Request> requests) {
       return null;
     }
 
-    @Override public Status launchTasks(OfferID offerID, Collection<TaskInfo> taskInfos,
-        Filters filters) {
+    @Override
+    public Status launchTasks(OfferID offerID, Collection<TaskInfo> taskInfos, Filters filters) {
       return null;
     }
 
-    @Override public Status launchTasks(OfferID offerID, Collection<TaskInfo> taskInfos) {
+    @Override
+    public Status launchTasks(OfferID offerID, Collection<TaskInfo> taskInfos) {
       return null;
     }
 
-    @Override public Status killTask(TaskID taskID) {
+    @Override
+    public Status killTask(TaskID taskID) {
       return null;
     }
 
-    @Override public Status declineOffer(OfferID offerID, Filters filters) {
+    @Override
+    public Status declineOffer(OfferID offerID, Filters filters) {
       return null;
     }
 
-    @Override public Status declineOffer(OfferID offerID) {
+    @Override
+    public Status declineOffer(OfferID offerID) {
       return null;
     }
 
-    @Override public Status reviveOffers() {
+    @Override
+    public Status reviveOffers() {
       return null;
     }
 
-    @Override public Status sendFrameworkMessage(ExecutorID executorID, SlaveID slaveID,
-        byte[] bytes) {
+    @Override
+    public Status sendFrameworkMessage(ExecutorID executorID, SlaveID slaveID, byte[] bytes) {
       return null;
     }
 

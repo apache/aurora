@@ -83,7 +83,8 @@ public interface RescheduleCalculator {
 
     private static final Function<ITaskEvent, ScheduleStatus> TO_STATUS =
         new Function<ITaskEvent, ScheduleStatus>() {
-          @Override public ScheduleStatus apply(ITaskEvent input) {
+          @Override
+          public ScheduleStatus apply(ITaskEvent input) {
             return input.getStatus();
           }
         };
@@ -92,7 +93,8 @@ public interface RescheduleCalculator {
         EnumSet.of(RESTARTING, KILLING);
 
     private final Predicate<IScheduledTask> flapped = new Predicate<IScheduledTask>() {
-      @Override public boolean apply(IScheduledTask task) {
+      @Override
+      public boolean apply(IScheduledTask task) {
         if (!task.isSetTaskEvents()) {
           return false;
         }

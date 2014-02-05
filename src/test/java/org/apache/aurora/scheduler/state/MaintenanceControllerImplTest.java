@@ -71,7 +71,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
     Injector injector = Guice.createInjector(
         new AbstractModule() {
-          @Override protected void configure() {
+          @Override
+          protected void configure() {
             PubsubTestUtil.installPubsub(binder());
             StateModule.bindMaintenanceController(binder());
             bind(Storage.class).toInstance(storageUtil.storage);

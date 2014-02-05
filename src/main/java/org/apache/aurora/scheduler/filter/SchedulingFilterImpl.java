@@ -97,7 +97,8 @@ public class SchedulingFilterImpl implements SchedulingFilter {
    * Convenience class for a rule that will only ever have a single veto.
    */
   private abstract static class SingleVetoRule implements FilterRule {
-    @Override public final Iterable<Veto> apply(ITaskConfig task) {
+    @Override
+    public final Iterable<Veto> apply(ITaskConfig task) {
       return doApply(task).asSet();
     }
 
@@ -148,27 +149,31 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private Iterable<FilterRule> rulesFromOffer(final ResourceSlot available) {
     return ImmutableList.<FilterRule>of(
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(ITaskConfig task) {
+          @Override
+          public Optional<Veto> doApply(ITaskConfig task) {
             return CPU.maybeVeto(
                 available.getNumCpus(),
                 ResourceSlot.from(task).getNumCpus());
           }
         },
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(ITaskConfig task) {
+          @Override
+          public Optional<Veto> doApply(ITaskConfig task) {
             return RAM.maybeVeto(
                 available.getRam().as(Data.MB),
                 ResourceSlot.from(task).getRam().as(Data.MB));
           }
         },
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(ITaskConfig task) {
+          @Override
+          public Optional<Veto> doApply(ITaskConfig task) {
             return DISK.maybeVeto(available.getDisk().as(Data.MB),
                 ResourceSlot.from(task).getDisk().as(Data.MB));
           }
         },
         new SingleVetoRule() {
-          @Override public Optional<Veto> doApply(ITaskConfig task) {
+          @Override
+          public Optional<Veto> doApply(ITaskConfig task) {
             return PORTS.maybeVeto(available.getNumPorts(),
                 ResourceSlot.from(task).getNumPorts());
           }
@@ -182,7 +187,8 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   private static final Ordering<IConstraint> VALUES_FIRST = Ordering.from(
       new Comparator<IConstraint>() {
-        @Override public int compare(IConstraint a, IConstraint b) {
+        @Override
+        public int compare(IConstraint a, IConstraint b) {
           if (a.getConstraint().getSetField() == b.getConstraint().getSetField()) {
             return 0;
           }
@@ -192,7 +198,8 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   private FilterRule getConstraintFilter(final CachedJobState jobState, final String slaveHost) {
     return new FilterRule() {
-      @Override public Iterable<Veto> apply(final ITaskConfig task) {
+      @Override
+      public Iterable<Veto> apply(final ITaskConfig task) {
         if (!task.isSetConstraints()) {
           return ImmutableList.of();
         }
@@ -202,9 +209,11 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         // to correctly satisfy a diversity constraint.  Given that the likelihood is relatively low
         // for both of these, and the impact is also low, the weak consistency is acceptable.
         return storage.weaklyConsistentRead(new Quiet<Iterable<Veto>>() {
-          @Override public Iterable<Veto> apply(final StoreProvider storeProvider) {
+          @Override
+          public Iterable<Veto> apply(final StoreProvider storeProvider) {
             AttributeLoader attributeLoader = new AttributeLoader() {
-              @Override public Iterable<Attribute> apply(String host) {
+              @Override
+              public Iterable<Attribute> apply(String host) {
                 return AttributeStore.Util.attributesOrNone(storeProvider, host);
               }
             };
@@ -251,7 +260,8 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private boolean isDedicated(final String slaveHost) {
     Iterable<Attribute> slaveAttributes =
         storage.weaklyConsistentRead(new Quiet<Iterable<Attribute>>() {
-          @Override public Iterable<Attribute> apply(final StoreProvider storeProvider) {
+          @Override
+          public Iterable<Attribute> apply(final StoreProvider storeProvider) {
             return AttributeStore.Util.attributesOrNone(storeProvider, slaveHost);
           }
         });

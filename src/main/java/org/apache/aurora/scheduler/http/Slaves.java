@@ -64,7 +64,8 @@ public class Slaves extends JerseyTemplateServlet {
 
   private Iterable<HostAttributes> getHostAttributes() {
     return storage.weaklyConsistentRead(new Work.Quiet<Iterable<HostAttributes>>() {
-      @Override public Iterable<HostAttributes> apply(StoreProvider storeProvider) {
+      @Override
+      public Iterable<HostAttributes> apply(StoreProvider storeProvider) {
         return storeProvider.getAttributeStore().getHostAttributes();
       }
     });
@@ -72,7 +73,8 @@ public class Slaves extends JerseyTemplateServlet {
 
   private static final Function<HostAttributes, Slave> TO_SLAVE =
       new Function<HostAttributes, Slave>() {
-        @Override public Slave apply(HostAttributes attributes) {
+        @Override
+        public Slave apply(HostAttributes attributes) {
           return new Slave(attributes);
         }
       };
@@ -86,7 +88,8 @@ public class Slaves extends JerseyTemplateServlet {
   @Produces(MediaType.TEXT_HTML)
   public Response get() {
     return fillTemplate(new Closure<StringTemplate>() {
-      @Override public void execute(StringTemplate template) {
+      @Override
+      public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
 
         template.setAttribute("slaves",
@@ -97,7 +100,8 @@ public class Slaves extends JerseyTemplateServlet {
 
   private static final Ordering<Attribute> ATTR_ORDER = Ordering.natural().onResultOf(
       new Function<Attribute, String>() {
-        @Override public String apply(Attribute attr) {
+        @Override
+        public String apply(Attribute attr) {
           return attr .getName();
         }
       });
@@ -126,7 +130,8 @@ public class Slaves extends JerseyTemplateServlet {
 
     private static final Function<Attribute, String> ATTR_TO_STRING =
         new Function<Attribute, String>() {
-          @Override public String apply(Attribute attr) {
+          @Override
+          public String apply(Attribute attr) {
             return attr.getName() + "=[" + Joiner.on(",").join(attr.getValues()) + "]";
           }
         };

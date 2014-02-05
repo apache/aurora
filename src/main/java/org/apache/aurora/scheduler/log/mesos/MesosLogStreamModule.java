@@ -152,7 +152,8 @@ public class MesosLogStreamModule extends PrivateModule {
   @Provides
   LogInterface provideLogInterface(final Log log) {
     return new LogInterface() {
-      @Override public Log.Position position(byte[] identity) {
+      @Override
+      public Log.Position position(byte[] identity) {
         return log.position(identity);
       }
     };
@@ -168,11 +169,13 @@ public class MesosLogStreamModule extends PrivateModule {
         return reader.read(from, to, timeout, unit);
       }
 
-      @Override public Log.Position beginning() {
+      @Override
+      public Log.Position beginning() {
         return reader.beginning();
       }
 
-      @Override public Log.Position ending() {
+      @Override
+      public Log.Position ending() {
         return reader.ending();
       }
     };
@@ -181,12 +184,14 @@ public class MesosLogStreamModule extends PrivateModule {
   @Provides
   WriterInterface provideWriterInterface(final Log.Writer writer) {
     return new WriterInterface() {
-      @Override public Log.Position append(byte[] data, long timeout, TimeUnit unit)
+      @Override
+      public Log.Position append(byte[] data, long timeout, TimeUnit unit)
           throws TimeoutException, Log.WriterFailedException {
         return writer.append(data, timeout, unit);
       }
 
-      @Override public Log.Position truncate(Log.Position to, long timeout, TimeUnit unit)
+      @Override
+      public Log.Position truncate(Log.Position to, long timeout, TimeUnit unit)
           throws TimeoutException, Log.WriterFailedException {
         return writer.truncate(to, timeout, unit);
       }

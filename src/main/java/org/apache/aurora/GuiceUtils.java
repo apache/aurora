@@ -66,7 +66,8 @@ public final class GuiceUtils {
   // '>' is followed by whitespace.
   private static final Function<Method, Pair<String, Class[]>> CANONICALIZE =
       new Function<Method, Pair<String, Class[]>>() {
-        @Override public Pair<String, Class[]> apply(Method method) {
+        @Override
+        public Pair<String, Class[]> apply(Method method) {
           return Pair.of(method.getName(), (Class[]) method.getParameterTypes());
         }
       };
@@ -92,7 +93,8 @@ public final class GuiceUtils {
         .build(CacheLoader.from(CANONICALIZE));
 
     return new AbstractMatcher<Method>() {
-      @Override public boolean matches(Method method) {
+      @Override
+      public boolean matches(Method method) {
         return interfaceMethods.contains(cache.getUnchecked(method));
       }
     };
@@ -112,7 +114,8 @@ public final class GuiceUtils {
         Matchers.subclassesOf(wrapInterface),
         interfaceMatcher(wrapInterface, false),
         new MethodInterceptor() {
-          @Override public Object invoke(MethodInvocation invocation) throws Throwable {
+          @Override
+          public Object invoke(MethodInvocation invocation) throws Throwable {
             Thread currentThread = Thread.currentThread();
             ClassLoader prior = currentThread.getContextClassLoader();
             try {
@@ -126,19 +129,22 @@ public final class GuiceUtils {
   }
 
   private static final Predicate<Method> IS_WHITELISTED = new Predicate<Method>() {
-    @Override public boolean apply(Method method) {
+    @Override
+    public boolean apply(Method method) {
       return method.getAnnotation(AllowUnchecked.class) != null;
     }
   };
 
   private static final Matcher<Method> WHITELIST_MATCHER = new AbstractMatcher<Method>() {
-    @Override public boolean matches(Method method) {
+    @Override
+    public boolean matches(Method method) {
       return IS_WHITELISTED.apply(method);
     }
   };
 
   private static final Predicate<Method> VOID_METHOD = new Predicate<Method>() {
-    @Override public boolean apply(Method method) {
+    @Override
+    public boolean apply(Method method) {
       return method.getReturnType() == Void.TYPE;
     }
   };
@@ -165,7 +171,8 @@ public final class GuiceUtils {
         Matchers.<Method>not(WHITELIST_MATCHER).and(interfaceMatcher(wrapInterface, false));
     binder.bindInterceptor(Matchers.subclassesOf(wrapInterface), matcher,
         new MethodInterceptor() {
-          @Override public Object invoke(MethodInvocation invocation) throws Throwable {
+          @Override
+          public Object invoke(MethodInvocation invocation) throws Throwable {
             try {
               return invocation.proceed();
             } catch (RuntimeException e) {

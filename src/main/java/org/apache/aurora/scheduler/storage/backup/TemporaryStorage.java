@@ -66,7 +66,8 @@ interface TemporaryStorage {
    * A factory that creates temporary storage instances, detached from the rest of the system.
    */
   class TemporaryStorageFactory implements Function<Snapshot, TemporaryStorage> {
-    @Override public TemporaryStorage apply(Snapshot snapshot) {
+    @Override
+    public TemporaryStorage apply(Snapshot snapshot) {
       final Storage storage = MemStorage.newEmptyStorage();
       FakeClock clock = new FakeClock();
       clock.setNowMillis(snapshot.getTimestamp());
@@ -74,9 +75,11 @@ interface TemporaryStorage {
       snapshotStore.applySnapshot(snapshot);
 
       return new TemporaryStorage() {
-        @Override public void deleteTasks(final Query.Builder query) {
+        @Override
+        public void deleteTasks(final Query.Builder query) {
           storage.write(new MutateWork.NoResult.Quiet() {
-            @Override protected void execute(MutableStoreProvider storeProvider) {
+            @Override
+            protected void execute(MutableStoreProvider storeProvider) {
               Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
                   .transform(Tasks.SCHEDULED_TO_ID)
                   .toSet();
@@ -85,15 +88,18 @@ interface TemporaryStorage {
           });
         }
 
-        @Override public Set<IScheduledTask> fetchTasks(final Query.Builder query) {
+        @Override
+        public Set<IScheduledTask> fetchTasks(final Query.Builder query) {
           return storage.consistentRead(new Work.Quiet<Set<IScheduledTask>>() {
-            @Override public Set<IScheduledTask> apply(StoreProvider storeProvider) {
+            @Override
+            public Set<IScheduledTask> apply(StoreProvider storeProvider) {
               return storeProvider.getTaskStore().fetchTasks(query);
             }
           });
         }
 
-        @Override public Snapshot toSnapshot() {
+        @Override
+        public Snapshot toSnapshot() {
           return snapshotStore.createSnapshot();
         }
       };

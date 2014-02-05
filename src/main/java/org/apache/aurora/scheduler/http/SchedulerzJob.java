@@ -102,7 +102,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
       .build();
 
   private static final Function<Veto, String> GET_REASON = new Function<Veto, String>() {
-    @Override public String apply(Veto veto) {
+    @Override
+    public String apply(Veto veto) {
       return veto.getReason();
     }
   };
@@ -138,7 +139,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
   private final Function<IScheduledTask, Map<String, Object>> taskToStringMap =
       new Function<IScheduledTask, Map<String, Object>>() {
-        @Override public Map<String, Object> apply(IScheduledTask scheduledTask) {
+        @Override
+        public Map<String, Object> apply(IScheduledTask scheduledTask) {
           final IAssignedTask task = scheduledTask.getAssignedTask();
           ImmutableMap.Builder<String, Object> builder = ImmutableMap.<String, Object>builder()
             .put("taskId", task.getTaskId())
@@ -160,7 +162,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
           }
 
           Function<String, String> expander = new Function<String, String>() {
-            @Override public String apply(String input) {
+            @Override
+            public String apply(String input) {
               return expandText(input, task);
             }
           };
@@ -215,7 +218,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
   private static final Function<IConstraint, String> DISPLAY_CONSTRAINT =
       new Function<IConstraint, String>() {
-        @Override public String apply(IConstraint constraint) {
+        @Override
+        public String apply(IConstraint constraint) {
           StringBuilder sb = new StringBuilder().append(constraint.getName()).append(": ");
           ITaskConstraint taskConstraint = constraint.getConstraint();
           switch (taskConstraint.getSetField()) {
@@ -240,7 +244,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
 
   private static final Function<ITaskConfig, SchedulingDetails> CONFIG_TO_DETAILS =
       new Function<ITaskConfig, SchedulingDetails>() {
-        @Override public SchedulingDetails apply(ITaskConfig task) {
+        @Override
+        public SchedulingDetails apply(ITaskConfig task) {
           String resources = Joiner.on(", ").join(
               "cpu: " + task.getNumCpus(),
               "ram: " + scaleMb(task.getRamMb()),
@@ -335,7 +340,8 @@ public class SchedulerzJob extends JerseyTemplateServlet {
       @QueryParam(ADMIN_VIEW_PARAM) final String adminView) {
 
     return fillTemplate(new Closure<StringTemplate>() {
-      @Override public void execute(StringTemplate template) {
+      @Override
+      public void execute(StringTemplate template) {
         template.setAttribute("cluster_name", clusterName);
         template.setAttribute(ADMIN_VIEW_PARAM, adminView != null);
         IJobKey jobKey = JobKeys.from(role, environment, job);

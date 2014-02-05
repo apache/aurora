@@ -60,7 +60,8 @@ class ThriftServer {
 
     Thread listeningThread = new ThreadFactoryBuilder().setDaemon(false).build()
         .newThread(new Runnable() {
-          @Override public void run() {
+          @Override
+          public void run() {
             try {
               starting.serve();
             } catch (Throwable t) {

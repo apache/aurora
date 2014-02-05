@@ -36,7 +36,8 @@ public class HttpStatsFilter extends AbstractHttpFilter {
 
   private final LoadingCache<Integer, SlidingStats> counters = CacheBuilder.newBuilder()
       .build(new CacheLoader<Integer, SlidingStats>() {
-        @Override public SlidingStats load(Integer status) {
+        @Override
+        public SlidingStats load(Integer status) {
           return new SlidingStats("http_" + status + "_responses", "nanos");
         }
       });
@@ -49,12 +50,14 @@ public class HttpStatsFilter extends AbstractHttpFilter {
       super(resp);
     }
 
-    @Override public void setStatus(int sc) {
+    @Override
+    public void setStatus(int sc) {
       super.setStatus(sc);
       wrappedStatus = sc;
     }
 
-    @Override public void setStatus(int sc, String sm) {
+    @Override
+    public void setStatus(int sc, String sm) {
       super.setStatus(sc, sm);
       wrappedStatus = sc;
     }

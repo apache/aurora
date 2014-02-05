@@ -85,7 +85,8 @@ public class LogManagerTest extends EasyMockTest {
       Amount.of(Integer.MAX_VALUE, Data.GB);
 
   private static final Function<LogEntry, byte[]> ENCODE = new Function<LogEntry, byte[]>() {
-    @Override public byte[] apply(LogEntry entry) {
+    @Override
+    public byte[] apply(LogEntry entry) {
       try {
         return encode(entry);
       } catch (CodingException e) {
@@ -288,7 +289,8 @@ public class LogManagerTest extends EasyMockTest {
       this.header = LogEntry.frame(header);
       this.chunks = ImmutableList.copyOf(Iterables.transform(chunks,
           new Function<Frame, LogEntry>() {
-            @Override public LogEntry apply(Frame frame) {
+            @Override
+            public LogEntry apply(Frame frame) {
               return LogEntry.frame(frame);
             }
           }));
@@ -396,7 +398,8 @@ public class LogManagerTest extends EasyMockTest {
     tr1.add(op1);
 
     Thread snapshotThread = new Thread() {
-      @Override public void run() {
+      @Override
+      public void run() {
         StreamTransaction tr2 = streamManager.startTransaction();
         tr2.add(op2);
         try {
@@ -512,7 +515,8 @@ public class LogManagerTest extends EasyMockTest {
   private SaveTasks createSaveTasks(String... taskIds) {
     return new SaveTasks(ImmutableSet.copyOf(Iterables.transform(ImmutableList.copyOf(taskIds),
         new Function<String, ScheduledTask>() {
-          @Override public ScheduledTask apply(String taskId) {
+          @Override
+          public ScheduledTask apply(String taskId) {
             return new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(taskId));
           }
         })));

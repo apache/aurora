@@ -155,7 +155,8 @@ public interface MaintenanceController {
       if (Tasks.isTerminated(change.getNewState())) {
         final String host = change.getTask().getAssignedTask().getSlaveHost();
         storage.write(new MutateWork.NoResult.Quiet() {
-          @Override public void execute(MutableStoreProvider store) {
+          @Override
+          public void execute(MutableStoreProvider store) {
             // If the task _was_ associated with a draining host, and it was the last task on the
             // host.
             Optional<HostAttributes> attributes = store.getAttributeStore().getHostAttributes(host);
@@ -173,7 +174,8 @@ public interface MaintenanceController {
     @Override
     public Set<HostStatus> startMaintenance(final Set<String> hosts) {
       return storage.write(new MutateWork.Quiet<Set<HostStatus>>() {
-        @Override public Set<HostStatus> apply(MutableStoreProvider storeProvider) {
+        @Override
+        public Set<HostStatus> apply(MutableStoreProvider storeProvider) {
           return setMaintenanceMode(storeProvider, hosts, MaintenanceMode.SCHEDULED);
         }
       });
@@ -186,7 +188,8 @@ public interface MaintenanceController {
     @Override
     public Set<HostStatus> drain(final Set<String> hosts) {
       return storage.write(new MutateWork.Quiet<Set<HostStatus>>() {
-        @Override public Set<HostStatus> apply(MutableStoreProvider store) {
+        @Override
+        public Set<HostStatus> apply(MutableStoreProvider store) {
           return watchDrainingTasks(store, hosts);
         }
       });
@@ -194,21 +197,24 @@ public interface MaintenanceController {
 
     private static final Function<HostAttributes, String> HOST_NAME =
         new Function<HostAttributes, String>() {
-          @Override public String apply(HostAttributes attributes) {
+          @Override
+          public String apply(HostAttributes attributes) {
             return attributes.getHost();
           }
         };
 
     private static final Function<HostAttributes, HostStatus> ATTRS_TO_STATUS =
         new Function<HostAttributes, HostStatus>() {
-          @Override public HostStatus apply(HostAttributes attributes) {
+          @Override
+          public HostStatus apply(HostAttributes attributes) {
             return new HostStatus().setHost(attributes.getHost()).setMode(attributes.getMode());
           }
         };
 
     private static final Function<HostStatus, MaintenanceMode> GET_MODE =
       new Function<HostStatus, MaintenanceMode>() {
-        @Override public MaintenanceMode apply(HostStatus status) {
+        @Override
+        public MaintenanceMode apply(HostStatus status) {
           return status.getMode();
         }
       };
@@ -216,7 +222,8 @@ public interface MaintenanceController {
     @Override
     public MaintenanceMode getMode(final String host) {
       return storage.weaklyConsistentRead(new Work.Quiet<MaintenanceMode>() {
-        @Override public MaintenanceMode apply(StoreProvider storeProvider) {
+        @Override
+        public MaintenanceMode apply(StoreProvider storeProvider) {
           return storeProvider.getAttributeStore().getHostAttributes(host)
               .transform(ATTRS_TO_STATUS)
               .transform(GET_MODE)
@@ -228,7 +235,8 @@ public interface MaintenanceController {
     @Override
     public Set<HostStatus> getStatus(final Set<String> hosts) {
       return storage.weaklyConsistentRead(new Work.Quiet<Set<HostStatus>>() {
-        @Override public Set<HostStatus> apply(StoreProvider storeProvider) {
+        @Override
+        public Set<HostStatus> apply(StoreProvider storeProvider) {
           // Warning - this is filtering _all_ host attributes.  If using this to frequently query
           // for a small set of hosts, a getHostAttributes variant should be added.
           return FluentIterable.from(storeProvider.getAttributeStore().getHostAttributes())
@@ -241,7 +249,8 @@ public interface MaintenanceController {
     @Override
     public Set<HostStatus> endMaintenance(final Set<String> hosts) {
       return storage.write(new MutateWork.Quiet<Set<HostStatus>>() {
-        @Override public Set<HostStatus> apply(MutableStoreProvider storeProvider) {
+        @Override
+        public Set<HostStatus> apply(MutableStoreProvider storeProvider) {
           return setMaintenanceMode(storeProvider, hosts, MaintenanceMode.NONE);
         }
       });

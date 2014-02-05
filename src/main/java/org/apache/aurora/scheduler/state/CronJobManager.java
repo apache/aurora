@@ -167,14 +167,16 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   public void schedulerActive(SchedulerActive schedulerActive) {
     cron.start();
     shutdownRegistry.addAction(new ExceptionalCommand<CronException>() {
-      @Override public void execute() throws CronException {
+      @Override
+      public void execute() throws CronException {
         cron.stop();
       }
     });
 
     Iterable<IJobConfiguration> crons =
         storage.consistentRead(new Work.Quiet<Iterable<IJobConfiguration>>() {
-          @Override public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
+          @Override
+          public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
             return storeProvider.getJobStore().fetchJobs(MANAGER_KEY);
           }
         });
@@ -220,7 +222,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
       // There was no run already pending for this job, launch a task to delay launch until the
       // existing run has terminated.
       delayedRunExecutor.execute(new Runnable() {
-        @Override public void run() {
+        @Override
+        public void run() {
           runWhenTerminated(query, jobKey);
         }
       });
@@ -230,7 +233,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   private void runWhenTerminated(final Query.Builder query, final IJobKey jobKey) {
     try {
       delayedStartBackoff.doUntilSuccess(new Supplier<Boolean>() {
-        @Override public Boolean get() {
+        @Override
+        public Boolean get() {
           if (!hasTasks(query)) {
             LOG.info("Initiating delayed launch of cron " + jobKey);
             SanitizedConfiguration config = pendingRuns.remove(jobKey);
@@ -352,7 +356,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
 
     SanitizedCronJob cronJob = new SanitizedCronJob(config, cron);
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(MANAGER_KEY, job);
       }
     });
@@ -367,7 +372,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     LOG.info(String.format("Scheduling cron job %s: %s", jobPath, job.getCronSchedule()));
     try {
       return cron.schedule(job.getCronSchedule(), new Runnable() {
-        @Override public void run() {
+        @Override
+        public void run() {
           // TODO(William Farner): May want to record information about job runs.
           LOG.info("Running cron job: " + jobPath);
           cronTriggered(cronJob);
@@ -396,7 +402,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   private Optional<IJobConfiguration> fetchJob(final IJobKey jobKey) {
     checkNotNull(jobKey);
     return storage.consistentRead(new Work.Quiet<Optional<IJobConfiguration>>() {
-      @Override public Optional<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
+      @Override
+      public Optional<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobStore().fetchJob(MANAGER_KEY, jobKey);
       }
     });
@@ -414,7 +421,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
     if (scheduledJobKey != null) {
       cron.deschedule(scheduledJobKey);
       storage.write(new MutateWork.NoResult.Quiet() {
-        @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
+        @Override
+        protected void execute(Storage.MutableStoreProvider storeProvider) {
           storeProvider.getJobStore().removeJob(jobKey);
         }
       });
@@ -424,7 +432,8 @@ public class CronJobManager extends JobManager implements EventSubscriber {
   }
 
   private final Function<String, String> keyToSchedule = new Function<String, String>() {
-    @Override public String apply(String key) {
+    @Override
+    public String apply(String key) {
       return cron.getSchedule(key).or("Not found.");
     }
   };

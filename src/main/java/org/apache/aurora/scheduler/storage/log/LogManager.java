@@ -122,7 +122,8 @@ public final class LogManager {
   public StreamManager open() throws IOException {
     final Stream stream = log.open();
     shutdownRegistry.addAction(new ExceptionalCommand<IOException>() {
-      @Override public void execute() throws IOException {
+      @Override
+      public void execute() throws IOException {
         stream.close();
       }
     });

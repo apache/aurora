@@ -151,7 +151,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   // TODO(William Farner): Set up explicit expectations for calls to generate task IDs.
   private final AtomicLong idCounter = new AtomicLong();
   private TaskIdGenerator taskIdGenerator = new TaskIdGenerator() {
-    @Override public String generate(ITaskConfig input, int instanceId) {
+    @Override
+    public String generate(ITaskConfig input, int instanceId) {
       return "task-" + idCounter.incrementAndGet();
     }
   };
@@ -193,7 +194,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   private void buildScheduler(Storage newStorage) throws Exception {
     this.storage = newStorage;
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         StorageBackfill.backfill(storeProvider, clock);
       }
     });
@@ -306,7 +308,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         .setTaskLinks(ImmutableMap.<String, String>of());
 
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
             IScheduledTask.build(
               new ScheduledTask()
@@ -355,7 +358,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     final Set<IScheduledTask> badTasks = ImmutableSet.copyOf(Iterables
         .transform(job.getTaskConfigs().values(),
             new Function<ITaskConfig, IScheduledTask>() {
-              @Override public IScheduledTask apply(ITaskConfig task) {
+              @Override
+              public IScheduledTask apply(ITaskConfig task) {
                 return IScheduledTask.build(new ScheduledTask()
                     .setStatus(RUNNING)
                     .setAssignedTask(
@@ -367,7 +371,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
             }));
 
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(badTasks);
       }
     });
@@ -1153,7 +1158,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test
   public void testTaskIdLimit() throws Exception {
     taskIdGenerator = new TaskIdGenerator() {
-      @Override public String generate(ITaskConfig input, int instanceCount) {
+      @Override
+      public String generate(ITaskConfig input, int instanceCount) {
         return Strings.repeat("a", SchedulerCoreImpl.MAX_TASK_ID_LENGTH);
       }
     };
@@ -1167,7 +1173,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testRejectLongTaskId() throws Exception {
     taskIdGenerator = new TaskIdGenerator() {
-      @Override public String generate(ITaskConfig input, int instanceCount) {
+      @Override
+      public String generate(ITaskConfig input, int instanceCount) {
         return Strings.repeat("a", SchedulerCoreImpl.MAX_TASK_ID_LENGTH + 1);
       }
     };

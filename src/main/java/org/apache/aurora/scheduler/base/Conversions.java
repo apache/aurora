@@ -72,7 +72,8 @@ public final class Conversions {
 
   private static final Function<Protos.Attribute, String> ATTRIBUTE_NAME =
       new Function<Protos.Attribute, String>() {
-        @Override public String apply(Protos.Attribute attr) {
+        @Override
+        public String apply(Protos.Attribute attr) {
           return attr.getName();
         }
       };
@@ -86,7 +87,8 @@ public final class Conversions {
 
   private static final Function<Protos.Attribute, String> VALUE_CONVERTER =
       new Function<Protos.Attribute, String>() {
-        @Override public String apply(Protos.Attribute attribute) {
+        @Override
+        public String apply(Protos.Attribute attribute) {
           switch (attribute.getType()) {
             case SCALAR:
               return String.valueOf(attribute.getScalar().getValue());
@@ -102,7 +104,8 @@ public final class Conversions {
       };
 
   private static final AttributeConverter ATTRIBUTE_CONVERTER = new AttributeConverter() {
-    @Override public Attribute apply(Entry<String, Collection<Protos.Attribute>> entry) {
+    @Override
+    public Attribute apply(Entry<String, Collection<Protos.Attribute>> entry) {
       // Convert values and filter any that were ignored.
       return new Attribute(
           entry.getKey(),

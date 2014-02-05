@@ -48,7 +48,8 @@ public class NoopCronIT {
   @Test
   public void testSchedule() throws Exception {
     cronScheduler.schedule(SCHEDULE, new Runnable() {
-      @Override public void run() {
+      @Override
+      public void run() {
         // No-op.
       }
     });

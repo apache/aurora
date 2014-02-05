@@ -148,7 +148,8 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     Injector injector = Guice.createInjector(new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         bind(StateManager.class).toInstance(stateManager);
         bind(Storage.class).toInstance(storageUtil.storage);
         bind(CronScheduler.class).toInstance(cronScheduler);

@@ -65,7 +65,8 @@ public final class PubsubEventModule extends AbstractModule {
     bind(EventBus.class).toInstance(eventBus);
 
     EventSink eventSink = new EventSink() {
-      @Override public void post(PubsubEvent event) {
+      @Override
+      public void post(PubsubEvent event) {
         eventBus.post(event);
       }
     };

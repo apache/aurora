@@ -125,7 +125,8 @@ public final class StorageBackfill {
 
     LOG.info("Performing shard uniqueness sanity check.");
     storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {
-      @Override public IScheduledTask apply(final IScheduledTask task) {
+      @Override
+      public IScheduledTask apply(final IScheduledTask task) {
         ScheduledTask builder = task.newBuilder();
         ConfigurationManager.applyDefaultsIfUnset(builder.getAssignedTask().getTask());
         // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they

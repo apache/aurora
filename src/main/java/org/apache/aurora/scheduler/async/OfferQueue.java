@@ -157,7 +157,8 @@ public interface OfferQueue extends EventSubscriber {
         hostOffers.add(new HostOffer(offer, maintenance.getMode(offer.getHostname())));
         executor.schedule(
             new Runnable() {
-              @Override public void run() {
+              @Override
+              public void run() {
                 removeAndDecline(offer.getId());
               }
             },
@@ -200,7 +201,8 @@ public interface OfferQueue extends EventSubscriber {
     public Iterable<Offer> getOffers() {
       return FluentIterable.from(hostOffers.getWeaklyConsistentOffers())
           .transform(new Function<HostOffer, Offer>() {
-            @Override public Offer apply(HostOffer offer) {
+            @Override
+            public Offer apply(HostOffer offer) {
               return offer.offer;
             }
           });
@@ -266,7 +268,8 @@ public interface OfferQueue extends EventSubscriber {
           // Currently, the only preference is based on host maintenance status.
           Ordering.explicit(NONE, SCHEDULED, DRAINING, DRAINED)
               .onResultOf(new Function<HostOffer, MaintenanceMode>() {
-                @Override public MaintenanceMode apply(HostOffer offer) {
+                @Override
+                public MaintenanceMode apply(HostOffer offer) {
                   return offer.mode;
                 }
               })

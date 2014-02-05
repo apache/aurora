@@ -151,7 +151,8 @@ public class HistoryPruner implements EventSubscriber {
     // Insert the latest inactive task at the tail.
     tasksByJob.put(jobKey, taskId);
     Runnable runnable = new Runnable() {
-      @Override public void run() {
+      @Override
+      public void run() {
         LOG.info("Pruning expired inactive task " + taskId);
         tasksByJob.remove(jobKey, taskId);
         taskIdToFuture.remove(taskId);

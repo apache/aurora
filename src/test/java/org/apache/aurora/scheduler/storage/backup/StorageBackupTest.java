@@ -65,7 +65,8 @@ public class StorageBackupTest extends EasyMockTest {
     clock = new FakeClock();
     final File backupDir = FileUtils.createTempDir();
     addTearDown(new TearDown() {
-      @Override public void tearDown() throws Exception {
+      @Override
+      public void tearDown() throws Exception {
         org.apache.commons.io.FileUtils.deleteDirectory(backupDir);
       }
     });

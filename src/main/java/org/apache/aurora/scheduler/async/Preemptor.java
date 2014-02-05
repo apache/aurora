@@ -105,7 +105,8 @@ public interface Preemptor {
 
     private static final Function<IAssignedTask, Integer> GET_PRIORITY =
         new Function<IAssignedTask, Integer>() {
-          @Override public Integer apply(IAssignedTask task) {
+          @Override
+          public Integer apply(IAssignedTask task) {
             return task.getTask().getPriority();
           }
         };
@@ -117,7 +118,8 @@ public interface Preemptor {
     private final AtomicLong noSlotsFound = Stats.exportLong("preemptor_no_slots_found");
 
     private final Predicate<IScheduledTask> isIdleTask = new Predicate<IScheduledTask>() {
-      @Override public boolean apply(IScheduledTask task) {
+      @Override
+      public boolean apply(IScheduledTask task) {
         return (clock.nowMillis() - Tasks.getLatestEvent(task).getTimestamp())
             >= preemptionCandidacyDelay.as(Time.MILLISECONDS);
       }
@@ -170,14 +172,16 @@ public interface Preemptor {
 
     private static final Function<IAssignedTask, String> TASK_TO_SLAVE_ID =
         new Function<IAssignedTask, String>() {
-          @Override public String apply(IAssignedTask input) {
+          @Override
+          public String apply(IAssignedTask input) {
             return input.getSlaveId();
           }
         };
 
     private static Predicate<IAssignedTask> canPreempt(final IAssignedTask pending) {
       return new Predicate<IAssignedTask>() {
-        @Override public boolean apply(IAssignedTask possibleVictim) {
+        @Override
+        public boolean apply(IAssignedTask possibleVictim) {
           return preemptionFilter(possibleVictim).apply(pending);
         }
       };
@@ -185,21 +189,24 @@ public interface Preemptor {
 
     private static final Function<IAssignedTask, ResourceSlot> TASK_TO_RESOURCES =
         new Function<IAssignedTask, ResourceSlot>() {
-          @Override public ResourceSlot apply(IAssignedTask input) {
+          @Override
+          public ResourceSlot apply(IAssignedTask input) {
             return ResourceSlot.from(input.getTask());
           }
         };
 
     private static final Function<Offer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
         new Function<Offer, ResourceSlot>() {
-          @Override public ResourceSlot apply(Offer offer) {
+          @Override
+          public ResourceSlot apply(Offer offer) {
             return ResourceSlot.from(offer);
           }
         };
 
     private static final Function<Offer, String> OFFER_TO_HOST =
         new Function<Offer, String>() {
-          @Override public String apply(Offer offer) {
+          @Override
+          public String apply(Offer offer) {
             return offer.getHostname();
           }
         };
@@ -278,7 +285,8 @@ public interface Preemptor {
 
     private static final Function<Offer, String> OFFER_TO_SLAVE_ID =
         new Function<Offer, String>() {
-          @Override public String apply(Offer offer) {
+          @Override
+          public String apply(Offer offer) {
             return offer.getSlaveId().getValue();
           }
         };
@@ -379,7 +387,8 @@ public interface Preemptor {
 
     private static Predicate<IAssignedTask> isOwnedBy(final String role) {
       return new Predicate<IAssignedTask>() {
-        @Override public boolean apply(IAssignedTask task) {
+        @Override
+        public boolean apply(IAssignedTask task) {
           return getRole(task).equals(role);
         }
       };
@@ -391,7 +400,8 @@ public interface Preemptor {
 
     private static Predicate<Integer> greaterThan(final int value) {
       return new Predicate<Integer>() {
-        @Override public boolean apply(Integer input) {
+        @Override
+        public boolean apply(Integer input) {
           return input > value;
         }
       };

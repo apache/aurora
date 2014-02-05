@@ -178,31 +178,38 @@ public class LogStorage extends ForwardingStore
   private StreamTransaction transaction = null;
 
   private final MutableStoreProvider logStoreProvider = new MutableStoreProvider() {
-    @Override public SchedulerStore.Mutable getSchedulerStore() {
+    @Override
+    public SchedulerStore.Mutable getSchedulerStore() {
       return LogStorage.this;
     }
 
-    @Override public JobStore.Mutable getJobStore() {
+    @Override
+    public JobStore.Mutable getJobStore() {
       return LogStorage.this;
     }
 
-    @Override public TaskStore getTaskStore() {
+    @Override
+    public TaskStore getTaskStore() {
       return LogStorage.this;
     }
 
-    @Override public TaskStore.Mutable getUnsafeTaskStore() {
+    @Override
+    public TaskStore.Mutable getUnsafeTaskStore() {
       return LogStorage.this;
     }
 
-    @Override public LockStore.Mutable getLockStore() {
+    @Override
+    public LockStore.Mutable getLockStore() {
       return LogStorage.this;
     }
 
-    @Override public QuotaStore.Mutable getQuotaStore() {
+    @Override
+    public QuotaStore.Mutable getQuotaStore() {
       return LogStorage.this;
     }
 
-    @Override public AttributeStore.Mutable getAttributeStore() {
+    @Override
+    public AttributeStore.Mutable getAttributeStore() {
       return LogStorage.this;
     }
   };
@@ -296,7 +303,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public synchronized void start(final MutateWork.NoResult.Quiet initializationLogic) {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         // Must have the underlying storage started so we can query it for the last checkpoint.
         // We replay these entries in the forwarded storage system's transactions but not ours - we
         // do not want to re-record these ops to the log.
@@ -321,7 +329,8 @@ public class LogStorage extends ForwardingStore
   void recover() throws RecoveryFailedException {
     try {
       streamManager.readFromBeginning(new Closure<LogEntry>() {
-        @Override public void execute(LogEntry logEntry) {
+        @Override
+        public void execute(LogEntry logEntry) {
           replay(logEntry);
         }
       });
@@ -424,7 +433,8 @@ public class LogStorage extends ForwardingStore
   private void scheduleSnapshots() {
     if (snapshotInterval.getValue() > 0) {
       schedulingService.doEvery(snapshotInterval, new Runnable() {
-        @Override public void run() {
+        @Override
+        public void run() {
           try {
             snapshot();
           } catch (StorageException e) {
@@ -449,7 +459,8 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_snapshot")
   void doSnapshot() throws CodingException, InvalidPositionException, StreamAccessException {
     super.write(new MutateWork.NoResult<CodingException>() {
-      @Override protected void execute(MutableStoreProvider unused)
+      @Override
+      protected void execute(MutableStoreProvider unused)
           throws CodingException, InvalidPositionException, StreamAccessException {
 
         persist(snapshotStore.createSnapshot());
@@ -479,7 +490,8 @@ public class LogStorage extends ForwardingStore
     // store provider so any mutations performed by work get logged.
     if (transaction != null) {
       return super.write(new MutateWork<T, E>() {
-        @Override public T apply(MutableStoreProvider unused) throws E {
+        @Override
+        public T apply(MutableStoreProvider unused) throws E {
           return work.apply(logStoreProvider);
         }
       });
@@ -488,7 +500,8 @@ public class LogStorage extends ForwardingStore
     transaction = streamManager.startTransaction();
     try {
       return super.write(new MutateWork<T, E>() {
-        @Override public T apply(MutableStoreProvider unused) throws E {
+        @Override
+        public T apply(MutableStoreProvider unused) throws E {
           T result = work.apply(logStoreProvider);
           try {
             transaction.commit();
@@ -511,7 +524,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public void saveFrameworkId(final String frameworkId) {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         log(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
         LogStorage.super.saveFrameworkId(frameworkId);
       }
@@ -522,7 +536,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public void saveAcceptedJob(final String managerId, final IJobConfiguration jobConfig) {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         log(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())));
         LogStorage.super.saveAcceptedJob(managerId, jobConfig);
       }
@@ -535,7 +550,8 @@ public class LogStorage extends ForwardingStore
     checkNotNull(jobKey);
 
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         log(Op.removeJob(new RemoveJob().setJobKey(jobKey.newBuilder())));
         LogStorage.super.removeJob(jobKey);
       }
@@ -546,7 +562,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public void saveTasks(final Set<IScheduledTask> newTasks) throws IllegalStateException {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(newTasks))));
         LogStorage.super.saveTasks(newTasks);
       }
@@ -556,7 +573,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public void deleteAllTasks() {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         Query.Builder query = Query.unscoped();
         Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
             .transform(Tasks.SCHEDULED_TO_ID)
@@ -570,7 +588,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public void deleteTasks(final Set<String> taskIds) {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         log(Op.removeTasks(new RemoveTasks(taskIds)));
         LogStorage.super.deleteTasks(taskIds);
       }
@@ -584,7 +603,8 @@ public class LogStorage extends ForwardingStore
       final Function<IScheduledTask, IScheduledTask> mutator) {
 
     return write(new MutateWork.Quiet<ImmutableSet<IScheduledTask>>() {
-      @Override public ImmutableSet<IScheduledTask> apply(MutableStoreProvider unused) {
+      @Override
+      public ImmutableSet<IScheduledTask> apply(MutableStoreProvider unused) {
         ImmutableSet<IScheduledTask> mutated = LogStorage.super.mutateTasks(query, mutator);
 
         Map<String, IScheduledTask> tasksById = Tasks.mapById(mutated);
@@ -604,7 +624,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public boolean unsafeModifyInPlace(final String taskId, final ITaskConfig taskConfiguration) {
     return write(new MutateWork.Quiet<Boolean>() {
-      @Override public Boolean apply(MutableStoreProvider storeProvider) {
+      @Override
+      public Boolean apply(MutableStoreProvider storeProvider) {
         boolean mutated = LogStorage.super.unsafeModifyInPlace(taskId, taskConfiguration);
         if (mutated) {
           log(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration.newBuilder())));
@@ -618,7 +639,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public void removeQuota(final String role) {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         log(Op.removeQuota(new RemoveQuota(role)));
         LogStorage.super.removeQuota(role);
       }
@@ -629,7 +651,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public void saveQuota(final String role, final IQuota quota) {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         log(Op.saveQuota(new SaveQuota(role, quota.newBuilder())));
         LogStorage.super.saveQuota(role, quota);
       }
@@ -640,7 +663,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public void saveHostAttributes(final HostAttributes attrs) {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         // Pass the updated attributes upstream, and then check if the stored value changes.
         // We do this since different parts of the system write partial HostAttributes objects
         // and they are merged together internally.
@@ -660,7 +684,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public void saveLock(final ILock lock) {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         log(Op.saveLock(new SaveLock(lock.newBuilder())));
         LogStorage.super.saveLock(lock);
       }
@@ -671,7 +696,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public void removeLock(final ILockKey lockKey) {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         log(Op.removeLock(new RemoveLock(lockKey.newBuilder())));
         LogStorage.super.removeLock(lockKey);
       }
@@ -681,7 +707,8 @@ public class LogStorage extends ForwardingStore
   @Override
   public boolean setMaintenanceMode(final String host, final MaintenanceMode mode) {
     write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider unused) {
+      @Override
+      protected void execute(MutableStoreProvider unused) {
         Optional<HostAttributes> saved = LogStorage.super.getHostAttributes(host);
         if (saved.isPresent()) {
           HostAttributes attributes = saved.get().setMode(mode);

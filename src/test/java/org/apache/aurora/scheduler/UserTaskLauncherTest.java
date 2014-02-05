@@ -185,7 +185,8 @@ public class UserTaskLauncherTest extends EasyMockTest {
 
     Ranges portRanges = Ranges.newBuilder()
         .addAllRange(Iterables.transform(ports, new Function<Pair<Integer, Integer>, Range>() {
-          @Override public Range apply(Pair<Integer, Integer> range) {
+          @Override
+          public Range apply(Pair<Integer, Integer> range) {
             return Range.newBuilder().setBegin(range.getFirst()).setEnd(range.getSecond()).build();
           }
         }))

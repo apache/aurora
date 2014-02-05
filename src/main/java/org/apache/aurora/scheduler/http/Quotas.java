@@ -59,7 +59,8 @@ public class Quotas {
   @Produces(MediaType.APPLICATION_JSON)
   public Response getOffers(@QueryParam("role") final String role) {
     return storage.weaklyConsistentRead(new Work.Quiet<Response>() {
-      @Override public Response apply(StoreProvider storeProvider) {
+      @Override
+      public Response apply(StoreProvider storeProvider) {
         Map<String, IQuota> quotas;
         if (role == null) {
           quotas = storeProvider.getQuotaStore().fetchQuotas();
@@ -78,7 +79,8 @@ public class Quotas {
   }
 
   private static final Function<IQuota, QuotaBean> TO_BEAN = new Function<IQuota, QuotaBean>() {
-    @Override public QuotaBean apply(IQuota quota) {
+    @Override
+    public QuotaBean apply(IQuota quota) {
       return new QuotaBean(quota.getNumCpus(), quota.getRamMb(), quota.getDiskMb());
     }
   };

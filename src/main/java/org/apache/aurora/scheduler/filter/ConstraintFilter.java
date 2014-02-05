@@ -122,7 +122,8 @@ class ConstraintFilter implements Function<IConstraint, Optional<Veto>> {
       this.attributeName = attributeName;
     }
 
-    @Override public boolean apply(Attribute attribute) {
+    @Override
+    public boolean apply(Attribute attribute) {
       return attributeName.equals(attribute.getName());
     }
   }

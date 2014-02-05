@@ -60,7 +60,8 @@ public class Resources {
 
   private static final Function<Range, Set<Integer>> RANGE_TO_MEMBERS =
       new Function<Range, Set<Integer>>() {
-        @Override public Set<Integer> apply(Range range) {
+        @Override
+        public Set<Integer> apply(Range range) {
           return ContiguousSet.create(
               com.google.common.collect.Range.closed((int) range.getBegin(), (int) range.getEnd()),
               DiscreteDomain.integers());
@@ -267,7 +268,8 @@ public class Resources {
 
   private static Predicate<Resource> withName(final String name) {
     return new Predicate<Resource>() {
-      @Override public boolean apply(Resource resource) {
+      @Override
+      public boolean apply(Resource resource) {
         return resource.getName().equals(name);
       }
     };
@@ -296,7 +298,8 @@ public class Resources {
 
   private static final Function<com.google.common.collect.Range<Integer>, Range> RANGE_TRANSFORM =
       new Function<com.google.common.collect.Range<Integer>, Range>() {
-        @Override public Range apply(com.google.common.collect.Range<Integer> input) {
+        @Override
+        public Range apply(com.google.common.collect.Range<Integer> input) {
           return Range.newBuilder()
               .setBegin(input.lowerEndpoint())
               .setEnd(input.upperEndpoint())
@@ -401,7 +404,8 @@ public class Resources {
    * or equal to the other.
    */
   public static final Ordering<Resources> RESOURCE_ORDER = new Ordering<Resources>() {
-    @Override public int compare(Resources left, Resources right) {
+    @Override
+    public int compare(Resources left, Resources right) {
       int diskC = left.getDisk().compareTo(right.getDisk());
       int ramC = left.getRam().compareTo(right.getRam());
       int portC = Integer.compare(left.getNumPorts(), right.getNumPorts());
@@ -427,19 +431,22 @@ public class Resources {
   };
 
   private static final Predicate<Integer> IS_POSITIVE = new Predicate<Integer>() {
-    @Override public boolean apply(Integer input) {
+    @Override
+    public boolean apply(Integer input) {
       return input > 0;
     }
   };
 
   private static final Predicate<Integer> IS_NEGATIVE = new Predicate<Integer>() {
-    @Override public boolean apply(Integer input) {
+    @Override
+    public boolean apply(Integer input) {
       return input < 0;
     }
   };
 
   private static final Predicate<Integer> IS_ZERO = new Predicate<Integer>() {
-    @Override public boolean apply(Integer input) {
+    @Override
+    public boolean apply(Integer input) {
       return input == 0;
     }
   };

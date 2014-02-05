@@ -70,7 +70,8 @@ public class ThriftIT extends EasyMockTest {
   private QuotaManager quotaManager;
 
   private final SessionValidator validator = new SessionValidator() {
-    @Override public SessionContext checkAuthenticated(
+    @Override
+    public SessionContext checkAuthenticated(
         SessionKey sessionKey,
         Set<String> targetRoles) throws AuthFailedException {
 
@@ -83,7 +84,8 @@ public class ThriftIT extends EasyMockTest {
       return context;
     }
 
-    @Override public String toString(SessionKey sessionKey) {
+    @Override
+    public String toString(SessionKey sessionKey) {
       return "test";
     }
   };
@@ -95,7 +97,8 @@ public class ThriftIT extends EasyMockTest {
       this.validator = validator;
     }
 
-    @Override public SessionContext checkAuthorized(
+    @Override
+    public SessionContext checkAuthorized(
         SessionKey sessionKey,
         Capability capability,
         AuditCheck check)
@@ -106,7 +109,8 @@ public class ThriftIT extends EasyMockTest {
           ImmutableSet.of(CAPABILITIES.get(capability)));
     }
 
-    @Override public SessionContext checkAuthenticated(
+    @Override
+    public SessionContext checkAuthenticated(
         SessionKey sessionKey,
         Set<String> targetRoles)
         throws AuthFailedException {
@@ -114,7 +118,8 @@ public class ThriftIT extends EasyMockTest {
       return validator.checkAuthenticated(sessionKey, targetRoles);
     }
 
-    @Override public String toString(SessionKey sessionKey) {
+    @Override
+    public String toString(SessionKey sessionKey) {
       return validator.toString(sessionKey);
     }
   }
@@ -137,7 +142,8 @@ public class ThriftIT extends EasyMockTest {
             return mock;
           }
 
-          @Override protected void configure() {
+          @Override
+          protected void configure() {
             bindMock(CronScheduler.class);
             bindMock(MaintenanceController.class);
             bindMock(Recovery.class);

@@ -142,7 +142,8 @@ interface TaskScheduler extends EventSubscriber {
         final IScheduledTask task) {
 
       return new Function<Offer, Optional<TaskInfo>>() {
-        @Override public Optional<TaskInfo> apply(Offer offer) {
+        @Override
+        public Optional<TaskInfo> apply(Offer offer) {
           Optional<String> reservedTaskId = reservations.getSlaveReservation(offer.getSlaveId());
           if (reservedTaskId.isPresent()) {
             if (taskId.equals(reservedTaskId.get())) {
@@ -174,7 +175,8 @@ interface TaskScheduler extends EventSubscriber {
 
     private CachedJobState getJobState(final TaskStore store, final IJobKey jobKey) {
       return new CachedJobState(Suppliers.memoize(new Supplier<ImmutableSet<IScheduledTask>>() {
-        @Override public ImmutableSet<IScheduledTask> get() {
+        @Override
+        public ImmutableSet<IScheduledTask> get() {
           return store.fetchTasks(activeJobStateQuery(jobKey));
         }
       }));
@@ -186,7 +188,8 @@ interface TaskScheduler extends EventSubscriber {
       scheduleAttemptsFired.incrementAndGet();
       try {
         return storage.write(new MutateWork.Quiet<TaskSchedulerResult>() {
-          @Override public TaskSchedulerResult apply(MutableStoreProvider store) {
+          @Override
+          public TaskSchedulerResult apply(MutableStoreProvider store) {
             LOG.fine("Attempting to schedule task " + taskId);
             final IScheduledTask task = Iterables.getOnlyElement(
                 store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
@@ -253,13 +256,15 @@ interface TaskScheduler extends EventSubscriber {
         this.reservations = CacheBuilder.newBuilder()
             .expireAfterWrite(duration.as(Time.MINUTES), TimeUnit.MINUTES)
             .ticker(new Ticker() {
-              @Override public long read() {
+              @Override
+              public long read() {
                 return clock.nowNanos();
               }
             })
             .build();
         Stats.export(new StatImpl<Long>("reservation_cache_size") {
-          @Override public Long read() {
+          @Override
+          public Long read() {
             return reservations.size();
           }
         });

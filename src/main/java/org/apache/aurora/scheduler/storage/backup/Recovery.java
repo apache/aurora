@@ -129,11 +129,13 @@ public interface Recovery {
       this.shutDownNow = checkNotNull(shutDownNow);
     }
 
-    @Override public Set<String> listBackups() {
+    @Override
+    public Set<String> listBackups() {
       return ImmutableSet.<String>builder().add(backupDir.list()).build();
     }
 
-    @Override public void stage(String backupName) throws RecoveryException {
+    @Override
+    public void stage(String backupName) throws RecoveryException {
       File backupFile = new File(backupDir, backupName);
       if (!backupFile.exists()) {
         throw new RecoveryException("Backup " + backupName + " does not exist.");
@@ -162,19 +164,23 @@ public interface Recovery {
       return loaded;
     }
 
-    @Override public Set<IScheduledTask> query(Query.Builder query) throws RecoveryException {
+    @Override
+    public Set<IScheduledTask> query(Query.Builder query) throws RecoveryException {
       return getLoadedRecovery().query(query);
     }
 
-    @Override public void deleteTasks(Query.Builder query) throws RecoveryException {
+    @Override
+    public void deleteTasks(Query.Builder query) throws RecoveryException {
       getLoadedRecovery().delete(query);
     }
 
-    @Override public void unload() {
+    @Override
+    public void unload() {
       recovery.set(null);
     }
 
-    @Override public void commit() throws RecoveryException {
+    @Override
+    public void commit() throws RecoveryException {
       getLoadedRecovery().commit();
     }
 
@@ -187,7 +193,8 @@ public interface Recovery {
 
       void commit() {
         primaryStorage.write(new MutateWork.NoResult.Quiet() {
-          @Override protected void execute(MutableStoreProvider storeProvider) {
+          @Override
+          protected void execute(MutableStoreProvider storeProvider) {
             try {
               distributedStore.persist(tempStorage.toSnapshot());
               shutDownNow.execute();

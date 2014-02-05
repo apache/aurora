@@ -62,37 +62,45 @@ public class MemStorage implements Storage {
       final AttributeStore.Mutable attributeStore) {
 
     storeProvider = new MutableStoreProvider() {
-      @Override public SchedulerStore.Mutable getSchedulerStore() {
+      @Override
+      public SchedulerStore.Mutable getSchedulerStore() {
         return schedulerStore;
       }
 
-      @Override public JobStore.Mutable getJobStore() {
+      @Override
+      public JobStore.Mutable getJobStore() {
         return jobStore;
       }
 
-      @Override public TaskStore getTaskStore() {
+      @Override
+      public TaskStore getTaskStore() {
         return taskStore;
       }
 
-      @Override public TaskStore.Mutable getUnsafeTaskStore() {
+      @Override
+      public TaskStore.Mutable getUnsafeTaskStore() {
         return taskStore;
       }
 
-      @Override public LockStore.Mutable getLockStore() {
+      @Override
+      public LockStore.Mutable getLockStore() {
         return lockStore;
       }
 
-      @Override public QuotaStore.Mutable getQuotaStore() {
+      @Override
+      public QuotaStore.Mutable getQuotaStore() {
         return quotaStore;
       }
 
-      @Override public AttributeStore.Mutable getAttributeStore() {
+      @Override
+      public AttributeStore.Mutable getAttributeStore() {
         return attributeStore;
       }
     };
 
     Stats.export(new StatImpl<Integer>("storage_lock_threads_waiting") {
-      @Override public Integer read() {
+      @Override
+      public Integer read() {
         return lockManager.getQueueLength();
       }
     });

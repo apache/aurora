@@ -63,20 +63,23 @@ public class Offers {
 
   private static final Function<ExecutorID, String> EXECUTOR_ID_TOSTRING =
       new Function<ExecutorID, String>() {
-        @Override public String apply(ExecutorID id) {
+        @Override
+        public String apply(ExecutorID id) {
           return id.getValue();
         }
       };
 
   private static final Function<Range, Object> RANGE_TO_BEAN = new Function<Range, Object>() {
-    @Override public Object apply(Range range) {
+    @Override
+    public Object apply(Range range) {
       return range.getBegin() + "-" + range.getEnd();
     }
   };
 
   private static final Function<Attribute, Object> ATTRIBUTE_TO_BEAN =
       new Function<Attribute, Object>() {
-        @Override public Object apply(Attribute attr) {
+        @Override
+        public Object apply(Attribute attr) {
           ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
           builder.put("name", attr.getName());
           if (attr.hasScalar()) {
@@ -97,7 +100,8 @@ public class Offers {
 
   private static final Function<Resource, Object> RESOURCE_TO_BEAN =
       new Function<Resource, Object>() {
-        @Override public Object apply(Resource resource) {
+        @Override
+        public Object apply(Resource resource) {
           ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
           builder.put("name", resource.getName());
           if (resource.hasScalar()) {
@@ -119,7 +123,8 @@ public class Offers {
 
   private static final Function<Offer, Map<String, ?>> TO_BEAN =
       new Function<Offer, Map<String, ?>>() {
-        @Override public Map<String, ?> apply(Offer offer) {
+        @Override
+        public Map<String, ?> apply(Offer offer) {
           return ImmutableMap.<String, Object>builder()
               .put("id", offer.getId().getValue())
               .put("framework_id", offer.getFrameworkId().getValue())

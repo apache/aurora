@@ -53,7 +53,8 @@ public class LeaderRedirectTest extends EasyMockTest {
 
   private static final Function<HostAndPort, ServiceInstance> CREATE_INSTANCE =
       new Function<HostAndPort, ServiceInstance>() {
-        @Override public ServiceInstance apply(HostAndPort endpoint) {
+        @Override
+        public ServiceInstance apply(HostAndPort endpoint) {
           return new ServiceInstance()
               .setAdditionalEndpoints(ImmutableMap.of(HTTP_PORT_NAME,
                   new Endpoint(endpoint.getHostText(), endpoint.getPort())));
@@ -70,7 +71,8 @@ public class LeaderRedirectTest extends EasyMockTest {
         createMock(new Clazz<DynamicHostSet<ServiceInstance>>() { });
 
     ServiceRunner fakeRunner = new ServiceRunner() {
-      @Override public LocalService launch() {
+      @Override
+      public LocalService launch() {
         return LocalService.auxiliaryService(HTTP_PORT_NAME, HTTP_PORT, Commands.NOOP);
       }
     };

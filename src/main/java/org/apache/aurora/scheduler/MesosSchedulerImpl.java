@@ -114,7 +114,8 @@ class MesosSchedulerImpl implements Scheduler {
     LOG.info("Registered with ID " + frameworkId + ", master: " + masterInfo);
 
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getSchedulerStore().saveFrameworkId(frameworkId.getValue());
       }
     });
@@ -152,7 +153,8 @@ class MesosSchedulerImpl implements Scheduler {
     //                asynchronously and augment the task scheduler to skip over offers when the
     //                host attributes cannot be found. (AURORA-116)
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         for (final Offer offer : offers) {
           storeProvider.getAttributeStore().saveHostAttributes(Conversions.getAttributes(offer));
         }

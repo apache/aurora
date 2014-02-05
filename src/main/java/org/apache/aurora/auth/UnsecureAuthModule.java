@@ -44,7 +44,8 @@ public class UnsecureAuthModule extends AbstractModule {
         throws AuthFailedException {
 
       return new SessionContext() {
-        @Override public String getIdentity() {
+        @Override
+        public String getIdentity() {
           return UNSECURE;
         }
       };
@@ -62,7 +63,8 @@ public class UnsecureAuthModule extends AbstractModule {
         throws AuthFailedException {
 
       return new SessionContext() {
-        @Override public String getIdentity() {
+        @Override
+        public String getIdentity() {
           return UNSECURE;
         }
       };
@@ -73,7 +75,8 @@ public class UnsecureAuthModule extends AbstractModule {
         throws AuthFailedException {
 
       return new SessionContext() {
-        @Override public String getIdentity() {
+        @Override
+        public String getIdentity() {
           return UNSECURE;
         }
       };

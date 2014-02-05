@@ -32,7 +32,8 @@ public final class Protobufs {
    * Function to call {@link #toString(Message)} on message objects.
    */
   public static final Function<Message, String> SHORT_TOSTRING = new Function<Message, String>() {
-    @Override public String apply(Message message) {
+    @Override
+    public String apply(Message message) {
       return Protobufs.toString(message);
     }
   };

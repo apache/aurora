@@ -151,7 +151,8 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
 
     private static final Function<Log.Entry, LogEntry> MESOS_ENTRY_TO_ENTRY =
         new Function<Log.Entry, LogEntry>() {
-          @Override public LogEntry apply(Log.Entry entry) {
+          @Override
+          public LogEntry apply(Log.Entry entry) {
             return new LogEntry(entry);
           }
         };
@@ -278,7 +279,8 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       Preconditions.checkNotNull(contents);
 
       Log.Position position = mutate(append, new Mutation<Log.Position>() {
-        @Override public Log.Position apply(WriterInterface logWriter)
+        @Override
+        public Log.Position apply(WriterInterface logWriter)
             throws TimeoutException, Log.WriterFailedException {
           return logWriter.append(contents, writeTimeout, writeTimeUnit);
         }
@@ -295,7 +297,8 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
 
       final Log.Position before = ((LogPosition) position).unwrap();
       mutate(truncate, new Mutation<Void>() {
-        @Override public Void apply(WriterInterface logWriter)
+        @Override
+        public Void apply(WriterInterface logWriter)
             throws TimeoutException, Log.WriterFailedException {
           logWriter.truncate(before, writeTimeout, writeTimeUnit);
           return null;
@@ -356,7 +359,8 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
         return underlying;
       }
 
-      @Override public int compareTo(Position o) {
+      @Override
+      public int compareTo(Position o) {
         Preconditions.checkArgument(o instanceof LogPosition);
         return underlying.compareTo(((LogPosition) o).underlying);
       }

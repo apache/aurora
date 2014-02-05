@@ -155,7 +155,8 @@ public class LogStorageTest extends EasyMockTest {
     // supplied initialization logic.
     final AtomicBoolean initialized = new AtomicBoolean(false);
     MutateWork.NoResult.Quiet initializationLogic = new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider provider) {
+      @Override
+      protected void execute(MutableStoreProvider provider) {
         // Creating a mock and expecting apply(storeProvider) does not work here for whatever
         // reason.
         initialized.set(true);
@@ -165,7 +166,8 @@ public class LogStorageTest extends EasyMockTest {
     final Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
     storageUtil.storage.write(capture(recoverAndInitializeWork));
     expectLastCall().andAnswer(new IAnswer<Void>() {
-      @Override public Void answer() throws Throwable {
+      @Override
+      public Void answer() throws Throwable {
         recoverAndInitializeWork.getValue().apply(storageUtil.mutableStoreProvider);
         return null;
       }
@@ -186,7 +188,8 @@ public class LogStorageTest extends EasyMockTest {
     final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
     expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
         new IAnswer<Void>() {
-          @Override public Void answer() {
+          @Override
+          public Void answer() {
             recoveryWork.getValue().apply(storageUtil.mutableStoreProvider);
             return null;
           }
@@ -197,7 +200,8 @@ public class LogStorageTest extends EasyMockTest {
     final Capture<MutateWork<Void, RuntimeException>> initializationWork = createCapture();
     expect(storageUtil.storage.write(capture(initializationWork))).andAnswer(
         new IAnswer<Void>() {
-          @Override public Void answer() {
+          @Override
+          public Void answer() {
             initializationWork.getValue().apply(storageUtil.mutableStoreProvider);
             return null;
           }
@@ -218,7 +222,8 @@ public class LogStorageTest extends EasyMockTest {
     final Capture<MutateWork<Void, RuntimeException>> snapshotWork = createCapture();
     expect(storageUtil.storage.write(capture(snapshotWork))).andAnswer(
         new IAnswer<Void>() {
-          @Override public Void answer() {
+          @Override
+          public Void answer() {
             snapshotWork.getValue().apply(storageUtil.mutableStoreProvider);
             return null;
           }
@@ -245,7 +250,8 @@ public class LogStorageTest extends EasyMockTest {
     MutationFixture() {
       // Prevent otherwise silent noop tests that forget to call run().
       addTearDown(new TearDown() {
-        @Override public void tearDown() {
+        @Override
+        public void tearDown() {
           assertTrue(runCalled.get());
         }
       });
@@ -269,7 +275,8 @@ public class LogStorageTest extends EasyMockTest {
       final Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
       storageUtil.storage.write(capture(recoverAndInitializeWork));
       expectLastCall().andAnswer(new IAnswer<Void>() {
-        @Override public Void answer() throws Throwable {
+        @Override
+        public Void answer() throws Throwable {
           recoverAndInitializeWork.getValue().apply(storageUtil.mutableStoreProvider);
           return null;
         }
@@ -279,7 +286,8 @@ public class LogStorageTest extends EasyMockTest {
       final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
       expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
           new IAnswer<Void>() {
-            @Override public Void answer() {
+            @Override
+            public Void answer() {
               recoveryWork.getValue().apply(storageUtil.mutableStoreProvider);
               return null;
             }
@@ -309,14 +317,16 @@ public class LogStorageTest extends EasyMockTest {
   public void testSaveFrameworkId() throws Exception {
     final String frameworkId = "bob";
     new MutationFixture() {
-      @Override protected void setupExpectations() throws CodingException {
+      @Override
+      protected void setupExpectations() throws CodingException {
         storageUtil.expectOperations();
         storageUtil.schedulerStore.saveFrameworkId(frameworkId);
         streamMatcher.expectTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)))
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.saveFrameworkId(frameworkId);
       }
     }.run();
@@ -328,7 +338,8 @@ public class LogStorageTest extends EasyMockTest {
         IJobConfiguration.build(new JobConfiguration().setKey(new JobKey("owner", "env", "jake")));
     final String managerId = "CRON";
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.jobStore.saveAcceptedJob(managerId, jobConfig);
         streamMatcher.expectTransaction(
@@ -336,7 +347,8 @@ public class LogStorageTest extends EasyMockTest {
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.saveAcceptedJob(managerId, jobConfig);
       }
     }.run();
@@ -346,7 +358,8 @@ public class LogStorageTest extends EasyMockTest {
   public void testRemoveJob() throws Exception {
     final IJobKey jobKey = JobKeys.from("role", "env", "name");
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.jobStore.removeJob(jobKey);
         streamMatcher.expectTransaction(
@@ -354,7 +367,8 @@ public class LogStorageTest extends EasyMockTest {
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.removeJob(jobKey);
       }
     }.run();
@@ -364,7 +378,8 @@ public class LogStorageTest extends EasyMockTest {
   public void testSaveTasks() throws Exception {
     final Set<IScheduledTask> tasks = ImmutableSet.of(task("a", ScheduleStatus.INIT));
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.taskStore.saveTasks(tasks);
         streamMatcher.expectTransaction(
@@ -372,7 +387,8 @@ public class LogStorageTest extends EasyMockTest {
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.saveTasks(tasks);
       }
     }.run();
@@ -385,7 +401,8 @@ public class LogStorageTest extends EasyMockTest {
     final ImmutableSet<IScheduledTask> mutated =
         ImmutableSet.of(task("a", ScheduleStatus.STARTING));
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         expect(storageUtil.taskStore.mutateTasks(query, mutation)).andReturn(mutated);
         streamMatcher.expectTransaction(
@@ -393,7 +410,8 @@ public class LogStorageTest extends EasyMockTest {
             .andReturn(null);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         assertEquals(mutated, logStorage.mutateTasks(query, mutation));
       }
     }.run();
@@ -406,7 +424,8 @@ public class LogStorageTest extends EasyMockTest {
     final ITaskConfig updatedConfig =
         task(taskId, ScheduleStatus.RUNNING).getAssignedTask().getTask();
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         expect(storageUtil.taskStore.unsafeModifyInPlace(taskId2, updatedConfig)).andReturn(false);
         expect(storageUtil.taskStore.unsafeModifyInPlace(taskId, updatedConfig)).andReturn(true);
@@ -415,7 +434,8 @@ public class LogStorageTest extends EasyMockTest {
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.unsafeModifyInPlace(taskId2, updatedConfig);
         logStorage.unsafeModifyInPlace(taskId, updatedConfig);
       }
@@ -431,7 +451,8 @@ public class LogStorageTest extends EasyMockTest {
     final ImmutableSet<String> tasksToRemove = ImmutableSet.of("b");
 
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         expect(storageUtil.taskStore.mutateTasks(query, mutation)).andReturn(mutated);
 
@@ -443,12 +464,15 @@ public class LogStorageTest extends EasyMockTest {
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.write(new MutateWork.NoResult.Quiet() {
-          @Override protected void execute(MutableStoreProvider provider) {
+          @Override
+          protected void execute(MutableStoreProvider provider) {
             assertEquals(mutated, provider.getUnsafeTaskStore().mutateTasks(query, mutation));
             logStorage.write(new MutateWork.NoResult.Quiet() {
-              @Override protected void execute(MutableStoreProvider innerProvider) {
+              @Override
+              protected void execute(MutableStoreProvider innerProvider) {
                 innerProvider.getUnsafeTaskStore().deleteTasks(tasksToRemove);
               }
             });
@@ -466,7 +490,8 @@ public class LogStorageTest extends EasyMockTest {
     final ImmutableSet<IScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.PENDING));
 
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.taskStore.saveTasks(saved);
 
@@ -479,9 +504,11 @@ public class LogStorageTest extends EasyMockTest {
             .andReturn(null);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.write(new MutateWork.NoResult.Quiet() {
-          @Override protected void execute(MutableStoreProvider provider) {
+          @Override
+          protected void execute(MutableStoreProvider provider) {
             logStorage.saveTasks(saved);
             assertEquals(mutated, logStorage.mutateTasks(query, mutation));
           }
@@ -498,7 +525,8 @@ public class LogStorageTest extends EasyMockTest {
     final ImmutableSet<IScheduledTask> mutated = ImmutableSet.of(task("a", ScheduleStatus.PENDING));
 
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.taskStore.saveTasks(saved);
 
@@ -515,9 +543,11 @@ public class LogStorageTest extends EasyMockTest {
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.write(new MutateWork.NoResult.Quiet() {
-          @Override protected void execute(MutableStoreProvider provider) {
+          @Override
+          protected void execute(MutableStoreProvider provider) {
             logStorage.saveTasks(saved);
             assertEquals(mutated, logStorage.mutateTasks(query, mutation));
           }
@@ -531,7 +561,8 @@ public class LogStorageTest extends EasyMockTest {
     final IScheduledTask task = task("a", ScheduleStatus.FINISHED);
     final Set<String> taskIds = Tasks.ids(task);
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(ImmutableSet.of(task));
         storageUtil.taskStore.deleteTasks(taskIds);
@@ -539,7 +570,8 @@ public class LogStorageTest extends EasyMockTest {
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.deleteAllTasks();
       }
     }.run();
@@ -549,14 +581,16 @@ public class LogStorageTest extends EasyMockTest {
   public void testRemoveTasksIds() throws Exception {
     final Set<String> taskIds = ImmutableSet.of("42");
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.taskStore.deleteTasks(taskIds);
         streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.deleteTasks(taskIds);
       }
     }.run();
@@ -567,14 +601,16 @@ public class LogStorageTest extends EasyMockTest {
     final String role = "role";
     final IQuota quota = IQuota.build(new Quota(1.0, 128L, 1024L));
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.quotaStore.saveQuota(role, quota);
         streamMatcher.expectTransaction(Op.saveQuota(new SaveQuota(role, quota.newBuilder())))
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.saveQuota(role, quota);
       }
     }.run();
@@ -584,13 +620,15 @@ public class LogStorageTest extends EasyMockTest {
   public void testRemoveQuota() throws Exception {
     final String role = "role";
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.quotaStore.removeQuota(role);
         streamMatcher.expectTransaction(Op.removeQuota(new RemoveQuota(role))).andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.removeQuota(role);
       }
     }.run();
@@ -604,14 +642,16 @@ public class LogStorageTest extends EasyMockTest {
         .setUser("testUser")
         .setTimestampMs(12345L));
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.lockStore.saveLock(lock);
         streamMatcher.expectTransaction(Op.saveLock(new SaveLock(lock.newBuilder())))
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.saveLock(lock);
       }
     }.run();
@@ -622,14 +662,16 @@ public class LogStorageTest extends EasyMockTest {
     final ILockKey lockKey =
         ILockKey.build(LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()));
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         storageUtil.lockStore.removeLock(lockKey);
         streamMatcher.expectTransaction(Op.removeLock(new RemoveLock(lockKey.newBuilder())))
             .andReturn(position);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.removeLock(lockKey);
       }
     }.run();
@@ -645,7 +687,8 @@ public class LogStorageTest extends EasyMockTest {
         .setAttributes(attributes));
 
     new MutationFixture() {
-      @Override protected void setupExpectations() throws Exception {
+      @Override
+      protected void setupExpectations() throws Exception {
         storageUtil.expectOperations();
         expect(storageUtil.attributeStore.getHostAttributes(host))
             .andReturn(Optional.<HostAttributes>absent());
@@ -664,7 +707,8 @@ public class LogStorageTest extends EasyMockTest {
         expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
       }
 
-      @Override protected void performMutations() {
+      @Override
+      protected void performMutations() {
         logStorage.saveHostAttributes(hostAttributes.get());
         assertEquals(hostAttributes, logStorage.getHostAttributes(host));
         logStorage.saveHostAttributes(hostAttributes.get());

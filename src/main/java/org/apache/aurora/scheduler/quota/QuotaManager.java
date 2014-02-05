@@ -96,7 +96,8 @@ public interface QuotaManager {
       }
 
       storage.write(new Storage.MutateWork.NoResult.Quiet() {
-        @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
+        @Override
+        protected void execute(Storage.MutableStoreProvider storeProvider) {
           storeProvider.getQuotaStore().saveQuota(ownerRole, quota);
         }
       });
@@ -105,7 +106,8 @@ public interface QuotaManager {
     @Override
     public QuotaInfo getQuotaInfo(final String role) {
       return storage.consistentRead(new Work.Quiet<QuotaInfo>() {
-        @Override public QuotaInfo apply(StoreProvider storeProvider) {
+        @Override
+        public QuotaInfo apply(StoreProvider storeProvider) {
           FluentIterable<ITaskConfig> tasks = FluentIterable
               .from(storeProvider.getTaskStore().fetchTasks(Query.roleScoped(role).active()))
               .transform(Tasks.SCHEDULED_TO_INFO);

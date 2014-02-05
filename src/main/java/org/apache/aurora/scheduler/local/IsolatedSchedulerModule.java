@@ -110,7 +110,8 @@ public class IsolatedSchedulerModule extends AbstractModule {
 
     private final AtomicLong offerId = new AtomicLong();
     private final Function<FakeSlave, Offer> slaveToOffer = new Function<FakeSlave, Offer>() {
-      @Override public Offer apply(FakeSlave slave) {
+      @Override
+      public Offer apply(FakeSlave slave) {
         return slave.makeOffer(offerId.incrementAndGet());
       }
     };
@@ -137,7 +138,8 @@ public class IsolatedSchedulerModule extends AbstractModule {
           1,
           new ThreadFactoryBuilder().setDaemon(true).setNameFormat("TaskScheduler-%d").build()) {
 
-        @Override protected void afterExecute(Runnable runnable, @Nullable Throwable throwable) {
+        @Override
+        protected void afterExecute(Runnable runnable, @Nullable Throwable throwable) {
           if (throwable != null) {
             LOG.log(Level.WARNING, "Error: " + throwable, throwable);
           } else if (runnable instanceof Future) {
@@ -152,7 +154,8 @@ public class IsolatedSchedulerModule extends AbstractModule {
       };
       Stats.exportSize("schedule_queue_size", executor.getQueue());
       shutdownRegistry.addAction(new Command() {
-        @Override public void execute() {
+        @Override
+        public void execute() {
           new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
         }
       });
@@ -161,7 +164,8 @@ public class IsolatedSchedulerModule extends AbstractModule {
 
     private void offerClusterResources() {
       executor.submit(new Runnable() {
-        @Override public void run() {
+        @Override
+        public void run() {
           scheduler.get().resourceOffers(
               driver,
               FluentIterable.from(cluster).transform(slaveToOffer).toList());
@@ -171,7 +175,8 @@ public class IsolatedSchedulerModule extends AbstractModule {
 
     private void setQuotas() {
       executor.submit(new Runnable() {
-        @Override public void run() {
+        @Override
+        public void run() {
           try {
             thrift.setQuota(
                 "mesos",
@@ -187,7 +192,8 @@ public class IsolatedSchedulerModule extends AbstractModule {
     @Subscribe
     public void registered(DriverRegistered event) {
       executor.submit(new Runnable() {
-        @Override public void run() {
+        @Override
+        public void run() {
           Identity mesosUser = new Identity("mesos", "mesos");
           for (int i = 0; i < 20; i++) {
             JobConfiguration service = createJob("serviceJob" + i, mesosUser);
@@ -220,7 +226,8 @@ public class IsolatedSchedulerModule extends AbstractModule {
 
     private void moveTaskToState(final String taskId, final TaskState state, long delaySeconds) {
       Runnable changeState = new Runnable() {
-        @Override public void run() {
+        @Override
+        public void run() {
           scheduler.get().statusUpdate(
               driver,
               TaskStatus.newBuilder()

@@ -129,9 +129,8 @@ class SchedulerCoreImpl implements SchedulerCore {
       throws ScheduleException {
 
     storage.write(new MutateWork.NoResult<ScheduleException>() {
-      @Override protected void execute(MutableStoreProvider storeProvider)
-          throws ScheduleException {
-
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) throws ScheduleException {
         final IJobConfiguration job = sanitizedConfiguration.getJobConfig();
         if (hasActiveJob(job)) {
           throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
@@ -209,9 +208,8 @@ class SchedulerCoreImpl implements SchedulerCore {
       final ITaskConfig config) throws ScheduleException {
 
     storage.write(new MutateWork.NoResult<ScheduleException>() {
-      @Override protected void execute(MutableStoreProvider storeProvider)
-          throws ScheduleException {
-
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) throws ScheduleException {
         validateTaskLimits(config, instanceIds.size());
 
         ImmutableSet<IScheduledTask> tasks =
@@ -249,7 +247,8 @@ class SchedulerCoreImpl implements SchedulerCore {
    */
   private static Predicate<JobManager> managerHasJob(final IJobConfiguration job) {
     return new Predicate<JobManager>() {
-      @Override public boolean apply(JobManager manager) {
+      @Override
+      public boolean apply(JobManager manager) {
         return manager.hasJob(job.getKey());
       }
     };
@@ -293,7 +292,8 @@ class SchedulerCoreImpl implements SchedulerCore {
         : query;
 
     int tasksAffected = storage.write(new MutateWork.Quiet<Integer>() {
-      @Override public Integer apply(MutableStoreProvider storeProvider) {
+      @Override
+      public Integer apply(MutableStoreProvider storeProvider) {
         int total = 0;
         for (String taskId : Tasks.ids(storeProvider.getTaskStore().fetchTasks(taskQuery))) {
           boolean changed = stateManager.changeState(
@@ -331,9 +331,8 @@ class SchedulerCoreImpl implements SchedulerCore {
 
     final Query.Builder query = Query.instanceScoped(jobKey, shards).active();
     storage.write(new MutateWork.NoResult<ScheduleException>() {
-      @Override protected void execute(MutableStoreProvider storeProvider)
-          throws ScheduleException {
-
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) throws ScheduleException {
         Set<IScheduledTask> matchingTasks = storeProvider.getTaskStore().fetchTasks(query);
         if (matchingTasks.size() != shards.size()) {
           throw new ScheduleException("Not all requested shards are active.");

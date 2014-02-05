@@ -35,7 +35,8 @@ final class AttributeFilter {
 
   private static final Function<Attribute, Set<String>> GET_VALUES =
       new Function<Attribute, Set<String>>() {
-        @Override public Set<String> apply(Attribute attribute) {
+        @Override
+        public Set<String> apply(Attribute attribute) {
           return attribute.getValues();
         }
       };
@@ -73,7 +74,8 @@ final class AttributeFilter {
       final AttributeLoader attributeFetcher) {
 
     Predicate<IScheduledTask> hasAttribute = new Predicate<IScheduledTask>() {
-      @Override public boolean apply(IScheduledTask task) {
+      @Override
+      public boolean apply(IScheduledTask task) {
         Iterable<Attribute> hostAttributes =
             attributeFetcher.apply(task.getAssignedTask().getSlaveHost());
         return Iterables.any(hostAttributes, Predicates.in(attributes));

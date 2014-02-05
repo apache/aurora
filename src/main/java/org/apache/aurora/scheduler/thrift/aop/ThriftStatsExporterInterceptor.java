@@ -33,7 +33,8 @@ class ThriftStatsExporterInterceptor implements MethodInterceptor {
 
   private final LoadingCache<Method, SlidingStats> stats =
       CacheBuilder.newBuilder().build(new CacheLoader<Method, SlidingStats>() {
-        @Override public SlidingStats load(Method method) {
+        @Override
+        public SlidingStats load(Method method) {
           return new SlidingStats(
               Stats.normalizeName(String.format("scheduler_thrift_%s", method.getName())),
               "nanos");

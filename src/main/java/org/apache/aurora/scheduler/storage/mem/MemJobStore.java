@@ -41,7 +41,8 @@ class MemJobStore implements JobStore.Mutable {
 
   private final LoadingCache<String, Manager> managers = CacheBuilder.newBuilder()
       .build(new CacheLoader<String, Manager>() {
-        @Override public Manager load(String key) {
+        @Override
+        public Manager load(String key) {
           return new Manager();
         }
       });

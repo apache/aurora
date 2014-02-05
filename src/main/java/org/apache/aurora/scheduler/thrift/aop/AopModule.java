@@ -77,7 +77,8 @@ public class AopModule extends AbstractModule {
   }
 
   private static final Function<Method, String> GET_NAME = new Function<Method, String>() {
-    @Override public String apply(Method method) {
+    @Override
+    public String apply(Method method) {
       return method.getName();
     }
   };
@@ -104,7 +105,8 @@ public class AopModule extends AbstractModule {
         authInterceptor);
 
     install(new PrivateModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         // Ensure that the provided methods exist on the decorated interface.
         List<Method> methods =
             ImmutableList.copyOf(AuroraSchedulerManager.Iface.class.getMethods());

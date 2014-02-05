@@ -141,7 +141,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
   public void mySetUp() throws Exception {
     control = createControl();
     addTearDown(new TearDown() {
-      @Override public void tearDown() {
+      @Override
+      public void tearDown() {
         if (mainException.get().isPresent()) {
           RuntimeException e = mainException.get().get();
           LOG.log(Level.SEVERE, "Scheduler main exited with an exception", e);
@@ -152,7 +153,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
     });
     backupDir = FileUtils.createTempDir();
     addTearDown(new TearDown() {
-      @Override public void tearDown() throws Exception {
+      @Override
+      public void tearDown() throws Exception {
         org.apache.commons.io.FileUtils.deleteDirectory(backupDir);
       }
     });
@@ -170,20 +172,21 @@ public class SchedulerIT extends BaseZooKeeperTest {
     zkClient = createZkClient();
 
     Module testModule = new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         bind(DriverFactory.class).toInstance(driverFactory);
         bind(Log.class).toInstance(log);
         bind(ThriftConfiguration.class).toInstance(
             new ThriftConfiguration() {
-              @Override public Optional<? extends InputStream> getSslKeyStream()
-                  throws IOException {
-
+              @Override
+              public Optional<? extends InputStream> getSslKeyStream() throws IOException {
                 return Optional.of(
                     com.google.common.io.Resources.getResource(getClass(), "AuroraTestKeyStore")
                         .openStream());
               }
 
-              @Override public int getServingPort() {
+              @Override
+              public int getServingPort() {
                 return 0;
               }
             }
@@ -214,7 +217,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
     // Mimic AppLauncher running main.
     final SchedulerMain main = injector.getInstance(SchedulerMain.class);
     executor.submit(new Runnable() {
-      @Override public void run() {
+      @Override
+      public void run() {
         try {
           main.run();
         } catch (RuntimeException e) {
@@ -224,7 +228,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
       }
     });
     addTearDown(new TearDown() {
-      @Override public void tearDown() throws Exception {
+      @Override
+      public void tearDown() throws Exception {
         lifecycle.shutdown();
         new ExecutorServiceShutdown(executor, Amount.of(10L, Time.SECONDS)).execute();
       }
@@ -233,12 +238,14 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
   private HostAndPort awaitSchedulerReady() throws Exception {
     return executor.submit(new Callable<HostAndPort>() {
-      @Override public HostAndPort call() throws Exception {
+      @Override
+      public HostAndPort call() throws Exception {
         final AtomicReference<HostAndPort> thriftEndpoint = Atomics.newReference();
         ServerSet schedulerService = new ServerSetImpl(zkClient, SERVERSET_PATH);
         final CountDownLatch schedulerReady = new CountDownLatch(1);
         schedulerService.watch(new HostChangeMonitor<ServiceInstance>() {
-          @Override public void onChange(ImmutableSet<ServiceInstance> hostSet) {
+          @Override
+          public void onChange(ImmutableSet<ServiceInstance> hostSet) {
             if (!hostSet.isEmpty()) {
               Endpoint endpoint = Iterables.getOnlyElement(hostSet).getServiceEndpoint();
               thriftEndpoint.set(HostAndPort.fromParts(endpoint.getHost(), endpoint.getPort()));
@@ -262,7 +269,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
       this.pos = pos;
     }
 
-    @Override public int compareTo(Position position) {
+    @Override
+    public int compareTo(Position position) {
       return pos - ((IntPosition) position).pos;
     }
   }
@@ -273,9 +281,11 @@ public class SchedulerIT extends BaseZooKeeperTest {
   private Iterable<Entry> toEntries(LogEntry... entries) {
     return Iterables.transform(Arrays.asList(entries),
         new Function<LogEntry, Entry>() {
-          @Override public Entry apply(final LogEntry entry) {
+          @Override
+          public Entry apply(final LogEntry entry) {
             return new Entry() {
-              @Override public byte[] contents() {
+              @Override
+              public byte[] contents() {
                 try {
                   return entrySerializer.serialize(entry)[0];
                 } catch (CodingException e) {
@@ -329,7 +339,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
     final CountDownLatch driverStarted = new CountDownLatch(1);
     expect(driver.start()).andAnswer(new IAnswer<Status>() {
-      @Override public Status answer() {
+      @Override
+      public Status answer() {
         driverStarted.countDown();
         return Status.DRIVER_RUNNING;
       }
@@ -338,13 +349,15 @@ public class SchedulerIT extends BaseZooKeeperTest {
     // Try to be a good test suite citizen by releasing the blocked thread when the test case exits.
     final CountDownLatch testCompleted = new CountDownLatch(1);
     expect(driver.join()).andAnswer(new IAnswer<Status>() {
-      @Override public Status answer() throws Throwable {
+      @Override
+      public Status answer() throws Throwable {
         testCompleted.await();
         return Status.DRIVER_STOPPED;
       }
     });
     addTearDown(new TearDown() {
-      @Override public void tearDown() {
+      @Override
+      public void tearDown() {
         testCompleted.countDown();
       }
     });

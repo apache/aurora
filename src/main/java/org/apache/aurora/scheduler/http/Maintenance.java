@@ -60,7 +60,8 @@ public class Maintenance {
   @Produces(MediaType.APPLICATION_JSON)
   public Response getHosts() {
     return storage.weaklyConsistentRead(new Work.Quiet<Response>() {
-      @Override public Response apply(StoreProvider storeProvider) {
+      @Override
+      public Response apply(StoreProvider storeProvider) {
         Multimap<MaintenanceMode, String> hostsByMode =
             Multimaps.transformValues(
               Multimaps.index(storeProvider.getAttributeStore().getHostAttributes(), GET_MODE),
@@ -87,14 +88,16 @@ public class Maintenance {
 
   private static final Function<HostAttributes, String> HOST_NAME =
       new Function<HostAttributes, String>() {
-        @Override public String apply(HostAttributes attributes) {
+        @Override
+        public String apply(HostAttributes attributes) {
           return attributes.getHost();
         }
       };
 
   private static final Function<HostAttributes, MaintenanceMode> GET_MODE =
       new Function<HostAttributes, MaintenanceMode>() {
-        @Override public MaintenanceMode apply(HostAttributes attrs) {
+        @Override
+        public MaintenanceMode apply(HostAttributes attrs) {
           return attrs.getMode();
         }
       };

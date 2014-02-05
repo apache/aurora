@@ -78,7 +78,8 @@ public class ServletModule extends AbstractModule {
         }
       }
 
-      @Override protected void configureServlets() {
+      @Override
+      protected void configureServlets() {
         bind(HttpStatsFilter.class).in(Singleton.class);
         filter("/scheduler*").through(HttpStatsFilter.class);
         // Servlets may assign a special meaning to trailing /, but this confuses AngularJS's
@@ -244,7 +245,8 @@ public class ServletModule extends AbstractModule {
       this.redirector = Preconditions.checkNotNull(redirector);
     }
 
-    @Override public void execute() throws MonitorException {
+    @Override
+    public void execute() throws MonitorException {
       redirector.monitor();
     }
   }

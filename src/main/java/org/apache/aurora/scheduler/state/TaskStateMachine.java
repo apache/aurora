@@ -132,7 +132,8 @@ class TaskStateMachine {
 
     final Closure<Transition<ScheduleStatus>> manageRestartingTask =
         new Closure<Transition<ScheduleStatus>>() {
-          @Override public void execute(Transition<ScheduleStatus> transition) {
+          @Override
+          public void execute(Transition<ScheduleStatus> transition) {
             switch (transition.getTo()) {
               case ASSIGNED:
                 addFollowup(KILL);
@@ -175,7 +176,8 @@ class TaskStateMachine {
 
     // To be called on a task transitioning into the FINISHED state.
     final Command rescheduleIfService = new Command() {
-      @Override public void execute() {
+      @Override
+      public void execute() {
         if (task.get().getAssignedTask().getTask().isIsService()) {
           addFollowup(RESCHEDULE);
         }
@@ -184,7 +186,8 @@ class TaskStateMachine {
 
     // To be called on a task transitioning into the FAILED state.
     final Command incrementFailuresMaybeReschedule = new Command() {
-      @Override public void execute() {
+      @Override
+      public void execute() {
         addFollowup(INCREMENT_FAILURES);
 
         // Max failures is ignored for service task.
@@ -225,7 +228,8 @@ class TaskStateMachine {
                     KILLING, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<ScheduleStatus>>() {
-                      @Override public void execute(Transition<ScheduleStatus> transition) {
+                      @Override
+                      public void execute(Transition<ScheduleStatus> transition) {
                         switch (transition.getTo()) {
                           case FINISHED:
                             rescheduleIfService.execute();
@@ -267,7 +271,8 @@ class TaskStateMachine {
                 .to(RUNNING, FINISHED, FAILED, RESTARTING, KILLING, KILLED, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<ScheduleStatus>>() {
-                      @Override public void execute(Transition<ScheduleStatus> transition) {
+                      @Override
+                      public void execute(Transition<ScheduleStatus> transition) {
                         switch (transition.getTo()) {
                           case FINISHED:
                             rescheduleIfService.execute();
@@ -314,7 +319,8 @@ class TaskStateMachine {
                 .to(FINISHED, RESTARTING, FAILED, KILLING, KILLED, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<ScheduleStatus>>() {
-                      @Override public void execute(Transition<ScheduleStatus> transition) {
+                      @Override
+                      public void execute(Transition<ScheduleStatus> transition) {
                         switch (transition.getTo()) {
                           case FINISHED:
                             rescheduleIfService.execute();
@@ -390,7 +396,8 @@ class TaskStateMachine {
         // must be the last chained transition callback.
         .onAnyTransition(
             new Closure<Transition<ScheduleStatus>>() {
-              @Override public void execute(final Transition<ScheduleStatus> transition) {
+              @Override
+              public void execute(final Transition<ScheduleStatus> transition) {
                 if (transition.isValidStateChange()) {
                   ScheduleStatus from = transition.getFrom();
                   ScheduleStatus to = transition.getTo();
@@ -437,7 +444,8 @@ class TaskStateMachine {
 
   private Closure<Transition<ScheduleStatus>> addFollowupClosure(final Action action) {
     return new Closure<Transition<ScheduleStatus>>() {
-      @Override public void execute(Transition<ScheduleStatus> item) {
+      @Override
+      public void execute(Transition<ScheduleStatus> item) {
         addFollowup(action);
       }
     };

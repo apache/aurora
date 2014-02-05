@@ -54,7 +54,8 @@ class LockManagerImpl implements LockManager {
   @Override
   public ILock acquireLock(final ILockKey lockKey, final String user) throws LockException {
     return storage.write(new MutateWork<ILock, LockException>() {
-      @Override public ILock apply(Storage.MutableStoreProvider storeProvider)
+      @Override
+      public ILock apply(Storage.MutableStoreProvider storeProvider)
           throws LockException {
 
         LockStore.Mutable lockStore = storeProvider.getLockStore();
@@ -83,7 +84,8 @@ class LockManagerImpl implements LockManager {
   @Override
   public void releaseLock(final ILock lock) {
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override public void execute(MutableStoreProvider storeProvider) {
+      @Override
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getLockStore().removeLock(lock.getKey());
       }
     });
@@ -94,7 +96,8 @@ class LockManagerImpl implements LockManager {
       throws LockException {
 
     Optional<ILock> stored = storage.consistentRead(new Work.Quiet<Optional<ILock>>() {
-      @Override public Optional<ILock> apply(StoreProvider storeProvider) {
+      @Override
+      public Optional<ILock> apply(StoreProvider storeProvider) {
         return storeProvider.getLockStore().fetchLock(context);
       }
     });

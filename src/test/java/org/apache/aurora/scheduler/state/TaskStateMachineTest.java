@@ -229,7 +229,8 @@ public class TaskStateMachineTest {
 
   private static final Function<Action, SideEffect> TO_SIDE_EFFECT =
       new Function<Action, SideEffect>() {
-        @Override public SideEffect apply(Action action) {
+        @Override
+        public SideEffect apply(Action action) {
           return new SideEffect(action, Optional.<ScheduleStatus>absent());
         }
       };

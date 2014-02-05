@@ -96,7 +96,8 @@ class SlotSizeCounter implements Runnable {
 
   private int countSlots(Iterable<IQuota> slots, final IQuota slotSize) {
     Function<IQuota, Integer> counter = new Function<IQuota, Integer>() {
-      @Override public Integer apply(IQuota machineSlack) {
+      @Override
+      public Integer apply(IQuota machineSlack) {
         return Quotas.divide(machineSlack, slotSize);
       }
     };

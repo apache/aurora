@@ -38,7 +38,8 @@ public final class DisplayUtils {
 
   static final Ordering<Job> JOB_ORDERING = Ordering.natural().onResultOf(
       new Function<Job, String>() {
-        @Override public String apply(Job job) {
+        @Override
+        public String apply(Job job) {
           return job.getName();
         }
       });

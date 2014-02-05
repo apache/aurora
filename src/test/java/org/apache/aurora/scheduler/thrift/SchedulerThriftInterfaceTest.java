@@ -159,7 +159,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     // Use guice and install AuthModule to apply AOP-style auth layer.
     Module testModule = new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         bind(Clock.class).toInstance(new FakeClock());
         bind(Storage.class).toInstance(storageUtil.storage);
         bind(SchedulerCore.class).toInstance(scheduler);

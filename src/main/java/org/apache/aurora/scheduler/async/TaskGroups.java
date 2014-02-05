@@ -116,14 +116,16 @@ public class TaskGroups implements EventSubscriber {
     this.rescheduleCalculator = checkNotNull(rescheduleCalculator);
 
     final TaskScheduler ratelLimitedScheduler = new TaskScheduler() {
-      @Override public TaskSchedulerResult schedule(String taskId) {
+      @Override
+      public TaskSchedulerResult schedule(String taskId) {
         rateLimiter.acquire();
         return taskScheduler.schedule(taskId);
       }
     };
 
     groups = CacheBuilder.newBuilder().build(new CacheLoader<GroupKey, TaskGroup>() {
-      @Override public TaskGroup load(GroupKey key) {
+      @Override
+      public TaskGroup load(GroupKey key) {
         TaskGroup group = new TaskGroup(key, taskGroupBackoffStrategy);
         LOG.info("Evaluating group " + key + " in " + group.getPenaltyMs() + " ms");
         startGroup(group, executor, ratelLimitedScheduler);
@@ -146,7 +148,8 @@ public class TaskGroups implements EventSubscriber {
       final TaskScheduler taskScheduler) {
 
     Runnable monitor = new Runnable() {
-      @Override public void run() {
+      @Override
+      public void run() {
         GroupState state = group.isReady(clock.nowMillis());
 
         switch (state) {
@@ -194,7 +197,8 @@ public class TaskGroups implements EventSubscriber {
         new ThreadFactoryBuilder().setDaemon(true).setNameFormat("TaskScheduler-%d").build());
     Stats.exportSize("schedule_queue_size", executor.getQueue());
     shutdownRegistry.addAction(new Command() {
-      @Override public void execute() {
+      @Override
+      public void execute() {
         new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
       }
     });

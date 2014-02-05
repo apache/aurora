@@ -122,13 +122,15 @@ public class StateManagerImpl implements StateManager {
     // Done outside the write transaction to minimize the work done inside a transaction.
     final Set<IScheduledTask> scheduledTasks = FluentIterable.from(tasks.entrySet())
         .transform(new Function<Entry<Integer, ITaskConfig>, IScheduledTask>() {
-          @Override public IScheduledTask apply(Entry<Integer, ITaskConfig> entry) {
+          @Override
+          public IScheduledTask apply(Entry<Integer, ITaskConfig> entry) {
             return createTask(entry.getKey(), entry.getValue());
           }
         }).toSet();
 
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(scheduledTasks);
 
         for (IScheduledTask task : scheduledTasks) {
@@ -165,7 +167,8 @@ public class StateManagerImpl implements StateManager {
     checkNotNull(assignedPorts);
 
     return storage.write(new MutateWork.Quiet<IAssignedTask>() {
-      @Override public IAssignedTask apply(MutableStoreProvider storeProvider) {
+      @Override
+      public IAssignedTask apply(MutableStoreProvider storeProvider) {
         boolean success = updateTaskAndExternalState(
             Optional.<ScheduleStatus>absent(),
             taskId,
@@ -226,7 +229,8 @@ public class StateManagerImpl implements StateManager {
   @VisibleForTesting
   static final Supplier<String> LOCAL_HOST_SUPPLIER = Suppliers.memoize(
       new Supplier<String>() {
-        @Override public String get() {
+        @Override
+        public String get() {
           try {
             return InetAddress.getLocalHost().getHostName();
           } catch (UnknownHostException e) {
@@ -243,7 +247,8 @@ public class StateManagerImpl implements StateManager {
       final Optional<String> transitionMessage) {
 
     return storage.write(new MutateWork.Quiet<Boolean>() {
-      @Override public Boolean apply(MutableStoreProvider storeProvider) {
+      @Override
+      public Boolean apply(MutableStoreProvider storeProvider) {
         Optional<IScheduledTask> task = Optional.fromNullable(Iterables.getOnlyElement(
             storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskId)),
             null));
@@ -262,7 +267,8 @@ public class StateManagerImpl implements StateManager {
 
   private static final Function<SideEffect, Action> GET_ACTION =
       new Function<SideEffect, Action>() {
-        @Override public Action apply(SideEffect sideEffect) {
+        @Override
+        public Action apply(SideEffect sideEffect) {
           return sideEffect.getAction();
         }
       };
@@ -309,7 +315,8 @@ public class StateManagerImpl implements StateManager {
         : new TaskStateMachine(taskId);
 
     boolean success = storage.write(new MutateWork.Quiet<Boolean>() {
-      @Override public Boolean apply(MutableStoreProvider storeProvider) {
+      @Override
+      public Boolean apply(MutableStoreProvider storeProvider) {
         TransitionResult result = stateMachine.updateState(targetState);
         Query.Builder query = Query.taskScoped(taskId);
 
@@ -320,7 +327,8 @@ public class StateManagerImpl implements StateManager {
           switch (sideEffect.getAction()) {
             case INCREMENT_FAILURES:
               storeProvider.getUnsafeTaskStore().mutateTasks(query, new TaskMutation() {
-                @Override public IScheduledTask apply(IScheduledTask task) {
+                @Override
+                public IScheduledTask apply(IScheduledTask task) {
                   return IScheduledTask.build(
                       task.newBuilder().setFailureCount(task.getFailureCount() + 1));
                 }
@@ -333,7 +341,8 @@ public class StateManagerImpl implements StateManager {
                   "Operation expected task " + taskId + " to be present.");
 
               storeProvider.getUnsafeTaskStore().mutateTasks(query, new TaskMutation() {
-                @Override public IScheduledTask apply(IScheduledTask task) {
+                @Override
+                public IScheduledTask apply(IScheduledTask task) {
                   ScheduledTask mutableTask = task.newBuilder();
                   mutableTask.setStatus(stateMachine.getState());
                   mutableTask.addToTaskEvents(new TaskEvent()
@@ -426,7 +435,8 @@ public class StateManagerImpl implements StateManager {
   @Override
   public void deleteTasks(final Set<String> taskIds) {
     storage.write(new MutateWork.NoResult.Quiet() {
-      @Override protected void execute(final MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(final MutableStoreProvider storeProvider) {
         eventSink.post(deleteTasks(storeProvider, taskIds));
       }
     });

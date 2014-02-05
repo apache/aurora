@@ -129,7 +129,8 @@ public interface StorageBackup {
       lastBackupMs = clock.nowMillis();
     }
 
-    @Override public Snapshot createSnapshot() {
+    @Override
+    public Snapshot createSnapshot() {
       Snapshot snapshot = delegate.createSnapshot();
       if (clock.nowMillis() >= (lastBackupMs + backupIntervalMs)) {
         save(snapshot);
@@ -137,7 +138,8 @@ public interface StorageBackup {
       return snapshot;
     }
 
-    @Override public void backupNow() {
+    @Override
+    public void backupNow() {
       save(delegate.createSnapshot());
     }
 
@@ -189,14 +191,16 @@ public interface StorageBackup {
     }
 
     private static final FilenameFilter BACKUP_FILTER = new FilenameFilter() {
-      @Override public boolean accept(File file, String s) {
+      @Override
+      public boolean accept(File file, String s) {
         return s.startsWith(FILE_PREFIX);
       }
     };
 
     @VisibleForTesting
     static final Function<File, String> FILE_NAME = new Function<File, String>() {
-      @Override public String apply(File file) {
+      @Override
+      public String apply(File file) {
         return file.getName();
       }
     };

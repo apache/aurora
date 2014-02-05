@@ -48,7 +48,8 @@ public class FeatureToggleInterceptorTest extends EasyMockTest {
     realThrift = createMock(AuroraAdmin.Iface.class);
     predicate = createMock(new Clazz<Predicate<Method>>() { });
     Injector injector = Guice.createInjector(new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         MockDecoratedThrift.bindForwardedMock(binder(), realThrift);
         bind(new TypeLiteral<Predicate<Method>>() { }).toInstance(predicate);
         AopModule.bindThriftDecorator(

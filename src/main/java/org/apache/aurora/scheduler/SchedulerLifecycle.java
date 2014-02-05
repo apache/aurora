@@ -101,7 +101,8 @@ public class SchedulerLifecycle implements EventSubscriber {
   }
 
   private static final Predicate<Transition<State>> IS_DEAD = new Predicate<Transition<State>>() {
-    @Override public boolean apply(Transition<State> state) {
+    @Override
+    public boolean apply(Transition<State> state) {
       return state.getTo() == State.DEAD;
     }
   };
@@ -208,37 +209,43 @@ public class SchedulerLifecycle implements EventSubscriber {
     checkNotNull(eventSink);
 
     Stats.export(new StatImpl<Integer>("framework_registered") {
-      @Override public Integer read() {
+      @Override
+      public Integer read() {
         return registrationAcked.get() ? 1 : 0;
       }
     });
     for (final State state : State.values()) {
       Stats.export(new StatImpl<Integer>("scheduler_lifecycle_" + state) {
-        @Override public Integer read() {
+        @Override
+        public Integer read() {
           return (state == stateMachine.getState()) ? 1 : 0;
         }
       });
     }
 
     final Closure<Transition<State>> prepareStorage = new Closure<Transition<State>>() {
-      @Override public void execute(Transition<State> transition) {
+      @Override
+      public void execute(Transition<State> transition) {
         storage.prepare();
         stateMachine.transition(State.STORAGE_PREPARED);
       }
     };
 
     final Closure<Transition<State>> handleLeading = new Closure<Transition<State>>() {
-      @Override public void execute(Transition<State> transition) {
+      @Override
+      public void execute(Transition<State> transition) {
         LOG.info("Elected as leading scheduler!");
         storage.start(new MutateWork.NoResult.Quiet() {
-          @Override protected void execute(MutableStoreProvider storeProvider) {
+          @Override
+          protected void execute(MutableStoreProvider storeProvider) {
             StorageBackfill.backfill(storeProvider, clock);
           }
         });
 
         @Nullable final String frameworkId = storage.consistentRead(
             new Work.Quiet<String>() {
-              @Override public String apply(StoreProvider storeProvider) {
+              @Override
+              public String apply(StoreProvider storeProvider) {
                 return storeProvider.getSchedulerStore().fetchFrameworkId();
               }
             });
@@ -249,7 +256,8 @@ public class SchedulerLifecycle implements EventSubscriber {
 
         delayedActions.onRegistrationTimeout(
             new Runnable() {
-              @Override public void run() {
+              @Override
+              public void run() {
                 if (!registrationAcked.get()) {
                   LOG.severe(
                       "Framework has not been registered within the tolerated delay.");
@@ -260,7 +268,8 @@ public class SchedulerLifecycle implements EventSubscriber {
 
         delayedActions.onAutoFailover(
             new Runnable() {
-              @Override public void run() {
+              @Override
+              public void run() {
                 LOG.info("Triggering automatic failover.");
                 stateMachine.transition(State.DEAD);
               }
@@ -272,11 +281,13 @@ public class SchedulerLifecycle implements EventSubscriber {
     };
 
     final Closure<Transition<State>> handleRegistered = new Closure<Transition<State>>() {
-      @Override public void execute(Transition<State> transition) {
+      @Override
+      public void execute(Transition<State> transition) {
         registrationAcked.set(true);
         driver.initialize(driverRef.get());
         delayedActions.blockingDriverJoin(new Runnable() {
-          @Override public void run() {
+          @Override
+          public void run() {
             // Blocks until driver exits.
             driverRef.get().join();
             stateMachine.transition(State.DEAD);
@@ -309,7 +320,8 @@ public class SchedulerLifecycle implements EventSubscriber {
         // The latter is preferable since it makes it easier to reason about the state of an
         // announced scheduler.
         delayedActions.onRegistered(new Runnable() {
-          @Override public void run() {
+          @Override
+          public void run() {
             eventSink.post(new SchedulerActive());
             try {
               leaderControl.get().advertise();
@@ -328,7 +340,8 @@ public class SchedulerLifecycle implements EventSubscriber {
 
     final Closure<Transition<State>> shutDown = new Closure<Transition<State>>() {
       private final AtomicBoolean invoked = new AtomicBoolean(false);
-      @Override public void execute(Transition<State> transition) {
+      @Override
+      public void execute(Transition<State> transition) {
         if (!invoked.compareAndSet(false, true)) {
           LOG.info("Shutdown already invoked, ignoring extra call.");
           return;
@@ -393,7 +406,8 @@ public class SchedulerLifecycle implements EventSubscriber {
 
   private Closure<Transition<State>> dieOnError(final Closure<Transition<State>> closure) {
     return new Closure<Transition<State>>() {
-      @Override public void execute(Transition<State> transition) {
+      @Override
+      public void execute(Transition<State> transition) {
         try {
           closure.execute(transition);
         } catch (RuntimeException e) {
@@ -433,12 +447,14 @@ public class SchedulerLifecycle implements EventSubscriber {
       this.leaderControl = leaderControl;
     }
 
-    @Override public void onLeading(LeaderControl control) {
+    @Override
+    public void onLeading(LeaderControl control) {
       leaderControl.set(control);
       stateMachine.transition(State.LEADER_AWAITING_REGISTRATION);
     }
 
-    @Override public void onDefeated(@Nullable ServerSet.EndpointStatus status) {
+    @Override
+    public void onDefeated(@Nullable ServerSet.EndpointStatus status) {
       LOG.severe("Lost leadership, committing suicide.");
       stateMachine.transition(State.DEAD);
     }

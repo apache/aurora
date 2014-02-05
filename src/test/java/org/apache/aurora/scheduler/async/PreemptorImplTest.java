@@ -505,7 +505,8 @@ public class PreemptorImplTest extends EasyMockTest {
         EasyMock.<String>anyObject(),
         EasyMock.eq(EMPTY_JOB))).andAnswer(
         new IAnswer<Set<Veto>>() {
-          @Override public Set<Veto> answer() {
+          @Override
+          public Set<Veto> answer() {
             return ImmutableSet.of();
           }
         }

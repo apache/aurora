@@ -39,7 +39,8 @@ final class Util {
    */
   static <T extends TBase<T, ?>> Function<T, T> deepCopier() {
     return new Function<T, T>() {
-      @Override public T apply(@Nullable T input) {
+      @Override
+      public T apply(@Nullable T input) {
         if (input == null) {
           return null;
         }

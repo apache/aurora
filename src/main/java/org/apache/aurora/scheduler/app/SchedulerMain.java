@@ -182,7 +182,8 @@ public class SchedulerMain extends AbstractApplication {
     } else {
       // TODO(Kevin Sweeney): Push these bindings down into a "production" module.
       additional = new AbstractModule() {
-        @Override protected void configure() {
+        @Override
+        protected void configure() {
           bind(DriverFactory.class).to(DriverFactoryImpl.class);
           bind(DriverFactoryImpl.class).in(Singleton.class);
           install(new MesosLogStreamModule(zkClientConfig));
@@ -191,9 +192,11 @@ public class SchedulerMain extends AbstractApplication {
     }
 
     Module configModule = new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         bind(ThriftConfiguration.class).toInstance(new ThriftConfiguration() {
-          @Override public Optional<InputStream> getSslKeyStream() throws FileNotFoundException {
+          @Override
+          public Optional<InputStream> getSslKeyStream() throws FileNotFoundException {
             if (MESOS_SSL_KEY_FILE.hasAppliedValue()) {
               return Optional.<InputStream>of(new FileInputStream(MESOS_SSL_KEY_FILE.get()));
             } else {
@@ -201,7 +204,8 @@ public class SchedulerMain extends AbstractApplication {
             }
           }
 
-          @Override public int getServingPort() {
+          @Override
+          public int getServingPort() {
             return THRIFT_PORT.get();
           }
         });

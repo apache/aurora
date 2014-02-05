@@ -63,7 +63,8 @@ class TaskVars implements EventSubscriber {
     this.storage = checkNotNull(storage);
     checkNotNull(statProvider);
     counters = CacheBuilder.newBuilder().build(new CacheLoader<String, Counter>() {
-      @Override public Counter load(String statName) {
+      @Override
+      public Counter load(String statName) {
         Counter counter = new Counter(statProvider);
         if (exporting) {
           counter.exportAs(statName);
@@ -84,13 +85,15 @@ class TaskVars implements EventSubscriber {
   }
 
   private static final Predicate<Attribute> IS_RACK = new Predicate<Attribute>() {
-    @Override public boolean apply(Attribute attr) {
+    @Override
+    public boolean apply(Attribute attr) {
       return "rack".equals(attr.getName());
     }
   };
 
   private static final Function<Attribute, String> ATTR_VALUE = new Function<Attribute, String>() {
-    @Override public String apply(Attribute attr) {
+    @Override
+    public String apply(Attribute attr) {
       return Iterables.getOnlyElement(attr.getValues());
     }
   };
@@ -120,7 +123,8 @@ class TaskVars implements EventSubscriber {
     if (stateChange.getNewState() == ScheduleStatus.LOST) {
       final String host = stateChange.getTask().getAssignedTask().getSlaveHost();
       Optional<String> rack = storage.consistentRead(new Work.Quiet<Optional<String>>() {
-        @Override public Optional<String> apply(StoreProvider storeProvider) {
+        @Override
+        public Optional<String> apply(StoreProvider storeProvider) {
           Optional<Attribute> rack = FluentIterable
               .from(AttributeStore.Util.attributesOrNone(storeProvider, host))
               .firstMatch(IS_RACK);

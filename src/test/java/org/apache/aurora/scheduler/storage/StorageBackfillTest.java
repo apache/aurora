@@ -54,7 +54,8 @@ public class StorageBackfillTest {
         IScheduledTask.build(makeTask(taskId).newBuilder().setStatus(ScheduleStatus.DRAINING));
 
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override protected void execute(Storage.MutableStoreProvider storeProvider) {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(savedTask));
         StorageBackfill.backfill(storeProvider, clock);
       }

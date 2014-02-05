@@ -120,7 +120,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     eventSink = createMock(EventSink.class);
 
     Injector injector = Guice.createInjector(new AbstractModule() {
-      @Override protected void configure() {
+      @Override
+      protected void configure() {
         bind(Storage.class).toInstance(storageUtil.storage);
         bind(SchedulerCore.class).toInstance(createMock(SchedulerCore.class));
         bind(Lifecycle.class).toInstance(lifecycle);
@@ -144,7 +145,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test
   public void testNoOffers() throws Exception {
     new RegisteredFixture() {
-      @Override void test() {
+      @Override
+      void test() {
         scheduler.resourceOffers(driver, ImmutableList.<Offer>of());
       }
     }.run();
@@ -153,7 +155,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test
   public void testNoAccepts() throws Exception {
     new OfferFixture() {
-      @Override void respondToOffer() throws Exception {
+      @Override
+      void respondToOffer() throws Exception {
         expectOfferAttributesSaved(OFFER);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
         expect(userLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
@@ -164,7 +167,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test
   public void testOfferFirstAccepts() throws Exception {
     new OfferFixture() {
-      @Override void respondToOffer() throws Exception {
+      @Override
+      void respondToOffer() throws Exception {
         expectOfferAttributesSaved(OFFER);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
         expectLaunch(TASK);
@@ -175,7 +179,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test
   public void testOfferSchedulerAccepts() throws Exception {
     new OfferFixture() {
-      @Override void respondToOffer() throws Exception {
+      @Override
+      void respondToOffer() throws Exception {
         expectOfferAttributesSaved(OFFER);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
         expect(userLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
@@ -187,7 +192,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test
   public void testAcceptedExceedsOffer() throws Exception {
     new OfferFixture() {
-      @Override void respondToOffer() throws Exception {
+      @Override
+      void respondToOffer() throws Exception {
         expectOfferAttributesSaved(OFFER);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.of(BIGGER_TASK));
         expect(userLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
@@ -198,7 +204,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test
   public void testStatusUpdateNoAccepts() throws Exception {
     new StatusFixture() {
-      @Override void expectations() throws Exception {
+      @Override
+      void expectations() throws Exception {
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
         expect(userLauncher.statusUpdate(STATUS)).andReturn(false);
       }
@@ -208,7 +215,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test
   public void testStatusUpdateFirstAccepts() throws Exception {
     new StatusFixture() {
-      @Override void expectations() throws Exception {
+      @Override
+      void expectations() throws Exception {
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(true);
       }
     }.run();
@@ -217,7 +225,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test
   public void testStatusUpdateSecondAccepts() throws Exception {
     new StatusFixture() {
-      @Override void expectations() throws Exception {
+      @Override
+      void expectations() throws Exception {
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
         expect(userLauncher.statusUpdate(STATUS)).andReturn(true);
       }
@@ -227,7 +236,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test(expected = SchedulerException.class)
   public void testStatusUpdateFails() throws Exception {
     new StatusFixture() {
-      @Override void expectations() throws Exception {
+      @Override
+      void expectations() throws Exception {
         expect(systemLauncher.statusUpdate(STATUS)).andReturn(false);
         expect(userLauncher.statusUpdate(STATUS)).andThrow(new StorageException("Injected."));
       }
@@ -237,7 +247,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test
   public void testMultipleOffers() throws Exception {
     new RegisteredFixture() {
-      @Override void expectations() throws Exception {
+      @Override
+      void expectations() throws Exception {
         expectOfferAttributesSaved(OFFER);
         expectOfferAttributesSaved(OFFER_2);
         expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
@@ -247,7 +258,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         expect(userLauncher.createTask(OFFER_2)).andReturn(Optional.<TaskInfo>absent());
       }
 
-      @Override void test() {
+      @Override
+      void test() {
         scheduler.resourceOffers(driver, ImmutableList.of(OFFER, OFFER_2));
       }
     }.run();
@@ -256,11 +268,13 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   @Test
   public void testDisconnected() throws Exception {
     new RegisteredFixture() {
-      @Override void expectations() throws Exception {
+      @Override
+      void expectations() throws Exception {
         eventSink.post(new DriverDisconnected());
       }
 
-      @Override void test() {
+      @Override
+      void test() {
         scheduler.disconnected(driver);
       }
     }.run();
@@ -276,7 +290,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     RegisteredFixture() throws Exception {
       // Prevent otherwise silent noop tests that forget to call run().
       addTearDown(new TearDown() {
-        @Override public void tearDown() {
+        @Override
+        public void tearDown() {
           assertTrue(runCalled.get());
         }
       });
@@ -313,11 +328,13 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
     abstract void respondToOffer() throws Exception;
 
-    @Override void expectations() throws Exception {
+    @Override
+    void expectations() throws Exception {
       respondToOffer();
     }
 
-    @Override void test() {
+    @Override
+    void test() {
       scheduler.resourceOffers(driver, ImmutableList.of(OFFER));
     }
   }
@@ -327,7 +344,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       super();
     }
 
-    @Override void test() {
+    @Override
+    void test() {
       scheduler.statusUpdate(driver, STATUS);
     }
   }

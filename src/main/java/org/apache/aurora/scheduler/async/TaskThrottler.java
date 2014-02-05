@@ -72,7 +72,8 @@ class TaskThrottler implements EventSubscriber {
       throttleStats.accumulate(delayMs);
       executor.schedule(
           new Runnable() {
-            @Override public void run() {
+            @Override
+            public void run() {
               stateManager.changeState(
                   stateChange.getTaskId(),
                   Optional.of(THROTTLED),
