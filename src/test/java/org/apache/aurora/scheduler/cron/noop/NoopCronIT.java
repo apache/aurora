@@ -41,8 +41,8 @@ public class NoopCronIT {
 
   @Test
   public void testLifecycle() throws Exception {
-    cronScheduler.start();
-    cronScheduler.stop();
+    cronScheduler.startAsync().awaitRunning();
+    cronScheduler.stopAsync().awaitTerminated();
   }
 
   @Test

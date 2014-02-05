@@ -140,7 +140,8 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Test
   public void testPubsubWiring() throws Exception {
-    cronScheduler.start();
+    expect(cronScheduler.startAsync()).andReturn(cronScheduler);
+    cronScheduler.awaitRunning();
     shutdownRegistry.addAction(EasyMock.<ExceptionalCommand<?>>anyObject());
     expect(storageUtil.jobStore.fetchJobs(MANAGER_KEY))
         .andReturn(ImmutableList.<IJobConfiguration>of());
@@ -352,7 +353,8 @@ public class CronJobManagerTest extends EasyMockTest {
   public void testInvalidStoredJob() throws Exception {
     // Invalid jobs are left alone, but doesn't halt operation.
 
-    cronScheduler.start();
+    expect(cronScheduler.startAsync()).andReturn(cronScheduler);
+    cronScheduler.awaitRunning();
     shutdownRegistry.addAction(EasyMock.<ExceptionalCommand<?>>anyObject());
 
     IJobConfiguration jobA =
@@ -372,7 +374,8 @@ public class CronJobManagerTest extends EasyMockTest {
   public void testJobStoredTwice() throws Exception {
     // Simulate an inconsistent storage that contains two cron jobs under the same key.
 
-    cronScheduler.start();
+    expect(cronScheduler.startAsync()).andReturn(cronScheduler);
+    cronScheduler.awaitRunning();
     shutdownRegistry.addAction(EasyMock.<ExceptionalCommand<?>>anyObject());
 
     IJobConfiguration jobA =

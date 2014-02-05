@@ -18,11 +18,12 @@ package org.apache.aurora.scheduler.cron;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
+import com.google.common.util.concurrent.Service;
 
 /**
  * An execution manager that executes work on a cron schedule.
  */
-public interface CronScheduler {
+public interface CronScheduler extends Service {
   /**
    * Schedules a task on a cron schedule.
    *
@@ -51,26 +52,6 @@ public interface CronScheduler {
    * @throws IllegalStateException If the cron scheduler is not currently running.
    */
   Optional<String> getSchedule(String key) throws IllegalStateException;
-
-  /**
-   * Block until fully initialized. It is an error to call start twice. Prior to calling start,
-   * all other methods of this interface may throw {@link IllegalStateException}. The underlying
-   * implementation should not spawn threads or connect to databases prior to invocation of
-   * {@link #start()}.
-   *
-   * @throws IllegalStateException If called twice.
-   */
-  void start() throws IllegalStateException;
-
-  /**
-   * Block until stopped. Generally this means that underlying resources are freed, threads are
-   * terminated, and any bookkeeping state is persisted. If {@link #stop()} has already been called
-   * by another thread, {@link #stop()} either blocks until completion or returns immediately.
-   *
-   * @throws CronException If there was a problem stopping the scheduler, for example if it was not
-   *                       started.
-   */
-  void stop() throws CronException;
 
   /**
    * Checks to see if the scheduler would be accepted by the underlying scheduler.

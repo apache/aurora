@@ -23,8 +23,8 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.AbstractIdleService;
 
-import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.CronScheduler;
 
 /**
@@ -35,11 +35,21 @@ import org.apache.aurora.scheduler.cron.CronScheduler;
  * This class exists as a short term hack to get around a license compatibility issue - Real
  * Implementation (TM) coming soon.
  */
-class NoopCronScheduler implements CronScheduler {
+class NoopCronScheduler extends AbstractIdleService implements CronScheduler {
   private static final Logger LOG = Logger.getLogger(NoopCronScheduler.class.getName());
 
   // Keep a list of schedules we've seen.
   private final Set<String> schedules = Collections.synchronizedSet(Sets.<String>newHashSet());
+
+  @Override
+  public void startUp() throws Exception {
+    LOG.warning("NO-OP cron scheduler is in use. Cron jobs submitted will not be triggered!");
+  }
+
+  @Override
+  public void shutDown() {
+    // No-op.
+  }
 
   @Override
   public String schedule(String schedule, Runnable task) {
@@ -63,16 +73,6 @@ class NoopCronScheduler implements CronScheduler {
     return schedules.contains(key)
         ? Optional.of(key)
         : Optional.<String>absent();
-  }
-
-  @Override
-  public void start() throws IllegalStateException {
-    LOG.warning("NO-OP cron scheduler is in use. Cron jobs submitted will not be triggered!");
-  }
-
-  @Override
-  public void stop() throws CronException {
-    // No-op.
   }
 
   @Override

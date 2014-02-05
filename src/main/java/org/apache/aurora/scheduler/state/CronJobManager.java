@@ -40,7 +40,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
-import com.twitter.common.base.ExceptionalCommand;
+import com.twitter.common.base.Command;
 import com.twitter.common.base.Supplier;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -165,11 +165,10 @@ public class CronJobManager extends JobManager implements EventSubscriber {
    */
   @Subscribe
   public void schedulerActive(SchedulerActive schedulerActive) {
-    cron.start();
-    shutdownRegistry.addAction(new ExceptionalCommand<CronException>() {
-      @Override
-      public void execute() throws CronException {
-        cron.stop();
+    cron.startAsync().awaitRunning();
+    shutdownRegistry.addAction(new Command() {
+      @Override public void execute() {
+        cron.stopAsync().awaitTerminated();
       }
     });
 

@@ -15,6 +15,7 @@
  */
 package org.apache.aurora.scheduler.cron.testing;
 
+import java.util.Collection;
 import java.util.concurrent.CountDownLatch;
 
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -23,7 +24,6 @@ import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CronScheduler;
 import org.junit.Test;
 
-import static org.apache.aurora.gen.test.testConstants.VALID_CRON_SCHEDULES;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -36,14 +36,14 @@ public abstract class AbstractCronIT extends EasyMockTest {
   protected abstract CronScheduler makeCronScheduler() throws Exception;
 
   /**
-   * Child should configure expectations for a scheduler start.
+   * Child should return cron expressions that are expected to pass validation.
    */
-  protected abstract void expectStartCronScheduler();
+  protected abstract Collection<String> getValidCronSchedules();
 
   /**
-   * Child should configure expectations for a scheduler stop.
+   * Child should return a "wildcard" cron expression that executes at every possible moment.
    */
-  protected abstract void expectStopCronScheduler();
+  protected abstract String getWildcardCronSchedule();
 
   /**
    * Child should return an instance of the {@link CronPredictor} under test here.
@@ -54,21 +54,17 @@ public abstract class AbstractCronIT extends EasyMockTest {
   public void testCronSchedulerLifecycle() throws Exception {
     CronScheduler scheduler = makeCronScheduler();
 
-    expectStartCronScheduler();
-    expectStopCronScheduler();
-
     control.replay();
 
-    scheduler.start();
+    scheduler.startAsync().awaitRunning();
     final CountDownLatch cronRan = new CountDownLatch(1);
-    scheduler.schedule("* * * * *", new Runnable() {
-      @Override
-      public void run() {
+    scheduler.schedule(getWildcardCronSchedule(), new Runnable() {
+      @Override public void run() {
         cronRan.countDown();
       }
     });
     cronRan.await();
-    scheduler.stop();
+    scheduler.stopAsync().awaitTerminated();
   }
 
   @Test
@@ -76,7 +72,7 @@ public abstract class AbstractCronIT extends EasyMockTest {
     control.replay();
 
     CronPredictor cronPredictor = makeCronPredictor();
-    for (String schedule : VALID_CRON_SCHEDULES) {
+    for (String schedule : getValidCronSchedules()) {
       cronPredictor.predictNextRun(schedule);
     }
   }
@@ -87,7 +83,7 @@ public abstract class AbstractCronIT extends EasyMockTest {
 
     control.replay();
 
-    for (String schedule : VALID_CRON_SCHEDULES) {
+    for (String schedule : getValidCronSchedules()) {
       assertTrue(String.format("Cron schedule %s should validate.", schedule),
           cron.isValidSchedule(schedule));
     }
