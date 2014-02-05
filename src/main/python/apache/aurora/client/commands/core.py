@@ -49,6 +49,7 @@ from apache.aurora.client.factory import make_client, make_client_factory
 from apache.aurora.client.options import (
     CLUSTER_CONFIG_OPTION,
     CLUSTER_INVOKE_OPTION,
+    CLUSTER_NAME_OPTION,
     ENV_CONFIG_OPTION,
     ENVIRONMENT_BIND_OPTION,
     FROM_JOBKEY_OPTION,
@@ -599,7 +600,7 @@ def cancel_update(args, options):
 
 
 @app.command
-@app.command_option(CLUSTER_INVOKE_OPTION)
+@app.command_option(CLUSTER_NAME_OPTION)
 @requires.exactly('role')
 def get_quota(role):
   """usage: get_quota --cluster=CLUSTER role

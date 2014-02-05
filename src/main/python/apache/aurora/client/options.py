@@ -23,6 +23,7 @@ from apache.thermos.common.options import add_binding_to
 __all__ = (
   'CLUSTER_CONFIG_OPTION',
   'CLUSTER_INVOKE_OPTION',
+  'CLUSTER_NAME_OPTION',
   'ENVIRONMENT_BIND_OPTION',
   'ENV_CONFIG_OPTION',
   'EXECUTOR_SANDBOX_OPTION',
@@ -152,6 +153,14 @@ CLUSTER_INVOKE_OPTION = optparse.Option(
   type='string',
   help='Cluster to invoke this command against. Deprecated in favor of the CLUSTER/ROLE/ENV/NAME '
        'syntax.')
+
+
+CLUSTER_NAME_OPTION = optparse.Option(
+  '--cluster',
+  dest='cluster',
+  default=None,
+  type='string',
+  help='Cluster to invoke this command against.')
 
 
 ENV_CONFIG_OPTION = make_env_option(
