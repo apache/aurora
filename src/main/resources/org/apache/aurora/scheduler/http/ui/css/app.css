@@ -7,3 +7,11 @@
 .pagination {
   text-align: center;
 }
+
+.sort-ascent:before {
+  content: "\25BE";
+}
+
+.sort-descent:before {
+  content: "\25B4";
+}

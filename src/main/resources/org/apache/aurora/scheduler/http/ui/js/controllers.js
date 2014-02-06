@@ -22,7 +22,17 @@ angular.module('auroraUI.controllers', []).
       function parseResponse(response) {
         $scope.error = response.error;
         $scope.errorMsg = response.errorMsg;
-        return response.summaries;
+        // TODO(Suman Karumuri): Replace sort with defaultSortColumn once it lands
+        // https://github.com/lorenzofox3/Smart-Table/pull/61
+        return response.summaries.sort(function (a, b) {
+          if (a.role.toLowerCase() > b.role.toLowerCase()) {
+            return 1;
+          }
+          if (a.role.toLowerCase() < b.role.toLowerCase()) {
+            return -1;
+          }
+          return 0;
+        });
       }
 
       $scope.globalConfig = {
