@@ -27,13 +27,6 @@ import re
 import sys
 import time
 
-from twitter.common import app, log
-from twitter.common.log.options import LogOptions
-from twitter.common.dirutil import du, tail_f
-from twitter.common.dirutil.tail import tail as tail_closed
-from twitter.common.quantity import Amount, Time, Data
-from twitter.common.quantity.parse_simple import parse_time, parse_data
-from twitter.common.recordio import RecordIO, ThriftRecordReader
 from apache.thermos.common.path import TaskPath
 from apache.thermos.common.ckpt import CheckpointDispatcher
 from apache.thermos.common.options import add_port_to, add_binding_to
@@ -56,6 +49,13 @@ from gen.apache.thermos.ttypes import (
 
 from pystachio import Ref
 from pystachio.naming import frozendict
+from twitter.common import app, log
+from twitter.common.log.options import LogOptions
+from twitter.common.dirutil import du, tail_f
+from twitter.common.dirutil.tail import tail as tail_closed
+from twitter.common.quantity import Amount, Time, Data
+from twitter.common.quantity.parse_simple import parse_time, parse_data
+from twitter.common.recordio import RecordIO, ThriftRecordReader
 
 app.add_option("--root", dest="root", metavar="PATH",
                default=TaskPath.DEFAULT_CHECKPOINT_ROOT,

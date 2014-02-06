@@ -50,11 +50,6 @@ import sys
 import time
 import traceback
 
-from twitter.common import log
-from twitter.common.dirutil import safe_mkdir
-from twitter.common.quantity import Amount, Time
-from twitter.common.recordio import ThriftRecordReader
-
 from apache.thermos.common.ckpt import (
   CheckpointDispatcher,
   UniversalStateHandler,
@@ -84,6 +79,10 @@ from .muxer import ProcessMuxer
 from .process import Process
 
 from pystachio import Environment
+from twitter.common import log
+from twitter.common.dirutil import safe_mkdir
+from twitter.common.quantity import Amount, Time
+from twitter.common.recordio import ThriftRecordReader
 
 
 # TODO(wickman) Currently this is messy because of all the private access into ._runner.

@@ -15,6 +15,7 @@
 #
 
 from apache.aurora.config.loader import AuroraConfigLoader
+
 from twitter.common.lang import Compatibility
 
 

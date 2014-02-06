@@ -26,11 +26,6 @@ import os
 import threading
 import time
 
-from twitter.common.collections import OrderedDict
-from twitter.common.exceptions import ExceptionalThread
-from twitter.common.metrics import Observable
-from twitter.common.metrics.gauge import AtomicGauge
-from twitter.common.quantity import Amount, Time
 from apache.thermos.common.ckpt import CheckpointDispatcher
 from apache.thermos.common.path import TaskPath
 from apache.thermos.core.inspector import CheckpointInspector
@@ -52,6 +47,11 @@ import mesos_pb2 as mesos_pb
 import psutil
 from thrift.TSerialization import deserialize as thrift_deserialize
 from thrift.TSerialization import serialize as thrift_serialize
+from twitter.common.collections import OrderedDict
+from twitter.common.exceptions import ExceptionalThread
+from twitter.common.metrics import Observable
+from twitter.common.metrics.gauge import AtomicGauge
+from twitter.common.quantity import Amount, Time
 
 
 class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):

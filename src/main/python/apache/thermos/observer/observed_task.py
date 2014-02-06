@@ -17,13 +17,13 @@
 from abc import abstractproperty
 import os
 
-from twitter.common import log
-from twitter.common.lang import AbstractClass
 from apache.thermos.config.loader import ThermosTaskWrapper
 from apache.thermos.config.schema import ThermosContext
 from apache.thermos.common.ckpt import CheckpointDispatcher
 
 from pystachio import Environment
+from twitter.common import log
+from twitter.common.lang import AbstractClass
 
 
 class ObservedTask(AbstractClass):

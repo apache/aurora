@@ -14,14 +14,13 @@
 # limitations under the License.
 #
 
-from twitter.common import log
-
 from gen.apache.aurora.constants import TERMINAL_STATES as AURORA_TERMINAL_STATES
 from gen.apache.aurora.ttypes import ScheduleStatus
 from gen.apache.thermos.ttypes import TaskState
 
 import mesos
 import mesos_pb2 as mesos_pb
+from twitter.common import log
 
 
 class ThermosExecutorBase(mesos.Executor):

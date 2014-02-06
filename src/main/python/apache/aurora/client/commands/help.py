@@ -20,6 +20,7 @@ import collections
 import sys
 
 from apache.aurora.client.base import die
+
 from twitter.common import app
 
 

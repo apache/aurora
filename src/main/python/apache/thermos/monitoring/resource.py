@@ -37,16 +37,16 @@ import platform
 import threading
 import time
 
+from .disk import DiskCollector
+from .monitor import TaskMonitor
+from .process import ProcessSample
+from .process_collector_psutil import ProcessTreeCollector
+
 from twitter.common import log
 from twitter.common.collections import RingBuffer
 from twitter.common.concurrent import EventMuxer
 from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Time
-
-from .disk import DiskCollector
-from .monitor import TaskMonitor
-from .process import ProcessSample
-from .process_collector_psutil import ProcessTreeCollector
 
 
 class ResourceMonitorBase(Interface):

@@ -17,8 +17,6 @@
 """Helpers for composing Thermos workflows."""
 import itertools
 
-from twitter.common.lang import Compatibility
-
 from .schema_base import (
    Constraint,
    GB,
@@ -28,6 +26,7 @@ from .schema_base import (
 )
 
 from pystachio import Empty, List
+from twitter.common.lang import Compatibility
 
 
 __all__ = (

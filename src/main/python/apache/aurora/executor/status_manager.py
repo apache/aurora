@@ -16,11 +16,11 @@
 
 import time
 
+from .common.status_checker import StatusChecker
+
 from twitter.common import log
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.quantity import Amount, Time
-
-from .common.status_checker import StatusChecker
 
 
 class StatusManager(ExceptionalThread):

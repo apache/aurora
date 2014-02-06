@@ -25,18 +25,19 @@ import sys
 import tempfile
 import time
 
-from twitter.common import log
-from twitter.common.contextutil import temporary_file, environment_as
 from apache.thermos.common.path import TaskPath
 from apache.thermos.common.ckpt import CheckpointDispatcher
 from apache.thermos.config.loader import ThermosTaskWrapper
-from thrift.TSerialization import deserialize as thrift_deserialize
 
 from gen.apache.thermos.ttypes import (
   TaskState,
   RunnerCkpt,
   RunnerState,
 )
+
+from thrift.TSerialization import deserialize as thrift_deserialize
+from twitter.common import log
+from twitter.common.contextutil import temporary_file, environment_as
 
 
 class Runner(object):

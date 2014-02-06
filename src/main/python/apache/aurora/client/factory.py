@@ -19,9 +19,10 @@ import functools
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import CLUSTERS
-from twitter.common import app
 
 from .base import die
+
+from twitter.common import app
 
 
 # TODO(wickman) Kill make_client and make_client_factory as part of MESOS-3801.

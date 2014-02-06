@@ -20,13 +20,14 @@ import socket
 import sys
 import time
 
+from apache.thermos.common.path import TaskPath
+from apache.thermos.observer.task_observer import TaskObserver
+from apache.thermos.observer.http.http_observer import BottleObserver
+
 from twitter.common import app
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.http import HttpServer
 from twitter.common.http.diagnostics import DiagnosticsEndpoints
-from apache.thermos.common.path import TaskPath
-from apache.thermos.observer.task_observer import TaskObserver
-from apache.thermos.observer.http.http_observer import BottleObserver
 
 
 app.add_option("--root",

@@ -18,10 +18,7 @@ import json
 from collections import namedtuple
 from difflib import unified_diff
 
-from twitter.common import log
-
 from gen.apache.aurora.constants import ACTIVE_STATES
-
 from gen.apache.aurora.ttypes import (
     AddInstancesConfig,
     JobConfigValidation,
@@ -43,6 +40,7 @@ from .updater_util import FailureThreshold, UpdaterConfig
 
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
+from twitter.common import log
 
 class Updater(object):
   """Update the instances of a job in batches."""

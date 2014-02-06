@@ -20,13 +20,14 @@ import os
 import sys
 import time
 
-from twitter.common.dirutil import safe_delete, safe_rmtree, safe_bsize
-from twitter.common.lang import Interface
-from twitter.common.quantity import Amount, Data, Time
 from apache.thermos.common.ckpt import CheckpointDispatcher
 from apache.thermos.common.path import TaskPath
 
 from .detector import TaskDetector
+
+from twitter.common.dirutil import safe_delete, safe_rmtree, safe_bsize
+from twitter.common.lang import Interface
+from twitter.common.quantity import Amount, Data, Time
 
 
 class TaskGarbageCollector(object):

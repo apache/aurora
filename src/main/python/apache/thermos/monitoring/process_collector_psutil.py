@@ -19,12 +19,11 @@
 from operator import attrgetter
 from time import time
 
-from twitter.common import log
-
 from .process import ProcessSample
 
 from psutil import Process
 from psutil import NoSuchProcess, AccessDenied, Error as PsutilError
+from twitter.common import log
 
 
 def process_to_sample(process):

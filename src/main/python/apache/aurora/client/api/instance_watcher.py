@@ -16,15 +16,17 @@
 
 import time
 
-from twitter.common import log
-from .health_check import InstanceWatcherHealthCheck
-
 from gen.apache.aurora.ttypes import (
   Identity,
   ResponseCode,
   ScheduleStatus,
   TaskQuery,
 )
+
+from .health_check import InstanceWatcherHealthCheck
+
+from twitter.common import log
+
 
 class Instance(object):
   def __init__(self, birthday=None, finished=False):

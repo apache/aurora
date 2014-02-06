@@ -18,9 +18,9 @@ import operator
 
 from copy import deepcopy
 
-from twitter.common import log
-
 from gen.apache.aurora.ttypes import Quota, Response, ResponseCode
+
+from twitter.common import log
 
 
 class CapacityRequest(object):

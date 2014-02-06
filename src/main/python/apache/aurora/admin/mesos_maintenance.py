@@ -17,13 +17,13 @@
 from collections import defaultdict
 import time
 
-from twitter.common import log
-from twitter.common.quantity import Amount, Time
-
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.base import check_and_log_response
 
 from gen.apache.aurora.ttypes import Hosts, MaintenanceMode
+
+from twitter.common import log
+from twitter.common.quantity import Amount, Time
 
 
 def group_by_host(hostname):

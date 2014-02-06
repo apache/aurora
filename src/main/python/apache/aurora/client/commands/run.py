@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-from twitter.common import app
 from apache.aurora.client.base import die
 from apache.aurora.client.options import (
     EXECUTOR_SANDBOX_OPTION,
@@ -23,6 +22,8 @@ from apache.aurora.client.options import (
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 from apache.aurora.client.api.command_runner import DistributedCommandRunner
+
+from twitter.common import app
 
 
 @app.command

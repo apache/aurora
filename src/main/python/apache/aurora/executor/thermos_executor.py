@@ -19,11 +19,6 @@ import threading
 import time
 import traceback
 
-from twitter.common import log
-from twitter.common.concurrent import deadline, defer, Timeout
-from twitter.common.metrics import Observable
-from twitter.common.quantity import Amount, Time
-
 from .common.kill_manager import KillManager
 from .common.sandbox import DirectorySandbox, SandboxProvider
 from .common.status_checker import ChainedStatusChecker, ExitState
@@ -41,6 +36,10 @@ from .executor_base import ThermosExecutorBase
 from .status_manager import StatusManager
 
 import mesos_pb2 as mesos_pb
+from twitter.common import log
+from twitter.common.concurrent import deadline, defer, Timeout
+from twitter.common.metrics import Observable
+from twitter.common.quantity import Amount, Time
 
 
 class DefaultSandboxProvider(SandboxProvider):

@@ -20,10 +20,6 @@ import os
 import signal
 import time
 
-from twitter.common import log
-from twitter.common.dirutil import lock_file, safe_mkdir
-from twitter.common.quantity import Amount, Time
-from twitter.common.recordio import ThriftRecordWriter
 from apache.thermos.common.ckpt import CheckpointDispatcher
 from apache.thermos.common.path import TaskPath
 
@@ -35,6 +31,10 @@ from gen.apache.thermos.ttypes import (
   TaskStatus)
 
 import psutil
+from twitter.common import log
+from twitter.common.dirutil import lock_file, safe_mkdir
+from twitter.common.quantity import Amount, Time
+from twitter.common.recordio import ThriftRecordWriter
 
 
 class TaskKiller(object):

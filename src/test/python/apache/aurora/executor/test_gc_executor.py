@@ -25,11 +25,6 @@ import time
 import unittest
 
 from apache.aurora.executor.gc_executor import ThermosGCExecutor
-from twitter.common.concurrent import deadline, Timeout
-from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import safe_rmtree
-from twitter.common.quantity import Amount, Time
-from twitter.common.testing.clock import ThreadedClock
 from apache.thermos.common.path import TaskPath
 from apache.thermos.config.schema import SimpleTask
 from apache.thermos.core.runner import TaskRunner
@@ -40,10 +35,14 @@ from gen.apache.aurora.ttypes import ScheduleStatus
 from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 import mock
+import mesos_pb2 as mesos
 from thrift.TSerialization import serialize as thrift_serialize
 from thrift.TSerialization import deserialize as thrift_deserialize
-import mesos_pb2 as mesos
-
+from twitter.common.concurrent import deadline, Timeout
+from twitter.common.contextutil import temporary_dir
+from twitter.common.dirutil import safe_rmtree
+from twitter.common.quantity import Amount, Time
+from twitter.common.testing.clock import ThreadedClock
 
 
 ACTIVE_TASKS = ('sleep60-lost',)

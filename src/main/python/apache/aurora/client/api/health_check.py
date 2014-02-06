@@ -16,12 +16,12 @@
 
 from abc import abstractmethod
 
-from twitter.common import log
-from twitter.common.lang import Interface
-
 from apache.aurora.common.http_signaler import HttpSignaler
 
 from gen.apache.aurora.ttypes import ScheduleStatus
+
+from twitter.common import log
+from twitter.common.lang import Interface
 
 
 class HealthCheck(Interface):

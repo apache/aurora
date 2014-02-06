@@ -32,21 +32,22 @@ import subprocess
 import sys
 import time
 
-from twitter.common import log
-from twitter.common.dirutil import (
-    lock_file,
-    safe_mkdir,
-    safe_open,
-)
-from twitter.common.lang import Interface
-from twitter.common.quantity import Amount, Time
-from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
 from gen.apache.thermos.ttypes import (
     ProcessState,
     ProcessStatus,
     RunnerCkpt,
 )
+
+from twitter.common.dirutil import (
+    lock_file,
+    safe_mkdir,
+    safe_open,
+)
+from twitter.common.lang import Interface
+from twitter.common import log
+from twitter.common.quantity import Amount, Time
+from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
 
 
 class Platform(Interface):

@@ -19,8 +19,10 @@ import sys
 import json
 import pprint
 
-from twitter.common import app
 from apache.thermos.config.loader import ThermosConfigLoader
+
+from twitter.common import app
+
 
 def main(args):
   """

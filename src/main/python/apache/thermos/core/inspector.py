@@ -18,9 +18,6 @@ from collections import namedtuple
 from contextlib import closing
 import pwd
 
-from twitter.common import log
-from twitter.common.recordio import RecordIO, ThriftRecordReader
-
 from apache.thermos.common.ckpt import CheckpointDispatcher
 from apache.thermos.common.path import TaskPath
 
@@ -30,6 +27,9 @@ from gen.apache.thermos.ttypes import (
   RunnerState)
 
 from .muxer import ProcessMuxer
+
+from twitter.common import log
+from twitter.common.recordio import RecordIO, ThriftRecordReader
 
 
 CheckpointInspection = namedtuple('CheckpointInspection',

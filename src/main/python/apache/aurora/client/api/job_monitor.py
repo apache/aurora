@@ -16,8 +16,6 @@
 
 import time
 
-from twitter.common.quantity import Amount, Time
-
 from gen.apache.aurora.constants import (
     LIVE_STATES,
     TERMINAL_STATES
@@ -28,6 +26,7 @@ from gen.apache.aurora.ttypes import (
 )
 
 from thrift.transport import TTransport
+from twitter.common.quantity import Amount, Time
 
 
 class JobMonitor(object):

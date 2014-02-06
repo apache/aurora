@@ -18,8 +18,6 @@ from multiprocessing.pool import ThreadPool
 import posixpath
 import subprocess
 
-from twitter.common import log
-
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.config.schema.base import MesosContext
 from apache.aurora.common.cluster import Cluster
@@ -32,6 +30,7 @@ from gen.apache.aurora.ttypes import (
   TaskQuery)
 
 from pystachio import Environment, Required, String
+from twitter.common import log
 
 
 class CommandRunnerTrait(Cluster.Trait):

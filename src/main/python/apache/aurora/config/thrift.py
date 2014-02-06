@@ -22,7 +22,6 @@ from apache.aurora.config.schema.base import (
   MesosContext,
   MesosTaskInstance,
 )
-from twitter.common.lang import Compatibility
 from apache.thermos.config.loader import ThermosTaskValidator
 
 from gen.apache.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON, AURORA_EXECUTOR_NAME
@@ -41,6 +40,7 @@ from gen.apache.aurora.ttypes import (
 )
 
 from pystachio import Empty, Ref
+from twitter.common.lang import Compatibility
 
 __all__ = (
   'InvalidConfig',

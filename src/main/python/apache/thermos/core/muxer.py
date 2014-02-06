@@ -17,9 +17,10 @@
 import os
 import errno
 
+from gen.apache.thermos.ttypes import RunnerCkpt
+
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
-from gen.apache.thermos.ttypes import RunnerCkpt
 
 
 class ProcessMuxer(object):

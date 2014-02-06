@@ -23,15 +23,14 @@ slave.
 
 import os
 
-from twitter.common import app, log
-from twitter.common.log.options import LogOptions
-
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
 from apache.aurora.executor.common.health_checker import HealthCheckerProvider
 from apache.aurora.executor.thermos_executor import ThermosExecutor
 from apache.aurora.executor.thermos_task_runner import DefaultThermosTaskRunnerProvider
 
 import mesos
+from twitter.common import app, log
+from twitter.common.log.options import LogOptions
 
 
 app.configure(debug=True)

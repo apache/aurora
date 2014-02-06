@@ -29,8 +29,6 @@ import copy
 import errno
 import threading
 
-from twitter.common import log
-from twitter.common.recordio import ThriftRecordReader
 from apache.thermos.common.ckpt import CheckpointDispatcher
 
 from gen.apache.thermos.ttypes import (
@@ -39,6 +37,9 @@ from gen.apache.thermos.ttypes import (
   RunnerState,
   TaskState,
 )
+
+from twitter.common import log
+from twitter.common.recordio import ThriftRecordReader
 
 
 class TaskMonitor(object):

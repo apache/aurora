@@ -23,11 +23,11 @@ import json
 import os
 import sys
 
-from twitter.common.collections import maybe_list
-
 from .cluster import Cluster
 
 from pystachio import Required, String
+from twitter.common.collections import maybe_list
+
 
 try:
   import yaml

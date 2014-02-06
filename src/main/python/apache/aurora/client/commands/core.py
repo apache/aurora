@@ -29,10 +29,6 @@ import sys
 import time
 from tempfile import NamedTemporaryFile
 
-from twitter.common import app, log
-from twitter.common.python.pex import PexInfo
-from twitter.common.python.dirwrapper import PythonDirectoryWrapper
-
 from apache.aurora.client.base import (
     check_and_log_response,
     deprecation_warning,
@@ -62,6 +58,10 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.constants import ACTIVE_STATES, CURRENT_API_VERSION, AURORA_EXECUTOR_NAME
 from gen.apache.aurora.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
+
+from twitter.common import app, log
+from twitter.common.python.pex import PexInfo
+from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 
 
 def get_job_config(job_spec, config_file, options):

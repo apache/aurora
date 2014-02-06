@@ -23,10 +23,6 @@ import threading
 import time
 
 from apache.aurora.common.http_signaler import HttpSignaler
-from twitter.common import log
-from twitter.common.dirutil import chmod_plus_x, safe_mkdtemp
-from twitter.common.log.options import LogOptions
-from twitter.common.quantity import Amount, Time
 from apache.thermos.common.path import TaskPath
 from apache.thermos.config.loader import ThermosTaskWrapper
 from apache.thermos.core import runner as core
@@ -44,6 +40,11 @@ from .common.task_runner import (
     TaskRunner,
     TaskRunnerProvider,
 )
+
+from twitter.common import log
+from twitter.common.dirutil import chmod_plus_x, safe_mkdtemp
+from twitter.common.log.options import LogOptions
+from twitter.common.quantity import Amount, Time
 
 
 class ThermosTaskRunner(TaskRunner):

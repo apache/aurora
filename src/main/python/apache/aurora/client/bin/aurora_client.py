@@ -15,6 +15,7 @@
 #
 
 from apache.aurora.client.base import generate_terse_usage
+
 from twitter.common import app
 from twitter.common.log.options import LogOptions
 

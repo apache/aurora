@@ -32,12 +32,6 @@ import threading
 import time
 from Queue import Empty, Queue
 
-from twitter.common import log
-from twitter.common.dirutil import du, safe_bsize
-from twitter.common.exceptions import ExceptionalThread
-from twitter.common.lang import Lockable
-from twitter.common.quantity import Amount, Time
-
 from watchdog.observers import Observer as WatchdogObserver
 from watchdog.events import (
   FileSystemEventHandler,
@@ -47,6 +41,11 @@ from watchdog.events import (
   FileMovedEvent,
 )
 
+from twitter.common import log
+from twitter.common.dirutil import du, safe_bsize
+from twitter.common.exceptions import ExceptionalThread
+from twitter.common.lang import Lockable
+from twitter.common.quantity import Amount, Time
 
 class DiskCollectorThread(ExceptionalThread):
   """ Thread to calculate aggregate disk usage under a given path using a simple algorithm """

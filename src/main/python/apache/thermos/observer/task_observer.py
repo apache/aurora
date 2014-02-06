@@ -26,11 +26,6 @@ import os
 import threading
 import time
 
-from twitter.common import log
-from twitter.common.exceptions import ExceptionalThread
-from twitter.common.lang import Lockable
-from twitter.common.quantity import Amount, Time
-
 from apache.thermos.common.path import TaskPath
 from apache.thermos.monitoring.detector import TaskDetector
 from apache.thermos.monitoring.monitor import TaskMonitor
@@ -40,6 +35,11 @@ from apache.thermos.monitoring.resource import ResourceMonitorBase, TaskResource
 from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 from .observed_task import ActiveObservedTask, FinishedObservedTask
+
+from twitter.common import log
+from twitter.common.exceptions import ExceptionalThread
+from twitter.common.lang import Lockable
+from twitter.common.quantity import Amount, Time
 
 
 class TaskObserver(ExceptionalThread, Lockable):

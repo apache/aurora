@@ -14,11 +14,11 @@
 # limitations under the License.
 #
 
-from twitter.common import log
-
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.base import check_and_log_response, deprecation_warning, die
 from apache.aurora.common.aurora_job_key import AuroraJobKey
+
+from twitter.common import log
 
 
 class LiveJobDisambiguator(object):

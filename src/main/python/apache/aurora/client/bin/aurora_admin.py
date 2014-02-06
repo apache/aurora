@@ -17,6 +17,7 @@
 from apache.aurora.client.base import generate_terse_usage
 from apache.aurora.client.commands import admin, help
 from apache.aurora.client.options import add_verbosity_options
+
 from twitter.common import app
 from twitter.common.log.options import LogOptions
 

@@ -18,13 +18,12 @@ import os
 import pprint
 from xml.sax.saxutils import escape
 
-from twitter.common import log
-from twitter.common.http import HttpServer
+from .templating import HttpTemplate
 
 import bottle
 from mako.template import Template
-
-from .templating import HttpTemplate
+from twitter.common import log
+from twitter.common.http import HttpServer
 
 
 MB = 1024 * 1024

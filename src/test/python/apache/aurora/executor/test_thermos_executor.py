@@ -43,12 +43,6 @@ from apache.aurora.executor.thermos_task_runner import (
     ThermosTaskRunner,
 )
 from apache.aurora.executor.thermos_executor import ThermosExecutor
-from twitter.common import log
-from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import safe_mkdtemp, safe_rmtree
-from twitter.common.exceptions import ExceptionalThread
-from twitter.common.log.options import LogOptions
-from twitter.common.quantity import Amount, Time
 from apache.thermos.common.path import TaskPath
 from apache.thermos.core.runner import TaskRunner
 from apache.thermos.monitoring.monitor import TaskMonitor
@@ -61,8 +55,14 @@ from gen.apache.aurora.ttypes import (
   TaskConfig,
 )
 
-from thrift.TSerialization import serialize
 import mesos_pb2 as mesos_pb
+from thrift.TSerialization import serialize
+from twitter.common import log
+from twitter.common.contextutil import temporary_dir
+from twitter.common.dirutil import safe_mkdtemp, safe_rmtree
+from twitter.common.exceptions import ExceptionalThread
+from twitter.common.log.options import LogOptions
+from twitter.common.quantity import Amount, Time
 
 
 if 'THERMOS_DEBUG' in os.environ:

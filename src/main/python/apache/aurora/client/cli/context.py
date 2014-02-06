@@ -30,10 +30,10 @@ from apache.aurora.client.cli import (
 )
 from apache.aurora.client.config import get_config
 from apache.aurora.client.factory import make_client
-from twitter.common import log
 
 from gen.apache.aurora.ttypes import ResponseCode
 
+from twitter.common import log
 
 # Utility type, representing job keys with wildcards.
 PartialJobKey = namedtuple('PartialJobKey', ['cluster', 'role', 'env', 'name'])

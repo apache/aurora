@@ -25,8 +25,6 @@ import posixpath
 import re
 import sys
 
-from twitter.common import app, log
-
 from apache.aurora.client import binding_helper
 from apache.aurora.client.base import deprecation_warning, die
 from apache.aurora.config import AuroraConfig
@@ -35,6 +33,7 @@ from apache.thermos.config.schema_helpers import Tasks
 from gen.apache.aurora.constants import DEFAULT_ENVIRONMENT
 
 from pystachio import Empty, Ref
+from twitter.common import app, log
 
 
 APPAPP_DEPRECATION_WARNING = """

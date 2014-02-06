@@ -20,14 +20,13 @@ import os
 import re
 import textwrap
 
-from twitter.common.dirutil import safe_open
-from twitter.common.lang import Compatibility
 from apache.thermos.common.planner import TaskPlanner
 from apache.thermos.config.schema import Task
 
 from pystachio import Ref
 from pystachio.config import Config
-
+from twitter.common.dirutil import safe_open
+from twitter.common.lang import Compatibility
 
 class PortExtractor(object):
   class InvalidPorts(Exception): pass

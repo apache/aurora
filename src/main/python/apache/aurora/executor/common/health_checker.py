@@ -18,8 +18,6 @@ import threading
 import time
 
 from apache.aurora.common.http_signaler import HttpSignaler
-from twitter.common import log
-from twitter.common.exceptions import ExceptionalThread
 
 from .status_checker import (
     ExitState,
@@ -29,6 +27,8 @@ from .status_checker import (
 )
 from .task_info import mesos_task_instance_from_assigned_task, resolve_ports
 
+from twitter.common import log
+from twitter.common.exceptions import ExceptionalThread
 
 class HealthCheckerThread(StatusChecker, ExceptionalThread):
   """Generic, StatusChecker-conforming thread for arbitrary periodic health checks

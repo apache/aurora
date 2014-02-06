@@ -19,11 +19,12 @@ import sys
 import pprint
 import time
 
+from apache.thermos.common.ckpt import CheckpointDispatcher
+
 from gen.apache.thermos.ttypes import RunnerState, RunnerCkpt, TaskState
 
 from twitter.common import app
 from twitter.common.recordio import RecordIO, ThriftRecordReader
-from apache.thermos.common.ckpt import CheckpointDispatcher
 
 app.add_option("--checkpoint", dest = "ckpt", metavar = "CKPT",
                help = "read checkpoint from CKPT")

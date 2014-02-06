@@ -17,6 +17,7 @@
 import os
 import time
 
+import psutil
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import (
     LambdaGauge,
@@ -27,8 +28,6 @@ from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 from twitter.common.python.pex import PexInfo
 from twitter.common.quantity import Amount, Time
 from twitter.common.string.scanf import ScanfParser
-
-import psutil
 
 
 class ExecutorVars(Observable, ExceptionalThread):

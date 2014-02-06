@@ -24,13 +24,13 @@ system. To do this, it relies heavily on the Thermos TaskObserver.
 import os
 import socket
 
-from twitter.common import log
-from twitter.common.http import HttpServer
-
 from .file_browser import TaskObserverFileBrowser
 from .json import TaskObserverJSONBindings
 from .static_assets import StaticAssets
 from .templating import HttpTemplate
+
+from twitter.common import log
+from twitter.common.http import HttpServer
 
 
 class BottleObserver(HttpServer, StaticAssets, TaskObserverFileBrowser, TaskObserverJSONBindings):
