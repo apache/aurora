@@ -223,6 +223,8 @@ class AuroraCommandLine(CommandLine):
   def register_nouns(self):
     from .jobs import Job
     self.register_noun(Job())
+    from .quota import Quota
+    self.register_noun(Quota())
 
 
 def main():

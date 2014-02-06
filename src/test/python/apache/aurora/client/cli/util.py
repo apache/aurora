@@ -38,6 +38,8 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     self.fake_api = self.create_mock_api()
     self.task_status = []
     self.showed_urls = []
+    self.out = []
+    self.err = []
 
   def get_api(self, cluster):
     return self.fake_api
@@ -58,6 +60,18 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     mock_api = Mock(spec=HookedAuroraClientAPI)
     mock_api.scheduler_proxy = mock_scheduler_proxy
     return mock_api
+
+  def print_out(self, str):
+    self.out.append(str)
+
+  def print_err(self, str):
+    self.err.append(str)
+
+  def get_out(self):
+    return self.out
+
+  def get_err(self):
+    return self.err
 
   def open_page(self, url):
     self.showed_urls.append(url)

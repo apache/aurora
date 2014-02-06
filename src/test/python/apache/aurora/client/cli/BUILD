@@ -16,7 +16,7 @@
 
 python_test_suite(
   name = 'all',
-  dependencies = [ pants(':job') ]
+  dependencies = [ pants(':job'), pants(':quota') ]
 )
 
 python_library(
@@ -39,6 +39,18 @@ python_tests(
     'test_status.py',
     'test_update.py',
   ],
+  dependencies = [
+    pants(':util'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/client/cli'),
+    pants('src/test/python/apache/aurora/client/commands:util')
+  ]
+)
+
+python_tests(
+  name = 'quota',
+  sources = [ 'test_quota.py' ],
   dependencies = [
     pants(':util'),
     pants('3rdparty/python:mock'),

@@ -16,15 +16,13 @@
 
 python_binary(
   name='client',
-  entry_point = 'apache.aurora.cli:main',
-  dependencies = [
-    pants(':cli'),
-  ],
-)
+  entry_point = 'apache.aurora.client.cli:main',
+  dependencies = [ pants(':cli') ],
+  )
 
 python_library(
   name='cli',
-  sources = [ '__init__.py', 'context.py', 'jobs.py', 'options.py' ],
+  sources = globs('*.py'),
   dependencies = [
     pants('3rdparty/python:argparse'),
     pants('3rdparty/python:twitter.common.python'),

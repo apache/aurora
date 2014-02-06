@@ -18,6 +18,15 @@ from apache.aurora.client.cli import CommandOption
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 
+def parse_qualified_role(rolestr):
+  if rolestr is None:
+    raise ValueError('Role argument cannot be empty!')
+  role_parts = rolestr.split('/')
+  if len(role_parts) != 2:
+    raise ValueError('Role argument must be a CLUSTER/NAME pair')
+  return role_parts
+
+
 def parse_instances(instances):
   """Parse lists of instances or instance ranges into a set().
      Examples:
@@ -83,6 +92,13 @@ JSON_WRITE_OPTION = CommandOption('--write_json', default=False, dest='write_jso
     help='Generate command output in JSON format')
 
 
+ROLE_ARGUMENT = CommandOption('role', type=parse_qualified_role,
+    help='Rolename to retrieve information about, in CLUSTER/NAME format')
+
+
 WATCH_OPTION = CommandOption('--watch_secs', type=int, default=30,
     help='Minimum number of seconds a shard must remain in RUNNING state before considered a '
          'success.')
+
+
+
