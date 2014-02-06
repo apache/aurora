@@ -20,7 +20,6 @@ apply plugin: 'checkstyle'
 apply plugin: 'idea'
 apply plugin: 'jacoco'
 apply plugin: 'java'
-apply plugin: 'license'
 apply plugin: 'maven-publish'
 apply plugin: 'versions'
 
@@ -31,7 +30,6 @@ buildscript {
   dependencies {
     classpath 'com.github.ben-manes:gradle-versions-plugin:0.4'
     classpath 'com.github.goldin.plugins.gradle:about:0.3.1'
-    classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.7.0'
   }
 }
 
@@ -303,26 +301,6 @@ jacocoTestReport {
   additionalSourceDirs = files(sourceSets.main.allJava.srcDirs)
   doLast {
     println "Coverage report generated: file:///$buildDir/reports/jacoco/test/html/index.html"
-  }
-}
-
-license {
-  header rootProject.file('config/checkstyle/apache.header')
-  strictCheck true
-  skipExistingHeaders true
-  ext.year = Calendar.getInstance().get(Calendar.YEAR)
-
-  sourceSets {
-    main {
-        resources {
-            exclude '**'
-        }
-    }
-    test {
-        resources {
-            exclude '**'
-        }
-    }
   }
 }
 
