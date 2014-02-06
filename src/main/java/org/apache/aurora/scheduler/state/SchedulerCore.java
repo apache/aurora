@@ -63,14 +63,6 @@ public interface SchedulerCore {
       throws ScheduleException;
 
   /**
-   * Validates the new job configuration passes resource filters.
-   *
-   * @param sanitizedConfiguration Job configuration to validate.
-   * @throws ScheduleException If job resources do not pass filters.
-   */
-  void validateJobResources(SanitizedConfiguration sanitizedConfiguration) throws ScheduleException;
-
-  /**
    * Starts a cron job immediately.
    *
    * @param jobKey Job key.

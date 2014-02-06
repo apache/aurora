@@ -67,7 +67,6 @@ import org.apache.aurora.gen.Hosts;
 import org.apache.aurora.gen.InstanceConfigRewrite;
 import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobConfigRewrite;
-import org.apache.aurora.gen.JobConfigValidation;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobSummary;
@@ -306,8 +305,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response populateJobConfig(JobConfiguration description, JobConfigValidation validation) {
-
+  public Response populateJobConfig(JobConfiguration description) {
     checkNotNull(description);
 
     Response response = new Response();
@@ -315,17 +313,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       SanitizedConfiguration sanitized =
           SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(description));
 
-      // TODO(maximk): Drop it once migration to client quota checks is completed.
-      if (validation != null && validation == JobConfigValidation.RUN_FILTERS) {
-        schedulerCore.validateJobResources(sanitized);
-      }
-
       PopulateJobResult result = new PopulateJobResult()
           .setPopulated(ITaskConfig.toBuildersSet(sanitized.getTaskConfigs().values()));
       response.setResult(Result.populateJobResult(result))
           .setResponseCode(OK)
           .setMessage("Tasks populated");
-    } catch (TaskDescriptionException | ScheduleException e) {
+    } catch (TaskDescriptionException e) {
       response.setResponseCode(INVALID_REQUEST)
           .setMessage("Invalid configuration: " + e.getMessage());
     }

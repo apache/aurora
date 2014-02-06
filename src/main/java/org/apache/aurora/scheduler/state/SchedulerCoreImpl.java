@@ -194,14 +194,6 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public void validateJobResources(SanitizedConfiguration sanitizedConfiguration)
-      throws ScheduleException {
-
-    IJobConfiguration job = sanitizedConfiguration.getJobConfig();
-    validateTaskLimits(job.getTaskConfig(), job.getInstanceCount());
-  }
-
-  @Override
   public void addInstances(
       final IJobKey jobKey,
       final ImmutableSet<Integer> instanceIds,

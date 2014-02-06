@@ -46,7 +46,6 @@ import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceConfigRewrite;
 import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobConfigRewrite;
-import org.apache.aurora.gen.JobConfigValidation;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobSummary;
@@ -186,30 +185,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testPopulateJobConfig() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
-    scheduler.validateJobResources(anyObject(SanitizedConfiguration.class));
     control.replay();
 
-    Response response = thrift.populateJobConfig(job.newBuilder(), JobConfigValidation.RUN_FILTERS);
+    Response response = thrift.populateJobConfig(job.newBuilder());
     assertEquals(ResponseCode.OK, response.getResponseCode());
-  }
-
-  @Test
-  public void testPopulateJobConfigNoValidation() throws Exception {
-    control.replay();
-
-    Response response = thrift.populateJobConfig(makeJob(), null);
-    assertEquals(ResponseCode.OK, response.getResponseCode());
-  }
-
-  @Test
-  public void testPopulateJobConfigFailQuotaCheck() throws Exception {
-    IJobConfiguration job = IJobConfiguration.build(makeJob());
-    scheduler.validateJobResources(anyObject(SanitizedConfiguration.class));
-    expectLastCall().andThrow(new ScheduleException("err"));
-    control.replay();
-
-    Response response = thrift.populateJobConfig(job.newBuilder(), JobConfigValidation.RUN_FILTERS);
-    assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test

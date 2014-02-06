@@ -32,7 +32,6 @@ from gen.apache.aurora.ttypes import (
   Constraint,
   ExecutorConfig,
   JobConfiguration,
-  JobConfigValidation,
   JobKey,
   Identity,
   LimitConstraint,
@@ -152,7 +151,7 @@ class UpdaterTest(TestCase):
     resp = Response(responseCode=response_code, message='test')
     result = set([deepcopy(job_config.taskConfig)])
     resp.result = Result(populateJobResult=PopulateJobResult(populated=result))
-    self._scheduler.populateJobConfig(job_config, JobConfigValidation.RUN_FILTERS).AndReturn(resp)
+    self._scheduler.populateJobConfig(job_config).AndReturn(resp)
 
   def expect_get_tasks(self, tasks, ignore_ids=None, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code

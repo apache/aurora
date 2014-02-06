@@ -1134,28 +1134,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testEnsureCanAddInstances() throws Exception {
-    SanitizedConfiguration job = makeJob(KEY_A, 1);
-
-    control.replay();
-    buildScheduler();
-
-    scheduler.validateJobResources(job);
-  }
-
-  @Test(expected = ScheduleException.class)
-  public void testEnsureCanAddInstancesFails() throws Exception {
-    SanitizedConfiguration job = makeJob(KEY_A, 1);
-    expect(quotaManager.checkQuota(anyObject(ITaskConfig.class), anyInt()))
-        .andReturn(NOT_ENOUGH_QUOTA);
-
-    control.replay();
-    buildScheduler();
-
-    scheduler.validateJobResources(job);
-  }
-
-  @Test
   public void testTaskIdLimit() throws Exception {
     taskIdGenerator = new TaskIdGenerator() {
       @Override

@@ -62,8 +62,8 @@ class AuroraClientAPI(object):
     log.debug('Lock %s' % lock)
     return self._scheduler_proxy.createJob(config.job(), lock)
 
-  def populate_job_config(self, config, validation=None):
-    return self._scheduler_proxy.populateJobConfig(config.job(), validation)
+  def populate_job_config(self, config):
+    return self._scheduler_proxy.populateJobConfig(config.job())
 
   def start_cronjob(self, job_key):
     self._assert_valid_job_key(job_key)

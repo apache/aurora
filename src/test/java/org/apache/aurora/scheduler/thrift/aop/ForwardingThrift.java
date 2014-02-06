@@ -20,7 +20,6 @@ import java.util.Set;
 import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Hosts;
-import org.apache.aurora.gen.JobConfigValidation;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.Lock;
@@ -125,11 +124,8 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response populateJobConfig(
-      JobConfiguration description,
-      JobConfigValidation validation) throws TException {
-
-    return delegate.populateJobConfig(description, validation);
+  public Response populateJobConfig(JobConfiguration description) throws TException {
+    return delegate.populateJobConfig(description);
   }
 
   @Override

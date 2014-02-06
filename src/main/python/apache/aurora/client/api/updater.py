@@ -21,7 +21,6 @@ from difflib import unified_diff
 from gen.apache.aurora.constants import ACTIVE_STATES
 from gen.apache.aurora.ttypes import (
     AddInstancesConfig,
-    JobConfigValidation,
     JobKey,
     Identity,
     Lock,
@@ -389,7 +388,7 @@ class Updater(object):
 
     Returns a TaskConfig populated with default values.
     """
-    resp = self._scheduler.populateJobConfig(self._config.job(), JobConfigValidation.RUN_FILTERS)
+    resp = self._scheduler.populateJobConfig(self._config.job())
     self._check_and_log_response(resp)
 
     # Safe to take the first element as Scheduler would throw in case zero instances provided.

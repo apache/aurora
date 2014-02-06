@@ -397,12 +397,6 @@ struct JobSummaryResult {
   1: set<JobSummary> summaries
 }
 
-// Specifies validation level for the populateJobConfig.
-enum JobConfigValidation {
-  NONE              = 0   // No additional job config validation would be performed (only parsing).
-  RUN_FILTERS       = 1   // In addition to parsing config, will run through job filters.
-}
-
 union Result {
   1: PopulateJobResult populateJobResult
   3: ScheduleStatusResult scheduleStatusResult
@@ -455,7 +449,7 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
 
   // Populates fields in a job configuration as though it were about to be run.
   // This can be used to diff a configuration running tasks.
-  Response populateJobConfig(1: JobConfiguration description, 2: JobConfigValidation validation)
+  Response populateJobConfig(1: JobConfiguration description)
 
   // Starts a cron job immediately.  The request will be denied if the specified job does not
   // exist for the role account, or the job is not a cron job.
