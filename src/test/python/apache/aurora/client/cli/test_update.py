@@ -6,7 +6,8 @@ from twitter.common.contextutil import temporary_file
 from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.api.health_check import InstanceWatcherHealthCheck, Retriable
 from apache.aurora.client.api.quota_check import QuotaCheck
-from apache.aurora.client.cli import AuroraCommandLine, EXIT_INVALID_CONFIGURATION
+from apache.aurora.client.cli import EXIT_INVALID_CONFIGURATION
+from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.config import AuroraConfig
 

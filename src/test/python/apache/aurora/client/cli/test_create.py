@@ -29,10 +29,10 @@ from gen.apache.aurora.ttypes import (
 )
 
 from apache.aurora.client.cli import (
-    AuroraCommandLine,
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION
 )
+from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.config import AuroraConfig

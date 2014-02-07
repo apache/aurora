@@ -29,9 +29,9 @@ from gen.apache.aurora.ttypes import (
 )
 
 from apache.aurora.client.cli import (
-    AuroraCommandLine,
     EXIT_INVALID_PARAMETER
 )
+from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 

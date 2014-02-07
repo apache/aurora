@@ -16,8 +16,15 @@
 
 python_binary(
   name = 'aurora_client',
-  source = 'aurora_client.py',
   entry_point = 'apache.aurora.client.bin.aurora_client:proxy_main',
+  dependencies = [
+    pants(':aurora_client_lib')
+  ]
+)
+
+python_library(
+  name = 'aurora_client_lib',
+  sources = [ 'aurora_client.py' ],
   dependencies = [
     pants('3rdparty/python:twitter.common.app'),
     pants('3rdparty/python:twitter.common.log'),

@@ -112,11 +112,13 @@ class CommandLine(object):
   """The top-level object implementing a command-line application."""
 
   def __init__(self):
-    self.nouns = {}
+    self.nouns = None
     self.parser = None
 
   def register_noun(self, noun):
     """Add a noun to the application"""
+    if self.nouns is None:
+      self.nouns = {}
     if not isinstance(noun, Noun):
       raise TypeError('register_noun requires a Noun argument')
     self.nouns[noun.name] = noun
@@ -132,18 +134,34 @@ class CommandLine(object):
   def register_nouns(self):
     """This method should overridden by applications to register the collection of nouns
     that they can manipulate.
+
+    Noun registration is done on-demand, when either get_nouns or execute is called.
+    This allows the command-line tool a small amount of self-customizability depending
+    on the environment in which it is being used.
+
+    For example, if a cluster is being run via AWS, then you could provide an
+    AWS noun with a set of operations for querying AWS status, billing stats,
+    etc. You wouldn't want to clutter the help output with AWS commands for users
+    that weren't using AWS. So you could have the command-line check the cluster.json
+    file, and only register the AWS noun if there was an AWS cluster.
+
     """
-    pass
+
+  @property
+  def registered_nouns(self):
+    if self.nouns is None:
+      self.register_nouns()
+    return self.nouns.keys()
 
   def execute(self, args):
     """Execute a command.
     :param args: the command-line arguments for the command. This only includes arguments
         that should be parsed by the application; it does not include sys.argv[0].
     """
-    self.register_nouns()
+    nouns = self.registered_nouns
     self.setup_options_parser()
     options = self.parser.parse_args(args)
-    if options.noun not in self.nouns:
+    if options.noun not in nouns:
       raise ValueError('Unknown command: %s' % options.noun)
     noun = self.nouns[options.noun]
     context = noun.create_context()
@@ -210,27 +228,3 @@ class Verb(AuroraCommand):
   def execute(self, context):
     pass
 
-
-class AuroraCommandLine(CommandLine):
-  """ An example implementation of a command line application using this framework.
-  This should probably eventually get moved in to its own source file.
-  """
-
-  @classmethod
-  def get_description(cls):
-    return 'Aurora client command line'
-
-  def register_nouns(self):
-    from .jobs import Job
-    self.register_noun(Job())
-    from .quota import Quota
-    self.register_noun(Quota())
-
-
-def main():
-  cmd = AuroraCommandLine()
-  cmd.execute(sys.argv[1:])
-
-
-if __name__ == '__main__':
-  main(sys.argv)

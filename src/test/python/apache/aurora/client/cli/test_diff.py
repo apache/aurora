@@ -17,10 +17,10 @@
 import contextlib
 
 from apache.aurora.client.cli import (
-    AuroraCommandLine,
     EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER
 )
+from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
 
 from gen.apache.aurora.constants import ACTIVE_STATES

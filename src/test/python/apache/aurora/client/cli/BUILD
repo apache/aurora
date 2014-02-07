@@ -16,7 +16,7 @@
 
 python_test_suite(
   name = 'all',
-  dependencies = [ pants(':job'), pants(':quota') ]
+  dependencies = [ pants(':bridge'), pants(':job'), pants(':quota') ]
 )
 
 python_library(
@@ -25,6 +25,14 @@ python_library(
   dependencies = [
     pants('3rdparty/python:mock'),
     pants('src/main/python/apache/aurora/client/cli'),
+  ]
+)
+
+python_tests(
+  name = 'bridge',
+  sources = [ 'test_bridge.py' ],
+  dependencies = [
+    pants('src/main/python/apache/aurora/client/cli:bridge'),
   ]
 )
 
@@ -44,6 +52,7 @@ python_tests(
     pants('3rdparty/python:mock'),
     pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/client/cli'),
+    pants('src/main/python/apache/aurora/client/cli:client'),
     pants('src/test/python/apache/aurora/client/commands:util')
   ]
 )
@@ -56,6 +65,7 @@ python_tests(
     pants('3rdparty/python:mock'),
     pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/client/cli'),
+    pants('src/main/python/apache/aurora/client/cli:client'),
     pants('src/test/python/apache/aurora/client/commands:util')
   ]
 )

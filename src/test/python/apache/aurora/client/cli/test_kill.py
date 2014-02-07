@@ -17,7 +17,9 @@
 import contextlib
 import unittest
 
-from apache.aurora.client.cli import AuroraCommandLine
+from twitter.common.contextutil import temporary_file
+
+from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.common.contextutil import temporary_file

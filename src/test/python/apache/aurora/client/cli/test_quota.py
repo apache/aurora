@@ -16,7 +16,7 @@
 
 import contextlib
 
-from apache.aurora.client.cli import AuroraCommandLine
+from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 from gen.apache.aurora.ttypes import (

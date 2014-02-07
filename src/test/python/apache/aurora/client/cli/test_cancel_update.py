@@ -16,7 +16,7 @@
 
 import contextlib
 
-from apache.aurora.client.cli import AuroraCommandLine
+from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.common.contextutil import temporary_file

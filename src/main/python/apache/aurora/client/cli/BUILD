@@ -16,13 +16,30 @@
 
 python_binary(
   name='client',
-  entry_point = 'apache.aurora.client.cli:main',
-  dependencies = [ pants(':cli') ],
-  )
+  entry_point = 'apache.aurora.client.cli.client:proxy_main',
+  dependencies = [
+    pants(':client_lib')
+  ],
+)
+
+python_library(
+  name = 'bridge',
+  sources = ['bridge.py']
+)
+
+python_library(
+  name = 'client_lib',
+  sources = [ 'client.py' ],
+  dependencies = [
+    pants(':cli'),
+    pants(':bridge'),
+    pants('src/main/python/apache/aurora/client/bin:aurora_client_lib')
+  ]
+)
 
 python_library(
   name='cli',
-  sources = globs('*.py'),
+  sources = [ '__init__.py', 'jobs.py', 'quota.py', 'context.py', 'options.py' ],
   dependencies = [
     pants('3rdparty/python:argparse'),
     pants('3rdparty/python:twitter.common.python'),

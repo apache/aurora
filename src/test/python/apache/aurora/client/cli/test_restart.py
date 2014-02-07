@@ -2,7 +2,8 @@ import contextlib
 import functools
 
 from apache.aurora.client.api.health_check import InstanceWatcherHealthCheck, Retriable
-from apache.aurora.client.cli import AuroraCommandLine, EXIT_API_ERROR
+from apache.aurora.client.cli import EXIT_API_ERROR
+from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
 
 from twitter.common.contextutil import temporary_file
