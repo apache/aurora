@@ -101,7 +101,7 @@ public interface Preemptor {
 
     @VisibleForTesting
     static final Query.Builder CANDIDATE_QUERY = Query.statusScoped(
-        EnumSet.copyOf(Sets.difference(Tasks.ACTIVE_STATES, EnumSet.of(PENDING, PREEMPTING))));
+        EnumSet.copyOf(Sets.difference(Tasks.SLAVE_ASSIGNED_STATES, EnumSet.of(PREEMPTING))));
 
     private static final Function<IAssignedTask, Integer> GET_PRIORITY =
         new Function<IAssignedTask, Integer>() {

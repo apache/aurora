@@ -42,7 +42,10 @@ import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskInfo;
@@ -51,6 +54,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerResult.SUCCESS;
 import static org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerResult.TRY_AGAIN;
 import static org.easymock.EasyMock.capture;
@@ -89,7 +93,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     clock.setNowMillis(0);
     preemptor = createMock(Preemptor.class);
 
-    Injector injector = Guice.createInjector(new AbstractModule() {
+    Injector injector = getInjector(storageUtil.storage);
+    scheduler = injector.getInstance(TaskScheduler.class);
+    eventSink = PubsubTestUtil.startPubsub(injector);
+  }
+
+  private Injector getInjector(final Storage storageImpl) {
+    return Guice.createInjector(new AbstractModule() {
       @Override
       protected void configure() {
         PubsubTestUtil.installPubsub(binder());
@@ -99,12 +109,9 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         bind(StateManager.class).toInstance(stateManager);
         bind(TaskAssigner.class).toInstance(assigner);
         bind(Clock.class).toInstance(clock);
-        bind(Storage.class).toInstance(storageUtil.storage);
+        bind(Storage.class).toInstance(storageImpl);
       }
     });
-
-    scheduler = injector.getInstance(TaskScheduler.class);
-    eventSink = PubsubTestUtil.startPubsub(injector);
   }
 
   private void expectTaskStillPendingQuery(IScheduledTask task) {
@@ -119,7 +126,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testReservationsDeniesTasksForTimePeriod() throws OfferQueue.LaunchException {
+  public void testReservationsDeniesTasksForTimePeriod() throws Exception {
     storageUtil.expectOperations();
 
     expectTaskStillPendingQuery(TASK_A);
@@ -154,7 +161,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testReservationsExpireAfterAccepted() throws OfferQueue.LaunchException {
+  public void testReservationsExpireAfterAccepted() throws Exception {
     storageUtil.expectOperations();
 
     expectTaskStillPendingQuery(TASK_A);
@@ -188,7 +195,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testReservationsAcceptsWithInTimePeriod() throws OfferQueue.LaunchException {
+  public void testReservationsAcceptsWithInTimePeriod() throws Exception {
     storageUtil.expectOperations();
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
@@ -211,7 +218,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testReservationsCancellation() throws OfferQueue.LaunchException {
+  public void testReservationsCancellation() throws Exception {
     storageUtil.expectOperations();
 
     expectTaskStillPendingQuery(TASK_A);
@@ -237,7 +244,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testReservationsExpire() throws OfferQueue.LaunchException {
+  public void testReservationsExpire() throws Exception {
     storageUtil.expectOperations();
 
     expectTaskStillPendingQuery(TASK_B);
@@ -258,6 +265,39 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     clock.advance(reservationDuration);
     assertEquals(SUCCESS, scheduler.schedule("a"));
     firstAssignment.getValue().apply(OFFER);
+  }
+
+  @Test
+  public void testIgnoresThrottledTasks() throws Exception {
+    // Ensures that tasks in THROTTLED state are not considered part of the active job state passed
+    // to the assigner function.
+
+    Storage memStorage = MemStorage.newEmptyStorage();
+
+    Injector injector = getInjector(memStorage);
+    scheduler = injector.getInstance(TaskScheduler.class);
+    eventSink = PubsubTestUtil.startPubsub(injector);
+
+    ScheduledTask builder = TASK_A.newBuilder();
+    final IScheduledTask taskA = IScheduledTask.build(builder.setStatus(PENDING));
+    builder.getAssignedTask().setTaskId("b");
+    final IScheduledTask taskB = IScheduledTask.build(builder.setStatus(THROTTLED));
+
+    memStorage.write(new MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(MutableStoreProvider store) {
+        store.getUnsafeTaskStore().saveTasks(ImmutableSet.of(taskA, taskB));
+      }
+    });
+
+    Capture<Function<Offer, Optional<TaskInfo>>> assignment = expectLaunchAttempt(true);
+    expect(assigner.maybeAssign(OFFER, taskA, EMPTY_JOB))
+        .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
+
+    control.replay();
+
+    assertEquals(SUCCESS, scheduler.schedule(Tasks.id(taskA)));
+    assignment.getValue().apply(OFFER);
   }
 
   private static IScheduledTask makeTask(String taskId) {

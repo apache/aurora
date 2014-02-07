@@ -122,6 +122,12 @@ public final class Tasks {
   public static final Set<ScheduleStatus> TERMINAL_STATES =
       EnumSet.copyOf(apiConstants.TERMINAL_STATES);
 
+  /**
+   * Tasks a state can be in when associated with a slave machine.
+   */
+  public static final Set<ScheduleStatus> SLAVE_ASSIGNED_STATES =
+      EnumSet.copyOf(apiConstants.SLAVE_ASSIGNED_STATES);
+
   public static final Predicate<ITaskConfig> IS_PRODUCTION =
       new Predicate<ITaskConfig>() {
         @Override

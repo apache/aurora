@@ -262,20 +262,30 @@ enum ScheduleStatus {
 }
 
 // States that a task may be in while still considered active.
-const set<ScheduleStatus> ACTIVE_STATES = [ScheduleStatus.THROTTLED,
-                                           ScheduleStatus.PENDING,
-                                           ScheduleStatus.ASSIGNED,
-                                           ScheduleStatus.STARTING,
-                                           ScheduleStatus.RUNNING,
+const set<ScheduleStatus> ACTIVE_STATES = [ScheduleStatus.ASSIGNED,
+                                           ScheduleStatus.DRAINING,
                                            ScheduleStatus.KILLING,
-                                           ScheduleStatus.RESTARTING,
-                                           ScheduleStatus.PREEMPTING]
+                                           ScheduleStatus.PENDING,
+                                           ScheduleStatus.PREEMPTING,
+                                           ScheduleStatus.RESTARTING
+                                           ScheduleStatus.RUNNING,
+                                           ScheduleStatus.STARTING,
+                                           ScheduleStatus.THROTTLED]
+
+// States that a task may be in while associated with a slave machine and non-terminal.
+const set<ScheduleStatus> SLAVE_ASSIGNED_STATES = [ScheduleStatus.ASSIGNED,
+                                                   ScheduleStatus.DRAINING,
+                                                   ScheduleStatus.KILLING,
+                                                   ScheduleStatus.PREEMPTING,
+                                                   ScheduleStatus.RESTARTING,
+                                                   ScheduleStatus.RUNNING,
+                                                   ScheduleStatus.STARTING]
 
 // States that a task may be in while in an active sandbox.
-const set<ScheduleStatus> LIVE_STATES = [ScheduleStatus.RUNNING,
-                                         ScheduleStatus.KILLING,
+const set<ScheduleStatus> LIVE_STATES = [ScheduleStatus.KILLING,
+                                         ScheduleStatus.PREEMPTING,
                                          ScheduleStatus.RESTARTING,
-                                         ScheduleStatus.PREEMPTING]
+                                         ScheduleStatus.RUNNING]
 
 // States a completed task may be in.
 const set<ScheduleStatus> TERMINAL_STATES = [ScheduleStatus.FAILED,
