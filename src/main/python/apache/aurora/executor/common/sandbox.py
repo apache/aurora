@@ -76,13 +76,29 @@ class DirectorySandbox(SandboxInterface):
 
   def create(self):
     log.debug('DirectorySandbox: mkdir %s' % self.root)
-    safe_mkdir(self.root)
-    pwent = pwd.getpwnam(self._user)
-    grent = grp.getgrgid(pwent.pw_gid)
-    log.debug('DirectorySandbox: chown %s:%s %s' % (self._user, grent.gr_name, self.root))
-    os.chown(self.root, pwent.pw_uid, pwent.pw_gid)
-    log.debug('DirectorySandbox: chmod 700 %s' % self.root)
-    os.chmod(self.root, 0700)
+
+    try:
+      safe_mkdir(self.root)
+    except (IOError, OSError) as e:
+      raise self.CreationError('Failed to create the sandbox: %s' % e)
+
+    try:
+      pwent = pwd.getpwnam(self._user)
+      grent = grp.getgrgid(pwent.pw_gid)
+    except KeyError:
+      raise self.CreationError(
+          'Could not create sandbox because user does not exist: %s' % self._user)
+
+    try:
+      log.debug('DirectorySandbox: chown %s:%s %s' % (self._user, grent.gr_name, self.root))
+      os.chown(self.root, pwent.pw_uid, pwent.pw_gid)
+      log.debug('DirectorySandbox: chmod 700 %s' % self.root)
+      os.chmod(self.root, 0700)
+    except (IOError, OSError) as e:
+      raise self.CreationError('Failed to chown/chmod the sandbox: %s' % e)
 
   def destroy(self):
-    safe_rmtree(self.root)
+    try:
+      safe_rmtree(self.root)
+    except (IOError, OSError) as e:
+      raise self.DeletionError('Failed to destroy sandbox: %s' % e)

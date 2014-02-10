@@ -343,7 +343,10 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
     directory_sandbox = DirectorySandbox(header_sandbox) if header_sandbox else None
     if directory_sandbox and directory_sandbox.exists():
       self.log('Destroying DirectorySandbox for %s' % task_id)
-      directory_sandbox.destroy()
+      try:
+        directory_sandbox.destroy()
+      except DirectorySandbox.Error as e:
+        self.log('Failed to destroy DirectorySandbox: %s' % e)
     else:
       self.log('Found no sandboxes for %s' % task_id)
 
