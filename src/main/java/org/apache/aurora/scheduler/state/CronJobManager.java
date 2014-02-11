@@ -353,6 +353,11 @@ public class CronJobManager extends JobManager implements EventSubscriber {
       return false;
     }
 
+    if (CronCollisionPolicy.RUN_OVERLAP.equals(job.getCronCollisionPolicy())) {
+      throw new ScheduleException(
+          "The RUN_OVERLAP collision policy has been removed (AURORA-38).");
+    }
+
     SanitizedCronJob cronJob = new SanitizedCronJob(config, cron);
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override

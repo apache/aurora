@@ -431,19 +431,6 @@ public class CronJobManagerTest extends EasyMockTest {
     jobTriggerCapture.getValue().run();
   }
 
-  @Test
-  public void testRunOverlapCollision() throws Exception {
-    IJobConfiguration killExisting = IJobConfiguration.build(
-        job.newBuilder().setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP));
-    Capture<Runnable> jobTriggerCapture = expectJobAccepted(killExisting);
-    expectActiveTaskFetch(TASK);
-
-    control.replay();
-
-    cron.receiveJob(new SanitizedConfiguration(killExisting));
-    jobTriggerCapture.getValue().run();
-  }
-
   @Test(expected = ScheduleException.class)
   public void testScheduleFails() throws Exception {
     expectJobValidated(job);
@@ -454,6 +441,38 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     cron.receiveJob(sanitizedConfiguration);
+  }
+
+  @Test(expected = ScheduleException.class)
+  public void testRunOverlapRejected() throws Exception {
+    IJobConfiguration killExisting = IJobConfiguration.build(
+        job.newBuilder().setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP));
+
+    control.replay();
+
+    cron.receiveJob(new SanitizedConfiguration(killExisting));
+  }
+
+  @Test
+  public void testRunOverlapLoadedSuccessfully() throws Exception {
+    // Existing RUN_OVERLAP jobs should still load and map.
+
+    expect(cronScheduler.startAsync()).andReturn(cronScheduler);
+    cronScheduler.awaitRunning();
+    shutdownRegistry.addAction(EasyMock.<ExceptionalCommand<?>>anyObject());
+
+    IJobConfiguration jobA =
+        IJobConfiguration.build(makeJob().newBuilder()
+            .setCronCollisionPolicy(CronCollisionPolicy.RUN_OVERLAP));
+
+    expect(storageUtil.jobStore.fetchJobs(MANAGER_KEY)).andReturn(ImmutableList.of(jobA));
+    expect(cronScheduler.isValidSchedule(jobA.getCronSchedule())).andReturn(true);
+    expect(cronScheduler.schedule(eq(jobA.getCronSchedule()), EasyMock.<Runnable>anyObject()))
+        .andReturn("keyA");
+
+    control.replay();
+
+    cron.schedulerActive(new SchedulerActive());
   }
 
   private IJobConfiguration makeJob() {

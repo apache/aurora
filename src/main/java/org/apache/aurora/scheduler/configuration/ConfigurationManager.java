@@ -32,7 +32,6 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 
 import org.apache.aurora.gen.Constraint;
-import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.TaskConfig;
@@ -266,11 +265,6 @@ public final class ConfigurationManager {
     if (!StringUtils.isEmpty(job.getCronSchedule()) && builder.getTaskConfig().isIsService()) {
       throw new TaskDescriptionException(
           "A service task may not be run on a cron schedule: " + builder);
-    }
-
-    if (CronCollisionPolicy.RUN_OVERLAP.equals(job.getCronCollisionPolicy())) {
-      throw new TaskDescriptionException(
-          "The RUN_OVERLAP collision policy has been removed (AURORA-38).");
     }
 
     return IJobConfiguration.build(builder);
