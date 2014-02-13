@@ -19,6 +19,7 @@ import contextlib
 from apache.aurora.client.commands.ssh import ssh
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 
+from gen.apache.aurora.constants import LIVE_STATES
 from gen.apache.aurora.ttypes import (
     AssignedTask,
     Identity,
@@ -111,8 +112,7 @@ class TestSshCommand(AuroraClientCommandTest):
       # and then prints the result.
       mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll'), instanceIds=set([1]),
-          statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING])))
+          statuses=LIVE_STATES))
       mock_subprocess.assert_called_with(['ssh', '-t', 'mchucarroll@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])

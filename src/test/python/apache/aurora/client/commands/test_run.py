@@ -19,6 +19,7 @@ import contextlib
 from apache.aurora.client.commands.run import run
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 
+from gen.apache.aurora.constants import LIVE_STATES
 from gen.apache.aurora.ttypes import (
     AssignedTask,
     Identity,
@@ -121,8 +122,7 @@ class TestRunCommand(AuroraClientCommandTest):
       # and then prints the result.
       mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll'),
-          statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING])))
+          statuses=LIVE_STATES))
 
       # The mock status call returns 3 three ScheduledTasks, so three commands should have been run
       assert mock_subprocess.call_count == 3
