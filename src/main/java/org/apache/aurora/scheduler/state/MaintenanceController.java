@@ -133,7 +133,7 @@ public interface MaintenanceController {
             stateManager.changeState(
                 taskId,
                 Optional.<ScheduleStatus>absent(),
-                ScheduleStatus.RESTARTING,
+                ScheduleStatus.DRAINING,
                 DRAINING_MESSAGE);
           }
         }

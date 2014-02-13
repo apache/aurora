@@ -42,6 +42,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
+import static org.apache.aurora.gen.ScheduleStatus.DRAINING;
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.INIT;
@@ -224,8 +225,8 @@ class TaskStateMachine {
             .withCallback(deleteIfKilling))
         .addState(
             Rule.from(ASSIGNED)
-                .to(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, KILLED,
-                    KILLING, LOST, PREEMPTING)
+                .to(STARTING, RUNNING, FINISHED, FAILED, RESTARTING, DRAINING,
+                    KILLED, KILLING, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<ScheduleStatus>>() {
                       @Override
@@ -244,6 +245,10 @@ class TaskStateMachine {
                             break;
 
                           case RESTARTING:
+                            addFollowup(KILL);
+                            break;
+
+                          case DRAINING:
                             addFollowup(KILL);
                             break;
 
@@ -268,7 +273,8 @@ class TaskStateMachine {
                 ))
         .addState(
             Rule.from(STARTING)
-                .to(RUNNING, FINISHED, FAILED, RESTARTING, KILLING, KILLED, LOST, PREEMPTING)
+                .to(RUNNING, FINISHED, FAILED, RESTARTING, DRAINING, KILLING,
+                    KILLED, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<ScheduleStatus>>() {
                       @Override
@@ -279,6 +285,10 @@ class TaskStateMachine {
                             break;
 
                           case RESTARTING:
+                            addFollowup(KILL);
+                            break;
+
+                          case DRAINING:
                             addFollowup(KILL);
                             break;
 
@@ -316,7 +326,7 @@ class TaskStateMachine {
                 ))
         .addState(
             Rule.from(RUNNING)
-                .to(FINISHED, RESTARTING, FAILED, KILLING, KILLED, LOST, PREEMPTING)
+                .to(FINISHED, RESTARTING, DRAINING, FAILED, KILLING, KILLED, LOST, PREEMPTING)
                 .withCallback(
                     new Closure<Transition<ScheduleStatus>>() {
                       @Override
@@ -331,6 +341,10 @@ class TaskStateMachine {
                             break;
 
                           case RESTARTING:
+                            addFollowup(KILL);
+                            break;
+
+                          case DRAINING:
                             addFollowup(KILL);
                             break;
 
@@ -370,6 +384,10 @@ class TaskStateMachine {
                 .withCallback(manageRestartingTask))
         .addState(
             Rule.from(RESTARTING)
+                .to(FINISHED, FAILED, KILLING, KILLED, LOST)
+                .withCallback(manageRestartingTask))
+        .addState(
+            Rule.from(DRAINING)
                 .to(FINISHED, FAILED, KILLING, KILLED, LOST)
                 .withCallback(manageRestartingTask))
         .addState(

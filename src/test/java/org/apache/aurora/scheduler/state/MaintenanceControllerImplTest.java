@@ -105,7 +105,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expect(stateManager.changeState(
         Tasks.id(task),
         Optional.<ScheduleStatus>absent(),
-        ScheduleStatus.RESTARTING,
+        ScheduleStatus.DRAINING,
         MaintenanceControllerImpl.DRAINING_MESSAGE))
         .andReturn(true);
     expectMaintenanceModeChange(HOST_A, DRAINING);

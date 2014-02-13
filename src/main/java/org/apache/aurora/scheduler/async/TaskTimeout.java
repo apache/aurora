@@ -69,7 +69,8 @@ class TaskTimeout implements EventSubscriber {
       ScheduleStatus.ASSIGNED,
       ScheduleStatus.PREEMPTING,
       ScheduleStatus.RESTARTING,
-      ScheduleStatus.KILLING);
+      ScheduleStatus.KILLING,
+      ScheduleStatus.DRAINING);
 
   private final Map<TimeoutKey, Context> futures = Maps.newConcurrentMap();
 

@@ -269,6 +269,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
                 case ASSIGNED:
                 case STARTING:
                 case RESTARTING:
+                case DRAINING:
                 case RUNNING:
                 case KILLING:
                 case PREEMPTING:

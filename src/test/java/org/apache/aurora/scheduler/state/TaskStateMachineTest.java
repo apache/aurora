@@ -179,6 +179,27 @@ public class TaskStateMachineTest {
   }
 
   @Test
+  public void testDrainedTask() {
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(DRAINING, Action.SAVE_STATE, Action.KILL);
+    legalTransition(FINISHED, Action.SAVE_STATE, Action.RESCHEDULE);
+  }
+
+  @Test
+  public void testRogueDrainedTask() {
+    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
+    legalTransition(DRAINING, Action.SAVE_STATE, Action.KILL);
+    illegalTransition(RUNNING, Action.KILL);
+  }
+
+  @Test
+  public void testPendingDrainedTask() {
+    expectUpdateStateOnTransitionTo(PENDING);
+    // PENDING -> DRAINING should not be allowed.
+    illegalTransition(DRAINING);
+  }
+
+  @Test
   public void testAllowsSkipStartingAndRunning() {
     expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, FINISHED);
   }
@@ -384,6 +405,7 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, ASSIGNED, FINISHED), SAVE)
           .put(new TestCase(true, ASSIGNED, PREEMPTING), SAVE_AND_KILL)
           .put(new TestCase(true, ASSIGNED, RESTARTING), SAVE_AND_KILL)
+          .put(new TestCase(true, ASSIGNED, DRAINING), SAVE_AND_KILL)
           .put(new TestCase(true, ASSIGNED, FAILED), RECORD_FAILURE)
           .put(new TestCase(true, ASSIGNED, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, ASSIGNED, KILLING), SAVE_AND_KILL)
@@ -395,6 +417,7 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, STARTING, FINISHED), SAVE)
           .put(new TestCase(true, STARTING, PREEMPTING), SAVE_AND_KILL)
           .put(new TestCase(true, STARTING, RESTARTING), SAVE_AND_KILL)
+          .put(new TestCase(true, STARTING, DRAINING), SAVE_AND_KILL)
           .put(new TestCase(true, STARTING, FAILED), RECORD_FAILURE)
           .put(new TestCase(true, STARTING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, STARTING, KILLING), SAVE_AND_KILL)
@@ -406,6 +429,7 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, RUNNING, FINISHED), SAVE)
           .put(new TestCase(true, RUNNING, PREEMPTING), SAVE_AND_KILL)
           .put(new TestCase(true, RUNNING, RESTARTING), SAVE_AND_KILL)
+          .put(new TestCase(true, RUNNING, DRAINING), SAVE_AND_KILL)
           .put(new TestCase(true, RUNNING, FAILED), RECORD_FAILURE)
           .put(new TestCase(true, RUNNING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, RUNNING, KILLING), SAVE_AND_KILL)
@@ -442,6 +466,18 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, RESTARTING, KILLING), SAVE)
           .put(new TestCase(true, RESTARTING, LOST), SAVE_KILL_AND_RESCHEDULE)
           .put(new TestCase(true, RESTARTING, UNKNOWN), MARK_LOST)
+          .put(new TestCase(true, DRAINING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(false, DRAINING, ASSIGNED), ILLEGAL_KILL)
+          .put(new TestCase(true, DRAINING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(false, DRAINING, STARTING), ILLEGAL_KILL)
+          .put(new TestCase(true, DRAINING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(false, DRAINING, RUNNING), ILLEGAL_KILL)
+          .put(new TestCase(true, DRAINING, FINISHED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, DRAINING, FAILED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, DRAINING, KILLED), SAVE_AND_RESCHEDULE)
+          .put(new TestCase(true, DRAINING, KILLING), SAVE)
+          .put(new TestCase(true, DRAINING, LOST), SAVE_KILL_AND_RESCHEDULE)
+          .put(new TestCase(true, DRAINING, UNKNOWN), MARK_LOST)
           .put(new TestCase(true, FAILED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, FAILED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, FAILED, STARTING), ILLEGAL_KILL)
@@ -510,11 +546,6 @@ public class TaskStateMachineTest {
             }
           } else {
             machine = new TaskStateMachine("name");
-          }
-
-          // TODO(maximk): Drop when DRAINING support is implemented.
-          if (from == DRAINING || to == DRAINING) {
-            continue;
           }
 
           assertEquals(

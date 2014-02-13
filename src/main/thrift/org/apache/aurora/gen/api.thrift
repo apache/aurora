@@ -285,6 +285,7 @@ const set<ScheduleStatus> SLAVE_ASSIGNED_STATES = [ScheduleStatus.ASSIGNED,
 const set<ScheduleStatus> LIVE_STATES = [ScheduleStatus.KILLING,
                                          ScheduleStatus.PREEMPTING,
                                          ScheduleStatus.RESTARTING,
+                                         ScheduleStatus.DRAINING,
                                          ScheduleStatus.RUNNING]
 
 // States a completed task may be in.

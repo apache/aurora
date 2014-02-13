@@ -102,18 +102,6 @@ public final class StorageBackfill {
   }
 
   /**
-   * Ensures backwards-compatibility of the DRAINING state, which exists in this version but is
-   * not handled.
-   *
-   * @param task Task to possibly rewrite.
-   */
-  private static void rewriteDrainingState(ScheduledTask task) {
-    if (ScheduleStatus.DRAINING == task.getStatus()) {
-      task.setStatus(ScheduleStatus.RESTARTING);
-    }
-  }
-
-  /**
    * Backfills the storage to make it match any assumptions that may have changed since
    * the structs were first written.
    *
@@ -132,7 +120,6 @@ public final class StorageBackfill {
         // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they
         // don't.
         guaranteeShardUniqueness(builder, storeProvider.getUnsafeTaskStore(), clock);
-        rewriteDrainingState(builder);
         return IScheduledTask.build(builder);
       }
     });
