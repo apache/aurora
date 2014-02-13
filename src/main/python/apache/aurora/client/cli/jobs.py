@@ -363,6 +363,8 @@ class RestartCommand(Verb):
              'considered a failure.')
     parser.add_argument('--max_total_failures', type=int, default=0,
         help='Maximum number of shard failures to be tolerated in total during restart.')
+    parser.add_argument('--rollback_on_failure', type=bool, default=True,
+        help='If false, prevent update from performing a rollback.')
     self.add_option(parser, JOBSPEC_ARGUMENT)
     self.add_option(parser, CONFIG_ARGUMENT)
 
@@ -392,7 +394,8 @@ class RestartCommand(Verb):
         context.options.restart_threshold,
         context.options.watch_secs,
         context.options.max_per_shard_failures,
-        context.options.max_total_failures)
+        context.options.max_total_failures,
+        context.options.rollback_on_failure)
     resp = api.restart(context.options.jobspec, context.options.instances, updater_config,
         context.options.healthcheck_interval_seconds, config=config)
 

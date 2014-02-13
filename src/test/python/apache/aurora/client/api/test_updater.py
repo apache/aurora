@@ -106,6 +106,7 @@ class UpdaterTest(TestCase):
     'watch_secs':                 50,
     'max_per_shard_failures':     0,
     'max_total_failures':         0,
+    'rollback_on_failure':        True,
   }
 
   def setUp(self):
@@ -769,3 +770,30 @@ class UpdaterTest(TestCase):
     diff_result = self._updater._diff_configs(from_config, to_config)
     assert diff_result == "", (
       'diff result must be empty but was: %s' % diff_result)
+
+  def test_update_no_rollback(self):
+    """Update process failures exceed total allowable count and update is not rolled back."""
+    update_config = self.UPDATE_CONFIG.copy()
+    update_config.update(max_total_failures=2, max_per_shard_failures=1, rollback_on_failure=False)
+    self.init_updater(update_config)
+
+    old_configs = self.make_task_configs(10)
+    new_config = deepcopy(old_configs[0])
+    new_config.priority = 5
+    job_config = self.make_job_config(new_config, 10)
+    self._config.job_config = job_config
+    self.expect_start()
+    self.expect_get_tasks(old_configs)
+    self.expect_populate(job_config)
+    self.expect_quota_check(10, 10)
+    self.expect_kill([0, 1, 2])
+    self.expect_add([0, 1, 2], new_config)
+    self.expect_watch_instances([0, 1, 2], failed_instances=[0, 1, 2])
+    self.expect_restart([0, 1, 2])
+    self.expect_watch_instances([0, 1, 2], failed_instances=[0, 1, 2])
+    self.expect_finish()
+    self.replay_mocks()
+
+    self.update_and_expect_response(ResponseCode.ERROR)
+    self.verify_mocks()
+

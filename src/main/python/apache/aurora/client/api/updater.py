@@ -171,6 +171,10 @@ class Updater(object):
     instances_to_rollback -- instance ids to rollback.
     instance_configs -- instance configuration to use for rollback.
     """
+    if not self._update_config.rollback_on_failure:
+      log.info('Rollback on failure is disabled in config. Aborting rollback')
+      return
+
     log.info('Reverting update for %s' % instances_to_rollback)
     instance_operation = self.OperationConfigs(
         from_config=instance_configs.local_config_map,

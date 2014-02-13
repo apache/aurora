@@ -36,7 +36,8 @@ class UpdaterConfig(object):
                restart_threshold,
                watch_secs,
                max_per_shard_failures,
-               max_total_failures):
+               max_total_failures,
+               rollback_on_failure):
 
     if batch_size <= 0:
       raise ValueError('Batch size should be greater than 0')
@@ -49,6 +50,7 @@ class UpdaterConfig(object):
     self.watch_secs = watch_secs
     self.max_total_failures = max_total_failures
     self.max_per_instance_failures = max_per_shard_failures
+    self.rollback_on_failure = rollback_on_failure
 
 
 class FailureThreshold(object):

@@ -575,7 +575,8 @@ def restart(args, options):
       options.restart_threshold,
       options.watch_secs,
       options.max_per_shard_failures,
-      options.max_total_failures)
+      options.max_total_failures,
+      options.rollback_on_failure)
   resp = api.restart(job_key, options.shards, updater_config,
       options.health_check_interval_seconds, config=config)
   check_and_log_response(resp)

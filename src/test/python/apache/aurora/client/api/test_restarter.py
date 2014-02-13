@@ -37,7 +37,8 @@ UPDATER_CONFIG = UpdaterConfig(
     23, # restart_threshold
     45, #watch_secs
     0, # max_per_instance_failures
-    0 # max_total_failures
+    0, # max_total_failures
+    True # rollback_on_failure
 )
 
 

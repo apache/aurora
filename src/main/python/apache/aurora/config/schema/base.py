@@ -64,6 +64,7 @@ class UpdateConfig(Struct):
   watch_secs                  = Default(Integer, 30)
   max_per_shard_failures      = Default(Integer, 0)
   max_total_failures          = Default(Integer, 0)
+  rollback_on_failure         = Default(Boolean, True)
 
 
 class HealthCheckConfig(Struct):
