@@ -20,6 +20,7 @@ python_library(
   dependencies = [
     pants(':restarter'),
     pants(':scheduler_client'),
+    pants(':sla'),
     pants(':updater'),
     pants('3rdparty/python:twitter.common.lang'),
     pants('3rdparty/python:twitter.common.log'),
@@ -104,6 +105,18 @@ python_library(
   dependencies = [
     pants(':scheduler_client'),
     pants('3rdparty/python:twitter.common.log'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ]
+)
+
+python_library(
+  name = 'sla',
+  sources = ['sla.py'],
+  dependencies = [
+    pants(':scheduler_client'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('src/main/python/apache/aurora/client:base'),
+    pants('src/main/python/apache/aurora/common'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )

@@ -23,6 +23,7 @@ python_test_suite(name = 'all',
     pants(':instance_watcher'),
     pants(':updater'),
     pants(':quota_check'),
+    pants(':sla'),
   ],
 )
 
@@ -81,6 +82,15 @@ python_tests(name = 'quota_check',
   dependencies = [
     pants('3rdparty/python:mock'),
     pants('src/main/python/apache/aurora/client/api:quota_check'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ]
+)
+
+python_tests(name = 'sla',
+  sources = ['test_sla.py'],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('src/main/python/apache/aurora/client/api:sla'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )

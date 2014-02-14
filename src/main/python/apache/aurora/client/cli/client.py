@@ -17,6 +17,8 @@ class AuroraCommandLine(CommandLine):
     self.register_noun(Job())
     from apache.aurora.client.cli.quota import Quota
     self.register_noun(Quota())
+    from apache.aurora.client.cli.sla import Sla
+    self.register_noun(Sla())
 
 
 class AuroraClientV2CommandProcessor(CommandProcessor):

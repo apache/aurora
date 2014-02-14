@@ -39,10 +39,11 @@ python_library(
 
 python_library(
   name='cli',
-  sources = [ '__init__.py', 'jobs.py', 'quota.py', 'context.py', 'options.py' ],
+  sources = [ '__init__.py', 'jobs.py', 'quota.py', 'context.py', 'options.py', 'sla.py' ],
   dependencies = [
     pants('3rdparty/python:argparse'),
     pants('3rdparty/python:twitter.common.python'),
+    pants('3rdparty/python:twitter.common.quantity'),
     pants('src/main/python/apache/aurora/client/api:command_runner'),
     pants('src/main/python/apache/aurora/client/api:disambiguator'),
     pants('src/main/python/apache/aurora/client/api:job_monitor'),

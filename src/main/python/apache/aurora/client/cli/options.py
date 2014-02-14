@@ -17,6 +17,8 @@
 from apache.aurora.client.cli import CommandOption
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
+from twitter.common.quantity.parse_simple import parse_time
+
 
 def parse_qualified_role(rolestr):
   if rolestr is None:
@@ -41,6 +43,16 @@ def parse_instances(instances):
     x = part.split('-')
     result.update(range(int(x[0]), int(x[-1]) + 1))
   return sorted(result)
+
+def parse_time_values(time_values):
+  """Parse lists of discrete time values. Every value must be in the following format: XdYhZmWs.
+     Examples:
+       15m
+       1m,1d,3h25m,2h4m15s
+  """
+  if time_values is None or time_values == '':
+    return None
+  return sorted(map(parse_time, time_values.split(',')))
 
 
 BATCH_OPTION = CommandOption('--batch_size', type=int, default=5,
