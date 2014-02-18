@@ -39,7 +39,15 @@ python_library(
 
 python_library(
   name='cli',
-  sources = [ '__init__.py', 'jobs.py', 'quota.py', 'context.py', 'options.py', 'sla.py' ],
+  sources = [
+    '__init__.py',
+    'context.py',
+    'jobs.py',
+    'options.py',
+    'quota.py',
+    'sla.py',
+    'task.py'
+  ],
   dependencies = [
     pants('3rdparty/python:argparse'),
     pants('3rdparty/python:twitter.common.python'),

@@ -19,6 +19,8 @@ class AuroraCommandLine(CommandLine):
     self.register_noun(Quota())
     from apache.aurora.client.cli.sla import Sla
     self.register_noun(Sla())
+    from apache.aurora.client.cli.task import Task
+    self.register_noun(Task())
 
 
 class AuroraClientV2CommandProcessor(CommandProcessor):

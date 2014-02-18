@@ -14,6 +14,8 @@
 # limitations under the License.
 #
 
+from collections import namedtuple
+
 from apache.aurora.client.cli import CommandOption
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
@@ -55,6 +57,21 @@ def parse_time_values(time_values):
   return sorted(map(parse_time, time_values.split(',')))
 
 
+TaskInstanceKey = namedtuple('TaskInstanceKey', [ 'jobkey', 'instance' ])
+
+def parse_task_instance_key(key):
+  pieces = key.split('/')
+  if len(pieces) != 5:
+    raise ValueError('Task instance specifier %s is not in the form '
+        'CLUSTER/ROLE/ENV/NAME/INSTANCE' % key)
+  (cluster, role, env, name, instance_str) = pieces
+  try:
+    instance = int(instance_str)
+  except ValueError:
+    raise ValueError('Instance must be an integer, but got %s' % instance_str)
+  return TaskInstanceKey(AuroraJobKey(cluster, role, env, name), instance)
+
+
 BATCH_OPTION = CommandOption('--batch_size', type=int, default=5,
         help='Number of instances to be operate on in one iteration')
 
@@ -72,6 +89,10 @@ BROWSER_OPTION = CommandOption('--open-browser', default=False, dest='open_brows
 
 CONFIG_ARGUMENT = CommandOption('config_file', type=str,
     help='pathname of the aurora configuration file contain the job specification')
+
+
+EXECUTOR_SANDBOX_OPTION = CommandOption('--executor_sandbox', action='store_true',
+     default=False, help='Run the command in the executor sandbox instead of the task sandbox')
 
 
 FORCE_OPTION = CommandOption('--force', default=False, action='store_true',
@@ -108,8 +129,16 @@ ROLE_ARGUMENT = CommandOption('role', type=parse_qualified_role,
     help='Rolename to retrieve information about, in CLUSTER/NAME format')
 
 
+SSH_USER_OPTION = CommandOption('--ssh_user', '-l', default=None,
+    help='ssh as this username instead of the job\'s role')
+
+
+TASK_INSTANCE_ARGUMENT = CommandOption('task_instance', type=parse_task_instance_key,
+    help='A task instance specifier, in the form CLUSTER/ROLE/ENV/NAME/INSTANCE')
+
+
 WATCH_OPTION = CommandOption('--watch_secs', type=int, default=30,
-    help='Minimum number of seconds a shard must remain in RUNNING state before considered a '
+    help='Minimum number of seconds a instance must remain in RUNNING state before considered a '
          'success.')
 
 

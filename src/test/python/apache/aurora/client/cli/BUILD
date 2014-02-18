@@ -16,7 +16,13 @@
 
 python_test_suite(
   name = 'all',
-  dependencies = [ pants(':bridge'), pants(':job'), pants(':quota'), pants(':sla') ]
+  dependencies = [
+    pants(':bridge'),
+    pants(':job'),
+    pants(':quota'),
+    pants(':sla'),
+    pants(':task')
+  ]
 )
 
 python_library(
@@ -73,6 +79,19 @@ python_tests(
 python_tests(
   name = 'sla',
   sources = [ 'test_sla.py' ],
+  dependencies = [
+    pants(':util'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/client/cli'),
+    pants('src/main/python/apache/aurora/client/cli:client'),
+    pants('src/test/python/apache/aurora/client/commands:util')
+  ]
+)
+
+python_tests(
+  name='task',
+  sources = [ 'test_task_run.py'],
   dependencies = [
     pants(':util'),
     pants('3rdparty/python:mock'),

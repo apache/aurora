@@ -355,14 +355,14 @@ class RestartCommand(Verb):
     self.add_option(parser, INSTANCES_OPTION)
     self.add_option(parser, JSON_READ_OPTION)
     self.add_option(parser, WATCH_OPTION)
-    parser.add_argument('--max_per_shard_failures', type=int, default=0,
-        help='Maximum number of restarts per shard during restart. Increments total failure '
+    parser.add_argument('--max_per_instance_failures', type=int, default=0,
+        help='Maximum number of restarts per instance during restart. Increments total failure '
             'count when this limit is exceeded.')
     parser.add_argument('--restart_threshold', type=int, default=60,
-        help='Maximum number of seconds before a shard must move into the RUNNING state before '
+        help='Maximum number of seconds before an instance must move into the RUNNING state before '
              'considered a failure.')
     parser.add_argument('--max_total_failures', type=int, default=0,
-        help='Maximum number of shard failures to be tolerated in total during restart.')
+        help='Maximum number of instance failures to be tolerated in total during restart.')
     parser.add_argument('--rollback_on_failure', type=bool, default=True,
         help='If false, prevent update from performing a rollback.')
     self.add_option(parser, JOBSPEC_ARGUMENT)
@@ -371,16 +371,16 @@ class RestartCommand(Verb):
   @property
   def help(self):
     return """Usage: restart cluster/role/env/job
-    [--shards=SHARDS]
+    [--instances=INSTANCES]
     [--batch_size=INT]
     [--updater_health_check_interval_seconds=SECONDS]
-    [--max_per_shard_failures=INT]
+    [--max_per_instance_failures=INT]
     [--max_total_failures=INT]
     [--restart_threshold=INT]
     [--watch_secs=SECONDS]
     [--open_browser]
 
-  Performs a rolling restart of shards within a job.
+  Performs a rolling restart of running task instances within a job.
 
   Restarts are fully controlled client-side, so aborting halts the restart.
   """
@@ -393,7 +393,7 @@ class RestartCommand(Verb):
         context.options.batch_size,
         context.options.restart_threshold,
         context.options.watch_secs,
-        context.options.max_per_shard_failures,
+        context.options.max_per_instance_failures,
         context.options.max_total_failures,
         context.options.rollback_on_failure)
     resp = api.restart(context.options.jobspec, context.options.instances, updater_config,
@@ -518,8 +518,8 @@ class UpdateCommand(Verb):
   Subsequent update attempts will fail until the update is 'unlocked' using the
   'cancel_update' command.
 
-  The updater only takes action on shards in a job that have changed, meaning
-  that changing a single shard will only induce a restart on the changed shard.
+  The updater only takes action on instances in a job that have changed, meaning
+  that changing a single instance will only induce a restart on the changed task instance.
 
   You may want to consider using the 'diff' subcommand before updating,
   to preview what changes will take effect.
