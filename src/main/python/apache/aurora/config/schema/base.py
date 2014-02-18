@@ -25,15 +25,6 @@ class MesosContext(Struct):
   instance    = Required(Integer)
 
 
-# AppApp layout setup
-class AppPackage(Struct):
-  name    = Required(String)
-  version = Default(String, 'latest')
-
-class AppLayout(Struct):
-  packages = Default(List(AppPackage), [])
-
-
 # The object bound into the {{packer}} namespace.
 # Referenced by
 #  {{packer[role][name][version]}}
@@ -91,7 +82,6 @@ class Announcer(Struct):
 # The executorConfig populated inside of TaskConfig.
 class MesosTaskInstance(Struct):
   task                       = Required(Task)
-  layout                     = AppLayout
   instance                   = Required(Integer)
   role                       = Required(String)
   announce                   = Announcer
@@ -129,8 +119,6 @@ class MesosJob(Struct):
   health_check_interval_secs = Integer # DEPRECATED in favor of health_check_config (MESOS-2649).
   health_check_config        = HealthCheckConfig
   task_links                 = Map(String, String)
-
-  layout        = AppLayout      # DEPRECATED in favor of directory sandboxes
 
   enable_hooks = Default(Boolean, False)  # enable client API hooks; from env python-list 'hooks'
 

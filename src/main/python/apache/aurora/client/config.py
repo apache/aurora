@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-'''Library of utilities called by the mesos client binary
+'''Library of utilities called by the aurora client binary
 '''
 
 from __future__ import print_function
@@ -34,17 +34,6 @@ from gen.apache.aurora.constants import DEFAULT_ENVIRONMENT
 
 from pystachio import Empty, Ref
 from twitter.common import app, log
-
-
-APPAPP_DEPRECATION_WARNING = """
-The use of app-app is deprecated. Please reach out to mesos-team@twitter.com for advice on
-migrating your application away from app-app layouts to an alternative packaging solution.
-"""
-
-
-def _warn_on_appapp_layouts(config):
-  if config.raw().has_layout():
-    deprecation_warning(APPAPP_DEPRECATION_WARNING)
 
 
 CRON_DEPRECATION_WARNING = """
@@ -189,7 +178,6 @@ def populate_namespaces(config, env=None):
   _warn_on_deprecated_cron_policy(config)
   _warn_on_deprecated_daemon_job(config)
   _warn_on_deprecated_health_check_interval_secs(config)
-  _warn_on_appapp_layouts(config)
   return config
 
 
