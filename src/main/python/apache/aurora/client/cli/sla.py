@@ -20,7 +20,7 @@ from apache.aurora.client.cli import (
     Verb,
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
-from apache.aurora.client.cli.options import JOBSPEC_ARGUMENT, parse_time_values
+from apache.aurora.client.cli.options import CommandOption, JOBSPEC_ARGUMENT, parse_time_values
 
 from twitter.common.quantity import Time
 
@@ -32,12 +32,10 @@ class GetTaskUpCountCmd(Verb):
 
   @property
   def help(self):
-    return """Usage: aurora sla get_task_up_count cluster/role/env/job [--duration]
-
-    Prints the percentage of tasks that stayed up within the last "duration" s|m|h|d.
-    If duration is not specified prints a histogram-like log-scale distribution
-    of task uptime percentages.
-    """
+    return """Print the percentage of tasks that stayed up within the last "duration" s|m|h|d.
+If duration is not specified prints a histogram-like log-scale distribution
+of task uptime percentages.
+"""
 
   @classmethod
   def render_get_task_up_count(cls, context, vector):
@@ -49,14 +47,15 @@ class GetTaskUpCountCmd(Verb):
     return '\n'.join(format_output(durations))
 
 
-  def setup_options_parser(self, parser):
-    self.add_option(parser, JOBSPEC_ARGUMENT)
-    parser.add_argument('--durations', type=parse_time_values, default=None,
-        help='Durations to report uptime for.'
-             'Format: XdYhZmWs (each field optional but must be in that order.)'
-             'Examples: '
-             '  --durations=1d'
-             '  --durations=3m,10s,1h3m10s')
+  def get_options(self):
+    return [
+        CommandOption('--durations', type=parse_time_values, default=None,
+            help="""Durations to report uptime for.
+Format: XdYhZmWs (each field optional but must be in that order.)
+Examples:
+ --durations=1d'
+  --durations=3m,10s,1h3m10s"""),
+        JOBSPEC_ARGUMENT]
 
   def execute(self, context):
     api = context.get_api(context.options.jobspec.cluster)

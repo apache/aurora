@@ -42,6 +42,7 @@ from apache.aurora.client.cli.options import (
     BATCH_OPTION,
     BIND_OPTION,
     BROWSER_OPTION,
+    CommandOption,
     CONFIG_ARGUMENT,
     EXECUTOR_SANDBOX_OPTION,
     FORCE_OPTION,
@@ -87,13 +88,15 @@ class RunCommand(Verb):
   This means anything in the {{mesos.*}} and {{thermos.*}} namespaces.
   """
 
-  def setup_options_parser(self, parser):
-    parser.add_argument('--threads', '-t', type=int, default=1, dest='num_threads',
-        help='Number of threads to use')
-    self.add_option(parser, SSH_USER_OPTION)
-    self.add_option(parser, EXECUTOR_SANDBOX_OPTION)
-    self.add_option(parser, JOBSPEC_ARGUMENT)
-    parser.add_argument('cmd', type=str)
+  def get_options(self):
+    return [
+        CommandOption('--threads', '-t', type=int, default=1, dest='num_threads',
+            help='Number of threads to use'),
+        SSH_USER_OPTION,
+        EXECUTOR_SANDBOX_OPTION,
+        JOBSPEC_ARGUMENT,
+        CommandOption('cmd', type=str)
+    ]
 
   def execute(self, context):
     # TODO(mchucarroll): add options to specify which instances to run on (AURORA-198)
@@ -116,15 +119,17 @@ class SshCommand(Verb):
   Initiate an SSH session on the machine that a task instance is running on.
   """
 
-  def setup_options_parser(self, parser):
-    self.add_option(parser, SSH_USER_OPTION)
-    self.add_option(parser, EXECUTOR_SANDBOX_OPTION)
-    parser.add_argument('--tunnels', '-L', dest='tunnels', action='append', metavar='PORT:NAME',
-        default=[],
-        help="Add tunnel from local port PART to remote named port NAME")
-    parser.add_argument('--command', '-c', dest='command', type=str, default=None,
-        help="Command to execute through the ssh connection.")
-    self.add_option(parser, TASK_INSTANCE_ARGUMENT)
+  def get_options(self):
+    return [
+        SSH_USER_OPTION,
+        EXECUTOR_SANDBOX_OPTION,
+        CommandOption('--tunnels', '-L', dest='tunnels', action='append', metavar='PORT:NAME',
+            default=[],
+            help="Add tunnel from local port PART to remote named port NAME"),
+        CommandOption('--command', '-c', dest='command', type=str, default=None,
+            help="Command to execute through the ssh connection."),
+        TASK_INSTANCE_ARGUMENT
+    ]
 
   def execute(self, context):
     (cluster, role, env, name) = context.options.task_instance.jobkey

@@ -41,14 +41,10 @@ class GetQuotaCmd(Verb):
 
   @property
   def help(self):
-    return """Usage: aurora quota get cluster/role
+    return "Print information about quotas for a role"
 
-    Prints information about quotas for a role
-    """
-
-  def setup_options_parser(self, parser):
-    self.add_option(parser, JSON_WRITE_OPTION)
-    self.add_option(parser, ROLE_ARGUMENT)
+  def get_options(self):
+    return [JSON_WRITE_OPTION, ROLE_ARGUMENT]
 
   def render_quota(self, write_json, quota_resp):
     def get_quota_json(quota):

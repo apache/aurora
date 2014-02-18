@@ -72,51 +72,52 @@ class Context(object):
     self.options = options
 
 
-class CommandOption(object):
-  """A lightweight encapsulation of an argparse option specification, which can be used to
-  define options that can be reused by multiple commands.
-  """
-
-  def __init__(self, *args, **kwargs):
-    self.args = args
-    self.kwargs = kwargs
-
-  def add_to_parser(self, parser):
-    parser.add_argument(*self.args, **self.kwargs)
-
-
 class AuroraCommand(object):
   def setup_options_parser(self, argparser):
-    """Set up command line options parsing for this command.
+    """Sets up command line options parsing for this command.
     This is a thin veneer over the standard python argparse system.
     :param argparser: the argument parser where this command can add its arguments.
     """
     pass
 
   def add_option(self, argparser, option):
-    """Add a predefined argument encapsulated an a CommandOption to an argument parser."""
+    """Adds an option spec encapsulated an a CommandOption to this command's argument parser."""
     if not isinstance(option, CommandOption):
       raise TypeError('Command option object must be an instance of CommandOption')
     option.add_to_parser(argparser)
 
   @property
   def help(self):
-    """The help message for a command that will be used in the argparse help message"""
+    """Returns the help message for this command"""
+
+  @property
+  def usage(self):
+    """Returns a short usage description of the command"""
 
   @property
   def name(self):
-    """The command name"""
+    """Returns the command name"""
 
 
 class CommandLine(object):
   """The top-level object implementing a command-line application."""
+
+  @property
+  def name(self):
+    """Returns the name of this command-line tool"""
+
+  def print_out(self, str):
+    print(str)
+
+  def print_err(self, str):
+    print(str, file=sys.stderr)
 
   def __init__(self):
     self.nouns = None
     self.parser = None
 
   def register_noun(self, noun):
-    """Add a noun to the application"""
+    """Adds a noun to the application"""
     if self.nouns is None:
       self.nouns = {}
     if not isinstance(noun, Noun):
@@ -124,12 +125,58 @@ class CommandLine(object):
     self.nouns[noun.name] = noun
 
   def setup_options_parser(self):
-    """ Build the options parsing for the application."""
+    """ Builds the options parsing for the application."""
     self.parser = argparse.ArgumentParser()
     subparser = self.parser.add_subparsers(dest='noun')
     for (name, noun) in self.nouns.items():
       noun_parser = subparser.add_parser(name, help=noun.help)
       noun.internal_setup_options_parser(noun_parser)
+
+  def help_cmd(self, args):
+    """Generates a help message for a help request.
+    There are three kinds of help requests: a simple no-parameter request (help) which generates
+    a list of all of the commands; a one-parameter (help noun) request, which generates the help
+    for a particular noun, and a two-parameter request (help noun verb) which generates the help
+    for a particular verb.
+    """
+    if args is None or len(args) == 0:
+      self.print_out(self.composed_help)
+    elif len(args) == 1:
+      if args[0] in self.nouns:
+        self.print_out(self.nouns[args[0]].composed_help)
+        return EXIT_OK
+      else:
+        self.print_err('Unknown noun "%s"' % args[0])
+        self.print_err('Valid nouns are: %s' % [k for k in self.nouns])
+        return EXIT_INVALID_PARAMETER
+    elif len(args) == 2:
+      if args[0] in self.nouns:
+        if args[1] in self.nouns[args[0]].verbs:
+          self.print_out(self.nouns[args[0]].verbs[args[1]].composed_help)
+          return EXIT_OK
+        else:
+          self.print_err('Noun "%s" does not support a verb "%s"' % (args[0], args[1]))
+          verbs = [v for v in self.nouns[args[0]].verbs]
+          self.print_err('Valid verbs for "%s" are: %s' % (args[0], verbs))
+          return EXIT_INVALID_PARAMETER
+      else:
+        self.print_err('Unknown noun %s' % args[0])
+        return EXIT_INVALID_PARAMETER
+    else:
+      self.print_err('Unknown help command: %s' % (' '.join(args)))
+      self.print_err(self.composed_help)
+      return EXIT_INVALID_PARAMETER
+
+  @property
+  def composed_help(self):
+    """Get a fully composed, well-formatted help message"""
+    result = ["Usage:"]
+    for noun in self.registered_nouns:
+      result += ["==Commands for %ss" % noun]
+      result += ["  %s" % s for s in self.nouns[noun].usage] + [""]
+    result.append("\nRun 'help noun' or 'help noun verb' for help about a specific command")
+    return "\n".join(result)
+
 
   def register_nouns(self):
     """This method should overridden by applications to register the collection of nouns
@@ -159,6 +206,8 @@ class CommandLine(object):
         that should be parsed by the application; it does not include sys.argv[0].
     """
     nouns = self.registered_nouns
+    if args[0] == 'help':
+      return self.help_cmd(args[1:])
     self.setup_options_parser()
     options = self.parser.parse_args(args)
     if options.noun not in nouns:
@@ -194,7 +243,12 @@ class Noun(AuroraCommand):
     subparser = argparser.add_subparsers(dest='verb')
     for (name, verb) in self.verbs.items():
       vparser = subparser.add_parser(name, help=verb.help)
-      verb.setup_options_parser(vparser)
+      for opt in verb.get_options():
+        opt.add_to_parser(vparser)
+
+  @property
+  def usage(self):
+    return ["%s %s" % (self.name, ' '.join(self.verbs[verb].usage)) for verb in self.verbs]
 
   @classmethod
   def create_context(cls):
@@ -203,9 +257,12 @@ class Noun(AuroraCommand):
     """
     pass
 
-  @abstractmethod
-  def setup_options_parser(self, argparser):
-    pass
+  @property
+  def composed_help(self):
+    result = ['Usage for noun "%s":' % self.name]
+    result += ["    %s %s" % (self.name, self.verbs[verb].usage) for verb in self.verbs]
+    result += [self.help]
+    return '\n'.join(result)
 
   def execute(self, context):
     if context.options.verb not in self.verbs:
@@ -221,9 +278,30 @@ class Verb(AuroraCommand):
     """Create a link from a verb to its noun."""
     self.noun = noun
 
+  @property
+  def usage(self):
+    """Get a brief usage-description for the command.
+    A default usage string is automatically generated, but for commands with many options,
+    users may want to specify usage themselves.
+    """
+    result = [self.name]
+    result += [opt.render_usage() for opt in self.get_options()]
+    return " ".join(result)
+
   @abstractmethod
-  def setup_options_parser(self, argparser):
+  def get_options(self):
     pass
+
+  @property
+  def composed_help(self):
+    """Generate the composed help message shown when the user requests help about this verb"""
+    result = ['Usage for verb "%s %s":' % (self.noun.name, self.name)]
+    result += ["  " + s for s in self.usage]
+    result += ["Options:"]
+    for opt in self.get_options():
+      result += ["  " + s for s in opt.render_help()]
+    result += ["", self.help]
+    return "\n".join(result)
 
   def execute(self, context):
     pass

@@ -35,6 +35,17 @@ python_library(
 )
 
 python_tests(
+  name = 'help',
+  sources = [ 'test_help.py' ],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/client/cli'),
+    pants('src/main/python/apache/aurora/client/cli:client'),
+  ]
+)
+
+python_tests(
   name = 'bridge',
   sources = [ 'test_bridge.py' ],
   dependencies = [

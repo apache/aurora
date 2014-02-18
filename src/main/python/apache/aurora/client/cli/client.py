@@ -27,8 +27,12 @@ class AuroraClientV2CommandProcessor(CommandProcessor):
   def __init__(self):
     self.commandline = AuroraCommandLine()
 
+  @property
+  def name(self):
+    return "aurora"
+
   def get_commands(self):
-    return self.commandline.registered_nouns
+    return self.commandline.registered_nouns + ["help"]
 
   def execute(self, args):
     return self.commandline.execute(args[1:])

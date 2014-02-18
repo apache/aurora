@@ -39,6 +39,7 @@ from apache.aurora.client.cli.options import (
     BATCH_OPTION,
     BIND_OPTION,
     BROWSER_OPTION,
+    CommandOption,
     CONFIG_ARGUMENT,
     FORCE_OPTION,
     HEALTHCHECK_OPTION,
@@ -73,16 +74,13 @@ class CancelUpdateCommand(Verb):
 
   @property
   def help(self):
-    return """Usage: aurora job cancel_update [--config_file=path [--json]] cluster/role/env/name
+    return "Cancel an in-progress update operation, releasing the update lock"
 
-    Cancels an in-progress update operation, releasing the update lock
-    """
-
-  def setup_options_parser(self, parser):
-    self.add_option(parser, JSON_READ_OPTION)
-    parser.add_argument('--config', type=str, default=None, dest='config_file',
-         help='Config file for the job, possibly containing hooks')
-    self.add_option(parser, JOBSPEC_ARGUMENT)
+  def get_options(self):
+    return [JSON_READ_OPTION,
+        CommandOption('--config', type=str, default=None, dest='config_file',
+            help='Config file for the job, possibly containing hooks'),
+        JOBSPEC_ARGUMENT]
 
   def execute(self, context):
     api = context.get_api(context.options.jobspec.cluster)
@@ -99,24 +97,18 @@ class CreateJobCommand(Verb):
 
   @property
   def help(self):
-    return """Usage: aurora create cluster/role/env/job config.aurora
-
-    Create a job using aurora
-    """
+    return "Create a job using aurora"
 
   CREATE_STATES = ('PENDING', 'RUNNING', 'FINISHED')
 
-  def setup_options_parser(self, parser):
-    self.add_option(parser, BIND_OPTION)
-    self.add_option(parser, BROWSER_OPTION)
-    self.add_option(parser, JSON_READ_OPTION)
-    parser.add_argument('--wait_until', choices=self.CREATE_STATES,
-        default='PENDING',
-        help=('Block the client until all the tasks have transitioned into the requested state. '
-                        'Default: PENDING'))
-    self.add_option(parser, JOBSPEC_ARGUMENT)
-    self.add_option(parser, CONFIG_ARGUMENT)
-
+  def get_options(self):
+    return [BIND_OPTION, JSON_READ_OPTION,
+        CommandOption('--wait_until', choices=self.CREATE_STATES,
+            default='PENDING',
+            help=('Block the client until all the tasks have transitioned into the requested '
+                'state. Default: PENDING')),
+        BROWSER_OPTION,
+        JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
   def execute(self, context):
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
@@ -143,24 +135,19 @@ class DiffCommand(Verb):
 
   @property
   def help(self):
-    return """Usage: diff cluster/role/env/job config
-
-  Compares a job configuration against a running job.
-  By default the diff will be displayed using 'diff', though you may choose an alternate
-  diff program by setting the DIFF_VIEWER environment variable.
-  """
+    return """Compare a job configuration against a running job.
+By default the diff will be displayed using 'diff', though you may choose an
+alternate diff program by setting the DIFF_VIEWER environment variable."""
 
   @property
   def name(self):
     return 'diff'
 
-  def setup_options_parser(self, parser):
-    self.add_option(parser, BIND_OPTION)
-    self.add_option(parser, JSON_READ_OPTION)
-    parser.add_argument('--from', dest='rename_from', type=AuroraJobKey.from_path, default=None,
-        help='If specified, the job key to diff against.')
-    self.add_option(parser, JOBSPEC_ARGUMENT)
-    self.add_option(parser, CONFIG_ARGUMENT)
+  def get_options(self):
+    return [BIND_OPTION, JSON_READ_OPTION,
+        CommandOption('--from', dest='rename_from', type=AuroraJobKey.from_path, default=None,
+            help='If specified, the job key to diff against.'),
+        JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
   def pretty_print_task(self, task):
     task.configuration = None
@@ -214,27 +201,23 @@ class DiffCommand(Verb):
 
 
 class InspectCommand(Verb):
+
   @property
   def help(self):
-    return """Usage: inspect cluster/role/env/job config
-
-  Verifies that a job can be parsed from a configuration file, and displays
-  the parsed configuration.
-  """
+    return """Verify that a job can be parsed from a configuration file, and display
+the parsed configuration."""
 
   @property
   def name(self):
     return 'inspect'
 
-  def setup_options_parser(self, parser):
-    self.add_option(parser, BIND_OPTION)
-    self.add_option(parser, JSON_READ_OPTION)
-    parser.add_argument('--local', dest='local', default=False, action='store_true',
-        help='Inspect the configuration as would be created by the "spawn" command.')
-    parser.add_argument('--raw', dest='raw', default=False, action='store_true',
-        help='Show the raw configuration.')
-    self.add_option(parser, JOBSPEC_ARGUMENT)
-    self.add_option(parser, CONFIG_ARGUMENT)
+  def get_options(self):
+    return [BIND_OPTION, JSON_READ_OPTION,
+        CommandOption('--local', dest='local', default=False, action='store_true',
+            help='Inspect the configuration as would be created by the "spawn" command.'),
+        CommandOption('--raw', dest='raw', default=False, action='store_true',
+            help='Show the raw configuration.'),
+        JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
   def execute(self, context):
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
@@ -295,17 +278,13 @@ class KillJobCommand(Verb):
 
   @property
   def help(self):
-    return """Usage: kill cluster/role/env/job
+    return "Kill a scheduled job"
 
-    Kill a scheduled job
-    """
-
-  def setup_options_parser(self, parser):
-    self.add_option(parser, BROWSER_OPTION)
-    self.add_option(parser, INSTANCES_OPTION)
-    parser.add_argument('--config', type=str, default=None, dest='config',
-         help='Config file for the job, possibly containing hooks')
-    self.add_option(parser, JOBSPEC_ARGUMENT)
+  def get_options(self):
+    return [BROWSER_OPTION, INSTANCES_OPTION,
+        CommandOption('--config', type=str, default=None, dest='config',
+            help='Config file for the job, possibly containing hooks'),
+        JOBSPEC_ARGUMENT]
 
   def execute(self, context):
     # TODO(mchucarroll): Check for wildcards; we don't allow wildcards for job kill.
@@ -319,19 +298,17 @@ class KillJobCommand(Verb):
 
 
 class ListJobsCommand(Verb):
+
   @property
   def help(self):
-    return """Usage: aurora job list jobspec
-
-    Lists jobs that match a jobkey or jobkey pattern.
-    """
+    return "List jobs that match a jobkey or jobkey pattern."
 
   @property
   def name(self):
     return 'list'
 
-  def setup_options_parser(self, parser):
-    parser.add_argument('jobspec', type=arg_type_jobkey)
+  def get_options(self):
+    return [CommandOption('jobspec', type=arg_type_jobkey)]
 
   def execute(self, context):
     jobs = context.get_jobs_matching_key(context.options.jobspec)
@@ -346,44 +323,25 @@ class RestartCommand(Verb):
   def name(self):
     return 'restart'
 
-  def setup_options_parser(self, parser):
-    self.add_option(parser, BATCH_OPTION)
-    self.add_option(parser, BIND_OPTION)
-    self.add_option(parser, BROWSER_OPTION)
-    self.add_option(parser, FORCE_OPTION)
-    self.add_option(parser, HEALTHCHECK_OPTION)
-    self.add_option(parser, INSTANCES_OPTION)
-    self.add_option(parser, JSON_READ_OPTION)
-    self.add_option(parser, WATCH_OPTION)
-    parser.add_argument('--max_per_instance_failures', type=int, default=0,
-        help='Maximum number of restarts per instance during restart. Increments total failure '
-            'count when this limit is exceeded.')
-    parser.add_argument('--restart_threshold', type=int, default=60,
-        help='Maximum number of seconds before an instance must move into the RUNNING state before '
-             'considered a failure.')
-    parser.add_argument('--max_total_failures', type=int, default=0,
-        help='Maximum number of instance failures to be tolerated in total during restart.')
-    parser.add_argument('--rollback_on_failure', type=bool, default=True,
-        help='If false, prevent update from performing a rollback.')
-    self.add_option(parser, JOBSPEC_ARGUMENT)
-    self.add_option(parser, CONFIG_ARGUMENT)
+  def get_options(self):
+    return [BATCH_OPTION, BIND_OPTION, BROWSER_OPTION, FORCE_OPTION, HEALTHCHECK_OPTION,
+        INSTANCES_OPTION, JSON_READ_OPTION, WATCH_OPTION,
+        CommandOption('--max_per_instance_failures', type=int, default=0,
+             help='Maximum number of restarts per instance during restart. Increments total failure '
+                 'count when this limit is exceeded.'),
+        CommandOption('--restart_threshold', type=int, default=60,
+             help='Maximum number of seconds before a shard must move into the RUNNING state '
+                 'before considered a failure.'),
+        CommandOption('--max_total_failures', type=int, default=0,
+             help='Maximum number of instance failures to be tolerated in total during restart.'),
+        CommandOption('--rollback_on_failure', default=True, action='store_false',
+            help='If false, prevent update from performing a rollback.'),
+        JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
   @property
   def help(self):
-    return """Usage: restart cluster/role/env/job
-    [--instances=INSTANCES]
-    [--batch_size=INT]
-    [--updater_health_check_interval_seconds=SECONDS]
-    [--max_per_instance_failures=INT]
-    [--max_total_failures=INT]
-    [--restart_threshold=INT]
-    [--watch_secs=SECONDS]
-    [--open_browser]
-
-  Performs a rolling restart of running task instances within a job.
-
-  Restarts are fully controlled client-side, so aborting halts the restart.
-  """
+    return """Perform a rolling restart of shards within a job.
+Restarts are fully controlled client-side, so aborting halts the restart."""
 
   def execute(self, context):
     api = context.get_api(context.options.jobspec.cluster)
@@ -405,21 +363,18 @@ class RestartCommand(Verb):
 
 
 class StatusCommand(Verb):
+
   @property
   def help(self):
-    return """Usage: aurora status jobspec
-
-    Get status information about a scheduled job or group of jobs. The
-    jobspec parameter can ommit parts of the jobkey, or use shell-style globs.
-    """
+    return """Get status information about a scheduled job or group of jobs.
+The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
 
   @property
   def name(self):
     return 'status'
 
-  def setup_options_parser(self, parser):
-    self.add_option(parser, JSON_WRITE_OPTION)
-    parser.add_argument('jobspec', type=arg_type_jobkey)
+  def get_options(self):
+    return [JSON_WRITE_OPTION, CommandOption('jobspec', type=arg_type_jobkey)]
 
   def render_tasks_json(self, jobkey, active_tasks, inactive_tasks):
     """Render the tasks running for a job in machine-processable JSON format."""
@@ -497,33 +452,26 @@ class UpdateCommand(Verb):
   def name(self):
     return 'update'
 
-  def setup_options_parser(self, parser):
-    self.add_option(parser, FORCE_OPTION)
-    self.add_option(parser, BIND_OPTION)
-    self.add_option(parser, JSON_READ_OPTION)
-    self.add_option(parser, INSTANCES_OPTION)
-    self.add_option(parser, HEALTHCHECK_OPTION)
-    self.add_option(parser, JOBSPEC_ARGUMENT)
-    self.add_option(parser, CONFIG_ARGUMENT)
+  def get_options(self):
+    return [FORCE_OPTION, BIND_OPTION, JSON_READ_OPTION, INSTANCES_OPTION, HEALTHCHECK_OPTION,
+        JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
   @property
   def help(self):
-    return """Usage: update cluster/role/env/job config
+    return """Perform a rolling upgrade on a running job, using the update configuration
+within the config file as a control for update velocity and failure tolerance.
 
-  Performs a rolling upgrade on a running job, using the update configuration
-  within the config file as a control for update velocity and failure tolerance.
+Updates are fully controlled client-side, so aborting an update halts the
+update and leaves the job in a 'locked' state on the scheduler.
+Subsequent update attempts will fail until the update is 'unlocked' using the
+'cancel_update' command.
 
-  Updates are fully controlled client-side, so aborting an update halts the
-  update and leaves the job in a 'locked' state on the scheduler.
-  Subsequent update attempts will fail until the update is 'unlocked' using the
-  'cancel_update' command.
+The updater only takes action on instances in a job that have changed, meaning
+that changing a single instance will only induce a restart on the changed task instance.
 
-  The updater only takes action on instances in a job that have changed, meaning
-  that changing a single instance will only induce a restart on the changed task instance.
-
-  You may want to consider using the 'diff' subcommand before updating,
-  to preview what changes will take effect.
-  """
+You may want to consider using the 'diff' subcommand before updating,
+to preview what changes will take effect.
+"""
 
   def warn_if_dangerous_change(self, context, api, job_spec, config):
     # Get the current job status, so that we can check if there's anything
@@ -545,7 +493,8 @@ class UpdateCommand(Verb):
     if (local_task_count >= 4 * remote_task_count or
         local_task_count <= 4 * remote_task_count or
         local_task_count == 0):
-      context.print_out('Warning: this update is a large change. Press ^C within 5 seconds to abort')
+      context.print_out('Warning: this update is a large change. '
+          'Press ^C within 5 seconds to abort')
       time.sleep(5)
 
   def execute(self, context):

@@ -73,17 +73,21 @@ class AuroraCommandContext(Context):
     except Exception as e:
       raise self.CommandError(EXIT_INVALID_CONFIGURATION, 'Error loading configuration: %s' % e)
 
-  def print_out(self, str, indent=0):
+  def print_out(self, msg, indent=0):
     """Prints output. For debugging purposes, it's nice to be able to patch this
     and capture output.
     """
     indent_str = ' ' * indent
-    print('%s%s' % (indent_str, str))
+    lines = msg.split('\n')
+    for line in lines:
+      print('%s%s' % (indent_str, line))
 
-  def print_err(self, str, indent=0):
+  def print_err(self, msg, indent=0):
     """Prints output to standard error."""
     indent_str = ' ' * indent
-    print('%s%s' % (indent_str, str), file=sys.stderr)
+    lines = msg.split('\n')
+    for line in lines:
+      print('%s%s' % (indent_str, line), file=sys.stderr)
 
   def open_page(self, url):
     import webbrowser

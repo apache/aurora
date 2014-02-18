@@ -15,11 +15,70 @@
 #
 
 from collections import namedtuple
+from types import IntType, StringType
 
-from apache.aurora.client.cli import CommandOption
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from twitter.common.quantity.parse_simple import parse_time
+
+
+class CommandOption(object):
+  """A lightweight encapsulation of an argparse option specification"""
+
+  def __init__(self, *args, **kwargs):
+    self.name = args[0]
+    self.args = args
+    self.kwargs = kwargs
+    self.type = kwargs['type'] if 'type' in kwargs else None
+    self.help = kwargs['help'] if 'help' in kwargs else ""
+
+  def is_mandatory(self):
+    return self.kwargs["required"] if "required" in self.kwargs else not self.name.startswith('--')
+
+  def get_displayname(self):
+    """Get a display name for a the expected format of a parameter value"""
+    if 'metavar' in self.kwargs:
+      displayname = self.kwargs['metavar']
+    elif self.type == str:
+      displayname = "str"
+    elif type(self.type) is StringType:
+      displayname = self.type
+    elif type(self.type) is IntType:
+      displayname = "int",
+    else:
+      displayname = "value"
+    return displayname
+
+  def render_usage(self):
+    """Create a usage string for this option"""
+    if not self.name.startswith('--'):
+      return self.get_displayname()
+    if "action" in self.kwargs:
+      if self.kwargs["action"] == "store_true":
+        return "[%s]" % self.name
+      elif self.kwargs["action"] == "store_false":
+        return "[--no-%s]" % self.name[2:]
+    if self.type is None and "choices" in self.kwargs:
+      return "[%s=%s]" % (self.name, self.kwargs["choices"])
+    else:
+      return "[%s=%s]" % (self.name, self.get_displayname())
+
+  def render_help(self):
+    """Render a full help message for this option"""
+    result = ""
+    if "action" in self.kwargs and self.kwargs["action"] == "store_true":
+      result = self.name
+    elif "action" in self.kwargs and self.kwargs["action"] == "store_false":
+      result = "--no-%s" % self.name[2:]
+    elif self.type is None and "choices" in self.kwargs:
+      result = "%s=%s" % (self.name, self.kwargs["choices"])
+    else:
+      result = "%s=%s" % (self.name, self.get_displayname())
+    return [result, "\t" + self.help]
+
+  def add_to_parser(self, parser):
+    """Add this option to an option parser"""
+    parser.add_argument(*self.args, **self.kwargs)
 
 
 def parse_qualified_role(rolestr):
@@ -78,6 +137,7 @@ BATCH_OPTION = CommandOption('--batch_size', type=int, default=5,
 
 BIND_OPTION = CommandOption('--bind', type=str, default=[], dest='bindings',
     action='append',
+    metavar="pystachio-binding",
     help='Bind a thermos mustache variable name to a value. '
     'Multiple flags may be used to specify multiple values.')
 
@@ -105,13 +165,14 @@ HEALTHCHECK_OPTION = CommandOption('--healthcheck_interval_seconds', type=int,
 
 
 INSTANCES_OPTION = CommandOption('--instances', type=parse_instances, dest='instances',
-    default=None,
+    default=None, metavar="inst,inst,inst...",
      help='A list of instance ids to act on. Can either be a comma-separated list (e.g. 0,1,2) '
          'or a range (e.g. 0-2) or any combination of the two (e.g. 0-2,5,7-9). If not set, '
          'all instances will be acted on.')
 
 
 JOBSPEC_ARGUMENT = CommandOption('jobspec', type=AuroraJobKey.from_path,
+    metavar="CLUSTER/ROLE/ENV/NAME",
     help='Fully specified job key, in CLUSTER/ROLE/ENV/NAME format')
 
 
@@ -125,8 +186,8 @@ JSON_WRITE_OPTION = CommandOption('--write_json', default=False, dest='write_jso
     help='Generate command output in JSON format')
 
 
-ROLE_ARGUMENT = CommandOption('role', type=parse_qualified_role,
-    help='Rolename to retrieve information about, in CLUSTER/NAME format')
+ROLE_ARGUMENT = CommandOption('role', type=parse_qualified_role, metavar='CLUSTER/NAME',
+    help='Rolename to retrieve information about')
 
 
 SSH_USER_OPTION = CommandOption('--ssh_user', '-l', default=None,
