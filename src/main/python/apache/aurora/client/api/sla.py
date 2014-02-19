@@ -51,12 +51,26 @@ class JobUpTimeSlaVector(object):
     above = len([uptime for uptime in self._uptime_map.values() if uptime >= duration])
     return 0 if not total else 100.0 * above / total
 
+  def get_job_uptime(self, percentile):
+    """Returns the uptime (in seconds) of the job at the specified percentile.
+
+    Arguments:
+    percentile -- percentile to report uptime for.
+    """
+    if percentile <= 0 or percentile >= 100:
+      raise ValueError('Percentile must be within (0, 100), got %r instead.' % percentile)
+
+    total = len(self._uptime_map)
+    value = math.floor(percentile / 100.0 * total)
+    index = total - int(value) - 1
+    return sorted(self._uptime_map.values())[index] if 0 <= index < total else 0
+
   def _instance_uptime(self):
     instance_map = {}
     for task in self._tasks:
       for event in task.taskEvents:
         if event.status == ScheduleStatus.STARTING:
-          instance_map[task.assignedTask.instanceId] = self._now - event.timestamp / 1000
+          instance_map[task.assignedTask.instanceId] = math.floor(self._now - event.timestamp / 1000)
           break
     return instance_map
 

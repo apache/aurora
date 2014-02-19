@@ -20,6 +20,7 @@ from types import IntType, StringType
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from twitter.common.quantity.parse_simple import parse_time
+from argparse import ArgumentTypeError
 
 
 class CommandOption(object):
@@ -83,12 +84,11 @@ class CommandOption(object):
 
 def parse_qualified_role(rolestr):
   if rolestr is None:
-    raise ValueError('Role argument cannot be empty!')
+    raise ArgumentTypeError('Role argument cannot be empty!')
   role_parts = rolestr.split('/')
   if len(role_parts) != 2:
-    raise ValueError('Role argument must be a CLUSTER/NAME pair')
+    raise ArgumentTypeError('Role argument must be a CLUSTER/NAME pair')
   return role_parts
-
 
 def parse_instances(instances):
   """Parse lists of instances or instance ranges into a set().
@@ -111,9 +111,28 @@ def parse_time_values(time_values):
        15m
        1m,1d,3h25m,2h4m15s
   """
-  if time_values is None or time_values == '':
-    return None
-  return sorted(map(parse_time, time_values.split(',')))
+  try:
+    return sorted(map(parse_time, time_values.split(','))) if time_values else None
+  except ValueError as e:
+    raise ArgumentTypeError(e)
+
+def parse_percentiles(percentiles):
+  """Parse lists of percentile values in (0,100) range.
+     Examples:
+       .2
+       10,15,99.9
+  """
+  def parse_percentile(val):
+    try:
+      result = float(val)
+      if result <= 0 or result >= 100:
+        raise ValueError()
+    except ValueError:
+      raise ArgumentTypeError('Invalid percentile value:%s. '
+                              'Must be between 0.0 and 100.0 exclusive.' % val)
+    return result
+
+  return sorted(map(parse_percentile, percentiles.split(','))) if percentiles else None
 
 
 TaskInstanceKey = namedtuple('TaskInstanceKey', [ 'jobkey', 'instance' ])

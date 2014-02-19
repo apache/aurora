@@ -67,20 +67,36 @@ class SlaTest(unittest.TestCase):
   def create_tasks(self, durations):
     return [self.create_task(duration, index) for index, duration in enumerate(durations)]
 
-
   def assert_count_result(self, percentage, duration):
     vector = self._sla.get_job_uptime_vector(self._job_key)
     actual = vector.get_task_up_count(duration)
     assert percentage == actual, (
         'Expected percentage:%s Actual percentage:%s' % (percentage, actual)
     )
+    self.expect_task_status_call()
 
+  def assert_uptime_result(self, expected, percentile):
+    vector = self._sla.get_job_uptime_vector(self._job_key)
+    try:
+      actual = vector.get_job_uptime(percentile)
+    except ValueError:
+      assert expected is None, 'Unexpected error raised.'
+    else:
+      assert expected is not None, 'Expected error not raised.'
+      assert expected == actual, (
+          'Expected uptime:%s Actual uptime:%s' % (expected, actual)
+      )
+      self.expect_task_status_call()
+
+  def expect_task_status_call(self):
     self._scheduler.getTasksStatus.assert_called_once_with(
         TaskQuery(
             owner=Identity(role=self._role),
             environment=self._env,
             jobName=self._name,
-            statuses=ACTIVE_STATES))
+            statuses=ACTIVE_STATES)
+    )
+
 
   def test_count_0(self):
     self.mock_get_tasks([])
@@ -93,3 +109,27 @@ class SlaTest(unittest.TestCase):
   def test_count_100(self):
     self.mock_get_tasks(self.create_tasks([100, 200, 300, 400, 500]))
     self.assert_count_result(100, 50)
+
+  def test_uptime_empty(self):
+    self.mock_get_tasks([])
+    self.assert_uptime_result(0, 50)
+
+  def test_uptime_0(self):
+    self.mock_get_tasks(self.create_tasks([100, 200, 300, 400]))
+    self.assert_uptime_result(None, 0)
+
+  def test_uptime_10(self):
+    self.mock_get_tasks(self.create_tasks([100, 200, 300, 400]))
+    self.assert_uptime_result(400, 10)
+
+  def test_uptime_50(self):
+    self.mock_get_tasks(self.create_tasks([100, 200, 300, 400]))
+    self.assert_uptime_result(200, 50)
+
+  def test_uptime_99(self):
+    self.mock_get_tasks(self.create_tasks([100, 200, 300, 400]))
+    self.assert_uptime_result(100, 99)
+
+  def test_uptime_100(self):
+    self.mock_get_tasks(self.create_tasks([100, 200, 300, 400]))
+    self.assert_uptime_result(None, 100)
