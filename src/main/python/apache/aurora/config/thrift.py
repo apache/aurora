@@ -89,7 +89,6 @@ def task_instance_from_job(job, instance):
   elif job.has_health_check_config():
     health_check_config = job.health_check_config()
   ti = MesosTaskInstance(task=job.task(),
-                         layout=job.layout(),
                          role=job.role(),
                          health_check_interval_secs=health_check_config.interval_secs().get(),
                          health_check_config=health_check_config,
