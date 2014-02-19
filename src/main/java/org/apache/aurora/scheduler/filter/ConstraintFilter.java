@@ -15,20 +15,14 @@
  */
 package org.apache.aurora.scheduler.filter;
 
-import java.util.Set;
-import java.util.logging.Logger;
-
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
-import org.apache.aurora.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 
@@ -37,28 +31,18 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * Filter that determines whether a task's constraints are satisfied.
  */
-class ConstraintFilter implements Function<IConstraint, Optional<Veto>> {
-
-  private static final Logger LOG = Logger.getLogger(ConstraintFilter.class.getName());
-
-  private final CachedJobState cachedjobState;
-  private final AttributeLoader attributeLoader;
+class ConstraintFilter {
+  private final AttributeAggregate cachedjobState;
   private final Iterable<Attribute> hostAttributes;
 
   /**
    * Creates a new constraint filer for a given job.
    *
    * @param cachedjobState Cached information about the job containing the task being matched.
-   * @param attributeLoader Interface to fetch host attributes (if necessary).
    * @param hostAttributes The attributes of the host to test against.
    */
-  ConstraintFilter(
-      CachedJobState cachedjobState,
-      AttributeLoader attributeLoader,
-      Iterable<Attribute> hostAttributes) {
-
+  ConstraintFilter(AttributeAggregate cachedjobState, Iterable<Attribute> hostAttributes) {
     this.cachedjobState = checkNotNull(cachedjobState);
-    this.attributeLoader = checkNotNull(attributeLoader);
     this.hostAttributes = checkNotNull(hostAttributes);
   }
 
@@ -77,36 +61,41 @@ class ConstraintFilter implements Function<IConstraint, Optional<Veto>> {
     return new Veto("Host " + reason + " for maintenance", Veto.MAX_SCORE);
   }
 
-  @Override
-  public Optional<Veto> apply(IConstraint constraint) {
-    Set<Attribute> attributes =
-        ImmutableSet.copyOf(Iterables.filter(hostAttributes, new NameFilter(constraint.getName())));
+  /**
+   * Gets the veto (if any) for a scheduling constraint based on the {@link AttributeAggregate} this
+   * filter was created with.
+   *
+   * @param constraint Scheduling filter to check.
+   * @return A veto if the constraint is not satisfied based on the existing state of the job.
+   */
+  Optional<Veto> getVeto(IConstraint constraint) {
+    // Per TODO in api.thrift, we expect host attributes to have unique names.
+    Optional<Attribute> attribute = Optional.fromNullable(Iterables.getOnlyElement(
+        Iterables.filter(hostAttributes, new NameFilter(constraint.getName())), null));
 
     ITaskConstraint taskConstraint = constraint.getConstraint();
     switch (taskConstraint.getSetField()) {
       case VALUE:
         boolean matches =
-            AttributeFilter.matches(attributes, taskConstraint.getValue());
+            AttributeFilter.matches(attribute, taskConstraint.getValue());
         return matches
             ? Optional.<Veto>absent()
             : Optional.of(mismatchVeto(constraint.getName()));
 
       case LIMIT:
-        if (attributes.isEmpty()) {
+        if (!attribute.isPresent()) {
           return Optional.of(mismatchVeto(constraint.getName()));
         }
 
         boolean satisfied = AttributeFilter.matches(
-            attributes,
+            attribute.get(),
             taskConstraint.getLimit().getLimit(),
-            cachedjobState.getActiveTasks(),
-            attributeLoader);
+            cachedjobState);
         return satisfied
             ? Optional.<Veto>absent()
             : Optional.of(limitVeto(constraint.getName()));
 
       default:
-        LOG.warning("Unrecognized constraint type: " + taskConstraint.getSetField());
         throw new SchedulerException("Failed to recognize the constraint type: "
             + taskConstraint.getSetField());
     }

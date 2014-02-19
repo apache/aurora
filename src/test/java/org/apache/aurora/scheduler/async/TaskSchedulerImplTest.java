@@ -37,10 +37,11 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
-import org.apache.aurora.scheduler.filter.CachedJobState;
+import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
+import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -67,9 +68,6 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private static final IScheduledTask TASK_B = makeTask("b");
   private static final Offer OFFER = Offers.makeOffer("OFFER_A", "HOST_A");
 
-  private static final CachedJobState EMPTY_JOB =
-      new CachedJobState(Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()));
-
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private TaskAssigner assigner;
@@ -80,6 +78,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   private Amount<Long, Time> reservationDuration;
   private Amount<Long, Time> halfReservationDuration;
   private EventSink eventSink;
+  private AttributeAggregate emptyJob;
 
   @Before
   public void setUp() throws Exception {
@@ -96,6 +95,9 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     Injector injector = getInjector(storageUtil.storage);
     scheduler = injector.getInstance(TaskScheduler.class);
     eventSink = PubsubTestUtil.startPubsub(injector);
+    emptyJob = new AttributeAggregate(
+        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
+        createMock(AttributeStore.class));
   }
 
   private Injector getInjector(final Storage storageImpl) {
@@ -121,7 +123,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   private void expectAssigned(IScheduledTask task) {
-    expect(assigner.maybeAssign(OFFER, task, EMPTY_JOB))
+    expect(assigner.maybeAssign(OFFER, task, emptyJob))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
   }
 
@@ -133,13 +135,13 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_A);
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
-    expect(preemptor.findPreemptionSlotFor("a", EMPTY_JOB))
+    expect(preemptor.findPreemptionSlotFor("a", emptyJob))
         .andReturn(Optional.of(OFFER.getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
     Capture<Function<Offer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(false);
-    expect(preemptor.findPreemptionSlotFor("b", EMPTY_JOB)).andReturn(Optional.<String>absent());
+    expect(preemptor.findPreemptionSlotFor("b", emptyJob)).andReturn(Optional.<String>absent());
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
@@ -168,7 +170,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_A);
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
-    expect(preemptor.findPreemptionSlotFor("a", EMPTY_JOB))
+    expect(preemptor.findPreemptionSlotFor("a", emptyJob))
         .andReturn(Optional.of(OFFER.getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_A);
@@ -181,7 +183,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     Capture<Function<Offer, Optional<TaskInfo>>> secondAssignment = expectLaunchAttempt(true);
 
-    expect(assigner.maybeAssign(OFFER, TASK_B, EMPTY_JOB))
+    expect(assigner.maybeAssign(OFFER, TASK_B, emptyJob))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
 
     control.replay();
@@ -201,7 +203,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_A);
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
-    expect(preemptor.findPreemptionSlotFor("a", EMPTY_JOB))
+    expect(preemptor.findPreemptionSlotFor("a", emptyJob))
         .andReturn(Optional.of(OFFER.getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_A);
@@ -226,7 +228,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectLaunchAttempt(false);
 
     // Reserve "a" with offerA
-    expect(preemptor.findPreemptionSlotFor("a", EMPTY_JOB))
+    expect(preemptor.findPreemptionSlotFor("a", emptyJob))
         .andReturn(Optional.of(OFFER.getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_B);
@@ -251,7 +253,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectActiveJobFetch(TASK_B);
     expectLaunchAttempt(false);
     // Reserve "b" with offer1
-    expect(preemptor.findPreemptionSlotFor("b", EMPTY_JOB))
+    expect(preemptor.findPreemptionSlotFor("b", emptyJob))
         .andReturn(Optional.of(OFFER.getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_A);
@@ -291,7 +293,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     });
 
     Capture<Function<Offer, Optional<TaskInfo>>> assignment = expectLaunchAttempt(true);
-    expect(assigner.maybeAssign(OFFER, taskA, EMPTY_JOB))
+    expect(assigner.maybeAssign(OFFER, taskA, emptyJob))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
 
     control.replay();

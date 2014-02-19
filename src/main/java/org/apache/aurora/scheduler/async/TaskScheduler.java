@@ -47,13 +47,13 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
-import org.apache.aurora.scheduler.filter.CachedJobState;
+import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import org.apache.aurora.scheduler.storage.TaskStore;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos.Offer;
@@ -134,7 +134,7 @@ interface TaskScheduler extends EventSubscriber {
     }
 
     private Function<Offer, Optional<TaskInfo>> getAssignerFunction(
-        final CachedJobState cachedJobState,
+        final AttributeAggregate attributeAggregate,
         final String taskId,
         final IScheduledTask task) {
 
@@ -145,14 +145,14 @@ interface TaskScheduler extends EventSubscriber {
           if (reservedTaskId.isPresent()) {
             if (taskId.equals(reservedTaskId.get())) {
               // Slave is reserved to satisfy this task.
-              return assigner.maybeAssign(offer, task, cachedJobState);
+              return assigner.maybeAssign(offer, task, attributeAggregate);
             } else {
               // Slave is reserved for another task.
               return Optional.absent();
             }
           } else {
             // Slave is not reserved.
-            return assigner.maybeAssign(offer, task, cachedJobState);
+            return assigner.maybeAssign(offer, task, attributeAggregate);
           }
         }
       };
@@ -167,13 +167,18 @@ interface TaskScheduler extends EventSubscriber {
       return Query.jobScoped(jobKey).byStatus(Tasks.SLAVE_ASSIGNED_STATES);
     }
 
-    private CachedJobState getJobState(final TaskStore store, final IJobKey jobKey) {
-      return new CachedJobState(Suppliers.memoize(new Supplier<ImmutableSet<IScheduledTask>>() {
-        @Override
-        public ImmutableSet<IScheduledTask> get() {
-          return store.fetchTasks(activeJobStateQuery(jobKey));
-        }
-      }));
+    private AttributeAggregate getJobState(
+        final StoreProvider storeProvider,
+        final IJobKey jobKey) {
+
+      Supplier<ImmutableSet<IScheduledTask>> taskSupplier = Suppliers.memoize(
+          new Supplier<ImmutableSet<IScheduledTask>>() {
+            @Override
+            public ImmutableSet<IScheduledTask> get() {
+              return storeProvider.getTaskStore().fetchTasks(activeJobStateQuery(jobKey));
+            }
+          });
+      return new AttributeAggregate(taskSupplier, storeProvider.getAttributeStore());
     }
 
     @Timed("task_schedule_attempt")
@@ -191,12 +196,12 @@ interface TaskScheduler extends EventSubscriber {
             if (task == null) {
               LOG.warning("Failed to look up task " + taskId + ", it may have been deleted.");
             } else {
-              final CachedJobState cachedJobState =
-                  getJobState(store.getTaskStore(), Tasks.SCHEDULED_TO_JOB_KEY.apply(task));
+              AttributeAggregate aggregate =
+                  getJobState(store, Tasks.SCHEDULED_TO_JOB_KEY.apply(task));
               try {
-                if (!offerQueue.launchFirst(getAssignerFunction(cachedJobState, taskId, task))) {
+                if (!offerQueue.launchFirst(getAssignerFunction(aggregate, taskId, task))) {
                   // Task could not be scheduled.
-                  maybePreemptFor(taskId, cachedJobState);
+                  maybePreemptFor(taskId, aggregate);
                   return TaskSchedulerResult.TRY_AGAIN;
                 }
               } catch (OfferQueue.LaunchException e) {
@@ -224,11 +229,11 @@ interface TaskScheduler extends EventSubscriber {
       }
     }
 
-    private void maybePreemptFor(String taskId, CachedJobState cachedJobState) {
+    private void maybePreemptFor(String taskId, AttributeAggregate attributeAggregate) {
       if (reservations.hasReservationForTask(taskId)) {
         return;
       }
-      Optional<String> slaveId = preemptor.findPreemptionSlotFor(taskId, cachedJobState);
+      Optional<String> slaveId = preemptor.findPreemptionSlotFor(taskId, attributeAggregate);
       if (slaveId.isPresent()) {
         this.reservations.add(SlaveID.newBuilder().setValue(slaveId.get()).build(), taskId);
       }

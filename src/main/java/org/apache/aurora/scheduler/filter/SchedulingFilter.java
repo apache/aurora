@@ -109,7 +109,7 @@ public interface SchedulingFilter {
    * @param slaveHost Host that the resources are associated with.
    * @param task Task.
    * @param taskId Canonical ID of the task.
-   * @param cachedJobState Cached information about the job containing {@code task}.
+   * @param attributeAggregate Attribute information for tasks in the job containing {@code task}.
    * @return A set of vetoes indicating reasons the task cannot be scheduled.  If the task may be
    *    scheduled, the set will be empty.
    */
@@ -118,5 +118,5 @@ public interface SchedulingFilter {
       String slaveHost,
       ITaskConfig task,
       String taskId,
-      CachedJobState cachedJobState);
+      AttributeAggregate attributeAggregate);
 }

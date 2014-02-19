@@ -26,7 +26,7 @@ import org.apache.aurora.scheduler.MesosTaskFactory;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
-import org.apache.aurora.scheduler.filter.CachedJobState;
+import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
@@ -47,10 +47,13 @@ public interface TaskAssigner {
    *
    * @param offer The resource offer.
    * @param task The task to match against and optionally assign.
-   * @param cachedJobState Cached information about the job containing {@code task}.
+   * @param attributeAggregate Attribute information for tasks in the job containing {@code task}.
    * @return Instructions for launching the task if matching and assignment were successful.
    */
-  Optional<TaskInfo> maybeAssign(Offer offer, IScheduledTask task, CachedJobState cachedJobState);
+  Optional<TaskInfo> maybeAssign(
+      Offer offer,
+      IScheduledTask task,
+      AttributeAggregate attributeAggregate);
 
   class TaskAssignerImpl implements TaskAssigner {
     private static final Logger LOG = Logger.getLogger(TaskAssignerImpl.class.getName());
@@ -88,14 +91,14 @@ public interface TaskAssigner {
     public Optional<TaskInfo> maybeAssign(
         Offer offer,
         IScheduledTask task,
-        CachedJobState cachedJobState) {
+        AttributeAggregate attributeAggregate) {
 
       Set<Veto> vetoes = filter.filter(
           ResourceSlot.from(offer),
           offer.getHostname(),
           task.getAssignedTask().getTask(),
           Tasks.id(task),
-          cachedJobState);
+          attributeAggregate);
       if (vetoes.isEmpty()) {
         return Optional.of(assign(offer, task));
       } else {

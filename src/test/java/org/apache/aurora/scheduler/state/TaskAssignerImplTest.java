@@ -27,10 +27,11 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.MesosTaskFactory;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.filter.CachedJobState;
+import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
+import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
@@ -75,13 +76,11 @@ public class TaskAssignerImplTest extends EasyMockTest {
       .setSlaveId(OFFER.getSlaveId())
       .build();
 
-  private static final CachedJobState EMPTY_JOB =
-      new CachedJobState(Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()));
-
   private StateManager stateManager;
   private SchedulingFilter filter;
   private MesosTaskFactory taskFactory;
   private TaskAssigner assigner;
+  private AttributeAggregate emptyJob;
 
   @Before
   public void setUp() throws Exception {
@@ -89,6 +88,9 @@ public class TaskAssignerImplTest extends EasyMockTest {
     filter = createMock(SchedulingFilter.class);
     taskFactory = createMock(MesosTaskFactory.class);
     assigner = new TaskAssignerImpl(stateManager, filter, taskFactory);
+    emptyJob = new AttributeAggregate(
+        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
+        createMock(AttributeStore.class));
   }
 
   @Test
@@ -98,7 +100,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         OFFER.getHostname(),
         TASK.getAssignedTask().getTask(),
         Tasks.id(TASK),
-        EMPTY_JOB))
+        emptyJob))
         .andReturn(ImmutableSet.<Veto>of());
     expect(stateManager.assignTask(
         Tasks.id(TASK),
@@ -110,7 +112,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(Optional.of(TASK_INFO), assigner.maybeAssign(OFFER, TASK, EMPTY_JOB));
+    assertEquals(Optional.of(TASK_INFO), assigner.maybeAssign(OFFER, TASK, emptyJob));
   }
 
 
@@ -121,11 +123,11 @@ public class TaskAssignerImplTest extends EasyMockTest {
         OFFER.getHostname(),
         TASK.getAssignedTask().getTask(),
         Tasks.id(TASK),
-        EMPTY_JOB))
+        emptyJob))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("denied")));
 
     control.replay();
 
-    assertEquals(Optional.<TaskInfo>absent(), assigner.maybeAssign(OFFER, TASK, EMPTY_JOB));
+    assertEquals(Optional.<TaskInfo>absent(), assigner.maybeAssign(OFFER, TASK, emptyJob));
   }
 }

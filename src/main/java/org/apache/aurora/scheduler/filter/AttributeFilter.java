@@ -18,14 +18,12 @@ package org.apache.aurora.scheduler.filter;
 import java.util.Set;
 
 import com.google.common.base.Function;
-import com.google.common.base.Predicate;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.Attribute;
-import org.apache.aurora.scheduler.filter.SchedulingFilterImpl.AttributeLoader;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
 
 /**
@@ -48,13 +46,13 @@ final class AttributeFilter {
   /**
    * Tests whether a constraint is satisfied by attributes.
    *
-   * @param attributes Host attributes.
+   * @param attribute Host attribute.
    * @param constraint Constraint to match.
    * @return {@code true} if the attribute satisfies the constraint, {@code false} otherwise.
    */
-  static boolean matches(Set<Attribute> attributes, IValueConstraint constraint) {
+  static boolean matches(Optional<Attribute> attribute, IValueConstraint constraint) {
     Set<String> allAttributes =
-        ImmutableSet.copyOf(Iterables.concat(Iterables.transform(attributes, GET_VALUES)));
+        ImmutableSet.copyOf(attribute.transform(GET_VALUES).or(ImmutableSet.<String>of()));
     boolean match = Iterables.any(constraint.getValues(), Predicates.in(allAttributes));
     return constraint.isNegated() ^ match;
   }
@@ -62,26 +60,21 @@ final class AttributeFilter {
   /**
    * Tests whether an attribute matches a limit constraint.
    *
-   * @param attributes Attributes to match against.
+   * @param attribute Attribute to match against.
    * @param limit Limit value.
-   * @param activeTasks All active tasks in the system.
-   * @param attributeFetcher Interface for fetching attributes for hosts in the system.
+   * @param attributeAggregate Cached state of the job being filtered.
    * @return {@code true} if the limit constraint is satisfied, {@code false} otherwise.
    */
-  static boolean matches(final Set<Attribute> attributes,
+  static boolean matches(final Attribute attribute,
       int limit,
-      Iterable<IScheduledTask> activeTasks,
-      final AttributeLoader attributeFetcher) {
+      AttributeAggregate attributeAggregate) {
 
-    Predicate<IScheduledTask> hasAttribute = new Predicate<IScheduledTask>() {
-      @Override
-      public boolean apply(IScheduledTask task) {
-        Iterable<Attribute> hostAttributes =
-            attributeFetcher.apply(task.getAssignedTask().getSlaveHost());
-        return Iterables.any(hostAttributes, Predicates.in(attributes));
+    for (String value : attribute.getValues()) {
+      if (limit <= attributeAggregate.getNumTasksWithAttribute(attribute.getName(), value)) {
+        return false;
       }
-    };
+    }
 
-    return limit > Iterables.size(Iterables.filter(activeTasks, hasAttribute));
+    return true;
   }
 }

@@ -84,11 +84,6 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   }
 
   /**
-   * A function that fetches attributes associated with a given host.
-   */
-  public interface AttributeLoader extends Function<String, Iterable<Attribute>> { }
-
-  /**
    * A function that may veto a task.
    */
   private interface FilterRule extends Function<ITaskConfig, Iterable<Veto>> { }
@@ -196,7 +191,10 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         }
       });
 
-  private FilterRule getConstraintFilter(final CachedJobState jobState, final String slaveHost) {
+  private FilterRule getConstraintFilter(
+      final AttributeAggregate jobState,
+      final String slaveHost) {
+
     return new FilterRule() {
       @Override
       public Iterable<Veto> apply(final ITaskConfig task) {
@@ -211,20 +209,12 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         return storage.weaklyConsistentRead(new Quiet<Iterable<Veto>>() {
           @Override
           public Iterable<Veto> apply(final StoreProvider storeProvider) {
-            AttributeLoader attributeLoader = new AttributeLoader() {
-              @Override
-              public Iterable<Attribute> apply(String host) {
-                return AttributeStore.Util.attributesOrNone(storeProvider, host);
-              }
-            };
-
             ConstraintFilter constraintFilter = new ConstraintFilter(
                 jobState,
-                attributeLoader,
-                attributeLoader.apply(slaveHost));
+                AttributeStore.Util.attributesOrNone(storeProvider, slaveHost));
             ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
             for (IConstraint constraint : VALUES_FIRST.sortedCopy(task.getConstraints())) {
-              Optional<Veto> veto = constraintFilter.apply(constraint);
+              Optional<Veto> veto = constraintFilter.getVeto(constraint);
               if (veto.isPresent()) {
                 vetoes.add(veto.get());
                 if (isValueConstraint(constraint)) {
@@ -275,13 +265,13 @@ public class SchedulingFilterImpl implements SchedulingFilter {
       String slaveHost,
       ITaskConfig task,
       String taskId,
-      CachedJobState cachedJobState) {
+      AttributeAggregate attributeAggregate) {
 
     if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
       return ImmutableSet.of(DEDICATED_HOST_VETO);
     }
     return ImmutableSet.<Veto>builder()
-        .addAll(getConstraintFilter(cachedJobState, slaveHost).apply(task))
+        .addAll(getConstraintFilter(attributeAggregate, slaveHost).apply(task))
         .addAll(getResourceVetoes(offer, task))
         .addAll(getMaintenanceVeto(slaveHost).asSet())
         .build();

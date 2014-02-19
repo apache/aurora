@@ -45,11 +45,12 @@ import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
-import org.apache.aurora.scheduler.filter.CachedJobState;
+import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -95,15 +96,13 @@ public class PreemptorImplTest extends EasyMockTest {
 
   private static final Amount<Long, Time> PREEMPTION_DELAY = Amount.of(30L, Time.SECONDS);
 
-  private static final CachedJobState EMPTY_JOB =
-      new CachedJobState(Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()));
-
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private SchedulingFilter schedulingFilter;
   private FakeClock clock;
   private MaintenanceController maintenance;
   private OfferQueue offerQueue;
+  private AttributeAggregate emptyJob;
 
   @Before
   public void setUp() {
@@ -113,6 +112,9 @@ public class PreemptorImplTest extends EasyMockTest {
     maintenance = createMock(MaintenanceController.class);
     clock = new FakeClock();
     offerQueue = createMock(OfferQueue.class);
+    emptyJob = new AttributeAggregate(
+        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
+        createMock(AttributeStore.class));
   }
 
   private void runPreemptor(ScheduledTask pendingTask) {
@@ -124,7 +126,7 @@ public class PreemptorImplTest extends EasyMockTest {
         PREEMPTION_DELAY,
         clock);
 
-    preemptor.findPreemptionSlotFor(pendingTask.getAssignedTask().getTaskId(), EMPTY_JOB);
+    preemptor.findPreemptionSlotFor(pendingTask.getAssignedTask().getTaskId(), emptyJob);
   }
 
   // TODO(zmanji): Put together a SchedulerPreemptorIntegrationTest as well.
@@ -511,7 +513,7 @@ public class PreemptorImplTest extends EasyMockTest {
 
     assertEquals(
         Optional.<String>absent(),
-        preemptor.findPreemptionSlotFor(pending.getAssignedTask().getTaskId(), EMPTY_JOB));
+        preemptor.findPreemptionSlotFor(pending.getAssignedTask().getTaskId(), emptyJob));
   }
 
   // TODO(zmanji) spread tasks across slave ids on the same host and see if preemption fails.
@@ -548,7 +550,7 @@ public class PreemptorImplTest extends EasyMockTest {
         EasyMock.eq(HOST_A),
         EasyMock.<ITaskConfig>anyObject(),
         EasyMock.<String>anyObject(),
-        EasyMock.eq(EMPTY_JOB))).andAnswer(
+        EasyMock.eq(emptyJob))).andAnswer(
         new IAnswer<Set<Veto>>() {
           @Override
           public Set<Veto> answer() {

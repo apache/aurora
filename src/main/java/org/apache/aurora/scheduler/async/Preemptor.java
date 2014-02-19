@@ -48,7 +48,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.filter.CachedJobState;
+import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -76,10 +76,10 @@ public interface Preemptor {
    * Preempts active tasks in favor of the input task.
    *
    * @param taskId ID of the preempting task.
-   * @param cachedJobState Cached information about the job containing {@code taskId}.
+   * @param attributeAggregate Attribute information for tasks in the job containing {@code task}.
    * @return ID of the slave where preemption occured.
    */
-  Optional<String> findPreemptionSlotFor(String taskId, CachedJobState cachedJobState);
+  Optional<String> findPreemptionSlotFor(String taskId, AttributeAggregate attributeAggregate);
 
   /**
    * A task preemptor that tries to find tasks that are waiting to be scheduled, which are of higher
@@ -225,7 +225,7 @@ public interface Preemptor {
         Iterable<IAssignedTask> possibleVictims,
         Iterable<Offer> offers,
         IAssignedTask pendingTask,
-        CachedJobState cachedJobState) {
+        AttributeAggregate attributeAggregate) {
 
       // This enforces the precondition that all of the resources are from the same host. We need to
       // get the host for the schedulingFilter.
@@ -244,7 +244,7 @@ public interface Preemptor {
             host,
             pendingTask.getTask(),
             pendingTask.getTaskId(),
-            cachedJobState);
+            attributeAggregate);
 
         if (vetos.isEmpty()) {
           return Optional.<Set<IAssignedTask>>of(ImmutableSet.<IAssignedTask>of());
@@ -274,7 +274,7 @@ public interface Preemptor {
             host,
             pendingTask.getTask(),
             pendingTask.getTaskId(),
-            cachedJobState);
+            attributeAggregate);
 
         if (vetos.isEmpty()) {
           return Optional.<Set<IAssignedTask>>of(ImmutableSet.copyOf(toPreemptTasks));
@@ -305,7 +305,7 @@ public interface Preemptor {
     @Override
     public synchronized Optional<String> findPreemptionSlotFor(
         String taskId,
-        CachedJobState cachedJobState) {
+        AttributeAggregate attributeAggregate) {
 
       List<IAssignedTask> pendingTasks =
           fetch(Query.statusScoped(PENDING).byId(taskId), isIdleTask);
@@ -339,7 +339,7 @@ public interface Preemptor {
             slavesToActiveTasks.get(slaveID),
             slavesToOffers.get(slaveID),
             pendingTask,
-            cachedJobState);
+            attributeAggregate);
 
         if (toPreemptTasks.isPresent()) {
           for (IAssignedTask toPreempt : toPreemptTasks.get()) {

@@ -101,8 +101,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       Amount.of(DEFAULT_DISK, Data.MB),
       0);
 
-  private static final CachedJobState EMPTY_JOB =
-      new CachedJobState(Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()));
+  private AttributeAggregate emptyJob;
 
   private final AtomicLong taskIdCounter = new AtomicLong();
 
@@ -119,6 +118,9 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     defaultFilter = new SchedulingFilterImpl(storage, maintenance);
     storeProvider = createMock(StoreProvider.class);
     attributeStore = createMock(AttributeStore.Mutable.class);
+    emptyJob = new AttributeAggregate(
+        Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
+        attributeStore);
 
     // Link the store provider to the store mocks.
     expectReads();
@@ -145,7 +147,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     control.replay();
 
     assertNoVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK));
-    assertNoVetoes(makeTask(DEFAULT_CPUS - 1, DEFAULT_RAM - 1, DEFAULT_DISK - 1), EMPTY_JOB);
+    assertNoVetoes(makeTask(DEFAULT_CPUS - 1, DEFAULT_RAM - 1, DEFAULT_DISK - 1), emptyJob);
   }
 
   @Test
@@ -175,12 +177,12 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .setRequestedPorts(ImmutableSet.of("one", "two", "three")));
 
     Set<Veto> none = ImmutableSet.of();
-    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, noPortTask, TASK_ID, EMPTY_JOB));
-    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, onePortTask, TASK_ID, EMPTY_JOB));
-    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, twoPortTask, TASK_ID, EMPTY_JOB));
+    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, noPortTask, TASK_ID, emptyJob));
+    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, onePortTask, TASK_ID, emptyJob));
+    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, twoPortTask, TASK_ID, emptyJob));
     assertEquals(
         ImmutableSet.of(PORTS.veto(1)),
-        defaultFilter.filter(twoPorts, HOST_A, threePortTask, TASK_ID, EMPTY_JOB));
+        defaultFilter.filter(twoPorts, HOST_A, threePortTask, TASK_ID, emptyJob));
   }
 
   @Test
@@ -355,15 +357,17 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     expectGetHostMaintenanceStatus(HOST_B).atLeastOnce();
     expectGetHostMaintenanceStatus(HOST_C).atLeastOnce();
 
-    CachedJobState stateA = new CachedJobState(Suppliers.ofInstance(ImmutableSet.of(
+    AttributeAggregate stateA = new AttributeAggregate(Suppliers.ofInstance(ImmutableSet.of(
         makeScheduledTask(OWNER_A, JOB_A, HOST_A),
         makeScheduledTask(OWNER_A, JOB_A, HOST_B),
         makeScheduledTask(OWNER_A, JOB_A, HOST_B),
-        makeScheduledTask(OWNER_A, JOB_A, HOST_C))));
-    CachedJobState stateB = new CachedJobState(Suppliers.ofInstance(ImmutableSet.of(
+        makeScheduledTask(OWNER_A, JOB_A, HOST_C))),
+        attributeStore);
+    AttributeAggregate stateB = new AttributeAggregate(Suppliers.ofInstance(ImmutableSet.of(
         makeScheduledTask(OWNER_B, JOB_A, HOST_A),
         makeScheduledTask(OWNER_B, JOB_A, HOST_A),
-        makeScheduledTask(OWNER_B, JOB_A, HOST_B))));
+        makeScheduledTask(OWNER_B, JOB_A, HOST_B))),
+        attributeStore);
 
     control.replay();
 
@@ -434,7 +438,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint zoneConstraint = makeConstraint("zone", "c");
 
     ITaskConfig task = makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint);
-    assertTrue(defaultFilter.filter(DEFAULT_OFFER, HOST_A, task, TASK_ID, EMPTY_JOB).isEmpty());
+    assertTrue(defaultFilter.filter(DEFAULT_OFFER, HOST_A, task, TASK_ID, emptyJob).isEmpty());
 
     Constraint jvmNegated = jvmConstraint.deepCopy();
     jvmNegated.getConstraint().getValue().setNegated(true);
@@ -482,7 +486,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       String value,
       String... vs) {
 
-    return checkConstraint(owner, jobName, EMPTY_JOB, host, constraintName, expected,
+    return checkConstraint(owner, jobName, emptyJob, host, constraintName, expected,
         new ValueConstraint(false,
             ImmutableSet.<String>builder().add(value).addAll(Arrays.asList(vs)).build()));
   }
@@ -490,7 +494,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private ITaskConfig checkConstraint(
       Identity owner,
       String jobName,
-      CachedJobState cachedJobState,
+      AttributeAggregate aggregate,
       String host,
       String constraintName,
       boolean expected,
@@ -500,38 +504,38 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     ITaskConfig task = makeTask(owner, jobName, constraint);
     assertEquals(
         expected,
-        defaultFilter.filter(DEFAULT_OFFER, host, task, TASK_ID, cachedJobState).isEmpty());
+        defaultFilter.filter(DEFAULT_OFFER, host, task, TASK_ID, aggregate).isEmpty());
 
     Constraint negated = constraint.deepCopy();
     negated.getConstraint().getValue().setNegated(!value.isNegated());
     ITaskConfig negatedTask = makeTask(owner, jobName, negated);
     assertEquals(
         !expected,
-        defaultFilter.filter(DEFAULT_OFFER, host, negatedTask, TASK_ID, cachedJobState).isEmpty());
+        defaultFilter.filter(DEFAULT_OFFER, host, negatedTask, TASK_ID, aggregate).isEmpty());
     return task;
   }
 
   private void assertNoVetoes(ITaskConfig task) {
-    assertNoVetoes(task, EMPTY_JOB);
+    assertNoVetoes(task, emptyJob);
   }
 
-  private void assertNoVetoes(ITaskConfig task, CachedJobState jobState) {
+  private void assertNoVetoes(ITaskConfig task, AttributeAggregate jobState) {
     assertNoVetoes(task, HOST_A, jobState);
   }
 
   private void assertNoVetoes(ITaskConfig task, String host) {
-    assertVetoes(task, host, EMPTY_JOB);
+    assertVetoes(task, host, emptyJob);
   }
 
-  private void assertNoVetoes(ITaskConfig task, String host, CachedJobState jobState) {
+  private void assertNoVetoes(ITaskConfig task, String host, AttributeAggregate jobState) {
     assertVetoes(task, host, jobState);
   }
 
   private void assertVetoes(ITaskConfig task, Veto... vetos) {
-    assertVetoes(task, EMPTY_JOB, vetos);
+    assertVetoes(task, emptyJob, vetos);
   }
 
-  private void assertVetoes(ITaskConfig task, CachedJobState jobState, Veto... vetos) {
+  private void assertVetoes(ITaskConfig task, AttributeAggregate jobState, Veto... vetos) {
     assertVetoes(task, HOST_A, jobState, vetos);
   }
 
@@ -540,13 +544,13 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       String host,
       Veto... vetoes) {
 
-    assertVetoes(task, host, EMPTY_JOB, vetoes);
+    assertVetoes(task, host, emptyJob, vetoes);
   }
 
   private void assertVetoes(
       ITaskConfig task,
       String host,
-      CachedJobState jobState,
+      AttributeAggregate jobState,
       Veto... vetoes) {
 
     assertEquals(
