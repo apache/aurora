@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+"""Utility to show reviews missing your shipit.
+
+Usage: list-missing-shipits [REVIEWBOARD_USERNAME]
+
+If not specified REVIEWBOARD_USERNAME defaults to the current user's name.
+"""
+from __future__ import print_function
+
+import getpass
+import json
+import os
+import subprocess
+import sys
+
+
+USERNAME = sys.argv[1] if len(sys.argv) > 1 else getpass.getuser()
+RBT_PATH = os.path.realpath(os.path.join(os.path.dirname(sys.argv[0]), '..', '..', 'rbt'))
+
+
+def rb_api_get(resource, params={}):
+  return json.loads(subprocess.Popen(
+    [RBT_PATH, 'api-get', resource, '--'] + ['--%s=%s' % (k, v) for k, v in params.items()],
+    stdout=subprocess.PIPE).communicate()[0])
+
+pending_requests = rb_api_get('review-requests', {
+    'to-users-directly': USERNAME,
+    'status': 'pending',
+  })
+
+def main():
+  for request in pending_requests['review_requests']:
+    reviews_resource = request['links']['reviews']['href']
+    reviews = rb_api_get(reviews_resource)
+    for review in reviews['reviews']:
+      if review['links']['user']['title'] == USERNAME and review['ship_it'] and review['public']:
+        break
+    else:
+      print('https://reviews.apache.org%s\t' % (request['url']), end="")
+      print('%s\t' % (request['links']['submitter']['title']), end="")
+      print('%s' % (request['summary']))
+
+
+if __name__ == '__main__':
+  main()
