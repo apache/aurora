@@ -16,6 +16,19 @@ elif [[ "`git rev-parse --abbrev-ref HEAD`" != master ]]; then
 elif [[ "`git rev-parse --show-toplevel`" != "$PWD" ]]; then
   echo "!! This script must be run from the root of the repository."
   exit 1
+elif [[ -z "`git config user.signingkey`" ]]; then
+  cat <<EOF
+!! No GPG signing key is configured for this repository.
+
+To configure one, find your code signing key's ID with
+
+   gpg --list-secret-keys
+
+Then configure it as the signing key for this repository with
+
+   git config user.signingkey YOUR_KEY_ID
+EOF
+  exit 1
 fi
 
 function print_help_and_exit {
@@ -127,8 +140,7 @@ function increment_aurora_version {
 increment_aurora_version
 
 echo == Creating tag $new_tagged_version.
-git tag -u `git config user.email` -s -m "aurora-$new_tagged_version." $new_tagged_version
-
+git tag -s -m "aurora-$new_tagged_version." $new_tagged_version
 
 cat <<EOF
 == Tag created.
