@@ -72,6 +72,29 @@ class Context(object):
     self.options = options
 
 
+class ConfigurationPlugin(object):
+  """A component that can be plugged in to a command-line.
+  The component can add a set of options to the command-line.
+  After a context is created, but before a call is dispatched
+  to the noun/verb for execution, the plugin will have the opportunity
+  to process its parameters and perform whatever initialization it
+  requires on the context.
+
+  For example, if a production environment is protected behind some
+  kind of gateway, a ConfigurationPlugin could be created that
+  performs a security handshake with the gateway before any of the commands
+  attempt to communicate with the environment.
+  """
+
+  @abstractmethod
+  def get_options(self):
+    """Return the set of options processed by this plugin"""
+
+  @abstractmethod
+  def execute(self, context):
+    """Run the context/command line initialization code for this plugin."""
+
+
 class AuroraCommand(object):
   def setup_options_parser(self, argparser):
     """Sets up command line options parsing for this command.
@@ -115,6 +138,7 @@ class CommandLine(object):
   def __init__(self):
     self.nouns = None
     self.parser = None
+    self.plugins = []
 
   def register_noun(self, noun):
     """Adds a noun to the application"""
@@ -123,6 +147,10 @@ class CommandLine(object):
     if not isinstance(noun, Noun):
       raise TypeError('register_noun requires a Noun argument')
     self.nouns[noun.name] = noun
+    noun.set_commandline(self)
+
+  def register_plugin(self, plugin):
+    self.plugins.append(plugin)
 
   def setup_options_parser(self):
     """ Builds the options parsing for the application."""
@@ -216,6 +244,12 @@ class CommandLine(object):
     context = noun.create_context()
     context.set_options(options)
     try:
+      for plugin in self.plugins:
+        plugin.execute(context)
+    except Context.CommandError as c:
+      print('Error in configuration plugin: %s' % c.msg, file=sys.stderr)
+      return c.code
+    try:
       return noun.execute(context)
     except Context.CommandError as c:
       print('Error executing command: %s' % c.msg, file=sys.stderr)
@@ -229,6 +263,10 @@ class Noun(AuroraCommand):
   def __init__(self):
     super(Noun, self).__init__()
     self.verbs = {}
+    self.commandline = None
+
+  def set_commandline(self, commandline):
+    self.commandline = commandline
 
   def register_verb(self, verb):
     """Add an operation supported for this noun."""
@@ -245,6 +283,9 @@ class Noun(AuroraCommand):
       vparser = subparser.add_parser(name, help=verb.help)
       for opt in verb.get_options():
         opt.add_to_parser(vparser)
+      for plugin in self.commandline.plugins:
+        for opt in plugin.get_options():
+          opt.add_to_parser(vparser)
 
   @property
   def usage(self):
@@ -300,6 +341,9 @@ class Verb(AuroraCommand):
     result += ["Options:"]
     for opt in self.get_options():
       result += ["  " + s for s in opt.render_help()]
+    for plugin in self.noun.commandline.plugins:
+      for opt in plugin.get_options():
+        result += ["  " + s for s in opt.render_help()]
     result += ["", self.help]
     return "\n".join(result)
 

@@ -21,9 +21,9 @@ from apache.aurora.client.cli import (
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
-    CommandOption, 
-    JOBSPEC_ARGUMENT, 
-    parse_percentiles, 
+    CommandOption,
+    JOBSPEC_ARGUMENT,
+    parse_percentiles,
     parse_time_values
 )
 
@@ -41,7 +41,7 @@ class GetTaskUpCountCmd(Verb):
 If duration is not specified prints a histogram-like log-scale distribution
 of task uptime percentages.
 """
-  
+
   @classmethod
   def render_get_task_up_count(cls, context, vector):
     def format_output(durations):
@@ -56,7 +56,9 @@ of task uptime percentages.
         CommandOption('--durations', type=parse_time_values, default=None,
             help="""Durations to report uptime for.
 Format: XdYhZmWs (each field optional but must be in that order.)
-Example: --durations=3m,10s,1h3m10s"""),
+Examples:
+  --durations=1d'
+  --durations=3m,10s,1h3m10s"""),
         JOBSPEC_ARGUMENT]
 
   def execute(self, context):
