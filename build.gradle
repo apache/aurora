@@ -256,21 +256,31 @@ tasks.withType(Test) {
   maxParallelForks = Runtime.runtime.availableProcessors()
 }
 
-// TODO(zmanji): This is an awful hack. Find a better way of adding the
-// generated sources.
+ideaProject.dependsOn generateSources
+
 idea {
-   module {
-    iml {
-      beforeMerged { module ->
-        module.sourceFolders.add(new org.gradle.plugins.ide.idea.model.Path(
-            "file://$generatedJavaDir"))
-      }
-      whenMerged { module ->
-        // TODO(zmanji): Find a way to remove the `dist` directory instead of
-        // clearing all the excludes.
-        module.excludeFolders.clear()
-      }
+  module {
+    def codegenDirs = [file(generatedJavaDir), file(generatedJSDir)]
+
+    // These directories must exist, else the plugin omits them from the
+    // generated project. Since this is executed during the configuration
+    // lifecycle phase, dependency tasks have not yet run and created
+    // the directories themselves.
+    codegenDirs.each { File codegenDir ->
+      codegenDir.mkdirs()
     }
+
+    // By default, the idea module [1] excludes are set to
+    // [project.buildDir, project.file('.gradle')]
+    // This has the side-effect of also excluding our generated sources [2].  Due to the way
+    // directory exclusion works in idea, you can't exclude a directory and include a child of that
+    // directory.  Clearing the excludes seems to have no ill side-effects, making it preferable to
+    // other possible approaches.
+    //
+    // [1] http://www.gradle.org/docs/current/dsl/org.gradle.plugins.ide.idea.model.IdeaModule.html
+    // [2] http://issues.gradle.org/browse/GRADLE-1174
+    excludeDirs = []
+    sourceDirs += codegenDirs
   }
 }
 
