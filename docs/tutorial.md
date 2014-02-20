@@ -78,7 +78,7 @@ are written in a Python variant).
     # run the script
     hello_world = Process(
       name = 'hello_world',
-      cmdline = 'python2.6 hello_world.py')
+      cmdline = 'python hello_world.py')
 
     # describe the task
     hello_world_task = SequentialTask(
@@ -179,7 +179,7 @@ This returns:
 
 Now that our job is running, let's see what it's doing. Access the
 scheduler web interface at `http://$scheduler_hostname:$scheduler_port/scheduler`
-Or when using `vagrant`, `http://192.168.33.5:8081/scheduler`
+Or when using `vagrant`, `http://192.168.33.6:8081/scheduler`
 First we see what Jobs are scheduled:
 
 ![Scheduled Jobs](images/ScheduledJobs.png)
