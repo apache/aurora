@@ -12,6 +12,10 @@ class CommandProcessor(object):
   "arg1" and "arg2" would be the parameters to that command.
   """
 
+  @property
+  def name(self):
+    """Get the name of this command processor"""
+
   def execute(self, args):
     """Execute the command-line tool wrapped by this processor.
 
@@ -40,9 +44,31 @@ class Bridge(object):
     self.command_processors = command_processors
     self.default = default
 
+  def show_help(self, args):
+    """Dispatch a help request to the appropriate sub-command"""
+    if len(args) == 2:  # command was just "help":
+      print("This is a merged command line, consisting of %s" %
+          [cp.name for cp in self.command_processors])
+      for cp in self.command_processors:
+        print("========== help for %s ==========" % cp.name)
+        cp.execute(args)
+      return
+    elif len(args) >= 3:
+      discriminator = args[2]
+      for cp in self.command_processors:
+        if discriminator in cp.get_commands():
+          cp.execute(args)
+          return
+      if self.default is not None:
+        self.default.execute(args)
+
+
   def execute(self, args):
     """Dispatch a command line to the appropriate CommandProcessor"""
     for cl in self.command_processors:
+      if args[1] == 'help':
+        self.show_help(args)
+        return 0
       if args[1] in cl.get_commands():
         return cl.execute(args)
     if self.default is not None:

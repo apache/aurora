@@ -15,10 +15,10 @@
 #
 
 from collections import namedtuple
-from types import IntType, StringType
 
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
+from twitter.common.lang import Compatibility
 from twitter.common.quantity.parse_simple import parse_time
 from argparse import ArgumentTypeError
 
@@ -27,24 +27,32 @@ class CommandOption(object):
   """A lightweight encapsulation of an argparse option specification"""
 
   def __init__(self, *args, **kwargs):
-    self.name = args[0]
+    # Search for the long-name: it's either the first argument that
+    # is a double-dashed option name, or the first argument that doesn't
+    # have a dash in front of it.
+    for arg in args:
+      if arg.startswith('--') or not arg.startswith('-'):
+        self.name = arg
+        break
+    else:
+      raise ValueError('CommandOption had no valid name.')
     self.args = args
     self.kwargs = kwargs
-    self.type = kwargs['type'] if 'type' in kwargs else None
-    self.help = kwargs['help'] if 'help' in kwargs else ""
+    self.type = kwargs.get('type')
+    self.help = kwargs.get('help', '')
 
   def is_mandatory(self):
-    return self.kwargs["required"] if "required" in self.kwargs else not self.name.startswith('--')
+    return self.kwargs.get('required', not self.name.startswith('--'))
 
   def get_displayname(self):
     """Get a display name for a the expected format of a parameter value"""
     if 'metavar' in self.kwargs:
       displayname = self.kwargs['metavar']
-    elif self.type == str:
+    elif self.type is str:
       displayname = "str"
-    elif type(self.type) is StringType:
+    elif isinstance(self.type, Compatibility.string):
       displayname = self.type
-    elif type(self.type) is IntType:
+    elif isinstance(self.type, Compatibility.integer):
       displayname = "int",
     else:
       displayname = "value"

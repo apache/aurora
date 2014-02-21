@@ -29,10 +29,10 @@ class AuroraClientV2CommandProcessor(CommandProcessor):
 
   @property
   def name(self):
-    return "aurora"
+    return "Aurora Client v2"
 
   def get_commands(self):
-    return self.commandline.registered_nouns + ["help"]
+    return self.commandline.registered_nouns
 
   def execute(self, args):
     return self.commandline.execute(args[1:])
@@ -40,6 +40,11 @@ class AuroraClientV2CommandProcessor(CommandProcessor):
 
 class AuroraClientV1CommandProcessor(CommandProcessor):
   # TODO(mchucarroll): deprecate client v1. (AURORA-131)
+
+  @property
+  def name(self):
+    return "Aurora Client v1"
+
   def get_commands(self):
     return ["cancel_update", "create", "diff", "get_quota", "inspect", "kill", "list_jobs",
         "open", "restart", "run", "ssh", "start_cron", "status", "update", "version" ]
