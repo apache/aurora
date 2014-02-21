@@ -67,22 +67,20 @@ python_library(
 )
 
 python_library(
-  name = 'thermos_executor_base',
+  name = 'executor_base',
   sources = ['executor_base.py'],
   dependencies = [
     pants('3rdparty/python:mesos'),
     pants('3rdparty/python:twitter.common.log'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
 python_library(
-  name = 'thermos_executor',
-  sources = ['thermos_executor.py'],
+  name = 'aurora_executor',
+  sources = ['aurora_executor.py'],
   dependencies = [
     pants(':status_manager'),
-    pants(':thermos_executor_base'),
+    pants(':executor_base'),
     pants('3rdparty/python:mesos'),
     pants('3rdparty/python:pystachio'),
     pants('3rdparty/python:twitter.common.app'),
@@ -113,7 +111,7 @@ python_library(
   sources = ['gc_executor.py'],
   dependencies = [
     pants(':executor_detector'),
-    pants(':thermos_executor_base'),
+    pants(':executor_base'),
     pants('3rdparty/python:mesos'),
     pants('3rdparty/python:psutil'),
     pants('3rdparty/python:twitter.common.collections'),
@@ -130,6 +128,7 @@ python_library(
     pants('src/main/python/apache/aurora/config:schema'),
     pants('src/main/python/apache/aurora/executor/common:sandbox'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ]
 )
 

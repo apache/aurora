@@ -14,18 +14,14 @@
 # limitations under the License.
 #
 
-from gen.apache.aurora.constants import TERMINAL_STATES as AURORA_TERMINAL_STATES
-from gen.apache.aurora.ttypes import ScheduleStatus
-from gen.apache.thermos.ttypes import TaskState
-
 import mesos
 import mesos_pb2 as mesos_pb
 from twitter.common import log
 
 
-class ThermosExecutorBase(mesos.Executor):
+class ExecutorBase(mesos.Executor):
   # Statuses are hard, let's go shopping.
-  MESOS_STATES = {
+  STATES_TO_STR = {
       mesos_pb.TASK_STARTING: 'STARTING',
       mesos_pb.TASK_RUNNING: 'RUNNING',
       mesos_pb.TASK_FINISHED: 'FINISHED',
@@ -34,45 +30,16 @@ class ThermosExecutorBase(mesos.Executor):
       mesos_pb.TASK_LOST: 'LOST',
   }
 
-  THERMOS_TO_MESOS_STATES = {
-      TaskState.ACTIVE: mesos_pb.TASK_RUNNING,
-      TaskState.SUCCESS: mesos_pb.TASK_FINISHED,
-      TaskState.FAILED: mesos_pb.TASK_FAILED,
-      TaskState.KILLED: mesos_pb.TASK_KILLED,
-      TaskState.LOST: mesos_pb.TASK_LOST,
-  }
-
-  THERMOS_TO_TWITTER_STATES = {
-      TaskState.ACTIVE: ScheduleStatus.RUNNING,
-      TaskState.CLEANING: ScheduleStatus.RUNNING,
-      TaskState.FINALIZING: ScheduleStatus.RUNNING,
-      TaskState.SUCCESS: ScheduleStatus.FINISHED,
-      TaskState.FAILED: ScheduleStatus.FAILED,
-      TaskState.KILLED: ScheduleStatus.KILLED,
-      TaskState.LOST: ScheduleStatus.LOST,
-  }
-
-  @staticmethod
-  def twitter_status_is_terminal(status):
-    return status in AURORA_TERMINAL_STATES
-
-  @staticmethod
-  def mesos_status_is_terminal(status):
-    return status in (
+  TERMINAL_STATES = frozenset([
         mesos_pb.TASK_FAILED,
         mesos_pb.TASK_FINISHED,
         mesos_pb.TASK_KILLED,
         mesos_pb.TASK_LOST,
-    )
+  ])
 
-  @staticmethod
-  def thermos_status_is_terminal(status):
-    return status in (
-        TaskState.FAILED,
-        TaskState.KILLED,
-        TaskState.LOST,
-        TaskState.SUCCESS,
-    )
+  @classmethod
+  def status_is_terminal(cls, status):
+    return status in cls.TERMINAL_STATES
 
   def __init__(self):
     self._slave_id = None
@@ -101,13 +68,13 @@ class ThermosExecutorBase(mesos.Executor):
     update = mesos_pb.TaskStatus()
     if not isinstance(state, int):
       raise TypeError('Invalid state type %s, should be int.' % type(state))
-    if state not in self.MESOS_STATES:
+    if state not in self.STATES_TO_STR:
       raise ValueError('Invalid state: %s' % state)
     update.state = state
     update.task_id.value = task_id
     if message:
       update.message = str(message)
-    self.log('Updating %s => %s' % (task_id, self.MESOS_STATES[state]))
+    self.log('Updating %s => %s' % (task_id, self.STATES_TO_STR[state]))
     self.log('   Reason: %s' % message)
     driver.sendStatusUpdate(update)
 

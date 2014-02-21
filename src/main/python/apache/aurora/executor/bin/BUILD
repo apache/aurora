@@ -29,7 +29,7 @@ python_binary(
     pants('src/main/python/apache/aurora/executor/common:sandbox'),
     pants('src/main/python/apache/aurora/executor:executor_detector'),
     pants('src/main/python/apache/aurora/executor:executor_vars'),
-    pants('src/main/python/apache/aurora/executor:thermos_executor'),
+    pants('src/main/python/apache/aurora/executor:aurora_executor'),
     pants('src/main/python/apache/aurora/executor:thermos_task_runner'),
   ]
 )

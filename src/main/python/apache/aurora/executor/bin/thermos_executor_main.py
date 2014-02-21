@@ -25,7 +25,7 @@ import os
 
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
 from apache.aurora.executor.common.health_checker import HealthCheckerProvider
-from apache.aurora.executor.thermos_executor import ThermosExecutor
+from apache.aurora.executor.aurora_executor import AuroraExecutor
 from apache.aurora.executor.thermos_task_runner import DefaultThermosTaskRunnerProvider
 
 import mesos
@@ -56,14 +56,14 @@ def dump_runner_pex():
 
 def proxy_main():
   def main():
-    runner_provider = DefaultThermosTaskRunnerProvider(
+    thermos_runner_provider = DefaultThermosTaskRunnerProvider(
         dump_runner_pex(),
         artifact_dir=os.path.realpath('.'),
     )
 
     # Create executor stub
-    thermos_executor = ThermosExecutor(
-        runner_provider=runner_provider,
+    thermos_executor = AuroraExecutor(
+        runner_provider=thermos_runner_provider,
         status_providers=(HealthCheckerProvider(),),
     )
 

@@ -328,7 +328,10 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
   def from_assigned_task(self, assigned_task, sandbox):
     task_id = assigned_task.taskId
     role = assigned_task.task.owner.role
-    mesos_task = mesos_task_instance_from_assigned_task(assigned_task)
+    try:
+      mesos_task = mesos_task_instance_from_assigned_task(assigned_task)
+    except ValueError as e:
+      raise TaskError('Could not deserialize Thermos task from AssignedTask: %s' % e)
     mesos_ports = resolve_ports(mesos_task, assigned_task.assignedPorts)
 
     class ProvidedThermosTaskRunner(self._task_runner_class):

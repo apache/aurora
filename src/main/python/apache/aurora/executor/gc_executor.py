@@ -37,10 +37,12 @@ from gen.apache.aurora.comm.ttypes import (
     AdjustRetainedTasks,
     DeletedTasks,
     SchedulerMessage)
+from gen.apache.aurora.constants import TERMINAL_STATES
 from gen.apache.aurora.ttypes import ScheduleStatus
+from gen.apache.thermos.ttypes import TaskState
 
 from .common.sandbox import DirectorySandbox, SandboxInterface
-from .executor_base import ThermosExecutorBase
+from .executor_base import ExecutorBase
 from .executor_detector import ExecutorDetector
 
 import mesos_pb2 as mesos_pb
@@ -54,7 +56,27 @@ from twitter.common.metrics.gauge import AtomicGauge
 from twitter.common.quantity import Amount, Time
 
 
-class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
+THERMOS_TO_TWITTER_STATES = {
+    TaskState.ACTIVE: ScheduleStatus.RUNNING,
+    TaskState.CLEANING: ScheduleStatus.RUNNING,
+    TaskState.FINALIZING: ScheduleStatus.RUNNING,
+    TaskState.SUCCESS: ScheduleStatus.FINISHED,
+    TaskState.FAILED: ScheduleStatus.FAILED,
+    TaskState.KILLED: ScheduleStatus.KILLED,
+    TaskState.LOST: ScheduleStatus.LOST,
+}
+
+
+THERMOS_TO_MESOS_STATES = {
+    TaskState.ACTIVE: mesos_pb.TASK_RUNNING,
+    TaskState.SUCCESS: mesos_pb.TASK_FINISHED,
+    TaskState.FAILED: mesos_pb.TASK_FAILED,
+    TaskState.KILLED: mesos_pb.TASK_KILLED,
+    TaskState.LOST: mesos_pb.TASK_LOST,
+}
+
+
+class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
   """
     Thermos GC Executor, responsible for:
       - garbage collecting old tasks to make sure they don't clutter up the system
@@ -89,7 +111,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
                executor_detector=ExecutorDetector,
                task_garbage_collector=TaskGarbageCollector,
                clock=time):
-    ThermosExecutorBase.__init__(self)
+    ExecutorBase.__init__(self)
     ExceptionalThread.__init__(self)
     self.daemon = True
     self._stop_event = threading.Event()
@@ -97,7 +119,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
                                         # the order in which they were received via a launchTask.
     self._driver = None   # cache the ExecutorDriver provided by the slave, so we can use it
                           # out of band from slave-initiated callbacks. This should be supplied by
-                          # ThermosExecutorBase.registered() when the executor first registers with
+                          # ExecutorBase.registered() when the executor first registers with
                           # the slave.
     self._slave_id = None # cache the slave ID provided by the slave
     self._task_id = None  # the task_id currently being executed by the ThermosGCExecutor, if any
@@ -220,7 +242,7 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
     def partition(rt):
       active, starting, finished = set(), set(), set()
       for task_id, schedule_status in rt.items():
-        if self.twitter_status_is_terminal(schedule_status):
+        if schedule_status in TERMINAL_STATES:
           finished.add(task_id)
         elif (schedule_status == ScheduleStatus.STARTING or
               schedule_status == ScheduleStatus.ASSIGNED):
@@ -263,11 +285,11 @@ class ThermosGCExecutor(ThermosExecutorBase, ExceptionalThread, Observable):
         states = self.get_states(task_id)
         if states:
           _, last_state = states[-1]
-          updates[task_id] = self.THERMOS_TO_TWITTER_STATES.get(last_state, ScheduleStatus.UNKNOWN)
+          updates[task_id] = THERMOS_TO_TWITTER_STATES.get(last_state, ScheduleStatus.UNKNOWN)
           self.send_update(
               driver,
               task_id,
-              self.THERMOS_TO_MESOS_STATES.get(last_state, mesos_pb.TASK_LOST),
+              THERMOS_TO_MESOS_STATES.get(last_state, mesos_pb.TASK_LOST),
               'Task finish detected by GC executor.')
         else:
           local_gc.update(self.should_gc_task(task_id))

@@ -14,18 +14,36 @@
 # limitations under the License.
 #
 
-# TODO(jfarrell): AURORA-14 for executor_builds, gc_executor and thermos_executor
 python_test_suite(name = 'all',
   dependencies = [
-    # pants(':executor_builds'),
-    pants(':executor_detector'),
-    pants(':executor_vars'),
-    # pants(':gc_executor'),
-    # pants(':thermos_executor'),
-    pants(':thermos_task_runner'),
-    pants('src/test/python/apache/aurora/executor/common:all'),
+    pants(':executor-small'),
+
+    # TODO(jfarrell): AURORA-14 for executor_builds, gc_executor and thermos_executor
+    # pants(':executor-large'),
   ]
 )
+
+
+python_test_suite(
+  name = 'executor-small',
+  dependencies = [
+    pants(':executor_detector'),
+    pants(':executor_vars'),
+    pants(':thermos_task_runner'),
+    pants('src/test/python/apache/aurora/executor/common:all'),
+  ],
+)
+
+
+python_test_suite(
+  name = 'executor-large',
+  dependencies = [
+    pants(':executor_builds'),
+    pants(':gc_executor'),
+    pants(':thermos_executor'),
+  ]
+)
+
 
 python_tests(name = 'gc_executor',
   sources = ['test_gc_executor.py'],
@@ -42,7 +60,6 @@ python_tests(name = 'gc_executor',
     pants('src/main/python/apache/aurora/executor:gc_executor'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ],
-  coverage = 'twitter.mesos.executor.gc_executor'
 )
 
 python_tests(name = 'executor_detector',
@@ -69,7 +86,7 @@ python_tests(name = 'thermos_executor',
     pants('src/main/python/apache/aurora/executor/common:health_checker'),
     pants('src/main/python/apache/aurora/executor/common:sandbox'),
     pants('src/main/python/apache/aurora/executor/common:task_runner'),
-    pants('src/main/python/apache/aurora/executor:thermos_executor'),
+    pants('src/main/python/apache/aurora/executor:aurora_executor'),
     pants('src/main/python/apache/aurora/executor:thermos_task_runner'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]

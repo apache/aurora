@@ -27,7 +27,6 @@ python_tests(name = 'test_pathspec',
   dependencies = [
     pants('src/main/python/apache/thermos/common:path'),
   ],
-  coverage = 'apache.thermos.base.path'
 )
 
 python_tests(name = 'test_planner',
@@ -35,7 +34,6 @@ python_tests(name = 'test_planner',
   dependencies = [
     pants('src/main/python/apache/thermos/common:planner'),
   ],
-  coverage = 'apache.thermos.base.planner'
 )
 
 python_tests(name = 'test_task_planner',
