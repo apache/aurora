@@ -54,7 +54,6 @@ class AuroraClientCommandTest(unittest.TestCase):
     # what API calls get made against the scheduler, and both of these objects
     # delegate calls to the scheduler. It doesn't matter which one is used:
     # what we care about is that the right API calls get made.
-    mock_api = Mock(spec=HookedAuroraClientAPI)
     mock_scheduler_proxy = Mock()
     mock_scheduler_proxy.url = "http://something_or_other"
     mock_scheduler_proxy.scheduler_client.return_value = mock_scheduler_proxy

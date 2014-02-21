@@ -17,7 +17,7 @@
 import unittest
 import time
 
-from apache.aurora.client.api.sla import Sla, JobUpTimeSlaVector
+from apache.aurora.client.api.sla import DomainUpTimeSlaVector, JobUpTimeSlaVector, Sla
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
@@ -44,10 +44,11 @@ class SlaTest(unittest.TestCase):
   def setUp(self):
     self._scheduler = Mock()
     self._sla = Sla(self._scheduler)
+    self._cluster = 'cl'
     self._role = 'mesos'
     self._name = 'job'
     self._env = 'test'
-    self._job_key = AuroraJobKey('foo', self._role, self._env, self._name)
+    self._job_key = AuroraJobKey(self._cluster, self._role, self._env, self._name)
 
   def mock_get_tasks(self, tasks, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
@@ -55,9 +56,16 @@ class SlaTest(unittest.TestCase):
     resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
     self._scheduler.getTasksStatus.return_value = resp
 
-  def create_task(self, duration, id):
+  def create_task(self, duration, id, host=None, name=None):
     return ScheduledTask(
-        assignedTask=AssignedTask(instanceId=id, task=TaskConfig(production=True)),
+        assignedTask=AssignedTask(
+            instanceId=id,
+            slaveHost=host,
+            task=TaskConfig(
+                production=True,
+                jobName=name or self._name,
+                owner=Identity(role=self._role),
+                environment=self._env)),
         status=ScheduleStatus.RUNNING,
         taskEvents=[TaskEvent(
             status=ScheduleStatus.STARTING,
@@ -87,6 +95,23 @@ class SlaTest(unittest.TestCase):
           'Expected uptime:%s Actual uptime:%s' % (expected, actual)
       )
       self.expect_task_status_call()
+
+  def assert_safe_domain_result(self, host, percentage, duration, in_limit=None, out_limit=None):
+    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    result = vector.get_safe_hosts(percentage, duration, in_limit)
+    assert 1 == len(result), ('Expected length:%s Actual length:%s' % (1, len(result)))
+    assert host in result, ('Expected host:%s not found in result' % host)
+    if out_limit:
+      assert result[host][0].job.name == out_limit.job.name, (
+          'Expected job:%s Actual:%s' % (out_limit.job.name, result[host][0].job.name)
+      )
+      assert result[host][0].percentage == out_limit.percentage, (
+        'Expected %%:%s Actual %%:%s' % (out_limit.percentage, result[host][0].percentage)
+      )
+      assert result[host][0].duration == out_limit.duration, (
+        'Expected duration:%s Actual duration:%s' % (out_limit.duration, result[host][0].duration)
+      )
+    self._scheduler.getTasksStatus.assert_called_once_with(TaskQuery(statuses=ACTIVE_STATES))
 
   def expect_task_status_call(self):
     self._scheduler.getTasksStatus.assert_called_once_with(
@@ -133,3 +158,41 @@ class SlaTest(unittest.TestCase):
   def test_uptime_100(self):
     self.mock_get_tasks(self.create_tasks([100, 200, 300, 400]))
     self.assert_uptime_result(None, 100)
+
+  def test_domain_uptime_no_tasks(self):
+    self.mock_get_tasks([])
+    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    assert 0 == len(vector.get_safe_hosts(50, 400)), 'Length must be empty.'
+
+  def test_domain_uptime_no_result(self):
+    self.mock_get_tasks([
+        self.create_task(100, 1, 'h1', 'j1'),
+        self.create_task(200, 2, 'h2', 'j1')
+    ])
+    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    assert 0 == len(vector.get_safe_hosts(50, 400)), 'Length must be empty.'
+
+  def test_domain_uptime(self):
+    self.mock_get_tasks([
+      self.create_task(100, 1, 'h1', 'j1'),
+      self.create_task(200, 2, 'h2', 'j1'),
+      self.create_task(100, 1, 'h2', 'j2')
+    ])
+    self.assert_safe_domain_result('h1', 50, 200)
+
+  def test_domain_uptime_with_override(self):
+    self.mock_get_tasks([
+      self.create_task(100, 1, 'h1', self._name),
+      self.create_task(200, 2, 'h2', self._name),
+      self.create_task(100, 1, 'h2', 'j2')
+    ])
+
+    job_override = {
+        self._job_key:
+        DomainUpTimeSlaVector.JobUpTimeLimit(
+            job=self._job_key,
+            percentage=50,
+            duration_seconds=100)
+    }
+    self.assert_safe_domain_result('h1', 50, 400, in_limit=job_override)
+

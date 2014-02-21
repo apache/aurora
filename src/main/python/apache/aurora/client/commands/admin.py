@@ -25,7 +25,9 @@ import subprocess
 
 from apache.aurora.admin.mesos_maintenance import MesosMaintenance
 from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.client.api.sla import DomainUpTimeSlaVector
 from apache.aurora.client.base import check_and_log_response, die, requires
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 
 from gen.apache.aurora.constants import ACTIVE_STATES, TERMINAL_STATES
@@ -36,8 +38,8 @@ from gen.apache.aurora.ttypes import (
 )
 
 from twitter.common import app, log
-from twitter.common.quantity import Amount, Data
-from twitter.common.quantity.parse_simple import parse_data
+from twitter.common.quantity import Amount, Data, Time
+from twitter.common.quantity.parse_simple import parse_data, parse_time
 
 
 GROUPING_OPTION = optparse.Option(
@@ -51,17 +53,27 @@ GROUPING_OPTION = optparse.Option(
         ', '.join(MesosMaintenance.GROUPING_FUNCTIONS.keys())))
 
 
+def parse_host_file(filename):
+  with open(filename, 'r') as hosts:
+    hosts = [hostname.strip() for hostname in hosts]
+  if not hosts:
+    die('No valid hosts found in %s.' % filename)
+  return hosts
+
 def parse_hosts(options):
   if bool(options.filename) == bool(options.hosts):
     die('Please specify either --filename or --hosts')
   if options.filename:
-    with open(options.filename, 'r') as hosts:
-      hosts = [hostname.strip() for hostname in hosts]
+    hosts = parse_host_file(options.filename)
   elif options.hosts:
     hosts = [hostname.strip() for hostname in options.hosts.split(",")]
   if not hosts:
     die('No valid hosts found.')
   return hosts
+
+def print_results(results):
+  for line in results:
+    print(line)
 
 
 @app.command
@@ -409,3 +421,92 @@ def scheduler_snapshot(cluster):
   """
   options = app.get_options()
   check_and_log_response(AuroraClientAPI(CLUSTERS['cluster'], options.verbosity).snapshot())
+
+
+@app.command
+@app.command_option('-i', '--include_hosts', dest='include_filename', default=None,
+    help='Inclusion filter. An optional text file listing hosts (one per line)'
+         'to include into the result set if found. Example: cl1-aau-dev2.test.com')
+@app.command_option('-x', '--exclude_hosts', dest='exclude_filename', default=None,
+    help='Exclusion filter. An optional text file listing hosts (one per line)'
+         'to exclude from the result set if found. Example: cl1-aau-dev1.test.com')
+@app.command_option('-l', '--list_jobs', dest='list_jobs', default=False, action='store_true',
+    help='Lists all affected job keys with projected new SLAs if their tasks get killed'
+         'in the following column format:\n'
+         'HOST  JOB  PREDICTED_SLA  DURATION_SECONDS')
+@app.command_option('-o', '--override_jobs', dest='override_filename', default=None,
+    help='An optional text file to load job specific SLAs that will override'
+         'cluster-wide command line percentage and duration values.'
+         'The file can have multiple lines in the following format:'
+         '"cluster/role/env/job percentage duration". Example: cl/mesos/prod/labrat 95 2h')
+@requires.exactly('cluster', 'percentage', 'duration')
+def sla_list_safe_domain(cluster, percentage, duration):
+  """usage: sla_list_safe_domain
+            [--exclude_hosts=filename]
+            [--include_hosts=filename]
+            [--list_jobs]
+            [--override_jobs=filename]
+            cluster percentage duration
+
+  Returns a list of relevant hosts where it would be safe to kill
+  tasks without violating their job SLA. The SLA is defined as a pair of
+  percentage and duration, where:
+
+  percentage - Percentage of tasks required to be up within the duration.
+  Applied to all jobs except those listed in --override_jobs file;
+
+  duration - Time interval (now - value) for the percentage of up tasks.
+  Applied to all jobs except those listed in --override_jobs file.
+  Format: XdYhZmWs (each field is optional but must be in that order.)
+  Examples: 5m, 1d3h45m.
+  """
+  def parse_percentage(percentage):
+    val = float(percentage)
+    if val <= 0 or val > 100:
+      die('Invalid percentage %s. Must be within (0, 100].' % percentage)
+    return val
+
+  def parse_jobs_file(filename):
+    result = {}
+    with open(filename, 'r') as overrides:
+      for line in overrides:
+        if not line.strip():
+          continue
+
+        tokens = line.split()
+        if len(tokens) != 3:
+          die('Invalid line in %s:%s' % (filename, line))
+        job_key = AuroraJobKey.from_path(tokens[0])
+        result[job_key] = DomainUpTimeSlaVector.JobUpTimeLimit(
+            job=job_key,
+            percentage=parse_percentage(tokens[1]),
+            duration_seconds=parse_time(tokens[2]).as_(Time.SECONDS)
+        )
+    return result
+
+  options = app.get_options()
+
+  sla_percentage = parse_percentage(percentage)
+  sla_duration = parse_time(duration)
+
+  exclude_hosts = parse_host_file(options.exclude_filename) if options.exclude_filename else []
+  include_hosts = parse_host_file(options.include_filename) if options.include_filename else []
+  override_jobs = parse_jobs_file(options.override_filename) if options.override_filename else {}
+
+  vector = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).sla_get_safe_domain_vector()
+  hosts = vector.get_safe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), override_jobs)
+
+  results = []
+  for host in sorted(hosts.keys()):
+    if include_hosts and host not in include_hosts or exclude_hosts and host in exclude_hosts:
+      continue
+
+    if options.list_jobs:
+      results.append('\n'.join(['%s %s %.2f %d' %
+                               (host, limit.job.to_path(), limit.percentage, limit.duration_seconds)
+                                for limit in hosts[host]]))
+    else:
+      results.append('%s' % host)
+
+  print_results(results)
+

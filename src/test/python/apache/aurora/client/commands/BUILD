@@ -16,7 +16,7 @@
 
 python_test_suite(
   name = 'all',
-  dependencies = [ pants(':core'), pants(':run'), pants(':ssh') ]
+  dependencies = [ pants(':core'), pants(':run'), pants(':ssh'), pants(':admin') ]
 )
 
 python_tests(
@@ -36,6 +36,19 @@ python_tests(
     pants('3rdparty/python:mock'),
     pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/client/commands:core'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ])
+
+python_tests(
+  name='admin',
+  sources = [
+    'test_admin_sla.py',
+  ],
+  dependencies = [
+    pants(':util'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/client/commands:admin'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ])
 
