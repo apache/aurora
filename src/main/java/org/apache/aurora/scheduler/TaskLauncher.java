@@ -15,11 +15,8 @@
  */
 package org.apache.aurora.scheduler;
 
-import com.google.common.base.Optional;
-
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
 /**
@@ -28,16 +25,17 @@ import org.apache.mesos.Protos.TaskStatus;
 public interface TaskLauncher {
 
   /**
-   * Grants a resource offer to the task launcher, which will be passed to any subsequent task
+   * Presents a resource offer to the task launcher, which will be passed to any subsequent task
    * launchers if this one does not accept.
    * <p>
    * A task launcher may choose to retain an offer for later use.  Any retained offers must be
    * cleaned up with {@link #cancelOffer(OfferID)}.
    *
    * @param offer The resource offer.
-   * @return A task, absent if the launcher chooses not to accept the offer.
+   * @return {@code false} if the launcher will not act on the offer, or {@code true} if the
+   *         launcher may accept the offer at some point in the future.
    */
-  Optional<TaskInfo> createTask(Offer offer);
+  boolean willUse(Offer offer);
 
   /**
    * Informs the launcher that a status update has been received for a task.  If the task is not

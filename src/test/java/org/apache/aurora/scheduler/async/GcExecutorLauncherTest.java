@@ -13,20 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.periodic;
+package org.apache.aurora.scheduler.async;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
-import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
@@ -34,27 +35,28 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.comm.AdjustRetainedTasks;
+import org.apache.aurora.scheduler.Driver;
+import org.apache.aurora.scheduler.async.GcExecutorLauncher.GcExecutorSettings;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
-import org.apache.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutorSettings;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
+import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.Protos.TaskState;
+import org.apache.mesos.Protos.TaskStatus;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
-import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertEquals;
+import static org.apache.aurora.scheduler.async.GcExecutorLauncher.SYSTEM_TASK_PREFIX;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class GcExecutorLauncherTest extends EasyMockTest {
@@ -71,73 +73,62 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
   private static final String JOB_A = "jobA";
 
-  private static final Amount<Long, Time> MAX_GC_INTERVAL = Amount.of(1L, Time.HOURS);
-  private static final Optional<String> GC_EXCECUTOR_PATH = Optional.of("nonempty");
+  private static final GcExecutorSettings SETTINGS =
+      new GcExecutorSettings(Amount.of(1L, Time.HOURS), Optional.of("nonempty"));
 
   private final AtomicInteger taskIdCounter = new AtomicInteger();
 
   private FakeClock clock;
   private StorageTestUtil storageUtil;
+  private Driver driver;
   private GcExecutorLauncher gcExecutorLauncher;
-  private GcExecutorSettings settings;
 
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
     clock = new FakeClock();
     storageUtil.expectOperations();
-    settings = createMock(GcExecutorSettings.class);
-    expect(settings.getMaxGcInterval()).andReturn(MAX_GC_INTERVAL.as(Time.MILLISECONDS)).anyTimes();
-  }
-
-  private void replayAndCreate() {
-    control.replay();
-    gcExecutorLauncher = new GcExecutorLauncher(settings, storageUtil.storage, clock);
+    driver = createMock(Driver.class);
+    gcExecutorLauncher = new GcExecutorLauncher(
+        SETTINGS,
+        storageUtil.storage,
+        clock,
+        MoreExecutors.sameThreadExecutor(),
+        driver,
+        Suppliers.ofInstance("gc"));
   }
 
   @Test
   public void testPruning() throws Exception {
-    IScheduledTask thermosPrunedTask = makeTask(JOB_A, true, FAILED);
-    IScheduledTask thermosTask = makeTask(JOB_A, true, FAILED);
-    IScheduledTask nonThermosTask = makeTask(JOB_A, false, FAILED);
+    IScheduledTask a = makeTask(JOB_A, FAILED);
+    IScheduledTask b = makeTask(JOB_A, FAILED);
+    IScheduledTask c = makeTask(JOB_A, FAILED);
 
     // First call - no tasks to be collected.
-    expectGetTasksByHost(HOST, thermosPrunedTask, thermosTask, nonThermosTask);
-    expect(settings.getDelayMs()).andReturn(Amount.of(30, Time.MINUTES).as(Time.MILLISECONDS));
+    expectGetTasksByHost(HOST, a, b, c);
+    expectAdjustRetainedTasks(a, b, c);
 
     // Third call - two tasks collected.
-    expectGetTasksByHost(HOST, thermosPrunedTask);
-    expect(settings.getDelayMs()).andReturn(Amount.of(30, Time.MINUTES).as(Time.MILLISECONDS));
+    expectGetTasksByHost(HOST, a);
+    expectAdjustRetainedTasks(a);
 
-    expect(settings.getGcExecutorPath()).andReturn(GC_EXCECUTOR_PATH).times(5);
-
-    replayAndCreate();
+    control.replay();
 
     // First call - no items in the cache, no tasks collected.
-    Optional<TaskInfo> taskInfo = gcExecutorLauncher.createTask(OFFER);
-    assertTrue(taskInfo.isPresent());
-    assertRetainedTasks(taskInfo.get(), thermosPrunedTask, thermosTask, nonThermosTask);
-    ExecutorInfo executor1 = taskInfo.get().getExecutor();
+    assertTrue(gcExecutorLauncher.willUse(OFFER));
 
     // Second call - host item alive, no tasks collected.
-    clock.advance(Amount.of(15L, Time.MINUTES));
-    taskInfo = gcExecutorLauncher.createTask(OFFER);
-    assertFalse(taskInfo.isPresent());
+    clock.advance(Amount.of((long) SETTINGS.getDelayMs() - 1, Time.MILLISECONDS));
+    assertFalse(gcExecutorLauncher.willUse(OFFER));
 
     // Third call - two tasks collected.
     clock.advance(Amount.of(15L, Time.MINUTES));
-    taskInfo = gcExecutorLauncher.createTask(OFFER);
-    assertTrue(taskInfo.isPresent());
-    assertRetainedTasks(taskInfo.get(), thermosPrunedTask);
-
-    // Same executor should be re-used for both tasks
-    assertEquals(executor1, taskInfo.get().getExecutor());
+    assertTrue(gcExecutorLauncher.willUse(OFFER));
   }
 
   @Test
   public void testNoAcceptingSmallOffers() {
-    expect(settings.getGcExecutorPath()).andReturn(GC_EXCECUTOR_PATH);
-    replayAndCreate();
+    control.replay();
 
     Iterable<Resource> resources =
         Resources.subtract(
@@ -147,19 +138,50 @@ public class GcExecutorLauncherTest extends EasyMockTest {
         .clearResources()
         .addAllResources(resources)
         .build();
-    assertFalse(gcExecutorLauncher.createTask(smallOffer).isPresent());
+    assertFalse(gcExecutorLauncher.willUse(smallOffer));
   }
 
-  private static void assertRetainedTasks(TaskInfo taskInfo, IScheduledTask... tasks)
-      throws ThriftBinaryCodec.CodingException {
-    AdjustRetainedTasks message = ThriftBinaryCodec.decode(
-        AdjustRetainedTasks.class, taskInfo.getData().toByteArray());
-    Map<String, IScheduledTask> byId = Tasks.mapById(ImmutableSet.copyOf(tasks));
-    assertNotNull(message);
-    assertEquals(Maps.transformValues(byId, Tasks.GET_STATUS), message.getRetainedTasks());
+  private static TaskStatus makeStatus(String taskId) {
+    return TaskStatus.newBuilder()
+        .setSlaveId(OFFER.getSlaveId())
+        .setState(TaskState.TASK_RUNNING)
+        .setTaskId(TaskID.newBuilder().setValue(taskId))
+        .build();
   }
 
-  private IScheduledTask makeTask(String jobName, boolean isThermos, ScheduleStatus status) {
+  @Test
+  public void testStatusUpdate() {
+    control.replay();
+
+    assertTrue(gcExecutorLauncher.statusUpdate(makeStatus(SYSTEM_TASK_PREFIX)));
+    assertTrue(gcExecutorLauncher.statusUpdate(makeStatus(SYSTEM_TASK_PREFIX + "1")));
+    assertFalse(gcExecutorLauncher.statusUpdate(makeStatus("1" + SYSTEM_TASK_PREFIX)));
+    assertFalse(gcExecutorLauncher.statusUpdate(makeStatus("asdf")));
+  }
+
+  @Test
+  public void testGcExecutorDisabled() {
+    control.replay();
+
+    gcExecutorLauncher = new GcExecutorLauncher(
+        new GcExecutorSettings(Amount.of(1L, Time.HOURS), Optional.<String>absent()),
+        storageUtil.storage,
+        clock,
+        MoreExecutors.sameThreadExecutor(),
+        driver,
+        Suppliers.ofInstance("gc"));
+    assertFalse(gcExecutorLauncher.willUse(OFFER));
+  }
+
+  private void expectAdjustRetainedTasks(IScheduledTask... tasks) {
+    Map<String, ScheduleStatus> statuses =
+        Maps.transformValues(Tasks.mapById(ImmutableSet.copyOf(tasks)), Tasks.GET_STATUS);
+    AdjustRetainedTasks message = new AdjustRetainedTasks().setRetainedTasks(statuses);
+    TaskInfo task = gcExecutorLauncher.makeGcTask(HOST, OFFER.getSlaveId(), message);
+    driver.launchTask(OFFER.getId(), task);
+  }
+
+  private IScheduledTask makeTask(String jobName, ScheduleStatus status) {
     return IScheduledTask.build(new ScheduledTask()
         .setStatus(status)
         .setAssignedTask(new AssignedTask()
@@ -168,7 +190,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
             .setTask(new TaskConfig()
                 .setJobName(jobName)
                 .setOwner(new Identity().setRole("role").setUser("user"))
-                .setExecutorConfig(isThermos ? new ExecutorConfig("aurora", "config") : null))));
+                .setExecutorConfig(new ExecutorConfig("aurora", "config")))));
   }
 
   private void expectGetTasksByHost(String host, IScheduledTask... tasks) {

@@ -20,7 +20,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.testing.TearDown;
 import com.google.inject.AbstractModule;
@@ -33,7 +32,6 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
-import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
@@ -83,23 +81,9 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       .setId(OFFER_ID_2)
       .build();
 
-  private static final TaskID TASK_ID = TaskID.newBuilder().setValue("task-id").build();
-  private static final TaskInfo TASK = TaskInfo.newBuilder()
-      .setName("task-name")
-      .setSlaveId(SLAVE_ID)
-      .setTaskId(TASK_ID)
-      .build();
-
-  private static final TaskInfo BIGGER_TASK = TaskInfo.newBuilder()
-      .setName("task-name")
-      .setSlaveId(SLAVE_ID)
-      .addResources(Resources.makeMesosResource(Resources.CPUS, 5))
-      .setTaskId(TaskID.newBuilder().setValue("task-id"))
-      .build();
-
   private static final TaskStatus STATUS = TaskStatus.newBuilder()
       .setState(TaskState.TASK_RUNNING)
-      .setTaskId(TASK_ID)
+      .setTaskId(TaskID.newBuilder().setValue("task-id").build())
       .build();
 
   private StorageTestUtil storageUtil;
@@ -158,8 +142,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override
       void respondToOffer() throws Exception {
         expectOfferAttributesSaved(OFFER);
-        expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
-        expect(userLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
+        expect(systemLauncher.willUse(OFFER)).andReturn(false);
+        expect(userLauncher.willUse(OFFER)).andReturn(false);
       }
     }.run();
   }
@@ -170,8 +154,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override
       void respondToOffer() throws Exception {
         expectOfferAttributesSaved(OFFER);
-        expect(systemLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
-        expectLaunch(TASK);
+        expect(systemLauncher.willUse(OFFER)).andReturn(true);
       }
     }.run();
   }
@@ -182,21 +165,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       @Override
       void respondToOffer() throws Exception {
         expectOfferAttributesSaved(OFFER);
-        expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
-        expect(userLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
-        expectLaunch(TASK);
-      }
-    }.run();
-  }
-
-  @Test
-  public void testAcceptedExceedsOffer() throws Exception {
-    new OfferFixture() {
-      @Override
-      void respondToOffer() throws Exception {
-        expectOfferAttributesSaved(OFFER);
-        expect(systemLauncher.createTask(OFFER)).andReturn(Optional.of(BIGGER_TASK));
-        expect(userLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
+        expect(systemLauncher.willUse(OFFER)).andReturn(false);
+        expect(userLauncher.willUse(OFFER)).andReturn(true);
       }
     }.run();
   }
@@ -251,11 +221,10 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       void expectations() throws Exception {
         expectOfferAttributesSaved(OFFER);
         expectOfferAttributesSaved(OFFER_2);
-        expect(systemLauncher.createTask(OFFER)).andReturn(Optional.<TaskInfo>absent());
-        expect(userLauncher.createTask(OFFER)).andReturn(Optional.of(TASK));
-        expectLaunch(TASK);
-        expect(systemLauncher.createTask(OFFER_2)).andReturn(Optional.<TaskInfo>absent());
-        expect(userLauncher.createTask(OFFER_2)).andReturn(Optional.<TaskInfo>absent());
+        expect(systemLauncher.willUse(OFFER)).andReturn(false);
+        expect(userLauncher.willUse(OFFER)).andReturn(true);
+        expect(systemLauncher.willUse(OFFER_2)).andReturn(false);
+        expect(userLauncher.willUse(OFFER_2)).andReturn(false);
       }
 
       @Override

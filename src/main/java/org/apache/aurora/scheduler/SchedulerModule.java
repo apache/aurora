@@ -21,7 +21,6 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import javax.inject.Singleton;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
@@ -36,23 +35,14 @@ import org.apache.aurora.scheduler.Driver.DriverImpl;
 import org.apache.aurora.scheduler.Driver.SettableDriver;
 import org.apache.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
 import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
+import org.apache.aurora.scheduler.async.GcExecutorLauncher;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
-import org.apache.aurora.scheduler.periodic.GcExecutorLauncher;
-import org.apache.aurora.scheduler.periodic.GcExecutorLauncher.GcExecutorSettings;
 import org.apache.mesos.Scheduler;
 
 /**
  * Binding module for top-level scheduling logic.
  */
 public class SchedulerModule extends AbstractModule {
-
-  @CmdLine(name = "executor_gc_interval",
-      help = "Max interval on which to run the GC executor on a host to clean up dead tasks.")
-  private static final Arg<Amount<Long, Time>> EXECUTOR_GC_INTERVAL =
-      Arg.create(Amount.of(1L, Time.HOURS));
-
-  @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
-  private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
 
   @CmdLine(name = "max_registration_delay",
       help = "Max allowable delay to allow the driver to register before aborting")
@@ -75,11 +65,6 @@ public class SchedulerModule extends AbstractModule {
 
     bind(TaskIdGenerator.class).to(TaskIdGeneratorImpl.class);
 
-    bind(GcExecutorSettings.class).toInstance(new GcExecutorSettings(
-        EXECUTOR_GC_INTERVAL.get(),
-        Optional.fromNullable(GC_EXECUTOR_PATH.get())));
-
-    bind(GcExecutorLauncher.class).in(Singleton.class);
     bind(UserTaskLauncher.class).in(Singleton.class);
 
     install(new PrivateModule() {

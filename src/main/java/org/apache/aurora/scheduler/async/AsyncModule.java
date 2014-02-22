@@ -17,6 +17,7 @@ package org.apache.aurora.scheduler.async;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Logger;
@@ -43,6 +44,8 @@ import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
+import org.apache.aurora.scheduler.async.GcExecutorLauncher.GcExecutorSettings;
+import org.apache.aurora.scheduler.async.GcExecutorLauncher.RandomGcExecutorSettings;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
@@ -152,6 +155,14 @@ public class AsyncModule extends AbstractModule {
   @VisibleForTesting
   static final Key<Preemptor> PREEMPTOR_KEY = Key.get(Preemptor.class, PreemptionBinding.class);
 
+  @CmdLine(name = "executor_gc_interval",
+      help = "Max interval on which to run the GC executor on a host to clean up dead tasks.")
+  private static final Arg<Amount<Long, Time>> EXECUTOR_GC_INTERVAL =
+      Arg.create(Amount.of(1L, Time.HOURS));
+
+  @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
+  private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
+
   @Override
   protected void configure() {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
@@ -252,6 +263,19 @@ public class AsyncModule extends AbstractModule {
       }
     });
     PubsubEventModule.bindSubscriber(binder(), TaskThrottler.class);
+
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(GcExecutorSettings.class).toInstance(new RandomGcExecutorSettings(
+            EXECUTOR_GC_INTERVAL.get(),
+            Optional.fromNullable(GC_EXECUTOR_PATH.get())));
+        bind(Executor.class).toInstance(executor);
+
+        bind(GcExecutorLauncher.class).in(Singleton.class);
+        expose(GcExecutorLauncher.class);
+      }
+    });
   }
 
   /**

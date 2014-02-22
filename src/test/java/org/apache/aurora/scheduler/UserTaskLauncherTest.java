@@ -50,7 +50,6 @@ import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.HOST_CONSTRAINT;
 import static org.easymock.EasyMock.expect;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class UserTaskLauncherTest extends EasyMockTest {
@@ -83,7 +82,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
 
     control.replay();
 
-    assertFalse(launcher.createTask(OFFER).isPresent());
+    assertTrue(launcher.willUse(OFFER));
   }
 
   @Test

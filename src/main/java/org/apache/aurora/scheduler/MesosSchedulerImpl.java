@@ -22,9 +22,7 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
@@ -34,7 +32,6 @@ import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.gen.comm.SchedulerMessage;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
-import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
@@ -48,7 +45,6 @@ import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
@@ -62,7 +58,6 @@ class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
 
   private final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
-  private final AtomicLong failedOffers = Stats.exportLong("scheduler_failed_offers");
   private final AtomicLong failedStatusUpdates = Stats.exportLong("scheduler_status_updates");
   private final AtomicLong frameworkDisconnects =
       Stats.exportLong("scheduler_framework_disconnects");
@@ -83,7 +78,11 @@ class MesosSchedulerImpl implements Scheduler {
    *
    * @param schedulerCore Core scheduler.
    * @param lifecycle Application lifecycle manager.
-   * @param taskLaunchers Task launchers.
+   * @param taskLaunchers Task launchers, which will be used in order.  Calls to
+   *                      {@link TaskLauncher#willUse(Offer)} and
+   *                      {@link TaskLauncher#statusUpdate(TaskStatus)} are propagated to provided
+   *                      launchers, ceasing after the first match (based on a return value of
+   *                      {@code true}.
    */
   @Inject
   public MesosSchedulerImpl(
@@ -136,10 +135,6 @@ class MesosSchedulerImpl implements Scheduler {
     frameworkReregisters.incrementAndGet();
   }
 
-  private static boolean fitsInOffer(TaskInfo task, Offer offer) {
-    return Resources.from(offer).greaterThanOrEqual(Resources.from(task.getResourcesList()));
-  }
-
   @Timed("scheduler_resource_offers")
   @Override
   public void resourceOffers(SchedulerDriver driver, final List<Offer> offers) {
@@ -164,26 +159,9 @@ class MesosSchedulerImpl implements Scheduler {
     for (Offer offer : offers) {
       log(Level.FINE, "Received offer: %s", offer);
       resourceOffers.incrementAndGet();
-
-      // Ordering of task launchers is important here, since offers are consumed greedily.
-      // TODO(William Farner): Refactor this area of code now that the primary task launcher
-      // is asynchronous.
       for (TaskLauncher launcher : taskLaunchers) {
-        Optional<TaskInfo> task = Optional.absent();
-        try {
-          task = launcher.createTask(offer);
-        } catch (SchedulerException e) {
-          LOG.log(Level.WARNING, "Failed to schedule offers.", e);
-          failedOffers.incrementAndGet();
-        }
-
-        if (task.isPresent()) {
-          if (fitsInOffer(task.get(), offer)) {
-            driver.launchTasks(offer.getId(), ImmutableList.of(task.get()));
-            break;
-          } else {
-            LOG.warning("Insufficient resources to launch task " + task);
-          }
+        if (launcher.willUse(offer)) {
+          break;
         }
       }
     }
