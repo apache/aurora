@@ -5,11 +5,11 @@ auroraUI.factory(
   function () {
     return {
       getJobSummary: function () {
-        var response = this.makeSchedulerClient().getJobSummary();
+        var response = this.makeSchedulerClient().getRoleSummary();
         return {
           error : response.responseCode !== 1,
           errorMsg : response.message,
-          summaries : response.result !== null ? response.result.jobSummaryResult.summaries : []
+          summaries : response.result !== null ? response.result.roleSummaryResult.summaries : []
         }
      },
 

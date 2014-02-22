@@ -105,8 +105,8 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response getJobSummary() throws TException {
-    return delegate.getJobSummary();
+  public Response getRoleSummary() throws TException {
+    return delegate.getRoleSummary();
   }
 
   @Override

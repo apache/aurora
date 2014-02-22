@@ -48,8 +48,6 @@ import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobConfigRewrite;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
-import org.apache.aurora.gen.JobSummary;
-import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
@@ -57,6 +55,8 @@ import org.apache.aurora.gen.Quota;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.RewriteConfigsRequest;
+import org.apache.aurora.gen.RoleSummary;
+import org.apache.aurora.gen.RoleSummaryResult;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.SessionKey;
@@ -1083,17 +1083,17 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(crons));
 
-    JobSummaryResult expectedResult = new JobSummaryResult();
+    RoleSummaryResult expectedResult = new RoleSummaryResult();
     expectedResult.addToSummaries(
-        new JobSummary().setRole(ROLE).setCronJobCount(2).setJobCount(1));
+        new RoleSummary().setRole(ROLE).setCronJobCount(2).setJobCount(1));
     expectedResult.addToSummaries(
-        new JobSummary().setRole(BAZ_ROLE).setCronJobCount(1).setJobCount(2));
+        new RoleSummary().setRole(BAZ_ROLE).setCronJobCount(1).setJobCount(2));
 
     control.replay();
 
-    Response response = thrift.getJobSummary();
+    Response response = thrift.getRoleSummary();
     assertEquals(ResponseCode.OK, response.getResponseCode());
-    assertEquals(expectedResult, response.getResult().getJobSummaryResult());
+    assertEquals(expectedResult, response.getResult().getRoleSummaryResult());
   }
 
   @Test

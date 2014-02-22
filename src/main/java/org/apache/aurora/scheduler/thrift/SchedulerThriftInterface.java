@@ -69,8 +69,6 @@ import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobConfigRewrite;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
-import org.apache.aurora.gen.JobSummary;
-import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.ListBackupsResult;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
@@ -83,6 +81,8 @@ import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.RewriteConfigsRequest;
+import org.apache.aurora.gen.RoleSummary;
+import org.apache.aurora.gen.RoleSummaryResult;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduleStatusResult;
 import org.apache.aurora.gen.SessionKey;
@@ -374,7 +374,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response getJobSummary() {
+  public Response getRoleSummary() {
     Multimap<String, IJobKey> jobsByRole = mapByRole(
         Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped()),
         Tasks.SCHEDULED_TO_JOB_KEY);
@@ -383,18 +383,18 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         cronJobManager.getJobs(),
         JobKeys.FROM_CONFIG);
 
-    Set<JobSummary> jobSummaries = Sets.newHashSet();
+    Set<RoleSummary> summaries = Sets.newHashSet();
     for (String role : Sets.union(jobsByRole.keySet(), cronJobsByRole.keySet())) {
-      JobSummary summary = new JobSummary();
+      RoleSummary summary = new RoleSummary();
       summary.setRole(role);
       summary.setJobCount(jobsByRole.get(role).size());
       summary.setCronJobCount(cronJobsByRole.get(role).size());
-      jobSummaries.add(summary);
+      summaries.add(summary);
     }
 
     return new Response()
         .setResponseCode(OK)
-        .setResult(Result.jobSummaryResult(new JobSummaryResult(jobSummaries)));
+        .setResult(Result.roleSummaryResult(new RoleSummaryResult(summaries)));
   }
 
   private static <T> Multimap<String, IJobKey> mapByRole(
