@@ -58,12 +58,17 @@ class FakeDriverFactory implements DriverFactory {
   public SchedulerDriver apply(@Nullable final String frameworkId) {
     return new FakeSchedulerDriver() {
       @Override
-      public Status run() {
+      public Status start() {
         scheduler.get().registered(
             this,
             FrameworkID.newBuilder().setValue(
                 Optional.fromNullable(frameworkId).or("new-framework-id")).build(),
             MasterInfo.newBuilder().setId("master-id").setIp(100).setPort(200).build());
+        return null;
+      }
+
+      @Override
+      public Status join() {
         lifecycle.awaitShutdown();
         return null;
       }
