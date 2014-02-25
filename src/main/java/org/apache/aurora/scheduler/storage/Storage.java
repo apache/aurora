@@ -66,13 +66,13 @@ public interface Storage {
   }
 
   /**
-   * Encapsulates a read-only storage operation.
+   * A unit of work to perform against the storage system.
    *
-   * @param <T> The type of result this unit of work produces.
-   * @param <E> The type of exception this unit of work can throw.
+   * @param <S> Type of stores the work needs access to.
+   * @param <T> Return type of the operation.
+   * @param <E> Exception type thrown by the operation.
    */
-  interface Work<T, E extends Exception> {
-
+  interface StorageOperation<S extends StoreProvider, T, E extends Exception> {
     /**
      * Abstracts a unit of work that has a result, but may also throw a specific exception.
      *
@@ -80,14 +80,23 @@ public interface Storage {
      * @return the result of the successfully completed unit of work
      * @throws E if the unit of work could not be completed
      */
-    T apply(StoreProvider storeProvider) throws E;
+    T apply(S storeProvider) throws E;
+  }
+
+  /**
+   * Encapsulates a read-only storage operation.
+   *
+   * @param <T> The type of result this unit of work produces.
+   * @param <E> The type of exception this unit of work can throw.
+   */
+  abstract class Work<T, E extends Exception> implements StorageOperation<StoreProvider, T, E> {
 
     /**
      * A convenient typedef for Work that throws no checked exceptions - it runs quietly.
      *
      * @param <T> The type of result this unit of work produces.
      */
-    interface Quiet<T> extends Work<T, RuntimeException> {
+    public abstract static class Quiet<T> extends Work<T, RuntimeException> {
       // typedef
     }
   }
@@ -98,31 +107,15 @@ public interface Storage {
    * @param <T> The type of result this unit of work produces.
    * @param <E> The type of exception this unit of work can throw.
    */
-  interface MutateWork<T, E extends Exception> {
-
-    NoResult.Quiet NOOP = new NoResult.Quiet() {
-      @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
-        // No-op.
-      }
-    };
-
-    /**
-     * Abstracts a unit of work that should either commit a set of changes to storage as a side
-     * effect of successful completion or else commit no changes at all when an exception is thrown.
-     *
-     * @param storeProvider A provider to give access to different available stores.
-     * @return the result of the successfully completed unit of work
-     * @throws E if the unit of work could not be completed
-     */
-    T apply(MutableStoreProvider storeProvider) throws E;
+  abstract class MutateWork<T, E extends Exception>
+      implements StorageOperation<MutableStoreProvider, T, E> {
 
     /**
      * A convenient typedef for Work that throws no checked exceptions - it runs quietly.
      *
      * @param <T> The type of result this unit of work produces.
      */
-    interface Quiet<T> extends MutateWork<T, RuntimeException> {
+    public abstract static class Quiet<T> extends MutateWork<T, RuntimeException> {
       // typedef
     }
 
@@ -131,7 +124,7 @@ public interface Storage {
      *
      * @param <E> The type of exception this unit of work can throw.
      */
-    abstract class NoResult<E extends Exception> implements MutateWork<Void, E> {
+    public abstract static class NoResult<E extends Exception> extends MutateWork<Void, E> {
 
       @Override
       public final Void apply(MutableStoreProvider storeProvider) throws E {
@@ -215,12 +208,6 @@ public interface Storage {
   <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E;
 
   /**
-   * Clean up the underlying storage by optimizing internal data structures. Does not change
-   * externally-visible state but might not run concurrently with write operations.
-   */
-  void snapshot() throws StorageException;
-
-  /**
    * A non-volatile storage that has additional methods to control its lifecycle.
    */
   interface NonVolatileStorage extends Storage {
@@ -241,6 +228,12 @@ public interface Storage {
      * @throws StorageException if there was a starting storage.
      */
     void start(MutateWork.NoResult.Quiet initializationLogic) throws StorageException;
+
+    /**
+     * Clean up the underlying storage by optimizing internal data structures. Does not change
+     * externally-visible state but might not run concurrently with write operations.
+     */
+    void snapshot() throws StorageException;
 
     /**
      * Prepares the underlying storage system for clean shutdown.

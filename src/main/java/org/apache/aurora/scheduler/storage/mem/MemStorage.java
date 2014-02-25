@@ -21,6 +21,7 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.twitter.common.inject.TimedInterceptor.Timed;
+import com.twitter.common.stats.SlidingStats;
 import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
 
@@ -29,6 +30,7 @@ import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.ReadWriteLockManager;
+import org.apache.aurora.scheduler.storage.ReadWriteLockManager.LockType;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
@@ -48,6 +50,13 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class MemStorage implements Storage {
   private final AtomicLong readLockWaitNanos = Stats.exportLong("read_lock_wait_nanos");
   private final AtomicLong writeLockWaitNanos = Stats.exportLong("write_lock_wait_nanos");
+
+  // We choose to not use the @Timed decorator for these stats since nested transactions are normal
+  // and pollute the stats.
+  private final SlidingStats readStats =
+      new SlidingStats("mem_storage_consistent_read_operation", "nanos");
+  private final SlidingStats writeStats =
+      new SlidingStats("mem_storage_write_operation", "nanos");
 
   private final MutableStoreProvider storeProvider;
   private final ReadWriteLockManager lockManager = new ReadWriteLockManager();
@@ -120,21 +129,40 @@ public class MemStorage implements Storage {
         new MemAttributeStore());
   }
 
-  @Timed("mem_storage_consistent_read_operation")
-  @Override
-  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
+  private <S extends StoreProvider, T, E extends Exception> T doWork(
+      LockType lockType,
+      S stores,
+      StorageOperation<S, T, E> work,
+      SlidingStats stats,
+      AtomicLong lockWaitStat) throws StorageException, E {
+
     checkNotNull(work);
 
+    // Perform the work, and only record stats for top-level transactions.  This prevents
+    // over-counting when nested transactions are performed.
     long lockStartNanos = System.nanoTime();
-    boolean topLevelOperation = lockManager.readLock();
+    boolean topLevelOperation = lockManager.lock(lockType);
     if (topLevelOperation) {
-      readLockWaitNanos.addAndGet(System.nanoTime() - lockStartNanos);
+      lockWaitStat.addAndGet(System.nanoTime() - lockStartNanos);
     }
     try {
-      return work.apply(storeProvider);
+      return work.apply(stores);
     } finally {
-      lockManager.readUnlock();
+      lockManager.unlock(lockType);
+      if (topLevelOperation) {
+        stats.accumulate(System.nanoTime() - lockStartNanos);
+      }
     }
+  }
+
+  @Override
+  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
+    return doWork(LockType.READ, storeProvider, work, readStats, readLockWaitNanos);
+  }
+
+  @Override
+  public <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E {
+    return doWork(LockType.WRITE, storeProvider, work, writeStats, writeLockWaitNanos);
   }
 
   @Timed("mem_storage_weakly_consistent_read_operation")
@@ -143,29 +171,5 @@ public class MemStorage implements Storage {
       throws StorageException, E {
 
     return work.apply(storeProvider);
-  }
-
-  @Timed("mem_storage_write_operation")
-  @Override
-  public <T, E extends Exception> T write(MutateWork<T, E> work)
-      throws StorageException, E {
-
-    checkNotNull(work);
-
-    long lockStartNanos = System.nanoTime();
-    boolean topLevelOperation = lockManager.writeLock();
-    if (topLevelOperation) {
-      writeLockWaitNanos.addAndGet(System.nanoTime() - lockStartNanos);
-    }
-    try {
-      return work.apply(storeProvider);
-    } finally {
-      lockManager.writeUnlock();
-    }
-  }
-
-  @Override
-  public void snapshot() {
-    // No-op.
   }
 }

@@ -19,6 +19,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.base.Preconditions;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * A lock manager that wraps a ReadWriteLock and detects ill-fated attempts to upgrade
  * a read-locked thread to a write-locked thread, which would otherwise deadlock.
@@ -26,10 +28,21 @@ import com.google.common.base.Preconditions;
 public class ReadWriteLockManager {
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
-  enum LockMode {
+  private enum LockMode {
     NONE,
     READ,
     WRITE
+  }
+
+  public enum LockType {
+    READ(LockMode.READ),
+    WRITE(LockMode.WRITE);
+
+    private LockMode mode;
+
+    private LockType(LockMode mode) {
+      this.mode = mode;
+    }
   }
 
   private static class LockState {
@@ -66,44 +79,42 @@ public class ReadWriteLockManager {
   };
 
   /**
-   * Blocks until this thread has acquired a read lock.
+   * Blocks until this thread has acquired the requested lock.
    *
+   * @param type Type of lock to acquire.
    * @return {@code true} if the lock was newly-acquired, or {@code false} if this thread previously
-   *         secured the write lock and has yet to release it.
+   *         secured the lock and has yet to release it.
    */
-  public boolean readLock() {
-    lock.readLock().lock();
-    return lockState.get().lockAcquired(LockMode.READ);
+  public boolean lock(LockType type) {
+    checkNotNull(type);
+
+    if (LockType.READ == type) {
+      lock.readLock().lock();
+    } else {
+      Preconditions.checkState(lockState.get().initialLockMode != LockMode.READ,
+          "A read operation may not be upgraded to a write operation.");
+
+      lock.writeLock().lock();
+    }
+
+    return lockState.get().lockAcquired(type.mode);
   }
 
   /**
-   * Releases this thread's read lock.
-   */
-  public void readUnlock() {
-    lock.readLock().unlock();
-    lockState.get().lockReleased(LockMode.READ);
-  }
-
-  /**
-   * Blocks until this thread has acquired a write lock.
+   * Releases this thread's lock of the given type.
    *
-   * @return {@code true} if the lock was newly-acquired, or {@code false} if this thread previously
-   *         secured the write lock and has yet to release it.
+   * @param type Type of lock to release.
    */
-  public boolean writeLock() {
-    Preconditions.checkState(lockState.get().initialLockMode != LockMode.READ,
-        "A read operation may not be upgraded to a write operation.");
+  public void unlock(LockType type) {
+    checkNotNull(type);
 
-    lock.writeLock().lock();
-    return lockState.get().lockAcquired(LockMode.WRITE);
-  }
+    if (LockType.READ == type) {
+      lock.readLock().unlock();
+    } else {
+      lock.writeLock().unlock();
+    }
 
-  /**
-   * Releases this thread's write lock.
-   */
-  public void writeUnlock() {
-    lock.writeLock().unlock();
-    lockState.get().lockReleased(LockMode.WRITE);
+    lockState.get().lockReleased(type.mode);
   }
 
   /**

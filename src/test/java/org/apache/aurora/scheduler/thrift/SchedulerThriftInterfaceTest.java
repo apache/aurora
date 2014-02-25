@@ -77,6 +77,7 @@ import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.SchedulerCore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -161,7 +162,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
       @Override
       protected void configure() {
         bind(Clock.class).toInstance(new FakeClock());
-        bind(Storage.class).toInstance(storageUtil.storage);
+        bind(NonVolatileStorage.class).toInstance(storageUtil.storage);
         bind(SchedulerCore.class).toInstance(scheduler);
         bind(LockManager.class).toInstance(lockManager);
         bind(CapabilityValidator.class).toInstance(userValidator);

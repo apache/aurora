@@ -108,6 +108,7 @@ import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
@@ -163,7 +164,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       },
       Tasks.SCHEDULED_TO_INFO);
 
-  private final Storage storage;
+  private final NonVolatileStorage storage;
   private final SchedulerCore schedulerCore;
   private final LockManager lockManager;
   private final CapabilityValidator sessionValidator;
@@ -177,7 +178,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Inject
   SchedulerThriftInterface(
-      Storage storage,
+      NonVolatileStorage storage,
       SchedulerCore schedulerCore,
       LockManager lockManager,
       CapabilityValidator sessionValidator,
@@ -202,7 +203,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @VisibleForTesting
   SchedulerThriftInterface(
-      Storage storage,
+      NonVolatileStorage storage,
       SchedulerCore schedulerCore,
       LockManager lockManager,
       CapabilityValidator sessionValidator,

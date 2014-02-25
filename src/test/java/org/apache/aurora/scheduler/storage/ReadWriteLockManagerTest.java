@@ -31,6 +31,8 @@ import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.storage.ReadWriteLockManager.LockType.READ;
+import static org.apache.aurora.scheduler.storage.ReadWriteLockManager.LockType.WRITE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -55,14 +57,14 @@ public class ReadWriteLockManagerTest extends TearDownTestCase {
 
   @Test
   public void testModeDowngrade() {
-    lockManager.writeLock();
-    lockManager.readLock();
+    lockManager.lock(WRITE);
+    lockManager.lock(READ);
   }
 
   @Test(expected = IllegalStateException.class)
   public void testModeUpgrade() {
-    lockManager.readLock();
-    lockManager.writeLock();
+    lockManager.lock(READ);
+    lockManager.lock(WRITE);
   }
 
   @Test
@@ -73,37 +75,37 @@ public class ReadWriteLockManagerTest extends TearDownTestCase {
     Future<String> slowReadResult = executor.submit(new Callable<String>() {
       @Override
       public String call() throws Exception {
-        lockManager.readLock();
+        lockManager.lock(READ);
         slowReadStarted.countDown();
         fastReadFinished.await();
-        lockManager.readUnlock();
+        lockManager.unlock(READ);
         return "slow";
       }
     });
 
     slowReadStarted.await();
-    lockManager.readLock();
-    lockManager.readUnlock();
+    lockManager.lock(READ);
+    lockManager.unlock(READ);
     fastReadFinished.countDown();
     assertEquals("slow", slowReadResult.get());
   }
 
   @Test
   public void testReentrantReadLock() {
-    assertTrue(lockManager.readLock());
-    assertFalse(lockManager.readLock());
-    lockManager.readUnlock();
-    lockManager.readUnlock();
-    assertTrue(lockManager.readLock());
+    assertTrue(lockManager.lock(READ));
+    assertFalse(lockManager.lock(READ));
+    lockManager.unlock(READ);
+    lockManager.unlock(READ);
+    assertTrue(lockManager.lock(READ));
   }
 
   @Test
   public void testReentrantWriteLock() {
-    assertTrue(lockManager.writeLock());
-    assertFalse(lockManager.writeLock());
-    lockManager.writeUnlock();
-    lockManager.writeUnlock();
-    assertTrue(lockManager.writeLock());
-    assertFalse(lockManager.readLock());
+    assertTrue(lockManager.lock(WRITE));
+    assertFalse(lockManager.lock(WRITE));
+    lockManager.unlock(WRITE);
+    lockManager.unlock(WRITE);
+    assertTrue(lockManager.lock(WRITE));
+    assertFalse(lockManager.lock(READ));
   }
 }

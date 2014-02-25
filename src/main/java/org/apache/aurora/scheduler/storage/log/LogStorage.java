@@ -692,7 +692,6 @@ public class LogStorage extends ForwardingStore
     } catch (StreamAccessException e) {
       throw new StorageException("Failed to create a snapshot", e);
     }
-    super.snapshot();
   }
 
   private void log(Op op) {

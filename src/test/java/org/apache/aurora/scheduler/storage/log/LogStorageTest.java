@@ -72,8 +72,10 @@ import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
+import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -184,7 +186,7 @@ public class LogStorageTest extends EasyMockTest {
         createTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId2)));
     expect(entry1.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry1));
     expect(entry2.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry2));
-    expect(stream.readAll()).andReturn(Iterators.<Entry>forArray(entry1, entry2));
+    expect(stream.readAll()).andReturn(Iterators.forArray(entry1, entry2));
 
     final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
     expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
@@ -229,7 +231,6 @@ public class LogStorageTest extends EasyMockTest {
             return null;
           }
         }).times(2);
-    storageUtil.storage.snapshot();
 
     control.replay();
 
@@ -271,7 +272,12 @@ public class LogStorageTest extends EasyMockTest {
       // Simulate NOOP initialization work
       // Creating a mock and expecting apply(storeProvider) does not work here for whatever
       // reason.
-      MutateWork.NoResult.Quiet initializationLogic = MutateWork.NOOP;
+      MutateWork.NoResult.Quiet initializationLogic = new NoResult.Quiet() {
+        @Override
+        protected void execute(Storage.MutableStoreProvider storeProvider) {
+          // No-op.
+        }
+      };
 
       final Capture<MutateWork.NoResult.Quiet> recoverAndInitializeWork = createCapture();
       storageUtil.storage.write(capture(recoverAndInitializeWork));
