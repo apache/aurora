@@ -20,6 +20,7 @@ apply plugin: 'checkstyle'
 apply plugin: 'idea'
 apply plugin: 'jacoco'
 apply plugin: 'java'
+apply plugin: 'license'
 apply plugin: 'maven-publish'
 apply plugin: 'project-report'
 apply plugin: 'versions'
@@ -31,6 +32,7 @@ buildscript {
   dependencies {
     classpath 'com.github.ben-manes:gradle-versions-plugin:0.4'
     classpath 'com.github.goldin.plugins.gradle:about:0.3.1'
+    classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.7.0'
   }
 }
 
@@ -308,6 +310,17 @@ run {
     '-testing_isolated_scheduler=true',
     '-testing_log_file_path=/tmp/testing_log_file',
   ]
+}
+
+tasks.withType(nl.javadude.gradle.plugins.license.License).each { licenseTask ->
+  licenseTask.setSource files("$projectDir/src/main/java", "$projectDir/src/test/java")
+}
+
+license {
+  header rootProject.file('config/checkstyle/apache.header')
+  strictCheck true
+  skipExistingHeaders true
+  ext.year = Calendar.getInstance().get(Calendar.YEAR)
 }
 
 jacocoTestReport {
