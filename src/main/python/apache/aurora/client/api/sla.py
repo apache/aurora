@@ -23,7 +23,7 @@ from copy import deepcopy
 from apache.aurora.client.base import check_and_log_response
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.constants import ACTIVE_STATES
+from gen.apache.aurora.constants import LIVE_STATES
 from gen.apache.aurora.ttypes import (
   Identity,
   Quota,
@@ -32,6 +32,9 @@ from gen.apache.aurora.ttypes import (
   ScheduleStatus,
   TaskQuery
 )
+
+
+SLA_LIVE_STATES = LIVE_STATES | set([ScheduleStatus.STARTING])
 
 
 class JobUpTimeSlaVector(object):
@@ -194,12 +197,14 @@ class DomainUpTimeSlaVector(object):
     return probed_hosts
 
   def _simulate_host_down(self, job_key, host, duration):
+    unfiltered_tasks = self._jobs[job_key]
+
     # Get total job task count to use in SLA calculation.
-    total_count = JobUpTimeSlaVector(self._jobs[job_key]).total_tasks()
+    total_count = len(unfiltered_tasks)
 
     # Get a list of job tasks that would remain after the affected host goes down
     # and create an SLA vector with these tasks.
-    filtered_tasks = [task for task in self._jobs[job_key]
+    filtered_tasks = [task for task in unfiltered_tasks
                       if task.assignedTask.slaveHost != host]
     filtered_vector = JobUpTimeSlaVector(filtered_tasks, self._now)
 
@@ -256,4 +261,4 @@ class Sla(object):
         environment=job_key.env if job_key else None,
         jobName=job_key.name if job_key else None,
         slaveHost=host,
-        statuses=ACTIVE_STATES)
+        statuses=SLA_LIVE_STATES)

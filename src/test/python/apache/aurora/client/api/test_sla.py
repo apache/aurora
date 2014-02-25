@@ -17,12 +17,16 @@
 import unittest
 import time
 
-from apache.aurora.client.api.sla import DomainUpTimeSlaVector, JobUpTimeSlaVector, Sla
+from apache.aurora.client.api.sla import (
+    DomainUpTimeSlaVector,
+    JobUpTimeSlaVector,
+    Sla,
+    SLA_LIVE_STATES
+)
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 
 from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
-from gen.apache.aurora.constants import ACTIVE_STATES
 from gen.apache.aurora.ttypes import (
     AssignedTask,
     Identity,
@@ -149,11 +153,11 @@ class SlaTest(unittest.TestCase):
             owner=Identity(role=self._role),
             environment=self._env,
             jobName=self._name,
-            statuses=ACTIVE_STATES)
+            statuses=SLA_LIVE_STATES)
     )
 
   def expect_task_status_call_cluster_scoped(self):
-    self._scheduler.getTasksStatus.assert_called_once_with(TaskQuery(statuses=ACTIVE_STATES))
+    self._scheduler.getTasksStatus.assert_called_once_with(TaskQuery(statuses=SLA_LIVE_STATES))
 
 
   def test_count_0(self):
