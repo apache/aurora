@@ -17,15 +17,17 @@
 set -o errexit
 set -o nounset
 
+HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+
 PANTS_VERSION=0.0.14-dev2
-if ! [[ -e build-support/pants-$PANTS_VERSION.pex ]]; then
+if ! [[ -e "$HERE/build-support/pants-$PANTS_VERSION.pex" ]]; then
   echo "Building pants.pex @ $PANTS_VERSION"
-  ./build-support/pex \
+  "$HERE/build-support/pex" \
     --requirement "twitter.pants==$PANTS_VERSION" \
     --entry-point twitter.pants.bin.pants_exe:main \
-    -p build-support/pants-$PANTS_VERSION.pex.tmp
-  mv build-support/pants-$PANTS_VERSION.pex.tmp build-support/pants-$PANTS_VERSION.pex  # 2PC
+    -p "$HERE/build-support/pants-$PANTS_VERSION.pex.tmp"
+  mv "$HERE/build-support/pants-$PANTS_VERSION.pex.tmp" "$HERE/build-support/pants-$PANTS_VERSION.pex"  # 2PC
   echo "Built pants-$PANTS_VERSION.pex"
 fi
 
-exec ./build-support/pants-$PANTS_VERSION.pex "$@"
+exec "$HERE/build-support/pants-$PANTS_VERSION.pex" "$@"

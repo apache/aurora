@@ -14,8 +14,9 @@ fi
 
 echo "Using $PY" >&2
 
-if ! [ -f "build-support/virtualenv-$VIRTUALENV_VERSION/BOOTSTRAPPED" ]; then
-  pushd build-support
+HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+if ! [ -f "$HERE/virtualenv-$VIRTUALENV_VERSION/BOOTSTRAPPED" ]; then
+  pushd "$HERE"
   curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-$VIRTUALENV_VERSION.tar.gz
   tar zxvf virtualenv-$VIRTUALENV_VERSION.tar.gz
   # TODO(ksweeney): Checksum
@@ -23,4 +24,4 @@ if ! [ -f "build-support/virtualenv-$VIRTUALENV_VERSION/BOOTSTRAPPED" ]; then
   popd
 fi
 
-exec "$PY" build-support/virtualenv-$VIRTUALENV_VERSION/virtualenv.py "$@"
+exec "$PY" "$HERE/virtualenv-$VIRTUALENV_VERSION/virtualenv.py" "$@"
