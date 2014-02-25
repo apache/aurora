@@ -14,6 +14,7 @@ set -o errexit
 
 TARGETS=(
   src/main/python/apache/aurora/client:client-packaged
+  src/main/python/apache/aurora/client:clientv2-packaged
   src/main/python/apache/aurora/common
   src/main/python/apache/aurora/config:config-packaged
   src/main/python/apache/aurora/executor:executor-packaged

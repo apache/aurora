@@ -92,3 +92,19 @@ python_library(
     aurora = pants('src/main/python/apache/aurora/client/bin:aurora_client'),
   )
 )
+
+python_library(
+  name = 'clientv2-packaged',
+  dependencies = [
+    pants('src/main/python/apache/aurora/common'),
+    pants('src/main/python/apache/aurora/config'),
+    pants('src/main/python/apache/thermos/common'),
+  ],
+  provides = setup_py(
+    name = 'apache.aurora.clientv2',
+    version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
+  ).with_binaries(
+    aurora_client_v2 = pants('src/main/python/apache/aurora/client/cli:client'),
+  )
+)
+
