@@ -70,6 +70,7 @@ import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
+import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -244,10 +245,10 @@ public class LogStorageTest extends EasyMockTest {
     shutdownStream.getValue().execute();
   }
 
-  abstract class MutationFixture {
+  abstract class StorageTestFixture {
     private final AtomicBoolean runCalled = new AtomicBoolean(false);
 
-    MutationFixture() {
+    StorageTestFixture() {
       // Prevent otherwise silent noop tests that forget to call run().
       addTearDown(new TearDown() {
         @Override
@@ -306,11 +307,28 @@ public class LogStorageTest extends EasyMockTest {
       logStorage.start(initializationLogic);
 
       // Exercise the system.
-      performMutations();
+      runTest();
     }
 
-    protected abstract void setupExpectations() throws Exception;
-    protected abstract void performMutations();
+    protected void setupExpectations() throws Exception {
+      // Default to no expectations.
+    }
+
+    protected abstract void runTest();
+  }
+
+  abstract class MutationFixture extends StorageTestFixture {
+    @Override
+    protected void runTest() {
+      logStorage.write(new MutateWork.NoResult.Quiet() {
+        @Override
+        protected void execute(MutableStoreProvider storeProvider) {
+          performMutations(storeProvider);
+        }
+      });
+    }
+
+    protected abstract void performMutations(MutableStoreProvider storeProvider);
   }
 
   @Test
@@ -319,15 +337,15 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws CodingException {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.schedulerStore.saveFrameworkId(frameworkId);
         streamMatcher.expectTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)))
             .andReturn(position);
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.saveFrameworkId(frameworkId);
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getSchedulerStore().saveFrameworkId(frameworkId);
       }
     }.run();
   }
@@ -340,7 +358,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.jobStore.saveAcceptedJob(managerId, jobConfig);
         streamMatcher.expectTransaction(
             Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())))
@@ -348,8 +366,8 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.saveAcceptedJob(managerId, jobConfig);
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getJobStore().saveAcceptedJob(managerId, jobConfig);
       }
     }.run();
   }
@@ -360,7 +378,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.jobStore.removeJob(jobKey);
         streamMatcher.expectTransaction(
             Op.removeJob(new RemoveJob().setJobKey(jobKey.newBuilder())))
@@ -368,8 +386,8 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.removeJob(jobKey);
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getJobStore().removeJob(jobKey);
       }
     }.run();
   }
@@ -380,7 +398,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.taskStore.saveTasks(tasks);
         streamMatcher.expectTransaction(
             Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(tasks))))
@@ -388,8 +406,8 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.saveTasks(tasks);
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().saveTasks(tasks);
       }
     }.run();
   }
@@ -403,7 +421,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         expect(storageUtil.taskStore.mutateTasks(query, mutation)).andReturn(mutated);
         streamMatcher.expectTransaction(
             Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))))
@@ -411,8 +429,8 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override
-      protected void performMutations() {
-        assertEquals(mutated, logStorage.mutateTasks(query, mutation));
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        assertEquals(mutated, storeProvider.getUnsafeTaskStore().mutateTasks(query, mutation));
       }
     }.run();
   }
@@ -426,7 +444,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         expect(storageUtil.taskStore.unsafeModifyInPlace(taskId2, updatedConfig)).andReturn(false);
         expect(storageUtil.taskStore.unsafeModifyInPlace(taskId, updatedConfig)).andReturn(true);
         streamMatcher.expectTransaction(
@@ -435,9 +453,9 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.unsafeModifyInPlace(taskId2, updatedConfig);
-        logStorage.unsafeModifyInPlace(taskId, updatedConfig);
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(taskId2, updatedConfig);
+        storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(taskId, updatedConfig);
       }
     }.run();
   }
@@ -453,7 +471,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         expect(storageUtil.taskStore.mutateTasks(query, mutation)).andReturn(mutated);
 
         storageUtil.taskStore.deleteTasks(tasksToRemove);
@@ -465,17 +483,13 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override
-      protected void performMutations() {
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        assertEquals(mutated, storeProvider.getUnsafeTaskStore().mutateTasks(query, mutation));
+
         logStorage.write(new MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(MutableStoreProvider provider) {
-            assertEquals(mutated, provider.getUnsafeTaskStore().mutateTasks(query, mutation));
-            logStorage.write(new MutateWork.NoResult.Quiet() {
-              @Override
-              protected void execute(MutableStoreProvider innerProvider) {
-                innerProvider.getUnsafeTaskStore().deleteTasks(tasksToRemove);
-              }
-            });
+          protected void execute(MutableStoreProvider innerProvider) {
+            innerProvider.getUnsafeTaskStore().deleteTasks(tasksToRemove);
           }
         });
       }
@@ -492,7 +506,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.taskStore.saveTasks(saved);
 
         // Nested transaction with result.
@@ -505,14 +519,9 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.write(new MutateWork.NoResult.Quiet() {
-          @Override
-          protected void execute(MutableStoreProvider provider) {
-            logStorage.saveTasks(saved);
-            assertEquals(mutated, logStorage.mutateTasks(query, mutation));
-          }
-        });
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().saveTasks(saved);
+        assertEquals(mutated, storeProvider.getUnsafeTaskStore().mutateTasks(query, mutation));
       }
     }.run();
   }
@@ -527,7 +536,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.taskStore.saveTasks(saved);
 
         // Nested transaction with result.
@@ -544,14 +553,9 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.write(new MutateWork.NoResult.Quiet() {
-          @Override
-          protected void execute(MutableStoreProvider provider) {
-            logStorage.saveTasks(saved);
-            assertEquals(mutated, logStorage.mutateTasks(query, mutation));
-          }
-        });
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().saveTasks(saved);
+        assertEquals(mutated, storeProvider.getUnsafeTaskStore().mutateTasks(query, mutation));
       }
     }.run();
   }
@@ -563,7 +567,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(ImmutableSet.of(task));
         storageUtil.taskStore.deleteTasks(taskIds);
         streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
@@ -571,8 +575,8 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.deleteAllTasks();
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().deleteAllTasks();
       }
     }.run();
   }
@@ -583,15 +587,15 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.taskStore.deleteTasks(taskIds);
         streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
             .andReturn(position);
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.deleteTasks(taskIds);
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().deleteTasks(taskIds);
       }
     }.run();
   }
@@ -603,15 +607,15 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.quotaStore.saveQuota(role, quota);
         streamMatcher.expectTransaction(Op.saveQuota(new SaveQuota(role, quota.newBuilder())))
             .andReturn(position);
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.saveQuota(role, quota);
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getQuotaStore().saveQuota(role, quota);
       }
     }.run();
   }
@@ -622,14 +626,14 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.quotaStore.removeQuota(role);
         streamMatcher.expectTransaction(Op.removeQuota(new RemoveQuota(role))).andReturn(position);
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.removeQuota(role);
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getQuotaStore().removeQuota(role);
       }
     }.run();
   }
@@ -644,15 +648,15 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.lockStore.saveLock(lock);
         streamMatcher.expectTransaction(Op.saveLock(new SaveLock(lock.newBuilder())))
             .andReturn(position);
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.saveLock(lock);
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getLockStore().saveLock(lock);
       }
     }.run();
   }
@@ -664,15 +668,15 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         storageUtil.lockStore.removeLock(lockKey);
         streamMatcher.expectTransaction(Op.removeLock(new RemoveLock(lockKey.newBuilder())))
             .andReturn(position);
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.removeLock(lockKey);
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getLockStore().removeLock(lockKey);
       }
     }.run();
   }
@@ -689,7 +693,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectOperations();
+        storageUtil.expectWriteOperation();
         expect(storageUtil.attributeStore.getHostAttributes(host))
             .andReturn(Optional.<HostAttributes>absent());
 
@@ -708,11 +712,23 @@ public class LogStorageTest extends EasyMockTest {
       }
 
       @Override
-      protected void performMutations() {
-        logStorage.saveHostAttributes(hostAttributes.get());
-        assertEquals(hostAttributes, logStorage.getHostAttributes(host));
-        logStorage.saveHostAttributes(hostAttributes.get());
-        assertEquals(hostAttributes, logStorage.getHostAttributes(host));
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        AttributeStore.Mutable store = storeProvider.getAttributeStore();
+        store.saveHostAttributes(hostAttributes.get());
+        assertEquals(hostAttributes, store.getHostAttributes(host));
+        store.saveHostAttributes(hostAttributes.get());
+        assertEquals(hostAttributes, store.getHostAttributes(host));
+      }
+    }.run();
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void testMutateRequiresWriteOperation() throws Exception {
+    new StorageTestFixture() {
+
+      @Override
+      protected void runTest() {
+        logStorage.deleteTasks(ImmutableSet.of("a"));
       }
     }.run();
   }

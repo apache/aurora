@@ -34,6 +34,7 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -354,9 +355,14 @@ public class LogStorage extends ForwardingStore
         break;
 
       case TRANSACTION:
-        for (Op op : logEntry.getTransaction().getOps()) {
-          replayOp(op);
-        }
+        write(new MutateWork.NoResult.Quiet() {
+          @Override
+          protected void execute(MutableStoreProvider unused) {
+            for (Op op : logEntry.getTransaction().getOps()) {
+              replayOp(op);
+            }
+          }
+        });
         break;
 
       case NOOP:
@@ -489,12 +495,7 @@ public class LogStorage extends ForwardingStore
     // The log stream transaction has already been set up so we just need to delegate with our
     // store provider so any mutations performed by work get logged.
     if (transaction != null) {
-      return super.write(new MutateWork<T, E>() {
-        @Override
-        public T apply(MutableStoreProvider unused) throws E {
-          return work.apply(logStoreProvider);
-        }
-      });
+      return work.apply(logStoreProvider);
     }
 
     transaction = streamManager.startTransaction();
@@ -523,25 +524,20 @@ public class LogStorage extends ForwardingStore
   @Timed("scheduler_log_save_framework_id")
   @Override
   public void saveFrameworkId(final String frameworkId) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        log(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
-        LogStorage.super.saveFrameworkId(frameworkId);
-      }
-    });
+    checkNotNull(frameworkId);
+
+    log(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
+    super.saveFrameworkId(frameworkId);
   }
 
   @Timed("scheduler_log_job_save")
   @Override
   public void saveAcceptedJob(final String managerId, final IJobConfiguration jobConfig) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        log(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())));
-        LogStorage.super.saveAcceptedJob(managerId, jobConfig);
-      }
-    });
+    checkNotNull(managerId);
+    checkNotNull(jobConfig);
+
+    log(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())));
+    super.saveAcceptedJob(managerId, jobConfig);
   }
 
   @Timed("scheduler_log_job_remove")
@@ -549,51 +545,35 @@ public class LogStorage extends ForwardingStore
   public void removeJob(final IJobKey jobKey) {
     checkNotNull(jobKey);
 
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        log(Op.removeJob(new RemoveJob().setJobKey(jobKey.newBuilder())));
-        LogStorage.super.removeJob(jobKey);
-      }
-    });
+    log(Op.removeJob(new RemoveJob().setJobKey(jobKey.newBuilder())));
+    super.removeJob(jobKey);
   }
 
   @Timed("scheduler_log_tasks_save")
   @Override
   public void saveTasks(final Set<IScheduledTask> newTasks) throws IllegalStateException {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(newTasks))));
-        LogStorage.super.saveTasks(newTasks);
-      }
-    });
+    checkNotNull(newTasks);
+
+    log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(newTasks))));
+    super.saveTasks(newTasks);
   }
 
   @Override
   public void deleteAllTasks() {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider storeProvider) {
-        Query.Builder query = Query.unscoped();
-        Set<String> ids = FluentIterable.from(storeProvider.getTaskStore().fetchTasks(query))
-            .transform(Tasks.SCHEDULED_TO_ID)
-            .toSet();
-        deleteTasks(ids);
-      }
-    });
+    Query.Builder query = Query.unscoped();
+    Set<String> ids = FluentIterable.from(fetchTasks(query))
+        .transform(Tasks.SCHEDULED_TO_ID)
+        .toSet();
+    deleteTasks(ids);
   }
 
   @Timed("scheduler_log_tasks_remove")
   @Override
   public void deleteTasks(final Set<String> taskIds) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        log(Op.removeTasks(new RemoveTasks(taskIds)));
-        LogStorage.super.deleteTasks(taskIds);
-      }
-    });
+    checkNotNull(taskIds);
+
+    log(Op.removeTasks(new RemoveTasks(taskIds)));
+    super.deleteTasks(taskIds);
   }
 
   @Timed("scheduler_log_tasks_mutate")
@@ -602,121 +582,102 @@ public class LogStorage extends ForwardingStore
       final Query.Builder query,
       final Function<IScheduledTask, IScheduledTask> mutator) {
 
-    return write(new MutateWork.Quiet<ImmutableSet<IScheduledTask>>() {
-      @Override
-      public ImmutableSet<IScheduledTask> apply(MutableStoreProvider unused) {
-        ImmutableSet<IScheduledTask> mutated = LogStorage.super.mutateTasks(query, mutator);
+    checkNotNull(query);
+    checkNotNull(mutator);
 
-        Map<String, IScheduledTask> tasksById = Tasks.mapById(mutated);
-        if (LOG.isLoggable(Level.FINE)) {
-          LOG.fine("Storing updated tasks to log: "
-              + Maps.transformValues(tasksById, Tasks.GET_STATUS));
-        }
+    ImmutableSet<IScheduledTask> mutated = super.mutateTasks(query, mutator);
 
-        // TODO(William Farner): Avoid writing an op when mutated is empty.
-        log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
-        return mutated;
-      }
-    });
+    Map<String, IScheduledTask> tasksById = Tasks.mapById(mutated);
+    if (LOG.isLoggable(Level.FINE)) {
+      LOG.fine("Storing updated tasks to log: "
+          + Maps.transformValues(tasksById, Tasks.GET_STATUS));
+    }
+
+    // TODO(William Farner): Avoid writing an op when mutated is empty.
+    log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
+    return mutated;
   }
 
   @Timed("scheduler_log_unsafe_modify_in_place")
   @Override
   public boolean unsafeModifyInPlace(final String taskId, final ITaskConfig taskConfiguration) {
-    return write(new MutateWork.Quiet<Boolean>() {
-      @Override
-      public Boolean apply(MutableStoreProvider storeProvider) {
-        boolean mutated = LogStorage.super.unsafeModifyInPlace(taskId, taskConfiguration);
-        if (mutated) {
-          log(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration.newBuilder())));
-        }
-        return mutated;
-      }
-    });
+    checkNotNull(taskId);
+    checkNotNull(taskConfiguration);
+
+    boolean mutated = super.unsafeModifyInPlace(taskId, taskConfiguration);
+    if (mutated) {
+      log(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration.newBuilder())));
+    }
+    return mutated;
   }
 
   @Timed("scheduler_log_quota_remove")
   @Override
   public void removeQuota(final String role) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        log(Op.removeQuota(new RemoveQuota(role)));
-        LogStorage.super.removeQuota(role);
-      }
-    });
+    checkNotNull(role);
+
+    log(Op.removeQuota(new RemoveQuota(role)));
+    super.removeQuota(role);
   }
 
   @Timed("scheduler_log_quota_save")
   @Override
   public void saveQuota(final String role, final IQuota quota) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        log(Op.saveQuota(new SaveQuota(role, quota.newBuilder())));
-        LogStorage.super.saveQuota(role, quota);
-      }
-    });
+    checkNotNull(role);
+    checkNotNull(quota);
+
+    log(Op.saveQuota(new SaveQuota(role, quota.newBuilder())));
+    super.saveQuota(role, quota);
   }
 
   @Timed("scheduler_save_host_attribute")
   @Override
   public void saveHostAttributes(final HostAttributes attrs) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        // Pass the updated attributes upstream, and then check if the stored value changes.
-        // We do this since different parts of the system write partial HostAttributes objects
-        // and they are merged together internally.
-        // TODO(William Farner): Split out a separate method
-        //                       saveAttributes(String host, Iterable<Attributes>) to simplify this.
-        Optional<HostAttributes> saved = LogStorage.super.getHostAttributes(attrs.getHost());
-        LogStorage.super.saveHostAttributes(attrs);
-        Optional<HostAttributes> updated = LogStorage.super.getHostAttributes(attrs.getHost());
-        if (!saved.equals(updated)) {
-          log(Op.saveHostAttributes(new SaveHostAttributes(updated.get())));
-        }
-      }
-    });
+    checkNotNull(attrs);
+
+    // Pass the updated attributes upstream, and then check if the stored value changes.
+    // We do this since different parts of the system write partial HostAttributes objects
+    // and they are merged together internally.
+    // TODO(William Farner): Split out a separate method
+    //                       saveAttributes(String host, Iterable<Attributes>) to simplify this.
+    Optional<HostAttributes> saved = getHostAttributes(attrs.getHost());
+    super.saveHostAttributes(attrs);
+    Optional<HostAttributes> updated = getHostAttributes(attrs.getHost());
+    if (!saved.equals(updated)) {
+      log(Op.saveHostAttributes(new SaveHostAttributes(updated.get())));
+    }
   }
 
   @Timed("scheduler_lock_save")
   @Override
   public void saveLock(final ILock lock) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        log(Op.saveLock(new SaveLock(lock.newBuilder())));
-        LogStorage.super.saveLock(lock);
-      }
-    });
+    checkNotNull(lock);
+
+    log(Op.saveLock(new SaveLock(lock.newBuilder())));
+    super.saveLock(lock);
   }
 
   @Timed("scheduler_lock_remove")
   @Override
   public void removeLock(final ILockKey lockKey) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        log(Op.removeLock(new RemoveLock(lockKey.newBuilder())));
-        LogStorage.super.removeLock(lockKey);
-      }
-    });
+    checkNotNull(lockKey);
+
+    log(Op.removeLock(new RemoveLock(lockKey.newBuilder())));
+    super.removeLock(lockKey);
   }
 
   @Override
   public boolean setMaintenanceMode(final String host, final MaintenanceMode mode) {
-    write(new MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(MutableStoreProvider unused) {
-        Optional<HostAttributes> saved = LogStorage.super.getHostAttributes(host);
-        if (saved.isPresent()) {
-          HostAttributes attributes = saved.get().setMode(mode);
-          log(Op.saveHostAttributes(new SaveHostAttributes(attributes)));
-          LogStorage.super.saveHostAttributes(attributes);
-        }
-      }
-    });
+    checkNotNull(host);
+    checkNotNull(mode);
+
+    Optional<HostAttributes> saved = getHostAttributes(host);
+    if (saved.isPresent()) {
+      HostAttributes attributes = saved.get().setMode(mode);
+      log(Op.saveHostAttributes(new SaveHostAttributes(attributes)));
+      super.saveHostAttributes(attributes);
+      return true;
+    }
     return false;
   }
 
@@ -735,6 +696,10 @@ public class LogStorage extends ForwardingStore
   }
 
   private void log(Op op) {
+    Preconditions.checkState(
+        !recovered || (transaction != null),
+        "Mutating operations must be done during recovery or within a transaction.");
+
     if (recovered) {
       transaction.add(op);
     }
