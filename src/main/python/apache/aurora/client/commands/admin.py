@@ -60,6 +60,7 @@ def parse_host_file(filename):
     die('No valid hosts found in %s.' % filename)
   return hosts
 
+
 def parse_hosts(options):
   if bool(options.filename) == bool(options.hosts):
     die('Please specify either --filename or --hosts')
@@ -71,9 +72,17 @@ def parse_hosts(options):
     die('No valid hosts found.')
   return hosts
 
+
 def print_results(results):
   for line in results:
     print(line)
+
+
+def parse_sla_percentage(percentage):
+  val = float(percentage)
+  if val <= 0 or val > 100:
+    die('Invalid percentage %s. Must be within (0, 100].' % percentage)
+  return val
 
 
 @app.command
@@ -460,12 +469,6 @@ def sla_list_safe_domain(cluster, percentage, duration):
   Format: XdYhZmWs (each field is optional but must be in that order.)
   Examples: 5m, 1d3h45m.
   """
-  def parse_percentage(percentage):
-    val = float(percentage)
-    if val <= 0 or val > 100:
-      die('Invalid percentage %s. Must be within (0, 100].' % percentage)
-    return val
-
   def parse_jobs_file(filename):
     result = {}
     with open(filename, 'r') as overrides:
@@ -479,14 +482,14 @@ def sla_list_safe_domain(cluster, percentage, duration):
         job_key = AuroraJobKey.from_path(tokens[0])
         result[job_key] = DomainUpTimeSlaVector.JobUpTimeLimit(
             job=job_key,
-            percentage=parse_percentage(tokens[1]),
-            duration_seconds=parse_time(tokens[2]).as_(Time.SECONDS)
+            percentage=parse_sla_percentage(tokens[1]),
+            duration_secs=parse_time(tokens[2]).as_(Time.SECONDS)
         )
     return result
 
   options = app.get_options()
 
-  sla_percentage = parse_percentage(percentage)
+  sla_percentage = parse_sla_percentage(percentage)
   sla_duration = parse_time(duration)
 
   exclude_hosts = parse_host_file(options.exclude_filename) if options.exclude_filename else []
@@ -502,11 +505,59 @@ def sla_list_safe_domain(cluster, percentage, duration):
       continue
 
     if options.list_jobs:
-      results.append('\n'.join(['%s %s %.2f %d' %
-                               (host, limit.job.to_path(), limit.percentage, limit.duration_seconds)
-                                for limit in hosts[host]]))
+      results.append('\n'.join(['%s\t%s\t%.2f\t%d' %
+          (host, d.job.to_path(), d.percentage, d.duration_secs) for d in sorted(hosts[host])]))
     else:
       results.append('%s' % host)
 
   print_results(results)
 
+
+@app.command
+@app.command_option('--filename', dest='filename', default=None,
+                    help='Name of the file with host names (one per line).')
+@app.command_option('--hosts', dest='hosts', default=None,
+                    help='Comma separated list of host names.')
+@requires.exactly('cluster', 'percentage', 'duration')
+def sla_probe_hosts(cluster, percentage, duration):
+  """usage: sla_probe_hosts
+            [--filename=filename]
+            [--hosts=hosts]
+            cluster percentage duration
+
+  Probes individual hosts with respect to their job SLA.
+  Specifically, given a host, outputs all affected jobs with their projected SLAs
+  if the host goes down. In addition, if a job's projected SLA does not clear
+  the specified limits suggests the approximate time when that job reaches its SLA.
+
+  Output format:
+  HOST  JOB  PREDICTED_SLA  SAFE?  PREDICTED_SAFE_IN
+
+  where:
+  HOST - host being probed.
+  JOB - job that has tasks running on the host being probed.
+  PREDICTED_SLA - predicted effective percentage of up tasks if the host is shut down.
+  SAFE? - PREDICTED_SLA >= percentage
+  PREDICTED_SAFE_IN - expected wait time in seconds for the job to reach requested SLA threshold.
+  """
+  options = app.get_options()
+
+  sla_percentage = parse_sla_percentage(percentage)
+  sla_duration = parse_time(duration)
+  hosts = parse_hosts(options)
+
+  vector = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).sla_get_safe_domain_vector()
+  probed_hosts = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), hosts)
+
+  results = []
+  for host, job_details in sorted(probed_hosts.items()):
+    results.append('\n'.join(
+        ['%s\t%s\t%.2f\t%s\t%s' %
+            (host,
+             d.job.to_path(),
+             d.predicted_percentage,
+             d.safe,
+             'n/a' if d.safe_in_secs is None else d.safe_in_secs)
+            for d in sorted(job_details)]))
+
+  print_results(results)

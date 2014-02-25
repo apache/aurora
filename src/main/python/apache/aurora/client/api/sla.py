@@ -49,6 +49,35 @@ class JobUpTimeSlaVector(object):
     """Returns the total count of active tasks."""
     return len(self._uptime_map)
 
+  def get_wait_time_to_sla(self, percentile, duration, total_tasks=None):
+    """Returns an approximate wait time until the job reaches the specified SLA
+       defined by percentile and duration.
+
+    Arguments:
+    percentile -- up count percentile to calculate wait time against.
+    duration -- uptime duration to calculate wait time against.
+    total_tasks -- optional total task count to calculate against.
+    """
+    upcount = self.get_task_up_count(duration, total_tasks)
+    if upcount >= percentile:
+      return 0
+
+    # To get wait time to SLA:
+    # - Calculate the desired number of up instances in order to satisfy the percentile.
+    # - Find the desired index (x) in the instance list sorted in non-decreasing order of uptimes.
+    #   If desired index outside of current element count -> return None for "infeasible".
+    # - Calculate wait time as: duration - duration(x)
+    elements = len(self._uptime_map)
+    total = total_tasks or elements
+    target_count = math.ceil(total * percentile / 100.0)
+    index = elements - int(target_count)
+
+    if index < 0 or index >= elements:
+      return None
+    else:
+      return duration - sorted(self._uptime_map.values())[index]
+
+
   def get_task_up_count(self, duration, total_tasks=None):
     """Returns the percentage of job tasks that stayed up longer than duration.
 
@@ -91,7 +120,9 @@ class DomainUpTimeSlaVector(object):
      Exposes an API for querying safe domain details.
   """
 
-  JobUpTimeLimit = namedtuple('JobUpTimeLimit', ['job', 'percentage', 'duration_seconds'])
+  JobUpTimeLimit = namedtuple('JobUpTimeLimit', ['job', 'percentage', 'duration_secs'])
+  JobUpTimeDetails = namedtuple('JobUpTimeDetails',
+      ['job', 'predicted_percentage', 'safe', 'safe_in_secs'])
 
   def __init__(self, cluster, tasks):
     self._cluster = cluster
@@ -113,23 +144,13 @@ class DomainUpTimeSlaVector(object):
     for host, job_keys in self._hosts.items():
       safe_limits = []
       for job_key in job_keys:
-        # Get total job task count to use in SLA calculation.
-        total_count = JobUpTimeSlaVector(self._jobs[job_key]).total_tasks()
-
-        # Get a list of job tasks that would remain after the affected host goes down
-        # and create an SLA vector with these tasks.
-        filtered_tasks = [task for task in self._jobs[job_key]
-                          if task.assignedTask.slaveHost != host]
-        filtered_vector = JobUpTimeSlaVector(filtered_tasks, self._now)
-
         job_duration = duration
         job_percentage = percentage
         if job_limits and job_key in job_limits:
-          job_duration = job_limits[job_key].duration_seconds
+          job_duration = job_limits[job_key].duration_secs
           job_percentage = job_limits[job_key].percentage
 
-        # Calculate the SLA that would be in effect should the host go down.
-        filtered_percentage = filtered_vector.get_task_up_count(job_duration, total_count)
+        filtered_percentage, _, _ = self._simulate_host_down(job_key, host, job_duration)
         safe_limits.append(self.JobUpTimeLimit(job_key, filtered_percentage, job_duration))
 
         if filtered_percentage < job_percentage:
@@ -140,10 +161,57 @@ class DomainUpTimeSlaVector(object):
 
     return safe_hosts
 
+  def probe_hosts(self, percentage, duration, hosts):
+    """Returns predicted job SLAs following the removal of provided hosts.
+
+       For every given host creates a list of JobUpTimeDetails with predicted job SLA details
+       in case the host is restarted, including: host, job_key, predicted up count, whether
+       the predicted job SLA >= percentage and the expected wait time in seconds for the job
+       to reach its SLA.
+
+       Arguments:
+       percentage -- task up count percentage.
+       duration -- task uptime duration in seconds.
+       hosts -- list of hosts to probe for job SLA changes.
+    """
+    probed_hosts = defaultdict(list)
+    for host in hosts:
+      for job_key in self._hosts.get(host, []):
+        filtered_percentage, total_count, filtered_vector = self._simulate_host_down(
+            job_key, host, duration)
+
+        # Calculate wait time to SLA in case down host violates job's SLA.
+        if filtered_percentage < percentage:
+          safe = False
+          wait_to_sla = filtered_vector.get_wait_time_to_sla(percentage, duration, total_count)
+        else:
+          safe = True
+          wait_to_sla = 0
+
+        probed_hosts[host].append(
+            self.JobUpTimeDetails(job_key, filtered_percentage, safe, wait_to_sla))
+
+    return probed_hosts
+
+  def _simulate_host_down(self, job_key, host, duration):
+    # Get total job task count to use in SLA calculation.
+    total_count = JobUpTimeSlaVector(self._jobs[job_key]).total_tasks()
+
+    # Get a list of job tasks that would remain after the affected host goes down
+    # and create an SLA vector with these tasks.
+    filtered_tasks = [task for task in self._jobs[job_key]
+                      if task.assignedTask.slaveHost != host]
+    filtered_vector = JobUpTimeSlaVector(filtered_tasks, self._now)
+
+    # Calculate the SLA that would be in effect should the host go down.
+    filtered_percentage = filtered_vector.get_task_up_count(duration, total_count)
+
+    return filtered_percentage, total_count, filtered_vector
+
   def _init_mappings(self):
     def job_key_from_scheduled(task):
       return AuroraJobKey(
-          cluster=self._cluster,
+          cluster=self._cluster.name,
           role=task.assignedTask.task.owner.role,
           env=task.assignedTask.task.environment,
           name=task.assignedTask.task.jobName

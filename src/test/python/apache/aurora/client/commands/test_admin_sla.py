@@ -20,7 +20,7 @@ from collections import defaultdict
 
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.sla import DomainUpTimeSlaVector
-from apache.aurora.client.commands.admin import sla_list_safe_domain
+from apache.aurora.client.commands.admin import sla_list_safe_domain, sla_probe_hosts
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
@@ -174,9 +174,9 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
 
       mock_vector.get_safe_hosts.assert_called_once_with(50.0, 100.0, {})
       mock_print_results.assert_called_once_with([
-          'h0 west/role/env/job0 50.00 100',
-          'h1 west/role/env/job1 50.00 100',
-          'h2 west/role/env/job2 50.00 100'])
+          'h0\twest/role/env/job0\t50.00\t100',
+          'h1\twest/role/env/job1\t50.00\t100',
+          'h2\twest/role/env/job2\t50.00\t100'])
 
   def test_safe_domain_invalid_percentage(self):
     """Tests execution of the sla_list_safe_domain command with invalid percentage"""
@@ -200,6 +200,97 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
 
         try:
           sla_list_safe_domain(['west', '50', '100s'])
+        except SystemExit:
+          pass
+        else:
+          assert 'Expected error is not raised.'
+
+
+class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
+
+  @classmethod
+  def setup_mock_options(cls, hosts=None, filename=None):
+    mock_options = Mock()
+    mock_options.hosts = hosts
+    mock_options.filename = filename
+    mock_options.verbosity = False
+    return mock_options
+
+  @classmethod
+  def create_mock_vector(cls, result):
+    mock_vector = Mock(spec=DomainUpTimeSlaVector)
+    mock_vector.probe_hosts.return_value = result
+    return mock_vector
+
+  @classmethod
+  def create_probe_hosts(cls, num_hosts, predicted, safe, safe_in):
+    hosts = defaultdict(list)
+    for i in range(num_hosts):
+      host_name = 'h%s' % i
+      job = AuroraJobKey.from_path('west/role/env/job%s' % i)
+      hosts[host_name].append(DomainUpTimeSlaVector.JobUpTimeDetails(job, predicted, safe, safe_in))
+    return hosts
+
+  def test_probe_hosts_with_list(self):
+    """Tests successful execution of the sla_probe_hosts command with host list."""
+    mock_options = self.setup_mock_options(hosts='h0,h1')
+    mock_vector = self.create_mock_vector(self.create_probe_hosts(2, 80, True, 0))
+    with contextlib.nested(
+        patch('apache.aurora.client.commands.admin.AuroraClientAPI', new=Mock(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.print_results'),
+        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('twitter.common.app.get_options', return_value=mock_options)
+    ) as (
+        mock_api,
+        mock_print_results,
+        test_clusters,
+        mock_options):
+
+      mock_api.return_value.sla_get_safe_domain_vector.return_value = mock_vector
+      sla_probe_hosts(['west', '90', '200s'])
+
+      mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0, ['h0', 'h1'])
+      mock_print_results.assert_called_once_with([
+          'h0\twest/role/env/job0\t80.00\tTrue\t0',
+          'h1\twest/role/env/job1\t80.00\tTrue\t0'
+      ])
+
+  def test_probe_hosts_with_file(self):
+    """Tests successful execution of the sla_probe_hosts command with host filename."""
+    mock_vector = self.create_mock_vector(self.create_probe_hosts(1, 80, False, None))
+    with temporary_file() as fp:
+      fp.write('h0')
+      fp.flush()
+      mock_options = self.setup_mock_options(filename=fp.name)
+      with contextlib.nested(
+          patch('apache.aurora.client.commands.admin.AuroraClientAPI', new=Mock(spec=AuroraClientAPI)),
+          patch('apache.aurora.client.commands.admin.print_results'),
+          patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+          patch('twitter.common.app.get_options', return_value=mock_options)
+      ) as (
+          mock_api,
+          mock_print_results,
+          test_clusters,
+          mock_options):
+
+        mock_api.return_value.sla_get_safe_domain_vector.return_value = mock_vector
+        sla_probe_hosts(['west', '90', '200s'])
+
+        mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0, ['h0'])
+        mock_print_results.assert_called_once_with([
+            'h0\twest/role/env/job0\t80.00\tFalse\tn/a'
+        ])
+
+  def test_probe_hosts_error(self):
+    """Tests execution of the sla_probe_hosts command with both host and filename provided."""
+    with temporary_file() as fp:
+      fp.write('h0')
+      fp.flush()
+      mock_options = self.setup_mock_options(hosts='h0', filename=fp.name)
+      with patch('twitter.common.app.get_options', return_value=mock_options) as (mock_options):
+
+        try:
+          sla_probe_hosts(['west', '50', '100s'])
         except SystemExit:
           pass
         else:
