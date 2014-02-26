@@ -192,15 +192,15 @@ def set_quota(cluster, role, cpu_str, ram, disk):
   try:
     ram_size = parse_data(ram).as_(Data.MB)
     disk_size = parse_data(disk).as_(Data.MB)
-  except ValueError:
-    log.error('Invalid unit specification')
+  except ValueError as e:
+    die(str(e))
 
   try:
     cpu = float(cpu_str)
     ram_mb = int(ram_size)
     disk_mb = int(disk_size)
-  except ValueError:
-    log.error('Invalid value')
+  except ValueError as e:
+    die(str(e))
 
   options = app.get_options()
   resp = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).set_quota(role, cpu, ram_mb, disk_mb)
