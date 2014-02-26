@@ -660,7 +660,7 @@ These are provided to give a basic understanding of simple Aurora jobs.
 ### <a name="hello_world.aurora"></a> `hello_world.aurora`
 
 Put the following in a file named `hello_world.aurora`, substituting your own values
-for values such as `cluster`'s.
+for values such as `cluster`s.
 
         import os
         hello_world_process = Process(name = 'hello_world', cmdline = 'echo hello world')
@@ -687,7 +687,7 @@ Then issue the following commands to create and kill the job, using your own val
 ### `hello_world_productionized.aurora`
 
 Put the following in a file named `hello_world_productionized.aurora`, substituting your own values
-for values such as `cluster`'s.
+for values such as `cluster`s.
 
         include('hello_world.aurora')
 
