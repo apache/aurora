@@ -1,29 +1,44 @@
 Aurora + Thermos Configuration Reference
 ========================================
 
+- [Aurora + Thermos Configuration Reference](#aurora--thermos-configuration-reference)
+- [Introduction](#introduction)
+- [Process Schema](#process-schema)
+    - [Process Objects](#process-objects)
+      - [name](#name)
+      - [cmdline](#cmdline)
+      - [max_failures](#max_failures)
+      - [daemon](#daemon)
+      - [ephemeral](#ephemeral)
+      - [min_duration](#min_duration)
+      - [final](#final)
+- [Task Schema](#task-schema)
+    - [Task Object](#task-object)
+      - [name](#name-1)
+      - [processes](#processes)
+        - [constraints](#constraints)
+      - [resources](#resources)
+      - [max_failures](#max_failures-1)
+      - [max_concurrency](#max_concurrency)
+      - [finalization_wait](#finalization_wait)
+    - [Constraint Object](#constraint-object)
+    - [Resource Object](#resource-object)
+- [Job Schema](#job-schema)
+    - [Job Objects](#job-objects)
+    - [Services](#services)
+    - [UpdateConfig Objects](#updateconfig-objects)
+    - [HealthCheckConfig Objects](#healthcheckconfig-objects)
+- [Specifying Scheduling Constraints](#specifying-scheduling-constraints)
+- [Template Namespaces](#template-namespaces)
+    - [mesos Namespace](#mesos-namespace)
+    - [thermos Namespace](#thermos-namespace)
+- [Basic Examples](#basic-examples)
+    - [hello_world.aurora](#hello_worldaurora)
+    - [Environment Tailoring](#environment-tailoring)
+      - [hello_world_productionized.aurora](#hello_world_productionizedaurora)
 
-[Introduction](#Introduction)
-[Process Schema](#Process Schema)
-&nbsp;&nbsp;&nbsp;&nbsp;[`Process` Objects](#ProcessObject)
-[Task Schema](#TaskSchema)
-&nbsp;&nbsp;&nbsp;&nbsp;[`Task` Object](#TaskObject)
-&nbsp;&nbsp;&nbsp;&nbsp;[`Constraint` Object](#ConstraintObject)
-&nbsp;&nbsp;&nbsp;&nbsp;[`Resource` Object](#ResourceObject)
-[Job Schema](#JobSchema)
-&nbsp;&nbsp;&nbsp;&nbsp;[`Job` Objects](#JobObject)
-&nbsp;&nbsp;&nbsp;&nbsp;[Services](#Services)
-&nbsp;&nbsp;&nbsp;&nbsp;[`UpdateConfig` Objects](#UpdateConfigObjects)
-&nbsp;&nbsp;&nbsp;&nbsp;[`HealthCheckConfig` Objects](#HealthCheckConfigObject)
-[Specifying Scheduling Constraints](#SchedulingConstraints)
-[Template Namespaces](#TemplateNamespaces)
-&nbsp;&nbsp;&nbsp;&nbsp;[`mesos` Namespace](#mesosNamespace)
-&nbsp;&nbsp;&nbsp;&nbsp;[`thermos` Namespace](#thermosNamespace)
-[Basic Examples](#BasicExamples)
-&nbsp;&nbsp;&nbsp;&nbsp;[`hello_world.aurora`](#hello_world.aurora)
-&nbsp;&nbsp;&nbsp;&nbsp;[Environment Tailoring](#EnvironmentTailoring)
-
-<a name="Introduction"></a>Introduction
-=======================================
+Introduction
+============
 
 Don't know where to start? The Aurora configuration schema is very
 powerful, and configurations can become quite complex for advanced use
@@ -31,18 +46,18 @@ cases.
 
 For examples of simple configurations to get something up and running
 quickly, check out the [Tutorial](tutorial.md). When you feel comfortable with the basics, move
-on to the [Configuration Tutorial](configurationtutorial.md) for more in-depth coverage of configuration
-design.
+on to the [Configuration Tutorial](configurationtutorial.md) for more in-depth coverage of
+configuration design.
 
 For additional basic configuration examples, see [the end of this document](#BasicExamples).
 
-<a name="Process Schema"></a>Process Schema
-===========================================
+Process Schema
+==============
 
 Process objects consist of required `name` and `cmdline` attributes. You can customize Process
 behavior with its optional attributes. Remember, Processes are handled by Thermos.
 
-### <a name="ProcessObject"></a> `Process` Objects
+### Process Objects
 
 <table border=1>
   <tbody>
@@ -88,19 +103,19 @@ behavior with its optional attributes. Remember, Processes are handled by Thermo
 </tbody>
 </table>
 
-#### `name`
+#### name
 
 The name is any valid UNIX filename string (specifically no
 slashes, NULLs or leading periods). Within a Task object, each Process name
 must be unique.
 
-#### `cmdline`
+#### cmdline
 
 The command line run by the process. The command line is invoked in a bash
 subshell, so can involve fully-blown bash scripts. However, nothing is
 supplied for command-line arguments so `$*` is unspecified.
 
-#### `max_failures`
+#### max_failures
 
 The maximum number of failures (non-zero exit statuses) this process can
 have before being marked permanently failed and not retried. If a
@@ -113,7 +128,7 @@ indefinitely until it achieves a successful (zero) exit status.
 It retries at most once every `min_duration` seconds to prevent
 an effective denial of service attack on the coordinating Thermos scheduler.
 
-#### `daemon`
+#### daemon
 
 By default, Thermos processes are non-daemon. If `daemon` is set to True, a
 successful (zero) exit status does not prevent future process runs.
@@ -125,7 +140,7 @@ for very short-lived processes because of the accumulation of
 checkpointed state for each process run. When running in Mesos
 specifically, `max_failures` is capped at 100.
 
-#### `ephemeral`
+#### ephemeral
 
 By default, Thermos processes are non-ephemeral. If `ephemeral` is set to
 True, the process' status is not used to determine if its containing task
@@ -135,14 +150,14 @@ that periodically checkpoints its log files to a centralized data store.
 The task is considered finished once the webserver process has
 completed, regardless of the logsaver's current status.
 
-#### `min_duration`
+#### min_duration
 
 Processes may succeed or fail multiple times during a single task's
 duration. Each of these is called a *process run*. `min_duration` is
 the minimum number of seconds the scheduler waits before running the
 same process.
 
-#### `final`
+#### final
 
 Processes can be grouped into two classes: ordinary processes and
 finalizing processes. By default, Thermos processes are ordinary. They
@@ -159,8 +174,8 @@ vice-versa, however finalizing processes may depend upon other
 finalizing processes and otherwise run as a typical process
 schedule.
 
-<a name="TaskSchema"></a>Task Schema
-====================================
+Task Schema
+===========
 
 Tasks fundamentally consist of a `name` and a list of Process objects stored as the
 value of the `processes` attribute. Processes can be further constrained with
@@ -168,7 +183,7 @@ value of the `processes` attribute. Processes can be further constrained with
 `processes` list, so for simple `Task` objects with one Process, `name`
 can be omitted. In Mesos, `resources` is also required.
 
-### <a name="TaskObject"></a> `Task` Object
+### Task Object
 
 <table border=1>
   <tbody>
@@ -214,16 +229,17 @@ can be omitted. In Mesos, `resources` is also required.
 </tbody>
 </table>
 
-`name`
+#### name
 
-`name` is a string denoting the name of this task. It defaults to the name of the first Process in the list of Processes associated with the `processes` attribute.
+`name` is a string denoting the name of this task. It defaults to the name of the first Process in
+the list of Processes associated with the `processes` attribute.
 
-`processes`
+#### processes
 
 `processes` is an unordered list of `Process` objects. To constrain the order
 in which they run, use `constraints`.
 
-`constraints`
+##### constraints
 
 A list of `Constraint` objects. Currently it supports only one type,
 the `order` constraint. `order` is a list of process names
@@ -247,11 +263,12 @@ is shorthand for
 
         [Constraint(order = [process1.name(), process2.name()])]
 
-`resources`
+#### resources
 
-Takes a `Resource` object, which specifies the amounts of CPU, memory, and disk space resources to allocate to the Task.
+Takes a `Resource` object, which specifies the amounts of CPU, memory, and disk space resources
+to allocate to the Task.
 
-`max_failures`
+#### max_failures
 
 `max_failures` is the number of times processes that are part of this
 Task can fail before the entire Task is marked for failure.
@@ -273,7 +290,7 @@ first run. The task would succeed despite only allowing for two failed
 processes. To be more specific, there would be 10 failed process runs
 yet 1 failed process.
 
-`max_concurrency`
+#### max_concurrency
 
 For Tasks with a number of expensive but otherwise independent
 processes, you may want to limit the amount of concurrency
@@ -287,26 +304,26 @@ For example, the following task spawns 180 Processes ("mappers")
 to compute individual elements of a 180 degree sine table, all dependent
 upon one final Process ("reducer") to tabulate the results:
 
-        def make_mapper(id):
-          return Process(
-            name = "mapper%03d" % id,
-            cmdline = "echo 'scale=50;s(%d\*4\*a(1)/180)' | bc -l >
-                       temp.sine_table.%03d" % (id, id))
+    def make_mapper(id):
+      return Process(
+        name = "mapper%03d" % id,
+        cmdline = "echo 'scale=50;s(%d\*4\*a(1)/180)' | bc -l >
+                   temp.sine_table.%03d" % (id, id))
 
-        def make_reducer():
-          return Process(name = "reducer", cmdline = "cat temp.\* | nl \> sine\_table.txt
-                         && rm -f temp.\*")
+    def make_reducer():
+      return Process(name = "reducer", cmdline = "cat temp.\* | nl \> sine\_table.txt
+                     && rm -f temp.\*")
 
-        processes = map(make_mapper, range(180))
+    processes = map(make_mapper, range(180))
 
-        task = Task(
-          name = "mapreduce",
-          processes = processes + [make\_reducer()],
-          constraints = [Constraint(order = [mapper.name(), 'reducer']) for mapper
-                         in processes],
-          max_concurrency = 8)
+    task = Task(
+      name = "mapreduce",
+      processes = processes + [make\_reducer()],
+      constraints = [Constraint(order = [mapper.name(), 'reducer']) for mapper
+                     in processes],
+      max_concurrency = 8)
 
-`finalization_wait`
+#### finalization_wait
 
 Tasks have three active stages: `ACTIVE`, `CLEANING`, and `FINALIZING`. The
 `ACTIVE` stage is when ordinary processes run. This stage lasts as
@@ -327,7 +344,7 @@ Client applications with higher priority may force a shorter
 finalization wait (e.g. through parameters to `thermos kill`), so this
 is mostly a best-effort signal.
 
-### <a name="ConstraintObject"></a> `Constraint` Object
+### Constraint Object
 
 Current constraint objects only support a single ordering constraint, `order`,
 which specifies its processes run sequentially in the order given. By
@@ -349,9 +366,11 @@ ordering constraints.
   </tbody>
 </table>
 
-### <a name="ResourceObject"></a> `Resource` Object
+### Resource Object
 
-Specifies the amount of CPU, Ram, and disk resources the task needs. See the [Resource Isolation document](resourceisolation.md) for suggested values and to understand how resources are allocated.
+Specifies the amount of CPU, Ram, and disk resources the task needs. See the
+[Resource Isolation document](resourceisolation.md) for suggested values and to understand how
+resources are allocated.
 
 <table border=1>
   <tbody>
@@ -378,10 +397,10 @@ Specifies the amount of CPU, Ram, and disk resources the task needs. See the [Re
   </tbody>
 </table>
 
-<a name="JobSchema"></a>Job Schema
-==================================
+Job Schema
+==========
 
-### <a name="JobObject"></a> `Job` Objects
+### Job Objects
 
 <table border=1>
   <tbody>
@@ -473,7 +492,7 @@ Specifies the amount of CPU, Ram, and disk resources the task needs. See the [Re
   </tbody>
 </table>
 
-### <a name="Services"></a> Services
+### Services
 
 Jobs with the `service` flag set to True are called Services. The `Service`
 alias can be used as shorthand for `Job` with `service=True`.
@@ -483,7 +502,7 @@ Jobs without the service bit set only restart up to
 `max_task_failures` times and only if they terminated unsuccessfully
 either due to human error or machine failure.
 
-### <a name="UpdateConfigObjects"></a> `UpdateConfig` Objects
+### UpdateConfig Objects
 
 Parameters for controlling the rate and policy of rolling updates.
 
@@ -517,7 +536,7 @@ Parameters for controlling the rate and policy of rolling updates.
   </tbody>
 </table>
 
-### <a name="HealthCheckConfigObject"></a> `HealthCheckConfig` Objects
+### HealthCheckConfig Objects
 
 Parameters for controlling a task's health checks via HTTP.
 
@@ -546,8 +565,8 @@ Parameters for controlling a task's health checks via HTTP.
     </tbody>
 </table>
 
-<a name="SchedulingConstraints"></a>Specifying Scheduling Constraints
-=====================================================================
+Specifying Scheduling Constraints
+=================================
 
 Most users will not need to specify constraints explicitly, as the
 scheduler automatically inserts reasonable defaults that attempt to
@@ -586,28 +605,28 @@ You can also control machine diversity using constraints. The below
 constraint ensures that no more than two instances of your job may run
 on a single host. Think of this as a "group by" limit.
 
-        constraints = {
-          'host': 'limit:2',
-        }
+    constraints = {
+      'host': 'limit:2',
+    }
 
 Likewise, you can use constraints to control rack diversity, e.g. at
 most one task per rack:
 
-        constraints = {
-          'rack': 'limit:1',
-        }
+    constraints = {
+      'rack': 'limit:1',
+    }
 
 Use these constraints sparingly as they can dramatically reduce Tasks' schedulability.
 
-<a name="TemplateNamespaces"></a>Template Namespaces
-====================================================
+Template Namespaces
+===================
 
 Currently, a few Pystachio namespaces have special semantics. Using them
 in your configuration allow you to tailor application behavior
 through environment introspection or interact in special ways with the
 Aurora client or Aurora-provided services.
 
-### <a name="mesosNamespace"></a> `mesos` Namespace
+### mesos Namespace
 
 The `mesos` namespace contains the `instance` variable that can be used
 to distinguish between Task replicas.
@@ -622,7 +641,7 @@ to distinguish between Task replicas.
   </tbody>
 </table>
 
-### <a name="thermosNamespace"></a> `thermos` Namespace
+### thermos Namespace
 
 The `thermos` namespace contains variables that work directly on the
 Thermos platform in addition to Aurora. This namespace is fully
@@ -652,67 +671,65 @@ configuration, it is automatically extracted and auto-populated by
 Aurora, but must be specified with, for example, `thermos -P http:12345`
 to map `http` to port 12345 when running via the CLI.
 
-<a name="BasicExamples"></a>Basic Examples
-==========================================
+Basic Examples
+==============
 
 These are provided to give a basic understanding of simple Aurora jobs.
 
-### <a name="hello_world.aurora"></a> `hello_world.aurora`
+### hello_world.aurora
 
 Put the following in a file named `hello_world.aurora`, substituting your own values
 for values such as `cluster`s.
 
-        import os
-        hello_world_process = Process(name = 'hello_world', cmdline = 'echo hello world')
+    import os
+    hello_world_process = Process(name = 'hello_world', cmdline = 'echo hello world')
 
-        hello_world_task = Task(
-          resources = Resources(cpu = 0.1, ram = 16 * MB, disk = 16 * MB),
-          processes = [hello_world_process])
+    hello_world_task = Task(
+      resources = Resources(cpu = 0.1, ram = 16 * MB, disk = 16 * MB),
+      processes = [hello_world_process])
 
-        hello_world_job = Job(
-          cluster = 'cluster1',
-          role = os.getenv('USER'),
-          task = hello_world_task)
+    hello_world_job = Job(
+      cluster = 'cluster1',
+      role = os.getenv('USER'),
+      task = hello_world_task)
 
-        jobs = [hello_world_job]
+    jobs = [hello_world_job]
 
 Then issue the following commands to create and kill the job, using your own values for the job key.
 
-        `aurora create cluster1/$USER/test/hello_world hello_world.aurora`
+    aurora create cluster1/$USER/test/hello_world hello_world.aurora
 
-        `aurora kill cluster1/$USER/test/hello_world `
+    aurora kill cluster1/$USER/test/hello_world
 
-### <a name="EnvironmentTailoring"></a> Environment Tailoring
+### Environment Tailoring
 
-### `hello_world_productionized.aurora`
+#### hello_world_productionized.aurora
 
 Put the following in a file named `hello_world_productionized.aurora`, substituting your own values
 for values such as `cluster`s.
 
-        include('hello_world.aurora')
+    include('hello_world.aurora')
 
-        production_resources = Resources(cpu = 1.0, ram = 512 * MB, disk = 2 * GB)
-        staging_resources = Resources(cpu = 0.1, ram = 32 * MB, disk = 512 * MB)
-        hello_world_template = hello_world(
-            name = "hello_world-{{cluster}}"
-            task = hello_world(resources=production_resources))
+    production_resources = Resources(cpu = 1.0, ram = 512 * MB, disk = 2 * GB)
+    staging_resources = Resources(cpu = 0.1, ram = 32 * MB, disk = 512 * MB)
+    hello_world_template = hello_world(
+        name = "hello_world-{{cluster}}"
+        task = hello_world(resources=production_resources))
 
-        jobs = [
-          # production jobs
-          hello_world_template(cluster = 'cluster1', instances = 25),
-          hello_world_template(cluster = 'cluster2', instances = 15),
+    jobs = [
+      # production jobs
+      hello_world_template(cluster = 'cluster1', instances = 25),
+      hello_world_template(cluster = 'cluster2', instances = 15),
 
-          # staging jobs
-          hello_world_template(
-            cluster = 'local',
-            instances = 1,
-            task = hello_world(resources=staging_resources)),
-        ]
+      # staging jobs
+      hello_world_template(
+        cluster = 'local',
+        instances = 1,
+        task = hello_world(resources=staging_resources)),
+    ]
 
 Then issue the following commands to create and kill the job, using your own values for the job key
 
-        aurora create cluster1/$USER/test/hello_world-cluster1 hello_world_productionized.aurora
+    aurora create cluster1/$USER/test/hello_world-cluster1 hello_world_productionized.aurora
 
-        aurora kill cluster1/$USER/test/hello_world-cluster1
-
-
+    aurora kill cluster1/$USER/test/hello_world-cluster1
