@@ -107,6 +107,18 @@ public class MemTaskStoreTest {
   }
 
   @Test
+  public void testQueryBySlaveHost() {
+    String hostA = "slaveA";
+    String hostB = "slaveB";
+    final IScheduledTask a = setHost(makeTask("a", "role", "env", "job"), Optional.of(hostA));
+    final IScheduledTask b = setHost(makeTask("b", "role", "env", "job"), Optional.of(hostB));
+    store.saveTasks(ImmutableSet.of(a, b));
+
+    assertQueryResults(Query.slaveScoped(hostA), a);
+    assertQueryResults(Query.slaveScoped(hostA, hostB), a, b);
+  }
+
+  @Test
   public void testMutate() {
     store.saveTasks(ImmutableSet.of(TASK_A, TASK_B, TASK_C, TASK_D));
     assertQueryResults(Query.statusScoped(RUNNING));

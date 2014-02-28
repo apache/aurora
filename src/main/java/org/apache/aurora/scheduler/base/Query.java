@@ -111,8 +111,12 @@ public final class Query {
     return unscoped().byId(taskIds);
   }
 
-  public static Builder slaveScoped(String slaveHost) {
-    return unscoped().bySlave(slaveHost);
+  public static Builder slaveScoped(String slaveHost, String... slaveHosts) {
+    return unscoped().bySlave(slaveHost, slaveHosts);
+  }
+
+  public static Builder slaveScoped(Iterable<String> slaveHosts) {
+    return unscoped().bySlave(slaveHosts);
   }
 
   public static Builder statusScoped(ScheduleStatus status, ScheduleStatus... statuses) {
@@ -257,16 +261,31 @@ public final class Query {
     }
 
     /**
-     * Returns a new builder scoped to the slave uniquely identified by the given slaveHost. A
+     * Returns a new builder scoped to the slaves uniquely identified by the given slaveHosts. A
      * builder can only be scoped to slaves once.
      *
      * @param slaveHost The hostname of the slave to scope the query to.
-     * @return A new Builder scoped to the given slave.
+     * @param slaveHosts Additional slave hostnames to scope this query to (they are ORed together).
+     * @return A new Builder scoped to the given slaves.
      */
-    public Builder bySlave(String slaveHost) {
+    public Builder bySlave(String slaveHost, String... slaveHosts) {
       checkNotNull(slaveHost);
 
-      return new Builder(query.deepCopy().setSlaveHost(slaveHost));
+      return bySlave(ImmutableSet.<String>builder().add(slaveHost).add(slaveHosts).build());
+    }
+
+    /**
+     * Creates a new builder scoped to slaveHosts.
+     *
+     * @see Builder#bySlave(String, String...)
+     *
+     * @param slaveHosts The slaveHost to scope this builder to.
+     * @return A new Builder scoped to the slaveHosts.
+     */
+    public Builder bySlave(Iterable<String> slaveHosts) {
+      checkNotNull(slaveHosts);
+
+      return new Builder(query.deepCopy().setSlaveHosts(ImmutableSet.copyOf(slaveHosts)));
     }
 
     /**

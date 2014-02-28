@@ -78,9 +78,7 @@ public class Maintenance {
 
   private Multimap<String, String> getTasksByHosts(StoreProvider provider, Iterable<String> hosts) {
     ImmutableSet.Builder<IScheduledTask> drainingTasks = ImmutableSet.builder();
-    for (String host : hosts) {
-      drainingTasks.addAll(provider.getTaskStore().fetchTasks(Query.slaveScoped(host).active()));
-    }
+    drainingTasks.addAll(provider.getTaskStore().fetchTasks(Query.slaveScoped(hosts).active()));
     return Multimaps.transformValues(
         Multimaps.index(drainingTasks.build(), Tasks.SCHEDULED_TO_SLAVE_HOST),
         Tasks.SCHEDULED_TO_ID);

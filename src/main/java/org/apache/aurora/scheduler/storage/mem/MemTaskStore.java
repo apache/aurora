@@ -72,18 +72,19 @@ class MemTaskStore implements TaskStore.Mutable {
 
   private final long slowQueryThresholdNanos = SLOW_QUERY_LOG_THRESHOLD.get().as(Time.NANOSECONDS);
 
-  private static final Function<Query.Builder, Optional<IJobKey>> QUERY_TO_JOB_KEY =
-      new Function<Query.Builder, Optional<IJobKey>>() {
+  private static final Function<Query.Builder, Optional<Set<IJobKey>>> QUERY_TO_JOB_KEY =
+      new Function<Query.Builder, Optional<Set<IJobKey>>>() {
         @Override
-        public Optional<IJobKey> apply(Query.Builder query) {
-          return JobKeys.from(query);
+        public Optional<Set<IJobKey>> apply(Query.Builder query) {
+          Optional<IJobKey> jobkey = JobKeys.from(query);
+          return jobkey.isPresent() ? Optional.of(jobkey.asSet()) : Optional.<Set<IJobKey>>absent();
         }
       };
-  private static final Function<Query.Builder, Optional<String>> QUERY_TO_SLAVE_HOST =
-      new Function<Query.Builder, Optional<String>>() {
+  private static final Function<Query.Builder, Optional<Set<String>>> QUERY_TO_SLAVE_HOST =
+      new Function<Query.Builder, Optional<Set<String>>>() {
         @Override
-        public Optional<String> apply(Query.Builder query) {
-          return Optional.fromNullable(query.get().getSlaveHost());
+        public Optional<Set<String>> apply(Query.Builder query) {
+          return Optional.fromNullable(query.get().getSlaveHosts());
         }
       };
 
@@ -265,8 +266,8 @@ class MemTaskStore implements TaskStore.Mutable {
             return false;
           }
         }
-        if (!StringUtils.isEmpty(query.getSlaveHost())) {
-          if (!query.getSlaveHost().equals(task.getAssignedTask().getSlaveHost())) {
+        if (query.getSlaveHostsSize() > 0) {
+          if (!query.getSlaveHosts().contains(task.getAssignedTask().getSlaveHost())) {
             return false;
           }
         }
@@ -365,19 +366,19 @@ class MemTaskStore implements TaskStore.Mutable {
     private final Multimap<K, String> index =
         Multimaps.synchronizedSetMultimap(HashMultimap.<K, String>create());
     private final Function<IScheduledTask, K> indexer;
-    private final Function<Query.Builder, Optional<K>> queryExtractor;
+    private final Function<Query.Builder, Optional<Set<K>>> queryExtractor;
     private final AtomicLong hitCount;
 
     /**
      * Creates a secondary index that will extract keys from tasks using the provided indexer.
      *
      * @param indexer Indexing function.
-     * @param queryExtractor Function to extract the key relevant to a query.
-     * @param hitCount Counter for number of times the seconary index applies to a query.
+     * @param queryExtractor Function to extract the keys relevant to a query.
+     * @param hitCount Counter for number of times the secondary index applies to a query.
      */
     SecondaryIndex(
         Function<IScheduledTask, K> indexer,
-        Function<Query.Builder, Optional<K>> queryExtractor,
+        Function<Query.Builder, Optional<Set<K>>> queryExtractor,
         AtomicLong hitCount) {
 
       this.indexer = indexer;
@@ -416,12 +417,17 @@ class MemTaskStore implements TaskStore.Mutable {
       }
     }
 
-    private final Function<K, Iterable<String>> lookup = new Function<K, Iterable<String>>() {
-      @Override
-      public Iterable<String> apply(K key) {
-        hitCount.incrementAndGet();
-        return index.get(key);
-      }
+    private final Function<Set<K>, Iterable<String>> lookup =
+        new Function<Set<K>, Iterable<String>>() {
+          @Override
+          public Iterable<String> apply(Set<K> keys) {
+            hitCount.incrementAndGet();
+            ImmutableSet.Builder<String> builder = ImmutableSet.builder();
+            for (K key : keys) {
+              builder.addAll(index.get(key));
+            }
+            return builder.build();
+          }
     };
 
     Optional<Iterable<String>> getMatches(Query.Builder query) {

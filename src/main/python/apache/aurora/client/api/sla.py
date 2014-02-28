@@ -254,10 +254,9 @@ class Sla(object):
     check_and_log_response(resp)
     return resp.result.scheduleStatusResult.tasks
 
-  def _create_task_query(self, job_key=None, host=None):
+  def _create_task_query(self, job_key=None):
     return TaskQuery(
         owner=Identity(role=job_key.role) if job_key else None,
         environment=job_key.env if job_key else None,
         jobName=job_key.name if job_key else None,
-        slaveHost=host,
         statuses=SLA_LIVE_STATES)
