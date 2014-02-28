@@ -15,6 +15,7 @@
 #
 
 import contextlib
+import os
 from socket import timeout as SocketTimeout
 import sys
 
@@ -39,10 +40,20 @@ class HttpSignaler(object):
   class Error(Exception): pass
   class QueryError(Error): pass
 
-  def __init__(self, port, host='localhost', timeout_secs=TIMEOUT_SECS):
+  def __init__(self, port, host='localhost', timeout_secs=None):
     self._host = host
     self._url_base = 'http://%s:%d/' % (host, port)
-    self._timeout_secs = timeout_secs
+    if timeout_secs is None:
+      env_timeout = os.getenv('AURORA_HTTP_SIGNALER_TIMEOUT_SECS')
+      if env_timeout is not None:
+        log.info('Using timeout %s secs (from AURORA_HTTP_SIGNALER_TIMEOUT_SECS).' % env_timeout)
+        self._timeout_secs = float(env_timeout)
+      else:
+        log.debug('Using timeout %s secs (default).' % self.TIMEOUT_SECS)
+        self._timeout_secs = self.TIMEOUT_SECS
+    else:
+      log.debug('Using timeout %s secs.' % timeout_secs)
+      self._timeout_secs = timeout_secs
 
   def url(self, endpoint):
     return self._url_base + endpoint
