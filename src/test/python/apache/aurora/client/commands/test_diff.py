@@ -15,6 +15,7 @@
 #
 
 import contextlib
+import os
 
 from apache.aurora.client.commands.core import diff
 from apache.aurora.client.commands.util import AuroraClientCommandTest
@@ -137,7 +138,7 @@ class TestDiffCommand(AuroraClientCommandTest):
         # Subprocess should have been used to invoke diff with two parameters.
         assert subprocess_patch.call_count == 1
         assert len(subprocess_patch.call_args[0][0]) == 3
-        assert subprocess_patch.call_args[0][0][0] == 'diff'
+        assert subprocess_patch.call_args[0][0][0] == os.environ.get('DIFF_VIEWER', 'diff')
 
   def test_diff_invalid_config(self):
     """Test the diff command if the user passes a config with an error in it."""
