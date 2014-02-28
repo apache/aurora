@@ -203,11 +203,11 @@ class TestSchedulerProxyInjection(unittest.TestCase):
 
 class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
   def test_setQuota(self):
-    self.mock_thrift_client.setQuota(IgnoreArg(), IsA(Quota), IsA(SessionKey))
+    self.mock_thrift_client.setQuota(IgnoreArg(), IsA(ResourceAggregate), IsA(SessionKey))
 
     self.mox.ReplayAll()
 
-    self.make_scheduler_proxy().setQuota(ROLE, Quota())
+    self.make_scheduler_proxy().setQuota(ROLE, ResourceAggregate())
 
   def test_forceTaskState(self):
     self.mock_thrift_client.forceTaskState(IgnoreArg(), IgnoreArg(), IsA(SessionKey))

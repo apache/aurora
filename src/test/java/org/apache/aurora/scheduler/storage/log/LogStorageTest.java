@@ -43,7 +43,7 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
-import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -80,7 +80,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.log.LogStorage.SchedulingService;
@@ -609,7 +609,9 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveQuota() throws Exception {
     final String role = "role";
-    final IQuota quota = IQuota.build(new Quota(1.0, 128L, 1024L));
+    final IResourceAggregate quota =
+        IResourceAggregate.build(new ResourceAggregate(1.0, 128L, 1024L));
+
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {

@@ -37,13 +37,13 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 
-import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.async.OfferQueue;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.mesos.Protos.Offer;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -117,7 +117,7 @@ public class AsyncStatsModule extends AbstractModule {
           @Override
           public MachineResource apply(Offer offer) {
             Resources resources = Resources.from(offer);
-            IQuota quota = IQuota.build(new Quota()
+            IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate()
                 .setNumCpus(resources.getNumCpus())
                 .setRamMb(resources.getRam().as(Data.MB))
                 .setDiskMb(resources.getDisk().as(Data.MB)));

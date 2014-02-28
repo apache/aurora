@@ -83,7 +83,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager;
@@ -412,7 +412,7 @@ public class LogStorage extends ForwardingStore
 
       case SAVE_QUOTA:
         SaveQuota saveQuota = op.getSaveQuota();
-        saveQuota(saveQuota.getRole(), IQuota.build(saveQuota.getQuota()));
+        saveQuota(saveQuota.getRole(), IResourceAggregate.build(saveQuota.getQuota()));
         break;
 
       case REMOVE_QUOTA:
@@ -622,7 +622,7 @@ public class LogStorage extends ForwardingStore
 
   @Timed("scheduler_log_quota_save")
   @Override
-  public void saveQuota(final String role, final IQuota quota) {
+  public void saveQuota(final String role, final IResourceAggregate quota) {
     checkNotNull(role);
     checkNotNull(quota);
 

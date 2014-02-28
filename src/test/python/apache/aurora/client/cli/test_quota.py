@@ -21,7 +21,7 @@ from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCom
 
 from gen.apache.aurora.ttypes import (
     GetQuotaResult,
-    Quota,
+    ResourceAggregate,
 )
 
 from mock import patch
@@ -33,7 +33,7 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     api = mock_context.get_api('west')
     response = cls.create_simple_success_response()
     response.result.getQuotaResult = GetQuotaResult()
-    response.result.getQuotaResult.quota = Quota()
+    response.result.getQuotaResult.quota = ResourceAggregate()
     response.result.getQuotaResult.quota.numCpus = 5
     response.result.getQuotaResult.quota.ramMb = 20480
     response.result.getQuotaResult.quota.diskMb = 40960
@@ -45,11 +45,11 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     api = mock_context.get_api('west')
     response = cls.create_simple_success_response()
     response.result.getQuotaResult = GetQuotaResult()
-    response.result.getQuotaResult.quota = Quota()
+    response.result.getQuotaResult.quota = ResourceAggregate()
     response.result.getQuotaResult.quota.numCpus = 5
     response.result.getQuotaResult.quota.ramMb = 20480
     response.result.getQuotaResult.quota.diskMb = 40960
-    response.result.getQuotaResult.consumed = Quota()
+    response.result.getQuotaResult.consumed = ResourceAggregate()
     response.result.getQuotaResult.consumed.numCpus = 1
     response.result.getQuotaResult.consumed.ramMb = 1024
     response.result.getQuotaResult.consumed.diskMb = 2048

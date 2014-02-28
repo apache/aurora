@@ -34,7 +34,7 @@ import com.google.common.collect.Maps;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.codehaus.jackson.annotate.JsonProperty;
 
 /**
@@ -61,11 +61,11 @@ public class Quotas {
     return storage.weaklyConsistentRead(new Work.Quiet<Response>() {
       @Override
       public Response apply(StoreProvider storeProvider) {
-        Map<String, IQuota> quotas;
+        Map<String, IResourceAggregate> quotas;
         if (role == null) {
           quotas = storeProvider.getQuotaStore().fetchQuotas();
         } else {
-          Optional<IQuota> quota = storeProvider.getQuotaStore().fetchQuota(role);
+          Optional<IResourceAggregate> quota = storeProvider.getQuotaStore().fetchQuota(role);
           if (quota.isPresent()) {
             quotas = ImmutableMap.of(role, quota.get());
           } else {
@@ -78,19 +78,20 @@ public class Quotas {
     });
   }
 
-  private static final Function<IQuota, QuotaBean> TO_BEAN = new Function<IQuota, QuotaBean>() {
-    @Override
-    public QuotaBean apply(IQuota quota) {
-      return new QuotaBean(quota.getNumCpus(), quota.getRamMb(), quota.getDiskMb());
-    }
-  };
+  private static final Function<IResourceAggregate, ResourceAggregateBean> TO_BEAN =
+      new Function<IResourceAggregate, ResourceAggregateBean>() {
+        @Override
+        public ResourceAggregateBean apply(IResourceAggregate quota) {
+          return new ResourceAggregateBean(quota.getNumCpus(), quota.getRamMb(), quota.getDiskMb());
+        }
+      };
 
-  private static final class QuotaBean {
+  private static final class ResourceAggregateBean {
     private final double cpu;
     private final long ramMb;
     private final long diskMb;
 
-    private QuotaBean(double cpu, long ramMb, long diskMb) {
+    private ResourceAggregateBean(double cpu, long ramMb, long diskMb) {
       this.cpu = cpu;
       this.ramMb = ramMb;
       this.diskMb = diskMb;

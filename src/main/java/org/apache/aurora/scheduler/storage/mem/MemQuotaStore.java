@@ -22,7 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
 import org.apache.aurora.scheduler.storage.QuotaStore;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -31,7 +31,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class MemQuotaStore implements QuotaStore.Mutable {
 
-  private final Map<String, IQuota> quotas = Maps.newConcurrentMap();
+  private final Map<String, IResourceAggregate> quotas = Maps.newConcurrentMap();
 
   @Override
   public void deleteQuotas() {
@@ -46,7 +46,7 @@ class MemQuotaStore implements QuotaStore.Mutable {
   }
 
   @Override
-  public void saveQuota(String role, IQuota quota) {
+  public void saveQuota(String role, IResourceAggregate quota) {
     checkNotNull(role);
     checkNotNull(quota);
 
@@ -54,13 +54,13 @@ class MemQuotaStore implements QuotaStore.Mutable {
   }
 
   @Override
-  public Optional<IQuota> fetchQuota(String role) {
+  public Optional<IResourceAggregate> fetchQuota(String role) {
     checkNotNull(role);
     return Optional.fromNullable(quotas.get(role));
   }
 
   @Override
-  public Map<String, IQuota> fetchQuotas() {
+  public Map<String, IResourceAggregate> fetchQuotas() {
     return ImmutableMap.copyOf(quotas);
   }
 }

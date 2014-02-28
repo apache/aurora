@@ -43,7 +43,7 @@ import org.apache.aurora.scheduler.storage.Storage.Volatile;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ILock;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -150,7 +150,9 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
         @Override
         public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
           ImmutableSet.Builder<QuotaConfiguration> quotas = ImmutableSet.builder();
-          for (Map.Entry<String, IQuota> entry : store.getQuotaStore().fetchQuotas().entrySet()) {
+          for (Map.Entry<String, IResourceAggregate> entry
+              : store.getQuotaStore().fetchQuotas().entrySet()) {
+
             quotas.add(new QuotaConfiguration(entry.getKey(), entry.getValue().newBuilder()));
           }
 
@@ -163,7 +165,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
           if (snapshot.isSetQuotaConfigurations()) {
             for (QuotaConfiguration quota : snapshot.getQuotaConfigurations()) {
-              store.getQuotaStore().saveQuota(quota.getRole(), IQuota.build(quota.getQuota()));
+              store.getQuotaStore()
+                  .saveQuota(quota.getRole(), IResourceAggregate.build(quota.getQuota()));
             }
           }
         }

@@ -37,7 +37,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
@@ -89,7 +89,7 @@ public class ResourceCounter {
       @Override
       public Metric apply(StoreProvider storeProvider) {
         Metric allocation = new Metric();
-        for (IQuota quota : storeProvider.getQuotaStore().fetchQuotas().values()) {
+        for (IResourceAggregate quota : storeProvider.getQuotaStore().fetchQuotas().values()) {
           allocation.accumulate(quota);
         }
         return allocation;
@@ -191,7 +191,7 @@ public class ResourceCounter {
       diskMb += task.getDiskMb();
     }
 
-    protected void accumulate(IQuota quota) {
+    protected void accumulate(IResourceAggregate quota) {
       cpu += quota.getNumCpus();
       ramMb += quota.getRamMb();
       diskMb += quota.getDiskMb();

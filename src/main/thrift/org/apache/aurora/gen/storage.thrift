@@ -58,7 +58,7 @@ struct RemoveTasks {
 
 struct SaveQuota {
   1: string role
-  2: api.Quota quota
+  2: api.ResourceAggregate quota
 }
 
 struct RemoveQuota {
@@ -116,7 +116,7 @@ struct SchedulerMetadata {
 
 struct QuotaConfiguration {
   1: string role
-  2: api.Quota quota
+  2: api.ResourceAggregate quota
 }
 
 // Represents a complete snapshot of local storage data suitable for restoring the local storage

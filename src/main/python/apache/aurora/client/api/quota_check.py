@@ -18,7 +18,7 @@ import operator
 
 from copy import deepcopy
 
-from gen.apache.aurora.ttypes import Quota, Response, ResponseCode
+from gen.apache.aurora.ttypes import ResourceAggregate, Response, ResponseCode
 
 from twitter.common import log
 
@@ -28,10 +28,10 @@ class CapacityRequest(object):
 
   @classmethod
   def from_task(cls, task):
-    return cls(Quota(numCpus=task.numCpus, ramMb=task.ramMb, diskMb=task.diskMb))
+    return cls(ResourceAggregate(numCpus=task.numCpus, ramMb=task.ramMb, diskMb=task.diskMb))
 
   def __init__(self, quota=None):
-    self._quota = quota or Quota(numCpus=0.0, ramMb=0, diskMb=0)
+    self._quota = quota or ResourceAggregate(numCpus=0.0, ramMb=0, diskMb=0)
 
   def __add__(self, other):
     return self._op(operator.__add__, other)
@@ -50,7 +50,7 @@ class CapacityRequest(object):
       return self
 
     return CapacityRequest(
-        Quota(numCpus=op(self._quota.numCpus, other._quota.numCpus),
+        ResourceAggregate(numCpus=op(self._quota.numCpus, other._quota.numCpus),
               ramMb=op(self._quota.ramMb, other._quota.ramMb),
               diskMb=op(self._quota.diskMb, other._quota.diskMb)))
 

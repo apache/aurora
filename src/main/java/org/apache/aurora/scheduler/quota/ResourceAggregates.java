@@ -17,33 +17,34 @@ package org.apache.aurora.scheduler.quota;
 
 import com.google.common.collect.Ordering;
 
-import org.apache.aurora.gen.Quota;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 /**
  * Convenience class for normalizing resource measures between tasks and offers.
  */
-public final class Quotas {
-  private static final IQuota NO_QUOTA = IQuota.build(new Quota(0, 0, 0));
+public final class ResourceAggregates {
+  private static final IResourceAggregate EMPTY_RESOURCE_AGGREGATE =
+      IResourceAggregate.build(new ResourceAggregate(0, 0, 0));
 
-  private Quotas() {
+  private ResourceAggregates() {
     // Utility class.
   }
 
   /**
    * Returns a quota with all resource vectors zeroed.
    *
-   * @return A quota with all resource vectors zeroed.
+   * @return A resource aggregate with all resource vectors zeroed.
    */
-  public static IQuota noQuota() {
-    return NO_QUOTA;
+  public static IResourceAggregate none() {
+    return EMPTY_RESOURCE_AGGREGATE;
   }
 
   /**
    * a * m
    */
-  public static IQuota scale(IQuota a, int m) {
-    return IQuota.build(new Quota()
+  public static IResourceAggregate scale(IResourceAggregate a, int m) {
+    return IResourceAggregate.build(new ResourceAggregate()
         .setNumCpus(a.getNumCpus() * m)
         .setRamMb(a.getRamMb() * m)
         .setDiskMb(a.getDiskMb() * m));
@@ -55,7 +56,7 @@ public final class Quotas {
    * This calculates how many times {@code b} "fits into" {@code a}.  Behavior is undefined when
    * {@code b} contains resources with a value of zero.
    */
-  public static int divide(IQuota a, IQuota b) {
+  public static int divide(IResourceAggregate a, IResourceAggregate b) {
     return Ordering.natural().min(
         a.getNumCpus() / b.getNumCpus(),
         (double) a.getRamMb() / b.getRamMb(),

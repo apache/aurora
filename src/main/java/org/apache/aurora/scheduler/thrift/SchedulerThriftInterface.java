@@ -76,7 +76,7 @@ import org.apache.aurora.gen.LockValidation;
 import org.apache.aurora.gen.MaintenanceStatusResult;
 import org.apache.aurora.gen.PopulateJobResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
-import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.Result;
@@ -117,7 +117,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
@@ -609,14 +609,18 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Requires(whitelist = Capability.PROVISIONER)
   @Override
-  public Response setQuota(final String ownerRole, final Quota quota, SessionKey session) {
+  public Response setQuota(
+      final String ownerRole,
+      final ResourceAggregate resourceAggregate,
+      SessionKey session) {
+
     checkNotBlank(ownerRole);
-    checkNotNull(quota);
+    checkNotNull(resourceAggregate);
     checkNotNull(session);
 
     Response response = new Response();
     try {
-      quotaManager.saveQuota(ownerRole, IQuota.build(quota));
+      quotaManager.saveQuota(ownerRole, IResourceAggregate.build(resourceAggregate));
       return response.setResponseCode(OK).setMessage("Quota applied.");
     } catch (QuotaException e) {
       return response.setResponseCode(ResponseCode.INVALID_REQUEST).setMessage(e.getMessage());

@@ -23,11 +23,11 @@ import com.google.common.collect.ImmutableMap;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import org.apache.aurora.gen.Quota;
-import org.apache.aurora.scheduler.quota.Quotas;
+import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.scheduler.quota.ResourceAggregates;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -36,10 +36,11 @@ import static org.junit.Assert.assertEquals;
 
 public class SlotSizeCounterTest extends EasyMockTest {
 
-  private static final IQuota SMALL = IQuota.build(new Quota(1.0, 1024, 4096));
-  private static final IQuota LARGE = Quotas.scale(SMALL, 4);
+  private static final IResourceAggregate SMALL =
+      IResourceAggregate.build(new ResourceAggregate(1.0, 1024, 4096));
+  private static final IResourceAggregate LARGE = ResourceAggregates.scale(SMALL, 4);
 
-  private static final Map<String, IQuota> SLOT_SIZES = ImmutableMap.of(
+  private static final Map<String, IResourceAggregate> SLOT_SIZES = ImmutableMap.of(
       "small", SMALL,
       "large", LARGE);
 
@@ -91,7 +92,8 @@ public class SlotSizeCounterTest extends EasyMockTest {
   @Test
   public void testTinyOffers() {
     expectStatExport();
-    expectGetSlots(new MachineResource(IQuota.build(new Quota(0.1, 1, 1)), false));
+    expectGetSlots(
+        new MachineResource(IResourceAggregate.build(new ResourceAggregate(0.1, 1, 1)), false));
 
     control.replay();
 
@@ -105,7 +107,9 @@ public class SlotSizeCounterTest extends EasyMockTest {
   @Test
   public void testStarvedResourceVector() {
     expectStatExport();
-    expectGetSlots(new MachineResource(IQuota.build(new Quota(1000, 16384, 1)), false));
+    expectGetSlots(
+        new MachineResource(
+            IResourceAggregate.build(new ResourceAggregate(1000, 16384, 1)), false));
 
     control.replay();
 
@@ -123,11 +127,11 @@ public class SlotSizeCounterTest extends EasyMockTest {
         new MachineResource(SMALL, false),
         new MachineResource(SMALL, false),
         new MachineResource(LARGE, false),
-        new MachineResource(Quotas.scale(LARGE, 4), false),
-        new MachineResource(IQuota.build(new Quota(1, 1, 1)), false),
+        new MachineResource(ResourceAggregates.scale(LARGE, 4), false),
+        new MachineResource(IResourceAggregate.build(new ResourceAggregate(1, 1, 1)), false),
         new MachineResource(SMALL, true),
         new MachineResource(SMALL, true),
-        new MachineResource(Quotas.scale(SMALL, 2), true));
+        new MachineResource(ResourceAggregates.scale(SMALL, 2), true));
 
     control.replay();
 

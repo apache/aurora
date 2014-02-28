@@ -24,7 +24,7 @@ from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
 from gen.apache.aurora.ttypes import (
     GetQuotaResult,
     JobKey,
-    Quota,
+    ResourceAggregate,
     Response,
     ResponseCode,
     Result)
@@ -64,27 +64,27 @@ class QuotaCheckTest(unittest.TestCase):
       assert not self._scheduler.getQuota.called, 'Scheduler.getQuota() unexpected call.'
 
   def test_pass(self):
-    allocated = Quota(numCpus=50.0, ramMb=1000, diskMb=3000)
-    consumed = Quota(numCpus=25.0, ramMb=500, diskMb=2000)
-    released = CapacityRequest(Quota(numCpus=5.0, ramMb=100, diskMb=500))
-    acquired = CapacityRequest(Quota(numCpus=15.0, ramMb=300, diskMb=800))
+    allocated = ResourceAggregate(numCpus=50.0, ramMb=1000, diskMb=3000)
+    consumed = ResourceAggregate(numCpus=25.0, ramMb=500, diskMb=2000)
+    released = CapacityRequest(ResourceAggregate(numCpus=5.0, ramMb=100, diskMb=500))
+    acquired = CapacityRequest(ResourceAggregate(numCpus=15.0, ramMb=300, diskMb=800))
 
     self.mock_get_quota(allocated, consumed)
     self.assert_result(True, released, acquired)
 
   def test_pass_with_no_consumed(self):
-    allocated = Quota(numCpus=50.0, ramMb=1000, diskMb=3000)
-    released = CapacityRequest(Quota(numCpus=5.0, ramMb=100, diskMb=500))
-    acquired = CapacityRequest(Quota(numCpus=15.0, ramMb=300, diskMb=800))
+    allocated = ResourceAggregate(numCpus=50.0, ramMb=1000, diskMb=3000)
+    released = CapacityRequest(ResourceAggregate(numCpus=5.0, ramMb=100, diskMb=500))
+    acquired = CapacityRequest(ResourceAggregate(numCpus=15.0, ramMb=300, diskMb=800))
 
     self.mock_get_quota(allocated, None)
     self.assert_result(True, released, acquired)
 
   def test_pass_due_to_released(self):
-    allocated = Quota(numCpus=50.0, ramMb=1000, diskMb=3000)
-    consumed = Quota(numCpus=45.0, ramMb=900, diskMb=2900)
-    released = CapacityRequest(Quota(numCpus=5.0, ramMb=100, diskMb=100))
-    acquired = CapacityRequest(Quota(numCpus=10.0, ramMb=200, diskMb=200))
+    allocated = ResourceAggregate(numCpus=50.0, ramMb=1000, diskMb=3000)
+    consumed = ResourceAggregate(numCpus=45.0, ramMb=900, diskMb=2900)
+    released = CapacityRequest(ResourceAggregate(numCpus=5.0, ramMb=100, diskMb=100))
+    acquired = CapacityRequest(ResourceAggregate(numCpus=10.0, ramMb=200, diskMb=200))
 
     self.mock_get_quota(allocated, consumed)
     self.assert_result(True, released, acquired)
@@ -93,19 +93,19 @@ class QuotaCheckTest(unittest.TestCase):
     self.assert_result(False, None, None)
 
   def test_fail(self):
-    allocated = Quota(numCpus=50.0, ramMb=1000, diskMb=3000)
-    consumed = Quota(numCpus=25.0, ramMb=500, diskMb=2000)
-    released = CapacityRequest(Quota(numCpus=5.0, ramMb=100, diskMb=500))
-    acquired = CapacityRequest(Quota(numCpus=35.0, ramMb=300, diskMb=800))
+    allocated = ResourceAggregate(numCpus=50.0, ramMb=1000, diskMb=3000)
+    consumed = ResourceAggregate(numCpus=25.0, ramMb=500, diskMb=2000)
+    released = CapacityRequest(ResourceAggregate(numCpus=5.0, ramMb=100, diskMb=500))
+    acquired = CapacityRequest(ResourceAggregate(numCpus=35.0, ramMb=300, diskMb=800))
 
     self.mock_get_quota(allocated, consumed)
     self.assert_result(True, released, acquired, ResponseCode.INVALID_REQUEST)
 
   def test_fail_scheduler_call(self):
-    allocated = Quota(numCpus=50.0, ramMb=1000, diskMb=3000)
-    consumed = Quota(numCpus=25.0, ramMb=500, diskMb=2000)
-    released = CapacityRequest(Quota(numCpus=5.0, ramMb=100, diskMb=500))
-    acquired = CapacityRequest(Quota(numCpus=1.0, ramMb=100, diskMb=100))
+    allocated = ResourceAggregate(numCpus=50.0, ramMb=1000, diskMb=3000)
+    consumed = ResourceAggregate(numCpus=25.0, ramMb=500, diskMb=2000)
+    released = CapacityRequest(ResourceAggregate(numCpus=5.0, ramMb=100, diskMb=500))
+    acquired = CapacityRequest(ResourceAggregate(numCpus=1.0, ramMb=100, diskMb=100))
 
     self.mock_get_quota(allocated, consumed, response_code=ResponseCode.INVALID_REQUEST)
     self.assert_result(True, released, acquired, ResponseCode.INVALID_REQUEST)

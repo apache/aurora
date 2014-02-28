@@ -26,7 +26,6 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from gen.apache.aurora.constants import LIVE_STATES
 from gen.apache.aurora.ttypes import (
   Identity,
-  Quota,
   Response,
   ResponseCode,
   ScheduleStatus,

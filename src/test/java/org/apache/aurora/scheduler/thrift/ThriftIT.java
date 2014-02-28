@@ -31,7 +31,7 @@ import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.Capability;
 import org.apache.aurora.auth.SessionValidator;
 import org.apache.aurora.gen.AuroraAdmin;
-import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.scheduler.cron.CronScheduler;
 import org.apache.aurora.scheduler.quota.QuotaManager;
@@ -43,7 +43,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import org.junit.Before;
@@ -60,7 +60,8 @@ public class ThriftIT extends EasyMockTest {
   private static final String USER = "someuser";
   private static final String ROOT_USER = "blue";
   private static final String PROVISIONER_USER = "red";
-  private static final IQuota QUOTA = IQuota.build(new Quota(1, 1, 1));
+  private static final IResourceAggregate QUOTA =
+      IResourceAggregate.build(new ResourceAggregate(1, 1, 1));
 
   private static final Map<Capability, String> CAPABILITIES =
       ImmutableMap.of(Capability.ROOT, ROOT_USER, Capability.PROVISIONER, PROVISIONER_USER);

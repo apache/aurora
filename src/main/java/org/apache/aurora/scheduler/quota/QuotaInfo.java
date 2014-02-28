@@ -15,7 +15,7 @@
  */
 package org.apache.aurora.scheduler.quota;
 
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -23,11 +23,15 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Wraps allocated quota and consumption details.
  */
 public class QuotaInfo {
-  private final IQuota quota;
-  private final IQuota prodConsumption;
-  private final IQuota nonProdConsumption;
+  private final IResourceAggregate quota;
+  private final IResourceAggregate prodConsumption;
+  private final IResourceAggregate nonProdConsumption;
 
-  QuotaInfo(IQuota quota, IQuota prodConsumption, IQuota nonProdConsumption) {
+  QuotaInfo(
+      IResourceAggregate quota,
+      IResourceAggregate prodConsumption,
+      IResourceAggregate nonProdConsumption) {
+
     this.quota = checkNotNull(quota);
     this.prodConsumption = checkNotNull(prodConsumption);
     this.nonProdConsumption = checkNotNull(nonProdConsumption);
@@ -38,7 +42,7 @@ public class QuotaInfo {
    *
    * @return Available quota.
    */
-  public IQuota guota() {
+  public IResourceAggregate guota() {
     return quota;
   }
 
@@ -47,7 +51,7 @@ public class QuotaInfo {
    *
    * @return Production job consumption.
    */
-  public IQuota prodConsumption() {
+  public IResourceAggregate prodConsumption() {
     return prodConsumption;
   }
 
@@ -56,7 +60,7 @@ public class QuotaInfo {
    *
    * @return Non production job consumption.
    */
-  public IQuota nonProdConsumption() {
+  public IResourceAggregate nonProdConsumption() {
     return nonProdConsumption;
   }
 }

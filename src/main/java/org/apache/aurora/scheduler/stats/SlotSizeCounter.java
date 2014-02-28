@@ -26,9 +26,9 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
-import org.apache.aurora.gen.Quota;
-import org.apache.aurora.scheduler.quota.Quotas;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.scheduler.quota.ResourceAggregates;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -37,19 +37,19 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * slot sizes, broken down by dedicated and non-dedicated hosts.
  */
 class SlotSizeCounter implements Runnable {
-  private static final Map<String, IQuota> SLOT_SIZES = ImmutableMap.of(
-      "small", IQuota.build(new Quota(1.0, 1024, 4096)),
-      "medium", IQuota.build(new Quota(4.0, 8192, 16384)),
-      "large", IQuota.build(new Quota(8.0, 16384, 32768)),
-      "xlarge", IQuota.build(new Quota(16.0, 32768, 65536)));
+  private static final Map<String, IResourceAggregate> SLOT_SIZES = ImmutableMap.of(
+      "small", IResourceAggregate.build(new ResourceAggregate(1.0, 1024, 4096)),
+      "medium", IResourceAggregate.build(new ResourceAggregate(4.0, 8192, 16384)),
+      "large", IResourceAggregate.build(new ResourceAggregate(8.0, 16384, 32768)),
+      "xlarge", IResourceAggregate.build(new ResourceAggregate(16.0, 32768, 65536)));
 
-  private final Map<String, IQuota> slotSizes;
+  private final Map<String, IResourceAggregate> slotSizes;
   private final MachineResourceProvider machineResourceProvider;
   private final CachedCounters cachedCounters;
 
   @VisibleForTesting
   SlotSizeCounter(
-      final Map<String, IQuota> slotSizes,
+      final Map<String, IResourceAggregate> slotSizes,
       MachineResourceProvider machineResourceProvider,
       CachedCounters cachedCounters) {
 
@@ -59,15 +59,15 @@ class SlotSizeCounter implements Runnable {
   }
 
   static class MachineResource {
-    private final IQuota size;
+    private final IResourceAggregate size;
     private final boolean dedicated;
 
-    public MachineResource(IQuota size, boolean dedicated) {
+    public MachineResource(IResourceAggregate size, boolean dedicated) {
       this.size = Preconditions.checkNotNull(size);
       this.dedicated = dedicated;
     }
 
-    public IQuota getSize() {
+    public IResourceAggregate getSize() {
       return size;
     }
 
@@ -94,11 +94,11 @@ class SlotSizeCounter implements Runnable {
     }
   }
 
-  private int countSlots(Iterable<IQuota> slots, final IQuota slotSize) {
-    Function<IQuota, Integer> counter = new Function<IQuota, Integer>() {
+  private int countSlots(Iterable<IResourceAggregate> slots, final IResourceAggregate slotSize) {
+    Function<IResourceAggregate, Integer> counter = new Function<IResourceAggregate, Integer>() {
       @Override
-      public Integer apply(IQuota machineSlack) {
-        return Quotas.divide(machineSlack, slotSize);
+      public Integer apply(IResourceAggregate machineSlack) {
+        return ResourceAggregates.divide(machineSlack, slotSize);
       }
     };
 
@@ -118,10 +118,10 @@ class SlotSizeCounter implements Runnable {
     };
   }
 
-  private static final Function<MachineResource, IQuota> GET_SIZE =
-      new Function<MachineResource, IQuota>() {
+  private static final Function<MachineResource, IResourceAggregate> GET_SIZE =
+      new Function<MachineResource, IResourceAggregate>() {
         @Override
-        public IQuota apply(MachineResource slot) {
+        public IResourceAggregate apply(MachineResource slot) {
           return slot.getSize();
         }
       };
@@ -130,9 +130,9 @@ class SlotSizeCounter implements Runnable {
       String name,
       boolean dedicated,
       Iterable<MachineResource> slots,
-      IQuota slotSize) {
+      IResourceAggregate slotSize) {
 
-    Iterable<IQuota> sizes =
+    Iterable<IResourceAggregate> sizes =
         FluentIterable.from(slots).filter(isDedicated(dedicated)).transform(GET_SIZE);
     cachedCounters.get(getStatName(name, dedicated)).set(countSlots(sizes, slotSize));
   }
@@ -140,7 +140,7 @@ class SlotSizeCounter implements Runnable {
   @Override
   public void run() {
     Iterable<MachineResource> slots = machineResourceProvider.get();
-    for (Map.Entry<String, IQuota> entry : slotSizes.entrySet()) {
+    for (Map.Entry<String, IResourceAggregate> entry : slotSizes.entrySet()) {
       updateStats(entry.getKey(), false, slots, entry.getValue());
       updateStats(entry.getKey(), true, slots, entry.getValue());
     }

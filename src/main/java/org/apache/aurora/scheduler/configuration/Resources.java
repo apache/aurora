@@ -49,7 +49,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A container for multiple resource vectors.
- * TODO(wfarner): Collapse this in with Quotas.
+ * TODO(wfarner): Collapse this in with ResourceAggregates AURORA-105.
  */
 public class Resources {
 

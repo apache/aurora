@@ -26,7 +26,6 @@ from gen.apache.aurora.ttypes import (
     Lock,
     LockKey,
     LockValidation,
-    Quota,
     Response,
     ResponseCode,
     TaskQuery,

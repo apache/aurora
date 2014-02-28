@@ -25,7 +25,7 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.LockValidation;
-import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -48,10 +48,12 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response setQuota(String ownerRole, Quota quota, SessionKey session)
-      throws TException {
+  public Response setQuota(
+      String ownerRole,
+      ResourceAggregate resourceAggregate,
+      SessionKey session) throws TException {
 
-    return delegate.setQuota(ownerRole, quota, session);
+    return delegate.setQuota(ownerRole, resourceAggregate, session);
   }
 
   @Override

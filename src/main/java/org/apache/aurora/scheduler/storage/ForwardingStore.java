@@ -31,7 +31,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -205,7 +205,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Map<String, IQuota> fetchQuotas() {
+  public Map<String, IResourceAggregate> fetchQuotas() {
     return quotaStore.fetchQuotas();
   }
 
@@ -220,12 +220,12 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void saveQuota(String role, IQuota quota) {
+  public void saveQuota(String role, IResourceAggregate quota) {
     quotaStore.saveQuota(role, quota);
   }
 
   @Override
-  public Optional<IQuota> fetchQuota(String role) {
+  public Optional<IResourceAggregate> fetchQuota(String role) {
     return quotaStore.fetchQuota(role);
   }
 

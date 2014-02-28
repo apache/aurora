@@ -20,14 +20,14 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 
-import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -45,7 +45,7 @@ public interface QuotaManager {
    * @param quota Quota to save.
    * @throws QuotaException If provided quota specification is invalid.
    */
-  void saveQuota(String role, IQuota quota) throws QuotaException;
+  void saveQuota(String role, IResourceAggregate quota) throws QuotaException;
 
   /**
    * Gets {@code QuotaInfo} for the specified role.
@@ -86,7 +86,9 @@ public interface QuotaManager {
     }
 
     @Override
-    public void saveQuota(final String ownerRole, final IQuota quota) throws QuotaException {
+    public void saveQuota(final String ownerRole, final IResourceAggregate quota)
+        throws QuotaException {
+
       if (!quota.isSetNumCpus() || !quota.isSetRamMb() || !quota.isSetDiskMb()) {
         throw new QuotaException("Missing quota specification(s) in: " + quota.toString());
       }
@@ -112,11 +114,12 @@ public interface QuotaManager {
               .from(storeProvider.getTaskStore().fetchTasks(Query.roleScoped(role).active()))
               .transform(Tasks.SCHEDULED_TO_INFO);
 
-          IQuota prodConsumed = fromTasks(tasks.filter(Tasks.IS_PRODUCTION));
-          IQuota nonProdConsumed =
+          IResourceAggregate prodConsumed = fromTasks(tasks.filter(Tasks.IS_PRODUCTION));
+          IResourceAggregate nonProdConsumed =
               fromTasks(tasks.filter(Predicates.not(Tasks.IS_PRODUCTION)));
 
-          IQuota quota = storeProvider.getQuotaStore().fetchQuota(role).or(Quotas.noQuota());
+          IResourceAggregate quota =
+              storeProvider.getQuotaStore().fetchQuota(role).or(ResourceAggregates.none());
 
           return new QuotaInfo(quota, prodConsumed, nonProdConsumed);
         }
@@ -131,15 +134,15 @@ public interface QuotaManager {
 
       QuotaInfo quotaInfo = getQuotaInfo(JobKeys.from(template).getRole());
 
-      IQuota additionalRequested =
-          Quotas.scale(fromTasks(ImmutableSet.of(template)), instances);
+      IResourceAggregate additionalRequested =
+          ResourceAggregates.scale(fromTasks(ImmutableSet.of(template)), instances);
 
       return QuotaCheckResult.greaterOrEqual(
           quotaInfo.guota(),
           add(quotaInfo.prodConsumption(), additionalRequested));
     }
 
-    private static IQuota fromTasks(Iterable<ITaskConfig> tasks) {
+    private static IResourceAggregate fromTasks(Iterable<ITaskConfig> tasks) {
       double cpu = 0;
       int ramMb = 0;
       int diskMb = 0;
@@ -149,14 +152,14 @@ public interface QuotaManager {
         diskMb += task.getDiskMb();
       }
 
-      return IQuota.build(new Quota()
+      return IResourceAggregate.build(new ResourceAggregate()
           .setNumCpus(cpu)
           .setRamMb(ramMb)
           .setDiskMb(diskMb));
     }
 
-    private static IQuota add(IQuota a, IQuota b) {
-      return IQuota.build(new Quota()
+    private static IResourceAggregate add(IResourceAggregate a, IResourceAggregate b) {
+      return IResourceAggregate.build(new ResourceAggregate()
           .setNumCpus(a.getNumCpus() + b.getNumCpus())
           .setRamMb(a.getRamMb() + b.getRamMb())
           .setDiskMb(a.getDiskMb() + b.getDiskMb()));

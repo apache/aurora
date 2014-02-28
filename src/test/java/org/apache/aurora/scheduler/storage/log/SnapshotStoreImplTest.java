@@ -36,7 +36,7 @@ import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.StoredJob;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.quota.Quotas;
+import org.apache.aurora.scheduler.quota.ResourceAggregates;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -69,7 +69,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     ImmutableSet<IScheduledTask> tasks = ImmutableSet.of(
         IScheduledTask.build(new ScheduledTask().setStatus(ScheduleStatus.PENDING)));
     Set<QuotaConfiguration> quotas =
-        ImmutableSet.of(new QuotaConfiguration("steve", Quotas.noQuota().newBuilder()));
+        ImmutableSet.of(
+            new QuotaConfiguration("steve", ResourceAggregates.none().newBuilder()));
     HostAttributes attribute = new HostAttributes("host",
         ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))));
     StoredJob job = new StoredJob(
@@ -89,7 +90,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);
     expect(storageUtil.quotaStore.fetchQuotas())
-        .andReturn(ImmutableMap.of("steve", Quotas.noQuota()));
+        .andReturn(ImmutableMap.of("steve", ResourceAggregates.none()));
     expect(storageUtil.attributeStore.getHostAttributes()).andReturn(ImmutableSet.of(attribute));
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of("jobManager"));
     expect(storageUtil.jobStore.fetchJobs("jobManager"))
@@ -99,7 +100,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
 
     expectDataWipe();
     storageUtil.taskStore.saveTasks(tasks);
-    storageUtil.quotaStore.saveQuota("steve", Quotas.noQuota());
+    storageUtil.quotaStore.saveQuota("steve", ResourceAggregates.none());
     storageUtil.attributeStore.saveHostAttributes(attribute);
     storageUtil.jobStore.saveAcceptedJob(
         job.getJobManagerId(),

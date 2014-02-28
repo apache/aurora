@@ -20,14 +20,14 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -44,7 +44,7 @@ import static org.junit.Assert.assertTrue;
 public class QuotaManagerImplTest extends EasyMockTest {
   private static final String ROLE = "test";
   private static final String ENV = "test_env";
-  private static final IQuota QUOTA = IQuota.build(new Quota()
+  private static final IResourceAggregate QUOTA = IResourceAggregate.build(new ResourceAggregate()
       .setNumCpus(1.0)
       .setRamMb(100L)
       .setDiskMb(200L));
@@ -63,7 +63,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testGetQuotaInfo() {
     IScheduledTask prodTask = createTask("foo", "id1", 3, 3, 3, true);
     IScheduledTask nonProdTask = createTask("bar", "id1", 2, 2, 2, false);
-    IQuota quota = IQuota.build(new Quota(4, 4, 4));
+    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate(4, 4, 4));
 
     expectQuota(quota);
     expectTasks(prodTask, nonProdTask);
@@ -73,13 +73,15 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ROLE);
     assertEquals(quota, quotaInfo.guota());
-    assertEquals(IQuota.build(new Quota(3, 3, 3)), quotaInfo.prodConsumption());
-    assertEquals(IQuota.build(new Quota(2, 2, 2)), quotaInfo.nonProdConsumption());
+    assertEquals(
+        IResourceAggregate.build(new ResourceAggregate(3, 3, 3)), quotaInfo.prodConsumption());
+    assertEquals(
+        IResourceAggregate.build(new ResourceAggregate(2, 2, 2)), quotaInfo.nonProdConsumption());
   }
 
   @Test
   public void testGetQuotaInfoNoTasks() {
-    IQuota quota = IQuota.build(new Quota(4, 4, 4));
+    IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate(4, 4, 4));
 
     expectQuota(quota);
     expectNoTasks();
@@ -89,13 +91,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ROLE);
     assertEquals(quota, quotaInfo.guota());
-    assertEquals(Quotas.noQuota(), quotaInfo.prodConsumption());
-    assertEquals(Quotas.noQuota(), quotaInfo.nonProdConsumption());
+    assertEquals(ResourceAggregates.none(), quotaInfo.prodConsumption());
+    assertEquals(ResourceAggregates.none(), quotaInfo.nonProdConsumption());
   }
 
   @Test
   public void testCheckQuotaPasses() {
-    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectTasks(createTask("foo", "id1", 3, 3, 3, true));
     storageUtil.expectOperations();
 
@@ -107,7 +109,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaPassesNoTasks() {
-    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectNoTasks();
     storageUtil.expectOperations();
 
@@ -119,7 +121,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaPassesNonProdUnaccounted() {
-    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectTasks(createTask("foo", "id1", 3, 3, 3, true), createTask("bar", "id2", 5, 5, 5, false));
     storageUtil.expectOperations();
 
@@ -139,7 +141,9 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaNoQuotaSet() {
-    expect(storageUtil.quotaStore.fetchQuota(ROLE)).andReturn(Optional.<IQuota>absent());
+    expect(storageUtil.quotaStore.fetchQuota(ROLE))
+        .andReturn(Optional.<IResourceAggregate>absent());
+
     expectNoTasks();
     storageUtil.expectOperations();
 
@@ -150,7 +154,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaExceedsCpu() {
-    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectTasks(createTask("foo", "id1", 3, 3, 3, true));
     storageUtil.expectOperations();
 
@@ -162,7 +166,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaExceedsRam() {
-    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectTasks(createTask("foo", "id1", 3, 3, 3, true));
     storageUtil.expectOperations();
 
@@ -174,7 +178,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test
   public void testCheckQuotaExceedsDisk() {
-    expectQuota(IQuota.build(new Quota(4, 4, 4)));
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectTasks(createTask("foo", "id1", 3, 3, 3, true));
     storageUtil.expectOperations();
 
@@ -198,7 +202,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     storageUtil.expectOperations();
 
     control.replay();
-    quotaManager.saveQuota(ROLE, IQuota.build(new Quota()));
+    quotaManager.saveQuota(ROLE, IResourceAggregate.build(new ResourceAggregate()));
   }
 
   @Test(expected = QuotaException.class)
@@ -206,7 +210,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     storageUtil.expectOperations();
 
     control.replay();
-    quotaManager.saveQuota(ROLE, IQuota.build(new Quota(-2.0, 4, 5)));
+    quotaManager.saveQuota(ROLE, IResourceAggregate.build(new ResourceAggregate(-2.0, 4, 5)));
   }
 
   private IExpectationSetters<?> expectTasks(IScheduledTask... tasks) {
@@ -217,7 +221,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
     return expectTasks();
   }
 
-  private IExpectationSetters<Optional<IQuota>> expectQuota(IQuota quota) {
+  private IExpectationSetters<Optional<IResourceAggregate>> expectQuota(IResourceAggregate quota) {
     return expect(storageUtil.quotaStore.fetchQuota(ROLE))
         .andReturn(Optional.of(quota));
   }

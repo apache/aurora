@@ -40,7 +40,7 @@ from gen.apache.aurora.ttypes import (
   LockValidation,
   Package,
   PopulateJobResult,
-  Quota,
+  ResourceAggregate,
   Response,
   ResponseCode,
   Result,
@@ -220,11 +220,11 @@ class UpdaterTest(TestCase):
   def expect_quota_check(self, num_released, num_acquired, response_code=None, prod=True):
     response_code = ResponseCode.OK if response_code is None else response_code
     response = Response(responseCode=response_code, message='test')
-    released = CapacityRequest(Quota(
+    released = CapacityRequest(ResourceAggregate(
         numCpus=num_released * self._num_cpus,
         ramMb=num_released * self._num_ram,
         diskMb=num_released * self._num_disk))
-    acquired = CapacityRequest(Quota(
+    acquired = CapacityRequest(ResourceAggregate(
       numCpus=num_acquired * self._num_cpus,
       ramMb=num_acquired * self._num_ram,
       diskMb=num_acquired * self._num_disk))

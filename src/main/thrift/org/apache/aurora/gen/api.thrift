@@ -49,9 +49,7 @@ struct SessionKey {
   5: optional binary data       // A blob of data that the server may use for authentication.
 }
 
-// Quota entry associated with a role.
-// In order for a user to launch a production job, they must have sufficient quota.
-struct Quota {
+struct ResourceAggregate {
   1: double numCpus  // Number of CPU cores allotted.
   2: i64 ramMb       // Megabytes of RAM allotted.
   3: i64 diskMb      // Megabytes of disk space allotted.
@@ -216,8 +214,8 @@ struct PopulateJobResult {
 }
 
 struct GetQuotaResult {
-  1: Quota quota              // Total allocated quota.
-  2: optional Quota consumed  // Amount of quota already consumed by a role.
+  1: ResourceAggregate quota              // Total allocated quota.
+  2: optional ResourceAggregate consumed  // Amount of quota already consumed by a role.
 }
 
 // Wraps return results for the acquireLock API.
@@ -515,7 +513,7 @@ struct RewriteConfigsRequest {
 // https://issues.apache.org/jira/browse/THRIFT-66 is resolved.
 service AuroraAdmin extends AuroraSchedulerManager {
   // Assign quota to a user.  This will overwrite any pre-existing quota for the user.
-  Response setQuota(1: string ownerRole, 2: Quota quota, 3: SessionKey session)
+  Response setQuota(1: string ownerRole, 2: ResourceAggregate quota, 3: SessionKey session)
 
   // Forces a task into a specific state.  This does not guarantee the task will enter the given
   // state, as the task must still transition within the bounds of the state machine.  However,

@@ -30,7 +30,6 @@ from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
 from gen.apache.aurora.ttypes import (
     AssignedTask,
     Identity,
-    Quota,
     Response,
     ResponseCode,
     Result,

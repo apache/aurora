@@ -50,7 +50,7 @@ import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Package;
-import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskConfig;
@@ -180,7 +180,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
           try {
             thrift.setQuota(
                 "mesos",
-                new Quota(2.0 * 1000000, 100000000, 100000000),
+                new ResourceAggregate(2.0 * 1000000, 100000000, 100000000),
                 new SessionKey());
           } catch (TException e) {
             throw Throwables.propagate(e);

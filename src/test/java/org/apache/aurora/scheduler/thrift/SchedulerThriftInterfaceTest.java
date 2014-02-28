@@ -51,7 +51,7 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
-import org.apache.aurora.gen.Quota;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.RewriteConfigsRequest;
@@ -84,7 +84,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
-import org.apache.aurora.scheduler.storage.entities.IQuota;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -127,8 +127,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final ILock LOCK = ILock.build(new Lock().setKey(LOCK_KEY.newBuilder()));
   private static final JobConfiguration CRON_JOB = makeJob().setCronSchedule("test");
   private static final Lock DEFAULT_LOCK = null;
-  private static final IQuota QUOTA = IQuota.build(new Quota(10.0, 1024, 2048));
-  private static final IQuota CONSUMED = IQuota.build(new Quota(0.0, 0, 0));
+
+  private static final IResourceAggregate QUOTA =
+      IResourceAggregate.build(new ResourceAggregate(10.0, 1024, 2048));
+
+  private static final IResourceAggregate CONSUMED =
+      IResourceAggregate.build(new ResourceAggregate(0.0, 0, 0));
 
   private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
@@ -413,54 +417,54 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testSetQuota() throws Exception {
-    Quota quota = new Quota()
+    ResourceAggregate resourceAggregate = new ResourceAggregate()
         .setNumCpus(10)
         .setDiskMb(100)
         .setRamMb(200);
     expectAuth(ROOT, true);
-    quotaManager.saveQuota(ROLE, IQuota.build(quota));
+    quotaManager.saveQuota(ROLE, IResourceAggregate.build(resourceAggregate));
 
     control.replay();
 
-    Response response = thrift.setQuota(ROLE, quota, SESSION);
+    Response response = thrift.setQuota(ROLE, resourceAggregate, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
   @Test
   public void testSetQuotaFails() throws Exception {
-    Quota quota = new Quota()
+    ResourceAggregate resourceAggregate = new ResourceAggregate()
         .setNumCpus(10)
         .setDiskMb(100)
         .setRamMb(200);
     expectAuth(ROOT, true);
-    quotaManager.saveQuota(ROLE, IQuota.build(quota));
+    quotaManager.saveQuota(ROLE, IResourceAggregate.build(resourceAggregate));
     expectLastCall().andThrow(new QuotaManager.QuotaException("fail"));
 
     control.replay();
 
-    Response response = thrift.setQuota(ROLE, quota, SESSION);
+    Response response = thrift.setQuota(ROLE, resourceAggregate, SESSION);
     assertEquals(ResponseCode.INVALID_REQUEST, response.getResponseCode());
   }
 
   @Test
   public void testProvisionerSetQuota() throws Exception {
-    Quota quota = new Quota()
+    ResourceAggregate resourceAggregate = new ResourceAggregate()
         .setNumCpus(10)
         .setDiskMb(100)
         .setRamMb(200);
     expectAuth(ROOT, false);
     expectAuth(Capability.PROVISIONER, true);
-    quotaManager.saveQuota(ROLE, IQuota.build(quota));
+    quotaManager.saveQuota(ROLE, IResourceAggregate.build(resourceAggregate));
 
     control.replay();
 
-    Response response = thrift.setQuota(ROLE, quota, SESSION);
+    Response response = thrift.setQuota(ROLE, resourceAggregate, SESSION);
     assertEquals(ResponseCode.OK, response.getResponseCode());
   }
 
   @Test
   public void testSetQuotaAuthFailure() throws Exception {
-    Quota quota = new Quota()
+    ResourceAggregate resourceAggregate = new ResourceAggregate()
         .setNumCpus(10)
         .setDiskMb(100)
         .setRamMb(200);
@@ -469,7 +473,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    Response response = thrift.setQuota(ROLE, quota, SESSION);
+    Response response = thrift.setQuota(ROLE, resourceAggregate, SESSION);
     assertEquals(ResponseCode.AUTH_FAILED, response.getResponseCode());
   }
 
