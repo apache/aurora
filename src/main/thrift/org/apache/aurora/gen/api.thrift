@@ -214,8 +214,9 @@ struct PopulateJobResult {
 }
 
 struct GetQuotaResult {
-  1: ResourceAggregate quota              // Total allocated quota.
-  2: optional ResourceAggregate consumed  // Amount of quota already consumed by a role.
+  1: ResourceAggregate quota                       // Total allocated resource quota.
+  2: optional ResourceAggregate prodConsumption    // Resources consumed by production jobs.
+  3: optional ResourceAggregate nonProdConsumption // Resources consumed by non-production jobs.
 }
 
 // Wraps return results for the acquireLock API.

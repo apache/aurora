@@ -601,7 +601,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ownerRole);
     GetQuotaResult result = new GetQuotaResult(quotaInfo.guota().newBuilder())
-        .setConsumed(quotaInfo.prodConsumption().newBuilder());
+        .setProdConsumption(quotaInfo.prodConsumption().newBuilder())
+        .setNonProdConsumption(quotaInfo.nonProdConsumption().newBuilder());
 
     return new Response().setResponseCode(OK).setResult(Result.getQuotaResult(result));
   }

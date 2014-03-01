@@ -1342,12 +1342,19 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(quotaManager.getQuotaInfo(ROLE)).andReturn(infoMock);
     expect(infoMock.guota()).andReturn(QUOTA);
     expect(infoMock.prodConsumption()).andReturn(CONSUMED);
+    IResourceAggregate nonProdConsumed = IResourceAggregate.build(new ResourceAggregate(1, 0, 0));
+    expect(infoMock.nonProdConsumption()).andReturn(nonProdConsumed);
     control.replay();
 
     Response response = thrift.getQuota(ROLE);
     assertEquals(ResponseCode.OK, response.getResponseCode());
     assertEquals(QUOTA.newBuilder(), response.getResult().getGetQuotaResult().getQuota());
-    assertEquals(CONSUMED.newBuilder(), response.getResult().getGetQuotaResult().getConsumed());
+    assertEquals(
+        CONSUMED.newBuilder(),
+        response.getResult().getGetQuotaResult().getProdConsumption());
+    assertEquals(
+        nonProdConsumed.newBuilder(),
+        response.getResult().getGetQuotaResult().getNonProdConsumption());
   }
 
   private static JobConfiguration makeJob() {
