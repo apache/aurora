@@ -46,7 +46,8 @@ class QuotaCheckTest(unittest.TestCase):
 
     resp = Response(responseCode=response_code, message='test')
     resp.result = Result(
-        getQuotaResult=GetQuotaResult(quota=deepcopy(allocated), consumed=deepcopy(consumed)))
+        getQuotaResult=GetQuotaResult(
+          quota=deepcopy(allocated), prodConsumption=deepcopy(consumed)))
     self._scheduler.getQuota.return_value = resp
 
   def assert_result(self, prod, released, acquired, expected_code=None):
