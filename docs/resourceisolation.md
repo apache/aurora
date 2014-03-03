@@ -5,25 +5,23 @@ Resource Isolation and Sizing
 Both user-facing aspects and how it works under the hood are subject to
 change.
 
-[Introduction](#Introduction)
-[CPU Isolation](#CPUisolation)
-[CPU Sizing](#CPUsizing)
-[Memory Isolation](#MemoryIsolation)
-[Memory Sizing](#MemorySizing)
-[Disk Space](#DiskSpace)
-[Disk Space Sizing](#DiskSpaceSizing)
-[Other Resources](#OtherResources)
+- [Introduction](#introduction)
+- [CPU Isolation](#cpu-isolation)
+- [CPU Sizing](#cpu-sizing)
+- [Memory Isolation](#memory-isolation)
+- [Memory Sizing](#memory-sizing)
+- [Disk Space](#disk-space)
+- [Disk Space Sizing](#disk-space-sizing)
+- [Other Resources](#other-resources)
 
-## <a name="Introduction<> Introduction
+## Introduction
 
 Aurora is a multi-tenant system; a single software instance runs on a
 server, serving multiple clients/tenants. To share resources among
 tenants, it implements isolation of:
 
 * CPU
-
 * memory
-
 * disk space
 
 CPU is a soft limit, and handled differently from memory and disk space.
@@ -33,7 +31,7 @@ application goes over these values, it's killed.
 
 Let's look at each resource type in more detail:
 
-## <a name="CPUisolation"></a> CPU Isolation
+## CPU Isolation
 
 Mesos uses a quota based CPU scheduler (the *Completely Fair Scheduler*)
 to provide consistent and predictable performance.  This is effectively
@@ -71,7 +69,7 @@ delay service of requests.
 *Technical Note*: Mesos considers logical cores, also known as
 hyperthreading or SMT cores, as the unit of CPU.
 
-## <a name="CPUsizing"></a> CPU Sizing
+## CPU Sizing
 
 To correctly size Aurora-run Mesos tasks, specify a per-shard CPU value
 that lets the task run at its desired performance when at peak load
@@ -83,7 +81,7 @@ your application, observe its CPU stats over time. If consistently at or
 near your quota during peak load, you should consider increasing either
 per-shard CPU or the number of shards.
 
-## <a name="MemoryIsolation"></a> Memory Isolation
+## Memory Isolation
 
 Mesos uses dedicated memory allocation. Your application always has
 access to the amount of memory specified in your configuration. The
@@ -100,7 +98,7 @@ working.
 so your application can request more than its allocation without getting
 an ENOMEM. However, it will be killed shortly after.
 
-## <a name="MemorySizing"></a> Memory Sizing
+## Memory Sizing
 
 Size for your application's peak requirement. Observe the per-instance
 memory statistics over time, as memory requirements can vary over
@@ -109,7 +107,7 @@ value, it will be killed, so you should also add a safety margin of
 around 10-20%. If you have the ability to do so, you may also want to
 put alerts on the per-instance memory.
 
-## <a name="DiskSpace"></a> Disk Space
+## Disk Space
 
 Disk space used by your application is defined as the sum of the files'
 disk space in your application's directory, including the `stdout` and
@@ -133,7 +131,7 @@ are still available but you shouldn't count on them being so.
 application can write above its quota without getting an ENOSPC, but it
 will be killed shortly after. This is subject to change.
 
-## Disk Space Sizing<a name="DiskSpaceSizing"></a>
+## Disk Space Sizing
 
 Size for your application's peak requirement. Rotate and discard log
 files as needed to stay within your quota. When running a Java process,
@@ -141,7 +139,7 @@ add the maximum size of the Java heap to your disk space requirement, in
 order to account for an out of memory error dumping the heap
 into the application's sandbox space.
 
-## <a name="OtherResources"></a> Other Resources
+## Other Resources
 
 Other resources, such as network bandwidth, do not have any performance
 guarantees. For some resources, such as memory bandwidth, there are no

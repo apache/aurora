@@ -36,8 +36,8 @@ You should read this after going through the general [Aurora Tutorial](tutorial.
 &nbsp;&nbsp;&nbsp;&nbsp;[Thermos Uses bash, But Thermos Is Not bash](#Bash)
 &nbsp;&nbsp;&nbsp;&nbsp;[Rarely Use Functions In Your Configurations](#Functions)
 
-<a name="Basic"></a>The Basics
-------------------------------
+The Basics
+----------
 
 To run a job on Aurora, you must specify a configuration file that tells
 Aurora what it needs to know to schedule the job, what Mesos needs to
@@ -49,14 +49,14 @@ A configuration file defines a collection of objects, along with parameter
 values for their attributes. An Aurora configuration file contains the
 following three types of objects:
 
--   `Job`
--   `Task`
--   `Process`
+- Job
+- Task
+- Process
 
 A configuration also specifies a list of `Job` objects assigned
 to the variable `jobs`.
 
--   `jobs` (list of defined Jobs to run)
+- jobs (list of defined Jobs to run)
 
 The `.aurora` file format is just Python. However, `Job`, `Task`,
 `Process`, and other classes are defined by a type-checked dictionary
@@ -73,7 +73,7 @@ file works like any other Python script.
 [*Aurora+Thermos Configuration Reference*](configurationreference.md)
 has a full reference of all Aurora/Thermos defined Pystachio objects.
 
-### <a name="Bottom"></a> Use Bottom-To-Top Object Ordering
+### Use Bottom-To-Top Object Ordering
 
 A well-structured configuration starts with structural templates (if
 any). Structural templates encapsulate in their attributes all the
@@ -90,8 +90,8 @@ instantiations are typically *UPPER\_SNAKE\_CASED*. `Process`, `Task`,
 and `Job` names are typically *lower\_snake\_cased*. Indentation is typically 2
 spaces.
 
-<a name="Example"></a>An Example Configuration File
----------------------------------------------------
+An Example Configuration File
+-----------------------------
 
 The following is a typical configuration file. Don't worry if there are
 parts you don't understand yet, but you may want to refer back to this
@@ -101,13 +101,12 @@ bound values for the variables.
 
     # --- templates here ---
 	class Profile(Struct):
-	  package_version =      Default(String, 'live')
-	  java_binary =          Default(String,
-	                            '/usr/lib/jvm/java-1.7.0-openjdk/bin/java')
-	  extra_jvm_options =   Default(String, '')
-	  parent_environment =   Default(String, 'prod')
-	  parent_serverset =     Default(String,
-	                           `/foocorp/service/bird/{{parent_environment}}/bird')
+	  package_version = Default(String, 'live')
+	  java_binary = Default(String, '/usr/lib/jvm/java-1.7.0-openjdk/bin/java')
+	  extra_jvm_options = Default(String, '')
+	  parent_environment = Default(String, 'prod')
+	  parent_serverset = Default(String,
+                                 '/foocorp/service/bird/{{parent_environment}}/bird')
 
 	# --- processes here ---
 	main = Process(
@@ -123,7 +122,7 @@ bound values for the variables.
 	  name = 'application',
 	  processes = [
 	    Process(
-	      name = 'fetch',variablesvv
+	      name = 'fetch',
 	      cmdline = 'curl -O
                   https://packages.foocorp.com/{{profile.package_version}}/application.jar'),
 	  ]
@@ -173,7 +172,7 @@ bound values for the variables.
 			.bind(profile = STAGING),
 	]
 
-## <a name="Process"></a> Defining Process Objects
+## Defining Process Objects
 
 Processes are handled by the Thermos system. A process is a single
 executable step run as a part of an Aurora task, which consists of a
@@ -281,7 +280,7 @@ if one isn't specified in the configuration:
     processes may depend upon other finalizing processes and will
     otherwise run as a typical process schedule.
 
-## <a name="Sandbox"></a>Getting Your Code Into The Sandbox
+## Getting Your Code Into The Sandbox
 
 When using Aurora, you need to get your executable code into its "sandbox", specifically
 the Task sandbox where the code executes for the Processes that make up that Task.
@@ -306,7 +305,7 @@ The template for this Process is:
 
 Note: Be sure the extracted code archive has an executable.
 
-## <a name="Task"></a> Defining Task Objects
+## Defining Task Objects
 
 Tasks are handled by Mesos. A task is a collection of processes that
 runs in a shared sandbox. It's the fundamental unit Aurora uses to
@@ -393,7 +392,7 @@ There are four optional Task attributes:
     `SIGKILL`s (or if dependent on yet to be completed Processes, are
     never invoked).
 
-### <a name="Sequential"></a> `SequentialTask`: Running Processes in Parallel or Sequentially
+### SequentialTask: Running Processes in Parallel or Sequentially
 
 By default, a Task with several Processes runs them in parallel. There
 are two ways to run Processes sequentially:
@@ -410,7 +409,7 @@ are two ways to run Processes sequentially:
 
         SequentialTask( ... processes=[process1, process2, process3] ...)
 
-### <a name="Simple"></a> `SimpleTask`
+### SimpleTask
 
 For quickly creating simple tasks, use the `SimpleTask` helper. It
 creates a basic task from a provided name and command line using a
@@ -438,7 +437,7 @@ The simplest idiomatic Job configuration thus becomes:
 When written to `hello_world.aurora`, you invoke it with a simple
 `aurora create cluster1/$USER/test/hello_world hello_world.aurora`.
 
-### <a name="Concat"></a> `Tasks.concat` and `Tasks.combine` (`concat_tasks` and `combine_tasks`)
+### Combining tasks
 
 `Tasks.concat`(synonym,`concat_tasks`) and
 `Tasks.combine`(synonym,`combine_tasks`) merge multiple Task definitions
@@ -514,7 +513,7 @@ the `start_application` Process implicitly relies
 upon `download_interpreter`). Make sure you understand the difference
 between using one or the other.
 
-## <a name="Job"></a> Defining `Job` Objects
+## Defining Job Objects
 
 A job is a group of identical tasks that Aurora can run in a Mesos cluster.
 
@@ -623,7 +622,7 @@ The final three Job attributes each take an object as their value.
     section in the Aurora + Thermos Reference manual on [Specifying
     Scheduling Constraints](configurationreference.md) for more information.
 
-## <a name="jobs"></a> Defining The `jobs` List
+## The jobs List
 
 At the end of your `.aurora` file, you need to specify a list of the
 file's defined Jobs to run in the order listed. For example, the
@@ -631,8 +630,8 @@ following runs first `job1`, then `job2`, then `job3`.
 
 jobs = [job1, job2, job3]
 
-<a name="Templating"></a>Templating
------------------------------------
+Templating
+----------
 
 The `.aurora` file format is just Python. However, `Job`, `Task`,
 `Process`, and other classes are defined by a templating library called
@@ -647,7 +646,7 @@ Reference* without `import` statements - the Aurora config loader
 injects them automatically. Other than that the `.aurora` format
 works like any other Python script.
 
-### <a name="Binding"></a>Templating 1: Binding in Pystachio
+### Templating 1: Binding in Pystachio
 
 Pystachio uses the visually distinctive {{}} to indicate template
 variables. These are often called "mustache variables" after the
@@ -737,7 +736,7 @@ You usually bind simple key to value pairs, but you can also bind three
 other objects: lists, dictionaries, and structurals. These will be
 described in detail later.
 
-### <a name="Structurals"></a> Structurals in Pystachio / Aurora
+### Structurals in Pystachio / Aurora
 
 Most Aurora/Thermos users don't ever (knowingly) interact with `String`,
 `Float`, or `Integer` Pystashio objects directly. Instead they interact
@@ -792,7 +791,7 @@ Similarly a Task level binding is available to that Task and its
 Processes but is *not* visible at the Job level (inheritance is a
 one-way street.)
 
-#### <a name="Mustaches"></a> Mustaches Within Structurals
+#### Mustaches Within Structurals
 
 When you define a `Struct` schema, one powerful, but confusing, feature
 is that all of that structure's attributes are Mustache variables within
@@ -825,9 +824,9 @@ Do not confuse Structural attributes with bound Mustache variables.
 Attributes are implicitly converted to Mustache variables but not vice
 versa.
 
-### <a name="Factories"></a>Templating 2: Structurals Are Factories
+### Templating 2: Structurals Are Factories
 
-#### <a name="Second"></a> A Second Way of Templating
+#### A Second Way of Templating
 
 A second templating method is both as powerful as the aforementioned and
 often confused with it. This method is due to automatic conversion of
@@ -856,14 +855,14 @@ Template creation is a common use for this technique:
     >>> logrotate = Daemon(name = 'logrotate', cmdline = './logrotate conf/logrotate.conf')
     >>> mysql = Daemon(name = 'mysql', cmdline = 'bin/mysqld --safe-mode')
 
-### <a name="AdvancedBinding"></a> Advanced Binding
+### Advanced Binding
 
 As described above, `.bind()` binds simple strings or numbers to
 Mustache variables. In addition to Structural types formed by combining
 atomic types, Pystachio has two container types; `List` and `Map` which
 can also be bound via `.bind()`.
 
-#### <a name="BindSyntax"></a> Bind Syntax
+#### Bind Syntax
 
 The `bind()` function can take Python dictionaries or `kwargs`
 interchangeably (when "`kwargs`" is in a function definition, `kwargs`
@@ -885,7 +884,7 @@ Bindings done "closer" to the object in question take precedence:
               min_duration=5)
     ))
 
-#### <a name="ComplexObjects"></a>Binding Complex Objects
+#### Binding Complex Objects
 
 ##### Lists
 
@@ -904,7 +903,7 @@ Bindings done "closer" to the object in question take precedence:
     >>> String('{{p.cmdline}}').bind(p = Process(cmdline = "echo hello world"))
     String(echo hello world)
 
-### <a name="StructuralBinding"></a> Structural Binding
+### Structural Binding
 
 Use structural templates when binding more than two or three individual
 values at the Job or Task level. For fewer than two or three, standard
@@ -923,7 +922,9 @@ or change the way the dataset is designated.
       dataset = Default(String, hdfs://home/aurora/data/{{environment}}')
 
     PRODUCTION = Profile(version = 'live', environment = 'prod')
-    DEVEL = Profile(version = 'latest', environment = 'devel', dataset = 'hdfs://home/aurora/data/test')
+    DEVEL = Profile(version = 'latest',
+                    environment = 'devel',
+                    dataset = 'hdfs://home/aurora/data/test')
     TEST = Profile(version = 'latest', environment = 'test')
 
     JOB_TEMPLATE = Job(
@@ -956,10 +957,10 @@ So rather than a `.bind()` with a half-dozen substituted variables, you
 can bind a single object that has sensible defaults stored in a single
 place.
 
-<a name="Tips"></a> Configuration File Writing Tips And Best Practices
-----------------------------------------------------------------------
+Configuration File Writing Tips And Best Practices
+--------------------------------------------------
 
-### <a name="Few"></a> Use As Few `.aurora` Files As Possible
+### Use As Few .aurora Files As Possible
 
 When creating your `.aurora` configuration, try to keep all versions of
 a particular job within the same `.aurora` file. For example, if you
@@ -970,7 +971,7 @@ Constructs shared across multiple jobs owned by your team (e.g.
 team-level defaults or structural templates) can be split into separate
 `.aurora`files and included via the `include` directive.
 
-### <a name="Boilerplate"></a> Avoid Boilerplate
+### Avoid Boilerplate
 
 If you see repetition or find yourself copy and pasting any parts of
 your configuration, it's likely an opportunity for templating. Take the
@@ -1047,7 +1048,7 @@ section.
       name = 'build_python',
       processes = [download, unpack, build, email]).bind(python = Python(version = "2.7.3"))
 
-### <a name="Bash"></a>Thermos Uses bash, But Thermos Is Not bash
+### Thermos Uses bash, But Thermos Is Not bash
 
 #### Bad
 
@@ -1090,13 +1091,13 @@ linear ordering constraint for you.
 
     stage = Process(
       name = 'stage',
-      cmdline = 'cmdline = 'rcp user@my_machine:my_application . && ' 'unzip app.zip && rm -f app.zip')
+      cmdline = 'rcp user@my_machine:my_application . && unzip app.zip && rm -f app.zip')
 
-      run = Process(name = 'app', cmdline = 'java -jar app.jar')
+    run = Process(name = 'app', cmdline = 'java -jar app.jar')
 
-      run_task = SequentialTask(processes = [stage, run])
+    run_task = SequentialTask(processes = [stage, run])
 
-### <a name="Functions"></a> Rarely Use Functions In Your Configurations
+### Rarely Use Functions In Your Configurations
 
 90% of the time you define a function in a `.aurora` file, you're
 probably Doing It Wrong(TM).
@@ -1136,7 +1137,3 @@ configuration.
       name = 'task_two',
       resources = Resources(cpu = 2.0, ram = 64*MB, disk = 1*GB)
     )
-
-
-
-

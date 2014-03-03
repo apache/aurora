@@ -7,28 +7,29 @@ The most up-to-date reference is in the client itself: use the
 functionality. Note that `aurora help open` does not work, due to underlying issues with
 reflection.
 
-- [Aurora Client Commands](#aurora-client-commands)
-    - [Introduction](#introduction)
-    - [Cluster Configuration](#cluster-configuration)
-    - [Job Keys](#job-keys)
-    - [Modifying Aurora Client Commands](#modifying-aurora-client-commands)
-    - [Regular Jobs](#regular-jobs)
-        - [Creating and Running a Job](#creating-and-running-a-job)
-        - [Killing a Job](#killing-a-job)
-        - [Updating a Job](#updating-a-job)
-        - [Renaming a Job](#renaming-a-job)
-        - [Restarting Jobs](#restarting-jobs)
-    - [Cron Jobs](#cron-jobs)
-    - [Comparing Jobs](#comparing-jobs)
-    - [Viewing/Examining Jobs](#viewingexamining-jobs)
-        - [Listing Jobs](#listing-jobs)
-        - [Inspecting a Job](#inspecting-a-job)
-        - [Checking Your Quota](#checking-your-quota)
-        - [Finding a Job on Web UI](#finding-a-job-on-web-ui)
-        - [Getting Job Status](#getting-job-status)
-        - [Opening the Web UI](#opening-the-web-ui)
-        - [SSHing to a Specific Task Machine](#sshing-to-a-specific-task-machine)
-        - [Templating Command Arguments](#templating-command-arguments)
+- [Introduction](#introduction)
+- [Cluster Configuration](#cluster-configuration)
+- [Job Keys](#job-keys)
+- [Modifying Aurora Client Commands](#modifying-aurora-client-commands)
+- [Regular Jobs](#regular-jobs)
+    - [Creating and Running a Job](#creating-and-running-a-job)
+    - [Running a Command On a Running Job](#running-a-command-on-a-running-job)
+    - [Killing a Job](#killing-a-job)
+    - [Updating a Job](#updating-a-job)
+    - [Renaming a Job](#renaming-a-job)
+    - [Restarting Jobs](#restarting-jobs)
+- [Cron Jobs](#cron-jobs)
+- [Comparing Jobs](#comparing-jobs)
+- [Viewing/Examining Jobs](#viewingexamining-jobs)
+    - [Listing Jobs](#listing-jobs)
+    - [Inspecting a Job](#inspecting-a-job)
+    - [Versions](#versions)
+    - [Checking Your Quota](#checking-your-quota)
+    - [Finding a Job on Web UI](#finding-a-job-on-web-ui)
+    - [Getting Job Status](#getting-job-status)
+    - [Opening the Web UI](#opening-the-web-ui)
+    - [SSHing to a Specific Task Machine](#sshing-to-a-specific-task-machine)
+    - [Templating Command Arguments](#templating-command-arguments)
 
 Introduction
 ------------
@@ -69,18 +70,22 @@ environment variable is not set. The second is a user-installed file, located at
 A cluster configuration is formatted as JSON.  The simplest cluster configuration is one that
 communicates with a single (non-leader-elected) scheduler.  For example:
 
-    [{
-      "name": "example",
-      "scheduler_uri": "localhost:55555",
-    }]
+```javascript
+[{
+  "name": "example",
+  "scheduler_uri": "localhost:55555",
+}]
+```
 
 A configuration for a leader-elected scheduler would contain something like:
 
-    [{
-      "name": "example",
-      "zk": "192.168.33.2",
-      "scheduler_zk_path": "/aurora/scheduler"
-    }]
+```javascript
+[{
+  "name": "example",
+  "zk": "192.168.33.2",
+  "scheduler_zk_path": "/aurora/scheduler"
+}]
+```
 
 Job Keys
 --------
@@ -143,17 +148,17 @@ The configuration file may also contain and activate hook definitions.
 
 `create` can take four named parameters:
 
--   `-E NAME=VALUE` Bind a Thermos mustache variable name to a
-    value. Multiple flags specify multiple values. Defaults to `[]`.
--   ` -o, --open_browser` Open a browser window to the scheduler UI Job
-    page after a job changing operation happens. When `False`, the Job
-    URL prints on the console and the user has to copy/paste it
-    manually. Defaults to `False`. Does not work when running in Vagrant.
--   ` -j, --json` If specified, configuration argument is read as a
-    string in JSON format. Defaults to False.
--   ` --wait_until=STATE` Block the client until all the Tasks have
-    transitioned into the requested state. Possible values are: `PENDING`,
-    `RUNNING`, `FINISHED`. Default: `PENDING`
+- `-E NAME=VALUE` Bind a Thermos mustache variable name to a
+  value. Multiple flags specify multiple values. Defaults to `[]`.
+- ` -o, --open_browser` Open a browser window to the scheduler UI Job
+  page after a job changing operation happens. When `False`, the Job
+  URL prints on the console and the user has to copy/paste it
+  manually. Defaults to `False`. Does not work when running in Vagrant.
+- ` -j, --json` If specified, configuration argument is read as a
+  string in JSON format. Defaults to False.
+- ` --wait_until=STATE` Block the client until all the Tasks have
+  transitioned into the requested state. Possible values are: `PENDING`,
+  `RUNNING`, `FINISHED`. Default: `PENDING`
 
 ### Running a Command On a Running Job
 
@@ -168,14 +173,14 @@ namespaces.
 
 `run` can take three named parameters:
 
--   `-t NUM_THREADS`, `--threads=NUM_THREADS `The number of threads to
-    use, defaulting to `1`.
--   `--user=SSH_USER` ssh as this user instead of the given role value.
-    Defaults to None.
--   `-e, --executor_sandbox`  Run the command in the executor sandbox
-    instead of the Task sandbox. Defaults to False.
+- `-t NUM_THREADS`, `--threads=NUM_THREADS `The number of threads to
+  use, defaulting to `1`.
+- `--user=SSH_USER` ssh as this user instead of the given role value.
+  Defaults to None.
+- `-e, --executor_sandbox`  Run the command in the executor sandbox
+  instead of the Task sandbox. Defaults to False.
 
-### <a name="Killing"></a>Killing a Job
+### Killing a Job
 
     aurora kill <job key> <configuration file>
 
@@ -188,14 +193,14 @@ kill command.
 
 `kill` can take two named parameters:
 
--   `-o, --open_browser` Open a browser window to the scheduler UI Job
-    page after a job changing operation happens. When `False`, the Job
-    URL prints on the console and the user has to copy/paste it
-    manually. Defaults to `False`. Does not work when running in Vagrant.
--   `--shards=SHARDS` A list of shard ids to act on. Can either be a
-    comma-separated list (e.g. 0,1,2) or a range (e.g. 0-2) or  any
-    combination of the two (e.g. 0-2,5,7-9). Defaults to acting on all
-    shards.
+- `-o, --open_browser` Open a browser window to the scheduler UI Job
+  page after a job changing operation happens. When `False`, the Job
+  URL prints on the console and the user has to copy/paste it
+  manually. Defaults to `False`. Does not work when running in Vagrant.
+- `--shards=SHARDS` A list of shard ids to act on. Can either be a
+  comma-separated list (e.g. 0,1,2) or a range (e.g. 0-2) or  any
+  combination of the two (e.g. 0-2,5,7-9). Defaults to acting on all
+  shards.
 
 ### Updating a Job
 
@@ -225,17 +230,16 @@ used to define and activate hooks for `update`.
 
 `update` can take four named parameters:
 
--   `--shards=SHARDS` A list of shard ids to update. Can either be a
-    comma-separated list (e.g. 0,1,2) or a range (e.g. 0-2) or  any
-    combination of the two (e.g. 0-2,5,7-9). If not  set, all shards are
-    acted on. Defaults to None.
--   `-E NAME=VALUE` Binds a Thermos mustache variable name to a value.
-    Use multiple flags to specify multiple values. Defaults to `[]`.
--   `-j, --json` If specified, configuration is read in JSON format.
-    Defaults to `False`.
--   `--updater_health_check_interval_seconds=HEALTH_CHECK_INTERVAL_SECONDS`
-    Time interval between subsequent shard status checks. Defaults to
-    `3`.
+- `--shards=SHARDS` A list of shard ids to update. Can either be a
+  comma-separated list (e.g. 0,1,2) or a range (e.g. 0-2) or  any
+  combination of the two (e.g. 0-2,5,7-9). If not  set, all shards are
+  acted on. Defaults to None.
+- `-E NAME=VALUE` Binds a Thermos mustache variable name to a value.
+  Use multiple flags to specify multiple values. Defaults to `[]`.
+- `-j, --json` If specified, configuration is read in JSON format.
+  Defaults to `False`.
+- `--updater_health_check_interval_seconds=HEALTH_CHECK_INTERVAL_SECONDS`
+  Time interval between subsequent shard status checks. Defaults to `3`.
 
 ### Renaming a Job
 
@@ -293,30 +297,30 @@ if it contains hook definitions and activations that affect the
 In addition to the required job key argument, there are eight
 `restart` specific optional arguments:
 
--   `--updater_health_check_interval_seconds`: Defaults to `3`, the time
-    interval between subsequent shard status checks.
--   `--shards=SHARDS`: Defaults to None, which restarts all shards.
-    Otherwise, only the specified-by-id shards restart. They can be
-    comma-separated `(0, 8, 9)`, a range `(3-5)` or a
-    combination `(0, 3-5, 8, 9-11)`.
--   `--batch_size`: Defaults to `1`, the number of shards to be started
-    in one iteration. So, for example, for value 3, it tries to restart
-    the first three shards specified by `--shards` simultaneously, then
-    the next three, and so on.
--   `--max_per_shard_failures=MAX_PER_SHARD_FAILURES`: Defaults to `0`,
-    the maximum number of restarts per shard during restart. When
-    exceeded, it increments the total failure count.
--   `--max_total_failures=MAX_TOTAL_FAILURES`: Defaults to `0`, the
-    maximum total number of shard failures tolerated during restart.
--   `-o, --open_browser` Open a browser window to the scheduler UI Job
-    page after a job changing operation happens. When `False`, the Job
-    url prints on the console and the user has to copy/paste it
-    manually. Defaults to `False`. Does not work when running in Vagrant.
--   `--restart_threshold`: Defaults to `60`, the maximum number of
-    seconds before a shard must move into the `RUNNING` state before
-    it's considered a failure.
--   `--watch_secs`: Defaults to `30`, the minimum number of seconds a
-    shard must remain in `RUNNING` state before considered a success.
+- `--updater_health_check_interval_seconds`: Defaults to `3`, the time
+  interval between subsequent shard status checks.
+- `--shards=SHARDS`: Defaults to None, which restarts all shards.
+  Otherwise, only the specified-by-id shards restart. They can be
+  comma-separated `(0, 8, 9)`, a range `(3-5)` or a
+  combination `(0, 3-5, 8, 9-11)`.
+- `--batch_size`: Defaults to `1`, the number of shards to be started
+  in one iteration. So, for example, for value 3, it tries to restart
+  the first three shards specified by `--shards` simultaneously, then
+  the next three, and so on.
+- `--max_per_shard_failures=MAX_PER_SHARD_FAILURES`: Defaults to `0`,
+  the maximum number of restarts per shard during restart. When
+  exceeded, it increments the total failure count.
+- `--max_total_failures=MAX_TOTAL_FAILURES`: Defaults to `0`, the
+  maximum total number of shard failures tolerated during restart.
+- `-o, --open_browser` Open a browser window to the scheduler UI Job
+  page after a job changing operation happens. When `False`, the Job
+  url prints on the console and the user has to copy/paste it
+  manually. Defaults to `False`. Does not work when running in Vagrant.
+- `--restart_threshold`: Defaults to `60`, the maximum number of
+  seconds before a shard must move into the `RUNNING` state before
+  it's considered a failure.
+- `--watch_secs`: Defaults to `30`, the minimum number of seconds a
+  shard must remain in `RUNNING` state before considered a success.
 
 Cron Jobs
 ---------
@@ -337,11 +341,11 @@ is determined using `diff`, though you may choose an alternate
 
 There are two named parameters:
 
--   `-E NAME=VALUE` Bind a Thermos mustache variable name to a
-    value. Multiple flags may be used to specify multiple values.
-    Defaults to `[]`.
--   `-j, --json` Read the configuration argument in JSON format.
-    Defaults to `False`.
+- `-E NAME=VALUE` Bind a Thermos mustache variable name to a
+  value. Multiple flags may be used to specify multiple values.
+  Defaults to `[]`.
+- `-j, --json` Read the configuration argument in JSON format.
+  Defaults to `False`.
 
 Viewing/Examining Jobs
 ----------------------
@@ -358,10 +362,10 @@ Lists all Jobs registered with the Aurora scheduler in the named cluster for the
 
 It has two named parameters:
 
--   `--pretty`: Displays job information in prettyprinted format.
-    Defaults to `False`.
--   `-c`, `--show-cron`: Shows cron schedule for jobs. Defaults to
-    `False`. Do not use, as it's not yet implemented.
+- `--pretty`: Displays job information in prettyprinted format.
+  Defaults to `False`.
+- `-c`, `--show-cron`: Shows cron schedule for jobs. Defaults to
+  `False`. Do not use, as it's not yet implemented.
 
 ### Inspecting a Job
 
@@ -371,14 +375,14 @@ It has two named parameters:
 configuration file, and displays the parsed configuration. It has four
 named parameters:
 
--   `--local`: Inspect the configuration that the  `spawn` command would
-    create, defaulting to `False`.
--   `--raw`: Shows the raw configuration. Defaults to `False`.
--   `-j`, `--json`: If specified, configuration is read in JSON format.
-    Defaults to `False`.
--   `-E NAME=VALUE`: Bind a Thermos Mustache variable name to a value.
-    You can use multiple flags to specify multiple values. Defaults
-    to `[]`
+- `--local`: Inspect the configuration that the  `spawn` command would
+  create, defaulting to `False`.
+- `--raw`: Shows the raw configuration. Defaults to `False`.
+- `-j`, `--json`: If specified, configuration is read in JSON format.
+  Defaults to `False`.
+- `-E NAME=VALUE`: Bind a Thermos Mustache variable name to a value.
+  You can use multiple flags to specify multiple values. Defaults
+  to `[]`
 
 ### Versions
 
@@ -398,10 +402,10 @@ cluster.
 When you create a job, part of the output response contains a URL that goes
 to the job's scheduler UI page. For example:
 
-        vagrant@precise64:~$ aurora create example/www-data/prod/hello /vagrant/examples/jobs/hello_world.aurora
-        INFO] Creating job hello
-        INFO] Response from scheduler: OK (message: 1 new tasks pending for job www-data/prod/hello)
-        INFO] Job url: http://precise64:8081/scheduler/www-data/prod/hello
+    vagrant@precise64:~$ aurora create example/www-data/prod/hello /vagrant/examples/jobs/hello_world.aurora
+    INFO] Creating job hello
+    INFO] Response from scheduler: OK (message: 1 new tasks pending for job www-data/prod/hello)
+    INFO] Job url: http://precise64:8081/scheduler/www-data/prod/hello
 
 You can go to the scheduler UI page for this job via `http://precise64:8081/scheduler/www-data/prod/hello`
 You can go to the overall scheduler UI page by going to the part of that URL that ends at `scheduler`; `http://precise64:8081/scheduler`
@@ -444,12 +448,12 @@ particular machine.
 
 It can take three named parameters:
 
--     `-e`, `--executor_sandbox`:  Run `ssh` in the executor sandbox
-    instead of the  task sandbox. Defaults to `False`.
--   `--user=SSH_USER`: `ssh` as the given user instead of as the role in
-    the `job_key` argument. Defaults to none.
--   `-L PORT:NAME`: Add tunnel from local port `PORT` to the remote
-    named port  `NAME`. Defaults to `[]`.
+- `-e`, `--executor_sandbox`:  Run `ssh` in the executor sandbox
+  instead of the  task sandbox. Defaults to `False`.
+- `--user=SSH_USER`: `ssh` as the given user instead of as the role in
+  the `job_key` argument. Defaults to none.
+- `-L PORT:NAME`: Add tunnel from local port `PORT` to the remote
+  named port  `NAME`. Defaults to `[]`.
 
 ### Templating Command Arguments
 
@@ -458,12 +462,12 @@ It can take three named parameters:
 Given a job specification, run the supplied command on all hosts and
 return the output. You may use the standard Mustache templating rules:
 
--   {{`thermos.ports[name]`}} substitutes the specific named port of the
-    task assigned to this machine
--   {{`mesos.instance`}} substitutes the shard id of the job's task
-    assigned to this machine
--   {{`thermos.task_id`}} substitutes the task id of the job's task
-    assigned to this machine
+- `{{thermos.ports[name]}}` substitutes the specific named port of the
+  task assigned to this machine
+- `{{mesos.instance}}` substitutes the shard id of the job's task
+  assigned to this machine
+- `{{thermos.task_id}}` substitutes the task id of the job's task
+  assigned to this machine
 
 For example, the following type of pattern can be a powerful diagnostic
 tool:

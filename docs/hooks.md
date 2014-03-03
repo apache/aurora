@@ -1,20 +1,20 @@
 # Hooks for Aurora Client API
 
-[Introduction](#Introduction)
-[Hook Types](#HookTypes)
-[Execution Order](#ExecutionOrder)
-[Hookable Methods](#HookableMethods)
-[Activating and Using Hooks](#ActivatingUsingHooks)
-[`.aurora` Config File Settings](#auroraConfigFileSettings)
-[Command Line](#CommandLine)
-[Hooks Protocol](#HooksProtocol)
-&nbsp;&nbsp;&nbsp;&nbsp;[`pre_` Methods](#preMethods)
-&nbsp;&nbsp;&nbsp;&nbsp;[`err_` Methods](#errMethods)
-&nbsp;&nbsp;&nbsp;&nbsp;[`post_` Methods](#postMethods)
-[Generic Hooks](#GenericHooks)
-[Hooks Process Checklist](#HooksProcessChecklist)
+- [Introduction](#introduction)
+- [Hook Types](#hook-types)
+- [Execution Order](#execution-order)
+- [Hookable Methods](#hookable-methods)
+- [Activating and Using Hooks](#activating-and-using-hooks)
+- [.aurora Config File Settings](#aurora-config-file-settings)
+- [Command Line](#command-line)
+- [Hooks Protocol](#hooks-protocol)
+  - [pre_ Methods](#pre_-methods)
+  - [err_ Methods](#err_-methods)
+  - [post_ Methods](#post_-methods)
+- [Generic Hooks](#generic-hooks)
+- [Hooks Process Checklist](#hooks-process-checklist)
 
-##<a name="Introduction"></a>Introduction
+## Introduction
 
 You can execute hook methods around Aurora API Client methods when they are called by the Aurora Command Line commands.
 
@@ -24,7 +24,7 @@ The catch is that hooks are associated with Aurora Client API methods, which use
 
 **Terminology Note**: From now on, "method(s)" refer to Client API methods, and "command(s)" refer to Command Line commands.
 
-##<a name="HookTypes"></a>Hook Types
+## Hook Types
 
 Hooks have three basic types, differing by when they run with respect to their associated method.
 
@@ -36,23 +36,25 @@ consider whether or not to error-trap them. You can error trap at the
 highest level very generally and always pass the `pre_` hook by
 returning `True`. For example:
 
-    def pre_create(...):
-        do_something()  # if do_something fails with an exception, the create_job is not attempted!
-        return True
+```python
+def pre_create(...):
+  do_something()  # if do_something fails with an exception, the create_job is not attempted!
+  return True
 
-    # However...
-    def pre_create(...):
-        try:
-          do_something()  # may cause exception
-        except Exception:  # generic error trap will catch it
-          pass  # and ignore the exception
-        return True  # create_job will run in any case!
+# However...
+def pre_create(...):
+  try:
+    do_something()  # may cause exception
+  except Exception:  # generic error trap will catch it
+    pass  # and ignore the exception
+  return True  # create_job will run in any case!
+```
 
 `post_<method_name>`: A `post_` hook executes after its associated method successfully finishes running. If it fails, the already executed method is unaffected. A `post_` hook's error is trapped, and any later operations are unaffected.
 
 `err_<method_name>`: Executes only when its associated method returns a status other than OK or throws an exception. If an `err_` hook fails, the already executed method is unaffected. An `err_` hook's error is trapped, and any later operations are unaffected.
 
-##<a name="ExecutionOrder"></a>Execution Order
+## Execution Order
 
 A command with `pre_`, `post_`, and `err_` hooks defined and activated for its called method executes in the following order when the method successfully executes:
 
@@ -78,7 +80,7 @@ The following is what happens when, for the same command and hooks, the method a
 
 Note that the `post_` and `err_` hooks for the same method can never both run for a single execution of that method.
 
-##<a name="HookableMethods"></a>Hookable Methods
+## Hookable Methods
 
 You can associate `pre_`, `post_`, and `err_` hooks with the following methods. Since you do not directly interact with the methods, but rather the Aurora Command Line commands that call them, for each method we also list the command(s) that can call the method. Note that a different method or methods may be called by a command depending on how the command's other code executes. Similarly, multiple commands can call the same method. We also list the methods' argument signatures, which are used by their associated hooks. <a name="Chart"></a>
 
@@ -124,17 +126,15 @@ Some specific examples:
 
 * `err_kill_job` executes when the `kill_job` method is called, but doesn't successfully finish running.
 
-##<a name="ActivatingUsingHooks"></a>Activating and Using Hooks
+## Activating and Using Hooks
 
 By default, hooks are inactive. If you do not want to use hooks, you do not need to make any changes to your code. If you do want to use hooks, you will need to alter your `.aurora` config file to activate them both for the configuration as a whole as well as for individual `Job`s. And, of course, you will need to define in your config file what happens when a particular hook executes.
 
-##<a name="auroraConfigFileSettings"></a>`.aurora` Config File Settings
+## .aurora Config File Settings
 
 You can define a top-level `hooks` variable in any `.aurora` config file. `hooks` is a list of all objects that define hooks used by `Job`s defined in that config file. If you do not want to define any hooks for a configuration, `hooks` is optional.
 
-    hooks = [  Object_with_defined_hooks1,
-               Object_with_defined_hooks2
-    ]
+    hooks = [Object_with_defined_hooks1, Object_with_defined_hooks2]
 
 Be careful when assembling a config file using `include` on multiple smaller config files. If there are multiple files that assign a value to `hooks`, only the last assignment made will stick. For example, if `x.aurora` has `hooks = [a, b, c]` and `y.aurora` has `hooks = [d, e, f]` and `z.aurora` has, in this order, `include x.aurora` and `include y.aurora`, the `hooks` value will be `[d, e, f]`.
 
@@ -144,16 +144,16 @@ To summarize, to use hooks for a particular job, you must both activate hooks fo
 
 Recall that `.aurora` config files are written in Pystachio. So the following turns on hooks for production jobs at cluster1 and cluster2, but leaves them off for similar jobs with a defined user role. Of course, you also need to list the objects that define the hooks in your config file's `hooks` variable.
 
-    jobs = [
-            Job(enable_hooks = True, cluster = c, env = 'prod')
-            for c in ('cluster1', 'cluster2')
-           ]
-    jobs.extend(
-       Job(cluster = c, env = 'prod', role = getpass.getuser())
-       for c in ('cluster1', 'cluster2')
-       # Hooks disabled for these jobs
+```python
+jobs = [
+        Job(enable_hooks = True, cluster = c, env = 'prod') for c in ('cluster1', 'cluster2')
+       ]
+jobs.extend(
+   Job(cluster = c, env = 'prod', role = getpass.getuser()) for c in ('cluster1', 'cluster2'))
+   # Hooks disabled for these jobs
+```
 
-##<a name="CommandLine"></a>Command Line
+## Command Line
 
 All Aurora Command Line commands now accept an `.aurora` config file as an optional parameter (some, of course, accept it as a required parameter). Whenever a command has a `.aurora` file parameter, any hooks specified and activated in the `.aurora` file can be used. For example:
 
@@ -163,7 +163,7 @@ The command activates any hooks specified and activated in `myapp.aurora`. For t
 
     aurora restart cluster1/role/env/app
 
-##<a name="HooksProtocol"></a>Hooks Protocol
+## Hooks Protocol
 
 Any object defined in the `.aurora` config file can define hook methods. You should define your hook methods within a class, and then use the class name as a value in the `hooks` list in your config file.
 
@@ -171,17 +171,19 @@ Note that you can define other methods in the class that its hook methods can ca
 
 The following example defines a class containing a `pre_kill_job` hook definition that calls another method defined in the class.
 
-    # An example of a hook that defines a method pre_kill_job
-    class KillConfirmer(object):
-        def confirm(self, msg):
-            return True if raw_input(msg).lower() == 'yes' else False
+```python
+# Defines a method pre_kill_job
+class KillConfirmer(object):
+  def confirm(self, msg):
+    return raw_input(msg).lower() == 'yes'
 
-        def pre_kill_job(self, job_key, shards=None):
-            shards = ('shards %s' % shards) if shards is not None else 'all shards'
-            return self.confirm('Are you sure you want to kill %s (%s)? (yes/no): '
-                                % (job_key, shards))
+  def pre_kill_job(self, job_key, shards=None):
+    shards = ('shards %s' % shards) if shards is not None else 'all shards'
+    return self.confirm('Are you sure you want to kill %s (%s)? (yes/no): '
+                        % (job_key, shards))
+```
 
-###<a name="preMethods"></a>`pre_` Methods
+### pre_ Methods
 
 `pre_` methods have the signature:
 
@@ -191,7 +193,7 @@ The following example defines a class containing a `pre_kill_job` hook definitio
 
 If this method returns False, the API command call aborts.
 
-###<a name="errMethods"></a>err_ Methods
+### err_ Methods
 
 `err_` methods have the signature:
 
@@ -201,21 +203,23 @@ If this method returns False, the API command call aborts.
 
 `err_` method return codes are ignored.
 
-###<a name="postMethods"></a>`post_` Methods
+### post_ Methods
 
 `post_` methods have the signature:
 
-    post_<API method name>(self, result, <associated method's signature>)
+    post_<API method name>(self, result, <associated method signature>)
 
 `post_` method parameters are `self`, then `result`, followed by the same parameter signature as their associated method. `result` is the result of the associated method call. See the [chart](#chart) above for the mapping of parameters to methods. When writing `post_` methods, you can use the `*` and `**` syntax to designate that all unspecified arguments are passed in a list to the `*`ed parameter and all unspecified named arguments with values are passed as name/value pairs to the `**`ed parameter.
 
 `post_` method return codes are ignored.
 
-##<a name="GenericHooks"></a>Generic Hooks
+## Generic Hooks
 
 There are five Aurora API Methods which any of the three hook types can attach to. Thus, there are 15 possible hook/method combinations for a single `.aurora` config file. Say that you define `pre_` and `post_` hooks for the `restart` method. That leaves 13 undefined hook/method combinations; `err_restart` and the 3 `pre_`, `post_`, and `err_` hooks for each of the other 4 hookable methods. You can define what happens when any of these otherwise undefined 13 hooks execute via a generic hook, whose signature is:
 
-    generic_hook(self, hook_config, event, method_name, result_or_err, args*, kw**)
+```python
+generic_hook(self, hook_config, event, method_name, result_or_err, args*, kw**)
+```
 
 where:
 
@@ -233,27 +237,29 @@ where:
 
 Example:
 
-    # An example of a hook that overrides the standard do-nothing generic_hook
-    # by adding a log writing operation.
+```python
+# Overrides the standard do-nothing generic_hook by adding a log writing operation.
+from twitter.common import log
+  class Logger(object):
+    '''Adds to the log every time a hookable API method is called'''
+    def generic_hook(self, hook_config, event, method_name, result_or_err, *args, **kw)
+      log.info('%s: %s_%s of %s'
+               % (self.__class__.__name__, event, method_name, hook_config.job_key))
+```
 
-    from twitter.common import log
-      class Logger(object):
-        '''Just adds to the log every time a hookable API method is called'''
-        def generic_hook(self, hook_config, event, method_name, result_or_err, *args, **kw)
-          log.info('%s: %s_%s of %s' % (self.__class__.__name__, event, method_name, hook_config.job_key))
-
-##<a name="HooksProcessChecklist"></a>Hooks Process Checklist
+## Hooks Process Checklist
 
 1. In your `.aurora` config file, add a `hooks` variable. Note that you may want to define a `.aurora` file only for hook definitions and then include this file in multiple other config files that you want to use the same hooks.
 
-    `hooks = [ ]`
+```python
+hooks = []
+```
 
 2. In the `hooks` variable, list all objects that define hooks used by `Job`s defined in this config:
 
-         hooks = [ Object_hook_definer1,
-                   Object_hook_definer2
-                 ]
-
+```python
+hooks = [Object_hook_definer1, Object_hook_definer2]
+```
 
 3. For each job that uses hooks in this config file, add `enable_hooks = True` to the `Job` definition. Note that this is necessary even if you only want to use the generic hook.
 
