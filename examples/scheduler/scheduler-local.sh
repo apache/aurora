@@ -11,7 +11,7 @@ JAVA_OPTS=(
   -Xmx2g
   -Xms2g
 
-  # Location of libmesos-0.15.0.so / libmesos-0.15.0.dylib
+  # Location of libmesos-0.17.0.so / libmesos-0.17.0.dylib
   -Djava.library.path=/usr/local/lib
 )
 

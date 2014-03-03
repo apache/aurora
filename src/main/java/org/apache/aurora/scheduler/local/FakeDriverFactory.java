@@ -43,6 +43,7 @@ import org.apache.mesos.SchedulerDriver;
 /**
  * A factory for fake scheduler driver instances.
  */
+@SuppressWarnings("deprecation")
 class FakeDriverFactory implements DriverFactory {
 
   private final Provider<Scheduler> scheduler;
@@ -108,6 +109,20 @@ class FakeDriverFactory implements DriverFactory {
 
     @Override
     public Status requestResources(Collection<Request> requests) {
+      return null;
+    }
+
+    @Override
+    public Status launchTasks(
+        Collection<OfferID> offerIds,
+        Collection<TaskInfo> tasks,
+        Filters filters) {
+
+      return null;
+    }
+
+    @Override
+    public Status launchTasks(Collection<OfferID> offerIds, Collection<TaskInfo> tasks) {
       return null;
     }
 

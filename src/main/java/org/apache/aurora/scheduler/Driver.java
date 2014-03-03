@@ -118,7 +118,7 @@ public interface Driver {
 
     @Override
     public void launchTask(OfferID offerId, TaskInfo task) {
-      get(State.RUNNING).launchTasks(offerId, ImmutableList.of(task));
+      get(State.RUNNING).launchTasks(ImmutableList.of(offerId), ImmutableList.of(task));
     }
 
     @Override

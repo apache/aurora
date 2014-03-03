@@ -8,8 +8,8 @@ install -m 755 /vagrant/dist/aurora_admin.pex /usr/local/bin/aurora_admin
 
 apt-get update
 apt-get -y install java7-runtime-headless curl
-wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.15.0_amd64.deb
-dpkg --install mesos_0.15.0_amd64.deb
+wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.17.0_amd64.deb
+dpkg --install mesos_0.17.0_amd64.deb
 
 # TODO(ksweeney): Make this a be part of the Aurora distribution tarball.
 # Location where aurora-scheduler.zip was unpacked.
@@ -25,7 +25,7 @@ JAVA_OPTS=(
   -Xmx1g
   -Xms1g
 
-  # Location of libmesos-0.15.0.so / libmesos-0.15.0.dylib
+  # Location of libmesos-0.17.0.so / libmesos-0.17.0.dylib
   -Djava.library.path=/usr/local/lib
 )
 
@@ -91,5 +91,13 @@ cat > /etc/rc.local <<EOF
   2> /var/log/aurora-scheduler-stderr.log
 EOF
 chmod +x /etc/rc.local
+
+export LD_LIBRARY_PATH=/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server
+if mesos-log initialize --path="/usr/local/aurora-scheduler-$AURORA_VERSION/db"; then
+  echo "Replicated log initialized."
+else
+  echo "Replicated log initialization failed with code $? (likely already initialized)."
+fi
+unset LD_LIBRARY_PATH
 
 /etc/rc.local

@@ -280,7 +280,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     }
 
     protected void expectLaunch(TaskInfo task) {
-      expect(driver.launchTasks(OFFER_ID, ImmutableList.of(task))).andReturn(DRIVER_RUNNING);
+      expect(driver.launchTasks(ImmutableList.of(OFFER_ID), ImmutableList.of(task)))
+          .andReturn(DRIVER_RUNNING);
     }
 
     void expectations() throws Exception {

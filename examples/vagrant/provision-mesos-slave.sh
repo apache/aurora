@@ -1,8 +1,8 @@
 #!/bin/bash -x
 apt-get update
 apt-get -y install java7-runtime-headless curl
-wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.15.0_amd64.deb
-dpkg --install mesos_0.15.0_amd64.deb
+wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.17.0_amd64.deb
+dpkg --install mesos_0.17.0_amd64.deb
 
 # Get the IP address; eth1 is the net interface we care about.
 export SLAVE_IP_ADDRESS=$(ip addr show eth1 | grep 'inet ' | cut -d'/' -f 1 | cut -c '10-')
