@@ -15,7 +15,6 @@
  */
 package org.apache.aurora.scheduler.log;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.Iterator;
 
@@ -51,7 +50,7 @@ public interface Log {
    * An interface to the live {@link Log} stream that allows for appending, reading and writing
    * entries.
    */
-  interface Stream extends Closeable {
+  interface Stream {
 
     /**
      * Indicates a {@link Position} that is not (currently) contained in this log stream.

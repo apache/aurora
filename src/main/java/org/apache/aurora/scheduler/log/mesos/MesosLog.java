@@ -51,6 +51,8 @@ import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * A {@code Log} implementation backed by a true distributed log in mesos core.
  */
@@ -111,15 +113,15 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       @WriteTimeout Amount<Long, Time> writeTimeout,
       @NoopEntry byte[] noopEntry) {
 
-    this.logFactory = Preconditions.checkNotNull(logFactory);
+    this.logFactory = checkNotNull(logFactory);
 
-    this.readerFactory = Preconditions.checkNotNull(readerFactory);
-    this.readTimeout = readTimeout;
+    this.readerFactory = checkNotNull(readerFactory);
+    this.readTimeout = checkNotNull(readTimeout);
 
-    this.writerFactory = Preconditions.checkNotNull(writerFactory);
-    this.writeTimeout = writeTimeout;
+    this.writerFactory = checkNotNull(writerFactory);
+    this.writeTimeout = checkNotNull(writeTimeout);
 
-    this.noopEntry = Preconditions.checkNotNull(noopEntry);
+    this.noopEntry = checkNotNull(noopEntry);
   }
 
   @Override
@@ -267,7 +269,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
             throw new NoSuchElementException();
           }
 
-          Entry result = Preconditions.checkNotNull(entry);
+          Entry result = checkNotNull(entry);
           entry = null;
           return result;
         }
@@ -276,7 +278,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
 
     @Override
     public LogPosition append(final byte[] contents) throws StreamAccessException {
-      Preconditions.checkNotNull(contents);
+      checkNotNull(contents);
 
       Log.Position position = mutate(append, new Mutation<Log.Position>() {
         @Override
@@ -337,11 +339,6 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
 
     private LogPosition end() {
       return LogPosition.wrap(reader.ending());
-    }
-
-    @Override
-    public void close() {
-      // noop
     }
 
     private static class LogPosition implements org.apache.aurora.scheduler.log.Log.Position {

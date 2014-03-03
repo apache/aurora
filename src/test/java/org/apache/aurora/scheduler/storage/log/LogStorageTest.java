@@ -15,7 +15,6 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -26,9 +25,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
 import com.google.common.testing.TearDown;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.base.Command;
-import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
@@ -88,7 +84,6 @@ import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.Capture;
-import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
@@ -111,7 +106,6 @@ public class LogStorageTest extends EasyMockTest {
   private Stream stream;
   private Position position;
   private StreamMatcher streamMatcher;
-  private ShutdownRegistry shutdownRegistry;
   private SchedulingService schedulingService;
   private SnapshotStore<Snapshot> snapshotStore;
   private StorageTestUtil storageUtil;
@@ -120,8 +114,7 @@ public class LogStorageTest extends EasyMockTest {
   public void setUp() {
     log = createMock(Log.class);
 
-    shutdownRegistry = createMock(ShutdownRegistry.class);
-    LogManager logManager = new LogManager(log, Amount.of(1, Data.GB), false, shutdownRegistry);
+    LogManager logManager = new LogManager(log, Amount.of(1, Data.GB), false);
 
     schedulingService = createMock(SchedulingService.class);
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
@@ -149,10 +142,6 @@ public class LogStorageTest extends EasyMockTest {
   public void testStart() throws Exception {
     // We should open the log and arrange for its clean shutdown.
     expect(log.open()).andReturn(stream);
-
-    Capture<ExceptionalCommand<IOException>> shutdownStream = createCapture();
-    shutdownRegistry.addAction(capture(shutdownStream));
-    stream.close();
 
     // Our start should recover the log and then forward to the underlying storage start of the
     // supplied initialization logic.
@@ -238,12 +227,8 @@ public class LogStorageTest extends EasyMockTest {
     logStorage.start(initializationLogic);
     assertTrue(initialized.get());
 
-    assertTrue(snapshotAction.hasCaptured());
     // Run the snapshot thread.
     snapshotAction.getValue().run();
-
-    assertTrue(shutdownStream.hasCaptured());
-    shutdownStream.getValue().execute();
   }
 
   abstract class StorageTestFixture {
@@ -266,7 +251,6 @@ public class LogStorageTest extends EasyMockTest {
 
       // Open the log stream.
       expect(log.open()).andReturn(stream);
-      shutdownRegistry.addAction(EasyMock.<Command>notNull());
 
       // Replay the log and perform and supplied initializationWork.
       // Simulate NOOP initialization work

@@ -106,7 +106,6 @@ import org.junit.Test;
 
 import static org.easymock.EasyMock.createControl;
 import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -333,9 +332,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
         .andReturn(nextPosition());
     streamMatcher.expectTransaction(Op.saveFrameworkId(new SaveFrameworkId(FRAMEWORK_ID)))
         .andReturn(nextPosition());
-
-    logStream.close();
-    expectLastCall().anyTimes();
 
     final CountDownLatch driverStarted = new CountDownLatch(1);
     expect(driver.start()).andAnswer(new IAnswer<Status>() {

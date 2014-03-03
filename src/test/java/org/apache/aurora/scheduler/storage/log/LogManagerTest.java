@@ -15,7 +15,6 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.Deque;
@@ -30,9 +29,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
-import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
-import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -64,20 +61,17 @@ import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager;
 import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
-import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.aryEq;
-import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
 
 public class LogManagerTest extends EasyMockTest {
 
@@ -112,26 +106,6 @@ public class LogManagerTest extends EasyMockTest {
 
   private StreamManager createStreamManager(Amount<Integer, Data> maxEntrySize) {
     return new StreamManager(stream, false, maxEntrySize);
-  }
-
-  @Test
-  public void testLogManager() throws IOException, CodingException {
-    Log log = createMock(Log.class);
-    expect(log.open()).andReturn(stream);
-
-    ShutdownRegistry shutdownRegistry = createMock(ShutdownRegistry.class);
-    Capture<ExceptionalCommand<IOException>> shutdownAction = new Capture<>();
-    shutdownRegistry.addAction(capture(shutdownAction));
-
-    // The registered shutdown command should close the stream
-    stream.close();
-
-    control.replay();
-
-    new LogManager(log, NO_FRAMES_EVER_SIZE, false, shutdownRegistry).open();
-
-    assertTrue(shutdownAction.hasCaptured());
-    shutdownAction.getValue().execute();
   }
 
   @Test
@@ -385,11 +359,6 @@ public class LogManagerTest extends EasyMockTest {
       public void truncateBefore(Position position)
           throws InvalidPositionException, StreamAccessException {
         throw new UnsupportedOperationException();
-      }
-
-      @Override
-      public void close() throws IOException {
-        // noop
       }
     };
 

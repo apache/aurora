@@ -41,9 +41,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Bytes;
 import com.google.inject.BindingAnnotation;
-import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
-import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
@@ -98,19 +96,16 @@ public final class LogManager {
   private final Log log;
   private final Amount<Integer, Data> maxEntrySize;
   private final boolean deflateSnapshots;
-  private final ShutdownRegistry shutdownRegistry;
 
   @Inject
   LogManager(
       Log log,
       @MaxEntrySize Amount<Integer, Data> maxEntrySize,
-      @SnapshotSetting boolean deflateSnapshots,
-      ShutdownRegistry shutdownRegistry) {
+      @SnapshotSetting boolean deflateSnapshots) {
 
     this.log = checkNotNull(log);
     this.maxEntrySize = checkNotNull(maxEntrySize);
     this.deflateSnapshots = deflateSnapshots;
-    this.shutdownRegistry = checkNotNull(shutdownRegistry);
   }
 
   /**
@@ -120,14 +115,7 @@ public final class LogManager {
    * @throws IOException If there is a problem opening the log.
    */
   public StreamManager open() throws IOException {
-    final Stream stream = log.open();
-    shutdownRegistry.addAction(new ExceptionalCommand<IOException>() {
-      @Override
-      public void execute() throws IOException {
-        stream.close();
-      }
-    });
-    return new StreamManager(stream, deflateSnapshots, maxEntrySize);
+    return new StreamManager(log.open(), deflateSnapshots, maxEntrySize);
   }
 
   /**

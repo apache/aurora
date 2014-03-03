@@ -147,11 +147,6 @@ class FileLog implements Log {
       logWriter.execute(logContents);
     }
 
-    @Override
-    public void close() throws IOException {
-      // No-op.
-    }
-
     private static class CounterPosition implements Position {
       private final long value;
 
