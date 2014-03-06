@@ -26,7 +26,6 @@ import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
-import com.google.inject.Key;
 import com.google.inject.Provides;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.application.modules.LifecycleModule;
@@ -46,21 +45,24 @@ import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientCon
 import com.twitter.thrift.ServiceInstance;
 
 import org.apache.aurora.GuiceUtils;
+import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.SchedulerModule;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
-import org.apache.aurora.scheduler.http.ClusterName;
 import org.apache.aurora.scheduler.http.ServletModule;
 import org.apache.aurora.scheduler.metadata.MetadataModule;
 import org.apache.aurora.scheduler.quota.QuotaModule;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.stats.AsyncStatsModule;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.mesos.Scheduler;
 import org.apache.zookeeper.data.ACL;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
+
+import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 
 /**
  * Binding module for the aurora scheduler application.
@@ -87,7 +89,11 @@ class AppModule extends AbstractModule {
 
     bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
 
-    bind(Key.get(String.class, ClusterName.class)).toInstance(clusterName);
+    bind(IServerInfo.class).toInstance(
+        IServerInfo.build(
+            new ServerInfo()
+                .setClusterName(clusterName)
+                .setThriftAPIVersion(THRIFT_API_VERSION)));
 
     // Filter layering: notifier filter -> base impl
     PubsubEventModule.bind(binder(), SchedulingFilterImpl.class);

@@ -64,6 +64,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -104,14 +105,14 @@ public class SchedulerzRole extends JerseyTemplateServlet {
       Storage storage,
       CronJobManager cronJobManager,
       CronPredictor cronPredictor,
-      @ClusterName String clusterName,
+      IServerInfo serverInfo,
       QuotaManager quotaManager) {
 
     super("schedulerzrole");
     this.storage = checkNotNull(storage);
     this.cronJobManager = checkNotNull(cronJobManager);
     this.cronPredictor = checkNotNull(cronPredictor);
-    this.clusterName = checkNotBlank(clusterName);
+    this.clusterName = checkNotBlank(serverInfo.getClusterName());
     this.quotaManager = checkNotNull(quotaManager);
   }
 

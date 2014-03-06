@@ -59,6 +59,7 @@ import org.apache.aurora.gen.RoleSummary;
 import org.apache.aurora.gen.RoleSummaryResult;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
@@ -86,6 +87,7 @@ import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.thrift.aop.AopModule;
@@ -176,6 +178,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(CronJobManager.class).toInstance(cronJobManager);
         bind(QuotaManager.class).toInstance(quotaManager);
         bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
+        bind(IServerInfo.class).toInstance(IServerInfo.build(
+            new ServerInfo().setClusterName("test").setThriftAPIVersion(1)));
       }
     };
     Injector injector = Guice.createInjector(testModule, new AopModule());

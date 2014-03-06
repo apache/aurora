@@ -128,7 +128,7 @@ public class AopModule extends AbstractModule {
     });
     bindThriftDecorator(new FeatureToggleInterceptor());
     bindThriftDecorator(new ThriftStatsExporterInterceptor());
-    bindThriftDecorator(new APIVersionInterceptor());
+    bindThriftDecorator(new ServerInfoInterceptor());
   }
 
   private void bindThriftDecorator(MethodInterceptor interceptor) {

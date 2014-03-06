@@ -62,6 +62,7 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 
@@ -191,19 +192,18 @@ public class SchedulerzJob extends JerseyTemplateServlet {
   /**
    * Creates a new job servlet.
    *
-   * @param storage Backing store to fetch tasks from.
-   * @param clusterName Name of the serving cluster.
+   * @param storage a reference to scheduler storage.
    */
   @Inject
   public SchedulerzJob(
       Storage storage,
       CronJobManager cronJobManager,
-      @ClusterName String clusterName,
+      IServerInfo serverInfo,
       NearestFit nearestFit) {
 
     super("schedulerzjob");
     this.storage = checkNotNull(storage);
-    this.clusterName = checkNotBlank(clusterName);
+    this.clusterName = checkNotBlank(serverInfo.getClusterName());
     this.nearestFit = checkNotNull(nearestFit);
     this.cronJobManager = checkNotNull(cronJobManager);
   }

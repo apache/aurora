@@ -22,12 +22,13 @@ import com.google.inject.Injector;
 import com.google.inject.matcher.Matchers;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
-import org.apache.aurora.gen.APIVersion;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.GetJobsResult;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.Result;
+import org.apache.aurora.gen.ServerInfo;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 import org.junit.Before;
 import org.junit.Test;
@@ -37,23 +38,27 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
-public class APIVersionInterceptorTest extends EasyMockTest {
+public class ServerInfoInterceptorTest extends EasyMockTest {
 
   private static final String ROLE = "bob";
 
   private AuroraAdmin.Iface realThrift;
   private AuroraAdmin.Iface decoratedThrift;
 
-  private APIVersionInterceptor interceptor;
+  private static final IServerInfo SERVER_INFO =
+      IServerInfo.build(new ServerInfo().setClusterName("test").setThriftAPIVersion(1));
+
+  private ServerInfoInterceptor interceptor;
 
   @Before
   public void setUp() {
-    interceptor = new APIVersionInterceptor();
+    interceptor = new ServerInfoInterceptor();
     realThrift = createMock(AuroraAdmin.Iface.class);
     Injector injector = Guice.createInjector(new AbstractModule() {
       @Override
       protected void configure() {
         MockDecoratedThrift.bindForwardedMock(binder(), realThrift);
+        bind(IServerInfo.class).toInstance(SERVER_INFO);
         AopModule.bindThriftDecorator(
             binder(),
             Matchers.annotatedWith(DecoratedThrift.class),
@@ -65,29 +70,36 @@ public class APIVersionInterceptorTest extends EasyMockTest {
 
   @Test
   public void testVersionIsSet() throws Exception {
-    Response response = new Response().setResponseCode(OK)
-        .setResult(Result.getJobsResult(new GetJobsResult()
-            .setConfigs(ImmutableSet.<JobConfiguration>of())));
+    Response response = okResponse(
+        Result.getJobsResult(
+            new GetJobsResult().setConfigs(ImmutableSet.<JobConfiguration>of())));
 
     expect(realThrift.getJobs(ROLE)).andReturn(response);
     control.replay();
 
-    assertNotNull(decoratedThrift.getJobs(ROLE).version);
+    assertNotNull(decoratedThrift.getJobs(ROLE).DEPRECATEDversion);
   }
 
   @Test
-  public void testExistingVersion() throws Exception {
-    Response response = new Response().setResponseCode(OK)
-        .setResult(Result.getJobsResult(new GetJobsResult()
-            .setConfigs(ImmutableSet.<JobConfiguration>of())))
-        .setVersion(new APIVersion().setMajor(1));
+  public void testServerInfoIsSet() throws Exception {
+    ServerInfo previousServerInfo =
+        new ServerInfo().setClusterName("FAKECLUSTER").setThriftAPIVersion(100000);
+
+    Response response = okResponse(
+            Result.getJobsResult(
+                new GetJobsResult().setConfigs(ImmutableSet.<JobConfiguration>of())))
+            .setServerInfo(previousServerInfo);
 
     expect(realThrift.getJobs(ROLE)).andReturn(response);
+
     control.replay();
 
-    Response decoratedResponse = decoratedThrift.getJobs(ROLE);
-    assertNotNull(decoratedResponse.version);
-    assertEquals(decoratedResponse.version.getMajor(), 1);
+    assertEquals(SERVER_INFO.newBuilder(), decoratedThrift.getJobs(ROLE).serverInfo);
   }
 
+  private static Response okResponse(Result result) {
+    return new Response()
+        .setResponseCode(OK)
+        .setResult(result);
+  }
 }

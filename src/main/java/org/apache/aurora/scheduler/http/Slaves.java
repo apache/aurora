@@ -34,6 +34,7 @@ import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -52,13 +53,13 @@ public class Slaves extends JerseyTemplateServlet {
   /**
    * Injected constructor.
    *
-   * @param clusterName cluster name
+   * @param serverInfo server meta-data that contains the cluster name
    * @param storage store to fetch the host attributes from
    */
   @Inject
-  public Slaves(@ClusterName String clusterName, Storage storage) {
+  public Slaves(IServerInfo serverInfo, Storage storage) {
     super("slaves");
-    this.clusterName = checkNotBlank(clusterName);
+    this.clusterName = checkNotBlank(serverInfo.getClusterName());
     this.storage = checkNotNull(storage);
   }
 

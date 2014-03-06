@@ -42,6 +42,7 @@ import com.twitter.thrift.ServiceInstance;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.CronJobManager;
 import org.apache.aurora.scheduler.state.SchedulerCore;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_RESPONSE_FILTERS;
@@ -61,7 +62,7 @@ public class ServletModule extends AbstractModule {
   protected void configure() {
     requireBinding(SchedulerCore.class);
     requireBinding(CronJobManager.class);
-    requireBinding(Key.get(String.class, ClusterName.class));
+    requireBinding(IServerInfo.class);
     requireBinding(QuotaManager.class);
 
     // Bindings required for the leader redirector.

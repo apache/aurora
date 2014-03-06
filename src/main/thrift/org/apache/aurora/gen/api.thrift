@@ -28,12 +28,14 @@ enum ResponseCode {
   LOCK_ERROR      = 5  // Raised when a Lock-protected operation failed due to lock validation.
 }
 
+const i32 THRIFT_API_VERSION = 3
+
 struct APIVersion {
   1: required i32 major
 }
 
 // Scheduler Thrift API Version. Increment this when breaking backwards compatibility.
-const APIVersion CURRENT_API_VERSION = {'major': 3}
+const APIVersion CURRENT_API_VERSION = {'major': THRIFT_API_VERSION}
 
 // Aurora executor framework name.
 const string AURORA_EXECUTOR_NAME = 'AuroraExecutor'
@@ -407,6 +409,12 @@ struct RoleSummaryResult {
   1: set<RoleSummary> summaries
 }
 
+// meta-data about the thrift server that is wrapped around every thrift response
+struct ServerInfo {
+  1: string clusterName
+  2: i32 thriftAPIVersion
+}
+
 union Result {
   1: PopulateJobResult populateJobResult
   3: ScheduleStatusResult scheduleStatusResult
@@ -426,7 +434,10 @@ union Result {
 struct Response {
   1: ResponseCode responseCode
   2: string message
-  4: APIVersion version
+  // TODO(Suman Karumuri): Remove version field
+  // version field is deprecated.
+  4: APIVersion DEPRECATEDversion
+  5: ServerInfo serverInfo
   3: optional Result result
 }
 
@@ -445,6 +456,8 @@ service ReadOnlyScheduler {
   // Fetches the quota allocated for a user.
   Response getQuota(1: string ownerRole)
 
+  // TODO(Suman Karumuri): Delete this API once it is no longer used.
+  // NOTE: This API is deprecated.
   // Returns the current version of the API implementation
   Response getVersion()
 }

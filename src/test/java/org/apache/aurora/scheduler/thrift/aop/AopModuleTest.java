@@ -29,7 +29,9 @@ import org.apache.aurora.gen.AuroraAdmin.Iface;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -59,6 +61,7 @@ public class AopModuleTest extends EasyMockTest {
           @Override
           protected void configure() {
             bind(CapabilityValidator.class).toInstance(capabilityValidator);
+            bind(IServerInfo.class).toInstance(IServerInfo.build(new ServerInfo()));
             MockDecoratedThrift.bindForwardedMock(binder(), mockThrift);
           }
         },

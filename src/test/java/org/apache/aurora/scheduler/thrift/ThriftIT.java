@@ -32,6 +32,7 @@ import org.apache.aurora.auth.CapabilityValidator.Capability;
 import org.apache.aurora.auth.SessionValidator;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.scheduler.cron.CronScheduler;
 import org.apache.aurora.scheduler.quota.QuotaManager;
@@ -44,6 +45,7 @@ import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 import org.junit.Before;
@@ -161,6 +163,7 @@ public class ThriftIT extends EasyMockTest {
             bind(QuotaManager.class).toInstance(quotaManager);
             bind(SessionValidator.class).toInstance(validator);
             bind(CapabilityValidator.class).toInstance(new CapabilityValidatorFake(validator));
+            bind(IServerInfo.class).toInstance(IServerInfo.build(new ServerInfo()));
           }
         }
     );

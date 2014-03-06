@@ -45,6 +45,7 @@ import org.apache.aurora.scheduler.stats.ResourceCounter;
 import org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
 import org.apache.aurora.scheduler.stats.ResourceCounter.Metric;
 import org.apache.aurora.scheduler.stats.ResourceCounter.MetricType;
+import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
@@ -58,10 +59,10 @@ public class Utilization {
   private final StringTemplateHelper templateHelper;
 
   @Inject
-  Utilization(ResourceCounter counter, @ClusterName String clusterName) {
+  Utilization(ResourceCounter counter, IServerInfo serverInfo) {
     templateHelper = new StringTemplateHelper(getClass(), "utilization", true);
     this.counter = Preconditions.checkNotNull(counter);
-    this.clusterName = MorePreconditions.checkNotBlank(clusterName);
+    this.clusterName = MorePreconditions.checkNotBlank(serverInfo.getClusterName());
   }
 
   private String fillTemplate(Map<Display, Metric> metrics) {
