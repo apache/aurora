@@ -39,13 +39,15 @@ class TestRestartCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_options(cls):
     """set up to get a mock options object."""
-    mock_options = Mock()
+    mock_options = Mock(spec=['json', 'bindings', 'open_browser', 'shards', 'cluster',
+                              'health_check_interval_seconds', 'batch_size', 'max_per_shard_failures',
+                              'max_total_failures', 'restart_threshold', 'watch_secs'])
     mock_options.json = False
     mock_options.bindings = {}
     mock_options.open_browser = False
     mock_options.shards = None
     mock_options.cluster = None
-    mock_options.health_check_interval_secs = 3
+    mock_options.health_check_interval_seconds = 3
     mock_options.batch_size = 5
     mock_options.max_per_shard_failures = 0
     mock_options.max_total_failures = 0

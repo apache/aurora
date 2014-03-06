@@ -37,7 +37,7 @@ class UpdaterConfig(object):
                watch_secs,
                max_per_shard_failures,
                max_total_failures,
-               rollback_on_failure):
+               rollback_on_failure=True):
 
     if batch_size <= 0:
       raise ValueError('Batch size should be greater than 0')
