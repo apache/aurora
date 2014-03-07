@@ -140,7 +140,7 @@ dependencies {
   def guavaDep = 'com.google.guava:guava:15.0'
   compile guavaDep
   compile 'com.google.inject:guice:3.0'
-  compile 'com.google.protobuf:protobuf-java:2.4.1'
+  compile 'com.google.protobuf:protobuf-java:2.5.0'
   def jerseyRev = '1.12'
   compile "com.sun.jersey:jersey-core:${jerseyRev}"
   compile "com.sun.jersey:jersey-json:${jerseyRev}"
