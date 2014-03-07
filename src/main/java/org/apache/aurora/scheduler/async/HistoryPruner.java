@@ -18,10 +18,7 @@ package org.apache.aurora.scheduler.async;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.util.Collection;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -29,20 +26,20 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.LinkedHashMultimap;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.BindingAnnotation;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.gen.apiConstants;
+import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -55,7 +52,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import static org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
-import static org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 
 /**
  * Prunes tasks in a job based on per-job history and an inactive time threshold by observing tasks
@@ -64,19 +60,12 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 public class HistoryPruner implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(HistoryPruner.class.getName());
 
-  private final Multimap<IJobKey, String> tasksByJob =
-      Multimaps.synchronizedSetMultimap(LinkedHashMultimap.<IJobKey, String>create());
-  @VisibleForTesting
-  Multimap<IJobKey, String> getTasksByJob() {
-    return tasksByJob;
-  }
-
   private final ScheduledExecutorService executor;
   private final StateManager stateManager;
   private final Clock clock;
   private final long pruneThresholdMillis;
   private final int perJobHistoryGoal;
-  private final Map<String, Future<?>> taskIdToFuture = Maps.newConcurrentMap();
+  private final Storage storage;
 
   @BindingAnnotation
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
@@ -88,13 +77,15 @@ public class HistoryPruner implements EventSubscriber {
       final StateManager stateManager,
       final Clock clock,
       @PruneThreshold Amount<Long, Time> inactivePruneThreshold,
-      @PruneThreshold int perJobHistoryGoal) {
+      @PruneThreshold int perJobHistoryGoal,
+      Storage storage) {
 
     this.executor = checkNotNull(executor);
     this.stateManager = checkNotNull(stateManager);
     this.clock = checkNotNull(clock);
     this.pruneThresholdMillis = inactivePruneThreshold.as(Time.MILLISECONDS);
     this.perJobHistoryGoal = perJobHistoryGoal;
+    this.storage = checkNotNull(storage);
   }
 
   @VisibleForTesting
@@ -125,21 +116,9 @@ public class HistoryPruner implements EventSubscriber {
     stateManager.deleteTasks(taskIds);
   }
 
-  /**
-   * When triggered, removes the tasks scheduled for pruning and cancels any existing future.
-   *
-   * @param event A new TasksDeleted event.
-   */
-  @Subscribe
-  public void tasksDeleted(final TasksDeleted event) {
-    for (IScheduledTask task : event.getTasks()) {
-      String id = Tasks.id(task);
-      tasksByJob.remove(Tasks.SCHEDULED_TO_JOB_KEY.apply(task), id);
-      Future<?> future = taskIdToFuture.remove(id);
-      if (future != null) {
-        future.cancel(false);
-      }
-    }
+  @VisibleForTesting
+  static Query.Builder jobHistoryQuery(IJobKey jobKey) {
+    return Query.jobScoped(jobKey).byStatus(apiConstants.TERMINAL_STATES);
   }
 
   private void registerInactiveTask(
@@ -148,41 +127,34 @@ public class HistoryPruner implements EventSubscriber {
       long timeRemaining) {
 
     LOG.fine("Prune task " + taskId + " in " + timeRemaining + " ms.");
-    // Insert the latest inactive task at the tail.
-    tasksByJob.put(jobKey, taskId);
-    Runnable runnable = new Runnable() {
+    executor.schedule(
+        new Runnable() {
+          @Override
+          public void run() {
+            LOG.info("Pruning expired inactive task " + taskId);
+            deleteTasks(ImmutableSet.of(taskId));
+          }
+        },
+        timeRemaining,
+        TimeUnit.MILLISECONDS);
+
+    executor.submit(new Runnable() {
       @Override
       public void run() {
-        LOG.info("Pruning expired inactive task " + taskId);
-        tasksByJob.remove(jobKey, taskId);
-        taskIdToFuture.remove(taskId);
-        deleteTasks(ImmutableSet.of(taskId));
-      }
-    };
-    taskIdToFuture.put(taskId, executor.schedule(runnable, timeRemaining, TimeUnit.MILLISECONDS));
-
-    ImmutableSet.Builder<String> pruneTaskIds = ImmutableSet.builder();
-    Collection<String> tasks = tasksByJob.get(jobKey);
-    // From Multimaps javadoc: "It is imperative that the user manually synchronize on the returned
-    // multimap when accessing any of its collection views".
-    synchronized (tasksByJob) {
-      Iterator<String> iterator = tasks.iterator();
-      while (tasks.size() > perJobHistoryGoal) {
-        // Pick oldest task from the head. Guaranteed by LinkedHashMultimap based on insertion
-        // order.
-        String id = iterator.next();
-        iterator.remove();
-        pruneTaskIds.add(id);
-        Future<?> future = taskIdToFuture.remove(id);
-        if (future != null) {
-          future.cancel(false);
+        Collection<IScheduledTask> inactiveTasks =
+            Storage.Util.weaklyConsistentFetchTasks(storage, jobHistoryQuery(jobKey));
+        int tasksToPrune = inactiveTasks.size() - perJobHistoryGoal;
+        if (tasksToPrune > 0) {
+          if (inactiveTasks.size() > perJobHistoryGoal) {
+            Set<String> toPrune = FluentIterable
+                .from(Tasks.LATEST_ACTIVITY.sortedCopy(inactiveTasks))
+                .limit(tasksToPrune)
+                .transform(Tasks.SCHEDULED_TO_ID)
+                .toSet();
+            deleteTasks(toPrune);
+          }
         }
       }
-    }
-
-    Set<String> ids = pruneTaskIds.build();
-    if (!ids.isEmpty()) {
-      deleteTasks(ids);
-    }
+    });
   }
 }

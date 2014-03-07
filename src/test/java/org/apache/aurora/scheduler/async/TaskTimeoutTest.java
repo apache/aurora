@@ -15,16 +15,13 @@
  */
 package org.apache.aurora.scheduler.async;
 
-import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatsProvider;
@@ -41,13 +38,10 @@ import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
-import org.easymock.IExpectationSetters;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
-import static org.apache.aurora.gen.ScheduleStatus.DRAINING;
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
@@ -55,7 +49,6 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.PREEMPTING;
-import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.easymock.EasyMock.eq;
@@ -69,9 +62,6 @@ public class TaskTimeoutTest extends EasyMockTest {
   private static final long TIMEOUT_MS = Amount.of(1L, Time.MINUTES).as(Time.MILLISECONDS);
 
   private AtomicLong timedOutTaskCounter;
-  private Capture<Supplier<Number>> stateCountCapture;
-  private Map<ScheduleStatus, Capture<Supplier<Number>>> stateCaptures;
-
   private ScheduledExecutorService executor;
   private ScheduledFuture<?> future;
   private StateManager stateManager;
@@ -86,33 +76,9 @@ public class TaskTimeoutTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
     clock = new FakeClock();
     statsProvider = createMock(StatsProvider.class);
-    expectStatsProvider();
-  }
-
-  @After
-  public void verifyTasksDepleted() {
-    // Verify there is no memory leak.
-    assertEquals(0, stateCountCapture.getValue().get().intValue());
-  }
-
-  private void expectStatsProvider() {
     timedOutTaskCounter = new AtomicLong();
     expect(statsProvider.makeCounter(TaskTimeout.TIMED_OUT_TASKS_COUNTER))
         .andReturn(timedOutTaskCounter);
-
-    stateCountCapture = createCapture();
-    expect(statsProvider.makeGauge(
-        eq(TaskTimeout.TRANSIENT_COUNT_STAT_NAME),
-        EasyMock.capture(stateCountCapture))).andReturn(null);
-
-    stateCaptures = Maps.newHashMap();
-    for (ScheduleStatus status : TaskTimeout.TRANSIENT_STATES) {
-      Capture<Supplier<Number>> statusCapture = createCapture();
-      expect(statsProvider.makeGauge(
-          eq(TaskTimeout.waitingTimeStatName(status)),
-          EasyMock.capture(statusCapture))).andReturn(null);
-      stateCaptures.put(status, statusCapture);
-    }
   }
 
   private void replayAndCreate() {
@@ -120,7 +86,6 @@ public class TaskTimeoutTest extends EasyMockTest {
     timeout = new TaskTimeout(
         executor,
         stateManager,
-        clock,
         Amount.of(TIMEOUT_MS, Time.MILLISECONDS),
         statsProvider);
   }
@@ -139,10 +104,6 @@ public class TaskTimeoutTest extends EasyMockTest {
     return expectTaskWatch(TIMEOUT_MS);
   }
 
-  private IExpectationSetters<?> expectCancel() {
-    return expect(future.cancel(false)).andReturn(true);
-  }
-
   private void changeState(String taskId, ScheduleStatus from, ScheduleStatus to) {
     IScheduledTask task = IScheduledTask.build(new ScheduledTask()
         .setStatus(to)
@@ -157,9 +118,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Test
   public void testNormalTransitions() {
     expectTaskWatch();
-    expectCancel();
     expectTaskWatch();
-    expectCancel();
 
     replayAndCreate();
 
@@ -174,7 +133,6 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Test
   public void testTransientToTransient() {
     expectTaskWatch();
-    expectCancel();
     Capture<Runnable> killingTimeout = expectTaskWatch();
     expect(stateManager.changeState(
         TASK_ID,
@@ -241,11 +199,9 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   @Test
   public void testStorageStart() {
-
     expectTaskWatch(TIMEOUT_MS);
     expectTaskWatch(TIMEOUT_MS);
     expectTaskWatch(TIMEOUT_MS);
-    expectCancel().times(3);
 
     replayAndCreate();
 
@@ -261,57 +217,5 @@ public class TaskTimeoutTest extends EasyMockTest {
     changeState("a", ASSIGNED, RUNNING);
     changeState("b", KILLING, KILLED);
     changeState("c", PREEMPTING, FINISHED);
-  }
-
-  private void checkOutstandingTimer(ScheduleStatus status, long expectedValue) {
-    long value = stateCaptures.get(status).getValue().get().longValue();
-    assertEquals(expectedValue, value);
-  }
-
-  @Test
-  public void testOutstandingTimers() throws Exception {
-    expectTaskWatch();
-    expectTaskWatch();
-    expectCancel();
-    expectTaskWatch();
-    expectCancel().times(2);
-
-    replayAndCreate();
-
-    checkOutstandingTimer(ASSIGNED, 0);
-    checkOutstandingTimer(PREEMPTING, 0);
-    checkOutstandingTimer(RESTARTING, 0);
-    checkOutstandingTimer(DRAINING, 0);
-    checkOutstandingTimer(KILLING, 0);
-
-    changeState("a", PENDING, ASSIGNED);
-
-    Amount<Long, Time> tick = Amount.of(10L, Time.SECONDS);
-    clock.advance(tick);
-
-    checkOutstandingTimer(ASSIGNED, tick.as(Time.MILLISECONDS));
-
-    clock.advance(tick);
-    changeState("b", PENDING, ASSIGNED);
-
-    clock.advance(tick);
-    checkOutstandingTimer(ASSIGNED, tick.as(Time.MILLISECONDS) * 3);
-
-    changeState("a", ASSIGNED, RUNNING);
-    clock.advance(tick);
-    changeState("a", RUNNING, KILLING);
-    clock.advance(tick);
-
-    checkOutstandingTimer(ASSIGNED, tick.as(Time.MILLISECONDS) * 3);
-    checkOutstandingTimer(KILLING, tick.as(Time.MILLISECONDS));
-
-    changeState("a", KILLING, KILLED);
-    changeState("b", ASSIGNED, FINISHED);
-
-    checkOutstandingTimer(ASSIGNED, 0);
-    checkOutstandingTimer(PREEMPTING, 0);
-    checkOutstandingTimer(RESTARTING, 0);
-    checkOutstandingTimer(DRAINING, 0);
-    checkOutstandingTimer(KILLING, 0);
   }
 }
