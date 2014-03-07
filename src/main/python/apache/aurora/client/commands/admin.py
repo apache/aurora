@@ -61,13 +61,31 @@ def parse_host_file(filename):
   return hosts
 
 
+def parse_host_list(host_list):
+  hosts = [hostname.strip() for hostname in host_list.split(",")]
+  if not hosts:
+    die('No valid hosts found.')
+  return hosts
+
+
+def parse_hosts_optional(list_option, file_option):
+  if bool(list_option) and bool(file_option):
+    die('Cannot specify both filename and list for the same option.')
+  hosts = None
+  if file_option:
+    hosts = parse_host_file(file_option)
+  elif list_option:
+    hosts = parse_host_list(list_option)
+  return hosts
+
+
 def parse_hosts(options):
   if bool(options.filename) == bool(options.hosts):
     die('Please specify either --filename or --hosts')
   if options.filename:
     hosts = parse_host_file(options.filename)
   elif options.hosts:
-    hosts = [hostname.strip() for hostname in options.hosts.split(",")]
+    hosts = parse_host_list(options.hosts)
   if not hosts:
     die('No valid hosts found.')
   return hosts
@@ -433,17 +451,23 @@ def scheduler_snapshot(cluster):
 
 
 @app.command
-@app.command_option('-i', '--include_hosts', dest='include_filename', default=None,
-    help='Inclusion filter. An optional text file listing hosts (one per line)'
-         'to include into the result set if found. Example: cl1-aau-dev2.test.com')
-@app.command_option('-x', '--exclude_hosts', dest='exclude_filename', default=None,
-    help='Exclusion filter. An optional text file listing hosts (one per line)'
-         'to exclude from the result set if found. Example: cl1-aau-dev1.test.com')
+@app.command_option('-I', '--include_file', dest='include_filename', default=None,
+    help='Inclusion filter. An optional text file listing host names (one per line)'
+         'to include into the result set if found.')
+@app.command_option('-i', '--include_hosts', dest='include_hosts', default=None,
+    help='Inclusion filter. An optional comma-separated list of host names'
+         'to include into the result set if found.')
+@app.command_option('-X', '--exclude_file', dest='exclude_filename', default=None,
+    help='Exclusion filter. An optional text file listing host names (one per line)'
+         'to exclude from the result set if found.')
+@app.command_option('-x', '--exclude_hosts', dest='exclude_hosts', default=None,
+    help='Exclusion filter. An optional comma-separated list of host names'
+         'to exclude from the result set if found.')
 @app.command_option('-l', '--list_jobs', dest='list_jobs', default=False, action='store_true',
     help='Lists all affected job keys with projected new SLAs if their tasks get killed'
          'in the following column format:\n'
          'HOST  JOB  PREDICTED_SLA  DURATION_SECONDS')
-@app.command_option('-o', '--override_jobs', dest='override_filename', default=None,
+@app.command_option('-o', '--override_file', dest='override_filename', default=None,
     help='An optional text file to load job specific SLAs that will override'
          'cluster-wide command line percentage and duration values.'
          'The file can have multiple lines in the following format:'
@@ -492,16 +516,18 @@ def sla_list_safe_domain(cluster, percentage, duration):
   sla_percentage = parse_sla_percentage(percentage)
   sla_duration = parse_time(duration)
 
-  exclude_hosts = parse_host_file(options.exclude_filename) if options.exclude_filename else []
-  include_hosts = parse_host_file(options.include_filename) if options.include_filename else []
+  exclude_hosts = parse_hosts_optional(options.exclude_hosts, options.exclude_filename)
+  include_hosts = parse_hosts_optional(options.include_hosts, options.include_filename)
   override_jobs = parse_jobs_file(options.override_filename) if options.override_filename else {}
 
-  vector = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).sla_get_safe_domain_vector()
+  vector = AuroraClientAPI(
+      CLUSTERS[cluster],
+      options.verbosity).sla_get_safe_domain_vector(include_hosts)
   hosts = vector.get_safe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), override_jobs)
 
   results = []
   for host in sorted(hosts.keys()):
-    if include_hosts and host not in include_hosts or exclude_hosts and host in exclude_hosts:
+    if exclude_hosts and host in exclude_hosts:
       continue
 
     if options.list_jobs:
@@ -546,7 +572,7 @@ def sla_probe_hosts(cluster, percentage, duration):
   sla_duration = parse_time(duration)
   hosts = parse_hosts(options)
 
-  vector = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).sla_get_safe_domain_vector()
+  vector = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).sla_get_safe_domain_vector(hosts)
   probed_hosts = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), hosts)
 
   results = []

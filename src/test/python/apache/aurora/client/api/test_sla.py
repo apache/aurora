@@ -14,14 +14,15 @@
 # limitations under the License.
 #
 
-import unittest
 import time
+import unittest
 
 from apache.aurora.client.api.sla import (
     DomainUpTimeSlaVector,
     JobUpTimeSlaVector,
     Sla,
-    SLA_LIVE_STATES
+    SLA_LIVE_STATES,
+    task_query
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
@@ -41,7 +42,7 @@ from gen.apache.aurora.ttypes import (
     TaskQuery
 )
 
-from mock import Mock
+from mock import call, Mock, patch
 
 
 class SlaTest(unittest.TestCase):
@@ -305,3 +306,41 @@ class SlaTest(unittest.TestCase):
         self.create_task(400, 4, 'h4', self._name),
     ])
     self.assert_probe_hosts_result('h1', 80, 300, 50.0, False, None)
+
+
+  def test_get_domain_uptime_vector_with_hosts(self):
+    with patch('apache.aurora.client.api.sla.task_query', return_value=TaskQuery()) as (mock_query):
+      self.mock_get_tasks([
+          self.create_task(100, 1, 'h1', 'j1'),
+          self.create_task(200, 2, 'h1', 'j2'),
+          self.create_task(200, 3, 'h2', 'j1'),
+          self.create_task(200, 3, 'h2', 'j3'),
+          self.create_task(200, 4, 'h3', 'j4'),
+          self.create_task(200, 4, 'h3', 'j3'),
+      ])
+      hosts = ['h1', 'h2', 'h3']
+      jobs = set([
+          AuroraJobKey(self._cluster.name, self._role, self._env, 'j1'),
+          AuroraJobKey(self._cluster.name, self._role, self._env, 'j2'),
+          AuroraJobKey(self._cluster.name, self._role, self._env, 'j3'),
+          AuroraJobKey(self._cluster.name, self._role, self._env, 'j4')
+      ])
+
+      self._sla.get_domain_uptime_vector(self._cluster, hosts)
+      mock_query.assert_has_calls([call(hosts=hosts), call(job_keys=jobs)], any_order=False)
+
+  def test_task_query(self):
+    jobs = set([
+        AuroraJobKey(self._cluster.name, self._role, self._env, 'j1'),
+        AuroraJobKey(self._cluster.name, self._role, self._env, 'j2'),
+        AuroraJobKey(self._cluster.name, self._role, self._env, 'j3'),
+        AuroraJobKey(self._cluster.name, self._role, self._env, 'j4')
+    ])
+
+    query = task_query(job_keys=jobs)
+    assert len(jobs) == len(query.jobKeys), 'Expected length:%s, Actual:%s' % (
+        len(jobs), len(query.jobKeys)
+    )
+    assert SLA_LIVE_STATES == query.statuses, 'Expected:%s, Actual:%s' % (
+        SLA_LIVE_STATES, query.statuses
+    )

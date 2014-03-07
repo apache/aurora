@@ -32,10 +32,13 @@ from mock import Mock, patch
 class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
 
   @classmethod
-  def setup_mock_options(cls, exclude=None, include=None, override=None, list_jobs=False):
+  def setup_mock_options(cls, exclude=None, include=None, override=None,
+                         exclude_list=None, include_list=None, list_jobs=False):
     mock_options = Mock()
     mock_options.exclude_filename = exclude
+    mock_options.exclude_hosts = exclude_list
     mock_options.include_filename = include
+    mock_options.include_hosts = include_list
     mock_options.override_filename = override
     mock_options.list_jobs = list_jobs
     mock_options.verbosity = False
@@ -102,11 +105,34 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
         mock_vector.get_safe_hosts.assert_called_once_with(50.0, 100.0, {})
         mock_print_results.assert_called_once_with(['h0', 'h2'])
 
+  def test_safe_domain_exclude_hosts_from_list(self):
+    """Test successful execution of the sla_list_safe_domain command with exclude list option."""
+    mock_vector = self.create_mock_vector(self.create_hosts(3, 80, 100))
+    mock_options = self.setup_mock_options(exclude_list=','.join(['h0', 'h1']))
+    with contextlib.nested(
+        patch('apache.aurora.client.commands.admin.AuroraClientAPI', new=Mock(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.print_results'),
+        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('twitter.common.app.get_options', return_value=mock_options)
+    ) as (
+        mock_api,
+        mock_print_results,
+        test_clusters,
+        mock_options):
+
+      mock_api.return_value.sla_get_safe_domain_vector.return_value = mock_vector
+
+      sla_list_safe_domain(['west', '50', '100s'])
+
+      mock_vector.get_safe_hosts.assert_called_once_with(50.0, 100.0, {})
+      mock_print_results.assert_called_once_with(['h2'])
+
   def test_safe_domain_include_hosts(self):
     """Test successful execution of the sla_list_safe_domain command with include hosts option."""
-    mock_vector = self.create_mock_vector(self.create_hosts(3, 80, 100))
+    mock_vector = self.create_mock_vector(self.create_hosts(1, 80, 100))
+    hostname = 'h0'
     with temporary_file() as fp:
-      fp.write('h1')
+      fp.write(hostname)
       fp.flush()
       mock_options = self.setup_mock_options(include=fp.name)
       with contextlib.nested(
@@ -124,8 +150,33 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
 
         sla_list_safe_domain(['west', '50', '100s'])
 
+        mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with([hostname])
         mock_vector.get_safe_hosts.assert_called_once_with(50.0, 100.0, {})
-        mock_print_results.assert_called_once_with(['h1'])
+        mock_print_results.assert_called_once_with([hostname])
+
+  def test_safe_domain_include_hosts_from_list(self):
+    """Test successful execution of the sla_list_safe_domain command with include list option."""
+    mock_vector = self.create_mock_vector(self.create_hosts(2, 80, 100))
+    hosts = ['h0', 'h1']
+    mock_options = self.setup_mock_options(include_list=','.join(hosts))
+    with contextlib.nested(
+        patch('apache.aurora.client.commands.admin.AuroraClientAPI', new=Mock(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.print_results'),
+        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('twitter.common.app.get_options', return_value=mock_options)
+    ) as (
+        mock_api,
+        mock_print_results,
+        test_clusters,
+        mock_options):
+
+      mock_api.return_value.sla_get_safe_domain_vector.return_value = mock_vector
+
+      sla_list_safe_domain(['west', '50', '100s'])
+
+      mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(hosts)
+      mock_vector.get_safe_hosts.assert_called_once_with(50.0, 100.0, {})
+      mock_print_results.assert_called_once_with(hosts)
 
   def test_safe_domain_override_jobs(self):
     """Test successful execution of the sla_list_safe_domain command with override_jobs option."""
@@ -205,6 +256,18 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
         else:
           assert 'Expected error is not raised.'
 
+  def test_safe_domain_hosts_error(self):
+    """Tests execution of the sla_list_safe_domain command with both include file and list"""
+    mock_options = self.setup_mock_options(include='file', include_list='list')
+    with patch('twitter.common.app.get_options', return_value=mock_options) as (mock_options):
+
+      try:
+        sla_list_safe_domain(['west', '50', '100s'])
+      except SystemExit:
+        pass
+      else:
+        assert 'Expected error is not raised.'
+
 
 class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
 
@@ -233,7 +296,8 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
 
   def test_probe_hosts_with_list(self):
     """Tests successful execution of the sla_probe_hosts command with host list."""
-    mock_options = self.setup_mock_options(hosts='h0,h1')
+    hosts = ['h0', 'h1']
+    mock_options = self.setup_mock_options(hosts=','.join(hosts))
     mock_vector = self.create_mock_vector(self.create_probe_hosts(2, 80, True, 0))
     with contextlib.nested(
         patch('apache.aurora.client.commands.admin.AuroraClientAPI', new=Mock(spec=AuroraClientAPI)),
@@ -249,7 +313,8 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
       mock_api.return_value.sla_get_safe_domain_vector.return_value = mock_vector
       sla_probe_hosts(['west', '90', '200s'])
 
-      mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0, ['h0', 'h1'])
+      mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(hosts)
+      mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0, hosts)
       mock_print_results.assert_called_once_with([
           'h0\twest/role/env/job0\t80.00\tTrue\t0',
           'h1\twest/role/env/job1\t80.00\tTrue\t0'
@@ -276,6 +341,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
         mock_api.return_value.sla_get_safe_domain_vector.return_value = mock_vector
         sla_probe_hosts(['west', '90', '200s'])
 
+        mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(['h0'])
         mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0, ['h0'])
         mock_print_results.assert_called_once_with([
             'h0\twest/role/env/job0\t80.00\tFalse\tn/a'

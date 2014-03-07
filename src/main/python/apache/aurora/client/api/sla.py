@@ -36,6 +36,38 @@ from gen.apache.aurora.ttypes import (
 SLA_LIVE_STATES = LIVE_STATES | set([ScheduleStatus.STARTING])
 
 
+def job_key_from_scheduled(task, cluster):
+  """Creates AuroraJobKey from the ScheduledTask.
+
+  Arguments:
+  task -- ScheduledTask to get job key from.
+  cluster -- Cluster the task belongs to.
+  """
+  return AuroraJobKey(
+      cluster=cluster.name,
+      role=task.assignedTask.task.owner.role,
+      env=task.assignedTask.task.environment,
+      name=task.assignedTask.task.jobName
+  )
+
+
+def task_query(job_key=None, hosts=None, job_keys=None):
+  """Creates TaskQuery optionally scoped by a job(s) or hosts.
+
+  Arguments:
+  job_key -- AuroraJobKey to scope the query by.
+  hosts -- list of hostnames to scope the query by.
+  job_keys -- list of AuroraJobKeys to scope the query by.
+  """
+  return TaskQuery(
+      owner=Identity(role=job_key.role) if job_key else None,
+      environment=job_key.env if job_key else None,
+      jobName=job_key.name if job_key else None,
+      slaveHosts=set(hosts) if hosts else None,
+      jobKeys=set(k.to_thrift() for k in job_keys) if job_keys else None,
+      statuses=SLA_LIVE_STATES)
+
+
 class JobUpTimeSlaVector(object):
   """A grouping of job active tasks by:
       - instance: Map of instance ID -> instance uptime in seconds.
@@ -213,18 +245,10 @@ class DomainUpTimeSlaVector(object):
     return filtered_percentage, total_count, filtered_vector
 
   def _init_mappings(self):
-    def job_key_from_scheduled(task):
-      return AuroraJobKey(
-          cluster=self._cluster.name,
-          role=task.assignedTask.task.owner.role,
-          env=task.assignedTask.task.environment,
-          name=task.assignedTask.task.jobName
-      )
-
     jobs = defaultdict(list)
     hosts = defaultdict(list)
     for task in self._tasks:
-      job_key = job_key_from_scheduled(task)
+      job_key = job_key_from_scheduled(task, self._cluster)
       jobs[job_key].append(task)
       hosts[task.assignedTask.slaveHost].append(job_key)
 
@@ -243,20 +267,20 @@ class Sla(object):
     Arguments:
     job_key -- job to create a task uptime vector for.
     """
-    return JobUpTimeSlaVector(self._get_tasks(self._create_task_query(job_key=job_key)))
+    return JobUpTimeSlaVector(self._get_tasks(task_query(job_key=job_key)))
 
-  def get_domain_uptime_vector(self, cluster):
-    """Returns a DomainUpTimeSlaVector object with all available job uptimes."""
-    return DomainUpTimeSlaVector(cluster, self._get_tasks(self._create_task_query()))
+  def get_domain_uptime_vector(self, cluster, hosts=None):
+    """Returns a DomainUpTimeSlaVector object with all available job uptimes.
+
+    Arguments:
+    cluster -- Cluster to get vector for.
+    hosts -- optional list of hostnames to query by.
+    """
+    tasks = self._get_tasks(task_query(hosts=hosts)) if hosts else None
+    job_keys = set(job_key_from_scheduled(t, cluster) for t in tasks) if tasks else None
+    return DomainUpTimeSlaVector(cluster, self._get_tasks(task_query(job_keys=job_keys)))
 
   def _get_tasks(self, task_query):
     resp = self._scheduler.getTasksStatus(task_query)
     check_and_log_response(resp)
     return resp.result.scheduleStatusResult.tasks
-
-  def _create_task_query(self, job_key=None):
-    return TaskQuery(
-        owner=Identity(role=job_key.role) if job_key else None,
-        environment=job_key.env if job_key else None,
-        jobName=job_key.name if job_key else None,
-        statuses=SLA_LIVE_STATES)
