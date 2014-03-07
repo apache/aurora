@@ -15,12 +15,14 @@
  */
 package org.apache.aurora.scheduler.base;
 
+import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.TaskQuery;
@@ -152,19 +154,39 @@ public final class JobKeys {
   }
 
   /**
-   * Attempt to extract a job key from the given query if it is scoped to a single job.
+   * Attempt to extract job keys from the given query if it is job scoped.
    *
-   * @param query Query to extract the key from.
-   * @return A present if one can be extracted, absent otherwise.
+   * @param query Query to extract the keys from.
+   * @return A present if keys can be extracted, absent otherwise.
    */
-  public static Optional<IJobKey> from(Query.Builder query) {
+  public static Optional<Set<IJobKey>> from(Query.Builder query) {
     if (Query.isJobScoped(query)) {
       TaskQuery taskQuery = query.get();
-      return Optional.of(
-          from(taskQuery.getOwner().getRole(), taskQuery.getEnvironment(), taskQuery.getJobName()));
+      ImmutableSet.Builder<IJobKey> builder = ImmutableSet.builder();
 
+      if (taskQuery.isSetJobName()) {
+        builder.add(from(
+            taskQuery.getOwner().getRole(),
+            taskQuery.getEnvironment(),
+            taskQuery.getJobName()));
+      }
+
+      if (taskQuery.isSetJobKeys()) {
+        builder.addAll(IJobKey.setFromBuilders(taskQuery.getJobKeys()));
+      }
+      return Optional.of(assertValid(builder.build()));
     } else {
       return Optional.absent();
     }
+  }
+
+  private static Set<IJobKey> assertValid(Set<IJobKey> jobKeys)
+      throws IllegalArgumentException {
+
+    for (IJobKey jobKey : jobKeys) {
+      checkArgument(isValid(jobKey), "Invalid job key format:" + jobKey);
+    }
+
+    return jobKeys;
   }
 }

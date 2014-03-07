@@ -267,10 +267,11 @@ class SchedulerCoreImpl implements SchedulerCore {
 
     boolean jobDeleted = false;
 
-    if (Query.isOnlyJobScoped(query)) {
+    if (Query.isSingleJobScoped(query)) {
       // If this looks like a query for all tasks in a job, instruct the scheduler modules to
       // delete the job.
-      IJobKey jobKey = JobKeys.from(query).get();
+      // TODO(maxim): Should be trivial to support killing multiple jobs instead.
+      IJobKey jobKey = Iterables.getOnlyElement(JobKeys.from(query).get());
       for (JobManager manager : jobManagers) {
         if (manager.deleteJob(jobKey)) {
           jobDeleted = true;

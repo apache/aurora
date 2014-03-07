@@ -76,8 +76,7 @@ class MemTaskStore implements TaskStore.Mutable {
       new Function<Query.Builder, Optional<Set<IJobKey>>>() {
         @Override
         public Optional<Set<IJobKey>> apply(Query.Builder query) {
-          Optional<IJobKey> jobkey = JobKeys.from(query);
-          return jobkey.isPresent() ? Optional.of(jobkey.asSet()) : Optional.<Set<IJobKey>>absent();
+            return JobKeys.from(query);
         }
       };
   private static final Function<Query.Builder, Optional<Set<String>>> QUERY_TO_SLAVE_HOST =
@@ -255,6 +254,11 @@ class MemTaskStore implements TaskStore.Mutable {
           }
         }
 
+        if (query.getJobKeysSize() > 0) {
+          if (!query.getJobKeys().contains(JobKeys.from(config).newBuilder())) {
+            return false;
+          }
+        }
         if (query.getTaskIds() != null) {
           if (!query.getTaskIds().contains(Tasks.id(task))) {
             return false;

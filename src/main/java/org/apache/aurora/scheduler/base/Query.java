@@ -16,11 +16,13 @@
 package org.apache.aurora.scheduler.base;
 
 import java.util.EnumSet;
+import java.util.Set;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
 
 import org.apache.aurora.gen.Identity;
@@ -30,8 +32,6 @@ import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-
-import static org.apache.commons.lang.StringUtils.isEmpty;
 
 /**
  * A utility class to construct storage queries.
@@ -45,30 +45,33 @@ public final class Query {
 
   /**
    * Checks whether a query is scoped to a specific job.
-   * A query scoped to a job specifies a role and job name.
+   * A query scoped to a job specifies either:
+   * <ol>
+   *   <li>a role, environment and job name, or</li>
+   *   <li>a set of JobKey instances</li>
+   * </ol>
    *
    * @param taskQuery Query to test.
-   * @return {@code true} if the query specifies at least a role and job name,
-   *         otherwise {@code false}.
+   * @return {@code true} if the query specifies at least one job key, otherwise {@code false}.
    */
   public static boolean isJobScoped(Builder taskQuery) {
-    TaskQuery query = taskQuery.get();
-    return (query.getOwner() != null)
-        && !isEmpty(query.getOwner().getRole())
-        && !isEmpty(query.getEnvironment())
-        && !isEmpty(query.getJobName());
+    TaskQuery q = taskQuery.get();
+    return (q.isSetOwner() && q.getOwner().isSetRole() && q.isSetEnvironment() && q.isSetJobName())
+        || q.isSetJobKeys();
   }
 
   /**
    * Checks whether a query is strictly scoped to a specific job. A query is strictly job scoped,
-   * iff it has the role, environment and jobName set.
+   * iff the only fields that are set in the query are: role, environment and job name.
    *
    * @param query Query to test.
-   * @return {@code true} if the query is strictly job scoped, otherwise {@code false}.
+   * @return {@code true} if the query is strictly single job scoped, otherwise {@code false}.
    */
-  public static boolean isOnlyJobScoped(Builder query) {
-    Optional<IJobKey> jobKey = JobKeys.from(query);
-    return jobKey.isPresent() && Query.jobScoped(jobKey.get()).equals(query);
+  public static boolean isSingleJobScoped(Builder query) {
+    Optional<Set<IJobKey>> jobKey = JobKeys.from(query);
+    return jobKey.isPresent()
+        && jobKey.get().size() == 1
+        && Query.jobScoped(Iterables.getOnlyElement(jobKey.get())).equals(query);
   }
 
   public static Builder arbitrary(TaskQuery query) {
@@ -89,6 +92,10 @@ public final class Query {
 
   public static Builder jobScoped(IJobKey jobKey) {
     return unscoped().byJob(jobKey);
+  }
+
+  public static Builder jobScoped(Iterable<IJobKey> jobKeys) {
+    return unscoped().byJobKeys(jobKeys);
   }
 
   public static Builder instanceScoped(InstanceKey instanceKey) {
@@ -360,6 +367,19 @@ public final class Query {
               .setEnvironment(jobKey.getEnvironment())
               .setJobName(jobKey.getName())
               .setInstanceIds(ImmutableSet.copyOf(instanceIds)));
+    }
+
+    /**
+     * Returns a new builder scoped to the jobs uniquely identified by the given jobKeys. A
+     * builder can only be scoped to jobs once.
+     *
+     * @param jobKeys The job keys to scope this builder to.
+     * @return A new Builder scoped to the job keys.
+     */
+    public Builder byJobKeys(Iterable<IJobKey> jobKeys) {
+      checkNotNull(jobKeys);
+
+      return new Builder(query.deepCopy().setJobKeys(IJobKey.toBuildersSet(jobKeys)));
     }
 
     /**

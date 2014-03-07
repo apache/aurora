@@ -925,8 +925,8 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   public void testIsStrictlyJobScoped() throws Exception {
     // TODO(Sathya): Remove this after adding a unit test for Query utility class.
     control.replay();
-    assertTrue(Query.isOnlyJobScoped(Query.jobScoped(KEY_A)));
-    assertFalse(Query.isOnlyJobScoped(Query.jobScoped(KEY_A).byId("xyz")));
+    assertTrue(Query.isSingleJobScoped(Query.jobScoped(KEY_A)));
+    assertFalse(Query.isSingleJobScoped(Query.jobScoped(KEY_A).byId("xyz")));
   }
 
   @Test

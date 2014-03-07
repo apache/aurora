@@ -119,6 +119,42 @@ public class MemTaskStoreTest {
   }
 
   @Test
+  public void testQueryByJobKeys() {
+    assertStoreContents();
+    store.saveTasks(ImmutableSet.of(TASK_A, TASK_B, TASK_C, TASK_D));
+
+    assertQueryResults(
+        Query.jobScoped(ImmutableSet.of(
+            JobKeys.from("role-a", "env-a", "job-a"),
+            JobKeys.from("role-b", "env-b", "job-b"),
+            JobKeys.from("role-c", "env-c", "job-c"))),
+        TASK_A, TASK_B, TASK_C);
+
+    // Conflicting jobs will produce empty result as TaskQuery fields are ANDed.
+    assertEquals(
+        0,
+        store.fetchTasks(
+            Query.jobScoped(JobKeys.from("role-a", "env-a", "job-a"))
+                .byJobKeys(ImmutableSet.of(JobKeys.from("role-b", "env-b", "job-b")))).size());
+
+    // Matching jobs would return successfully.
+    assertQueryResults(
+        Query.jobScoped(JobKeys.from("role-a", "env-a", "job-a"))
+            .byJobKeys(ImmutableSet.of(
+                JobKeys.from("role-b", "env-b", "job-b"),
+                JobKeys.from("role-a", "env-a", "job-a"))),
+        TASK_A);
+
+    // Combination of individual field and jobKeys is allowed.
+    assertQueryResults(
+        Query.roleScoped("role-b")
+            .byJobKeys(ImmutableSet.of(
+                JobKeys.from("role-b", "env-b", "job-b"),
+                JobKeys.from("role-a", "env-a", "job-a"))),
+        TASK_B);
+  }
+
+  @Test
   public void testMutate() {
     store.saveTasks(ImmutableSet.of(TASK_A, TASK_B, TASK_C, TASK_D));
     assertQueryResults(Query.statusScoped(RUNNING));
