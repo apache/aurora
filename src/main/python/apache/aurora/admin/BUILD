@@ -15,8 +15,8 @@
 #
 
 python_library(
-  name = 'mesos_maintenance',
-  sources = 'mesos_maintenance.py',
+  name = 'host_maintenance',
+  sources = 'host_maintenance.py',
   dependencies = [
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.quantity'),

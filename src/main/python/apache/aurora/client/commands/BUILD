@@ -31,11 +31,22 @@ python_library(
     pants('3rdparty/python:twitter.common.app'),
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.quantity'),
-    pants('src/main/python/apache/aurora/admin:mesos_maintenance'),
     pants('src/main/python/apache/aurora/client/api'),
     pants('src/main/python/apache/aurora/client:base'),
     pants('src/main/python/apache/aurora/common:clusters'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ]
+)
+
+python_library(
+  name = 'maintenance',
+  sources = ['maintenance.py'],
+  dependencies = [
+    pants('3rdparty/python:twitter.common.app'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('src/main/python/apache/aurora/admin:host_maintenance'),
+    pants('src/main/python/apache/aurora/client:base'),
+    pants('src/main/python/apache/aurora/common:clusters'),
   ]
 )
 

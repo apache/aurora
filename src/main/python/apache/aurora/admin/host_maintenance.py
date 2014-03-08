@@ -30,9 +30,9 @@ def group_by_host(hostname):
   return hostname
 
 
-class MesosMaintenance(object):
-  """This class provides more methods to interact with the mesos cluster and perform
-  maintenance.
+class HostMaintenance(object):
+  """Submit requests to the scheduler to put hosts into and out of maintenance
+  mode so they can be operated upon without causing LOST tasks.
   """
 
   DEFAULT_GROUPING = 'by_host'
@@ -53,13 +53,13 @@ class MesosMaintenance(object):
     return groups
 
   @classmethod
-  def iter_batches(cls, hostnames, batch_size, grouping_function=DEFAULT_GROUPING):
-    if batch_size <= 0:
+  def iter_batches(cls, hostnames, groups_per_batch, grouping_function=DEFAULT_GROUPING):
+    if groups_per_batch <= 0:
       raise ValueError('Batch size must be > 0!')
     groups = cls.group_hosts(hostnames, grouping_function)
     groups = sorted(groups.items(), key=lambda v: v[0])
-    for k in range(0, len(groups), batch_size):
-      yield Hosts(set.union(*(hostset for (key, hostset) in groups[k:k+batch_size])))
+    for k in range(0, len(groups), groups_per_batch):
+      yield Hosts(set.union(*(hostset for (key, hostset) in groups[k:k + groups_per_batch])))
 
   def __init__(self, cluster, verbosity):
     self._client = AuroraClientAPI(cluster, verbosity == 'verbose')
@@ -72,7 +72,6 @@ class MesosMaintenance(object):
       log.info("Sleeping for %s." % self.START_MAINTENANCE_DELAY)
       clock.sleep(self.START_MAINTENANCE_DELAY.as_(Time.SECONDS))
       resp = self._client.maintenance_status(Hosts(not_ready_hosts))
-      #TODO(jsmith): Workaround until scheduler responds with unknown slaves in MESOS-3454
       if not resp.result.maintenanceStatusResult.statuses:
         not_ready_hosts = None
       for host_status in resp.result.maintenanceStatusResult.statuses:
@@ -103,7 +102,7 @@ class MesosMaintenance(object):
     """Put a list of hosts into maintenance mode, to de-prioritize scheduling."""
     check_and_log_response(self._client.start_maintenance(Hosts(set(hosts))))
 
-  def perform_maintenance(self, hosts, batch_size=1, grouping_function=DEFAULT_GROUPING,
+  def perform_maintenance(self, hosts, groups_per_batch=1, grouping_function=DEFAULT_GROUPING,
                           callback=None):
     """The wrap a callback in between sending hosts into maintenance mode and back.
 
@@ -114,7 +113,7 @@ class MesosMaintenance(object):
     self._complete_maintenance(Hosts(set(hosts)))
     self.start_maintenance(hosts)
 
-    for hosts in self.iter_batches(hosts, batch_size, grouping_function):
+    for hosts in self.iter_batches(hosts, groups_per_batch, grouping_function):
       self._drain_hosts(hosts)
       if callback:
         self._operate_on_hosts(hosts, callback)

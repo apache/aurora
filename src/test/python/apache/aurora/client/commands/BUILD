@@ -16,8 +16,13 @@
 
 python_test_suite(
   name = 'all',
-  dependencies = [ pants(':core'), pants(':run'), pants(':ssh'), pants(':admin') ]
-)
+  dependencies = [
+    pants(':admin'),
+    pants(':core'),
+    pants(':maintenance'),
+    pants(':run'),
+    pants(':ssh'),
+  ])
 
 python_tests(
   name='core',
@@ -76,6 +81,17 @@ python_tests(
     pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/client/commands:run'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ])
+
+python_tests(
+  name='maintenance',
+  sources = [
+    'test_maintenance.py',
+  ],
+  dependencies = [
+    pants(':util'),
+    pants('3rdparty/python:mock'),
+    pants('src/main/python/apache/aurora/client/commands:maintenance'),
   ])
 
 python_library(

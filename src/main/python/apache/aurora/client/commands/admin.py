@@ -20,13 +20,19 @@ from __future__ import print_function
 """
 
 import os
-import optparse
 import subprocess
 
-from apache.aurora.admin.mesos_maintenance import MesosMaintenance
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.sla import DomainUpTimeSlaVector
-from apache.aurora.client.base import check_and_log_response, die, requires
+from apache.aurora.client.base import (
+    check_and_log_response,
+    die,
+    FILENAME_OPTION,
+    HOSTS_OPTION,
+    parse_hosts,
+    parse_hosts_optional,
+    requires
+)
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 
@@ -40,55 +46,6 @@ from gen.apache.aurora.ttypes import (
 from twitter.common import app, log
 from twitter.common.quantity import Amount, Data, Time
 from twitter.common.quantity.parse_simple import parse_data, parse_time
-
-
-GROUPING_OPTION = optparse.Option(
-    '--grouping',
-    type='choice',
-    choices=MesosMaintenance.GROUPING_FUNCTIONS.keys(),
-    metavar='GROUPING',
-    default=MesosMaintenance.DEFAULT_GROUPING,
-    dest='grouping',
-    help='Grouping function to use to group hosts.  Options: %s.  Default: %%default' % (
-        ', '.join(MesosMaintenance.GROUPING_FUNCTIONS.keys())))
-
-
-def parse_host_file(filename):
-  with open(filename, 'r') as hosts:
-    hosts = [hostname.strip() for hostname in hosts]
-  if not hosts:
-    die('No valid hosts found in %s.' % filename)
-  return hosts
-
-
-def parse_host_list(host_list):
-  hosts = [hostname.strip() for hostname in host_list.split(",")]
-  if not hosts:
-    die('No valid hosts found.')
-  return hosts
-
-
-def parse_hosts_optional(list_option, file_option):
-  if bool(list_option) and bool(file_option):
-    die('Cannot specify both filename and list for the same option.')
-  hosts = None
-  if file_option:
-    hosts = parse_host_file(file_option)
-  elif list_option:
-    hosts = parse_host_list(list_option)
-  return hosts
-
-
-def parse_hosts(options):
-  if bool(options.filename) == bool(options.hosts):
-    die('Please specify either --filename or --hosts')
-  if options.filename:
-    hosts = parse_host_file(options.filename)
-  elif options.hosts:
-    hosts = parse_host_list(options.hosts)
-  if not hosts:
-    die('No valid hosts found.')
-  return hosts
 
 
 def print_results(results):
@@ -223,93 +180,6 @@ def set_quota(cluster, role, cpu_str, ram, disk):
   options = app.get_options()
   resp = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).set_quota(role, cpu, ram_mb, disk_mb)
   check_and_log_response(resp)
-
-
-@app.command
-@app.command_option('--filename', dest='filename', default=None,
-    help='Name of the file with hostnames')
-@app.command_option('--hosts', dest='hosts', default=None,
-    help='Comma separated list of hosts')
-@requires.exactly('cluster')
-def start_maintenance_hosts(cluster):
-  """usage: start_maintenance_hosts {--filename=filename | --hosts=hosts}
-                                    cluster
-  """
-  options = app.get_options()
-  MesosMaintenance(CLUSTERS[cluster], options.verbosity).start_maintenance(parse_hosts(options))
-
-
-@app.command
-@app.command_option('--filename', dest='filename', default=None,
-    help='Name of the file with hostnames')
-@app.command_option('--hosts', dest='hosts', default=None,
-    help='Comma separated list of hosts')
-@requires.exactly('cluster')
-def end_maintenance_hosts(cluster):
-  """usage: end_maintenance_hosts {--filename=filename | --hosts=hosts}
-                                  cluster
-  """
-  options = app.get_options()
-  MesosMaintenance(CLUSTERS[cluster], options.verbosity).end_maintenance(parse_hosts(options))
-
-
-@app.command
-@app.command_option('--filename', dest='filename', default=None,
-    help='Name of the file with hostnames')
-@app.command_option('--hosts', dest='hosts', default=None,
-    help='Comma separated list of hosts')
-@app.command_option('--batch_size', dest='batch_size', default=1,
-    help='Number of groups to operate on at a time.')
-@app.command_option('--post_drain_script', dest='post_drain_script', default=None,
-    help='Path to a script to run for each host.')
-@app.command_option(GROUPING_OPTION)
-@requires.exactly('cluster')
-def perform_maintenance_hosts(cluster):
-  """usage: perform_maintenance_hosts {--filename=filename | --hosts=hosts}
-                                      [--batch_size=num]
-                                      [--post_drain_script=path]
-                                      [--grouping=function]
-                                      cluster
-
-  Asks the scheduler to remove any running tasks from the machine and remove it
-  from service temporarily, perform some action on them, then return the machines
-  to service.
-  """
-  options = app.get_options()
-  drainable_hosts = parse_hosts(options)
-
-  if options.post_drain_script:
-    if not os.path.exists(options.post_drain_script):
-      die("No such file: %s" % options.post_drain_script)
-    cmd = os.path.abspath(options.post_drain_script)
-    drained_callback = lambda host: subprocess.Popen([cmd, host])
-  else:
-    drained_callback = None
-
-  MesosMaintenance(CLUSTERS[cluster], options.verbosity).perform_maintenance(
-      drainable_hosts,
-      batch_size=int(options.batch_size),
-      callback=drained_callback,
-      grouping_function=options.grouping)
-
-
-@app.command
-@app.command_option('--filename', dest='filename', default=None,
-    help='Name of the file with hostnames')
-@app.command_option('--hosts', dest='hosts', default=None,
-    help='Comma separated list of hosts')
-@requires.exactly('cluster')
-def host_maintenance_status(cluster):
-  """usage: host_maintenance_status {--filename=filename | --hosts=hosts}
-                                    cluster
-
-  Check on the schedulers maintenance status for a list of hosts in the cluster.
-  """
-  options = app.get_options()
-  checkable_hosts = parse_hosts(options)
-  statuses = MesosMaintenance(CLUSTERS[cluster], options.verbosity).check_status(checkable_hosts)
-  for pair in statuses:
-    log.info("%s is in state: %s" % pair)
 
 
 @app.command
@@ -540,10 +410,8 @@ def sla_list_safe_domain(cluster, percentage, duration):
 
 
 @app.command
-@app.command_option('--filename', dest='filename', default=None,
-                    help='Name of the file with host names (one per line).')
-@app.command_option('--hosts', dest='hosts', default=None,
-                    help='Comma separated list of host names.')
+@app.command_option(FILENAME_OPTION)
+@app.command_option(HOSTS_OPTION)
 @requires.exactly('cluster', 'percentage', 'duration')
 def sla_probe_hosts(cluster, percentage, duration):
   """usage: sla_probe_hosts
@@ -570,7 +438,7 @@ def sla_probe_hosts(cluster, percentage, duration):
 
   sla_percentage = parse_sla_percentage(percentage)
   sla_duration = parse_time(duration)
-  hosts = parse_hosts(options)
+  hosts = parse_hosts(options.filename, options.hosts)
 
   vector = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).sla_get_safe_domain_vector(hosts)
   probed_hosts = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), hosts)

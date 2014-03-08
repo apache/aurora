@@ -42,6 +42,7 @@ python_binary(
     pants('3rdparty/python:twitter.common.log'),
     pants('src/main/python/apache/aurora/client/commands:admin'),
     pants('src/main/python/apache/aurora/client/commands:help'),
+    pants('src/main/python/apache/aurora/client/commands:maintenance'),
     pants('src/main/python/apache/aurora/client:base'),
     pants('src/main/python/apache/aurora/client:options'),
   ]

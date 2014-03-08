@@ -16,6 +16,7 @@
 
 from collections import defaultdict
 import functools
+import optparse
 import sys
 from urlparse import urljoin
 
@@ -91,6 +92,58 @@ class requires(object):
     def real_fn(line):
       return fn(*line)
     return real_fn
+
+
+FILENAME_OPTION = optparse.Option(
+    '--filename',
+    dest='filename',
+    default=None,
+    help='Name of the file with hostnames')
+
+
+HOSTS_OPTION = optparse.Option(
+    '--hosts',
+    dest='hosts',
+    default=None,
+    help='Comma separated list of hosts')
+
+
+def parse_host_list(host_list):
+  hosts = [hostname.strip() for hostname in host_list.split(",")]
+  if not hosts:
+    die('No valid hosts found.')
+  return hosts
+
+
+def parse_host_file(filename):
+  with open(filename, 'r') as hosts:
+    hosts = [hostname.strip() for hostname in hosts]
+  if not hosts:
+    die('No valid hosts found in %s.' % filename)
+  return hosts
+
+
+def parse_hosts_optional(list_option, file_option):
+  if bool(list_option) and bool(file_option):
+    die('Cannot specify both filename and list for the same option.')
+  hosts = None
+  if file_option:
+    hosts = parse_host_file(file_option)
+  elif list_option:
+    hosts = parse_host_list(list_option)
+  return hosts
+
+
+def parse_hosts(filename, hosts):
+  if bool(filename) == bool(hosts):
+    die('Please specify either --filename or --hosts')
+  if filename:
+    hosts = parse_host_file(filename)
+  elif hosts:
+    hosts = parse_host_list(hosts)
+  if not hosts:
+    die('No valid hosts found.')
+  return hosts
 
 
 def synthesize_url(scheduler_url, role=None, env=None, job=None):
