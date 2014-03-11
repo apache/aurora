@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -34,6 +35,7 @@ import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
 import org.apache.aurora.auth.CapabilityValidator.Capability;
 import org.apache.aurora.auth.SessionValidator.AuthFailedException;
+import org.apache.aurora.gen.APIVersion;
 import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.AuroraAdmin;
@@ -48,12 +50,16 @@ import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobConfigRewrite;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobStats;
+import org.apache.aurora.gen.JobSummary;
+import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.RoleSummary;
 import org.apache.aurora.gen.RoleSummaryResult;
@@ -108,6 +114,7 @@ import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
 import static org.apache.aurora.gen.ResponseCode.WARNING;
 import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
+import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 import static org.easymock.EasyMock.anyObject;
@@ -135,6 +142,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static final IResourceAggregate CONSUMED =
       IResourceAggregate.build(new ResourceAggregate(0.0, 0, 0));
+  private static final ServerInfo SERVER_INFO =
+      new ServerInfo().setClusterName("test").setThriftAPIVersion(THRIFT_API_VERSION);
+  private static final APIVersion API_VERSION = new APIVersion().setMajor(THRIFT_API_VERSION);
 
   private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
@@ -178,8 +188,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(CronJobManager.class).toInstance(cronJobManager);
         bind(QuotaManager.class).toInstance(quotaManager);
         bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
-        bind(IServerInfo.class).toInstance(IServerInfo.build(
-            new ServerInfo().setClusterName("test").setThriftAPIVersion(1)));
+        bind(IServerInfo.class).toInstance(IServerInfo.build(SERVER_INFO));
       }
     };
     Injector injector = Guice.createInjector(testModule, new AopModule());
@@ -942,6 +951,98 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testGetJobSummary() throws Exception {
+    TaskConfig ownedCronJobTask = nonProductionTask()
+        .setJobName(JobKeys.TO_JOB_NAME.apply(JOB_KEY))
+        .setOwner(ROLE_IDENTITY)
+        .setEnvironment(JobKeys.TO_ENVIRONMENT.apply(JOB_KEY));
+    JobConfiguration ownedCronJob = makeJob()
+        .setCronSchedule("0 * * * *")
+        .setTaskConfig(ownedCronJobTask);
+    IScheduledTask ownedCronJobScheduledTask = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask))
+        .setStatus(ScheduleStatus.ASSIGNED));
+    Identity otherOwner = new Identity("other", "other");
+    JobConfiguration unownedCronJob = makeJob()
+        .setOwner(otherOwner)
+        .setCronSchedule("0 * * * *")
+        .setKey(JOB_KEY.newBuilder().setRole("other"))
+        .setTaskConfig(ownedCronJobTask.deepCopy().setOwner(otherOwner));
+    TaskConfig ownedImmediateTaskInfo = defaultTask(false)
+        .setJobName("immediate")
+        .setOwner(ROLE_IDENTITY);
+    Set<JobConfiguration> ownedCronJobOnly = ImmutableSet.of(ownedCronJob);
+    Set<JobSummary> ownedCronJobSummaryOnly = ImmutableSet.of(
+        new JobSummary().setJob(ownedCronJob).setStats(new JobStats()));
+    Set<JobSummary> ownedCronJobSummaryWithRunningTask = ImmutableSet.of(
+        new JobSummary().setJob(ownedCronJob).setStats(new JobStats().setActiveTaskCount(1)));
+    Set<JobConfiguration> unownedCronJobOnly = ImmutableSet.of(unownedCronJob);
+    Set<JobConfiguration> bothCronJobs = ImmutableSet.of(ownedCronJob, unownedCronJob);
+
+    IScheduledTask ownedImmediateTask = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(ownedImmediateTaskInfo))
+        .setStatus(ScheduleStatus.ASSIGNED));
+    JobConfiguration ownedImmediateJob = new JobConfiguration()
+        .setKey(JOB_KEY.newBuilder().setName("immediate"))
+        .setOwner(ROLE_IDENTITY)
+        .setInstanceCount(1)
+        .setTaskConfig(ownedImmediateTaskInfo);
+    Query.Builder query = Query.roleScoped(ROLE).active();
+
+    Set<JobSummary> ownedImmedieteJobSummaryOnly = ImmutableSet.of(
+        new JobSummary().setJob(ownedImmediateJob).setStats(new JobStats().setActiveTaskCount(1)));
+
+    expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(ownedCronJobOnly));
+    storageUtil.expectTaskFetch(query);
+
+    expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(bothCronJobs));
+    storageUtil.expectTaskFetch(query);
+
+    expect(cronJobManager.getJobs())
+        .andReturn(IJobConfiguration.setFromBuilders(unownedCronJobOnly));
+    storageUtil.expectTaskFetch(query, ownedImmediateTask);
+
+    expect(cronJobManager.getJobs()).andReturn(ImmutableSet.<IJobConfiguration>of());
+    storageUtil.expectTaskFetch(query);
+
+    // Handle the case where a cron job has a running task (same JobKey present in both stores).
+    expect(cronJobManager.getJobs())
+        .andReturn(ImmutableList.of(IJobConfiguration.build(ownedCronJob)));
+    storageUtil.expectTaskFetch(query, ownedCronJobScheduledTask);
+
+    control.replay();
+
+    assertEquals(jobSummaryResponse(ownedCronJobSummaryOnly), thrift.getJobSummary(ROLE));
+
+    assertEquals(jobSummaryResponse(ownedCronJobSummaryOnly), thrift.getJobSummary(ROLE));
+
+    Response jobSummaryResponse = thrift.getJobSummary(ROLE);
+    assertEquals(jobSummaryResponse(ownedImmedieteJobSummaryOnly), jobSummaryResponse);
+    assertEquals(ownedImmediateTaskInfo,
+        Iterables.getOnlyElement(
+            jobSummaryResponse.getResult().getJobSummaryResult().getSummaries())
+            .getJob()
+            .getTaskConfig());
+
+    assertEquals(jobSummaryResponse(Sets.<JobSummary>newHashSet()), thrift.getJobSummary(ROLE));
+
+    assertEquals(jobSummaryResponse(ownedCronJobSummaryWithRunningTask),
+        thrift.getJobSummary(ROLE));
+  }
+
+  private Response jobSummaryResponse(Set<JobSummary> jobSummaries) {
+    return okResponse(Result.jobSummaryResult(new JobSummaryResult().setSummaries(jobSummaries)));
+  }
+
+  private Response okResponse(Result result) {
+    return new Response()
+        .setResponseCode(OK)
+        .setDEPRECATEDversion(API_VERSION)
+        .setServerInfo(SERVER_INFO)
+        .setResult(result);
+  }
+
+  @Test
   public void testGetJobs() throws Exception {
     TaskConfig ownedCronJobTask = nonProductionTask()
         .setJobName(JobKeys.TO_JOB_NAME.apply(JOB_KEY))
@@ -951,7 +1052,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setCronSchedule("0 * * * *")
         .setTaskConfig(ownedCronJobTask);
     IScheduledTask ownedCronJobScheduledTask = IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask)));
+        .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask))
+        .setStatus(ScheduleStatus.ASSIGNED));
     Identity otherOwner = new Identity("other", "other");
     JobConfiguration unownedCronJob = makeJob()
         .setOwner(otherOwner)
@@ -965,8 +1067,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Set<JobConfiguration> unownedCronJobOnly = ImmutableSet.of(unownedCronJob);
     Set<JobConfiguration> bothCronJobs = ImmutableSet.of(ownedCronJob, unownedCronJob);
     IScheduledTask ownedImmediateTask = IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(
-            new AssignedTask().setTask(ownedImmediateTaskInfo)));
+        .setAssignedTask(new AssignedTask().setTask(ownedImmediateTaskInfo))
+        .setStatus(ScheduleStatus.ASSIGNED));
     JobConfiguration ownedImmediateJob = new JobConfiguration()
         .setKey(JOB_KEY.newBuilder().setName("immediate"))
         .setOwner(ROLE_IDENTITY)
@@ -1027,8 +1129,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
     IScheduledTask immediateTask = IScheduledTask.build(new ScheduledTask()
-        .setAssignedTask(
-            new AssignedTask().setTask(immediateTaskConfig)));
+        .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig))
+        .setStatus(ScheduleStatus.ASSIGNED));
     JobConfiguration immediateJob = new JobConfiguration()
         .setKey(JOB_KEY.newBuilder().setName("immediate"))
         .setOwner(ROLE_IDENTITY)

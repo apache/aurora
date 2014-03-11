@@ -16,11 +16,14 @@
 package org.apache.aurora.scheduler.base;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -43,6 +46,12 @@ import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
  * Utility class providing convenience functions relating to tasks.
  */
 public final class Tasks {
+
+  @VisibleForTesting
+  static final List<ScheduleStatus> ORDERED_TASK_STATUSES = ImmutableList.<ScheduleStatus>builder()
+          .addAll(apiConstants.TERMINAL_STATES)
+          .addAll(apiConstants.ACTIVE_STATES)
+          .build();
 
   public static final Function<IScheduledTask, IAssignedTask> SCHEDULED_TO_ASSIGNED =
       new Function<IScheduledTask, IAssignedTask>() {
@@ -146,6 +155,7 @@ public final class Tasks {
 
   /**
    * Order by production flag (true, then false), subsorting by task ID.
+   * TODO(Suman Karumuri): Move this call into SchedulerThriftInterface once SchedulerzRole is gone.
    */
   public static final Ordering<IAssignedTask> SCHEDULING_ORDER =
       Ordering.explicit(true, false)
@@ -158,6 +168,7 @@ public final class Tasks {
 
   /**
    * A utility method that returns a multi-map of tasks keyed by IJobKey.
+   *
    * @param tasks A list of tasks to be keyed by map
    * @return A multi-map of tasks keyed by job key.
    */
@@ -200,6 +211,21 @@ public final class Tasks {
 
   public static String getJob(IScheduledTask task) {
     return task.getAssignedTask().getTask().getJobName();
+  }
+
+  /**
+   * Get the latest active task or the latest inactive task if no active task exists.
+   *
+   * @param tasks a collection of tasks
+   * @return the task that transitioned most recently.
+   */
+  public static IScheduledTask getLatestActiveTask(Iterable<IScheduledTask> tasks) {
+    Preconditions.checkArgument(Iterables.size(tasks) != 0);
+
+    return Ordering.explicit(ORDERED_TASK_STATUSES)
+        .onResultOf(GET_STATUS)
+        .compound(LATEST_ACTIVITY)
+        .max(tasks);
   }
 
   public static ITaskEvent getLatestEvent(IScheduledTask task) {

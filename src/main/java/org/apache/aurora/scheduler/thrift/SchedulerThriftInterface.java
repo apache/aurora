@@ -69,6 +69,8 @@ import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.JobConfigRewrite;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobSummary;
+import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.ListBackupsResult;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
@@ -90,6 +92,7 @@ import org.apache.aurora.gen.StartMaintenanceResult;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.Jobs;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -393,9 +396,78 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       summaries.add(summary);
     }
 
-    return new Response()
-        .setResponseCode(OK)
-        .setResult(Result.roleSummaryResult(new RoleSummaryResult(summaries)));
+    return okResponse(Result.roleSummaryResult(new RoleSummaryResult(summaries)));
+  }
+
+  @Override
+  public Response getJobSummary(@Nullable String maybeNullRole) {
+    Optional<String> ownerRole = Optional.fromNullable(maybeNullRole);
+
+    final Multimap<IJobKey, IScheduledTask> tasks = getTasks(ownerRole);
+    final Map<IJobKey, IJobConfiguration> jobs = getJobs(ownerRole, tasks);
+
+    Function<IJobKey, JobSummary> makeJobSummary = new Function<IJobKey, JobSummary>() {
+      @Override
+      public JobSummary apply(IJobKey jobKey) {
+        return new JobSummary()
+            .setJob(jobs.get(jobKey).newBuilder())
+            .setStats(Jobs.getJobStats(tasks.get(jobKey)));
+      }
+    };
+
+    ImmutableSet<JobSummary> jobSummaries =
+        FluentIterable.from(jobs.keySet()).transform(makeJobSummary).toSet();
+
+    return okResponse(Result.jobSummaryResult(new JobSummaryResult().setSummaries(jobSummaries)));
+  }
+
+  private Map<IJobKey, IJobConfiguration> getJobs(
+      Optional<String> ownerRole,
+      Multimap<IJobKey, IScheduledTask> tasks) {
+
+    // We need to synthesize the JobConfiguration from the the current tasks because the
+    // ImmediateJobManager doesn't store jobs directly and ImmediateJobManager#getJobs always
+    // returns an empty Collection.
+    Map<IJobKey, IJobConfiguration> jobs = Maps.newHashMap();
+
+    jobs.putAll(Maps.transformEntries(tasks.asMap(),
+        new Maps.EntryTransformer<IJobKey, Collection<IScheduledTask>, IJobConfiguration>() {
+          @Override
+          public IJobConfiguration transformEntry(
+              IJobKey jobKey,
+              Collection<IScheduledTask> tasks) {
+
+            // Pick the latest transitioned task for each immediate job since the job can be in the
+            // middle of an update or some shards have been selectively created.
+            TaskConfig mostRecentTaskConfig =
+                Tasks.getLatestActiveTask(tasks).getAssignedTask().getTask().newBuilder();
+
+            return IJobConfiguration.build(new JobConfiguration()
+                .setKey(jobKey.newBuilder())
+                .setOwner(mostRecentTaskConfig.getOwner())
+                .setTaskConfig(mostRecentTaskConfig)
+                .setInstanceCount(tasks.size()));
+          }
+        }));
+
+    // Get cron jobs directly from the manager. Do this after querying the task store so the real
+    // template JobConfiguration for a cron job will overwrite the synthesized one that could have
+    // been created above.
+    Predicate<IJobConfiguration> configFilter = ownerRole.isPresent()
+        ? Predicates.compose(Predicates.equalTo(ownerRole.get()), JobKeys.CONFIG_TO_ROLE)
+        : Predicates.<IJobConfiguration>alwaysTrue();
+    jobs.putAll(Maps.uniqueIndex(
+            FluentIterable.from(cronJobManager.getJobs()).filter(configFilter),
+            JobKeys.FROM_CONFIG));
+
+    return jobs;
+  }
+
+  private Multimap<IJobKey, IScheduledTask> getTasks(Optional<String> ownerRole) {
+    Query.Builder scope = ownerRole.isPresent()
+        ? Query.roleScoped(ownerRole.get())
+        : Query.unscoped();
+    return Tasks.byJobKey(Storage.Util.weaklyConsistentFetchTasks(storage, scope.active()));
   }
 
   private static <T> Multimap<String, IJobKey> mapByRole(
@@ -410,52 +482,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response getJobs(@Nullable String maybeNullRole) {
     Optional<String> ownerRole = Optional.fromNullable(maybeNullRole);
 
-
-    // Ensure we only return one JobConfiguration for each JobKey.
-    Map<IJobKey, IJobConfiguration> jobs = Maps.newHashMap();
-
-    // Query the task store, find immediate jobs, and synthesize a JobConfiguration for them.
-    // This is necessary because the ImmediateJobManager doesn't store jobs directly and
-    // ImmediateJobManager#getJobs always returns an empty Collection.
-    Query.Builder scope = ownerRole.isPresent()
-        ? Query.roleScoped(ownerRole.get())
-        : Query.unscoped();
-    Multimap<IJobKey, IScheduledTask> tasks =
-        Tasks.byJobKey(Storage.Util.weaklyConsistentFetchTasks(storage, scope.active()));
-
-    jobs.putAll(Maps.transformEntries(tasks.asMap(),
-        new Maps.EntryTransformer<IJobKey, Collection<IScheduledTask>, IJobConfiguration>() {
-          @Override
-          public IJobConfiguration transformEntry(
-              IJobKey jobKey,
-              Collection<IScheduledTask> tasks) {
-
-            // Pick an arbitrary task for each immediate job. The chosen task might not be the most
-            // recent if the job is in the middle of an update or some shards have been selectively
-            // created.
-            TaskConfig firstTask = tasks.iterator().next().getAssignedTask().getTask().newBuilder();
-            return IJobConfiguration.build(new JobConfiguration()
-                .setKey(jobKey.newBuilder())
-                .setOwner(firstTask.getOwner())
-                .setTaskConfig(firstTask)
-                .setInstanceCount(tasks.size()));
-          }
-        }));
-
-    // Get cron jobs directly from the manager. Do this after querying the task store so the real
-    // template JobConfiguration for a cron job will overwrite the synthesized one that could have
-    // been created above.
-    Predicate<IJobConfiguration> configFilter = ownerRole.isPresent()
-        ? Predicates.compose(Predicates.equalTo(ownerRole.get()), JobKeys.CONFIG_TO_ROLE)
-        : Predicates.<IJobConfiguration>alwaysTrue();
-    jobs.putAll(Maps.uniqueIndex(
-        FluentIterable.from(cronJobManager.getJobs()).filter(configFilter),
-        JobKeys.FROM_CONFIG));
-
-    return new Response()
-        .setResponseCode(OK)
-        .setResult(Result.getJobsResult(new GetJobsResult()
-            .setConfigs(IJobConfiguration.toBuildersSet(jobs.values()))));
+    return okResponse(Result.getJobsResult(
+        new GetJobsResult()
+            .setConfigs(IJobConfiguration.toBuildersSet(
+                getJobs(ownerRole, getTasks(ownerRole)).values()))));
   }
 
   private void validateLockForTasks(Optional<ILock> lock, Iterable<IScheduledTask> tasks)
@@ -604,7 +634,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         .setProdConsumption(quotaInfo.prodConsumption().newBuilder())
         .setNonProdConsumption(quotaInfo.nonProdConsumption().newBuilder());
 
-    return new Response().setResponseCode(OK).setResult(Result.getQuotaResult(result));
+    return okResponse(Result.getQuotaResult(result));
   }
 
 
@@ -630,33 +660,27 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response startMaintenance(Hosts hosts, SessionKey session) {
-      return new Response()
-          .setResponseCode(OK)
-          .setResult(Result.startMaintenanceResult(new StartMaintenanceResult()
+      return okResponse(Result.startMaintenanceResult(
+          new StartMaintenanceResult()
               .setStatuses(maintenance.startMaintenance(hosts.getHostNames()))));
   }
 
   @Override
   public Response drainHosts(Hosts hosts, SessionKey session) {
-    return new Response()
-        .setResponseCode(OK)
-        .setResult(Result.drainHostsResult(new DrainHostsResult()
-            .setStatuses(maintenance.drain(hosts.getHostNames()))));
+    return okResponse(Result.drainHostsResult(
+        new DrainHostsResult().setStatuses(maintenance.drain(hosts.getHostNames()))));
   }
 
   @Override
   public Response maintenanceStatus(Hosts hosts, SessionKey session) {
-    return new Response()
-        .setResponseCode(OK)
-        .setResult(Result.maintenanceStatusResult(new MaintenanceStatusResult()
-            .setStatuses(maintenance.getStatus(hosts.getHostNames()))));
+    return okResponse(Result.maintenanceStatusResult(
+        new MaintenanceStatusResult().setStatuses(maintenance.getStatus(hosts.getHostNames()))));
   }
 
   @Override
   public Response endMaintenance(Hosts hosts, SessionKey session) {
-      return new Response()
-          .setResponseCode(OK)
-          .setResult(Result.endMaintenanceResult(new EndMaintenanceResult()
+      return okResponse(Result.endMaintenanceResult(
+          new EndMaintenanceResult()
               .setStatuses(maintenance.endMaintenance(hosts.getHostNames()))));
   }
 
@@ -692,10 +716,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response listBackups(SessionKey session) {
-    return new Response()
-        .setResponseCode(OK)
-        .setResult(Result.listBackupsResult(new ListBackupsResult()
-            .setBackups(recovery.listBackups())));
+    return okResponse(Result.listBackupsResult(new ListBackupsResult()
+        .setBackups(recovery.listBackups())));
   }
 
   @Override
@@ -897,9 +919,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response getVersion() {
-    return new Response()
-        .setResponseCode(OK)
-        .setResult(Result.getVersionResult(CURRENT_API_VERSION));
+    return okResponse(Result.getVersionResult(CURRENT_API_VERSION));
   }
 
   @Override
@@ -1003,5 +1023,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @VisibleForTesting
   static Optional<String> transitionMessage(String user) {
     return Optional.of("Transition forced by " + user);
+  }
+
+  private static Response okResponse(Result result) {
+    return new Response().setResponseCode(OK).setResult(result);
   }
 }

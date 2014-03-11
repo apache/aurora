@@ -204,6 +204,18 @@ struct JobConfiguration {
                                               // [0, instances).
 }
 
+struct JobStats {
+ 1: i32 activeTaskCount    // Number of tasks in active state for this job.
+ 2: i32 finishedTaskCount  // Number of tasks in finished state for this job.
+ 3: i32 failedTaskCount    // Number of failed tasks for this job.
+ 4: i32 pendingTaskCount   // Number of tasks in pending state for this job.
+}
+
+struct JobSummary {
+  1: JobConfiguration job
+  2: JobStats stats
+}
+
 // A request to add the following instances to an existing job. Used by addInstances.
 struct AddInstancesConfig {
   1: JobKey key
@@ -410,6 +422,10 @@ struct RoleSummaryResult {
   1: set<RoleSummary> summaries
 }
 
+struct JobSummaryResult {
+  1: set<JobSummary> summaries
+}
+
 // meta-data about the thrift server that is wrapped around every thrift response
 struct ServerInfo {
   1: string clusterName
@@ -430,6 +446,7 @@ union Result {
   15: APIVersion getVersionResult
   16: AcquireLockResult acquireLockResult
   17: RoleSummaryResult roleSummaryResult
+  18: JobSummaryResult jobSummaryResult
 }
 
 struct Response {
@@ -447,6 +464,9 @@ service ReadOnlyScheduler {
   // Returns a summary of the jobs grouped by role.
   Response getRoleSummary()
 
+  // Returns a summary of jobs, optionally only those owned by a specific role.
+  Response getJobSummary(1: string role)
+
   // Fetches the status of tasks.
   Response getTasksStatus(1: TaskQuery query)
 
@@ -461,6 +481,10 @@ service ReadOnlyScheduler {
   // NOTE: This API is deprecated.
   // Returns the current version of the API implementation
   Response getVersion()
+
+  // Populates fields in a job configuration as though it were about to be run.
+  // This can be used to diff a configuration running tasks.
+  Response populateJobConfig(1: JobConfiguration description)
 }
 
 // Due to assumptions in the client all authenticated RPCs must have a SessionKey as their
@@ -470,10 +494,6 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   // Creates a new job.  The request will be denied if a job with the provided
   // name already exists in the cluster.
   Response createJob(1: JobConfiguration description, 3: Lock lock, 2: SessionKey session)
-
-  // Populates fields in a job configuration as though it were about to be run.
-  // This can be used to diff a configuration running tasks.
-  Response populateJobConfig(1: JobConfiguration description)
 
   // Starts a cron job immediately.  The request will be denied if the specified job does not
   // exist for the role account, or the job is not a cron job.

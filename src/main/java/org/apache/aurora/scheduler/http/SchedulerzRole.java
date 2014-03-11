@@ -16,7 +16,6 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,28 +30,21 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 import com.twitter.common.base.Closure;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
 
 import org.antlr.stringtemplate.StringTemplate;
 import org.apache.aurora.gen.CronCollisionPolicy;
-import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.gen.apiConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -70,29 +62,13 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
-import static org.apache.aurora.scheduler.base.Tasks.GET_STATUS;
-import static org.apache.aurora.scheduler.base.Tasks.LATEST_ACTIVITY;
+import static org.apache.aurora.scheduler.base.Tasks.getLatestActiveTask;
 
 /**
  * HTTP interface to provide information about jobs for a specific role.
  */
 @Path("/scheduler/{role}")
 public class SchedulerzRole extends JerseyTemplateServlet {
-
-  private static final List<ScheduleStatus> STATUSES = ImmutableList.<ScheduleStatus>builder()
-      .addAll(apiConstants.TERMINAL_STATES)
-      .addAll(apiConstants.ACTIVE_STATES)
-      .build();
-
-  // The freshest task is the latest active task
-  // or the latest inactive task if no active task exists.
-  private static final Ordering<IScheduledTask> FRESH_TASK_ORDER =
-      Ordering.explicit(STATUSES).onResultOf(GET_STATUS).compound(LATEST_ACTIVITY);
-
-  @VisibleForTesting
-  static IScheduledTask getFreshestTask(Iterable<IScheduledTask> tasks) {
-    return FRESH_TASK_ORDER.max(tasks);
-  }
 
   private final Storage storage;
   private final CronJobManager cronJobManager;
@@ -247,55 +223,17 @@ public class SchedulerzRole extends JerseyTemplateServlet {
             job.name = jobKey.getName();
 
             // Pick the freshest task's config and associate it with the job.
-            ITaskConfig freshestConfig = getFreshestTask(tasks).getAssignedTask().getTask();
-            job.production = freshestConfig.isProduction();
+            ITaskConfig mostRecentTaskConfig =
+                getLatestActiveTask(tasks).getAssignedTask().getTask();
+            job.production = mostRecentTaskConfig.isProduction();
 
             // TODO(Suman Karumuri): Add a source/job type to TaskConfig and replace logic below
-            if (freshestConfig.isIsService()) {
+            if (mostRecentTaskConfig.isIsService()) {
               job.type = JobType.SERVICE;
             } else if (cronJobs.containsKey(jobKey)) {
               job.type = JobType.CRON;
             } else {
               job.type = JobType.ADHOC;
-            }
-
-            for (IScheduledTask task : tasks) {
-              switch (task.getStatus()) {
-                case INIT:
-                case THROTTLED:
-                case PENDING:
-                  job.pendingTaskCount++;
-                  break;
-
-                case ASSIGNED:
-                case STARTING:
-                case RESTARTING:
-                case DRAINING:
-                case RUNNING:
-                case KILLING:
-                case PREEMPTING:
-                  job.activeTaskCount++;
-                  break;
-
-                case KILLED:
-                case FINISHED:
-                  job.finishedTaskCount++;
-                  break;
-
-                case LOST:
-                case FAILED:
-                case UNKNOWN:
-                  job.failedTaskCount++;
-                  Date now = new Date();
-                  long elapsedMillis = now.getTime() - Tasks.getLatestEvent(task).getTimestamp();
-                  if (Amount.of(elapsedMillis, Time.MILLISECONDS).as(Time.HOURS) < 6) {
-                    job.recentlyFailedTaskCount++;
-                  }
-                  break;
-
-                default:
-                  throw new IllegalArgumentException("Unsupported status: " + task.getStatus());
-              }
             }
 
             return job;
