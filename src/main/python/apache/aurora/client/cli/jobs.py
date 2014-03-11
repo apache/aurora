@@ -222,7 +222,7 @@ the parsed configuration."""
   def execute(self, context):
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
     if context.options.raw:
-      context.print(config.job())
+      context.print_out(config.job())
       return EXIT_OK
 
     job = config.raw()
@@ -243,7 +243,7 @@ the parsed configuration."""
         context.print_out('%s: %s' % (constraint, value), indent=4)
     context.print_out('service:    %s' % job_thrift.taskConfig.isService, indent=2)
     context.print_out('production: %s' % bool(job.production().get()), indent=2)
-    context.print()
+    context.print_out()
 
     task = job.task()
     context.print_out('Task level information')
@@ -313,7 +313,7 @@ class ListJobsCommand(Verb):
   def execute(self, context):
     jobs = context.get_jobs_matching_key(context.options.jobspec)
     for j in jobs:
-      context.print('%s/%s/%s/%s' % (j.cluster, j.role, j.env, j.name))
+      context.print_out('%s/%s/%s/%s' % (j.cluster, j.role, j.env, j.name))
     result = self.get_status_for_jobs(jobs, context)
     context.print_out(result)
 
@@ -409,9 +409,10 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
         task_strings.append('\t %s %s: %s' % (datetime.fromtimestamp(event.timestamp / 1000),
             ScheduleStatus._VALUES_TO_NAMES[event.status], event.message))
         task_strings.append('packages:')
-        for pkg in assigned_task.task.packages:
-          task_strings.append('\trole: %s, package: %s, version: %s' %
-              (pkg.role, pkg.name, pkg.version))
+        if assigned_task.task.packages is not None:
+          for pkg in assigned_task.task.packages:
+            task_strings.append('\trole: %s, package: %s, version: %s' %
+                (pkg.role, pkg.name, pkg.version))
       return '\n\t'.join(task_strings)
 
     result = ["Active tasks (%s):\n" % len(active_tasks)]
