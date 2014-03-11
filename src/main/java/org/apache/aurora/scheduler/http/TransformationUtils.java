@@ -19,11 +19,16 @@ import java.util.Collection;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
+import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Range;
 
 import org.apache.aurora.scheduler.base.Numbers;
+import org.apache.aurora.scheduler.storage.entities.IMetadata;
 import org.apache.aurora.scheduler.storage.entities.IPackage;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Utility class to hold common object to string transformation helper functions.
@@ -34,6 +39,14 @@ final class TransformationUtils {
         @Override
         public String apply(IPackage pkg) {
           return pkg.getRole() + "/" + pkg.getName() + " v" + pkg.getVersion();
+        }
+      };
+
+  public static final Function<IMetadata, String> METADATA_TOSTRING =
+      new com.twitter.common.base.Function<IMetadata, String>() {
+        @Override
+        public String apply(IMetadata item) {
+          return item.getKey() + ": " + item.getValue();
         }
       };
 
@@ -58,5 +71,24 @@ final class TransformationUtils {
 
   private TransformationUtils() {
     // Utility class
+  }
+
+  /**
+   * Gets an optional task metadata.
+   *
+   * @param task Task to get metadata from.
+   * @return Present if task metadata exists, absent otherwise.
+   */
+  public static Optional<String> getMetadata(ITaskConfig task) {
+    if (task.isSetPackagesDEPRECATED()) {
+      Iterable<String> packages = ImmutableSet.copyOf(
+          Iterables.transform(task.getPackagesDEPRECATED(), TransformationUtils.PACKAGE_TOSTRING));
+      return Optional.of(Joiner.on(", ").join(Ordering.natural().sortedCopy(packages)));
+    } else if (task.isSetMetadata()) {
+      Iterable<String> metadata = ImmutableSet.copyOf(
+          Iterables.transform(task.getMetadata(), TransformationUtils.METADATA_TOSTRING));
+      return Optional.of(Joiner.on(", ").join(Ordering.natural().sortedCopy(metadata)));
+    }
+    return Optional.absent();
   }
 }

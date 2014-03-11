@@ -268,12 +268,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
             details.put("ports",
                 Joiner.on(", ").join(ImmutableSortedSet.copyOf(task.getRequestedPorts())));
           }
-          if (!task.getPackages().isEmpty()) {
-            List<String> packages = Ordering.natural().sortedCopy(
-                Iterables.transform(task.getPackages(), TransformationUtils.PACKAGE_TOSTRING));
-            details.put(
-                "packages",
-                Joiner.on(',').join(packages));
+          Optional<String> metadata = TransformationUtils.getMetadata(task);
+          if (metadata.isPresent()) {
+            details.put("metadata", metadata.get());
           }
           details.put("contact", task.isSetContactEmail() ? task.getContactEmail() : "none");
           return new SchedulingDetails(details.build());

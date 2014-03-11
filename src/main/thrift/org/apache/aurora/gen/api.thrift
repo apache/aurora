@@ -110,6 +110,12 @@ struct Package {
   3: i32 version
 }
 
+// Arbitrary key-value metadata to be included into TaskConfig.
+struct Metadata {
+  1: string key
+  2: string value
+}
+
 // A unique identifier for a Job.
 struct JobKey {
   1: string role        // Mesos role (Unix service account), for example "mesos"
@@ -170,9 +176,9 @@ struct TaskConfig {
                                              // Wildcards are supported for dynamic link
                                              // crafting based on host, ports, instance, etc.
  23: optional string contactEmail
- 24: optional set<Package> packages          // Used only to display package information in the
-                                             // scheduler UI.
+ 24: optional set<Package> packagesDEPRECATED // TODO(maxim): Drop when fully migrated to metadata.
  25: optional ExecutorConfig executorConfig  // Executor configuration
+ 27: optional set<Metadata> metadata         // Used to display additional details in the UI.
 }
 
 // Defines the policy for launching a new cron job when one is already running.

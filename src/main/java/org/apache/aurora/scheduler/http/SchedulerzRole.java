@@ -18,7 +18,6 @@ package org.apache.aurora.scheduler.http;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -31,16 +30,12 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Function;
-import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
 import com.twitter.common.base.Closure;
 
 import org.antlr.stringtemplate.StringTemplate;
@@ -184,7 +179,7 @@ public class SchedulerzRole extends JerseyTemplateServlet {
                 .put("cronSchedule", job.getCronSchedule())
                 .put("nextRun", cronPredictor.predictNextRun(job.getCronSchedule()).getTime())
                 .put("cronCollisionPolicy", cronCollisionPolicy(job))
-                .put("packages", getPackages(job))
+                .put("metadata", getMetadata(job))
                 .build();
           }
         });
@@ -194,16 +189,9 @@ public class SchedulerzRole extends JerseyTemplateServlet {
     return CronJobManager.orDefault(jobConfiguration.getCronCollisionPolicy());
   }
 
-  private static String getPackages(IJobConfiguration job) {
-    Set<String> packages = Sets.newHashSet();
-
-    // Insert all packages for all tasks in the set to eliminate duplicates
-    ITaskConfig task = job.getTaskConfig();
-    if (!task.getPackages().isEmpty()) {
-      packages.addAll(Lists.newArrayList(
-          Iterables.transform(task.getPackages(), TransformationUtils.PACKAGE_TOSTRING)));
-    }
-    return Joiner.on(',').join(packages);
+  private static String getMetadata(IJobConfiguration job) {
+    Optional<String> metadata = TransformationUtils.getMetadata(job.getTaskConfig());
+    return metadata.isPresent() ? metadata.get() : "";
   }
 
   private List<Job> fetchJobsBy(

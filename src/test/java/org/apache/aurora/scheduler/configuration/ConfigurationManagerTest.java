@@ -58,7 +58,7 @@ public class ConfigurationManagerTest {
               .setContactEmail("foo@twitter.com")
               .setProduction(false)
               .setDiskMb(1)
-              .setPackages(null)
+              .setMetadata(null)
               .setNumCpus(1.0)
               .setRamMb(1)
               .setMaxTaskFailures(0)

@@ -49,7 +49,7 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
-import org.apache.aurora.gen.Package;
+import org.apache.aurora.gen.Metadata;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.SessionKey;
@@ -277,7 +277,9 @@ public class IsolatedSchedulerModule extends AbstractModule {
               .setNumCpus(1.0)
               .setDiskMb(1024)
               .setRamMb(1024)
-              .setPackages(ImmutableSet.of(new Package(owner.getRole(), "package", 15)))
+              .setMetadata(ImmutableSet.of(
+                  new Metadata("role", owner.getRole()),
+                  new Metadata("package", "15")))
               .setExecutorConfig(new ExecutorConfig("aurora", "opaque")));
     }
 

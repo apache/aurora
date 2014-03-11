@@ -134,7 +134,7 @@
               <th>Schedule
               <th>Next Run
               <th>Collision policy
-              <th>Packages
+              <th>Metadata
             </thead>
             <tbody>
               $cronJobs:{ job |
@@ -145,7 +145,7 @@
                 <td>$job.cronSchedule$
                 <td><script>document.write(printDate($job.nextRun$));</script>
                 <td>$job.cronCollisionPolicy$
-                <td>$job.packages$
+                <td>$job.metadata$
               </tr>
               }$
             </tbody>
