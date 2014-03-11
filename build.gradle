@@ -135,13 +135,20 @@ jar {
 }
 
 dependencies {
+  def jerseyRev = '1.12'
+  def libthriftRev = '0.9.1'
+  def log4jRev = '1.2.17'
+  def slf4jRev = '1.6.1'
+  def junitRev = '4.11'
+
+  def guavaDep = 'com.google.guava:guava:15.0'
+  def thriftLib = "org.apache.thrift:libthrift:${libthriftRev}"
+
   compile 'aopalliance:aopalliance:1.0'
   compile 'com.google.code.findbugs:jsr305:1.3.9'
-  def guavaDep = 'com.google.guava:guava:15.0'
   compile guavaDep
   compile 'com.google.inject:guice:3.0'
   compile 'com.google.protobuf:protobuf-java:2.5.0'
-  def jerseyRev = '1.12'
   compile "com.sun.jersey:jersey-core:${jerseyRev}"
   compile "com.sun.jersey:jersey-json:${jerseyRev}"
   compile "com.sun.jersey:jersey-server:${jerseyRev}"
@@ -150,13 +157,11 @@ dependencies {
   compile 'commons-lang:commons-lang:2.5'
   compile 'javax.inject:javax.inject:1'
   compile 'javax.servlet:servlet-api:2.5'
-  compile 'log4j:log4j:1.2.17'
+  compile "log4j:log4j:${log4jRev}"
   compile 'org.antlr:stringtemplate:3.2.1'
   compile 'org.apache.mesos:mesos:0.17.0'
-  def thriftLib = 'org.apache.thrift:libthrift:0.9.1'
   compile thriftLib
   compile 'org.apache.zookeeper:zookeeper:3.3.4'
-  def slf4jRev = '1.6.1'
   compile "org.slf4j:slf4j-api:${slf4jRev}"
   compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
   compile 'com.twitter.common.logging:log4j:0.0.4'
@@ -197,12 +202,31 @@ dependencies {
   compile 'com.twitter.common:util-testing:0.0.7'
   compile 'com.twitter.common:util:0.0.87'
   compile 'com.twitter.common:zookeeper-testing:0.0.40'
-  testCompile 'junit:junit:4.10'
+
+  testCompile "junit:junit:${junitRev}"
 
   generatedCompile guavaDep
   generatedCompile thriftLib
 
   checkstyle 'com.puppycrawl.tools:checkstyle:5.6'
+
+  configurations.compile {
+    resolutionStrategy {
+      failOnVersionConflict()
+
+      def forceDepVersions = [
+        // Force versions based on the dependencies we use from above
+        'org.slf4j:slf4j-api' : slf4jRev,
+        'log4j:log4j' : log4jRev,
+        'org.apache.thrift:libthrift' : libthriftRev,
+        'junit:junit' : junitRev,
+        // Force versions based on inter-dependency collisions
+        'org.hamcrest:hamcrest-core' : '1.3',
+      ]
+
+      force forceDepVersions.collect { dep, ver -> "$dep:$ver" }
+    }
+  }
 }
 
 checkstyle {
