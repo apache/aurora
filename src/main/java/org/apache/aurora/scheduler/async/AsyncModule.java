@@ -36,6 +36,7 @@ import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
@@ -80,10 +81,11 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> TRANSIENT_TASK_STATE_TIMEOUT =
       Arg.create(Amount.of(5L, Time.MINUTES));
 
+  @Positive
   @CmdLine(name = "initial_schedule_delay",
       help = "Initial amount of time to wait before attempting to schedule a PENDING task.")
   private static final Arg<Amount<Long, Time>> INITIAL_SCHEDULE_DELAY =
-      Arg.create(Amount.of(1L, Time.SECONDS));
+      Arg.create(Amount.of(1L, Time.MILLISECONDS));
 
   @CmdLine(name = "max_schedule_delay",
       help = "Maximum delay between attempts to schedule a PENDING tasks.")
@@ -102,7 +104,7 @@ public class AsyncModule extends AbstractModule {
 
   @CmdLine(name = "max_schedule_attempts_per_sec",
       help = "Maximum number of scheduling attempts to make per second.")
-  private static final Arg<Double> MAX_SCHEDULE_ATTEMPTS_PER_SEC = Arg.create(10D);
+  private static final Arg<Double> MAX_SCHEDULE_ATTEMPTS_PER_SEC = Arg.create(20D);
 
   @CmdLine(name = "flapping_task_threshold",
       help = "A task that repeatedly runs for less than this time is considered to be flapping.")
