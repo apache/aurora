@@ -21,8 +21,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.Date;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,12 +30,6 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
-import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import com.google.inject.BindingAnnotation;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
@@ -47,30 +39,17 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
-import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
-import org.apache.aurora.gen.storage.RemoveJob;
-import org.apache.aurora.gen.storage.RemoveLock;
-import org.apache.aurora.gen.storage.RemoveQuota;
-import org.apache.aurora.gen.storage.RemoveTasks;
 import org.apache.aurora.gen.storage.RewriteTask;
 import org.apache.aurora.gen.storage.SaveAcceptedJob;
-import org.apache.aurora.gen.storage.SaveFrameworkId;
-import org.apache.aurora.gen.storage.SaveHostAttributes;
-import org.apache.aurora.gen.storage.SaveLock;
 import org.apache.aurora.gen.storage.SaveQuota;
-import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.gen.storage.Snapshot;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.SchedulerException;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.log.Log.Stream.InvalidPositionException;
 import org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
-import org.apache.aurora.scheduler.storage.ForwardingStore;
 import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
@@ -127,8 +106,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * <p>If the op fails to apply to local storage we will never write the op to the log and if the op
  * fails to apply to the log, it'll throw and abort the local storage transaction as well.
  */
-public class LogStorage extends ForwardingStore
-    implements NonVolatileStorage, DistributedSnapshotStore {
+public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore {
 
   /**
    * A service that can schedule an action to be executed periodically.
@@ -143,6 +121,27 @@ public class LogStorage extends ForwardingStore
      * @param action The action to execute periodically.
      */
     void doEvery(Amount<Long, Time> interval, Runnable action);
+  }
+
+  /**
+   * A maintainer for context about open transactions. Assumes that an external entity is
+   * responsible for opening and closing transactions.
+   */
+  interface TransactionManager {
+
+    /**
+     * Checks whether there is an open transaction.
+     *
+     * @return {@code true} if there is an open transaction, {@code false} otherwise.
+     */
+    boolean hasActiveTransaction();
+
+    /**
+     * Adds an operation to the existing transaction.
+     *
+     * @param op Operation to include in the existing transaction.
+     */
+    void log(Op op);
   }
 
   private static class ScheduledExecutorSchedulingService implements SchedulingService {
@@ -172,48 +171,23 @@ public class LogStorage extends ForwardingStore
   private final SchedulingService schedulingService;
   private final SnapshotStore<Snapshot> snapshotStore;
   private final Amount<Long, Time> snapshotInterval;
+  private final Storage writeBehindStorage;
+  private final SchedulerStore.Mutable writeBehindSchedulerStore;
+  private final JobStore.Mutable writeBehindJobStore;
+  private final TaskStore.Mutable writeBehindTaskStore;
+  private final LockStore.Mutable writeBehindLockStore;
+  private final QuotaStore.Mutable writeBehindQuotaStore;
+  private final AttributeStore.Mutable writeBehindAttributeStore;
 
   private StreamManager streamManager;
+  private final WriteAheadStorage writeAheadStorage;
 
+  // TODO(wfarner): It should be possible to remove this flag now, since all call stacks when
+  // recovering are controlled at this layer (they're all calls to Mutable store implementations).
+  // The more involved change is changing SnapshotStore to accept a Mutable store provider to
+  // avoid a call to Storage.write() when we replay a Snapshot.
   private boolean recovered = false;
   private StreamTransaction transaction = null;
-
-  private final MutableStoreProvider logStoreProvider = new MutableStoreProvider() {
-    @Override
-    public SchedulerStore.Mutable getSchedulerStore() {
-      return LogStorage.this;
-    }
-
-    @Override
-    public JobStore.Mutable getJobStore() {
-      return LogStorage.this;
-    }
-
-    @Override
-    public TaskStore getTaskStore() {
-      return LogStorage.this;
-    }
-
-    @Override
-    public TaskStore.Mutable getUnsafeTaskStore() {
-      return LogStorage.this;
-    }
-
-    @Override
-    public LockStore.Mutable getLockStore() {
-      return LogStorage.this;
-    }
-
-    @Override
-    public QuotaStore.Mutable getQuotaStore() {
-      return LogStorage.this;
-    }
-
-    @Override
-    public AttributeStore.Mutable getAttributeStore() {
-      return LogStorage.this;
-    }
-  };
 
   /**
    * Identifies the grace period to give in-process snapshots and checkpoints to complete during
@@ -273,7 +247,7 @@ public class LogStorage extends ForwardingStore
              SchedulingService schedulingService,
              SnapshotStore<Snapshot> snapshotStore,
              Amount<Long, Time> snapshotInterval,
-             Storage storage,
+             Storage delegateStorage,
              SchedulerStore.Mutable schedulerStore,
              JobStore.Mutable jobStore,
              TaskStore.Mutable taskStore,
@@ -281,11 +255,41 @@ public class LogStorage extends ForwardingStore
              QuotaStore.Mutable quotaStore,
              AttributeStore.Mutable attributeStore) {
 
-    super(storage, schedulerStore, jobStore, taskStore, lockStore, quotaStore, attributeStore);
     this.logManager = checkNotNull(logManager);
     this.schedulingService = checkNotNull(schedulingService);
     this.snapshotStore = checkNotNull(snapshotStore);
     this.snapshotInterval = checkNotNull(snapshotInterval);
+
+    // Log storage has two distinct operating modes: pre- and post-recovery.  When recovering,
+    // we write directly to the writeBehind stores since we are replaying what's already persisted.
+    // After that, all writes must succeed in the distributed log before they may be considered
+    // successful.
+    this.writeBehindStorage = checkNotNull(delegateStorage);
+    this.writeBehindSchedulerStore = checkNotNull(schedulerStore);
+    this.writeBehindJobStore = checkNotNull(jobStore);
+    this.writeBehindTaskStore = checkNotNull(taskStore);
+    this.writeBehindLockStore = checkNotNull(lockStore);
+    this.writeBehindQuotaStore = checkNotNull(quotaStore);
+    this.writeBehindAttributeStore = checkNotNull(attributeStore);
+    TransactionManager transactionManager = new TransactionManager() {
+      @Override
+      public boolean hasActiveTransaction() {
+        return transaction != null;
+      }
+
+      @Override
+      public void log(Op op) {
+        transaction.add(op);
+      }
+    };
+    this.writeAheadStorage = new WriteAheadStorage(
+        transactionManager,
+        schedulerStore,
+        jobStore,
+        taskStore,
+        lockStore,
+        quotaStore,
+        attributeStore);
   }
 
   @Override
@@ -383,52 +387,57 @@ public class LogStorage extends ForwardingStore
   private void replayOp(Op op) {
     switch (op.getSetField()) {
       case SAVE_FRAMEWORK_ID:
-        saveFrameworkId(op.getSaveFrameworkId().getId());
+        writeBehindSchedulerStore.saveFrameworkId(op.getSaveFrameworkId().getId());
         break;
 
       case SAVE_ACCEPTED_JOB:
         SaveAcceptedJob acceptedJob = op.getSaveAcceptedJob();
-        saveAcceptedJob(
+        writeBehindJobStore.saveAcceptedJob(
             acceptedJob.getManagerId(),
             IJobConfiguration.build(acceptedJob.getJobConfig()));
         break;
 
       case REMOVE_JOB:
-        removeJob(IJobKey.build(op.getRemoveJob().getJobKey()));
+        writeBehindJobStore.removeJob(IJobKey.build(op.getRemoveJob().getJobKey()));
         break;
 
       case SAVE_TASKS:
-        saveTasks(IScheduledTask.setFromBuilders(op.getSaveTasks().getTasks()));
+        writeBehindTaskStore.saveTasks(
+            IScheduledTask.setFromBuilders(op.getSaveTasks().getTasks()));
         break;
 
       case REWRITE_TASK:
         RewriteTask rewriteTask = op.getRewriteTask();
-        unsafeModifyInPlace(rewriteTask.getTaskId(), ITaskConfig.build(rewriteTask.getTask()));
+        writeBehindTaskStore.unsafeModifyInPlace(
+            rewriteTask.getTaskId(),
+            ITaskConfig.build(rewriteTask.getTask()));
         break;
 
       case REMOVE_TASKS:
-        deleteTasks(op.getRemoveTasks().getTaskIds());
+        writeBehindTaskStore.deleteTasks(op.getRemoveTasks().getTaskIds());
         break;
 
       case SAVE_QUOTA:
         SaveQuota saveQuota = op.getSaveQuota();
-        saveQuota(saveQuota.getRole(), IResourceAggregate.build(saveQuota.getQuota()));
+        writeBehindQuotaStore.saveQuota(
+            saveQuota.getRole(),
+            IResourceAggregate.build(saveQuota.getQuota()));
         break;
 
       case REMOVE_QUOTA:
-        removeQuota(op.getRemoveQuota().getRole());
+        writeBehindQuotaStore.removeQuota(op.getRemoveQuota().getRole());
         break;
 
       case SAVE_HOST_ATTRIBUTES:
-        saveHostAttributes(op.getSaveHostAttributes().hostAttributes);
+        writeBehindAttributeStore.saveHostAttributes(op.getSaveHostAttributes().hostAttributes);
         break;
 
       case SAVE_LOCK:
-        saveLock(ILock.build(op.getSaveLock().getLock()));
+        writeBehindLockStore.saveLock(ILock.build(op.getSaveLock().getLock()));
         break;
 
       case REMOVE_LOCK:
-        removeLock(ILockKey.build(op.getRemoveLock().getLockKey()));
+        writeBehindLockStore.removeLock(ILockKey.build(op.getRemoveLock().getLockKey()));
         break;
 
       default:
@@ -464,7 +473,7 @@ public class LogStorage extends ForwardingStore
    */
   @Timed("scheduler_log_snapshot")
   void doSnapshot() throws CodingException, InvalidPositionException, StreamAccessException {
-    super.write(new MutateWork.NoResult<CodingException>() {
+    write(new MutateWork.NoResult<CodingException>() {
       @Override
       protected void execute(MutableStoreProvider unused)
           throws CodingException, InvalidPositionException, StreamAccessException {
@@ -489,21 +498,21 @@ public class LogStorage extends ForwardingStore
     // We don't want to use the log when recovering from it, we just want to update the underlying
     // store - so pass mutations straight through to the underlying storage.
     if (!recovered) {
-      return super.write(work);
+      return writeBehindStorage.write(work);
     }
 
     // The log stream transaction has already been set up so we just need to delegate with our
     // store provider so any mutations performed by work get logged.
     if (transaction != null) {
-      return work.apply(logStoreProvider);
+      return work.apply(writeAheadStorage);
     }
 
     transaction = streamManager.startTransaction();
     try {
-      return super.write(new MutateWork<T, E>() {
+      return writeBehindStorage.write(new MutateWork<T, E>() {
         @Override
         public T apply(MutableStoreProvider unused) throws E {
-          T result = work.apply(logStoreProvider);
+          T result = work.apply(writeAheadStorage);
           try {
             transaction.commit();
           } catch (CodingException e) {
@@ -521,164 +530,16 @@ public class LogStorage extends ForwardingStore
     }
   }
 
-  @Timed("scheduler_log_save_framework_id")
   @Override
-  public void saveFrameworkId(final String frameworkId) {
-    checkNotNull(frameworkId);
-
-    log(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
-    super.saveFrameworkId(frameworkId);
-  }
-
-  @Timed("scheduler_log_job_save")
-  @Override
-  public void saveAcceptedJob(final String managerId, final IJobConfiguration jobConfig) {
-    checkNotNull(managerId);
-    checkNotNull(jobConfig);
-
-    log(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())));
-    super.saveAcceptedJob(managerId, jobConfig);
-  }
-
-  @Timed("scheduler_log_job_remove")
-  @Override
-  public void removeJob(final IJobKey jobKey) {
-    checkNotNull(jobKey);
-
-    log(Op.removeJob(new RemoveJob().setJobKey(jobKey.newBuilder())));
-    super.removeJob(jobKey);
-  }
-
-  @Timed("scheduler_log_tasks_save")
-  @Override
-  public void saveTasks(final Set<IScheduledTask> newTasks) throws IllegalStateException {
-    checkNotNull(newTasks);
-
-    log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(newTasks))));
-    super.saveTasks(newTasks);
+  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
+    return writeBehindStorage.consistentRead(work);
   }
 
   @Override
-  public void deleteAllTasks() {
-    Query.Builder query = Query.unscoped();
-    Set<String> ids = FluentIterable.from(fetchTasks(query))
-        .transform(Tasks.SCHEDULED_TO_ID)
-        .toSet();
-    deleteTasks(ids);
-  }
+  public <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work)
+      throws StorageException, E {
 
-  @Timed("scheduler_log_tasks_remove")
-  @Override
-  public void deleteTasks(final Set<String> taskIds) {
-    checkNotNull(taskIds);
-
-    log(Op.removeTasks(new RemoveTasks(taskIds)));
-    super.deleteTasks(taskIds);
-  }
-
-  @Timed("scheduler_log_tasks_mutate")
-  @Override
-  public ImmutableSet<IScheduledTask> mutateTasks(
-      final Query.Builder query,
-      final Function<IScheduledTask, IScheduledTask> mutator) {
-
-    checkNotNull(query);
-    checkNotNull(mutator);
-
-    ImmutableSet<IScheduledTask> mutated = super.mutateTasks(query, mutator);
-
-    Map<String, IScheduledTask> tasksById = Tasks.mapById(mutated);
-    if (LOG.isLoggable(Level.FINE)) {
-      LOG.fine("Storing updated tasks to log: "
-          + Maps.transformValues(tasksById, Tasks.GET_STATUS));
-    }
-
-    // TODO(William Farner): Avoid writing an op when mutated is empty.
-    log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
-    return mutated;
-  }
-
-  @Timed("scheduler_log_unsafe_modify_in_place")
-  @Override
-  public boolean unsafeModifyInPlace(final String taskId, final ITaskConfig taskConfiguration) {
-    checkNotNull(taskId);
-    checkNotNull(taskConfiguration);
-
-    boolean mutated = super.unsafeModifyInPlace(taskId, taskConfiguration);
-    if (mutated) {
-      log(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration.newBuilder())));
-    }
-    return mutated;
-  }
-
-  @Timed("scheduler_log_quota_remove")
-  @Override
-  public void removeQuota(final String role) {
-    checkNotNull(role);
-
-    log(Op.removeQuota(new RemoveQuota(role)));
-    super.removeQuota(role);
-  }
-
-  @Timed("scheduler_log_quota_save")
-  @Override
-  public void saveQuota(final String role, final IResourceAggregate quota) {
-    checkNotNull(role);
-    checkNotNull(quota);
-
-    log(Op.saveQuota(new SaveQuota(role, quota.newBuilder())));
-    super.saveQuota(role, quota);
-  }
-
-  @Timed("scheduler_save_host_attribute")
-  @Override
-  public void saveHostAttributes(final HostAttributes attrs) {
-    checkNotNull(attrs);
-
-    // Pass the updated attributes upstream, and then check if the stored value changes.
-    // We do this since different parts of the system write partial HostAttributes objects
-    // and they are merged together internally.
-    // TODO(William Farner): Split out a separate method
-    //                       saveAttributes(String host, Iterable<Attributes>) to simplify this.
-    Optional<HostAttributes> saved = getHostAttributes(attrs.getHost());
-    super.saveHostAttributes(attrs);
-    Optional<HostAttributes> updated = getHostAttributes(attrs.getHost());
-    if (!saved.equals(updated)) {
-      log(Op.saveHostAttributes(new SaveHostAttributes(updated.get())));
-    }
-  }
-
-  @Timed("scheduler_lock_save")
-  @Override
-  public void saveLock(final ILock lock) {
-    checkNotNull(lock);
-
-    log(Op.saveLock(new SaveLock(lock.newBuilder())));
-    super.saveLock(lock);
-  }
-
-  @Timed("scheduler_lock_remove")
-  @Override
-  public void removeLock(final ILockKey lockKey) {
-    checkNotNull(lockKey);
-
-    log(Op.removeLock(new RemoveLock(lockKey.newBuilder())));
-    super.removeLock(lockKey);
-  }
-
-  @Override
-  public boolean setMaintenanceMode(final String host, final MaintenanceMode mode) {
-    checkNotNull(host);
-    checkNotNull(mode);
-
-    Optional<HostAttributes> saved = getHostAttributes(host);
-    if (saved.isPresent()) {
-      HostAttributes attributes = saved.get().setMode(mode);
-      log(Op.saveHostAttributes(new SaveHostAttributes(attributes)));
-      super.saveHostAttributes(attributes);
-      return true;
-    }
-    return false;
+    return writeBehindStorage.weaklyConsistentRead(work);
   }
 
   @Override
@@ -691,16 +552,6 @@ public class LogStorage extends ForwardingStore
       throw new StorageException("Saved snapshot but failed to truncate entries preceding it", e);
     } catch (StreamAccessException e) {
       throw new StorageException("Failed to create a snapshot", e);
-    }
-  }
-
-  private void log(Op op) {
-    Preconditions.checkState(
-        !recovered || (transaction != null),
-        "Mutating operations must be done during recovery or within a transaction.");
-
-    if (recovered) {
-      transaction.add(op);
     }
   }
 }

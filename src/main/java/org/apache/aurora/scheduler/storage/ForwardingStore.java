@@ -20,12 +20,10 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -33,7 +31,6 @@ import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -42,26 +39,23 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * an existing storage system.
  */
 public class ForwardingStore implements
-    Storage,
-    SchedulerStore.Mutable,
-    JobStore.Mutable,
-    TaskStore.Mutable,
-    LockStore.Mutable,
-    QuotaStore.Mutable,
-    AttributeStore.Mutable {
+    SchedulerStore,
+    JobStore,
+    TaskStore,
+    LockStore,
+    QuotaStore,
+    AttributeStore {
 
-  private final Storage storage;
-  private final SchedulerStore.Mutable schedulerStore;
-  private final JobStore.Mutable jobStore;
-  private final TaskStore.Mutable taskStore;
-  private final LockStore.Mutable lockStore;
-  private final QuotaStore.Mutable quotaStore;
-  private final AttributeStore.Mutable attributeStore;
+  private final SchedulerStore schedulerStore;
+  private final JobStore jobStore;
+  private final TaskStore taskStore;
+  private final LockStore lockStore;
+  private final QuotaStore quotaStore;
+  private final AttributeStore attributeStore;
 
   /**
    * Creats a new forwarding store that delegates to the providing default stores.
    *
-   * @param storage Delegate.
    * @param schedulerStore Delegate.
    * @param jobStore Delegate.
    * @param taskStore Delegate.
@@ -70,44 +64,19 @@ public class ForwardingStore implements
    * @param attributeStore Delegate.
    */
   public ForwardingStore(
-      Storage storage,
-      SchedulerStore.Mutable schedulerStore,
-      JobStore.Mutable jobStore,
-      TaskStore.Mutable taskStore,
-      LockStore.Mutable lockStore,
-      QuotaStore.Mutable quotaStore,
-      AttributeStore.Mutable attributeStore) {
+      SchedulerStore schedulerStore,
+      JobStore jobStore,
+      TaskStore taskStore,
+      LockStore lockStore,
+      QuotaStore quotaStore,
+      AttributeStore attributeStore) {
 
-    this.storage = checkNotNull(storage);
     this.schedulerStore = checkNotNull(schedulerStore);
     this.jobStore = checkNotNull(jobStore);
     this.taskStore = checkNotNull(taskStore);
     this.lockStore = checkNotNull(lockStore);
     this.quotaStore = checkNotNull(quotaStore);
     this.attributeStore = checkNotNull(attributeStore);
-  }
-
-  @Override
-  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
-    return storage.consistentRead(work);
-  }
-
-  @Override
-  public <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work)
-      throws StorageException, E {
-    return storage.weaklyConsistentRead(work);
-  }
-
-  @Override
-  public <T, E extends Exception> T write(MutateWork<T, E> work)
-      throws StorageException, E {
-
-    return storage.write(work);
-  }
-
-  @Override
-  public void saveFrameworkId(String frameworkId) {
-    schedulerStore.saveFrameworkId(frameworkId);
   }
 
   @Override
@@ -127,51 +96,8 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void saveAcceptedJob(String managerId, IJobConfiguration jobConfig) {
-    jobStore.saveAcceptedJob(managerId, jobConfig);
-  }
-
-  @Override
-  public void removeJob(IJobKey jobKey) {
-    jobStore.removeJob(jobKey);
-  }
-
-  @Override
-  public void deleteJobs() {
-    jobStore.deleteJobs();
-  }
-
-  @Override
   public Set<String> fetchManagerIds() {
     return jobStore.fetchManagerIds();
-  }
-
-  @Override
-  public void saveTasks(Set<IScheduledTask> tasks) throws IllegalStateException {
-    taskStore.saveTasks(tasks);
-  }
-
-  @Override
-  public void deleteAllTasks() {
-    taskStore.deleteAllTasks();
-  }
-
-  @Override
-  public void deleteTasks(Set<String> taskIds) {
-    taskStore.deleteTasks(taskIds);
-  }
-
-  @Override
-  public ImmutableSet<IScheduledTask> mutateTasks(
-      Query.Builder query,
-      Function<IScheduledTask, IScheduledTask> mutator) {
-
-    return taskStore.mutateTasks(query, mutator);
-  }
-
-  @Override
-  public boolean unsafeModifyInPlace(String taskId, ITaskConfig taskConfiguration) {
-    return taskStore.unsafeModifyInPlace(taskId, taskConfiguration);
   }
 
   @Override
@@ -190,48 +116,13 @@ public class ForwardingStore implements
   }
 
   @Override
-  public void saveLock(ILock lock) {
-    lockStore.saveLock(lock);
-  }
-
-  @Override
-  public void removeLock(ILockKey lockKey) {
-    lockStore.removeLock(lockKey);
-  }
-
-  @Override
-  public void deleteLocks() {
-    lockStore.deleteLocks();
-  }
-
-  @Override
   public Map<String, IResourceAggregate> fetchQuotas() {
     return quotaStore.fetchQuotas();
   }
 
   @Override
-  public void removeQuota(String role) {
-    quotaStore.removeQuota(role);
-  }
-
-  @Override
-  public void deleteQuotas() {
-    quotaStore.deleteQuotas();
-  }
-
-  @Override
-  public void saveQuota(String role, IResourceAggregate quota) {
-    quotaStore.saveQuota(role, quota);
-  }
-
-  @Override
   public Optional<IResourceAggregate> fetchQuota(String role) {
     return quotaStore.fetchQuota(role);
-  }
-
-  @Override
-  public void saveHostAttributes(HostAttributes hostAttribute) {
-    attributeStore.saveHostAttributes(hostAttribute);
   }
 
   @Override
@@ -242,15 +133,5 @@ public class ForwardingStore implements
   @Override
   public Set<HostAttributes> getHostAttributes() {
     return attributeStore.getHostAttributes();
-  }
-
-  @Override
-  public void deleteHostAttributes() {
-    attributeStore.deleteHostAttributes();
-  }
-
-  @Override
-  public boolean setMaintenanceMode(String host, MaintenanceMode mode) {
-    return attributeStore.setMaintenanceMode(host, mode);
   }
 }

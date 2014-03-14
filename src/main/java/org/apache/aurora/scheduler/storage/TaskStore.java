@@ -58,6 +58,8 @@ public interface TaskStore {
 
     /**
      * Removes all tasks from the store.
+     * TODO(wfarner): Move this and other mass-delete methods to an interface that is only
+     * accessible by SnapshotStoreImpl.
      */
     void deleteAllTasks();
 

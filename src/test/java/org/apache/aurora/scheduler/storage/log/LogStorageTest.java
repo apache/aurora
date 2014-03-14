@@ -558,7 +558,6 @@ public class LogStorageTest extends EasyMockTest {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWriteOperation();
-        expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(ImmutableSet.of(task));
         storageUtil.taskStore.deleteTasks(taskIds);
         streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
             .andReturn(position);
@@ -566,7 +565,7 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().deleteAllTasks();
+        storeProvider.getUnsafeTaskStore().deleteTasks(taskIds);
       }
     }.run();
   }
@@ -710,17 +709,6 @@ public class LogStorageTest extends EasyMockTest {
         assertEquals(hostAttributes, store.getHostAttributes(host));
         store.saveHostAttributes(hostAttributes.get());
         assertEquals(hostAttributes, store.getHostAttributes(host));
-      }
-    }.run();
-  }
-
-  @Test(expected = IllegalStateException.class)
-  public void testMutateRequiresWriteOperation() throws Exception {
-    new StorageTestFixture() {
-
-      @Override
-      protected void runTest() {
-        logStorage.deleteTasks(ImmutableSet.of("a"));
       }
     }.run();
   }
