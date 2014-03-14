@@ -32,8 +32,10 @@ import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Atomics;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.twitter.common.application.Lifecycle;
+import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
+import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatImpl;
@@ -129,7 +131,8 @@ public class SchedulerLifecycle implements EventSubscriber {
       LeadingOptions leadingOptions,
       ScheduledExecutorService executorService,
       Clock clock,
-      EventSink eventSink) {
+      EventSink eventSink,
+      ShutdownRegistry shutdownRegistry) {
 
     this(
         driverFactory,
@@ -138,7 +141,8 @@ public class SchedulerLifecycle implements EventSubscriber {
         driver,
         new DefaultDelayedActions(leadingOptions, executorService),
         clock,
-        eventSink);
+        eventSink,
+        shutdownRegistry);
   }
 
   private static final class DefaultDelayedActions implements DelayedActions {
@@ -198,7 +202,8 @@ public class SchedulerLifecycle implements EventSubscriber {
       final SettableDriver driver,
       final DelayedActions delayedActions,
       final Clock clock,
-      final EventSink eventSink) {
+      final EventSink eventSink,
+      final ShutdownRegistry shutdownRegistry) {
 
     checkNotNull(driverFactory);
     checkNotNull(storage);
@@ -207,6 +212,7 @@ public class SchedulerLifecycle implements EventSubscriber {
     checkNotNull(delayedActions);
     checkNotNull(clock);
     checkNotNull(eventSink);
+    checkNotNull(shutdownRegistry);
 
     Stats.export(new StatImpl<Integer>("framework_registered") {
       @Override
@@ -222,6 +228,13 @@ public class SchedulerLifecycle implements EventSubscriber {
         }
       });
     }
+
+    shutdownRegistry.addAction(new Command() {
+      @Override
+      public void execute() {
+        stateMachine.transition(State.DEAD);
+      }
+    });
 
     final Closure<Transition<State>> prepareStorage = new Closure<Transition<State>>() {
       @Override
