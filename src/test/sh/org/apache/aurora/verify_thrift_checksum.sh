@@ -46,7 +46,8 @@ do
 import hashlib
 with open('$file', 'rb') as f:
   print(hashlib.md5(f.read()).hexdigest())
-EOF)
+EOF
+)
   golden_file=src/test/resources/${file#src/main/thrift/}.md5
   if $reset_mode
   then
