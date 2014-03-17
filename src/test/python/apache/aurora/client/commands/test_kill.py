@@ -19,7 +19,7 @@ import unittest
 
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
-from apache.aurora.client.commands.core import kill
+from apache.aurora.client.commands.core import kill, killall
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.common.contextutil import temporary_file
@@ -81,10 +81,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     assert mock_api.kill_job.call_count == 1
 
 
-  def test_simple_successful_kill_job(self):
-    """Run a test of the "kill" command against a mocked-out API:
-    Verifies that the kill command sends the right API RPCs, and performs the correct
-    tests on the result."""
+  def test_kill_job_noshards_fail(self):
     mock_options = self.setup_mock_options()
     mock_config = Mock()
     mock_api_factory = self.setup_mock_api_factory()
@@ -100,14 +97,41 @@ class TestClientKillCommand(AuroraClientCommandTest):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        kill(['west/mchucarroll/test/hello', fp.name], mock_options)
+        self.assertRaises(SystemExit, kill, ['west/mchucarroll/test/hello', fp.name], mock_options)
+
+      # Now check that the right API calls got made.
+      mock_api.kill_job.call_count == 0
+
+
+  def test_simple_successful_killall_job(self):
+    """Run a test of the "kill" command against a mocked-out API:
+    Verifies that the kill command sends the right API RPCs, and performs the correct
+    tests on the result."""
+
+    mock_options = self.setup_mock_options()
+    mock_config = Mock()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_api.kill_job.return_value = self.get_kill_job_response()
+    with contextlib.nested(
+        patch('apache.aurora.client.commands.core.make_client',
+            return_value=mock_api),
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
+            mock_make_client,
+            options, mock_get_job_config):
+
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        killall(['west/mchucarroll/test/hello', fp.name], mock_options)
 
       # Now check that the right API calls got made.
       self.assert_kill_job_called(mock_api)
       mock_api.kill_job.assert_called_with(
         AuroraJobKey(cluster=self.TEST_CLUSTER, role=self.TEST_ROLE, env=self.TEST_ENV,
             name=self.TEST_JOB), None, config=mock_config)
-      assert mock_make_client_factory.call_count == 1
+
+
 
   @classmethod
   def get_expected_task_query(cls, shards=None):
@@ -123,22 +147,21 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_config.hooks = []
     mock_config.raw.return_value.enable_hooks.return_value.get.return_value = False
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_api_factory = Mock(return_value=mock_api)
     mock_scheduler_proxy.killTasks.return_value = self.get_kill_job_response()
     with contextlib.nested(
-        patch('apache.aurora.client.factory.make_client_factory', return_value=mock_api_factory),
+        patch('apache.aurora.client.factory.make_client', return_value=mock_api),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            mock_api_factory_patch,
+            mock_api_patch,
             mock_scheduler_proxy_class,
             mock_clusters,
             options, mock_get_job_config):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        kill(['west/mchucarroll/test/hello', fp.name], mock_options)
+        killall(['west/mchucarroll/test/hello', fp.name], mock_options)
 
       # Now check that the right API calls got made.
       assert mock_scheduler_proxy.killTasks.call_count == 1
@@ -152,10 +175,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_config.hooks = []
     mock_config.raw.return_value.enable_hooks.return_value.get.return_value = False
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_api_factory = Mock(return_value=mock_api)
     mock_scheduler_proxy.killTasks.return_value = self.get_kill_job_response()
     with contextlib.nested(
-        patch('apache.aurora.client.factory.make_client_factory', return_value=mock_api_factory),
+        patch('apache.aurora.client.factory.make_client', return_value=mock_api),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),

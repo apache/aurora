@@ -64,7 +64,7 @@ test_flask_example() {
   runlen=$(run_sched "/vagrant/$_testdir/aurora_client.pex run $jobkey 'pwd'" | wc -l)
   test $runlen -eq 2
 
-  run_sched "/vagrant/$_testdir/aurora_client.pex kill  $jobkey"
+  run_sched "/vagrant/$_testdir/aurora_client.pex killall  $jobkey"
 }
 
 RETCODE=1
