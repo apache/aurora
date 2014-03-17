@@ -73,8 +73,7 @@ enum MaintenanceMode {
 // The attributes assigned to a host.
 struct HostAttributes {
   1: string          host
-  2: set<Attribute>  attributes  // TODO(William Farner): Change this to map<String, Attribute>
-                                 // and remove name field from Attribute.
+  2: set<Attribute>  attributes
   3: optional MaintenanceMode mode
   4: optional string slaveId
 }

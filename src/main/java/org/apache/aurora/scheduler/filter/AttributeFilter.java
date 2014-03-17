@@ -17,10 +17,7 @@ package org.apache.aurora.scheduler.filter;
 
 import java.util.Set;
 
-import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.Attribute;
@@ -31,14 +28,6 @@ import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
  */
 final class AttributeFilter {
 
-  private static final Function<Attribute, Set<String>> GET_VALUES =
-      new Function<Attribute, Set<String>>() {
-        @Override
-        public Set<String> apply(Attribute attribute) {
-          return attribute.getValues();
-        }
-      };
-
   private AttributeFilter() {
     // Utility class.
   }
@@ -46,14 +35,12 @@ final class AttributeFilter {
   /**
    * Tests whether a constraint is satisfied by attributes.
    *
-   * @param attribute Host attribute.
+   * @param values Host attribute values.
    * @param constraint Constraint to match.
    * @return {@code true} if the attribute satisfies the constraint, {@code false} otherwise.
    */
-  static boolean matches(Optional<Attribute> attribute, IValueConstraint constraint) {
-    Set<String> allAttributes =
-        ImmutableSet.copyOf(attribute.transform(GET_VALUES).or(ImmutableSet.<String>of()));
-    boolean match = Iterables.any(constraint.getValues(), Predicates.in(allAttributes));
+  static boolean matches(Set<String> values, IValueConstraint constraint) {
+    boolean match = Iterables.any(constraint.getValues(), Predicates.in(values));
     return constraint.isNegated() ^ match;
   }
 

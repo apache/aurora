@@ -15,9 +15,13 @@
  */
 package org.apache.aurora.scheduler.filter;
 
+import java.util.Set;
+
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.apache.aurora.gen.Attribute;
@@ -61,6 +65,14 @@ class ConstraintFilter {
     return new Veto("Host " + reason + " for maintenance", Veto.MAX_SCORE);
   }
 
+  private static final Function<Attribute, Set<String>> GET_VALUES =
+      new Function<Attribute, Set<String>>() {
+        @Override
+        public Set<String> apply(Attribute attribute) {
+          return attribute.getValues();
+        }
+      };
+
   /**
    * Gets the veto (if any) for a scheduling constraint based on the {@link AttributeAggregate} this
    * filter was created with.
@@ -69,15 +81,23 @@ class ConstraintFilter {
    * @return A veto if the constraint is not satisfied based on the existing state of the job.
    */
   Optional<Veto> getVeto(IConstraint constraint) {
-    // Per TODO in api.thrift, we expect host attributes to have unique names.
-    Optional<Attribute> attribute = Optional.fromNullable(Iterables.getOnlyElement(
-        Iterables.filter(hostAttributes, new NameFilter(constraint.getName())), null));
+    Iterable<Attribute> sameNameAttributes =
+        Iterables.filter(hostAttributes, new NameFilter(constraint.getName()));
+    Optional<Attribute> attribute;
+    if (Iterables.isEmpty(sameNameAttributes)) {
+      attribute = Optional.absent();
+    } else {
+      Set<String> attributeValues = ImmutableSet.copyOf(
+          Iterables.concat(Iterables.transform(sameNameAttributes, GET_VALUES)));
+      attribute = Optional.of(new Attribute(constraint.getName(), attributeValues));
+    }
 
     ITaskConstraint taskConstraint = constraint.getConstraint();
     switch (taskConstraint.getSetField()) {
       case VALUE:
-        boolean matches =
-            AttributeFilter.matches(attribute, taskConstraint.getValue());
+        boolean matches = AttributeFilter.matches(
+            attribute.transform(GET_VALUES).or(ImmutableSet.<String>of()),
+            taskConstraint.getValue());
         return matches
             ? Optional.<Veto>absent()
             : Optional.of(mismatchVeto(constraint.getName()));

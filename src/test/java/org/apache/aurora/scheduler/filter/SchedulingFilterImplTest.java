@@ -460,6 +460,22 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertEquals((int) (Veto.MAX_SCORE * 200.0 / DISK.getRange()), DISK.veto(200).getScore());
   }
 
+  @Test
+  public void testDuplicatedAttribute() throws Exception {
+    expectGetHostAttributes(HOST_A,
+        valueAttribute("jvm", "1.4"),
+        valueAttribute("jvm", "1.6", "1.7")).atLeastOnce();
+    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
+
+    control.replay();
+
+    // Matches attribute, matching value.
+    checkConstraint(HOST_A, "jvm", true, "1.4");
+    checkConstraint(HOST_A, "jvm", true, "1.6");
+    checkConstraint(HOST_A, "jvm", true, "1.7");
+    checkConstraint(HOST_A, "jvm", true, "1.6", "1.7");
+  }
+
   private ITaskConfig checkConstraint(
       String host,
       String constraintName,
