@@ -79,7 +79,7 @@ def test_simple_config():
   assert tti.priority == 0
   assert tti.maxTaskFailures == 1
   assert tti.constraints == set()
-  assert tti.packages == set()
+  assert tti.packagesDEPRECATED == set()
   assert tti.environment == HELLO_WORLD.environment().get()
 
 
@@ -212,8 +212,8 @@ def test_packages_in_config():
   assert job.instanceCount == 1
   tti = job.taskConfig
 
-  assert len(tti.packages) == 1
-  pi = iter(tti.packages).next()
+  assert len(tti.packagesDEPRECATED) == 1
+  pi = iter(tti.packagesDEPRECATED).next()
   assert pi.role == 'alpha'
   assert pi.name == 'beta'
   assert pi.version == 1

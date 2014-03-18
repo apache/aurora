@@ -57,7 +57,7 @@ class TestListJobs(AuroraClientCommandTest):
       job.assignedTask.slaveHost = 'slavehost'
       job.assignedTask.task = Mock(spec=TaskConfig)
       job.assignedTask.task.maxTaskFailures = 1
-      job.assignedTask.task.packages = []
+      job.assignedTask.task.packagesDEPRECATED = []
       job.assignedTask.task.owner = Identity(role='mchucarroll')
       job.assignedTask.task.environment = 'test'
       job.assignedTask.task.jobName = 'woops'
@@ -76,10 +76,24 @@ class TestListJobs(AuroraClientCommandTest):
     return jobs
 
   @classmethod
+  def create_mock_scheduled_task_no_packages(cls):
+    result = cls.create_mock_scheduled_tasks()
+    for job in result:
+      job.assignedTask.task.packagesDEPRECATED = None
+    return result
+
+  @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_tasks())
+    return resp
+
+  @classmethod
+  def create_status_response_null_package(cls):
+    resp = cls.create_simple_success_response()
+    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
+    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_no_packages())
     return resp
 
   @classmethod
@@ -120,6 +134,24 @@ class TestListJobs(AuroraClientCommandTest):
             mock_clusters,
             options):
       self.assertRaises(SystemExit, status, ['west/mchucarroll/test/hello'], mock_options)
+
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+          environment='test', owner=Identity(role='mchucarroll')))
+
+  def test_successful_status_nopackages(self):
+    """Test the status command with no packages."""
+    # Calls api.check_status, which calls scheduler_proxy.getJobs
+    mock_options = self.setup_mock_options()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response_null_package()
+    with contextlib.nested(
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('twitter.common.app.get_options', return_value=mock_options)) as (
+      mock_scheduler_proxy_class,
+      mock_clusters,
+      options):
+      status(['west/mchucarroll/test/hello'], mock_options)
 
       mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll')))

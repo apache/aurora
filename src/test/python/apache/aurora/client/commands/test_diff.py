@@ -68,7 +68,7 @@ class TestDiffCommand(AuroraClientCommandTest):
       job.assignedTask.task.maxTaskFailures = 1
       job.assignedTask.task.executorConfig = Mock(spec=ExecutorConfig)
       job.assignedTask.task.executorConfig.data = Mock()
-      job.assignedTask.task.packages = []
+      job.assignedTask.task.packagesDEPRECATED = []
       job.assignedTask.task.owner = Identity(role='mchucarroll')
       job.assignedTask.task.environment = 'test'
       job.assignedTask.task.jobName = 'woops'

@@ -50,7 +50,7 @@ class TestJobStatus(AuroraClientCommandTest):
       job.assignedTask.slaveHost = 'slavehost'
       job.assignedTask.task = Mock(spec=TaskConfig)
       job.assignedTask.task.maxTaskFailures = 1
-      job.assignedTask.task.packages = []
+      job.assignedTask.task.packagesDEPRECATED = []
       job.assignedTask.task.owner = Identity(role='bozo')
       job.assignedTask.task.environment = 'test'
       job.assignedTask.task.jobName = 'woops'
@@ -72,7 +72,7 @@ class TestJobStatus(AuroraClientCommandTest):
   def create_mock_scheduled_task_no_packages(cls):
     result = cls.create_mock_scheduled_tasks()
     for job in result:
-      job.assignedTask.task.packages = None
+      job.assignedTask.task.packagesDEPRECATED = None
     return result
 
   @classmethod

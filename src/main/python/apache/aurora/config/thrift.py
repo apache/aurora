@@ -211,7 +211,7 @@ def convert(job, packages=frozenset(), ports=frozenset()):
   task.contactEmail = not_empty_or(job.contact(), None)
 
   # Add package tuples to a task, to display in the scheduler UI.
-  task.packages = frozenset(
+  task.packagesDEPRECATED = frozenset(
       Package(role=str(role), name=str(package_name), version=int(version))
       for role, package_name, version in packages)
 
