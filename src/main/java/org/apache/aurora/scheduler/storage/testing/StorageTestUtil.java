@@ -76,27 +76,29 @@ public class StorageTestUtil {
 
   public <T> IExpectationSetters<T> expectConsistentRead() {
     final Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.consistentRead(capture(work))).andAnswer(new IAnswer<T>() {
-      @Override
-      public T answer() {
-        return work.getValue().apply(storeProvider);
-      }
-    });
+    return expect(storage.<T, RuntimeException>consistentRead(capture(work)))
+        .andAnswer(new IAnswer<T>() {
+          @Override
+          public T answer() {
+            return work.getValue().apply(storeProvider);
+          }
+        });
   }
 
   public <T> IExpectationSetters<T> expectWeaklyConsistentRead() {
     final Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.weaklyConsistentRead(capture(work))).andAnswer(new IAnswer<T>() {
-      @Override
-      public T answer() {
-        return work.getValue().apply(storeProvider);
-      }
-    });
+    return expect(storage.<T, RuntimeException>weaklyConsistentRead(capture(work)))
+        .andAnswer(new IAnswer<T>() {
+          @Override
+          public T answer() {
+            return work.getValue().apply(storeProvider);
+          }
+        });
   }
 
   public <T> IExpectationSetters<T> expectWriteOperation() {
     final Capture<MutateWork<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.write(capture(work))).andAnswer(new IAnswer<T>() {
+    return expect(storage.<T, RuntimeException>write(capture(work))).andAnswer(new IAnswer<T>() {
       @Override
       public T answer() {
         return work.getValue().apply(mutableStoreProvider);

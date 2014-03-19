@@ -145,7 +145,6 @@ limitations under the License.
       <!-- See http://checkstyle.sf.net/config_whitespace.html -->
       <module name="EmptyForInitializerPad"/>
       <module name="EmptyForIteratorPad"/>
-      <module name="GenericWhitespace"/>
       <module name="MethodParamPad"/>
       <module name="NoWhitespaceAfter"/>
       <module name="NoWhitespaceBefore"/>

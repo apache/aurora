@@ -62,10 +62,10 @@ import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager;
 import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
 import org.easymock.EasyMock;
+import org.easymock.IArgumentMatcher;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.easymock.EasyMock.aryEq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -180,6 +180,37 @@ public class LogManagerTest extends EasyMockTest {
     StreamTransaction streamTransaction = createNoMessagesStreamManager().startTransaction();
     streamTransaction.commit();
     streamTransaction.add(Op.saveFrameworkId(new SaveFrameworkId("don't allow this")));
+  }
+
+  private static class LogEntryMatcher implements IArgumentMatcher {
+    private final LogEntry expected;
+
+    LogEntryMatcher(LogEntry expected) {
+      this.expected = expected;
+    }
+
+    @Override
+    public boolean matches(Object argument) {
+      if (!(argument instanceof byte[])) {
+        return false;
+      }
+
+      try {
+        return expected.equals(ThriftBinaryCodec.decode(LogEntry.class, (byte[]) argument));
+      } catch (CodingException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    @Override
+    public void appendTo(StringBuffer buffer) {
+      buffer.append(expected.toString());
+    }
+  }
+
+  private static byte[] entryEq(LogEntry expected) {
+    EasyMock.reportMatcher(new LogEntryMatcher(expected));
+    return null;
   }
 
   @Test
@@ -453,7 +484,7 @@ public class LogManagerTest extends EasyMockTest {
     LogEntry deflatedSnapshotEntry = Entries.deflate(snapshotLogEntry);
 
     Entry snapshotEntry = createMock(Entry.class);
-    expect(stream.append(EasyMock.aryEq(encode(deflatedSnapshotEntry)))).andReturn(position1);
+    expect(stream.append(entryEq(deflatedSnapshotEntry))).andReturn(position1);
     stream.truncateBefore(position1);
 
     expect(snapshotEntry.contents()).andReturn(encode(deflatedSnapshotEntry));
@@ -496,10 +527,10 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   private void expectFrames(Position position, Message message) throws CodingException {
-    expect(stream.append(aryEq(encode(message.header)))).andReturn(position);
+    expect(stream.append(entryEq(message.header))).andReturn(position);
     for (LogEntry chunk : message.chunks) {
       // Only return a valid position for the header.
-      expect(stream.append(aryEq(encode(chunk)))).andReturn(null);
+      expect(stream.append(entryEq(chunk))).andReturn(null);
     }
   }
 
@@ -513,7 +544,7 @@ public class LogManagerTest extends EasyMockTest {
   }
 
   private void expectAppend(Position position, LogEntry logEntry) throws CodingException {
-    expect(stream.append(aryEq(encode(logEntry)))).andReturn(position);
+    expect(stream.append(entryEq(logEntry))).andReturn(position);
   }
 
   private static byte[] encode(LogEntry logEntry) throws CodingException {

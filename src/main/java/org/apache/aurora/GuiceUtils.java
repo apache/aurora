@@ -62,13 +62,11 @@ public final class GuiceUtils {
     // utility
   }
 
-  // No wildcards on the Class here because it upsets checkstyle - complains with:
-  // '>' is followed by whitespace.
-  private static final Function<Method, Pair<String, Class[]>> CANONICALIZE =
-      new Function<Method, Pair<String, Class[]>>() {
+  private static final Function<Method, Pair<String, Class<?>[]>> CANONICALIZE =
+      new Function<Method, Pair<String, Class<?>[]>>() {
         @Override
-        public Pair<String, Class[]> apply(Method method) {
-          return Pair.of(method.getName(), (Class[]) method.getParameterTypes());
+        public Pair<String, Class<?>[]> apply(Method method) {
+          return Pair.of(method.getName(), method.getParameterTypes());
         }
       };
 
@@ -87,9 +85,9 @@ public final class GuiceUtils {
 
     Method[] methods =
         declaredMethodsOnly ? matchInterface.getDeclaredMethods() : matchInterface.getMethods();
-    final Set<Pair<String, Class[]>> interfaceMethods =
+    final Set<Pair<String, Class<?>[]>> interfaceMethods =
         ImmutableSet.copyOf(Iterables.transform(ImmutableList.copyOf(methods), CANONICALIZE));
-    final LoadingCache<Method, Pair<String, Class[]>> cache = CacheBuilder.newBuilder()
+    final LoadingCache<Method, Pair<String, Class<?>[]>> cache = CacheBuilder.newBuilder()
         .build(CacheLoader.from(CANONICALIZE));
 
     return new AbstractMatcher<Method>() {
