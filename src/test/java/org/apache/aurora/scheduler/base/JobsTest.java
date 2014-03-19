@@ -24,6 +24,7 @@ import com.google.common.collect.Sets;
 
 import org.apache.aurora.gen.JobStats;
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.scheduler.storage.entities.IJobStats;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Test;
 
@@ -44,11 +45,11 @@ public class JobsTest {
               }
             }).toList();
 
-    JobStats expectedStats = new JobStats()
+    IJobStats expectedStats = IJobStats.build(new JobStats()
         .setActiveTaskCount(7)
         .setFailedTaskCount(3)
         .setFinishedTaskCount(2)
-        .setPendingTaskCount(3);
+        .setPendingTaskCount(3));
 
     assertEquals(expectedStats, Jobs.getJobStats(tasks));
   }

@@ -445,9 +445,9 @@ if __name__ == '__main__':
     print('usage: %s thrift_file struct_name output_directory' % sys.argv[0])
     sys.exit(1)
 
-  thrift_file, struct_name, output_directory = sys.argv[1:]
-  log('Searching for %s in %s' % (sys.argv[2], sys.argv[1]))
-  with open(sys.argv[1]) as f:
+  thrift_file, struct_name, output_directory = args
+  log('Searching for %s in %s' % (struct_name, thrift_file))
+  with open(thrift_file) as f:
     # Load all structs found in the thrift file.
     structs = parse_structs(f.read())
 
@@ -483,7 +483,7 @@ if __name__ == '__main__':
       symbol_table[name] = symbol
       return symbol
 
-    find_symbol(sys.argv[2])
+    find_symbol(struct_name)
     log('Symbol table:')
     for _, symbol in symbol_table.items():
       log('    %s' % symbol)
@@ -493,7 +493,7 @@ if __name__ == '__main__':
         if symbol.kind == 'enum':
           log('Skipping code generation for %s, since it is immutable' % symbol.name)
         else:
-          package_dir = os.path.join(sys.argv[3], PACKAGE_NAME.replace('.', os.path.sep))
+          package_dir = os.path.join(output_directory, PACKAGE_NAME.replace('.', os.path.sep))
           if not os.path.isdir(package_dir):
             os.makedirs(package_dir)
           gen_file = os.path.join(package_dir, '%s.java' % symbol.codegen_name)

@@ -41,6 +41,7 @@ import com.twitter.common.base.Closure;
 import org.antlr.stringtemplate.StringTemplate;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.Jobs;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.cron.CronPredictor;
@@ -50,6 +51,7 @@ import org.apache.aurora.scheduler.state.CronJobManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IJobStats;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -206,25 +208,31 @@ public class SchedulerzRole extends JerseyTemplateServlet {
             IJobKey jobKey = tasksByJobKey.getKey();
             Collection<IScheduledTask> tasks = tasksByJobKey.getValue();
 
-            Job job = new Job();
-            job.environment = jobKey.getEnvironment();
-            job.name = jobKey.getName();
-
             // Pick the freshest task's config and associate it with the job.
             ITaskConfig mostRecentTaskConfig =
                 getLatestActiveTask(tasks).getAssignedTask().getTask();
-            job.production = mostRecentTaskConfig.isProduction();
 
+            JobType jobType;
             // TODO(Suman Karumuri): Add a source/job type to TaskConfig and replace logic below
             if (mostRecentTaskConfig.isIsService()) {
-              job.type = JobType.SERVICE;
+              jobType = JobType.SERVICE;
             } else if (cronJobs.containsKey(jobKey)) {
-              job.type = JobType.CRON;
+              jobType = JobType.CRON;
             } else {
-              job.type = JobType.ADHOC;
+              jobType = JobType.ADHOC;
             }
 
-            return job;
+            IJobStats stats = Jobs.getJobStats(tasks);
+
+            return new Job(jobKey.getName(),
+                jobKey.getEnvironment(),
+                stats.getPendingTaskCount(),
+                stats.getActiveTaskCount(),
+                stats.getFinishedTaskCount(),
+                stats.getFailedTaskCount(),
+                0,
+                mostRecentTaskConfig.isProduction(),
+                jobType);
           }
         };
 
@@ -246,15 +254,36 @@ public class SchedulerzRole extends JerseyTemplateServlet {
    * Template object to represent a job.
    */
   static class Job {
-    private String name;
-    private String environment;
-    private int pendingTaskCount = 0;
-    private int activeTaskCount = 0;
-    private int finishedTaskCount = 0;
-    private int failedTaskCount = 0;
-    private int recentlyFailedTaskCount = 0;
-    private boolean production = false;
-    private JobType type;
+    private final String name;
+    private final String environment;
+    private final int pendingTaskCount;
+    private final int activeTaskCount;
+    private final int finishedTaskCount;
+    private final int failedTaskCount;
+    private final int recentlyFailedTaskCount;
+    private final boolean production;
+    private final JobType type;
+
+    Job(String name,
+        String environment,
+        int pendingTaskCount,
+        int activeTaskCount,
+        int finishedTaskCount,
+        int failedTaskCount,
+        int recentlyFailedTaskCount,
+        boolean production,
+        JobType type) {
+
+      this.name = name;
+      this.environment = environment;
+      this.pendingTaskCount = pendingTaskCount;
+      this.activeTaskCount = activeTaskCount;
+      this.finishedTaskCount = finishedTaskCount;
+      this.failedTaskCount = failedTaskCount;
+      this.recentlyFailedTaskCount = recentlyFailedTaskCount;
+      this.production = production;
+      this.type = type;
+    }
 
     public String getName() {
       return name;

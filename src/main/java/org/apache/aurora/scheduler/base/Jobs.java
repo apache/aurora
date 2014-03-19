@@ -16,6 +16,7 @@
 package org.apache.aurora.scheduler.base;
 
 import org.apache.aurora.gen.JobStats;
+import org.apache.aurora.scheduler.storage.entities.IJobStats;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 /**
@@ -33,7 +34,7 @@ public final class Jobs {
    * @param tasks a collection of tasks for which statistics are sought
    * @return an JobStats object containing the statistics about the tasks.
    */
-  public static JobStats getJobStats(Iterable<IScheduledTask> tasks) {
+  public static IJobStats getJobStats(Iterable<IScheduledTask> tasks) {
     JobStats stats = new JobStats();
     for (IScheduledTask task : tasks) {
       switch (task.getStatus()) {
@@ -68,6 +69,6 @@ public final class Jobs {
           throw new IllegalArgumentException("Unsupported status: " + task.getStatus());
       }
     }
-    return stats;
+    return IJobStats.build(stats);
   }
 }

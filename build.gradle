@@ -257,9 +257,14 @@ task generateSources(dependsOn: 'bootstrapThrift') {
         args = ['--gen', 'java:hashcode', '--gen', 'js', '-o', outputDir, file]
       }
     }
-    // These are the 'root' structs, the tool recursively generates all composed structs.
     // TODO(wfarner): Change codegen tool to generate for all structs in a thrift file.
-    ['JobConfiguration', 'Lock', 'ResourceAggregate', 'ScheduledTask', 'ServerInfo'].each {
+    def iStructs = ['JobConfiguration',
+                    'JobStats',
+                    'Lock',
+                    'ResourceAggregate',
+                    'ScheduledTask',
+                    'ServerInfo']
+    iStructs.each {
       def structName = it
       exec {
         executable = 'python'

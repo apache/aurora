@@ -220,31 +220,8 @@
         function drawBadges() {
           jQuery('#jobs-table>tbody').find('tr').each(function(){
             var tr = jQuery(this);
-            displayHealthBadge(tr);
             displayProductionBadge(tr);
           });
-        }
-
-        function displayHealthBadge(tr) {
-          var activeTasks = Number(tr.find('.active-tasks').val());
-          var recentlyFailedTasks = Number(tr.find('.recently-failed-tasks').val());
-          var pendingTasks = Number(tr.find('.pending-tasks').val());
-          var finishedTasks = Number(tr.find('.finished-tasks').val());
-          var totalTasks = pendingTasks + activeTasks + finishedTasks;
-          var jobStatus = tr.find('.job-status');
-
-          if (recentlyFailedTasks >= (totalTasks / 2)) {
-            jobStatus.addClass('label-important').html('Unstable');
-            jobStatus.attr('title', 'More than half of total tasks have failed in last 6 hours');
-          } else if (recentlyFailedTasks > 0) {
-            jobStatus.addClass('label-warning').html('Warning');
-            jobStatus.attr('title', 'One or more tasks have failed in last 6 hours');
-          } else {
-            jobStatus.addClass('label-success').html('Stable');
-            jobStatus.attr('title', 'No failed tasks in last 6 hours');
-          }
-
-          jobStatus.tooltip();
         }
 
         function displayProductionBadge(tr) {

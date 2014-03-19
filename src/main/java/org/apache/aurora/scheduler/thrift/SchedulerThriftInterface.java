@@ -411,7 +411,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       public JobSummary apply(IJobKey jobKey) {
         return new JobSummary()
             .setJob(jobs.get(jobKey).newBuilder())
-            .setStats(Jobs.getJobStats(tasks.get(jobKey)));
+            .setStats(Jobs.getJobStats(tasks.get(jobKey)).newBuilder());
       }
     };
 
