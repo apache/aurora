@@ -30,6 +30,9 @@ class KillManager(StatusChecker):
     if self._killed:
       return StatusResult(self._reason, ExitState.KILLED)
 
+  def name(self):
+    return 'kill_manager'
+
   def kill(self, reason):
     self._reason = reason
     self._killed = True

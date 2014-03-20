@@ -80,6 +80,7 @@ class AuroraExecutor(ExecutorBase, Observable):
     self.runner_started = threading.Event()
     self.sandbox_initialized = threading.Event()
     self.sandbox_created = threading.Event()
+    self.status_manager_started = threading.Event()
     self.terminated = threading.Event()
     self.launched = threading.Event()
 
@@ -160,14 +161,14 @@ class AuroraExecutor(ExecutorBase, Observable):
 
   def _start_status_manager(self, driver, assigned_task):
     status_checkers = [self._kill_manager]
-    self.metrics.register_observable('kill_manager', self._kill_manager)
+    self.metrics.register_observable(self._kill_manager.name(), self._kill_manager)
 
     for status_provider in self._status_providers:
       status_checker = status_provider.from_assigned_task(assigned_task, self._sandbox)
       if status_checker is None:
         continue
       status_checkers.append(status_checker)
-      # self.metrics.register_observable()
+      self.metrics.register_observable(status_checker.name(), status_checker)
 
     self._chained_checker = ChainedStatusChecker(status_checkers)
     self._chained_checker.start()
@@ -177,6 +178,7 @@ class AuroraExecutor(ExecutorBase, Observable):
     self._status_manager = self._status_manager_class(
         complete_checker, self._shutdown, clock=self._clock)
     self._status_manager.start()
+    self.status_manager_started.set()
 
   def _signal_kill_manager(self, driver, task_id, reason):
     if self._task_id is None:

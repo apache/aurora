@@ -74,6 +74,10 @@ class StatusChecker(Observable, Interface):
   def status(self):
     """Return None under normal operations.  Return StatusResult to indicate status proposal."""
 
+  def name(self):
+    """Return the name of the status checker.  By default it is the class name.  Subclassable."""
+    return self.__class__.__name__
+
   def start(self):
     """Invoked once the task has been started."""
     self.metrics.register(NamedGauge('enabled', 1))

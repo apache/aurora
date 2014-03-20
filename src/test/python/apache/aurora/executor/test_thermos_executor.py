@@ -205,7 +205,11 @@ def make_executor(
   task_description = make_task(task, assigned_ports=ports, instanceId=0)
   te.launchTask(proxy_driver, task_description)
 
-  te.runner_started.wait()
+  te.status_manager_started.wait()
+  sampled_metrics = te.metrics.sample()
+  assert 'kill_manager.enabled' in sampled_metrics
+  for checker in te._chained_checker._status_checkers:  # hacky
+    assert ('%s.enabled' % checker.name()) in sampled_metrics
 
   while len(proxy_driver.method_calls['sendStatusUpdate']) < 2:
     time.sleep(0.1)
