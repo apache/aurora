@@ -62,7 +62,7 @@ public class StructDump extends JerseyTemplateServlet {
   public Response getUsage() {
     return Response
         .status(Status.BAD_REQUEST)
-        .entity("<html>Usage: /structdump/{task_id} or /structdump/job/{role}/{env}/{job}</html>")
+        .entity("<html>Usage: /structdump/task/{task_id} or /structdump/cron/{role}/{env}/{job}</html>")
         .build();
   }
 
