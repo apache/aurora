@@ -47,6 +47,7 @@ import com.twitter.common.util.TruncatedBinaryBackoff;
 
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.GcExecutorSettings;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.RandomGcExecutorSettings;
+import org.apache.aurora.scheduler.async.HistoryPruner.HistoryPrunnerSettings;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
@@ -60,7 +61,6 @@ import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import static org.apache.aurora.scheduler.async.HistoryPruner.PruneThreshold;
 import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl;
 import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl.PreemptionDelay;
 import static org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
@@ -101,6 +101,15 @@ public class AsyncModule extends AbstractModule {
       help = "Time after which the scheduler will prune terminated task history.")
   private static final Arg<Amount<Long, Time>> HISTORY_PRUNE_THRESHOLD =
       Arg.create(Amount.of(2L, Time.DAYS));
+
+  @CmdLine(name = "history_max_per_job_threshold",
+      help = "Maximum number of terminated tasks to retain in a job history.")
+  private static final Arg<Integer> HISTORY_MAX_PER_JOB_THRESHOLD = Arg.create(100);
+
+  @CmdLine(name = "history_min_retention_threshold",
+      help = "Minimum guaranteed time for task history retention before any pruning is attempted.")
+  private static final Arg<Amount<Long, Time>> HISTORY_MIN_RETENTION_THRESHOLD =
+      Arg.create(Amount.of(1L, Time.HOURS));
 
   @CmdLine(name = "max_schedule_attempts_per_sec",
       help = "Maximum number of scheduling attempts to make per second.")
@@ -245,9 +254,11 @@ public class AsyncModule extends AbstractModule {
       protected void configure() {
         // TODO(ksweeney): Create a configuration validator module so this can be injected.
         // TODO(William Farner): Revert this once large task counts is cheap ala hierarchichal store
-        bind(Integer.class).annotatedWith(PruneThreshold.class).toInstance(100);
-        bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PruneThreshold.class)
-            .toInstance(HISTORY_PRUNE_THRESHOLD.get());
+        bind(HistoryPrunnerSettings.class).toInstance(new HistoryPrunnerSettings(
+            HISTORY_PRUNE_THRESHOLD.get(),
+            HISTORY_MIN_RETENTION_THRESHOLD.get(),
+            HISTORY_MAX_PER_JOB_THRESHOLD.get()
+        ));
         bind(ScheduledExecutorService.class).toInstance(executor);
 
         bind(HistoryPruner.class).in(Singleton.class);

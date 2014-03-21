@@ -40,6 +40,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.async.HistoryPruner.HistoryPrunnerSettings;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -67,6 +68,7 @@ public class HistoryPrunerTest extends EasyMockTest {
   private static final String TASK_ID = "task_id";
   private static final String SLAVE_HOST = "HOST_A";
   private static final Amount<Long, Time> ONE_MS = Amount.of(1L, Time.MILLISECONDS);
+  private static final Amount<Long, Time> ONE_MINUTE = Amount.of(1L, Time.MINUTES);
   private static final Amount<Long, Time> ONE_DAY = Amount.of(1L, Time.DAYS);
   private static final Amount<Long, Time> ONE_HOUR = Amount.of(1L, Time.HOURS);
   private static final int PER_JOB_HISTORY = 2;
@@ -90,8 +92,7 @@ public class HistoryPrunerTest extends EasyMockTest {
         executor,
         stateManager,
         clock,
-        ONE_DAY,
-        PER_JOB_HISTORY,
+        new HistoryPrunnerSettings(ONE_DAY, ONE_MINUTE, PER_JOB_HISTORY),
         storageUtil.storage);
   }
 
@@ -120,15 +121,15 @@ public class HistoryPrunerTest extends EasyMockTest {
     long taskATimestamp = clock.nowMillis();
     IScheduledTask a = makeTask("a", FINISHED);
 
-    clock.advance(ONE_MS);
+    clock.advance(ONE_MINUTE);
     long taskBTimestamp = clock.nowMillis();
     IScheduledTask b = makeTask("b", LOST);
 
-    clock.advance(ONE_MS);
+    clock.advance(ONE_MINUTE);
     long taskCTimestamp = clock.nowMillis();
     IScheduledTask c = makeTask("c", FINISHED);
 
-    clock.advance(ONE_MS);
+    clock.advance(ONE_MINUTE);
     IScheduledTask d = makeTask("d", FINISHED);
     IScheduledTask e = makeTask("job-x", "e", FINISHED);
 
@@ -190,22 +191,29 @@ public class HistoryPrunerTest extends EasyMockTest {
   @Test
   public void testJobHistoryExceeded() {
     IScheduledTask a = makeTask("a", RUNNING);
-    clock.advance(ONE_HOUR);
+    clock.advance(ONE_MS);
     IScheduledTask aKilled = copy(a, KILLED);
 
     IScheduledTask b = makeTask("b", RUNNING);
-    clock.advance(ONE_HOUR);
+    clock.advance(ONE_MS);
     IScheduledTask bKilled = copy(b, KILLED);
 
     IScheduledTask c = makeTask("c", RUNNING);
-    clock.advance(ONE_HOUR);
+    clock.advance(ONE_MS);
     IScheduledTask cLost = copy(c, LOST);
+
+    IScheduledTask d = makeTask("d", RUNNING);
+    clock.advance(ONE_MS);
+    IScheduledTask dLost = copy(d, LOST);
 
     expectNoImmediatePrune(ImmutableSet.of(a));
     expectDefaultDelayedPrune();
     expectNoImmediatePrune(ImmutableSet.of(a, b));
     expectDefaultDelayedPrune();
-    expectImmediatePrune(ImmutableSet.of(a, b, c), a);
+    expectNoImmediatePrune(ImmutableSet.of(a, b)); // no pruning yet due to min threshold
+    expectDefaultDelayedPrune();
+    clock.advance(ONE_HOUR);
+    expectImmediatePrune(ImmutableSet.of(a, b, c, d), a, b); // now prune 2 tasks
     expectDefaultDelayedPrune();
 
     control.replay();
@@ -213,6 +221,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     changeState(a, aKilled);
     changeState(b, bKilled);
     changeState(c, cLost);
+    changeState(d, dLost);
   }
 
   // TODO(William Farner): Consider removing the thread safety tests.  Now that intrinsic locks
@@ -253,8 +262,7 @@ public class HistoryPrunerTest extends EasyMockTest {
         realExecutor,
         stateManager,
         clock,
-        Amount.of(1L, Time.MILLISECONDS),
-        PER_JOB_HISTORY,
+        new HistoryPrunnerSettings(Amount.of(1L, Time.MILLISECONDS), ONE_MS, PER_JOB_HISTORY),
         storageUtil.storage);
   }
 
