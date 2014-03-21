@@ -7,6 +7,7 @@ If not specified REVIEWBOARD_USERNAME defaults to the current user's name.
 """
 from __future__ import print_function
 
+import datetime
 import getpass
 import json
 import os
@@ -23,22 +24,122 @@ def rb_api_get(resource, params={}):
     [RBT_PATH, 'api-get', resource, '--'] + ['--%s=%s' % (k, v) for k, v in params.items()],
     stdout=subprocess.PIPE).communicate()[0])
 
-pending_requests = rb_api_get('review-requests', {
-    'to-users-directly': USERNAME,
-    'status': 'pending',
-  })
+
+class Review(object):
+  def __init__(self, raw_review):
+    self._review = raw_review
+
+  @property
+  def shipit(self):
+    return self._review['ship_it']
+
+  @property
+  def timestamp(self):
+    return self._review['timestamp']
+
+  @property
+  def reviewer(self):
+    return self._review['links']['user']['title']
+
+
+class Diff(object):
+  def __init__(self, raw_diff):
+    self._diff = raw_diff
+
+  @property
+  def timestamp(self):
+    return self._diff['timestamp']
+
+
+class ReviewRequest(object):
+  SUMMARY_TRUNCATE = 20
+
+  def __init__(self, raw_request):
+    self._request = raw_request
+
+  @property
+  def submitter(self):
+    return self._request['links']['submitter']['title']
+
+  @property
+  def ships_required(self):
+    return [p['title'] for p in self._request['target_people']]
+
+  @property
+  def url(self):
+    return 'https://reviews.apache.org%s' % self._request['url']
+
+  @property
+  def summary(self):
+    full = self._request['summary']
+    return ((full[:(self.SUMMARY_TRUNCATE - 3)] + '...')
+            if len(full) > self.SUMMARY_TRUNCATE else full)
+
+  def get_reviews(self):
+    return [Review(r) for r in rb_api_get(self._request['links']['reviews']['href'])['reviews']]
+
+  def get_diffs(self):
+    return [Diff(d) for d in rb_api_get(self._request['links']['diffs']['href'])['diffs']]
+
+
+def get_review_requests(params):
+  return [ReviewRequest(r) for r in rb_api_get('review-requests', params)['review_requests']]
+
 
 def main():
-  for request in pending_requests['review_requests']:
-    reviews_resource = request['links']['reviews']['href']
-    reviews = rb_api_get(reviews_resource)
-    for review in reviews['reviews']:
-      if review['links']['user']['title'] == USERNAME and review['ship_it'] and review['public']:
+  pending_requests = get_review_requests({
+      'to-groups': 'Aurora',
+      'status': 'pending',
+    })
+
+  def to_row(request):
+    reviews = request.get_reviews()
+    diffs = request.get_diffs()
+    last = [-1]
+    ships_required = set(request.ships_required)
+    for event in sorted(reviews + diffs, key=lambda x: x.timestamp, reverse=True):
+      if isinstance(event, Review):
+        if event.shipit:
+          # A 'ship-it' review leaves remaining reviewers on the hook.
+          ships_required.discard(event.reviewer)
+          continue
+        elif event.reviewer in ships_required:
+          waiting_for = 'awaiting updated diff'
+          break
+      else:
+        ships = [r.reviewer for r in reviews if r.shipit]
+        needed = set(request.ships_required) - set(ships)
+        if not request.ships_required:
+          waiting_for = 'no reviewers specified'
+        elif not needed:
+          waiting_for = 'ready to submit'
+        else:
+          waiting_for = 'need review from %s' % ', '.join(needed)
         break
-    else:
-      print('https://reviews.apache.org%s\t' % (request['url']), end="")
-      print('%s\t' % (request['links']['submitter']['title']), end="")
-      print('%s' % (request['summary']))
+
+    return (str(event.timestamp),
+            request.url,
+            request.submitter.ljust(10),
+            request.summary.ljust(ReviewRequest.SUMMARY_TRUNCATE),
+            waiting_for)
+
+  table = [to_row(r) for r in pending_requests]
+  sorted_table = sorted(table, key=lambda row: row[0])
+  print('\n'.join('\t'.join(row) for row in sorted_table))
+
+  print()
+
+  recently_submitted_days = 1
+  updated_from = ((datetime.datetime.utcnow() - datetime.timedelta(days=1))
+                  .replace(microsecond=0).isoformat())
+  recently_submitted = get_review_requests({
+      'to-groups': 'Aurora',
+      'status': 'submitted',
+      'last-updated-from': updated_from
+    })
+  print('Recently submitted: %s' % len(recently_submitted))
+  for request in recently_submitted:
+    print('\t'.join((request.url, request.submitter, request.summary)))
 
 
 if __name__ == '__main__':
