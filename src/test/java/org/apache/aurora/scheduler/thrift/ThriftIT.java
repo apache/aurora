@@ -34,6 +34,7 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CronScheduler;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
@@ -164,6 +165,7 @@ public class ThriftIT extends EasyMockTest {
             bind(SessionValidator.class).toInstance(validator);
             bind(CapabilityValidator.class).toInstance(new CapabilityValidatorFake(validator));
             bind(IServerInfo.class).toInstance(IServerInfo.build(new ServerInfo()));
+            bindMock(CronPredictor.class);
           }
         }
     );

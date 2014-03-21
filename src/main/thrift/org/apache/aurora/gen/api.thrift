@@ -219,6 +219,7 @@ struct JobStats {
 struct JobSummary {
   1: JobConfiguration job
   2: JobStats stats
+  3: optional i64 nextCronRunMs  // Timestamp of next cron run in ms since epoch, for a cron job
 }
 
 // A request to add the following instances to an existing job. Used by addInstances.

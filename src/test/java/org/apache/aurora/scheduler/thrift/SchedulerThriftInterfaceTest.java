@@ -15,6 +15,7 @@
  */
 package org.apache.aurora.scheduler.thrift;
 
+import java.util.Date;
 import java.util.Set;
 
 import com.google.common.base.Optional;
@@ -22,7 +23,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -76,6 +76,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
+import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.CronJobManager;
@@ -145,6 +146,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final ServerInfo SERVER_INFO =
       new ServerInfo().setClusterName("test").setThriftAPIVersion(THRIFT_API_VERSION);
   private static final APIVersion API_VERSION = new APIVersion().setMajor(THRIFT_API_VERSION);
+  private static final String CRON_SCHEDULE = "0 * * * *";
 
   private StorageTestUtil storageUtil;
   private SchedulerCore scheduler;
@@ -156,6 +158,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private MaintenanceController maintenance;
   private AuroraAdmin.Iface thrift;
   private CronJobManager cronJobManager;
+  private CronPredictor cronPredictor;
   private QuotaManager quotaManager;
 
   @Before
@@ -171,6 +174,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     recovery = createMock(Recovery.class);
     maintenance = createMock(MaintenanceController.class);
     cronJobManager = createMock(CronJobManager.class);
+    cronPredictor = createMock(CronPredictor.class);
     quotaManager = createMock(QuotaManager.class);
 
     // Use guice and install AuthModule to apply AOP-style auth layer.
@@ -189,6 +193,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(QuotaManager.class).toInstance(quotaManager);
         bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
         bind(IServerInfo.class).toInstance(IServerInfo.build(SERVER_INFO));
+        bind(CronPredictor.class).toInstance(cronPredictor);
       }
     };
     Injector injector = Guice.createInjector(testModule, new AopModule());
@@ -952,12 +957,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testGetJobSummary() throws Exception {
+    int nextCronRunMs = 100;
     TaskConfig ownedCronJobTask = nonProductionTask()
         .setJobName(JobKeys.TO_JOB_NAME.apply(JOB_KEY))
         .setOwner(ROLE_IDENTITY)
         .setEnvironment(JobKeys.TO_ENVIRONMENT.apply(JOB_KEY));
     JobConfiguration ownedCronJob = makeJob()
-        .setCronSchedule("0 * * * *")
+        .setCronSchedule(CRON_SCHEDULE)
         .setTaskConfig(ownedCronJobTask);
     IScheduledTask ownedCronJobScheduledTask = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask))
@@ -965,7 +971,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Identity otherOwner = new Identity("other", "other");
     JobConfiguration unownedCronJob = makeJob()
         .setOwner(otherOwner)
-        .setCronSchedule("0 * * * *")
+        .setCronSchedule(CRON_SCHEDULE)
         .setKey(JOB_KEY.newBuilder().setRole("other"))
         .setTaskConfig(ownedCronJobTask.deepCopy().setOwner(otherOwner));
     TaskConfig ownedImmediateTaskInfo = defaultTask(false)
@@ -973,9 +979,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setOwner(ROLE_IDENTITY);
     Set<JobConfiguration> ownedCronJobOnly = ImmutableSet.of(ownedCronJob);
     Set<JobSummary> ownedCronJobSummaryOnly = ImmutableSet.of(
-        new JobSummary().setJob(ownedCronJob).setStats(new JobStats()));
+        new JobSummary()
+            .setJob(ownedCronJob)
+            .setStats(new JobStats())
+            .setNextCronRunMs(nextCronRunMs));
     Set<JobSummary> ownedCronJobSummaryWithRunningTask = ImmutableSet.of(
-        new JobSummary().setJob(ownedCronJob).setStats(new JobStats().setActiveTaskCount(1)));
+        new JobSummary()
+            .setJob(ownedCronJob)
+            .setStats(new JobStats().setActiveTaskCount(1))
+            .setNextCronRunMs(nextCronRunMs));
     Set<JobConfiguration> unownedCronJobOnly = ImmutableSet.of(unownedCronJob);
     Set<JobConfiguration> bothCronJobs = ImmutableSet.of(ownedCronJob, unownedCronJob);
 
@@ -991,6 +1003,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Set<JobSummary> ownedImmedieteJobSummaryOnly = ImmutableSet.of(
         new JobSummary().setJob(ownedImmediateJob).setStats(new JobStats().setActiveTaskCount(1)));
+
+    expect(cronPredictor.predictNextRun(CRON_SCHEDULE))
+        .andReturn(new Date(nextCronRunMs))
+        .anyTimes();
 
     expect(cronJobManager.getJobs()).andReturn(IJobConfiguration.setFromBuilders(ownedCronJobOnly));
     storageUtil.expectTaskFetch(query);
@@ -1024,7 +1040,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .getJob()
             .getTaskConfig());
 
-    assertEquals(jobSummaryResponse(Sets.<JobSummary>newHashSet()), thrift.getJobSummary(ROLE));
+    assertEquals(jobSummaryResponse(ImmutableSet.<JobSummary>of()), thrift.getJobSummary(ROLE));
 
     assertEquals(jobSummaryResponse(ownedCronJobSummaryWithRunningTask),
         thrift.getJobSummary(ROLE));
@@ -1049,7 +1065,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setOwner(ROLE_IDENTITY)
         .setEnvironment(JobKeys.TO_ENVIRONMENT.apply(JOB_KEY));
     JobConfiguration ownedCronJob = makeJob()
-        .setCronSchedule("0 * * * *")
+        .setCronSchedule(CRON_SCHEDULE)
         .setTaskConfig(ownedCronJobTask);
     IScheduledTask ownedCronJobScheduledTask = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(ownedCronJobTask))
@@ -1057,7 +1073,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Identity otherOwner = new Identity("other", "other");
     JobConfiguration unownedCronJob = makeJob()
         .setOwner(otherOwner)
-        .setCronSchedule("0 * * * *")
+        .setCronSchedule(CRON_SCHEDULE)
         .setKey(JOB_KEY.newBuilder().setRole("other"))
         .setTaskConfig(ownedCronJobTask.deepCopy().setOwner(otherOwner));
     TaskConfig ownedImmediateTaskInfo = defaultTask(false)

@@ -32,6 +32,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
@@ -99,6 +100,7 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
+import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
@@ -175,6 +177,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final Recovery recovery;
   private final MaintenanceController maintenance;
   private final CronJobManager cronJobManager;
+  private final CronPredictor cronPredictor;
   private final QuotaManager quotaManager;
   private final Amount<Long, Time> killTaskInitialBackoff;
   private final Amount<Long, Time> killTaskMaxBackoff;
@@ -188,6 +191,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       StorageBackup backup,
       Recovery recovery,
       CronJobManager cronJobManager,
+      CronPredictor cronPredictor,
       MaintenanceController maintenance,
       QuotaManager quotaManager) {
 
@@ -199,6 +203,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         recovery,
         maintenance,
         cronJobManager,
+        cronPredictor,
         quotaManager,
         KILL_TASK_INITIAL_BACKOFF.get(),
         KILL_TASK_MAX_BACKOFF.get());
@@ -214,6 +219,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       Recovery recovery,
       MaintenanceController maintenance,
       CronJobManager cronJobManager,
+      CronPredictor cronPredictor,
       QuotaManager quotaManager,
       Amount<Long, Time> initialBackoff,
       Amount<Long, Time> maxBackoff) {
@@ -226,6 +232,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.recovery = checkNotNull(recovery);
     this.maintenance = checkNotNull(maintenance);
     this.cronJobManager = checkNotNull(cronJobManager);
+    this.cronPredictor = checkNotNull(cronPredictor);
     this.quotaManager = checkNotNull(quotaManager);
     this.killTaskInitialBackoff = checkNotNull(initialBackoff);
     this.killTaskMaxBackoff = checkNotNull(maxBackoff);
@@ -409,9 +416,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     Function<IJobKey, JobSummary> makeJobSummary = new Function<IJobKey, JobSummary>() {
       @Override
       public JobSummary apply(IJobKey jobKey) {
-        return new JobSummary()
-            .setJob(jobs.get(jobKey).newBuilder())
+        IJobConfiguration job = jobs.get(jobKey);
+        JobSummary smry = new JobSummary()
+            .setJob(job.newBuilder())
             .setStats(Jobs.getJobStats(tasks.get(jobKey)).newBuilder());
+
+        return Strings.isNullOrEmpty(job.getCronSchedule())
+            ? smry
+            : smry.setNextCronRunMs(cronPredictor.predictNextRun(job.getCronSchedule()).getTime());
       }
     };
 
@@ -457,8 +469,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         ? Predicates.compose(Predicates.equalTo(ownerRole.get()), JobKeys.CONFIG_TO_ROLE)
         : Predicates.<IJobConfiguration>alwaysTrue();
     jobs.putAll(Maps.uniqueIndex(
-            FluentIterable.from(cronJobManager.getJobs()).filter(configFilter),
-            JobKeys.FROM_CONFIG));
+        FluentIterable.from(cronJobManager.getJobs()).filter(configFilter),
+        JobKeys.FROM_CONFIG));
 
     return jobs;
   }
