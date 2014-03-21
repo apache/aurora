@@ -21,13 +21,13 @@ from apache.aurora.client.api.sla import (
     DomainUpTimeSlaVector,
     JobUpTimeSlaVector,
     Sla,
-    SLA_LIVE_STATES,
     task_query
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 
 from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
+from gen.apache.aurora.constants import LIVE_STATES
 from gen.apache.aurora.ttypes import (
     AssignedTask,
     Identity,
@@ -73,7 +73,7 @@ class SlaTest(unittest.TestCase):
                 environment=self._env)),
         status=ScheduleStatus.RUNNING,
         taskEvents=[TaskEvent(
-            status=ScheduleStatus.STARTING,
+            status=ScheduleStatus.RUNNING,
             timestamp=(time.time() - duration) * 1000)]
     )
 
@@ -153,11 +153,11 @@ class SlaTest(unittest.TestCase):
             owner=Identity(role=self._role),
             environment=self._env,
             jobName=self._name,
-            statuses=SLA_LIVE_STATES)
+            statuses=LIVE_STATES)
     )
 
   def expect_task_status_call_cluster_scoped(self):
-    self._scheduler.getTasksStatus.assert_called_once_with(TaskQuery(statuses=SLA_LIVE_STATES))
+    self._scheduler.getTasksStatus.assert_called_once_with(TaskQuery(statuses=LIVE_STATES))
 
 
   def test_count_0(self):
@@ -341,6 +341,6 @@ class SlaTest(unittest.TestCase):
     assert len(jobs) == len(query.jobKeys), 'Expected length:%s, Actual:%s' % (
         len(jobs), len(query.jobKeys)
     )
-    assert SLA_LIVE_STATES == query.statuses, 'Expected:%s, Actual:%s' % (
-        SLA_LIVE_STATES, query.statuses
+    assert LIVE_STATES == query.statuses, 'Expected:%s, Actual:%s' % (
+      LIVE_STATES, query.statuses
     )

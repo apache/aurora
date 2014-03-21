@@ -33,9 +33,6 @@ from gen.apache.aurora.ttypes import (
 )
 
 
-SLA_LIVE_STATES = LIVE_STATES | set([ScheduleStatus.STARTING])
-
-
 def job_key_from_scheduled(task, cluster):
   """Creates AuroraJobKey from the ScheduledTask.
 
@@ -65,7 +62,7 @@ def task_query(job_key=None, hosts=None, job_keys=None):
       jobName=job_key.name if job_key else None,
       slaveHosts=set(hosts) if hosts else None,
       jobKeys=set(k.to_thrift() for k in job_keys) if job_keys else None,
-      statuses=SLA_LIVE_STATES)
+      statuses=LIVE_STATES)
 
 
 class JobUpTimeSlaVector(object):
@@ -141,7 +138,7 @@ class JobUpTimeSlaVector(object):
     instance_map = {}
     for task in self._tasks:
       for event in task.taskEvents:
-        if event.status == ScheduleStatus.STARTING:
+        if event.status == ScheduleStatus.RUNNING:
           instance_map[task.assignedTask.instanceId] = math.floor(self._now - event.timestamp / 1000)
           break
     return instance_map
