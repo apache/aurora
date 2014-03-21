@@ -85,6 +85,6 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.quota.Quota.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      cmd.execute(['quota', 'get', '--write_json', 'west/bozo'])
+      cmd.execute(['quota', 'get', '--write-json', 'west/bozo'])
       out = '\n'.join(mock_context.get_out())
       assert out == '{"quota":{"numCpus":5,"ramMb":20480,"diskMb":40960}}'

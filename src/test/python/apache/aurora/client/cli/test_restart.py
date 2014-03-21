@@ -81,7 +81,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'restart', '--batch_size=5', 'west/bozo/test/hello', fp.name])
+        cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello', fp.name])
 
         # Like the update test, the exact number of calls here doesn't matter.
         # what matters is that it must have been called once before batching, plus
@@ -111,7 +111,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['job', 'restart', '--batch_size=5', 'west/bozo/test/hello', fp.name])
+        result = cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello', fp.name])
         assert mock_scheduler_proxy.getTasksStatus.call_count == 1
         assert mock_scheduler_proxy.restartShards.call_count == 0
         assert result == EXIT_API_ERROR
@@ -134,7 +134,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['job', 'restart', '--batch_size=5', 'west/bozo/test/hello', fp.name])
+        result = cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello', fp.name])
         assert mock_scheduler_proxy.getTasksStatus.call_count == 1
         assert mock_scheduler_proxy.restartShards.call_count == 1
         mock_scheduler_proxy.restartShards.assert_called_with(JobKey(environment=self.TEST_ENV,

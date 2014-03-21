@@ -158,7 +158,7 @@ def parse_task_instance_key(key):
   return TaskInstanceKey(AuroraJobKey(cluster, role, env, name), instance)
 
 
-BATCH_OPTION = CommandOption('--batch_size', type=int, default=5,
+BATCH_OPTION = CommandOption('--batch-size', type=int, default=5,
         help='Number of instances to be operate on in one iteration')
 
 
@@ -178,7 +178,7 @@ CONFIG_ARGUMENT = CommandOption('config_file', type=str,
     help='pathname of the aurora configuration file contain the job specification')
 
 
-EXECUTOR_SANDBOX_OPTION = CommandOption('--executor_sandbox', action='store_true',
+EXECUTOR_SANDBOX_OPTION = CommandOption('--executor-sandbox', action='store_true',
      default=False, help='Run the command in the executor sandbox instead of the task sandbox')
 
 
@@ -186,7 +186,7 @@ FORCE_OPTION = CommandOption('--force', default=False, action='store_true',
     help='Force execution of the command even if there is a warning')
 
 
-HEALTHCHECK_OPTION = CommandOption('--healthcheck_interval_seconds', type=int,
+HEALTHCHECK_OPTION = CommandOption('--healthcheck-interval-seconds', type=int,
     default=3, dest='healthcheck_interval_seconds',
     help='Number of seconds between healthchecks while monitoring update')
 
@@ -203,12 +203,12 @@ JOBSPEC_ARGUMENT = CommandOption('jobspec', type=AuroraJobKey.from_path,
     help='Fully specified job key, in CLUSTER/ROLE/ENV/NAME format')
 
 
-JSON_READ_OPTION = CommandOption('--read_json', default=False, dest='read_json',
+JSON_READ_OPTION = CommandOption('--read-json', default=False, dest='read_json',
     action='store_true',
     help='Read job configuration in json format')
 
 
-JSON_WRITE_OPTION = CommandOption('--write_json', default=False, dest='write_json',
+JSON_WRITE_OPTION = CommandOption('--write-json', default=False, dest='write_json',
     action='store_true',
     help='Generate command output in JSON format')
 
@@ -217,7 +217,7 @@ ROLE_ARGUMENT = CommandOption('role', type=parse_qualified_role, metavar='CLUSTE
     help='Rolename to retrieve information about')
 
 
-SSH_USER_OPTION = CommandOption('--ssh_user', '-l', default=None,
+SSH_USER_OPTION = CommandOption('--ssh-user', '-l', default=None,
     help='ssh as this username instead of the job\'s role')
 
 
@@ -225,7 +225,7 @@ TASK_INSTANCE_ARGUMENT = CommandOption('task_instance', type=parse_task_instance
     help='A task instance specifier, in the form CLUSTER/ROLE/ENV/NAME/INSTANCE')
 
 
-WATCH_OPTION = CommandOption('--watch_secs', type=int, default=30,
+WATCH_OPTION = CommandOption('--watch-secs', type=int, default=30,
     help='Minimum number of seconds a instance must remain in RUNNING state before considered a '
          'success.')
 

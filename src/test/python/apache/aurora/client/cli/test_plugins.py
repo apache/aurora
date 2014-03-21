@@ -123,7 +123,7 @@ class TestPlugins(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.register_plugin(BogusPlugin())
-        cmd.execute(['job', 'create', '--bogosity=maximum', '--wait_until=RUNNING',
+        cmd.execute(['job', 'create', '--bogosity=maximum', '--wait-until=RUNNING',
             'west/bozo/test/hello', fp.name])
 
       # Now check that the right API calls got made.

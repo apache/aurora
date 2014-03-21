@@ -33,7 +33,7 @@ from twitter.common.quantity import Time
 class GetTaskUpCountCmd(Verb):
   @property
   def name(self):
-    return 'get_task_up_count'
+    return 'get-task-up-count'
 
   @property
   def help(self):
@@ -71,7 +71,7 @@ Examples:
 class GetJobUptimeCmd(Verb):
   @property
   def name(self):
-    return 'get_job_uptime'
+    return 'get-job-uptime'
 
   @property
   def help(self):

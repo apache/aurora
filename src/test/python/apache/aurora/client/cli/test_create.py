@@ -116,7 +116,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'create', '--wait_until=RUNNING', 'west/bozo/test/hello',
+        cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
             fp.name])
 
       # Now check that the right API calls got made.
@@ -142,7 +142,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'create', '--wait_until=RUNNING', 'west/bozo/test/hello',
+        cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
             fp.name])
         # Now check that the right API calls got made.
         # Check that create_job was called exactly once, with an AuroraConfig parameter.
@@ -164,7 +164,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['job', 'create', '--wait_until=RUNNING',
+        result = cmd.execute(['job', 'create', '--wait-until=RUNNING',
             'west/bozo/test/hello', fp.name])
         assert result == EXIT_COMMAND_FAILURE
 
@@ -184,7 +184,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.write(self.get_invalid_config('invalid_clause=oops'))
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['job', 'create', '--wait_until=RUNNING',
+        result = cmd.execute(['job', 'create', '--wait-until=RUNNING',
             'west/bozo/test/hello', fp.name])
         assert result == EXIT_INVALID_CONFIGURATION
 

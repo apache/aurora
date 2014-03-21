@@ -70,7 +70,7 @@ def arg_type_jobkey(key):
 class CancelUpdateCommand(Verb):
   @property
   def name(self):
-    return 'cancel_update'
+    return 'cancel-update'
 
   @property
   def help(self):
@@ -103,7 +103,7 @@ class CreateJobCommand(Verb):
 
   def get_options(self):
     return [BIND_OPTION, JSON_READ_OPTION,
-        CommandOption('--wait_until', choices=self.CREATE_STATES,
+        CommandOption('--wait-until', choices=self.CREATE_STATES,
             default='PENDING',
             help=('Block the client until all the tasks have transitioned into the requested '
                 'state. Default: PENDING')),
@@ -326,15 +326,15 @@ class RestartCommand(Verb):
   def get_options(self):
     return [BATCH_OPTION, BIND_OPTION, BROWSER_OPTION, FORCE_OPTION, HEALTHCHECK_OPTION,
         INSTANCES_OPTION, JSON_READ_OPTION, WATCH_OPTION,
-        CommandOption('--max_per_instance_failures', type=int, default=0,
+        CommandOption('--max-per-instance-failures', type=int, default=0,
              help='Maximum number of restarts per instance during restart. Increments total failure '
                  'count when this limit is exceeded.'),
-        CommandOption('--restart_threshold', type=int, default=60,
+        CommandOption('--restart-threshold', type=int, default=60,
              help='Maximum number of seconds before a shard must move into the RUNNING state '
                  'before considered a failure.'),
-        CommandOption('--max_total_failures', type=int, default=0,
+        CommandOption('--max-total-failures', type=int, default=0,
              help='Maximum number of instance failures to be tolerated in total during restart.'),
-        CommandOption('--rollback_on_failure', default=True, action='store_false',
+        CommandOption('--rollback-on-failure', default=True, action='store_false',
             help='If false, prevent update from performing a rollback.'),
         JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 

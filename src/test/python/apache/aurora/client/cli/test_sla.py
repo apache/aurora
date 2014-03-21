@@ -37,7 +37,7 @@ class TestGetTaskUpCountCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.sla.Sla.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      cmd.execute(['sla', 'get_task_up_count', 'west/role/env/test'])
+      cmd.execute(['sla', 'get-task-up-count', 'west/role/env/test'])
       out = '\n'.join(mock_context.get_out())
       assert '1 mins\t- 10.65 %\n' in out
       assert '10 mins\t- 10.65 %\n' in out
@@ -52,7 +52,7 @@ class TestGetTaskUpCountCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.sla.Sla.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      cmd.execute(['sla', 'get_task_up_count', 'west/role/env/test', '--durations=3m,2d6h,3h'])
+      cmd.execute(['sla', 'get-task-up-count', 'west/role/env/test', '--durations=3m,2d6h,3h'])
       out = '\n'.join(mock_context.get_out())
       assert '3 mins\t- 95.36 %' in out
       assert '54 hrs\t- 95.36 %' in out
@@ -74,7 +74,7 @@ class TestGetJobUptimeCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.sla.Sla.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      cmd.execute(['sla', 'get_job_uptime', 'west/role/env/test'])
+      cmd.execute(['sla', 'get-job-uptime', 'west/role/env/test'])
       out = '\n'.join(mock_context.get_out())
       assert '99.0 percentile\t- 915 seconds' in out
       assert '95.0 percentile\t- 915 seconds' in out
@@ -93,7 +93,7 @@ class TestGetJobUptimeCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.sla.Sla.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      cmd.execute(['sla', 'get_job_uptime', 'west/role/env/test', '--percentiles=99.9,85.5'])
+      cmd.execute(['sla', 'get-job-uptime', 'west/role/env/test', '--percentiles=99.9,85.5'])
       out = '\n'.join(mock_context.get_out())
       assert '99.9 percentile\t- 915 seconds' in out
       assert '85.5 percentile\t- 915 seconds' in out
@@ -101,7 +101,7 @@ class TestGetJobUptimeCommand(AuroraClientCommandTest):
   def test_invalid_percentile(self):
     cmd = AuroraCommandLine()
     try:
-      cmd.execute(['sla', 'get_job_uptime', 'west/role/env/test', '--percentiles=100'])
+      cmd.execute(['sla', 'get-job-uptime', 'west/role/env/test', '--percentiles=100'])
     except SystemExit:
       pass
     else:

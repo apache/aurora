@@ -80,7 +80,7 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
     mock_api.cancel_update.return_value = self.create_simple_success_response()
     with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       cmd = AuroraCommandLine()
-      cmd.execute(['job', 'cancel_update', 'west/bozo/test/hello'])
+      cmd.execute(['job', 'cancel-update', 'west/bozo/test/hello'])
       self.assert_cancel_update_called(mock_api)
 
   @classmethod
@@ -106,7 +106,7 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'cancel_update', 'west/mchucarroll/test/hello'])
+        cmd.execute(['job', 'cancel-update', 'west/mchucarroll/test/hello'])
 
       # All that cancel_update really does is release the update lock.
       # So that's all we really need to check.
