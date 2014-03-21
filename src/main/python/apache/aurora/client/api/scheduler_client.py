@@ -17,6 +17,7 @@
 import functools
 import threading
 import time
+import traceback
 
 from apache.aurora.common.auth import make_session_key, SessionKeyError
 from apache.aurora.common.cluster import Cluster
@@ -238,10 +239,17 @@ class SchedulerProxy(object):
     start = time.time()
     while (time.time() - start) < self.CONNECT_MAXIMUM_WAIT.as_(Time.SECONDS):
       try:
+        # this can wind up generating any kind of error, because it turns into
+        # a call to a dynamically set authentication module.
         self._client = self._scheduler_client.get_thrift_client()
         break
       except SchedulerClient.CouldNotConnect as e:
         log.warning('Could not connect to scheduler: %s' % e)
+      except Exception as e:
+        # turn any auth module exception into an auth error.
+        log.debug('Warning: got an unknown exception during authentication:')
+        log.debug(traceback.format_exc())
+        raise self.AuthenticationError('Error connecting to scheduler: %s' % e)
     if not self._client:
       raise self.TimeoutError('Timed out trying to connect to scheduler at %s' % self.cluster.name)
 
