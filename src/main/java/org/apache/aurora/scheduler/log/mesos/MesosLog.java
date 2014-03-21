@@ -26,15 +26,18 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.UnmodifiableIterator;
 import com.google.common.primitives.Longs;
 import com.google.inject.BindingAnnotation;
+import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Function;
 import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -94,6 +97,8 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
 
   private final byte[] noopEntry;
 
+  private final Lifecycle lifecycle;
+
   /**
    * Creates a new mesos log.
    *
@@ -103,6 +108,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
    * @param writerFactory Factory to provide access to log writers.
    * @param writeTimeout Log write timeout.
    * @param noopEntry A no-op log entry blob.
+   * @param lifecycle Lifecycle to use for initiating application teardown.
    */
   @Inject
   public MesosLog(
@@ -111,7 +117,8 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       @ReadTimeout Amount<Long, Time> readTimeout,
       Provider<WriterInterface> writerFactory,
       @WriteTimeout Amount<Long, Time> writeTimeout,
-      @NoopEntry byte[] noopEntry) {
+      @NoopEntry byte[] noopEntry,
+      Lifecycle lifecycle) {
 
     this.logFactory = checkNotNull(logFactory);
 
@@ -122,12 +129,20 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
     this.writeTimeout = checkNotNull(writeTimeout);
 
     this.noopEntry = checkNotNull(noopEntry);
+
+    this.lifecycle = checkNotNull(lifecycle);
   }
 
   @Override
   public Stream open() {
     return new LogStream(
-        logFactory.get(), readerFactory.get(), readTimeout, writerFactory, writeTimeout, noopEntry);
+        logFactory.get(),
+        readerFactory.get(),
+        readTimeout,
+        writerFactory,
+        writeTimeout,
+        noopEntry,
+        lifecycle);
   }
 
   @VisibleForTesting
@@ -177,11 +192,29 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
 
     private final byte[] noopEntry;
 
-    private WriterInterface writer;
+    private final Lifecycle lifecycle;
 
-    LogStream(LogInterface log, ReaderInterface reader, Amount<Long, Time> readTimeout,
-        Provider<WriterInterface> writerFactory, Amount<Long, Time> writeTimeout,
-        byte[] noopEntry) {
+    /**
+     * The underlying writer to use for mutation operations.  This field has three states:
+     * <ul>
+     *   <li>present: the writer is active and available for use</li>
+     *   <li>absent: the writer has not yet been initialized (initialization is lazy)</li>
+     *   <li>{@code null}: the writer has suffered a fatal error and no further operations may
+     *       be performed.</li>
+     * </ul>
+     * When {@code true}, indicates that the log has suffered a fatal error and no further
+     * operations may be performed.
+     */
+    @Nullable private Optional<WriterInterface> writer = Optional.absent();
+
+    LogStream(
+        LogInterface log,
+        ReaderInterface reader,
+        Amount<Long, Time> readTimeout,
+        Provider<WriterInterface> writerFactory,
+        Amount<Long, Time> writeTimeout,
+        byte[] noopEntry,
+        Lifecycle lifecycle) {
 
       this.log = log;
 
@@ -194,6 +227,8 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       this.writeTimeUnit = writeTimeout.getUnit().getTimeUnit();
 
       this.noopEntry = noopEntry;
+
+      this.lifecycle = lifecycle;
     }
 
     @Override
@@ -313,25 +348,30 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       T apply(WriterInterface writer) throws TimeoutException, Log.WriterFailedException;
     }
 
+    private StreamAccessException disableLog(AtomicLong stat, String message, Throwable cause) {
+      stat.incrementAndGet();
+      writer = null;
+      lifecycle.shutdown();
+
+      throw new StreamAccessException(message, cause);
+    }
+
     @VisibleForTesting
     synchronized <T> T mutate(OpStats stats, Mutation<T> mutation) {
-      long start = System.nanoTime();
       if (writer == null) {
-        writer = writerFactory.get();
+        throw new IllegalStateException("The log has encountered an error and cannot be used.");
+      }
+
+      long start = System.nanoTime();
+      if (!writer.isPresent()) {
+        writer = Optional.of(writerFactory.get());
       }
       try {
-        return mutation.apply(writer);
+        return mutation.apply(writer.get());
       } catch (TimeoutException e) {
-        stats.timeouts.getAndIncrement();
-        throw new StreamAccessException("Timeout performing log " + stats.opName, e);
+        throw disableLog(stats.timeouts, "Timeout performing log " + stats.opName, e);
       } catch (Log.WriterFailedException e) {
-        stats.failures.getAndIncrement();
-
-        // We must throw away a writer on any write failure - this could be because of a coordinator
-        // election in which case we must trigger a new election.
-        writer = null;
-
-        throw new StreamAccessException("Problem performing log" + stats.opName, e);
+        throw disableLog(stats.failures, "Problem performing log" + stats.opName, e);
       } finally {
         stats.timing.accumulate(System.nanoTime() - start);
       }

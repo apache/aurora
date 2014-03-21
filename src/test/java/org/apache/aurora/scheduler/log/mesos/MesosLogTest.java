@@ -17,9 +17,9 @@ package org.apache.aurora.scheduler.log.mesos;
 
 import java.util.concurrent.TimeoutException;
 
-import javax.inject.Provider;
-
 import com.google.inject.util.Providers;
+import com.twitter.common.application.Lifecycle;
+import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -33,6 +33,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.fail;
 
 public class MesosLogTest extends EasyMockTest {
 
@@ -40,39 +41,64 @@ public class MesosLogTest extends EasyMockTest {
   private static final Amount<Long, Time> WRITE_TIMEOUT = Amount.of(3L, Time.SECONDS);
   private static final byte[] DUMMY_CONTENT = "test data".getBytes();
 
-  private LogInterface logInterface;
-  private ReaderInterface reader;
-  private Provider<WriterInterface> writerFactory;
+  private Command shutdownHooks;
   private MesosLog.LogStream logStream;
   private MesosLog.LogStream.Mutation<String> dummyMutation;
   private MesosLog.LogStream.OpStats stats;
 
   @Before
   public void setUp() {
-    logInterface = createMock(LogInterface.class);
-    reader = createMock(ReaderInterface.class);
-    writerFactory = Providers.of(createMock(WriterInterface.class));
-
+    shutdownHooks = createMock(Command.class);
     dummyMutation = createMock(new Clazz<MesosLog.LogStream.Mutation<String>>() { });
     stats = new MesosLog.LogStream.OpStats("test");
-    logStream = new MesosLog.LogStream(logInterface, reader, READ_TIMEOUT,
-        writerFactory, WRITE_TIMEOUT, DUMMY_CONTENT);
+    logStream = new MesosLog.LogStream(
+        createMock(LogInterface.class),
+        createMock(ReaderInterface.class),
+        READ_TIMEOUT,
+        Providers.of(createMock(WriterInterface.class)),
+        WRITE_TIMEOUT,
+        DUMMY_CONTENT,
+        new Lifecycle(shutdownHooks, null));
   }
 
-  @Test(expected = StreamAccessException.class)
+  @Test
   public void testLogStreamTimeout() throws TimeoutException, Log.WriterFailedException {
-    testMutationFailure(new TimeoutException("Task timed out"));
+    try {
+      testMutationFailure(new TimeoutException("Task timed out"));
+      fail();
+    } catch (StreamAccessException e) {
+      // Expected.
+    }
+
+    expectStreamUnusable();
   }
 
-  @Test(expected = StreamAccessException.class)
+  @Test
   public void testLogStreamWriteFailure() throws TimeoutException, Log.WriterFailedException {
-    testMutationFailure(new Log.WriterFailedException("Failed to write to log"));
+    try {
+      testMutationFailure(new Log.WriterFailedException("Failed to write to log"));
+      fail();
+    } catch (StreamAccessException e) {
+      // Expected.
+    }
+
+    expectStreamUnusable();
   }
 
   private void testMutationFailure(Exception e) throws TimeoutException, Log.WriterFailedException {
+    shutdownHooks.execute();
     expect(dummyMutation.apply(EasyMock.<WriterInterface>anyObject())).andThrow(e);
 
     control.replay();
     logStream.mutate(stats, dummyMutation);
+  }
+
+  private void expectStreamUnusable() {
+    try {
+      logStream.mutate(stats, dummyMutation);
+      fail();
+    } catch (IllegalStateException e) {
+      // Expected.
+    }
   }
 }
