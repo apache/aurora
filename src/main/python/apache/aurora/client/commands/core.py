@@ -40,12 +40,13 @@ from apache.aurora.client.api.disambiguator import LiveJobDisambiguator
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import print_quota
 from apache.aurora.client.api.updater_util import UpdaterConfig
-from apache.aurora.client.config import get_config
+from apache.aurora.client.config import get_config, GlobalHookRegistry
 from apache.aurora.client.factory import make_client, make_client_factory
 from apache.aurora.client.options import (
     CLUSTER_CONFIG_OPTION,
     CLUSTER_INVOKE_OPTION,
     CLUSTER_NAME_OPTION,
+    DISABLE_HOOKS_OPTION,
     ENV_CONFIG_OPTION,
     ENVIRONMENT_BIND_OPTION,
     FROM_JOBKEY_OPTION,
@@ -111,6 +112,16 @@ def version(args):
   print("Aurora API version: %s" % CURRENT_API_VERSION)
 
 
+def maybe_disable_hooks(options):
+  """Checks the hooks disable option, and disables the hooks if required.
+  This could be done with a callback in the option, but this is better for the way that
+  we test clientv1.
+  """
+  if options.disable_all_hooks_reason is not None:
+    GlobalHookRegistry.disable_hooks()
+    log.info('Client hooks disabled; reason given by user: %s' % options.disable_all_hooks_reason)
+
+
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
@@ -118,6 +129,7 @@ def version(args):
 @app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
 @app.command_option(WAIT_UNTIL_OPTION)
+@app.command_option(DISABLE_HOOKS_OPTION)
 @requires.exactly('cluster/role/env/job', 'config')
 def create(job_spec, config_file):
   """usage: create cluster/role/env/job config
@@ -125,6 +137,7 @@ def create(job_spec, config_file):
   Creates a job based on a configuration file.
   """
   options = app.get_options()
+  maybe_disable_hooks(options)
   try:
     config = get_job_config(job_spec, config_file, options)
   except ValueError as v:
@@ -305,13 +318,14 @@ def inspect(job_spec, config_file):
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
+@app.command_option(DISABLE_HOOKS_OPTION)
 def start_cron(args, options):
   """usage: start_cron cluster/role/env/job
 
   Invokes a cron job immediately, out of its normal cron cycle.
   This does not affect the cron cycle in any way.
   """
-
+  maybe_disable_hooks(options)
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
@@ -374,12 +388,14 @@ def list_jobs(cluster_and_role):
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(SHARDS_OPTION)
+@app.command_option(DISABLE_HOOKS_OPTION)
 def kill(args, options):
   """usage: kill --shards=shardspec cluster/role/env/job
 
   Kills a group of tasks in a running job, blocking until all specified tasks have terminated.
 
   """
+  maybe_disable_hooks(options)
   if options.shards is None:
     print('Shards option is required for kill; use killall to kill all shards', file=sys.stderr)
     exit(1)
@@ -394,11 +410,12 @@ def kill(args, options):
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
+@app.command_option(DISABLE_HOOKS_OPTION)
 def killall(args, options):
   """usage: killall cluster/role/env/job
   Kills all tasks in a running job, blocking until all specified tasks have been terminated.
   """
-
+  maybe_disable_hooks(options)
   job_key = AuroraJobKey.from_path(args[0])
   config_file = args[1] if len(args) > 1 else None  # the config for hooks
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
@@ -482,6 +499,7 @@ def status(args, options):
 @app.command_option(ENV_CONFIG_OPTION)
 @app.command_option(JSON_OPTION)
 @app.command_option(HEALTH_CHECK_INTERVAL_SECONDS_OPTION)
+@app.command_option(DISABLE_HOOKS_OPTION)
 @app.command_option(
     '--force',
     dest='force',
@@ -526,6 +544,7 @@ def update(job_spec, config_file):
       time.sleep(5)
 
   options = app.get_options()
+  maybe_disable_hooks(options)
   config = get_job_config(job_spec, config_file, options)
   api = make_client(config.cluster())
   if not options.force:
@@ -572,6 +591,7 @@ def update(job_spec, config_file):
     default=30,
     help='Minimum number of seconds a shard must remain in RUNNING state before considered a '
          'success.')
+@app.command_option(DISABLE_HOOKS_OPTION)
 def restart(args, options):
   """usage: restart cluster/role/env/job
                [--shards=SHARDS]
@@ -586,6 +606,7 @@ def restart(args, options):
 
   Restarts are fully controlled client-side, so aborting halts the restart.
   """
+  maybe_disable_hooks(options)
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None

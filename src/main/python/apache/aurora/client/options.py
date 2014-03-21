@@ -24,6 +24,7 @@ __all__ = (
   'CLUSTER_CONFIG_OPTION',
   'CLUSTER_INVOKE_OPTION',
   'CLUSTER_NAME_OPTION',
+  'DISABLE_HOOKS_OPTION',
   'ENVIRONMENT_BIND_OPTION',
   'ENV_CONFIG_OPTION',
   'EXECUTOR_SANDBOX_OPTION',
@@ -101,6 +102,13 @@ def make_env_option(explanation):
 
 # Note: in these predefined options, "OPTION" is used in names of optional arguments,
 # and "PARAMETER" is used in names of required ones.
+
+DISABLE_HOOKS_OPTION = optparse.Option(
+    '--disable_all_hooks_reason',
+    type=str,
+    default=None,
+    help='Override standard behavior and disable the builtin hooks')
+
 
 OPEN_BROWSER_OPTION = optparse.Option(
     '-o',

@@ -19,6 +19,7 @@ python_test_suite(
   dependencies = [
     pants(':admin'),
     pants(':core'),
+    pants(':hooks'),
     pants(':maintenance'),
     pants(':run'),
     pants(':ssh'),
@@ -36,6 +37,17 @@ python_tests(
     'test_status.py',
     'test_update.py'
   ],
+  dependencies = [
+    pants(':util'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/client/commands:core'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ])
+
+python_tests(
+  name='hooks',
+  sources = [ 'test_hooks.py' ],
   dependencies = [
     pants(':util'),
     pants('3rdparty/python:mock'),

@@ -45,6 +45,7 @@ class TestRunCommand(AuroraClientCommandTest):
     mock_options.tunnels = []
     mock_options.executor_sandbox = False
     mock_options.ssh_user = None
+    mock_options.disable_all_hooks = False
     return mock_options
 
   @classmethod

@@ -46,6 +46,7 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
     mock_options.shards = None
     mock_options.cluster = None
     mock_options.json = False
+    mock_options.disable_all_hooks = False
     return mock_options
 
   @classmethod

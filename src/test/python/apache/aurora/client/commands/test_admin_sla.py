@@ -42,6 +42,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
     mock_options.override_filename = override
     mock_options.list_jobs = list_jobs
     mock_options.verbosity = False
+    mock_options.disable_all_hooks = False
     return mock_options
 
   @classmethod

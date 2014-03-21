@@ -53,6 +53,7 @@ class TestRestartCommand(AuroraClientCommandTest):
     mock_options.max_total_failures = 0
     mock_options.restart_threshold = 30
     mock_options.watch_secs = 30
+    mock_options.disable_all_hooks_reason = None
     return mock_options
 
   @classmethod

@@ -181,6 +181,41 @@ def populate_namespaces(config, env=None):
   return config
 
 
+class GlobalHookRegistry(object):
+  """To allow enforcable policy, we need a set of mandatory hooks that are
+  registered as part of the client executable. Global hooks are registered
+  by calling GlobalHookRegistry.register_global_hook.
+  """
+
+  HOOKS = []
+
+  DISABLED = False
+
+  @classmethod
+  def register_global_hook(cls, hook):
+    cls.HOOKS.append(hook)
+
+  @classmethod
+  def get_hooks(cls):
+    if cls.DISABLED:
+      return []
+    else:
+      return cls.HOOKS[:]
+
+  @classmethod
+  def reset(cls):
+    cls.HOOKS = []
+    cls.DISABLED = False
+
+  @classmethod
+  def disable_hooks(cls):
+    cls.DISABLED = True
+
+  @classmethod
+  def enable_hooks(cls):
+    cls.DISABLED = False
+
+
 def inject_hooks(config, env=None):
   config.hooks = (env or {}).get('hooks', [])
 

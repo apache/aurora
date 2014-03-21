@@ -52,6 +52,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     mock_options.open_browser = False
     mock_options.cluster = None
     mock_options.wait_until = 'RUNNING'  # or 'FINISHED' for other tests
+    mock_options.disable_all_hooks = False
     return mock_options
 
   @classmethod

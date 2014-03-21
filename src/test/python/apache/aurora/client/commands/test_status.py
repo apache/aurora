@@ -44,6 +44,7 @@ class TestListJobs(AuroraClientCommandTest):
     mock_options = Mock()
     mock_options.pretty = False
     mock_options.show_cron = False
+    mock_options.disable_all_hooks = False
     return mock_options
 
   @classmethod

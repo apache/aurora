@@ -46,6 +46,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     mock_options.hosts = ','.join(self.HOSTNAMES)
     mock_options.cluster = self.TEST_CLUSTER
     mock_options.verbosity = False
+    mock_options.disable_all_hooks = False
     return mock_options
 
   def create_host_statuses(self, maintenance_mode):

@@ -63,6 +63,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     mock_options.env = None
     mock_options.shards = None
     mock_options.health_check_interval_seconds = 3
+    mock_options.disable_all_hooks = False
     return mock_options
 
   @classmethod

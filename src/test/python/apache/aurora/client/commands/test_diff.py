@@ -53,6 +53,7 @@ class TestDiffCommand(AuroraClientCommandTest):
     mock_options.open_browser = False
     mock_options.rename_from = None
     mock_options.cluster = None
+    mock_options.disable_all_hooks = False
     return mock_options
 
   @classmethod

@@ -28,6 +28,7 @@ python_tests(name = 'hooked_api',
     pants('src/main/python/apache/aurora/common:cluster'),
     pants('src/main/python/apache/aurora/client:api'),
     pants('src/main/python/apache/aurora/client/hooks'),
+    pants('src/main/python/apache/aurora/client:config')
   ]
 )
 
@@ -36,5 +37,6 @@ python_tests(name = 'non_hooked_api',
   dependencies = [
     pants('src/main/python/apache/aurora/common:aurora_job_key'),
     pants('src/main/python/apache/aurora/client/hooks'),
+    pants('src/main/python/apache/aurora/client:config')
   ],
 )
