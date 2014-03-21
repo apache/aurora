@@ -57,12 +57,15 @@ public class StructDump extends JerseyTemplateServlet {
     this.storage = Preconditions.checkNotNull(storage);
   }
 
+  private static final String USAGE =
+    "<html>Usage: /structdump/task/{task_id} or /structdump/cron/{role}/{env}/{job}</html>";
+
   @GET
   @Produces(MediaType.TEXT_HTML)
   public Response getUsage() {
     return Response
         .status(Status.BAD_REQUEST)
-        .entity("<html>Usage: /structdump/task/{task_id} or /structdump/cron/{role}/{env}/{job}</html>")
+        .entity(USAGE)
         .build();
   }
 
