@@ -29,7 +29,7 @@ Build the Thermos CLI and the Thermos observer.
 
 ```shell
 $ ./pants src/python/apache/thermos
-$ ./pants src/python/apache/thermos/bin:thermos_observe
+$ ./pants src/python/apache/thermos/bin:thermos_observer
 ```
 
 You can copy `dist/thermos.pex` to `thermos` somewhere in your `$PATH` or use a la carte.
@@ -68,7 +68,7 @@ hello world
 #### thermos observer ####
 
 ```shell
-$ dist/thermos_observe.pex --root=$HOME/.thermos
+$ dist/thermos_observer.pex --root=$HOME/.thermos
 ```
 
 This will fire up a webserver on `localhost:1338` that you can use as a web interface to interact with
@@ -423,7 +423,7 @@ supplied by the user and exposed through the user interface.  For example, to ru
 the observer on port 1338:
 
 ```
-$ thermos simplerun --daemon -P http:1338 'dist/thermos_observe.pex --http_port={{thermos.ports[http]}} --root=$HOME/.thermos'
+$ thermos simplerun --daemon -P http:1338 'dist/thermos_observer.pex --http_port={{thermos.ports[http]}} --root=$HOME/.thermos'
 ```
 
 If you go to http://localhost:1338, this bound port `http` will be exposed
