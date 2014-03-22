@@ -55,6 +55,7 @@ import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.apache.aurora.gen.ScheduleStatus.UNKNOWN;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -261,11 +262,10 @@ public class TaskStateMachineTest {
   }
 
   private void legalTransition(ScheduleStatus state, Set<SideEffect.Action> expectedActions) {
-    ScheduleStatus initialStatus = stateMachine.getState();
+    ScheduleStatus previousState = stateMachine.getPreviousState();
     TransitionResult result = stateMachine.updateState(state);
     assertTrue("Transition to " + state + " was not successful", result.isSuccess());
-    assertEquals(initialStatus, stateMachine.getPreviousState());
-    assertEquals(state, stateMachine.getState());
+    assertNotEquals(previousState, stateMachine.getPreviousState());
     assertEquals(
         FluentIterable.from(expectedActions).transform(TO_SIDE_EFFECT).toSet(),
         result.getSideEffects());
@@ -285,9 +285,7 @@ public class TaskStateMachineTest {
   }
 
   private void illegalTransition(ScheduleStatus state, Set<SideEffect> sideEffects) {
-    ScheduleStatus initialStatus = stateMachine.getState();
     TransitionResult result = stateMachine.updateState(state);
-    assertEquals(initialStatus, stateMachine.getState());
     assertFalse(result.isSuccess());
     assertEquals(sideEffects, result.getSideEffects());
   }

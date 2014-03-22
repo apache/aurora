@@ -344,7 +344,7 @@ public class StateManagerImpl implements StateManager {
                 @Override
                 public IScheduledTask apply(IScheduledTask task) {
                   ScheduledTask mutableTask = task.newBuilder();
-                  mutableTask.setStatus(stateMachine.getState());
+                  mutableTask.setStatus(targetState);
                   mutableTask.addToTaskEvents(new TaskEvent()
                       .setTimestamp(clock.nowMillis())
                       .setStatus(targetState)
