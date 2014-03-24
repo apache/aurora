@@ -81,7 +81,7 @@ python_library(
   name = 'client-packaged',
   dependencies = [
     pants('src/main/python/apache/aurora/common'),
-    pants('src/main/python/apache/aurora/config'),
+    pants('src/main/python/apache/aurora/config:config-packaged'),
     pants('src/main/python/apache/thermos/common'),
   ],
   provides = setup_py(

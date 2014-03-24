@@ -95,6 +95,7 @@ python_library(
     # covering libs
     pants('src/main/python/apache/thermos/common'),
     pants('src/main/python/apache/thermos/config'),
+    pants('src/main/thrift/org/apache/thermos:py-thrift'),
   ],
   provides = setup_py(
     name = 'apache.thermos.core',

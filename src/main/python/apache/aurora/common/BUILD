@@ -69,6 +69,9 @@ python_library(
     pants(':clusters'),
     pants(':http_signaler'),
     pants('src/main/python/apache/aurora/common/auth'),
+
+    # covering dependency on gen.*
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift-packaged'),
   ],
   provides = setup_py(
     name = 'apache.aurora.common',
