@@ -17,9 +17,12 @@
 import unittest
 
 from gen.apache.aurora.ttypes import (
+    AssignedTask,
     Response,
     ResponseCode,
     Result,
+    ScheduleStatusResult,
+    ScheduledTask,
 )
 
 from apache.aurora.client.cli.context import AuroraCommandContext
@@ -83,6 +86,7 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     self.task_status.append(expected_result)
     # each call adds an expected query result, in order.
     self.fake_api.scheduler_proxy.getTasksStatus.side_effect = self.task_status
+    self.fake_api.check_status.side_effect = self.task_status
 
 
 class AuroraClientCommandTest(unittest.TestCase):
@@ -123,6 +127,32 @@ class AuroraClientCommandTest(unittest.TestCase):
     mock_api_factory = Mock()
     mock_api_factory.return_value = mock_api
     return mock_api_factory, mock_scheduler_client
+
+  @classmethod
+  def create_status_call_result(cls):
+    status_response = cls.create_simple_success_response()
+    schedule_status = Mock(spec=ScheduleStatusResult)
+    status_response.result.scheduleStatusResult = schedule_status
+    mock_task_config = Mock()
+    # This should be a list of ScheduledTask's.
+    schedule_status.tasks = []
+    for i in range(20):
+      task_status = Mock(spec=ScheduledTask)
+      task_status.assignedTask = Mock(spec=AssignedTask)
+      task_status.assignedTask.instanceId = i
+      task_status.assignedTask.taskId = "Task%s" % i
+      task_status.assignedTask.slaveId = "Slave%s" % i
+      task_status.slaveHost = "Slave%s" % i
+      task_status.assignedTask.task = mock_task_config
+      schedule_status.tasks.append(task_status)
+    return status_response
+
+
+  @classmethod
+  def setup_get_tasks_status_calls(cls, scheduler):
+    status_response = cls.create_status_call_result()
+    scheduler.getTasksStatus.return_value = status_response
+
 
   FAKE_TIME = 42131
 

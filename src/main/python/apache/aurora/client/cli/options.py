@@ -41,8 +41,10 @@ class CommandOption(object):
     self.type = kwargs.get('type')
     self.help = kwargs.get('help', '')
 
+
   def is_mandatory(self):
     return self.kwargs.get('required', not self.name.startswith('--'))
+
 
   def get_displayname(self):
     """Get a display name for a the expected format of a parameter value"""
@@ -58,6 +60,7 @@ class CommandOption(object):
       displayname = "value"
     return displayname
 
+
   def render_usage(self):
     """Create a usage string for this option"""
     if not self.name.startswith('--'):
@@ -71,6 +74,7 @@ class CommandOption(object):
       return "[%s=%s]" % (self.name, self.kwargs["choices"])
     else:
       return "[%s=%s]" % (self.name, self.get_displayname())
+
 
   def render_help(self):
     """Render a full help message for this option"""
@@ -98,20 +102,27 @@ def parse_qualified_role(rolestr):
     raise ArgumentTypeError('Role argument must be a CLUSTER/NAME pair')
   return role_parts
 
+
+ALL_INSTANCES = 'all'
+
+
 def parse_instances(instances):
-  """Parse lists of instances or instance ranges into a set().
+  """Parse lists of instances or instance ranges into a set(). This accepts a comma-separated
+  list of instances.
+
      Examples:
        0-2
        0,1-3,5
        1,3,5
   """
-  if instances is None or instances == '':
+  if instances is None or instances == "":
     return None
   result = set()
   for part in instances.split(','):
     x = part.split('-')
     result.update(range(int(x[0]), int(x[-1]) + 1))
   return sorted(result)
+
 
 def parse_time_values(time_values):
   """Parse lists of discrete time values. Every value must be in the following format: XdYhZmWs.
@@ -123,6 +134,7 @@ def parse_time_values(time_values):
     return sorted(map(parse_time, time_values.split(','))) if time_values else None
   except ValueError as e:
     raise ArgumentTypeError(e)
+
 
 def parse_percentiles(percentiles):
   """Parse lists of percentile values in (0,100) range.
@@ -145,6 +157,7 @@ def parse_percentiles(percentiles):
 
 TaskInstanceKey = namedtuple('TaskInstanceKey', [ 'jobkey', 'instance' ])
 
+
 def parse_task_instance_key(key):
   pieces = key.split('/')
   if len(pieces) != 5:
@@ -156,6 +169,21 @@ def parse_task_instance_key(key):
   except ValueError:
     raise ValueError('Instance must be an integer, but got %s' % instance_str)
   return TaskInstanceKey(AuroraJobKey(cluster, role, env, name), instance)
+
+
+def instance_specifier(spec_str):
+  if spec_str is None or spec_str == '':
+    raise ValueError('Instance specifier must be non-empty')
+  parts = spec_str.split('/')
+  if len(parts) == 4:
+    jobkey = AuroraJobKey(*parts)
+    return TaskInstanceKey(jobkey, ALL_INSTANCES)
+  elif len(parts) != 5:
+    raise ArgumentTypeError('Instance specifier must be a CLUSTER/ROLE/ENV/JOB/INSTANCES tuple')
+  (cluster, role, env, name, instance_str) = parts
+  jobkey = AuroraJobKey(cluster, role, env, name)
+  instances = parse_instances(instance_str)
+  return TaskInstanceKey(jobkey, instances)
 
 
 BATCH_OPTION = CommandOption('--batch-size', type=int, default=5,
@@ -197,6 +225,11 @@ INSTANCES_OPTION = CommandOption('--instances', type=parse_instances, dest='inst
          'or a range (e.g. 0-2) or any combination of the two (e.g. 0-2,5,7-9). If not set, '
          'all instances will be acted on.')
 
+INSTANCES_SPEC_ARGUMENT = CommandOption('instance_spec', type=instance_specifier,
+    default=None, metavar="CLUSTER/ROLE/ENV/NAME[/INSTANCES]",
+    help=('Fully specified job instance key, in CLUSTER/ROLE/ENV/NAME[/INSTANCES] format. '
+        'If INSTANCES is omitted, then all instances will be operated on.'))
+
 
 JOBSPEC_ARGUMENT = CommandOption('jobspec', type=AuroraJobKey.from_path,
     metavar="CLUSTER/ROLE/ENV/NAME",
@@ -211,6 +244,13 @@ JSON_READ_OPTION = CommandOption('--read-json', default=False, dest='read_json',
 JSON_WRITE_OPTION = CommandOption('--write-json', default=False, dest='write_json',
     action='store_true',
     help='Generate command output in JSON format')
+
+MAX_TOTAL_FAILURES_OPTION = CommandOption('--max-total-failures', type=int, default=0,
+     help='Maximum number of instance failures to be tolerated in total before aborting.')
+
+
+NO_BATCHING_OPTION = CommandOption('--no-batching', default=False, action='store_true',
+  help='Run the command on all instances at once, instead of running in batches')
 
 
 ROLE_ARGUMENT = CommandOption('role', type=parse_qualified_role, metavar='CLUSTER/NAME',

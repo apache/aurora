@@ -47,7 +47,6 @@ from apache.aurora.client.cli.options import (
     EXECUTOR_SANDBOX_OPTION,
     FORCE_OPTION,
     HEALTHCHECK_OPTION,
-    INSTANCES_OPTION,
     JOBSPEC_ARGUMENT,
     JSON_READ_OPTION,
     JSON_WRITE_OPTION,

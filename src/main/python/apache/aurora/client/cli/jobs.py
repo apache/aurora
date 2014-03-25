@@ -36,6 +36,7 @@ from apache.aurora.client.cli import (
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
+    ALL_INSTANCES,
     BATCH_OPTION,
     BIND_OPTION,
     BROWSER_OPTION,
@@ -43,10 +44,12 @@ from apache.aurora.client.cli.options import (
     CONFIG_ARGUMENT,
     FORCE_OPTION,
     HEALTHCHECK_OPTION,
-    INSTANCES_OPTION,
+    INSTANCES_SPEC_ARGUMENT,
     JOBSPEC_ARGUMENT,
     JSON_READ_OPTION,
     JSON_WRITE_OPTION,
+    MAX_TOTAL_FAILURES_OPTION,
+    NO_BATCHING_OPTION,
     WATCH_OPTION,
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -273,30 +276,100 @@ the parsed configuration."""
     return EXIT_OK
 
 
-class KillJobCommand(Verb):
+class AbstractKillCommand(Verb):
+  def get_options(self):
+    return [BROWSER_OPTION,
+        CommandOption('--config', type=str, default=None, dest='config',
+            help='Config file for the job, possibly containing hooks'),
+        BATCH_OPTION,
+        MAX_TOTAL_FAILURES_OPTION,
+        NO_BATCHING_OPTION]
+
+  def kill_in_batches(self, context, job, instances_arg):
+    api = context.get_api(job.cluster)
+    # query the job, to get the list of active instances.
+    tasks = context.get_job_status(job)
+    if tasks is None or len(tasks) == 0:
+      context.print_err('No tasks to kill found for job %s' % job)
+      return EXIT_INVALID_PARAMETER
+    instance_ids = set(instance.assignedTask.instanceId for instance in tasks)
+    # intersect that with the set of shards specified by the user.
+    instances_to_kill = (instance_ids & set(instances_arg) if instances_arg is not None
+        else instance_ids)
+    # kill the shard batches.
+    errors = 0
+    while len(instances_to_kill) > 0:
+      batch = []
+      for i in range(min(context.options.batch_size, len(instances_to_kill))):
+        batch.append(instances_to_kill.pop())
+      resp = api.kill_job(job, batch)
+      if resp.responseCode is not ResponseCode.OK:
+        resp.print_log('Kill of shards %s failed with error %s' % (batch, resp.message))
+        errors += 1
+        if errors > context.options.max_total_failures:
+          raise context.CommandError(EXIT_COMMAND_FAILURE,
+               'Exceeded maximum number of errors while killing instances')
+    if errors > 0:
+      context.print_err('Warning: Errors occurred during batch kill')
+      raise context.CommandError(EXIT_COMMAND_FAILURE, "Errors occurred while killing instances")
+
+
+class KillCommand(AbstractKillCommand):
   @property
   def name(self):
     return 'kill'
 
   @property
   def help(self):
-    return "Kill a scheduled job"
+    return "Kill instances in a scheduled job"
 
   def get_options(self):
-    return [BROWSER_OPTION, INSTANCES_OPTION,
-        CommandOption('--config', type=str, default=None, dest='config',
-            help='Config file for the job, possibly containing hooks'),
-        JOBSPEC_ARGUMENT]
+    return super(KillCommand, self).get_options() + [INSTANCES_SPEC_ARGUMENT]
 
   def execute(self, context):
-    # TODO(mchucarroll): Check for wildcards; we don't allow wildcards for job kill.
-    api = context.get_api(context.options.jobspec.cluster)
-    resp = api.kill_job(context.options.jobspec, context.options.instances)
-    if resp.responseCode != ResponseCode.OK:
-      context.print_err('Job %s not found' % context.options.jobspec, file=sys.stderr)
-      return EXIT_INVALID_PARAMETER
+    job = context.options.instance_spec.jobkey
+    instances_arg = context.options.instance_spec.instance
+    if instances_arg == ALL_INSTANCES:
+      raise context.CommandError(EXIT_INVALID_PARAMETER,
+          'The instances list cannot be omitted in a kill command!; '
+          'use killall to kill all instances')
+    api = context.get_api(job.cluster)
+    if context.options.no_batching:
+      resp = api.kill_job(job, instances_arg)
+      if resp.responseCode != ResponseCode.OK:
+        context.print_err('Job %s not found' % job, file=sys.stderr)
+        return EXIT_INVALID_PARAMETER
+    else:
+      self.kill_in_batches(context, job, instances_arg)
     if context.options.open_browser:
       context.open_job_page(api, context.options.jobspec)
+    return EXIT_OK
+
+
+class KillAllJobCommand(AbstractKillCommand):
+  @property
+  def name(self):
+    return 'killall'
+
+  @property
+  def help(self):
+    return "Kill all instances of a scheduled job"
+
+  def get_options(self):
+    return super(KillAllJobCommand, self).get_options() + [JOBSPEC_ARGUMENT]
+
+  def execute(self, context):
+    job = context.options.jobspec
+    api = context.get_api(job.cluster)
+    if context.options.no_batching:
+      resp = api.kill_job(job, None)
+      if resp.responseCode != ResponseCode.OK:
+        context.print_err('Job %s not found' % job, file=sys.stderr)
+        return EXIT_INVALID_PARAMETER
+    else:
+      self.kill_in_batches(context, job, None)
+    if context.options.open_browser:
+      context.open_job_page(api, job)
     return EXIT_OK
 
 
@@ -329,18 +402,17 @@ class RestartCommand(Verb):
 
   def get_options(self):
     return [BATCH_OPTION, BIND_OPTION, BROWSER_OPTION, FORCE_OPTION, HEALTHCHECK_OPTION,
-        INSTANCES_OPTION, JSON_READ_OPTION, WATCH_OPTION,
+        JSON_READ_OPTION, WATCH_OPTION,
         CommandOption('--max-per-instance-failures', type=int, default=0,
              help='Maximum number of restarts per instance during restart. Increments total failure '
                  'count when this limit is exceeded.'),
         CommandOption('--restart-threshold', type=int, default=60,
              help='Maximum number of seconds before a shard must move into the RUNNING state '
                  'before considered a failure.'),
-        CommandOption('--max-total-failures', type=int, default=0,
-             help='Maximum number of instance failures to be tolerated in total during restart.'),
+        MAX_TOTAL_FAILURES_OPTION,
         CommandOption('--rollback-on-failure', default=True, action='store_false',
             help='If false, prevent update from performing a rollback.'),
-        JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
+        INSTANCES_SPEC_ARGUMENT, CONFIG_ARGUMENT]
 
   @property
   def help(self):
@@ -348,8 +420,11 @@ class RestartCommand(Verb):
 Restarts are fully controlled client-side, so aborting halts the restart."""
 
   def execute(self, context):
-    api = context.get_api(context.options.jobspec.cluster)
-    config = (context.get_job_config(context.options.jobspec, context.options.config_file)
+    job = context.options.instance_spec.jobkey
+    instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
+        context.options.instance_spec.instance)
+    api = context.get_api(job.cluster)
+    config = (context.get_job_config(job, context.options.config_file)
         if context.options.config_file else None)
     updater_config = UpdaterConfig(
         context.options.batch_size,
@@ -358,7 +433,7 @@ Restarts are fully controlled client-side, so aborting halts the restart."""
         context.options.max_per_instance_failures,
         context.options.max_total_failures,
         context.options.rollback_on_failure)
-    resp = api.restart(context.options.jobspec, context.options.instances, updater_config,
+    resp = api.restart(job, instances, updater_config,
         context.options.healthcheck_interval_seconds, config=config)
 
     context.check_and_log_response(resp)
@@ -460,8 +535,8 @@ class UpdateCommand(Verb):
     return 'update'
 
   def get_options(self):
-    return [FORCE_OPTION, BIND_OPTION, JSON_READ_OPTION, INSTANCES_OPTION, HEALTHCHECK_OPTION,
-        JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
+    return [FORCE_OPTION, BIND_OPTION, JSON_READ_OPTION, HEALTHCHECK_OPTION,
+        INSTANCES_SPEC_ARGUMENT, CONFIG_ARGUMENT]
 
   @property
   def help(self):
@@ -505,12 +580,15 @@ to preview what changes will take effect.
       time.sleep(5)
 
   def execute(self, context):
-    config = context.get_job_config(context.options.jobspec, context.options.config_file)
+    job = context.options.instance_spec.jobkey
+    instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
+        context.options.instance_spec.instance)
+    config = context.get_job_config(job, context.options.config_file)
     api = context.get_api(config.cluster())
     if not context.options.force:
-      self.warn_if_dangerous_change(context, api, context.options.jobspec, config)
+      self.warn_if_dangerous_change(context, api, job, config)
     resp = api.update_job(config, context.options.healthcheck_interval_seconds,
-        context.options.instances)
+        instances)
     if resp.responseCode != ResponseCode.OK:
       raise context.CommandError(EXIT_COMMAND_FAILURE, 'Update failed: %s' % resp.message)
     return EXIT_OK
@@ -535,7 +613,8 @@ class Job(Noun):
     self.register_verb(CreateJobCommand())
     self.register_verb(DiffCommand())
     self.register_verb(InspectCommand())
-    self.register_verb(KillJobCommand())
+    self.register_verb(KillCommand())
+    self.register_verb(KillAllJobCommand())
     self.register_verb(ListJobsCommand())
     self.register_verb(RestartCommand())
     self.register_verb(StatusCommand())

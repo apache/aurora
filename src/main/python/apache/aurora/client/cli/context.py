@@ -150,6 +150,7 @@ class AuroraCommandContext(Context):
       return jobs
 
   def get_job_status(self, key):
+    """Returns a list of task instances running under the job."""
     api = self.get_api(key.cluster)
     resp = api.check_status(key)
     if resp.responseCode is not ResponseCode.OK:

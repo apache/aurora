@@ -39,24 +39,6 @@ class TestRestartCommand(AuroraClientCommandTest):
     populate.result.populateJobResult.populated = set(configs)
     return populate
 
-  @classmethod
-  def setup_get_tasks_status_calls(cls, scheduler):
-    status_response = cls.create_simple_success_response()
-    scheduler.getTasksStatus.return_value = status_response
-    schedule_status = Mock(spec=ScheduleStatusResult)
-    status_response.result.scheduleStatusResult = schedule_status
-    mock_task_config = Mock()
-    # This should be a list of ScheduledTask's.
-    schedule_status.tasks = []
-    for i in range(20):
-      task_status = Mock(spec=ScheduledTask)
-      task_status.assignedTask = Mock(spec=AssignedTask)
-      task_status.assignedTask.instanceId = i
-      task_status.assignedTask.taskId = "Task%s" % i
-      task_status.assignedTask.slaveId = "Slave%s" % i
-      task_status.slaveHost = "Slave%s" % i
-      task_status.assignedTask.task = mock_task_config
-      schedule_status.tasks.append(task_status)
 
   @classmethod
   def setup_health_checks(cls, mock_api):
