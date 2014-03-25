@@ -23,6 +23,7 @@ import com.twitter.common.application.modules.LifecycleModule;
 
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.scheduler.thrift.aop.AopModule;
+import org.mortbay.servlet.GzipFilter;
 
 /**
  * Binding module to configure a thrift server.
@@ -36,6 +37,9 @@ public class ThriftModule extends AbstractModule {
     LifecycleModule.bindServiceRunner(binder(), ThriftServerLauncher.class);
 
     Registration.registerServlet(binder(), "/api", SchedulerAPIServlet.class, true);
+    // NOTE: GzipFilter is applied only to /api instead of globally because the Jersey-managed
+    // servlets from ServletModule have a conflicting filter applied to them.
+    Registration.registerServletFilter(binder(), GzipFilter.class, "/api");
 
     install(new AopModule());
   }

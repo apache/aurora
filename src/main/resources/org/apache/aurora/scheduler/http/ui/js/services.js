@@ -19,7 +19,7 @@ auroraUI.factory(
 
       getSchedulerClient: function () {
         if (!this.schedulerClient) {
-          var transport = new Thrift.Transport("/api/");
+          var transport = new Thrift.Transport("/api");
           var protocol = new Thrift.Protocol(transport);
           this.schedulerClient = new ReadOnlySchedulerClient(protocol);
           return this.schedulerClient;
