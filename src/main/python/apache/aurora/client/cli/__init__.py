@@ -34,7 +34,10 @@ from __future__ import print_function
 
 from abc import abstractmethod
 import argparse
+import getpass
+import logging
 import sys
+from uuid import uuid1
 
 
 # Constants for standard return codes.
@@ -50,6 +53,24 @@ EXIT_API_ERROR = 10
 EXIT_UNKNOWN_ERROR = 20
 
 
+# Set up a logging call that adds a unique identifier for this invocation
+# of the client. Log messages sent via this call will contain two additional
+# fields in the log record: "clientid", which contains a UUID for the client
+# invocation, and "user", which contains the username of the user who invoked
+# the client.
+
+logger = logging.getLogger('aurora_client')
+CLIENT_ID = uuid1()
+
+
+def print_aurora_log(sev, msg, *args, **kwargs):
+  extra = kwargs.get('extra', {})
+  extra['clientid'] = CLIENT_ID
+  extra['user'] = getpass.getuser()
+  kwargs['extra'] = extra
+  logger.log(sev, msg, *args, **kwargs)
+
+
 class Context(object):
   class Error(Exception): pass
 
@@ -60,6 +81,7 @@ class Context(object):
       super(Context.CommandError, self).__init__(msg)
       self.msg = msg
       self.code = code
+      self.options = None
 
   @classmethod
   def exit(cls, code, msg):
@@ -70,6 +92,31 @@ class Context(object):
     This is separated from the constructor to make patching tests easier.
     """
     self.options = options
+
+  def print_out(self, msg, indent=0):
+    """Prints output to standard out with indent.
+    For debugging purposes, it's nice to be able to patch this and capture output.
+    """
+    indent_str = ' ' * indent
+    lines = msg.split('\n')
+    for line in lines:
+      print('%s%s' % (indent_str, line))
+
+  def print_err(self, msg, indent=0):
+    """Prints output to standard error, with an indent."""
+    indent_str = ' ' * indent
+    lines = msg.split('\n')
+    for line in lines:
+      print('%s%s' % (indent_str, line), file=sys.stderr)
+
+  def print_log(self, severity, msg, *args, **kwargs):
+    """Print a message to a log.
+    Logging with this method is intended for generating output for aurora developers/maintainers.
+    Log output isn't for users - information much more detailed than users want may be logged.
+    Logs generated for clients of a cluster may be gathered in a centralized database by the
+    aurora admins for that cluster.
+    """
+    print_aurora_log(severity, msg, *args, **kwargs)
 
 
 class ConfigurationPlugin(object):
@@ -233,6 +280,7 @@ class CommandLine(object):
     :param args: the command-line arguments for the command. This only includes arguments
         that should be parsed by the application; it does not include sys.argv[0].
     """
+    print_aurora_log(logging.INFO, 'Command=(%s)', args)
     nouns = self.registered_nouns
     if args[0] == 'help':
       return self.help_cmd(args[1:])
@@ -250,8 +298,14 @@ class CommandLine(object):
       print('Error in configuration plugin: %s' % c.msg, file=sys.stderr)
       return c.code
     try:
-      return noun.execute(context)
+      result = noun.execute(context)
+      if result == EXIT_OK:
+        print_aurora_log(logging.INFO, 'Command terminated successfully')
+      else:
+        print_aurora_log(logging.INFO, 'Commmand terminated with error code %s', result)
+      return result
     except Context.CommandError as c:
+      print_aurora_log(logging.INFO, 'Error executing command: %s', c.msg)
       print('Error executing command: %s' % c.msg, file=sys.stderr)
       return c.code
 
@@ -309,7 +363,7 @@ class Noun(AuroraCommand):
     if context.options.verb not in self.verbs:
       raise self.InvalidVerbException('Noun %s does not have a verb %s' %
           (self.name, context.options.verb))
-    self.verbs[context.options.verb].execute(context)
+    return self.verbs[context.options.verb].execute(context)
 
 
 class Verb(AuroraCommand):
@@ -349,4 +403,3 @@ class Verb(AuroraCommand):
 
   def execute(self, context):
     pass
-

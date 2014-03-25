@@ -20,6 +20,7 @@ python_test_suite(
     pants(':bridge'),
     pants(':help'),
     pants(':job'),
+    pants(':logging'),
     pants(':plugins'),
     pants(':quota'),
     pants(':sla'),
@@ -40,6 +41,18 @@ python_tests(
   name = 'help',
   sources = [ 'test_help.py' ],
   dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/client/cli'),
+    pants('src/main/python/apache/aurora/client/cli:client'),
+  ]
+)
+
+python_tests(
+  name = 'logging',
+  sources = [ 'test_logging.py' ],
+  dependencies = [
+    pants(':util'),
     pants('3rdparty/python:mock'),
     pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/client/cli'),

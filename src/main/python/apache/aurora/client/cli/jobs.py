@@ -88,6 +88,7 @@ class CancelUpdateCommand(Verb):
         if context.options.config_file else None)
     resp = api.cancel_update(context.options.jobspec, config=config)
     context.check_and_log_response(resp)
+    return EXIT_OK
 
 
 class CreateJobCommand(Verb):
@@ -269,6 +270,7 @@ the parsed configuration."""
       for line in process.cmdline().get().splitlines():
         context.print_out(line, indent=4)
       context.print_out()
+    return EXIT_OK
 
 
 class KillJobCommand(Verb):
@@ -295,6 +297,7 @@ class KillJobCommand(Verb):
       return EXIT_INVALID_PARAMETER
     if context.options.open_browser:
       context.open_job_page(api, context.options.jobspec)
+    return EXIT_OK
 
 
 class ListJobsCommand(Verb):
@@ -316,6 +319,7 @@ class ListJobsCommand(Verb):
       context.print_out('%s/%s/%s/%s' % (j.cluster, j.role, j.env, j.name))
     result = self.get_status_for_jobs(jobs, context)
     context.print_out(result)
+    return EXIT_OK
 
 
 class RestartCommand(Verb):
@@ -360,6 +364,7 @@ Restarts are fully controlled client-side, so aborting halts the restart."""
     context.check_and_log_response(resp)
     if context.options.open_browser:
       context.open_job_page(api, context.options.jobspec)
+    return EXIT_OK
 
 
 class StatusCommand(Verb):
@@ -446,6 +451,7 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
     jobs = context.get_jobs_matching_key(context.options.jobspec)
     result = self.get_status_for_jobs(jobs, context)
     context.print_out(result)
+    return EXIT_OK
 
 
 class UpdateCommand(Verb):
@@ -507,6 +513,7 @@ to preview what changes will take effect.
         context.options.instances)
     if resp.responseCode != ResponseCode.OK:
       raise context.CommandError(EXIT_COMMAND_FAILURE, 'Update failed: %s' % resp.message)
+    return EXIT_OK
 
 
 class Job(Noun):

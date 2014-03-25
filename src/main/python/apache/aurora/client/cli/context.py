@@ -17,6 +17,7 @@
 from __future__ import print_function
 from collections import namedtuple
 from fnmatch import fnmatch
+import logging
 import sys
 
 from apache.aurora.common.clusters import CLUSTERS
@@ -73,22 +74,6 @@ class AuroraCommandContext(Context):
     except Exception as e:
       raise self.CommandError(EXIT_INVALID_CONFIGURATION, 'Error loading configuration: %s' % e)
 
-  def print_out(self, msg, indent=0):
-    """Prints output. For debugging purposes, it's nice to be able to patch this
-    and capture output.
-    """
-    indent_str = ' ' * indent
-    lines = msg.split('\n')
-    for line in lines:
-      print('%s%s' % (indent_str, line))
-
-  def print_err(self, msg, indent=0):
-    """Prints output to standard error."""
-    indent_str = ' ' * indent
-    lines = msg.split('\n')
-    for line in lines:
-      print('%s%s' % (indent_str, line), file=sys.stderr)
-
   def open_page(self, url):
     import webbrowser
     webbrowser.open_new_tab(url)
@@ -99,7 +84,7 @@ class AuroraCommandContext(Context):
         jobkey.env, jobkey.name))
 
   def check_and_log_response(self, resp):
-    log.info('Response from scheduler: %s (message: %s)'
+    self.print_log(logging.INFO, 'Response from scheduler: %s (message: %s)'
         % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
     if resp.responseCode != ResponseCode.OK:
       raise self.CommandError(EXIT_API_ERROR, resp.message)
