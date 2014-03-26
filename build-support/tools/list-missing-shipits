@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-"""Utility to show reviews missing your shipit.
+"""Utility to show outstanding reviews for the project
 
-Usage: list-missing-shipits [REVIEWBOARD_USERNAME]
-
-If not specified REVIEWBOARD_USERNAME defaults to the current user's name.
+Usage: list-missing-shipits [--rb-server=RB_SERVER_URL]
 """
 from __future__ import print_function
 
@@ -14,15 +12,7 @@ import os
 import subprocess
 import sys
 
-
-USERNAME = sys.argv[1] if len(sys.argv) > 1 else getpass.getuser()
-RBT_PATH = os.path.realpath(os.path.join(os.path.dirname(sys.argv[0]), '..', '..', 'rbt'))
-
-
-def rb_api_get(resource, params={}):
-  return json.loads(subprocess.Popen(
-    [RBT_PATH, 'api-get', resource, '--'] + ['--%s=%s' % (k, v) for k, v in params.items()],
-    stdout=subprocess.PIPE).communicate()[0])
+from optparse import OptionParser
 
 
 class Review(object):
@@ -66,8 +56,8 @@ class ReviewRequest(object):
     return [p['title'] for p in self._request['target_people']]
 
   @property
-  def url(self):
-    return 'https://reviews.apache.org%s' % self._request['url']
+  def id(self):
+    return self._request['id']
 
   @property
   def summary(self):
@@ -75,27 +65,63 @@ class ReviewRequest(object):
     return ((full[:(self.SUMMARY_TRUNCATE - 3)] + '...')
             if len(full) > self.SUMMARY_TRUNCATE else full)
 
-  def get_reviews(self):
-    return [Review(r) for r in rb_api_get(self._request['links']['reviews']['href'])['reviews']]
+  @property
+  def reviews_href(self):
+    return self._request['links']['reviews']['href']
 
-  def get_diffs(self):
-    return [Diff(d) for d in rb_api_get(self._request['links']['diffs']['href'])['diffs']]
+  @property
+  def diffs_href(self):
+    return self._request['links']['diffs']['href']
 
 
-def get_review_requests(params):
-  return [ReviewRequest(r) for r in rb_api_get('review-requests', params)['review_requests']]
+class Reviewboard(object):
+  def __init__(self, url=None):
+    self._path = os.path.realpath(os.path.join(os.path.dirname(sys.argv[0]), '..', '..', 'rbt'))
+    self._url = url
+
+  def _get(self, resource, params={}):
+    base_cmd = [self._path, 'api-get']
+    if self._url is not None:
+      base_cmd += ['--server=%s' % self._url]
+    return json.loads(subprocess.Popen(
+      base_cmd + [resource, '--'] + ['--%s=%s' % (k, v) for k, v in params.items()],
+      stdout=subprocess.PIPE).communicate()[0])
+
+  def get_server_url(self):
+    return self._get('info')['info']['site']['url']
+
+  def get_review_requests(self, params):
+    return [ReviewRequest(r) for r in self._get('review-requests', params)['review_requests']]
+
+  def get_reviews(self, review_request):
+    return [Review(r) for r in self._get(review_request.reviews_href)['reviews']]
+
+  def get_diffs(self, review_request):
+    return [Diff(d) for d in self._get(review_request.diffs_href)['diffs']]
 
 
 def main():
-  pending_requests = get_review_requests({
+  parser = OptionParser()
+  parser.add_option('--server',
+                    dest='server',
+                    help='ReviewBoard server',
+                    default=None)
+  (options, args) = parser.parse_args()
+
+  api = Reviewboard(options.server)
+
+  server_url = api.get_server_url()
+  def request_url(id):
+    return '%sr/%s' % (server_url, id)
+
+  pending_requests = api.get_review_requests({
       'to-groups': 'Aurora',
       'status': 'pending',
     })
 
   def to_row(request):
-    reviews = request.get_reviews()
-    diffs = request.get_diffs()
-    last = [-1]
+    reviews = api.get_reviews(request)
+    diffs = api.get_diffs(request)
     ships_required = set(request.ships_required)
     for event in sorted(reviews + diffs, key=lambda x: x.timestamp, reverse=True):
       if isinstance(event, Review):
@@ -118,7 +144,7 @@ def main():
         break
 
     return (str(event.timestamp),
-            request.url,
+            request_url(request.id),
             request.submitter.ljust(10),
             request.summary.ljust(ReviewRequest.SUMMARY_TRUNCATE),
             waiting_for)
@@ -132,14 +158,14 @@ def main():
   recently_submitted_days = 1
   updated_from = ((datetime.datetime.utcnow() - datetime.timedelta(days=1))
                   .replace(microsecond=0).isoformat())
-  recently_submitted = get_review_requests({
+  recently_submitted = api.get_review_requests({
       'to-groups': 'Aurora',
       'status': 'submitted',
       'last-updated-from': updated_from
     })
   print('Recently submitted: %s' % len(recently_submitted))
   for request in recently_submitted:
-    print('\t'.join((request.url, request.submitter, request.summary)))
+    print('\t'.join((request_url(request.id), request.submitter, request.summary)))
 
 
 if __name__ == '__main__':
