@@ -61,13 +61,13 @@ class SlaTest(unittest.TestCase):
     resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
     self._scheduler.getTasksStatus.return_value = resp
 
-  def create_task(self, duration, id, host=None, name=None):
+  def create_task(self, duration, id, host=None, name=None, prod=None):
     return ScheduledTask(
         assignedTask=AssignedTask(
             instanceId=id,
             slaveHost=host,
             task=TaskConfig(
-                production=True,
+                production=prod if prod is not None else True,
                 jobName=name or self._name,
                 owner=Identity(role=self._role),
                 environment=self._env)),
@@ -266,6 +266,26 @@ class SlaTest(unittest.TestCase):
     }
     self.assert_safe_domain_result('h1', 50, 400, in_limit=job_override)
 
+  def test_domain_uptime_not_production(self):
+    self.mock_get_tasks([
+      self.create_task(100, 1, 'h1', self._name, False),
+      self.create_task(200, 2, 'h2', self._name, False),
+      self.create_task(100, 1, 'h2', self._name, False)
+    ])
+
+    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    assert 0 == len(vector.get_safe_hosts(50, 200)), 'Length must be empty.'
+    self.expect_task_status_call_cluster_scoped()
+
+  def test_domain_uptime_production_not_set(self):
+    task = self.create_task(500, 1, 'h1', self._name)
+    task.assignedTask.task.production = None
+    self.mock_get_tasks([task])
+
+    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    assert 0 == len(vector.get_safe_hosts(50, 200)), 'Length must be empty.'
+    self.expect_task_status_call_cluster_scoped()
+
 
   def test_probe_hosts_no_tasks(self):
     self.mock_get_tasks([])
@@ -306,6 +326,17 @@ class SlaTest(unittest.TestCase):
         self.create_task(400, 4, 'h4', self._name),
     ])
     self.assert_probe_hosts_result('h1', 80, 300, 50.0, False, None)
+
+  def test_probe_hosts_non_prod_ignored(self):
+    self.mock_get_tasks([
+        self.create_task(100, 1, 'h1', self._name, False),
+        self.create_task(200, 2, 'h2', self._name, False),
+        self.create_task(300, 3, 'h3', self._name, False),
+        self.create_task(400, 4, 'h4', self._name, False),
+    ])
+    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    assert 0 == len(vector.probe_hosts(50, 80, ['h1']))
+    self.expect_task_status_call_cluster_scoped()
 
 
   def test_get_domain_uptime_vector_with_hosts(self):

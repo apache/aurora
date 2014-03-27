@@ -245,9 +245,10 @@ class DomainUpTimeSlaVector(object):
     jobs = defaultdict(list)
     hosts = defaultdict(list)
     for task in self._tasks:
-      job_key = job_key_from_scheduled(task, self._cluster)
-      jobs[job_key].append(task)
-      hosts[task.assignedTask.slaveHost].append(job_key)
+      if task.assignedTask.task.production:
+        job_key = job_key_from_scheduled(task, self._cluster)
+        jobs[job_key].append(task)
+        hosts[task.assignedTask.slaveHost].append(job_key)
 
     return jobs, hosts
 
