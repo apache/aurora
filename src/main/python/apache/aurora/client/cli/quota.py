@@ -65,11 +65,15 @@ class GetQuotaCmd(Verb):
       return serialize(quota_resp.result.getQuotaResult,
           protocol_factory=TJSONProtocol.TSimpleJSONProtocolFactory())
     else:
+      quota_result = quota_resp.result.getQuotaResult
       result = ['Allocated:']
-      result += get_quota_str(quota_resp.result.getQuotaResult.quota)
-      if quota_resp.result.getQuotaResult.consumed:
-        result.append('Consumed:')
-        result += get_quota_str(quota_resp.result.getQuotaResult.consumed)
+      result += get_quota_str(quota_result.quota)
+      if quota_result.prodConsumption:
+        result.append('Production resources consumed:')
+        result += get_quota_str(quota_result.prodConsumption)
+      if quota_result.nonProdConsumption:
+        result.append('Non-production resources consumed:')
+        result += get_quota_str(quota_result.nonProdConsumption)
       return '\n'.join(result)
 
   def execute(self, context):

@@ -15,76 +15,76 @@
 #
 
 import contextlib
+import json
 
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 from gen.apache.aurora.ttypes import (
-    GetQuotaResult,
-    ResourceAggregate,
-)
+  GetQuotaResult,
+  ResourceAggregate,
+  )
 
 from mock import patch
 
 
 class TestGetQuotaCommand(AuroraClientCommandTest):
   @classmethod
-  def setup_mock_quota_call_no_consumed(cls, mock_context):
+  def setup_mock_quota_call_no_consumption(cls, mock_context):
     api = mock_context.get_api('west')
     response = cls.create_simple_success_response()
-    response.result.getQuotaResult = GetQuotaResult()
-    response.result.getQuotaResult.quota = ResourceAggregate()
-    response.result.getQuotaResult.quota.numCpus = 5
-    response.result.getQuotaResult.quota.ramMb = 20480
-    response.result.getQuotaResult.quota.diskMb = 40960
-    response.result.getQuotaResult.consumed = None
+    response.result.getQuotaResult = GetQuotaResult(
+      quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
+      prodConsumption=None,
+      nonProdConsumption=None
+    )
     api.get_quota.return_value = response
 
   @classmethod
-  def setup_mock_quota_call_with_consumed(cls, mock_context):
+  def setup_mock_quota_call_with_consumption(cls, mock_context):
     api = mock_context.get_api('west')
     response = cls.create_simple_success_response()
-    response.result.getQuotaResult = GetQuotaResult()
-    response.result.getQuotaResult.quota = ResourceAggregate()
-    response.result.getQuotaResult.quota.numCpus = 5
-    response.result.getQuotaResult.quota.ramMb = 20480
-    response.result.getQuotaResult.quota.diskMb = 40960
-    response.result.getQuotaResult.consumed = ResourceAggregate()
-    response.result.getQuotaResult.consumed.numCpus = 1
-    response.result.getQuotaResult.consumed.ramMb = 1024
-    response.result.getQuotaResult.consumed.diskMb = 2048
+    response.result.getQuotaResult = GetQuotaResult(
+      quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
+      prodConsumption=ResourceAggregate(numCpus=1, ramMb=1024, diskMb=2048),
+      nonProdConsumption=ResourceAggregate(numCpus=1, ramMb=1024, diskMb=2048),
+    )
     api.get_quota.return_value = response
 
-  def test_get_quota_no_consumed(self):
-    mock_context = FakeAuroraCommandContext()
-    self.setup_mock_quota_call_no_consumed(mock_context)
-    with contextlib.nested(
-        patch('apache.aurora.client.cli.quota.Quota.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      cmd = AuroraCommandLine()
-      cmd.execute(['quota', 'get', 'west/bozo'])
-      out = '\n'.join(mock_context.get_out())
-      assert out == "Allocated:\n  CPU: 5\n  RAM: 20.000000 GB\n  Disk: 40.000000 GB"
+  def test_get_quota_no_consumption(self):
+    assert ('Allocated:\n  CPU: 5\n  RAM: 20.000000 GB\n  Disk: 40.000000 GB' ==
+            self._get_quota(False, ['quota', 'get', 'west/bozo']))
 
-  def test_get_quota_with_consumed(self):
-    mock_context = FakeAuroraCommandContext()
-    self.setup_mock_quota_call_with_consumed(mock_context)
-    with contextlib.nested(
-        patch('apache.aurora.client.cli.quota.Quota.create_context', return_value=mock_context),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      cmd = AuroraCommandLine()
-      cmd.execute(['quota', 'get', 'west/bozo'])
-      out = '\n'.join(mock_context.get_out())
-      assert out == ("Allocated:\n  CPU: 5\n  RAM: 20.000000 GB\n  Disk: 40.000000 GB\n"
-          "Consumed:\n  CPU: 1\n  RAM: 1.000000 GB\n  Disk: 2.000000 GB")
+  def test_get_quota_with_consumption(self):
+    expected_output = ('Allocated:\n  CPU: 5\n  RAM: 20.000000 GB\n  Disk: 40.000000 GB\n'
+                       'Production resources consumed:\n'
+                       '  CPU: 1\n  RAM: 1.000000 GB\n  Disk: 2.000000 GB\n'
+                       'Non-production resources consumed:\n'
+                       '  CPU: 1\n  RAM: 1.000000 GB\n  Disk: 2.000000 GB')
+    assert expected_output == self._get_quota(True, ['quota', 'get', 'west/bozo'])
 
-  def test_get_quota_with_consumed_json(self):
+  def test_get_quota_with_no_consumption_json(self):
+    assert (json.loads('{"quota":{"numCpus":5,"ramMb":20480,"diskMb":40960}}') ==
+            json.loads(self._get_quota(False, ['quota', 'get', '--write-json', 'west/bozo'])))
+
+  def test_get_quota_with_consumption_json(self):
+    expected_response = json.loads('{"quota":{"numCpus":5,"ramMb":20480,"diskMb":40960},'
+                                   '"prodConsumption":{"numCpus":1,"ramMb":1024,"diskMb":2048},'
+                                   '"nonProdConsumption":{"numCpus":1,"ramMb":1024,"diskMb":2048}}')
+    assert (expected_response ==
+            json.loads(self._get_quota(True, ['quota', 'get', '--write-json', 'west/bozo'])))
+
+  def _get_quota(self, include_consumption, command_args):
     mock_context = FakeAuroraCommandContext()
-    self.setup_mock_quota_call_no_consumed(mock_context)
+    if include_consumption:
+      self.setup_mock_quota_call_with_consumption(mock_context)
+    else:
+      self.setup_mock_quota_call_no_consumption(mock_context)
+
     with contextlib.nested(
         patch('apache.aurora.client.cli.quota.Quota.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
-      cmd.execute(['quota', 'get', '--write-json', 'west/bozo'])
+      cmd.execute(command_args)
       out = '\n'.join(mock_context.get_out())
-      assert out == '{"quota":{"numCpus":5,"ramMb":20480,"diskMb":40960}}'
+      return out

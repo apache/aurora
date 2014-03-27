@@ -649,8 +649,15 @@ def get_quota(role):
   """
   options = app.get_options()
   resp = make_client(options.cluster).get_quota(role)
+  quota_result = resp.result.getQuotaResult
+  print_quota(quota_result.quota, 'Total allocated quota', role)
 
-  print_quota(resp.result.getQuotaResult.quota, 'Total allocated quota', role)
+  if resp.result.getQuotaResult.prodConsumption:
+    print_quota(quota_result.prodConsumption,
+                'Resources consumed by production jobs',
+                role)
 
-  if resp.result.getQuotaResult.consumed:
-    print_quota(resp.result.getQuotaResult.consumed, 'Consumed quota', role)
+  if resp.result.getQuotaResult.nonProdConsumption:
+    print_quota(quota_result.nonProdConsumption,
+                'Resources consumed by non-production jobs',
+                role)
