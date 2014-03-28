@@ -57,6 +57,7 @@ tasks.matching { it instanceof Compile && it.getName() != 'compileGeneratedJava'
 
 task wrapper(type: Wrapper) {
   gradleVersion = '1.11'
+  jarFile = "/build-support/gradle/wrapper/gradle-wrapper.jar"
 }
 
 task sourceJar(type: Jar) {
