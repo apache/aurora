@@ -987,37 +987,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testSlaveDeletesTasks() throws Exception {
-    expectTaskNotThrottled();
-
-    control.replay();
-    buildScheduler();
-
-    scheduler.createJob(makeJob(KEY_A, 2));
-
-    Query.Builder builder = Query.unscoped().active();
-    String taskId1 = Tasks.id(getOnlyTask(builder.byInstances(KEY_A, 0)));
-    String taskId2 = Tasks.id(getOnlyTask(builder.byInstances(KEY_A, 1)));
-
-    assignTask(taskId1, SLAVE_ID, SLAVE_HOST_1);
-    assignTask(taskId2, SLAVE_ID, SLAVE_HOST_1);
-
-    changeStatus(taskId1, STARTING, RUNNING);
-    changeStatus(taskId2, STARTING, FINISHED);
-
-    scheduler.tasksDeleted(ImmutableSet.of(taskId1, taskId2));
-
-    // The expected outcome is that one task is moved into the LOST state and rescheduled.
-    // The FINISHED task's state is deleted.
-    assertTaskCount(2);
-    assertEquals(LOST, getOnlyTask(Query.taskScoped(taskId1)).getStatus());
-    assertTrue(getTasks(Query.taskScoped(taskId2)).isEmpty());
-
-    IScheduledTask rescheduled = Iterables.getOnlyElement(getTasksByStatus(PENDING));
-    assertEquals(taskId1, rescheduled.getAncestorId());
-  }
-
-  @Test
   public void testRestartShards() throws Exception {
     expectKillTask(2);
     expectTaskNotThrottled().times(2);

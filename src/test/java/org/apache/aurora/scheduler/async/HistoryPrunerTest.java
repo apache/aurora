@@ -58,6 +58,7 @@ import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expectLastCall;
@@ -103,7 +104,7 @@ public class HistoryPrunerTest extends EasyMockTest {
 
     clock.advance(ONE_MS);
     long taskBTimestamp = clock.nowMillis();
-    IScheduledTask b = makeTask("b", LOST);
+    IScheduledTask b = makeTask("b", SANDBOX_DELETED);
 
     expectNoImmediatePrune(ImmutableSet.of(a));
     expectOneDelayedPrune(taskATimestamp);
@@ -119,7 +120,7 @@ public class HistoryPrunerTest extends EasyMockTest {
   @Test
   public void testStorageStartedWithPruning() {
     long taskATimestamp = clock.nowMillis();
-    IScheduledTask a = makeTask("a", FINISHED);
+    IScheduledTask a = makeTask("a", SANDBOX_DELETED);
 
     clock.advance(ONE_MINUTE);
     long taskBTimestamp = clock.nowMillis();
@@ -177,7 +178,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     Capture<Runnable> delayedDelete = expectDefaultDelayedPrune();
 
     // Expect task "a" to be pruned when future is activated.
-    stateManager.deleteTasks(ImmutableSet.of("a"));
+    expectDeleteTasks("a");
 
     control.replay();
 
@@ -304,6 +305,10 @@ public class HistoryPrunerTest extends EasyMockTest {
     });
 
     return eventDelivered;
+  }
+
+  private void expectDeleteTasks(String... tasks) {
+    stateManager.deleteTasks(ImmutableSet.copyOf(tasks));
   }
 
   private Capture<Runnable> expectDefaultDelayedPrune() {

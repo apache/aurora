@@ -99,11 +99,4 @@ public interface SchedulerCore {
    */
   void restartShards(IJobKey jobKey, Set<Integer> shards, String requestingUser)
       throws ScheduleException;
-
-  /**
-   * Indicates to the scheduler that tasks were deleted on the assigned host.
-   *
-   * @param taskIds IDs of tasks that were deleted.
-   */
-  void tasksDeleted(Set<String> taskIds);
 }

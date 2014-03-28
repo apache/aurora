@@ -228,6 +228,10 @@ public final class Tasks {
         .max(tasks);
   }
 
+  public static ITaskEvent getSecondToLatestEvent(IScheduledTask task) {
+    return task.getTaskEvents().get(task.getTaskEvents().size() - 2);
+  }
+
   public static ITaskEvent getLatestEvent(IScheduledTask task) {
     return Iterables.getLast(task.getTaskEvents());
   }

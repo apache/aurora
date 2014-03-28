@@ -21,7 +21,9 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -50,6 +52,7 @@ import static org.apache.aurora.scheduler.state.SideEffect.Action.RESCHEDULE;
 import static org.apache.aurora.scheduler.state.SideEffect.Action.SAVE_STATE;
 import static org.apache.aurora.scheduler.state.SideEffect.Action.STATE_CHANGE;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.ASSIGNED;
+import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.DELETED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.DRAINING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.FAILED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.FINISHED;
@@ -61,9 +64,9 @@ import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PENDI
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PREEMPTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.RESTARTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.RUNNING;
+import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.SANDBOX_DELETED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.STARTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.THROTTLED;
-import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.UNKNOWN;
 
 /**
  * State machine for a task.
@@ -87,17 +90,22 @@ class TaskStateMachine {
 
   private final Set<SideEffect> sideEffects = Sets.newHashSet();
 
-  private static final Function<IScheduledTask, TaskState> SCHEDULED_TO_TASK_STATE =
-      new Function<IScheduledTask, TaskState>() {
+  private static final Function<ScheduleStatus, TaskState> STATUS_TO_TASK_STATE =
+      new Function<ScheduleStatus, TaskState>() {
         @Override
-        public TaskState apply(IScheduledTask task) {
-          return TaskState.valueOf(task.getStatus().name());
+        public TaskState apply(ScheduleStatus input) {
+          return TaskState.valueOf(input.name());
         }
       };
 
+  private static final Function<IScheduledTask, TaskState> SCHEDULED_TO_TASK_STATE =
+      Functions.compose(STATUS_TO_TASK_STATE, Tasks.GET_STATUS);
+
   /**
    * ScheduleStatus enum extension to account for cases where no direct state mapping exists.
+   * TODO:(maxim): Consider making it private.
    */
+  @VisibleForTesting
   enum TaskState {
     INIT(Optional.of(ScheduleStatus.INIT)),
     THROTTLED(Optional.of(ScheduleStatus.THROTTLED)),
@@ -113,7 +121,11 @@ class TaskStateMachine {
     KILLED(Optional.of(ScheduleStatus.KILLED)),
     KILLING(Optional.of(ScheduleStatus.KILLING)),
     LOST(Optional.of(ScheduleStatus.LOST)),
-    UNKNOWN(Optional.of(ScheduleStatus.UNKNOWN));
+    SANDBOX_DELETED(Optional.of(ScheduleStatus.SANDBOX_DELETED)),
+    /**
+     * The task does not have an associated state as it has been deleted from the store.
+     */
+    DELETED(Optional.<ScheduleStatus>absent());
 
     private final Optional<ScheduleStatus> status;
 
@@ -150,15 +162,15 @@ class TaskStateMachine {
     MorePreconditions.checkNotBlank(name);
     checkNotNull(task);
 
-    final TaskState initialState = task.transform(SCHEDULED_TO_TASK_STATE).or(UNKNOWN);
+    final TaskState initialState = task.transform(SCHEDULED_TO_TASK_STATE).or(DELETED);
     if (task.isPresent()) {
       Preconditions.checkState(
-          initialState != UNKNOWN,
-          "A task that exists may not be in UNKNOWN state.");
+          initialState != DELETED,
+          "A task that exists may not be in DELETED state.");
     } else {
       Preconditions.checkState(
-          initialState == UNKNOWN,
-          "A task that does not exist must start in UNKNOWN state.");
+          initialState == DELETED,
+          "A task that does not exist must start in DELETED state.");
     }
 
     Closure<Transition<TaskState>> manageTerminatedTasks = Closures.combine(
@@ -166,9 +178,9 @@ class TaskStateMachine {
             // Kill a task that we believe to be terminated when an attempt is made to revive.
             .add(
                 Closures.filter(Transition.to(ASSIGNED, STARTING, RUNNING),
-                addFollowupClosure(KILL)))
-            // Remove a terminated task that is remotely removed.
-            .add(Closures.filter(Transition.to(UNKNOWN), addFollowupClosure(DELETE)))
+                    addFollowupClosure(KILL)))
+            // Remove a terminated task that is requested to be deleted.
+            .add(Closures.filter(Transition.to(DELETED), addFollowupClosure(DELETE)))
             .build());
 
     final Closure<Transition<TaskState>> manageRestartingTask =
@@ -205,7 +217,7 @@ class TaskStateMachine {
                 addFollowup(RESCHEDULE);
                 break;
 
-              case UNKNOWN:
+              case SANDBOX_DELETED:
                 addFollowupTransition(LOST);
                 break;
 
@@ -254,7 +266,7 @@ class TaskStateMachine {
         .initialState(initialState)
         .addState(
             Rule.from(INIT)
-                .to(PENDING, THROTTLED, UNKNOWN))
+                .to(PENDING, THROTTLED))
         .addState(
             Rule.from(PENDING)
                 .to(ASSIGNED, KILLING)
@@ -352,7 +364,7 @@ class TaskStateMachine {
                             addFollowup(RESCHEDULE);
                             break;
 
-                          case UNKNOWN:
+                          case SANDBOX_DELETED:
                             // The slave previously acknowledged that it had the task, and now
                             // stopped reporting it.
                             addFollowupTransition(LOST);
@@ -404,7 +416,7 @@ class TaskStateMachine {
                             addFollowup(RESCHEDULE);
                             break;
 
-                          case UNKNOWN:
+                          case SANDBOX_DELETED:
                             addFollowupTransition(LOST);
                             break;
 
@@ -416,7 +428,7 @@ class TaskStateMachine {
                 ))
         .addState(
             Rule.from(FINISHED)
-                .to(UNKNOWN)
+                .to(SANDBOX_DELETED, DELETED)
                 .withCallback(manageTerminatedTasks))
         .addState(
             Rule.from(PREEMPTING)
@@ -432,22 +444,26 @@ class TaskStateMachine {
                 .withCallback(manageRestartingTask))
         .addState(
             Rule.from(FAILED)
-                .to(UNKNOWN)
+                .to(SANDBOX_DELETED, DELETED)
                 .withCallback(manageTerminatedTasks))
         .addState(
             Rule.from(KILLED)
-                .to(UNKNOWN)
+                .to(SANDBOX_DELETED, DELETED)
                 .withCallback(manageTerminatedTasks))
         .addState(
             Rule.from(KILLING)
-                .to(FINISHED, FAILED, KILLED, LOST, UNKNOWN)
+                .to(FINISHED, FAILED, KILLED, LOST, SANDBOX_DELETED, DELETED)
                 .withCallback(manageTerminatedTasks))
         .addState(
             Rule.from(LOST)
-                .to(UNKNOWN)
+                .to(SANDBOX_DELETED, DELETED)
                 .withCallback(manageTerminatedTasks))
         .addState(
-            Rule.from(UNKNOWN)
+            Rule.from(SANDBOX_DELETED)
+                .to(DELETED)
+                .withCallback(manageTerminatedTasks))
+        .addState(
+            Rule.from(DELETED)
                 .noTransitions()
                 .withCallback(manageTerminatedTasks))
         // Since we want this action to be performed last in the transition sequence, the callback
@@ -467,7 +483,7 @@ class TaskStateMachine {
                       !(((from == PENDING) || (from == THROTTLED)) && (to == KILLING));
 
                   // Don't bother saving state of a task that is being removed.
-                  if ((to != UNKNOWN) && pendingDeleteHack) {
+                  if ((to != DELETED) && pendingDeleteHack) {
                     addFollowup(SAVE_STATE);
                   }
                   previousState = Optional.of(from);
@@ -514,10 +530,10 @@ class TaskStateMachine {
    * At the time this method returns, any work commands required to satisfy the state transition
    * will be appended to the work queue.
    *
-   * @param status Status to apply to the task.
+   * @param status Status to apply to the task or absent.
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
-  public synchronized TransitionResult updateState(final ScheduleStatus status) {
+  public synchronized TransitionResult updateState(final Optional<ScheduleStatus> status) {
     checkNotNull(status);
     Preconditions.checkState(sideEffects.isEmpty());
 
@@ -526,7 +542,7 @@ class TaskStateMachine {
      * state transition (e.g. storing resource consumption of a running task), we need to find
      * a different way to suppress noop transitions.
      */
-    TaskState taskState = TaskState.valueOf(status.name());
+    TaskState taskState = status.transform(STATUS_TO_TASK_STATE).or(TaskState.DELETED);
     if (stateMachine.getState() == taskState) {
       return new TransitionResult(false, ImmutableSet.<SideEffect>of());
     }

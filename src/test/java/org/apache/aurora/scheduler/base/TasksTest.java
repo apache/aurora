@@ -33,13 +33,12 @@ public class TasksTest {
 
   @Test
   public void testOrderedStatusesForCompleteness() {
-    // OrderedTaskStatuses should contain all ScheduleStatus values except INIT and UNKNOWN.
+    // OrderedTaskStatuses should contain all ScheduleStatus values except INIT.
     assertEquals(
         ImmutableSet.copyOf(ScheduleStatus.values()),
-        ImmutableSet.builder()
+        ImmutableSet.<ScheduleStatus>builder()
             .addAll(Tasks.ORDERED_TASK_STATUSES)
             .add(ScheduleStatus.INIT)
-            .add(ScheduleStatus.UNKNOWN)
             .build());
   }
 

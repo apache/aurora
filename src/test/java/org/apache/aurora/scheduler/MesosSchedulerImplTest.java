@@ -20,7 +20,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.TearDown;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -30,29 +32,32 @@ import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Command;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.codec.ThriftBinaryCodec;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.comm.DeletedTasks;
+import org.apache.aurora.gen.comm.SchedulerMessage;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
-import org.apache.aurora.scheduler.state.SchedulerCore;
+import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
-import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.SchedulerDriver;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.mesos.Protos.Status.DRIVER_RUNNING;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertTrue;
 
@@ -66,6 +71,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("slave-id").build();
   private static final String SLAVE_HOST_2 = "slave-hostname-2";
   private static final SlaveID SLAVE_ID_2 = SlaveID.newBuilder().setValue("slave-id-2").build();
+  private static final ExecutorID EXECUTOR_ID =
+      ExecutorID.newBuilder().setValue("executor-id").build();
 
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("offer-id").build();
   private static final Offer OFFER = Offer.newBuilder()
@@ -91,6 +98,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   private TaskLauncher userLauncher;
   private SchedulerDriver driver;
   private EventSink eventSink;
+  private StateManager stateManager;
 
   private MesosSchedulerImpl scheduler;
 
@@ -102,12 +110,13 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     systemLauncher = createMock(TaskLauncher.class);
     userLauncher = createMock(TaskLauncher.class);
     eventSink = createMock(EventSink.class);
+    stateManager = createMock(StateManager.class);
 
     Injector injector = Guice.createInjector(new AbstractModule() {
       @Override
       protected void configure() {
         bind(Storage.class).toInstance(storageUtil.storage);
-        bind(SchedulerCore.class).toInstance(createMock(SchedulerCore.class));
+        bind(StateManager.class).toInstance(stateManager);
         bind(Lifecycle.class).toInstance(lifecycle);
         bind(new TypeLiteral<List<TaskLauncher>>() { })
             .toInstance(Arrays.asList(systemLauncher, userLauncher));
@@ -249,6 +258,32 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     }.run();
   }
 
+  @Test
+  public void testSandboxesDeleted() throws Exception {
+    String task1 = "task1";
+    String task2 = "task2";
+    String message = "Sandbox disk space reclaimed.";
+
+    expect(stateManager.changeState(
+        task1,
+        Optional.<ScheduleStatus>absent(),
+        ScheduleStatus.SANDBOX_DELETED,
+        Optional.of(message))).andReturn(true);
+
+    expect(stateManager.changeState(
+        task2,
+        Optional.<ScheduleStatus>absent(),
+        ScheduleStatus.SANDBOX_DELETED,
+        Optional.of(message))).andReturn(true);
+
+    control.replay();
+
+    SchedulerMessage schedulerMessage =
+        SchedulerMessage.deletedTasks(new DeletedTasks(ImmutableSet.of("task1", "task2")));
+    byte[] data = ThriftBinaryCodec.encode(schedulerMessage);
+    scheduler.frameworkMessage(driver, EXECUTOR_ID, SLAVE_ID, data);
+  }
+
   private void expectOfferAttributesSaved(Offer offer) {
     storageUtil.attributeStore.saveHostAttributes(Conversions.getAttributes(offer));
   }
@@ -277,11 +312,6 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
       scheduler.registered(driver, FRAMEWORK, MasterInfo.getDefaultInstance());
       test();
-    }
-
-    protected void expectLaunch(TaskInfo task) {
-      expect(driver.launchTasks(ImmutableList.of(OFFER_ID), ImmutableList.of(task)))
-          .andReturn(DRIVER_RUNNING);
     }
 
     void expectations() throws Exception {
