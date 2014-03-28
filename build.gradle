@@ -371,3 +371,7 @@ task FlagSchemaChanges(type: Test) {
     args = ['src/test/sh/org/apache/aurora/verify_thrift_checksum.sh']
   }
 }
+
+javadoc {
+  classpath += sourceSets.generated.output
+}
