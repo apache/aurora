@@ -1,1 +1,0 @@
-{"processes": [{"cmdline": "echo hello world", "daemon": 0, "max_failures": 1, "name": "echo"}], "name": "echo", "max_failures": 1, "user": "{{thermos.user}}", "max_concurrency": 0, "resources": {"disk": 0, "ram": 8388608, "cpu": 0.01}}
