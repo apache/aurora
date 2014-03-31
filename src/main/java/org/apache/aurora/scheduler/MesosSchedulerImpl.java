@@ -22,7 +22,6 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -30,14 +29,13 @@ import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.GuiceUtils.AllowUnchecked;
 import org.apache.aurora.codec.ThriftBinaryCodec;
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.comm.SchedulerMessage;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
-import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.state.SchedulerCore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -70,7 +68,7 @@ class MesosSchedulerImpl implements Scheduler {
   private final List<TaskLauncher> taskLaunchers;
 
   private final Storage storage;
-  private final StateManager stateManager;
+  private final SchedulerCore schedulerCore;
   private final Lifecycle lifecycle;
   private final EventSink eventSink;
   private volatile boolean registered = false;
@@ -78,7 +76,7 @@ class MesosSchedulerImpl implements Scheduler {
   /**
    * Creates a new scheduler.
    *
-   * @param stateManager Scheduler state manager.
+   * @param schedulerCore Core scheduler.
    * @param lifecycle Application lifecycle manager.
    * @param taskLaunchers Task launchers, which will be used in order.  Calls to
    *                      {@link TaskLauncher#willUse(Offer)} and
@@ -89,13 +87,13 @@ class MesosSchedulerImpl implements Scheduler {
   @Inject
   public MesosSchedulerImpl(
       Storage storage,
-      StateManager stateManager,
+      SchedulerCore schedulerCore,
       final Lifecycle lifecycle,
       List<TaskLauncher> taskLaunchers,
       EventSink eventSink) {
 
     this.storage = checkNotNull(storage);
-    this.stateManager = checkNotNull(stateManager);
+    this.schedulerCore = checkNotNull(schedulerCore);
     this.lifecycle = checkNotNull(lifecycle);
     this.taskLaunchers = checkNotNull(taskLaunchers);
     this.eventSink = checkNotNull(eventSink);
@@ -240,13 +238,10 @@ class MesosSchedulerImpl implements Scheduler {
 
       switch (schedulerMsg.getSetField()) {
         case DELETED_TASKS:
-          for (String taskId : schedulerMsg.getDeletedTasks().getTaskIds()) {
-            stateManager.changeState(
-                taskId,
-                Optional.<ScheduleStatus>absent(),
-                ScheduleStatus.SANDBOX_DELETED,
-                Optional.of("Sandbox disk space reclaimed."));
-          }
+          // TODO(William Farner): Refactor this to use a thinner interface here.  As it stands
+          // it is odd that we route the registered() call to schedulerCore via the
+          // registeredListener and call the schedulerCore directly here.
+          schedulerCore.tasksDeleted(schedulerMsg.getDeletedTasks().getTaskIds());
           break;
 
         default:

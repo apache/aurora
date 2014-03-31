@@ -201,20 +201,13 @@
                   }
                 }
                 if (aliveTimestamp != 0) {
-                  document.write(printElapsed($task.statusTimestamp$, aliveTimestamp));
+                  document.write(printElapsed(events[events.length - 1][1], aliveTimestamp));
                 }
               </script>
             $if(admin)$
             <td><a href='/structdump/task/$task.taskId$'>$task.taskId$</a>
             $endif$
-            <td>
-              $if(task.slaveHost)$
-                $if(task.hideExecutorUri)$
-                  $task.slaveHost$
-                $else$
-                  <a href='$task.executorUri$'>$task.slaveHost$</a>
-                $endif$
-              $endif$
+            <td>$if(task.slaveHost)$ <a href='$task.executorUri$'>$task.slaveHost$</a> $endif$
           </tr>
           }$
           </tbody>

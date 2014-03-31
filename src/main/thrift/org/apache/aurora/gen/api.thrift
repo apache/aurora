@@ -246,7 +246,6 @@ struct AcquireLockResult {
 
 // States that a task may be in.
 enum ScheduleStatus {
-  // TODO(maxim): This state does not add much value. Consider dropping it completely.
   // Initial state for a task.  A task will remain in this state until it has been persisted.
   INIT             = 11,
   // The task will be rescheduled, but is being throttled for restarting too frequently.
@@ -276,8 +275,9 @@ enum ScheduleStatus {
   // A fault in the task environment has caused the system to believe the task no longer exists.
   // This can happen, for example, when a slave process disappears.
   LOST             = 7,
-  // The task sandbox has been deleted by the executor.
-  SANDBOX_DELETED  = 10
+  // The task is unknown to one end of the system.  This is used to reconcile state when the
+  // scheduler believes a task to exist in a location that stops reporting it, or vice versa.
+  UNKNOWN          = 10
 }
 
 // States that a task may be in while still considered active.
@@ -311,8 +311,7 @@ const set<ScheduleStatus> LIVE_STATES = [ScheduleStatus.KILLING,
 const set<ScheduleStatus> TERMINAL_STATES = [ScheduleStatus.FAILED,
                                              ScheduleStatus.FINISHED,
                                              ScheduleStatus.KILLED,
-                                             ScheduleStatus.LOST,
-                                             ScheduleStatus.SANDBOX_DELETED]
+                                             ScheduleStatus.LOST]
 
 // Environment assigned to a job when unspecified
 const string DEFAULT_ENVIRONMENT = "devel"

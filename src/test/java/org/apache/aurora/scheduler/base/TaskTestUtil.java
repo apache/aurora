@@ -38,7 +38,7 @@ public final class TaskTestUtil {
   }
 
   public static IScheduledTask makeTask(ScheduleStatus status, long startTime) {
-    return makeTask(status, makeTaskEvents(startTime, 3, status));
+    return makeTask(status, makeTaskEvents(startTime, 3));
   }
 
   public static IScheduledTask makeTask(ScheduleStatus status, List<TaskEvent> taskEvents) {
@@ -53,16 +53,16 @@ public final class TaskTestUtil {
         .setTaskEvents(taskEvents));
   }
 
-  public static TaskEvent makeTaskEvent(long ts, ScheduleStatus status) {
-    return new TaskEvent().setTimestamp(ts).setStatus(status);
-  }
-
-  private static List<TaskEvent> makeTaskEvents(long startTs, int count, ScheduleStatus status) {
+  private static List<TaskEvent> makeTaskEvents(long startTs, int count) {
     List<TaskEvent> taskEvents = Lists.newArrayListWithCapacity(3);
     for (int i = 0; i < count; i++) {
-      taskEvents.add(makeTaskEvent(startTs - (i * 10), status));
+      taskEvents.add(makeTaskEvent(startTs - (i * 10)));
     }
     Collections.reverse(taskEvents);
     return taskEvents;
+  }
+
+  private static TaskEvent makeTaskEvent(long ts) {
+    return new TaskEvent().setTimestamp(ts);
   }
 }

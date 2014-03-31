@@ -259,8 +259,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
 
     self.log('Told to retain the following task ids:')
     for task_id, schedule_status in retained_tasks.items():
-      self.log('  => %s as %s' %
-          (task_id, ScheduleStatus._VALUES_TO_NAMES.get(schedule_status, 'UNKNOWN')))
+      self.log('  => %s as %s' % (task_id, ScheduleStatus._VALUES_TO_NAMES[schedule_status]))
 
     self.log('Local active tasks:')
     for task_id in local_active:
@@ -286,9 +285,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
         states = self.get_states(task_id)
         if states:
           _, last_state = states[-1]
-          updates[task_id] = THERMOS_TO_TWITTER_STATES.get(
-              last_state,
-              ScheduleStatus.SANDBOX_DELETED)
+          updates[task_id] = THERMOS_TO_TWITTER_STATES.get(last_state, ScheduleStatus.UNKNOWN)
           self.send_update(
               driver,
               task_id,

@@ -80,9 +80,10 @@ public interface StateManager {
   void insertPendingTasks(Map<Integer, ITaskConfig> tasks);
 
   /**
-   * Attempts to delete tasks from the task store.
-   * If the task is not currently in a state that is considered safe for deletion,
-   * side-effect actions will be performed to reconcile the state conflict.
+   * Deletes records of tasks from the task store.
+   * This will not perform any state checking or state transitions, but will immediately remove
+   * the tasks from the store.  It will also silently ignore attempts to delete task IDs that do
+   * not exist.
    *
    * @param taskIds IDs of tasks to delete.
    */

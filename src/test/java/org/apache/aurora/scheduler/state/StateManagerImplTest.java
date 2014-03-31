@@ -62,8 +62,8 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
+import static org.apache.aurora.gen.ScheduleStatus.UNKNOWN;
 import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -208,7 +208,8 @@ public class StateManagerImplTest extends EasyMockTest {
     ITaskConfig task = makeTask(JIM, MY_JOB);
     String taskId = "a";
     expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
-    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING, SANDBOX_DELETED);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING);
+    eventSink.post(matchTasksDeleted(taskId));
 
     driver.killTask(EasyMock.<String>anyObject());
 
@@ -219,7 +220,7 @@ public class StateManagerImplTest extends EasyMockTest {
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
     changeState(taskId, KILLING);
-    changeState(taskId, SANDBOX_DELETED);
+    changeState(taskId, UNKNOWN);
   }
 
   @Test
@@ -247,7 +248,7 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   @Test
-  public void testDeletePendingTask() {
+  public void testDeleteTask() {
     ITaskConfig task = makeTask(JIM, MY_JOB);
     String taskId = "a";
     expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
@@ -257,7 +258,7 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     insertTask(task, 0);
-    changeState(taskId, KILLING);
+    stateManager.deleteTasks(ImmutableSet.of(taskId));
   }
 
   @Test
@@ -317,7 +318,6 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(taskId, FAILED);
     IScheduledTask rescheduledTask = Iterables.getOnlyElement(
         Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId2)));
-    assertEquals(taskId, rescheduledTask.getAncestorId());
     assertEquals(1, rescheduledTask.getFailureCount());
   }
 
@@ -341,7 +341,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
-    changeState(taskId, SANDBOX_DELETED);
+    changeState(taskId, UNKNOWN);
   }
 
   @Test

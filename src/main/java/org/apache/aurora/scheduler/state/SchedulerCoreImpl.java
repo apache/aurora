@@ -118,6 +118,13 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
+  public synchronized void tasksDeleted(Set<String> taskIds) {
+    for (String taskId : taskIds) {
+      setTaskStatus(taskId, ScheduleStatus.UNKNOWN, Optional.<String>absent());
+    }
+  }
+
+  @Override
   public synchronized void createJob(final SanitizedConfiguration sanitizedConfiguration)
       throws ScheduleException {
 
