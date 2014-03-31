@@ -24,9 +24,7 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
 import com.google.common.base.Optional;
-import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -41,7 +39,6 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaManager;
@@ -72,10 +69,9 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   private final Storage storage;
 
+  // TODO(wfarner): Consider changing this class to not be concerned with cron jobs, requiring the
+  // caller to deal with the fork.
   private final CronJobManager cronScheduler;
-
-  // Schedulers that are responsible for triggering execution of jobs.
-  private final ImmutableList<JobManager> jobManagers;
 
   // State manager handles persistence of task modifications and state transitions.
   private final StateManager stateManager;
@@ -88,7 +84,6 @@ class SchedulerCoreImpl implements SchedulerCore {
    *
    * @param storage Backing store implementation.
    * @param cronScheduler Cron scheduler.
-   * @param immediateScheduler Immediate scheduler.
    * @param stateManager Persistent state manager.
    * @param taskIdGenerator Task ID generator.
    * @param quotaManager Quota manager.
@@ -97,16 +92,11 @@ class SchedulerCoreImpl implements SchedulerCore {
   public SchedulerCoreImpl(
       Storage storage,
       CronJobManager cronScheduler,
-      ImmediateJobManager immediateScheduler,
       StateManager stateManager,
       TaskIdGenerator taskIdGenerator,
       QuotaManager quotaManager) {
 
     this.storage = checkNotNull(storage);
-
-    // The immediate scheduler will accept any job, so it's important that other schedulers are
-    // placed first.
-    this.jobManagers = ImmutableList.of(cronScheduler, immediateScheduler);
     this.cronScheduler = cronScheduler;
     this.stateManager = checkNotNull(stateManager);
     this.taskIdGenerator = checkNotNull(taskIdGenerator);
@@ -114,7 +104,11 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   private boolean hasActiveJob(IJobConfiguration job) {
-    return Iterables.any(jobManagers, managerHasJob(job));
+    boolean hasActiveTasks = !Storage.Util.consistentFetchTasks(
+        storage,
+        Query.jobScoped(job.getKey()).active()).isEmpty();
+
+    return hasActiveTasks || cronScheduler.hasJob(job.getKey());
   }
 
   @Override
@@ -138,21 +132,9 @@ class SchedulerCoreImpl implements SchedulerCore {
 
         validateTaskLimits(job.getTaskConfig(), job.getInstanceCount());
 
-        boolean accepted = false;
-        // TODO(wfarner): Remove the JobManager abstraction, and directly invoke addInstances
-        // here for non-cron jobs.
-        for (final JobManager manager : jobManagers) {
-          if (manager.receiveJob(sanitizedConfiguration)) {
-            LOG.info("Job accepted by manager: " + manager.getUniqueKey());
-            accepted = true;
-            break;
-          }
-        }
-
-        if (!accepted) {
-          LOG.severe("Job was not accepted by any of the configured schedulers, discarding.");
-          LOG.severe("Discarded job: " + job);
-          throw new ScheduleException("Job not accepted, discarding.");
+        if (!cronScheduler.receiveJob(sanitizedConfiguration)) {
+          LOG.info("Launching " + sanitizedConfiguration.getTaskConfigs().size() + " tasks.");
+          stateManager.insertPendingTasks(sanitizedConfiguration.getTaskConfigs());
         }
       }
     });
@@ -219,34 +201,6 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void startCronJob(IJobKey jobKey)
-      throws ScheduleException, TaskDescriptionException {
-
-    checkNotNull(jobKey);
-
-    if (!cronScheduler.hasJob(jobKey)) {
-      throw new ScheduleException("Cron job does not exist for " + JobKeys.toPath(jobKey));
-    }
-
-    cronScheduler.startJobNow(jobKey);
-  }
-
-  /**
-   * Creates a predicate that will determine whether a job manager has a job matching a job key.
-   *
-   * @param job Job to match.
-   * @return A new predicate matching the job owner and name given.
-   */
-  private static Predicate<JobManager> managerHasJob(final IJobConfiguration job) {
-    return new Predicate<JobManager>() {
-      @Override
-      public boolean apply(JobManager manager) {
-        return manager.hasJob(job.getKey());
-      }
-    };
-  }
-
-  @Override
   public synchronized void setTaskStatus(
       String taskId,
       final ScheduleStatus status,
@@ -265,18 +219,14 @@ class SchedulerCoreImpl implements SchedulerCore {
     checkNotNull(query);
     LOG.info("Killing tasks matching " + query);
 
-    boolean jobDeleted = false;
+    boolean cronDeleted = false;
 
     if (Query.isSingleJobScoped(query)) {
-      // If this looks like a query for all tasks in a job, instruct the scheduler modules to
-      // delete the job.
+      // If this looks like a query for all tasks in a job, instruct the cron scheduler to delete
+      // it.
       // TODO(maxim): Should be trivial to support killing multiple jobs instead.
       IJobKey jobKey = Iterables.getOnlyElement(JobKeys.from(query).get());
-      for (JobManager manager : jobManagers) {
-        if (manager.deleteJob(jobKey)) {
-          jobDeleted = true;
-        }
-      }
+      cronDeleted = cronScheduler.deleteJob(jobKey);
     }
 
     // Unless statuses were specifically supplied, only attempt to kill active tasks.
@@ -303,7 +253,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       }
     });
 
-    if (!jobDeleted && (tasksAffected == 0)) {
+    if (!cronDeleted && (tasksAffected == 0)) {
       throw new ScheduleException("No jobs to kill");
     }
   }

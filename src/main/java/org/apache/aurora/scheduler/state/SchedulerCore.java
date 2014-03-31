@@ -63,15 +63,6 @@ public interface SchedulerCore {
       throws ScheduleException;
 
   /**
-   * Starts a cron job immediately.
-   *
-   * @param jobKey Job key.
-   * @throws ScheduleException If the specified job does not exist, or is not a cron job.
-   * @throws TaskDescriptionException If the parsing of the job failed.
-   */
-  void startCronJob(IJobKey jobKey) throws ScheduleException, TaskDescriptionException;
-
-  /**
    * Assigns a new state to tasks.
    *
    * @param taskId ID of the task to transition.

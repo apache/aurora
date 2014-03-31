@@ -299,15 +299,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ILockKey.build(LockKey.job(jobKey.newBuilder())),
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-      SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
-
-      if (!cronJobManager.hasJob(jobKey)) {
-        return response.setResponseCode(INVALID_REQUEST).setMessage(
-            "No cron template found for the given key: " + jobKey);
-      }
-      cronJobManager.updateJob(sanitized);
+      cronJobManager.updateJob(SanitizedConfiguration.fromUnsanitized(job));
       return response.setResponseCode(OK).setMessage("Replaced template for: " + jobKey);
-
     } catch (LockException e) {
       return response.setResponseCode(LOCK_ERROR).setMessage(e.getMessage());
     } catch (TaskDescriptionException | ScheduleException e) {
@@ -350,7 +343,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     try {
-      schedulerCore.startCronJob(jobKey);
+      cronJobManager.startJobNow(jobKey);
       response.setResponseCode(OK).setMessage("Cron run started.");
     } catch (ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST)

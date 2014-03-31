@@ -663,7 +663,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testReplaceCronTemplate() throws Exception {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
     cronJobManager.updateJob(anyObject(SanitizedConfiguration.class));
     control.replay();
 
@@ -699,7 +698,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testReplaceCronTemplateDoesNotExist() throws Exception {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    cronJobManager.updateJob(
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB)));
+    expectLastCall().andThrow(new ScheduleException("Nope"));
     control.replay();
 
     assertEquals(

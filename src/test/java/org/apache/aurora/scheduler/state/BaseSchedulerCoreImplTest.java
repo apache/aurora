@@ -38,6 +38,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -207,17 +208,18 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         taskIdGenerator,
         eventSink,
         rescheduleCalculator);
-    ImmediateJobManager immediateManager = new ImmediateJobManager(stateManager, storage);
-    cron = new CronJobManager(stateManager, storage, cronScheduler, shutdownRegistry);
+    cron = new CronJobManager(
+        stateManager,
+        storage,
+        cronScheduler,
+        shutdownRegistry,
+        MoreExecutors.sameThreadExecutor());
     scheduler = new SchedulerCoreImpl(
         storage,
         cron,
-        immediateManager,
         stateManager,
         taskIdGenerator,
         quotaManager);
-    cron.schedulerCore = scheduler;
-    immediateManager.schedulerCore = scheduler;
   }
 
   @Test
@@ -472,7 +474,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(sanitizedConfiguration);
     assertTaskCount(0);
 
-    scheduler.startCronJob(jobKey);
+    cron.startJobNow(jobKey);
     assertEquals(PENDING, getOnlyTask(Query.jobScoped(jobKey)).getStatus());
   }
 
@@ -482,7 +484,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     buildScheduler();
 
-    scheduler.startCronJob(KEY_A);
+    cron.startJobNow(KEY_A);
   }
 
   @Test
@@ -496,7 +498,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     String taskId = Tasks.id(getOnlyTask(Query.jobScoped(KEY_A)));
 
     try {
-      scheduler.startCronJob(KEY_A);
+      cron.startJobNow(KEY_A);
       fail("Start should have failed.");
     } catch (ScheduleException e) {
       // Expected.
@@ -523,7 +525,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     scheduler.createJob(sanitizedConfiguration);
     assertTaskCount(0);
 
-    scheduler.startCronJob(KEY_B);
+    cron.startJobNow(KEY_B);
   }
 
   @Test
@@ -543,13 +545,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertTaskCount(0);
     assertTrue(cron.hasJob(KEY_A));
 
-    scheduler.startCronJob(KEY_A);
+    cron.startJobNow(KEY_A);
     assertTaskCount(1);
 
     String taskId = Tasks.id(getOnlyTask(Query.jobScoped(KEY_A)));
 
     // Now start the same cron job immediately.
-    scheduler.startCronJob(KEY_A);
+    cron.startJobNow(KEY_A);
     assertTaskCount(1);
     assertEquals(PENDING, getOnlyTask(Query.jobScoped(KEY_A)).getStatus());
 
@@ -790,7 +792,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertTrue(cron.hasJob(KEY_A));
 
     // Simulate a triggering of the cron job.
-    scheduler.startCronJob(KEY_A);
+    cron.startJobNow(KEY_A);
     assertTaskCount(10);
     assertEquals(10,
         getTasks(Query.jobScoped(KEY_A).byStatus(PENDING)).size());
@@ -827,13 +829,13 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     assertTrue(cron.hasJob(KEY_A));
 
     // Simulate a triggering of the cron job.
-    scheduler.startCronJob(KEY_A);
+    cron.startJobNow(KEY_A);
     assertTaskCount(10);
 
     Set<String> taskIds = Tasks.ids(getTasksOwnedBy(OWNER_A));
 
     // Simulate a triggering of the cron job.
-    scheduler.startCronJob(KEY_A);
+    cron.startJobNow(KEY_A);
     assertTaskCount(10);
     assertTrue(Sets.intersection(taskIds, Tasks.ids(getTasksOwnedBy(OWNER_A))).isEmpty());
 
@@ -943,7 +945,7 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
 
     scheduler.createJob(config);
     assertTrue(cron.hasJob(KEY_A));
-    scheduler.startCronJob(KEY_A);
+    cron.startJobNow(KEY_A);
     assertTaskCount(10);
 
     scheduler.killTasks(Query.instanceScoped(KEY_A, 0), USER_A);

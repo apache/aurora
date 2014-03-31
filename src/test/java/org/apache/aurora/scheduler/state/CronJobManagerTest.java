@@ -28,10 +28,12 @@ import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.JobKeys;
@@ -54,9 +56,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
-import static org.apache.aurora.scheduler.state.CronJobManager.CRON_USER;
 import static org.apache.aurora.scheduler.state.CronJobManager.MANAGER_KEY;
-import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -71,9 +71,10 @@ public class CronJobManagerTest extends EasyMockTest {
   private static final String ENVIRONMENT = "staging11";
   private static final String JOB_NAME = "jobName";
   private static final String DEFAULT_JOB_KEY = "key";
-  private static final IScheduledTask TASK = IScheduledTask.build(new ScheduledTask());
+  private static final String TASK_ID = "id";
+  private static final IScheduledTask TASK = IScheduledTask.build(
+      new ScheduledTask().setAssignedTask(new AssignedTask().setTaskId(TASK_ID)));
 
-  private SchedulerCore scheduler;
   private StateManager stateManager;
   private Executor delayExecutor;
   private Capture<Runnable> delayLaunchCapture;
@@ -87,7 +88,6 @@ public class CronJobManagerTest extends EasyMockTest {
 
   @Before
   public void setUp() throws Exception {
-    scheduler = createMock(SchedulerCore.class);
     stateManager = createMock(StateManager.class);
     delayExecutor = createMock(Executor.class);
     delayLaunchCapture = createCapture();
@@ -102,7 +102,6 @@ public class CronJobManagerTest extends EasyMockTest {
         cronScheduler,
         shutdownRegistry,
         delayExecutor);
-    cron.schedulerCore = scheduler;
     job = makeJob();
     sanitizedConfiguration = SanitizedConfiguration.fromUnsanitized(job);
   }
@@ -155,7 +154,6 @@ public class CronJobManagerTest extends EasyMockTest {
         bind(Storage.class).toInstance(storageUtil.storage);
         bind(CronScheduler.class).toInstance(cronScheduler);
         bind(ShutdownRegistry.class).toInstance(shutdownRegistry);
-        bind(SchedulerCore.class).toInstance(scheduler);
         PubsubTestUtil.installPubsub(binder());
         StateModule.bindCronJobManager(binder());
       }
@@ -198,6 +196,16 @@ public class CronJobManagerTest extends EasyMockTest {
     assertTrue(cron.deleteJob(job.getKey()));
   }
 
+  private IExpectationSetters<?> expectTaskKilled(String id) {
+    expect(stateManager.changeState(
+        id,
+        Optional.<ScheduleStatus>absent(),
+        ScheduleStatus.KILLING,
+        CronJobManager.KILL_AUDIT_MESSAGE))
+        .andReturn(true);
+    return expectLastCall();
+  }
+
   @Test
   public void testDelayedStart() throws Exception {
     expectJobAccepted();
@@ -210,7 +218,7 @@ public class CronJobManagerTest extends EasyMockTest {
     delayExecutor.execute(capture(delayLaunchCapture));
 
     // The cron manager will then try to initiate the kill.
-    scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
+    expectTaskKilled(TASK_ID);
 
     // Immediate query and delayed query.
     expectActiveTaskFetch(TASK).times(2);
@@ -241,7 +249,7 @@ public class CronJobManagerTest extends EasyMockTest {
     delayExecutor.execute(capture(delayLaunchCapture));
 
     // The cron manager will then try to initiate the kill.
-    scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
+    expectTaskKilled(TASK_ID);
 
     // Immediate query and delayed query.
     expectActiveTaskFetch(TASK).times(2);
@@ -253,7 +261,7 @@ public class CronJobManagerTest extends EasyMockTest {
     expectJobFetch();
     expectActiveTaskFetch(TASK);
     delayExecutor.execute(capture(delayLaunchCapture));
-    scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
+    expectTaskKilled(TASK_ID);
     expectActiveTaskFetch(TASK).times(2);
     expectActiveTaskFetch();
 
@@ -286,8 +294,7 @@ public class CronJobManagerTest extends EasyMockTest {
     // The cron manager will then try to initiate the kill.
     expectJobFetch();
     expectJobFetch();
-    scheduler.killTasks((Query.Builder) anyObject(), eq(CronJobManager.CRON_USER));
-    expectLastCall().times(3);
+    expectTaskKilled(TASK_ID).times(3);
 
     // Immediate queries and delayed query.
     expectActiveTaskFetch(TASK).times(4);
@@ -401,21 +408,6 @@ public class CronJobManagerTest extends EasyMockTest {
     control.replay();
 
     cron.receiveJob(sanitizedConfiguration);
-  }
-
-  @Test
-  public void testKillExistingCollisionFailedKill() throws Exception {
-    IJobConfiguration killExisting = IJobConfiguration.build(
-        job.newBuilder().setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING));
-    Capture<Runnable> jobTriggerCapture = expectJobAccepted(killExisting);
-    expectActiveTaskFetch(TASK);
-    scheduler.killTasks(Query.jobScoped(killExisting.getKey()).active(), CRON_USER);
-    expectLastCall().andThrow(new ScheduleException("injected"));
-
-    control.replay();
-
-    cron.receiveJob(new SanitizedConfiguration(killExisting));
-    jobTriggerCapture.getValue().run();
   }
 
   @Test

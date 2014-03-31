@@ -50,8 +50,6 @@ public class StateModule extends AbstractModule {
     bind(LockManagerImpl.class).in(Singleton.class);
 
     bindCronJobManager(binder());
-    bind(ImmediateJobManager.class).in(Singleton.class);
-
     bindMaintenanceController(binder());
   }
 
