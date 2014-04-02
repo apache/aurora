@@ -34,7 +34,9 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_options(cls, exclude=None, include=None, override=None,
                          exclude_list=None, include_list=None, list_jobs=False):
-    mock_options = Mock()
+    mock_options = Mock(spec=['exclude_filename', 'exclude_hosts', 'include_filename',
+        'include_hosts', 'override_filename', 'list_jobs', 'verbosity', 'disable_all_hooks'])
+
     mock_options.exclude_filename = exclude
     mock_options.exclude_hosts = exclude_list
     mock_options.include_filename = include
@@ -315,7 +317,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
       sla_probe_hosts(['west', '90', '200s'])
 
       mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(hosts)
-      mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0, hosts)
+      mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0)
       mock_print_results.assert_called_once_with([
           'h0\twest/role/env/job0\t80.00\tTrue\t0',
           'h1\twest/role/env/job1\t80.00\tTrue\t0'
@@ -343,7 +345,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
         sla_probe_hosts(['west', '90', '200s'])
 
         mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(['h0'])
-        mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0, ['h0'])
+        mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0)
         mock_print_results.assert_called_once_with([
             'h0\twest/role/env/job0\t80.00\tFalse\tn/a'
         ])

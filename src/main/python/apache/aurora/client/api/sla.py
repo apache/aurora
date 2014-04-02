@@ -155,11 +155,12 @@ class DomainUpTimeSlaVector(object):
   JobUpTimeDetails = namedtuple('JobUpTimeDetails',
       ['job', 'predicted_percentage', 'safe', 'safe_in_secs'])
 
-  def __init__(self, cluster, tasks):
+  def __init__(self, cluster, tasks, hosts=None):
     self._cluster = cluster
     self._tasks = tasks
     self._now = time.time()
-    self._jobs, self._hosts = self._init_mappings()
+    self._tasks_by_job, self._jobs_by_host = self._init_mappings()
+    self._host_filter = hosts
 
   def get_safe_hosts(self, percentage, duration, job_limits=None):
     """Returns hosts safe to restart with respect to their job SLA.
@@ -172,7 +173,10 @@ class DomainUpTimeSlaVector(object):
                      replaces default percentage/duration within the job context.
     """
     safe_hosts = defaultdict(list)
-    for host, job_keys in self._hosts.items():
+    for host, job_keys in self._jobs_by_host.items():
+      if self._host_filter and host not in self._host_filter:
+        continue
+
       safe_limits = []
       for job_key in job_keys:
         job_duration = duration
@@ -192,7 +196,7 @@ class DomainUpTimeSlaVector(object):
 
     return safe_hosts
 
-  def probe_hosts(self, percentage, duration, hosts):
+  def probe_hosts(self, percentage, duration):
     """Returns predicted job SLAs following the removal of provided hosts.
 
        For every given host creates a list of JobUpTimeDetails with predicted job SLA details
@@ -203,11 +207,10 @@ class DomainUpTimeSlaVector(object):
        Arguments:
        percentage -- task up count percentage.
        duration -- task uptime duration in seconds.
-       hosts -- list of hosts to probe for job SLA changes.
     """
     probed_hosts = defaultdict(list)
-    for host in hosts:
-      for job_key in self._hosts.get(host, []):
+    for host in self._host_filter or []:
+      for job_key in self._jobs_by_host.get(host, []):
         filtered_percentage, total_count, filtered_vector = self._simulate_host_down(
             job_key, host, duration)
 
@@ -225,7 +228,7 @@ class DomainUpTimeSlaVector(object):
     return probed_hosts
 
   def _simulate_host_down(self, job_key, host, duration):
-    unfiltered_tasks = self._jobs[job_key]
+    unfiltered_tasks = self._tasks_by_job[job_key]
 
     # Get total job task count to use in SLA calculation.
     total_count = len(unfiltered_tasks)
@@ -276,7 +279,7 @@ class Sla(object):
     """
     tasks = self._get_tasks(task_query(hosts=hosts)) if hosts else None
     job_keys = set(job_key_from_scheduled(t, cluster) for t in tasks) if tasks else None
-    return DomainUpTimeSlaVector(cluster, self._get_tasks(task_query(job_keys=job_keys)))
+    return DomainUpTimeSlaVector(cluster, self._get_tasks(task_query(job_keys=job_keys)), hosts)
 
   def _get_tasks(self, task_query):
     resp = self._scheduler.getTasksStatus(task_query)

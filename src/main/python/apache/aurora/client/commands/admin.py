@@ -441,7 +441,7 @@ def sla_probe_hosts(cluster, percentage, duration):
   hosts = parse_hosts(options.filename, options.hosts)
 
   vector = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).sla_get_safe_domain_vector(hosts)
-  probed_hosts = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), hosts)
+  probed_hosts = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS))
 
   results = []
   for host, job_details in sorted(probed_hosts.items()):

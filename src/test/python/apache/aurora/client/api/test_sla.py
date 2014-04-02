@@ -126,26 +126,28 @@ class SlaTest(unittest.TestCase):
       )
     self.expect_task_status_call_cluster_scoped()
 
-  def assert_probe_hosts_result(self, host, percent, duration, f_percent, safe=True, wait_time=0):
-    vector = self._sla.get_domain_uptime_vector(self._cluster)
-    result = vector.probe_hosts(percent, duration, [host])
-    assert 1 == len(result), ('Expected length:%s Actual length:%s' % (1, len(result)))
+  def assert_probe_hosts_result(self, hosts, percent, duration):
+    vector = self._sla.get_domain_uptime_vector(self._cluster, hosts)
+    result = vector.probe_hosts(percent, duration)
+    assert len(hosts) == len(result), ('Expected length:%s Actual length:%s' % (1, len(result)))
+    return result
+
+  def assert_probe_host_job_details(self, result, host, f_percent, safe=True, wait_time=0):
     assert host in result, ('Expected host:%s not found in result' % host)
 
     job_details = result[host][0]
     assert job_details.job.name == self._name, (
-        'Expected job:%s Actual:%s' % (self._name, job_details.job.name)
+      'Expected job:%s Actual:%s' % (self._name, job_details.job.name)
     )
     assert job_details.predicted_percentage == f_percent, (
-        'Expected percentage:%s Actual:%s' % (f_percent, job_details.predicted_percentage)
+      'Expected percentage:%s Actual:%s' % (f_percent, job_details.predicted_percentage)
     )
     assert job_details.safe == safe, (
-        'Expected safe:%s Actual:%s' % (safe, job_details.safe)
+      'Expected safe:%s Actual:%s' % (safe, job_details.safe)
     )
     assert job_details.safe_in_secs == wait_time, (
       'Expected safe:%s Actual:%s' % (wait_time, job_details.safe_in_secs)
     )
-    self.expect_task_status_call_cluster_scoped()
 
   def expect_task_status_call_job_scoped(self):
     self._scheduler.getTasksStatus.assert_called_once_with(
@@ -157,7 +159,7 @@ class SlaTest(unittest.TestCase):
     )
 
   def expect_task_status_call_cluster_scoped(self):
-    self._scheduler.getTasksStatus.assert_called_once_with(TaskQuery(statuses=LIVE_STATES))
+    self._scheduler.getTasksStatus.assert_called_with(TaskQuery(statuses=LIVE_STATES))
 
 
   def test_count_0(self):
@@ -287,27 +289,32 @@ class SlaTest(unittest.TestCase):
     self.expect_task_status_call_cluster_scoped()
 
 
-  def test_probe_hosts_no_tasks(self):
+  def test_probe_hosts_no_hosts(self):
     self.mock_get_tasks([])
     vector = self._sla.get_domain_uptime_vector(self._cluster)
-    assert 0 == len(vector.probe_hosts(90, 200, ['h1', 'h2']))
-    self.expect_task_status_call_cluster_scoped()
+    assert 0 == len(vector.probe_hosts(90, 200))
+
+  def test_probe_hosts_no_tasks(self):
+    self.mock_get_tasks([])
+    vector = self._sla.get_domain_uptime_vector(self._cluster, hosts=['h1', 'h2'])
+    assert 0 == len(vector.probe_hosts(90, 200))
 
   def test_probe_hosts_no_result(self):
     self.mock_get_tasks([
         self.create_task(100, 1, 'h3', 'j1'),
         self.create_task(100, 1, 'h4', 'j2')
     ])
-    vector = self._sla.get_domain_uptime_vector(self._cluster)
-    assert 0 == len(vector.probe_hosts(90, 200, ['h1', 'h2']))
-    self.expect_task_status_call_cluster_scoped()
+    vector = self._sla.get_domain_uptime_vector(self._cluster, ['h1', 'h2'])
+    assert 0 == len(vector.probe_hosts(90, 200))
 
   def test_probe_hosts_safe(self):
     self.mock_get_tasks([
         self.create_task(100, 1, 'h1', self._name),
         self.create_task(100, 2, 'h2', self._name),
     ])
-    self.assert_probe_hosts_result('h1', 20, 100, 50.0)
+    result = self.assert_probe_hosts_result(['h1', 'h2'], 20, 100)
+    self.assert_probe_host_job_details(result, 'h1', 50.0)
+    self.assert_probe_host_job_details(result, 'h2', 50.0)
 
   def test_probe_hosts_not_safe(self):
     self.mock_get_tasks([
@@ -316,7 +323,8 @@ class SlaTest(unittest.TestCase):
         self.create_task(300, 3, 'h3', self._name),
         self.create_task(400, 4, 'h4', self._name),
     ])
-    self.assert_probe_hosts_result('h1', 75, 300, 50.0, False, 100)
+    result = self.assert_probe_hosts_result(['h1', 'h2', 'h3', 'h4'], 75, 300)
+    self.assert_probe_host_job_details(result, 'h1', 50.0, False, 100)
 
   def test_probe_hosts_not_safe_infeasible(self):
     self.mock_get_tasks([
@@ -325,7 +333,8 @@ class SlaTest(unittest.TestCase):
         self.create_task(300, 3, 'h3', self._name),
         self.create_task(400, 4, 'h4', self._name),
     ])
-    self.assert_probe_hosts_result('h1', 80, 300, 50.0, False, None)
+    result = self.assert_probe_hosts_result(['h1', 'h2', 'h3', 'h4'], 80, 300)
+    self.assert_probe_host_job_details(result, 'h1', 50.0, False, None)
 
   def test_probe_hosts_non_prod_ignored(self):
     self.mock_get_tasks([
@@ -334,9 +343,8 @@ class SlaTest(unittest.TestCase):
         self.create_task(300, 3, 'h3', self._name, False),
         self.create_task(400, 4, 'h4', self._name, False),
     ])
-    vector = self._sla.get_domain_uptime_vector(self._cluster)
-    assert 0 == len(vector.probe_hosts(50, 80, ['h1']))
-    self.expect_task_status_call_cluster_scoped()
+    vector = self._sla.get_domain_uptime_vector(self._cluster, ['h1', 'h2'])
+    assert 0 == len(vector.probe_hosts(90, 200))
 
 
   def test_get_domain_uptime_vector_with_hosts(self):
