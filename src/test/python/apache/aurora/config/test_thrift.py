@@ -79,7 +79,7 @@ def test_simple_config():
   assert tti.priority == 0
   assert tti.maxTaskFailures == 1
   assert tti.constraints == set()
-  assert tti.packagesDEPRECATED == set()
+  assert tti.metadata == set()
   assert tti.environment == HELLO_WORLD.environment().get()
 
 
@@ -207,16 +207,15 @@ def test_cron_policy_alias():
     tti = convert_pystachio_to_thrift(CRON_HELLO_WORLD(cron_collision_policy='GARBAGE'))
 
 
-def test_packages_in_config():
-  job = convert_pystachio_to_thrift(HELLO_WORLD, packages = [('alpha', 'beta', 1)])
+def test_metadata_in_config():
+  job = convert_pystachio_to_thrift(HELLO_WORLD, metadata=[('alpha', 1)])
   assert job.instanceCount == 1
   tti = job.taskConfig
 
-  assert len(tti.packagesDEPRECATED) == 1
-  pi = iter(tti.packagesDEPRECATED).next()
-  assert pi.role == 'alpha'
-  assert pi.name == 'beta'
-  assert pi.version == 1
+  assert len(tti.metadata) == 1
+  pi = iter(tti.metadata).next()
+  assert pi.key == 'alpha'
+  assert pi.value == '1'
 
 
 def test_task_instance_from_job():

@@ -162,7 +162,7 @@ class AuroraConfig(object):
   def __init__(self, job):
     self.validate_job(job)
     self._job = self.standard_bindings(job)
-    self._packages = []
+    self._metadata = []
     self.binding_dicts = defaultdict(dict)
     self.hooks = []
 
@@ -193,7 +193,7 @@ class AuroraConfig(object):
       raise self.InvalidConfig(typecheck.message())
     interpolated_job = interpolated_job(task_links=self.task_links())
     try:
-      return convert_thrift(interpolated_job, self._packages, self.ports())
+      return convert_thrift(interpolated_job, self._metadata, self.ports())
     except InvalidThriftConfig as e:
       raise self.InvalidConfig(str(e))
 
@@ -273,12 +273,8 @@ class AuroraConfig(object):
   def update_config(self):
     return self._job.update_config()
 
-  def add_package(self, package):
-    self._packages.append(package)
-
-  # TODO(wickman) Kill package() once MESOS-3191 is in.
-  def package(self):
-    pass
+  def add_metadata(self, key, value):
+    self._metadata.append((key, value))
 
   def is_dedicated(self):
     return self._job.has_constraints() and 'dedicated' in self._job.constraints()

@@ -38,7 +38,7 @@ from gen.apache.aurora.ttypes import (
   Lock,
   LockKey,
   LockValidation,
-  Package,
+  Metadata,
   PopulateJobResult,
   ResourceAggregate,
   Response,
@@ -755,9 +755,9 @@ class UpdaterTest(TestCase):
         Constraint(name='value', constraint=ValueConstraint(values=set(['1', '2']))),
         Constraint(name='limit', constraint=TaskConstraint(limit=LimitConstraint(limit=int(10))))])
     from_config.taskLinks = {'task1': 'link1', 'task2': 'link2'}
-    from_config.packagesDEPRECATED = set([
-        Package(name='n2', role='r2', version=4),
-        Package(role='r1', name='n1', version=1)])
+    from_config.metadata = set([
+      Metadata(key='k2', value='v2'),
+      Metadata(key='k1', value='v1')])
     from_config.executorConfig = ExecutorConfig(name='test', data='test data')
     from_config.requestedPorts = set(['3424', '142', '45235'])
 

@@ -488,11 +488,10 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
       for event in scheduled_task.taskEvents:
         task_strings.append('\t %s %s: %s' % (datetime.fromtimestamp(event.timestamp / 1000),
             ScheduleStatus._VALUES_TO_NAMES[event.status], event.message))
-        task_strings.append('packages:')
-        if assigned_task.task.packagesDEPRECATED is not None:
-          for pkg in assigned_task.task.packagesDEPRECATED:
-            task_strings.append('\trole: %s, package: %s, version: %s' %
-                (pkg.role, pkg.name, pkg.version))
+        task_strings.append('metadata:')
+        if assigned_task.task.metadata is not None:
+          for md in assigned_task.task.metadata:
+            task_strings.append('\t%s: %s' % (md.key, md.value))
       return '\n\t'.join(task_strings)
 
     result = ["Active tasks (%s):\n" % len(active_tasks)]

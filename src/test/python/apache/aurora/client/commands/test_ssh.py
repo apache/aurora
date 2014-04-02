@@ -60,7 +60,7 @@ class TestSshCommand(AuroraClientCommandTest):
       job.assignedTask.task = Mock(spec=TaskConfig)
       job.assignedTask.task.executorConfig = Mock()
       job.assignedTask.task.maxTaskFailures = 1
-      job.assignedTask.task.packagesDEPRECATED = []
+      job.assignedTask.task.metadata = []
       job.assignedTask.task.owner = Identity(role='mchucarroll')
       job.assignedTask.task.environment = 'test'
       job.assignedTask.task.jobName = 'woops'

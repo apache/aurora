@@ -33,7 +33,7 @@ from gen.apache.aurora.ttypes import (
   JobConfiguration,
   JobKey,
   LimitConstraint,
-  Package,
+  Metadata,
   TaskConfig,
   TaskConstraint,
   ValueConstraint,
@@ -182,9 +182,7 @@ THERMOS_PORT_SCOPE_REF = Ref.from_address('thermos.ports')
 THERMOS_TASK_ID_REF = Ref.from_address('thermos.task_id')
 
 
-# TODO(wickman) Make this a method directly on an AuroraConfig so that we don't
-# need the packages/ports shenanigans.
-def convert(job, packages=frozenset(), ports=frozenset()):
+def convert(job, metadata=frozenset(), ports=frozenset()):
   """Convert a Pystachio MesosJob to an Aurora Thrift JobConfiguration."""
 
   owner = Identity(role=fully_interpolated(job.role()), user=getpass.getuser())
@@ -210,10 +208,8 @@ def convert(job, packages=frozenset(), ports=frozenset()):
   task.priority = fully_interpolated(job.priority())
   task.contactEmail = not_empty_or(job.contact(), None)
 
-  # Add package tuples to a task, to display in the scheduler UI.
-  task.packagesDEPRECATED = frozenset(
-      Package(role=str(role), name=str(package_name), version=int(version))
-      for role, package_name, version in packages)
+  # Add metadata to a task, to display in the scheduler UI.
+  task.metadata = frozenset(Metadata(key=str(key), value=str(value)) for key, value in metadata)
 
   # task components
   if not task_raw.has_resources():

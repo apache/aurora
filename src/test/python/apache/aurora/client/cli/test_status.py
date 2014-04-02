@@ -50,7 +50,7 @@ class TestJobStatus(AuroraClientCommandTest):
       job.assignedTask.slaveHost = 'slavehost'
       job.assignedTask.task = Mock(spec=TaskConfig)
       job.assignedTask.task.maxTaskFailures = 1
-      job.assignedTask.task.packagesDEPRECATED = []
+      job.assignedTask.task.metadata = []
       job.assignedTask.task.owner = Identity(role='bozo')
       job.assignedTask.task.environment = 'test'
       job.assignedTask.task.jobName = 'woops'
@@ -69,10 +69,10 @@ class TestJobStatus(AuroraClientCommandTest):
     return jobs
 
   @classmethod
-  def create_mock_scheduled_task_no_packages(cls):
+  def create_mock_scheduled_task_no_metadata(cls):
     result = cls.create_mock_scheduled_tasks()
     for job in result:
-      job.assignedTask.task.packagesDEPRECATED = None
+      job.assignedTask.task.metadata = None
     return result
 
   @classmethod
@@ -102,10 +102,10 @@ class TestJobStatus(AuroraClientCommandTest):
     return resp
 
   @classmethod
-  def create_status_response_null_package(cls):
+  def create_status_response_null_metadata(cls):
     resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_no_packages())
+    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_no_metadata())
     return resp
 
   @classmethod
@@ -124,12 +124,12 @@ class TestJobStatus(AuroraClientCommandTest):
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       mock_api.check_status.assert_called_with(AuroraJobKey('west', 'bozo', 'test', 'hello'))
 
-  def test_successful_status_shallow_nopackages(self):
-    """Regression test: there was a crasher bug when packages was None."""
-    
+  def test_successful_status_shallow_nometadata(self):
+    """Regression test: there was a crasher bug when metadata was None."""
+
     mock_context = FakeAuroraCommandContext()
     mock_api = mock_context.get_api('west')
-    mock_api.check_status.return_value = self.create_status_response_null_package()
+    mock_api.check_status.return_value = self.create_status_response_null_metadata()
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       cmd = AuroraCommandLine()
@@ -149,9 +149,9 @@ class TestJobStatus(AuroraClientCommandTest):
       mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='bozo')))
 
-  def test_successful_status_deep_null_packages(self):
+  def test_successful_status_deep_null_metadata(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_scheduler_proxy.query.return_value = self.create_status_response_null_package()
+    mock_scheduler_proxy.query.return_value = self.create_status_response_null_metadata()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):

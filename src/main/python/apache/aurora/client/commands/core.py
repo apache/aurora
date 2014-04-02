@@ -452,10 +452,10 @@ def status(args, options):
       taskString += '\n\t\t %s %s: %s' % (datetime.fromtimestamp(event.timestamp / 1000),
                                           ScheduleStatus._VALUES_TO_NAMES[event.status],
                                           event.message)
-    taskString += '\n\tpackages:'
-    if assigned_task.task.packagesDEPRECATED is not None:
-      for pkg in assigned_task.task.packagesDEPRECATED:
-        taskString += ('\n\t\trole: %s, package: %s, version: %s' % (pkg.role, pkg.name, pkg.version))
+    taskString += '\n\tmetadata:'
+    if assigned_task.task.metadata is not None:
+      for md in assigned_task.task.metadata:
+        taskString += ('\n\t\t%s: %s' % (md.key, md.value))
 
     return taskString
 
@@ -471,9 +471,6 @@ def status(args, options):
               ScheduleStatus._VALUES_TO_NAMES[task.status],
               task.assignedTask.slaveHost,
               taskString))
-      if task.assignedTask.task.packagesDEPRECATED is not None:
-        for pkg in task.assignedTask.task.packagesDEPRECATED:
-          log.info('\tpackage %s/%s/%s' % (pkg.role, pkg.name, pkg.version))
 
   api, job_key, _ = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())
