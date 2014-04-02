@@ -4,11 +4,11 @@ explore Aurora's various components. To get started, install
 then run `vagrant up` somewhere in the repository source tree to create a team of VMs.  This may take some time initially as it builds all
 the components involved in running an aurora cluster.
 
-The scheduler is listening on http://192.168.33.5:8081/scheduler
-The observer is listening on http://192.168.33.4:1338/
-The master is listening on http://192.168.33.3:5050/
+The scheduler is listening on http://192.168.33.7:8081/scheduler
+The observer is listening on http://192.168.33.7:1338
+The master is listening on http://192.168.33.7:5050
 
-Once everything is up, you can `vagrant ssh aurora-scheduler` and execute aurora client commands using the `aurora` client.
+Once everything is up, you can `vagrant ssh devcluster` and execute aurora client commands using the `aurora` client.
 
 Troubleshooting
 ---------------

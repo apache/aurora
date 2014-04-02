@@ -82,7 +82,7 @@ A configuration for a leader-elected scheduler would contain something like:
 ```javascript
 [{
   "name": "example",
-  "zk": "192.168.33.2",
+  "zk": "192.168.33.7",
   "scheduler_zk_path": "/aurora/scheduler"
 }]
 ```

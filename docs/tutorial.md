@@ -34,7 +34,8 @@ To get help, email questions to the Aurora Developer List,
 
 You use the Aurora client and web UI to interact with Aurora jobs. To
 install it locally, see [vagrant.md](vagrant.md). The remainder of this
-Tutorial assumes you are running Aurora using Vagrant.
+Tutorial assumes you are running Aurora using Vagrant.  Unless otherwise stated,
+all commands are to be run from the root of the aurora repository clone.
 
 ## The Script
 
@@ -66,17 +67,22 @@ if __name__ == "__main__":
 
 Once we have our script/program, we need to create a *configuration
 file* that tells Aurora how to manage and launch our Job. Save the below
-code in the file `hello_world.aurora` in the same directory as your
-`hello_world.py` file. (all Aurora configuration files end with `.aurora` and
-are written in a Python variant).
+code in the file `hello_world.aurora`.
 
 ```python
-import os
+pkg_path = '/vagrant/hello_world.py'
+
+# we use a trick here to make the configuration change with
+# the contents of the file, for simplicity.  in a normal setting, packages would be
+# versioned, and the version number would be changed in the configuration.
+import hashlib
+with open(pkg_path, 'rb') as f:
+  pkg_checksum = hashlib.md5(f.read()).hexdigest()
 
 # copy hello_world.py into the local sandbox
 install = Process(
   name = 'fetch_package',
-  cmdline = 'cp /vagrant/hello_world.py . && chmod +x hello_world.py')
+  cmdline = 'cp %s . && echo %s && chmod +x hello_world.py' % (pkg_path, pkg_checksum))
 
 # run the script
 hello_world = Process(
@@ -89,8 +95,11 @@ hello_world_task = SequentialTask(
   resources = Resources(cpu = 1, ram = 1*MB, disk=8*MB))
 
 jobs = [
-  Job(name = 'hello_world', cluster = 'example', role = 'www-data',
-      environment = 'devel', task = hello_world_task)
+  Service(cluster = 'devcluster',
+          environment = 'devel',
+          role = 'www-data',
+          name = 'hello_world',
+          task = hello_world_task)
 ]
 ```
 
@@ -132,7 +141,7 @@ identical, the job keys identify the same job.
 cluster names. For Vagrant, from the top-level of your Aurora repository clone,
 do:
 
-    $ vagrant ssh aurora-scheduler
+    $ vagrant ssh devcluster
 
 Followed by:
 
@@ -142,8 +151,8 @@ You'll see something like:
 
 ```javascript
 [{
-  "name": "example",
-  "zk": "192.168.33.2",
+  "name": "devcluster",
+  "zk": "192.168.33.7",
   "scheduler_zk_path": "/aurora/scheduler",
   "auth_mechanism": "UNAUTHENTICATED"
 }]
@@ -163,20 +172,17 @@ specified by its job key and configuration file arguments and runs it.
 
 Or for our example:
 
-    aurora create example/www-data/devel/hello_world /vagrant/hello_world.aurora
-
-Note: Remember, the job key's `<jobname>` value is the name of the Job, not the name
-of its code file.
+    aurora create devcluster/www-data/devel/hello_world /vagrant/hello_world.aurora
 
 This returns:
 
-    $ vagrant ssh aurora-scheduler
+    $ vagrant ssh devcluster
     Welcome to Ubuntu 12.04 LTS (GNU/Linux 3.2.0-23-generic x86_64)
 
      * Documentation:  https://help.ubuntu.com/
     Welcome to your Vagrant-built virtual machine.
     Last login: Fri Jan  3 02:18:55 2014 from 10.0.2.2
-    vagrant@precise64:~$ aurora create example/www-data/devel/hello_world \
+    vagrant@precise64:~$ aurora create devcluster/www-data/devel/hello_world \
         /vagrant/hello_world.aurora
      INFO] Creating job hello_world
      INFO] Response from scheduler: OK (message: 1 new tasks pending for job
@@ -187,7 +193,7 @@ This returns:
 
 Now that our job is running, let's see what it's doing. Access the
 scheduler web interface at `http://$scheduler_hostname:$scheduler_port/scheduler`
-Or when using `vagrant`, `http://192.168.33.6:8081/scheduler`
+Or when using `vagrant`, `http://192.168.33.7:8081/scheduler`
 First we see what Jobs are scheduled:
 
 ![Scheduled Jobs](images/ScheduledJobs.png)
@@ -197,15 +203,14 @@ with that role:
 
 ![Role Jobs](images/RoleJobs.png)
 
-Uh oh, that `Unstable` next to our `hello_world` Job doesn't look good. Click the
-`hello_world` Job, and you'll see:
+If you click on your `hello_world` Job, you'll see:
 
 ![hello_world Job](images/HelloWorldJob.png)
 
 Oops, looks like our first job didn't quite work! The task failed, so we have
 to figure out what went wrong.
 
-Access the page for our Task by clicking on its Host.
+Access the page for our Task by clicking on its host.
 
 ![Task page](images/TaskBreakdown.png)
 
@@ -217,12 +222,10 @@ to `stderr` on the failed `hello_world` process, we see what happened.
 ![stderr page](images/stderr.png)
 
 It looks like we made a typo in our Python script. We wanted `xrange`,
-not `xrang`. Edit the `hello_world.py` script, save as `hello_world_v2.py` and change your
-`hello_world.aurora` config file to use `hello_world_v2.py` instead of `hello_world.py`.
+not `xrang`. Edit the `hello_world.py` script to use the correct function and
+we will try again.
 
-Now that we've updated our configuration, let's restart the job:
-
-    aurora update example/www-data/devel/hello_world /vagrant/hello_world.aurora
+    aurora update devcluster/www-data/devel/hello_world /vagrant/hello_world.aurora
 
 This time, the task comes up, we inspect the page, and see that the
 `hello_world` process is running.
@@ -238,13 +241,13 @@ output:
 
 Now that we're done, we kill the job using the Aurora client:
 
-    vagrant@precise64:~$ aurora kill example/www-data/devel/hello_world
-     INFO] Killing tasks for job: example/www-data/devel/hello_world
+    vagrant@precise64:~$ aurora killall devcluster/www-data/devel/hello_world
+     INFO] Killing tasks for job: devcluster/www-data/devel/hello_world
      INFO] Response from scheduler: OK (message: Tasks killed.)
      INFO] Job url: http://precise64:8081/scheduler/www-data/devel/hello_world
     vagrant@precise64:~$
 
-The Task scheduler page now shows the `hello_world` process as `KILLED`.
+The job page now shows the `hello_world` tasks as completed.
 
 ![Killed Task page](images/killedtask.png)
 
