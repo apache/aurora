@@ -171,7 +171,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
     QuotaCheckResult quotaCheck = quotaManager.checkQuota(task, instances);
     if (quotaCheck.getResult() == INSUFFICIENT_QUOTA) {
-      throw new ScheduleException("Insufficient resource quota: " + quotaCheck.getDetails());
+      throw new ScheduleException("Insufficient resource quota: " + quotaCheck.getDetails().or(""));
     }
   }
 
