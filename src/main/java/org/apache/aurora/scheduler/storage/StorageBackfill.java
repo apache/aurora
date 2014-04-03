@@ -101,6 +101,29 @@ public final class StorageBackfill {
     }
   }
 
+  private static void rewriteUnknownState(
+      ScheduledTask task,
+      TaskStore.Mutable taskStore,
+      Clock clock) {
+
+    if (task.getStatus() == ScheduleStatus.UNKNOWN) {
+      if (!task.isSetTaskEvents() || task.getTaskEvents().size() < 2) {
+        // This should never happen normally. Convert it to FAILED to prevent downstream failures.
+        LOG.severe("Missing terminal event leading to UNKNOWN for:"
+            + task.getAssignedTask().getTaskId());
+
+        task.setStatus(ScheduleStatus.FAILED);
+        task.unsetTaskEvents();
+        task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.FAILED));
+      } else {
+        // Overwrite the task status with the previous (terminal) state.
+        TaskEvent terminalEvent = task.getTaskEvents().get(task.getTaskEvents().size() - 2);
+        task.setStatus(terminalEvent.getStatus());
+        task.getTaskEvents().remove(task.getTaskEvents().size() - 1);
+      }
+    }
+  }
+
   /**
    * Backfills the storage to make it match any assumptions that may have changed since
    * the structs were first written.
@@ -120,6 +143,7 @@ public final class StorageBackfill {
         // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they
         // don't.
         guaranteeShardUniqueness(builder, storeProvider.getUnsafeTaskStore(), clock);
+        rewriteUnknownState(builder, storeProvider.getUnsafeTaskStore(), clock);
         return IScheduledTask.build(builder);
       }
     });
