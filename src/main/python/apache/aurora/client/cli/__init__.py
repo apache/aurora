@@ -343,7 +343,7 @@ class Noun(AuroraCommand):
 
   @property
   def usage(self):
-    return ["%s %s" % (self.name, ' '.join(self.verbs[verb].usage)) for verb in self.verbs]
+    return ["%s %s" % (self.name, self.verbs[verb].usage) for verb in self.verbs]
 
   @classmethod
   def create_context(cls):

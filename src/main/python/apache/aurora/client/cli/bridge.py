@@ -80,6 +80,8 @@ class Bridge(object):
 
   def execute(self, args):
     """Dispatch a command line to the appropriate CommandProcessor"""
+    if len(args) == 1:
+      args.append('help')
     for cl in self.command_processors:
       if args[1] == 'help':
         self.show_help(args)
