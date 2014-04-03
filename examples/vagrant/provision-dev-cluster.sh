@@ -36,8 +36,6 @@ update-alternatives --set java /usr/lib/jvm/java-7-openjdk-amd64/jre/bin/java
 # that want to advertise the hostname to the user, or other components.
 hostname 192.168.33.7
 
-AURORA_VERSION=$(cat /vagrant/.auroraversion | tr '[a-z]' '[A-Z]')
-
 function build_all() {
   if [ ! -d aurora ]; then
     echo Cloning aurora repo
@@ -53,7 +51,7 @@ function build_all() {
     git pull
 
     # build scheduler
-    ./gradlew distTar
+    ./gradlew installApp
 
     # build clients
     ./pants src/main/python/apache/aurora/client/bin:aurora_admin
@@ -83,29 +81,24 @@ function install_mesos() {
   dpkg --install mesos_0.17.0_amd64.deb
 }
 
-function install_aurora_scheduler() {
-  # The bulk of the 'install' was done by the gradle build, the result of which we access
-  # through /vagrant.  All that's left is to initialize the log replica.
-  tar xvf ~/aurora/dist/distributions/aurora-scheduler-$AURORA_VERSION.tar -C /usr/local
+function install_aurora() {
+  # The bulk of the 'install' was done by the build, the result of which we access
+  # through /home/vagrant.
+  DIST_DIR=/home/vagrant/aurora/dist
+  AURORA_HOME=/usr/local/aurora
 
   export LD_LIBRARY_PATH=/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server
-  if mesos-log initialize --path="/usr/local/aurora-scheduler-$AURORA_VERSION/db"; then
+  mkdir -p $AURORA_HOME/scheduler
+  if mesos-log initialize --path="$AURORA_HOME/scheduler/db"; then
     echo "Replicated log initialized."
   else
     echo "Replicated log initialization failed with code $? (likely already initialized)."
   fi
   unset LD_LIBRARY_PATH
-}
 
-function install_aurora_executors() {
-  install -m 755 ~/aurora/dist/gc_executor.pex /usr/local/bin/gc_executor
-  install -m 755 ~/aurora/dist/thermos_executor.pex /usr/local/bin/thermos_executor
-  install -m 755 ~/aurora/dist/thermos_observer.pex /usr/local/bin/thermos_observer
-}
-
-function install_aurora_client() {
-  install -m 755 /vagrant/dist/aurora_client.pex /usr/local/bin/aurora
-  install -m 755 /vagrant/dist/aurora_admin.pex /usr/local/bin/aurora_admin
+  # Ensure clients are in the default PATH.
+  ln -s $DIST_DIR/aurora_client.pex /usr/local/bin/aurora
+  ln -s $DIST_DIR/aurora_admin.pex /usr/local/bin/aurora_admin
 
   mkdir -p /etc/aurora
   cat > /etc/aurora/clusters.json <<EOF
@@ -132,7 +125,5 @@ function start_services() {
 
 build_all
 install_mesos
-install_aurora_scheduler
-install_aurora_executors
-install_aurora_client
+install_aurora
 start_services
