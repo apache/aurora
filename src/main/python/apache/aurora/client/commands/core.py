@@ -225,6 +225,9 @@ def do_open(args, _):
   Opens the scheduler page for a cluster, role or job in the default web browser.
   """
   cluster_name = role = env = job = None
+  if len(args) == 0:
+    print('Open command requires a jobkey parameter.')
+    exit(1)
   args = args[0].split("/")
   if len(args) > 0:
     cluster_name = args[0]

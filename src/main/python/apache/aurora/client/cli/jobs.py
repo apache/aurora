@@ -394,6 +394,31 @@ class ListJobsCommand(Verb):
     context.print_out(result)
     return EXIT_OK
 
+class OpenCommand(Verb):
+  # TODO(mchucarroll): this is awkward in the noun/verb framework: where does it actually belong?
+  @property
+  def name(self):
+    return 'open'
+
+  @property
+  def help(self):
+    return "Open a job's scheduler page in the web browser."
+
+  def get_options(self):
+    return [
+      CommandOption('key', type=str, metavar='cluster[/role[/env[/job]]]',
+        help='A key for the cluster, role, env, or job whose scheduler page should be opened.')
+    ]
+
+  def execute(self, context):
+    key_parts = context.options.key.split('/')
+    while len(key_parts) < 4:
+      key_parts.append(None)
+    (cluster, role, env, name) = key_parts
+    api = context.get_api(cluster)
+    context.open_scheduler_page(cluster, role, env, name)
+    return EXIT_OK
+
 
 class RestartCommand(Verb):
   @property
@@ -615,6 +640,7 @@ class Job(Noun):
     self.register_verb(KillCommand())
     self.register_verb(KillAllJobCommand())
     self.register_verb(ListJobsCommand())
+    self.register_verb(OpenCommand())
     self.register_verb(RestartCommand())
     self.register_verb(StatusCommand())
     self.register_verb(UpdateCommand())

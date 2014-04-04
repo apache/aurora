@@ -75,6 +75,7 @@ python_tests(
     'test_create.py',
     'test_diff.py',
     'test_kill.py',
+    'test_open.py',
     'test_restart.py',
     'test_status.py',
     'test_update.py',

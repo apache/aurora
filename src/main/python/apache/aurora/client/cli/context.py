@@ -83,6 +83,12 @@ class AuroraCommandContext(Context):
     self.open_page(synthesize_url(api.scheduler_proxy.scheduler_client().url, jobkey.role,
         jobkey.env, jobkey.name))
 
+  def open_scheduler_page(self, cluster, role, env, name):
+    """Open a scheduler page"""
+    api = self.get_api(cluster)
+    self.open_page(synthesize_url(api.scheduler_proxy.scheduler_client().url,
+        role, env, name))
+
   def check_and_log_response(self, resp):
     self.print_log(logging.INFO, 'Response from scheduler: %s (message: %s)'
         % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
