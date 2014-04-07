@@ -175,7 +175,6 @@ struct TaskConfig {
                                              // Wildcards are supported for dynamic link
                                              // crafting based on host, ports, instance, etc.
  23: optional string contactEmail
- 24: optional set<Package> packagesDEPRECATED // TODO(maxim): Drop when fully migrated to metadata.
  25: optional ExecutorConfig executorConfig  // Executor configuration
  27: optional set<Metadata> metadata         // Used to display additional details in the UI.
 }

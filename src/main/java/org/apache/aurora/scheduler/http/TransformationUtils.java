@@ -27,21 +27,12 @@ import com.google.common.collect.Range;
 
 import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.storage.entities.IMetadata;
-import org.apache.aurora.scheduler.storage.entities.IPackage;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 /**
  * Utility class to hold common object to string transformation helper functions.
  */
 final class TransformationUtils {
-  public static final Function<IPackage, String> PACKAGE_TOSTRING =
-      new Function<IPackage, String>() {
-        @Override
-        public String apply(IPackage pkg) {
-          return pkg.getRole() + "/" + pkg.getName() + " v" + pkg.getVersion();
-        }
-      };
-
   public static final Function<IMetadata, String> METADATA_TOSTRING =
       new com.twitter.common.base.Function<IMetadata, String>() {
         @Override
@@ -80,11 +71,7 @@ final class TransformationUtils {
    * @return Present if task metadata exists, absent otherwise.
    */
   public static Optional<String> getMetadata(ITaskConfig task) {
-    if (task.isSetPackagesDEPRECATED()) {
-      Iterable<String> packages = ImmutableSet.copyOf(
-          Iterables.transform(task.getPackagesDEPRECATED(), TransformationUtils.PACKAGE_TOSTRING));
-      return Optional.of(Joiner.on(", ").join(Ordering.natural().sortedCopy(packages)));
-    } else if (task.isSetMetadata()) {
+    if (task.isSetMetadata()) {
       Iterable<String> metadata = ImmutableSet.copyOf(
           Iterables.transform(task.getMetadata(), TransformationUtils.METADATA_TOSTRING));
       return Optional.of(Joiner.on(", ").join(Ordering.natural().sortedCopy(metadata)));
