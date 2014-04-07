@@ -25,6 +25,7 @@ import org.junit.Test;
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTaskEvents;
 import static org.apache.aurora.scheduler.base.Tasks.getLatestActiveTask;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -33,24 +34,23 @@ public class TasksTest {
 
   @Test
   public void testOrderedStatusesForCompleteness() {
-    // OrderedTaskStatuses should contain all ScheduleStatus values except INIT and UNKNOWN.
+    // OrderedTaskStatuses should contain all ScheduleStatus values except INIT.
     assertEquals(
         ImmutableSet.copyOf(ScheduleStatus.values()),
-        ImmutableSet.builder()
+        ImmutableSet.<ScheduleStatus>builder()
             .addAll(Tasks.ORDERED_TASK_STATUSES)
             .add(ScheduleStatus.INIT)
-            .add(ScheduleStatus.UNKNOWN)
             .build());
   }
 
   @Test
   public void testLatestTransitionedTasks() {
-    IScheduledTask f1 = makeTask(FINISHED, 100);
-    IScheduledTask f2 = makeTask(FINISHED, 200);
-    IScheduledTask f3 = makeTask(FINISHED, 300);
-    IScheduledTask r1 = makeTask(RUNNING, 400);
-    IScheduledTask r2 = makeTask(RUNNING, 500);
-    IScheduledTask r3 = makeTask(RUNNING, 600);
+    IScheduledTask f1 = makeTask(FINISHED, makeTaskEvents(100, FINISHED));
+    IScheduledTask f2 = makeTask(FINISHED, makeTaskEvents(200, FINISHED));
+    IScheduledTask f3 = makeTask(FINISHED, makeTaskEvents(300, FINISHED));
+    IScheduledTask r1 = makeTask(RUNNING, makeTaskEvents(400, RUNNING));
+    IScheduledTask r2 = makeTask(RUNNING, makeTaskEvents(500, RUNNING));
+    IScheduledTask r3 = makeTask(RUNNING, makeTaskEvents(600, RUNNING));
 
     try {
       getLatestActiveTask(ImmutableList.<IScheduledTask>of());

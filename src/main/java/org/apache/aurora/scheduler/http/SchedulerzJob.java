@@ -65,6 +65,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
+import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -77,6 +78,7 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 
 /**
@@ -98,7 +100,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
       ImmutableMap.<ScheduleStatus, Set<ScheduleStatus>>builder()
         .put(PENDING, EnumSet.of(PENDING))
         .put(RUNNING, EnumSet.of(ASSIGNED, STARTING, RUNNING, KILLING))
-        .put(FINISHED, EnumSet.of(KILLED, FINISHED))
+        // Note: SANDBOX_DELETED can be issued for both FINISHED and FAILED states.
+        // Adding a post-processing filtering to place it into the right bucket may be needed.
+        .put(FINISHED, EnumSet.of(KILLED, FINISHED, SANDBOX_DELETED))
         .put(FAILED, EnumSet.of(LOST, FAILED))
       .build();
 
@@ -147,11 +151,15 @@ public class SchedulerzJob extends JerseyTemplateServlet {
             .put("taskId", task.getTaskId())
             .put("instanceId", task.getInstanceId())
             .put("slaveHost", task.isSetSlaveHost() ? task.getSlaveHost() : "")
-            .put("status", scheduledTask.getStatus())
-            .put("statusTimestamp", Tasks.getLatestEvent(scheduledTask).getTimestamp())
             .put("taskEvents", scheduledTask.getTaskEvents());
 
-          if (scheduledTask.getStatus() == ScheduleStatus.PENDING) {
+          ITaskEvent statusEvent = Tasks.getLatestEvent(scheduledTask);
+
+          if (scheduledTask.getStatus() == SANDBOX_DELETED) {
+            // Avoid displaying SANDBOX_DELETED as completed status.
+            statusEvent = Tasks.getSecondToLatestEvent(scheduledTask);
+            builder.put("hideExecutorUri", true);
+          } else if (scheduledTask.getStatus() == PENDING) {
             String pendingReason;
             Set<Veto> vetoes = nearestFit.getNearestFit(task.getTaskId());
             if (vetoes.isEmpty()) {
@@ -161,6 +169,9 @@ public class SchedulerzJob extends JerseyTemplateServlet {
             }
             builder.put("pendingReason", pendingReason);
           }
+
+          builder.put("status", statusEvent.getStatus());
+          builder.put("statusTimestamp", statusEvent.getTimestamp());
 
           Function<String, String> expander = new Function<String, String>() {
             @Override

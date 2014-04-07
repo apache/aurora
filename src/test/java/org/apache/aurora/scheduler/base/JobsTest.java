@@ -29,6 +29,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTask;
+import static org.apache.aurora.scheduler.base.TaskTestUtil.makeTaskEvents;
 import static org.junit.Assert.assertEquals;
 
 public class JobsTest {
@@ -41,7 +42,16 @@ public class JobsTest {
             .transform(new Function<ScheduleStatus, IScheduledTask>() {
               @Override
               public IScheduledTask apply(ScheduleStatus status) {
-                return makeTask(status, 100);
+                int startTime = 100;
+                if (status == ScheduleStatus.SANDBOX_DELETED) {
+                  return makeTask(
+                      status,
+                      makeTaskEvents(
+                          startTime,
+                          ScheduleStatus.FAILED,
+                          ScheduleStatus.SANDBOX_DELETED));
+                }
+                return makeTask(status, makeTaskEvents(startTime, status));
               }
             }).toList();
 

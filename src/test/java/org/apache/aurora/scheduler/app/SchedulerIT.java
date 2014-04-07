@@ -372,7 +372,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
     assertEquals(0L, Stats.<Long>getVariable("task_store_PENDING").read().longValue());
     assertEquals(1L, Stats.<Long>getVariable("task_store_ASSIGNED").read().longValue());
     assertEquals(1L, Stats.<Long>getVariable("task_store_RUNNING").read().longValue());
-    assertEquals(0L, Stats.<Long>getVariable("task_store_UNKNOWN").read().longValue());
+    assertEquals(0L, Stats.<Long>getVariable("task_store_SANDBOX_DELETED").read().longValue());
 
     // TODO(William Farner): Send a thrift RPC to the scheduler.
     // TODO(William Farner): Also send an admin thrift RPC to verify capability (e.g. ROOT) mapping.

@@ -137,7 +137,7 @@ public class StateManagerImpl implements StateManager {
           updateTaskAndExternalState(
               Tasks.id(task),
               Optional.of(task),
-              PENDING,
+              Optional.of(PENDING),
               Optional.<String>absent());
         }
       }
@@ -260,7 +260,11 @@ public class StateManagerImpl implements StateManager {
           return false;
         }
 
-        return updateTaskAndExternalState(taskId, task, targetState, transitionMessage);
+        return updateTaskAndExternalState(
+            taskId,
+            task,
+            Optional.of(targetState),
+            transitionMessage);
       }
     });
   }
@@ -301,7 +305,7 @@ public class StateManagerImpl implements StateManager {
       // highly-risky, since it doesn't necessarily represent the value in storage.
       // As a result, it would be easy to accidentally clobber mutations.
       Optional<IScheduledTask> task,
-      final ScheduleStatus targetState,
+      final Optional<ScheduleStatus> targetState,
       final Optional<String> transitionMessage) {
 
     if (task.isPresent()) {
@@ -344,10 +348,10 @@ public class StateManagerImpl implements StateManager {
                 @Override
                 public IScheduledTask apply(IScheduledTask task) {
                   ScheduledTask mutableTask = task.newBuilder();
-                  mutableTask.setStatus(targetState);
+                  mutableTask.setStatus(targetState.get());
                   mutableTask.addToTaskEvents(new TaskEvent()
                       .setTimestamp(clock.nowMillis())
-                      .setStatus(targetState)
+                      .setStatus(targetState.get())
                       .setMessage(transitionMessage.orNull())
                       .setScheduler(LOCAL_HOST_SUPPLIER.get()));
                   return IScheduledTask.build(mutableTask);
@@ -395,7 +399,7 @@ public class StateManagerImpl implements StateManager {
               updateTaskAndExternalState(
                   Tasks.id(newTask),
                   Optional.of(newTask),
-                  newState,
+                  Optional.of(newState),
                   Optional.of(auditMessage));
               break;
 
@@ -437,7 +441,13 @@ public class StateManagerImpl implements StateManager {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(final MutableStoreProvider storeProvider) {
-        eventSink.post(deleteTasks(storeProvider, taskIds));
+        for (String taskId : taskIds) {
+          updateTaskAndExternalState(
+              taskId,
+              Optional.<IScheduledTask>absent(),
+              Optional.<ScheduleStatus>absent(),
+              Optional.<String>absent());
+        }
       }
     });
   }

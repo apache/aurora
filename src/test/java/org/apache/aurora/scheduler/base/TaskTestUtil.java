@@ -15,10 +15,9 @@
  */
 package org.apache.aurora.scheduler.base;
 
-import java.util.Collections;
 import java.util.List;
 
-import com.google.common.collect.Lists;
+import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
@@ -37,10 +36,6 @@ public final class TaskTestUtil {
     // Utility class.
   }
 
-  public static IScheduledTask makeTask(ScheduleStatus status, long startTime) {
-    return makeTask(status, makeTaskEvents(startTime, 3));
-  }
-
   public static IScheduledTask makeTask(ScheduleStatus status, List<TaskEvent> taskEvents) {
     return IScheduledTask.build(new ScheduledTask()
         .setStatus(status)
@@ -53,16 +48,21 @@ public final class TaskTestUtil {
         .setTaskEvents(taskEvents));
   }
 
-  private static List<TaskEvent> makeTaskEvents(long startTs, int count) {
-    List<TaskEvent> taskEvents = Lists.newArrayListWithCapacity(3);
-    for (int i = 0; i < count; i++) {
-      taskEvents.add(makeTaskEvent(startTs - (i * 10)));
+  public static List<TaskEvent> makeTaskEvents(
+      long startTs,
+      ScheduleStatus status,
+      ScheduleStatus... statuses) {
+
+    ImmutableList.Builder<TaskEvent> taskEvents = ImmutableList.builder();
+    taskEvents.add(makeTaskEvent(startTs, status));
+    long increment = startTs;
+    for (ScheduleStatus st : statuses) {
+      taskEvents.add(makeTaskEvent(startTs + increment++, st));
     }
-    Collections.reverse(taskEvents);
-    return taskEvents;
+    return taskEvents.build();
   }
 
-  private static TaskEvent makeTaskEvent(long ts) {
-    return new TaskEvent().setTimestamp(ts);
+  private static TaskEvent makeTaskEvent(long ts, ScheduleStatus status) {
+    return new TaskEvent().setTimestamp(ts).setStatus(status);
   }
 }
