@@ -240,9 +240,11 @@ def thriftBinary = 'build-support/thrift/thrift-0.9.1/compiler/cpp/thrift'
 task bootstrapThrift {
   inputs.file file(thriftBinary)
   outputs.dir file(thriftBinary)
-  exec {
-    executable = 'make'
-    args = ['-C', 'build-support/thrift']
+  doLast {
+    exec {
+      executable = 'make'
+      args = ['-C', 'build-support/thrift']
+    }
   }
 }
 
@@ -251,7 +253,7 @@ task generateSources(dependsOn: 'bootstrapThrift') {
   ext.outputDir = file(generatedDir)
   inputs.file inputFiles
   outputs.dir outputDir
-  doFirst {
+  doLast {
     outputDir.exists() || outputDir.mkdirs()
     inputFiles.each { File file ->
       exec {
@@ -365,7 +367,7 @@ jacocoTestReport {
 
 test.finalizedBy jacocoTestReport
 
-task FlagSchemaChanges(type: Test) {
+task FlagSchemaChanges(type: Test) << {
   exec {
     executable = 'bash'
     args = ['src/test/sh/org/apache/aurora/verify_thrift_checksum.sh']
