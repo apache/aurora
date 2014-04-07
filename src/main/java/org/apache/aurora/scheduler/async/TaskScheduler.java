@@ -79,15 +79,10 @@ interface TaskScheduler extends EventSubscriber {
    * Attempts to schedule a task, possibly performing irreversible actions.
    *
    * @param taskId The task to attempt to schedule.
-   * @return SUCCESS if the task was scheduled, TRY_AGAIN otherwise. The caller should call schedule
-   * again if TRY_AGAIN is returned.
+   * @return {@code true} if the task was scheduled, {@code false} otherwise. The caller should
+   *         call schedule again if {@code false} is returned.
    */
-  TaskSchedulerResult schedule(String taskId);
-
-  enum TaskSchedulerResult {
-    SUCCESS,
-    TRY_AGAIN
-  }
+  boolean schedule(String taskId);
 
   /**
    * An asynchronous task scheduler.  Scheduling of tasks is performed on a delay, where each task
@@ -183,12 +178,12 @@ interface TaskScheduler extends EventSubscriber {
 
     @Timed("task_schedule_attempt")
     @Override
-    public TaskSchedulerResult schedule(final String taskId) {
+    public boolean schedule(final String taskId) {
       scheduleAttemptsFired.incrementAndGet();
       try {
-        return storage.write(new MutateWork.Quiet<TaskSchedulerResult>() {
+        return storage.write(new MutateWork.Quiet<Boolean>() {
           @Override
-          public TaskSchedulerResult apply(MutableStoreProvider store) {
+          public Boolean apply(MutableStoreProvider store) {
             LOG.fine("Attempting to schedule task " + taskId);
             final IScheduledTask task = Iterables.getOnlyElement(
                 store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
@@ -202,7 +197,7 @@ interface TaskScheduler extends EventSubscriber {
                 if (!offerQueue.launchFirst(getAssignerFunction(aggregate, taskId, task))) {
                   // Task could not be scheduled.
                   maybePreemptFor(taskId, aggregate);
-                  return TaskSchedulerResult.TRY_AGAIN;
+                  return false;
                 }
               } catch (OfferQueue.LaunchException e) {
                 LOG.log(Level.WARNING, "Failed to launch task.", e);
@@ -217,7 +212,7 @@ interface TaskScheduler extends EventSubscriber {
               }
             }
 
-            return TaskSchedulerResult.SUCCESS;
+            return true;
           }
         });
       } catch (RuntimeException e) {
@@ -225,7 +220,7 @@ interface TaskScheduler extends EventSubscriber {
         // if there is a transient issue resulting in an unchecked exception.
         LOG.log(Level.WARNING, "Task scheduling unexpectedly failed, will be retried", e);
         scheduleAttemptsFailed.incrementAndGet();
-        return TaskSchedulerResult.TRY_AGAIN;
+        return false;
       }
     }
 

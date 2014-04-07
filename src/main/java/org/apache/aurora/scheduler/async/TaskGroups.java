@@ -15,20 +15,18 @@
  */
 package org.apache.aurora.scheduler.async;
 
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -50,10 +48,11 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
-import static org.apache.aurora.scheduler.async.TaskGroup.GroupState;
 
 /**
  * A collection of task groups, where a task group is a collection of tasks that are known to be
@@ -66,10 +65,10 @@ import static org.apache.aurora.scheduler.async.TaskGroup.GroupState;
  */
 public class TaskGroups implements EventSubscriber {
 
-  private static final Logger LOG = Logger.getLogger(TaskGroups.class.getName());
-
-  private final LoadingCache<GroupKey, TaskGroup> groups;
-  private final Clock clock;
+  private final ConcurrentMap<GroupKey, TaskGroup> groups = Maps.newConcurrentMap();
+  private final ScheduledExecutorService executor;
+  private final TaskScheduler taskScheduler;
+  private final BackoffStrategy backoff;
   private final RescheduleCalculator rescheduleCalculator;
 
   static class TaskGroupsSettings {
@@ -95,98 +94,64 @@ public class TaskGroups implements EventSubscriber {
         settings.taskGroupBackoff,
         settings.rateLimiter,
         taskScheduler,
-        clock,
         rescheduleCalculator);
   }
 
   @VisibleForTesting
   TaskGroups(
       final ScheduledExecutorService executor,
-      final BackoffStrategy taskGroupBackoffStrategy,
+      final BackoffStrategy backoff,
       final RateLimiter rateLimiter,
       final TaskScheduler taskScheduler,
-      final Clock clock,
       final RescheduleCalculator rescheduleCalculator) {
 
-    checkNotNull(executor);
-    checkNotNull(taskGroupBackoffStrategy);
+    this.executor = checkNotNull(executor);
     checkNotNull(rateLimiter);
-    checkNotNull(taskScheduler);
-    this.clock = checkNotNull(clock);
+    this.taskScheduler = checkNotNull(taskScheduler);
+    this.backoff = checkNotNull(backoff);
     this.rescheduleCalculator = checkNotNull(rescheduleCalculator);
 
     final TaskScheduler ratelLimitedScheduler = new TaskScheduler() {
       @Override
-      public TaskSchedulerResult schedule(String taskId) {
+      public boolean schedule(String taskId) {
         rateLimiter.acquire();
         return taskScheduler.schedule(taskId);
       }
     };
-
-    groups = CacheBuilder.newBuilder().build(new CacheLoader<GroupKey, TaskGroup>() {
-      @Override
-      public TaskGroup load(GroupKey key) {
-        TaskGroup group = new TaskGroup(key, taskGroupBackoffStrategy);
-        LOG.info("Evaluating group " + key + " in " + group.getPenaltyMs() + " ms");
-        startGroup(group, executor, ratelLimitedScheduler);
-        return group;
-      }
-    });
   }
 
-  private synchronized boolean maybeInvalidate(TaskGroup group) {
-    if (group.getTaskIds().isEmpty()) {
-      groups.invalidate(group.getKey());
-      return true;
+  private synchronized void evaluateGroupLater(Runnable evaluate, TaskGroup group) {
+    // Avoid check-then-act by holding the intrinsic lock.  If not done atomically, we could
+    // remove a group while a task is being added to it.
+    if (group.hasMore()) {
+      executor.schedule(evaluate, group.getPenaltyMs(), MILLISECONDS);
+    } else {
+      groups.remove(group.getKey());
     }
-    return false;
   }
 
-  private void startGroup(
-      final TaskGroup group,
-      final ScheduledExecutorService executor,
-      final TaskScheduler taskScheduler) {
-
+  private void startGroup(final TaskGroup group) {
     Runnable monitor = new Runnable() {
       @Override
       public void run() {
-        GroupState state = group.isReady(clock.nowMillis());
-
-        switch (state) {
-          case EMPTY:
-            maybeInvalidate(group);
-            break;
-
-          case READY:
-            String id = group.pop();
-            TaskScheduler.TaskSchedulerResult result = taskScheduler.schedule(id);
-            switch (result) {
-              case SUCCESS:
-                if (!maybeInvalidate(group)) {
-                  executor.schedule(this, group.resetPenaltyAndGet(), TimeUnit.MILLISECONDS);
-                }
-                break;
-
-              case TRY_AGAIN:
-                group.push(id, clock.nowMillis());
-                executor.schedule(this, group.penalizeAndGet(), TimeUnit.MILLISECONDS);
-                break;
-
-              default:
-                throw new IllegalStateException("Unknown TaskSchedulerResult " + result);
+        Optional<String> taskId = group.peek();
+        long penaltyMs = 0;
+        if (taskId.isPresent()) {
+          if (taskScheduler.schedule(taskId.get())) {
+            group.remove(taskId.get());
+            if (group.hasMore()) {
+              penaltyMs = backoff.calculateBackoffMs(0);
             }
-            break;
-
-          case NOT_READY:
-            executor.schedule(this, group.getPenaltyMs(), TimeUnit.MILLISECONDS);
-            break;
-
-          default:
-            throw new IllegalStateException("Unknown GroupState " + state);
+          } else {
+            penaltyMs = backoff.calculateBackoffMs(group.getPenaltyMs());
+          }
         }
+
+        group.setPenaltyMs(penaltyMs);
+        evaluateGroupLater(this, group);
       }
     };
-    executor.schedule(monitor, group.getPenaltyMs(), TimeUnit.MILLISECONDS);
+    evaluateGroupLater(monitor, group);
   }
 
   private static ScheduledExecutorService createThreadPool(ShutdownRegistry shutdownRegistry) {
@@ -205,11 +170,6 @@ public class TaskGroups implements EventSubscriber {
     return executor;
   }
 
-  private synchronized void add(IAssignedTask task, long scheduleDelayMs) {
-    groups.getUnchecked(new GroupKey(task.getTask()))
-        .push(task.getTaskId(), clock.nowMillis() + scheduleDelayMs);
-  }
-
   /**
    * Informs the task groups of a task state change.
    * <p>
@@ -222,10 +182,21 @@ public class TaskGroups implements EventSubscriber {
   public synchronized void taskChangedState(TaskStateChange stateChange) {
     if (stateChange.getNewState() == PENDING) {
       IScheduledTask task = stateChange.getTask();
-      long readyAtMs = stateChange.isTransition()
-          ? rescheduleCalculator.getFlappingPenaltyMs(task)
-          : rescheduleCalculator.getStartupScheduleDelayMs(task);
-      add(task.getAssignedTask(), readyAtMs);
+      GroupKey key = new GroupKey(task.getAssignedTask().getTask());
+      TaskGroup newGroup = new TaskGroup(key, Tasks.id(task));
+      TaskGroup existing = groups.putIfAbsent(key, newGroup);
+      if (existing == null) {
+        long penaltyMs;
+        if (stateChange.isTransition()) {
+          penaltyMs = backoff.calculateBackoffMs(0);
+        } else {
+          penaltyMs = rescheduleCalculator.getStartupScheduleDelayMs(task);
+        }
+        newGroup.setPenaltyMs(penaltyMs);
+        startGroup(newGroup);
+      } else {
+        existing.offer(Tasks.id(task));
+      }
     }
   }
 
@@ -238,7 +209,7 @@ public class TaskGroups implements EventSubscriber {
   public synchronized void tasksDeleted(TasksDeleted deleted) {
     for (IAssignedTask task
         : Iterables.transform(deleted.getTasks(), Tasks.SCHEDULED_TO_ASSIGNED)) {
-      TaskGroup group = groups.getIfPresent(new GroupKey(task.getTask()));
+      TaskGroup group = groups.get(new GroupKey(task.getTask()));
       if (group != null) {
         group.remove(task.getTaskId());
       }
@@ -246,7 +217,7 @@ public class TaskGroups implements EventSubscriber {
   }
 
   public Iterable<TaskGroup> getGroups() {
-    return ImmutableSet.copyOf(groups.asMap().values());
+    return ImmutableSet.copyOf(groups.values());
   }
 
   static class GroupKey {

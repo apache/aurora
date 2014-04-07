@@ -41,7 +41,6 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
-import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -106,7 +105,7 @@ public class TaskSchedulerTest extends EasyMockTest {
   private OfferQueue offerQueue;
   private TaskGroups taskGroups;
   private FakeClock clock;
-  private BackoffStrategy flappingStrategy;
+  private RescheduleCalculator rescheduleCalculator;
   private Preemptor preemptor;
   private AttributeAggregate emptyJob;
   private Amount<Long, Time> reservationDuration = Amount.of(1L, Time.MINUTES);
@@ -124,7 +123,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     returnDelay = createMock(OfferReturnDelay.class);
     clock = new FakeClock();
     clock.setNowMillis(0);
-    flappingStrategy = createMock(BackoffStrategy.class);
+    rescheduleCalculator = createMock(RescheduleCalculator.class);
     preemptor = createMock(Preemptor.class);
     emptyJob = new AttributeAggregate(
         Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
@@ -134,8 +133,6 @@ public class TaskSchedulerTest extends EasyMockTest {
   private void replayAndCreateScheduler() {
     control.replay();
     offerQueue = new OfferQueueImpl(driver, returnDelay, executor, maintenance);
-    RateLimiter rateLimiter = RateLimiter.create(1);
-    Amount<Long, Time> flappingThreshold = Amount.of(5L, Time.MINUTES);
     TaskScheduler scheduler = new TaskSchedulerImpl(storage,
         stateManager,
         assigner,
@@ -146,16 +143,9 @@ public class TaskSchedulerTest extends EasyMockTest {
     taskGroups = new TaskGroups(
         executor,
         retryStrategy,
-        rateLimiter,
+        RateLimiter.create(100),
         scheduler,
-        clock,
-        // TODO(wfarner): Use a mock rather than impl here.
-        new RescheduleCalculatorImpl(
-            storage,
-            new RescheduleCalculatorImpl.RescheduleCalculatorSettings(
-                flappingStrategy,
-                flappingThreshold,
-                Amount.of(5, Time.SECONDS))));
+        rescheduleCalculator);
   }
 
   private Capture<Runnable> expectOffer() {
@@ -250,13 +240,15 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testLoadFromStorage() {
-    expectTaskGroupBackoff(10);
-
-    replayAndCreateScheduler();
-
     final IScheduledTask a = makeTask("a", KILLED);
     final IScheduledTask b = makeTask("b", PENDING);
     final IScheduledTask c = makeTask("c", RUNNING);
+
+    expect(rescheduleCalculator.getStartupScheduleDelayMs(b)).andReturn(10L);
+    expectTaskRetryIn(10);
+
+    replayAndCreateScheduler();
+
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(MutableStoreProvider store) {

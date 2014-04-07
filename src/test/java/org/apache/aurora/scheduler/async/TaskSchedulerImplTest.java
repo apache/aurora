@@ -56,11 +56,11 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
-import static org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerResult.SUCCESS;
-import static org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerResult.TRY_AGAIN;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class TaskSchedulerImplTest extends EasyMockTest {
 
@@ -150,14 +150,14 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(TRY_AGAIN, scheduler.schedule("a"));
-    assertEquals(TRY_AGAIN, scheduler.schedule("b"));
+    assertFalse(scheduler.schedule("a"));
+    assertFalse(scheduler.schedule("b"));
 
     assertEquals(Optional.<TaskInfo>absent(), firstAssignment.getValue().apply(OFFER));
 
     clock.advance(reservationDuration);
 
-    assertEquals(SUCCESS, scheduler.schedule("b"));
+    assertTrue(scheduler.schedule("b"));
 
     assertEquals(true, secondAssignment.getValue().apply(OFFER).isPresent());
   }
@@ -187,12 +187,12 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
 
     control.replay();
-    assertEquals(TRY_AGAIN, scheduler.schedule("a"));
-    assertEquals(SUCCESS, scheduler.schedule("a"));
+    assertFalse(scheduler.schedule("a"));
+    assertTrue(scheduler.schedule("a"));
     firstAssignment.getValue().apply(OFFER);
     eventSink.post(TaskStateChange.transition(TASK_A, PENDING));
     clock.advance(halfReservationDuration);
-    assertEquals(SUCCESS, scheduler.schedule("b"));
+    assertTrue(scheduler.schedule("b"));
     secondAssignment.getValue().apply(OFFER);
   }
 
@@ -212,9 +212,9 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectAssigned(TASK_A);
 
     control.replay();
-    assertEquals(TRY_AGAIN, scheduler.schedule("a"));
+    assertFalse(scheduler.schedule("a"));
     clock.advance(halfReservationDuration);
-    assertEquals(SUCCESS, scheduler.schedule("a"));
+    assertTrue(scheduler.schedule("a"));
 
     firstAssignment.getValue().apply(OFFER);
   }
@@ -237,11 +237,11 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectAssigned(TASK_B);
 
     control.replay();
-    assertEquals(TRY_AGAIN, scheduler.schedule("a"));
+    assertFalse(scheduler.schedule("a"));
     clock.advance(halfReservationDuration);
     // Task is killed by user before it is scheduled
     eventSink.post(TaskStateChange.transition(TASK_A, PENDING));
-    assertEquals(SUCCESS, scheduler.schedule("b"));
+    assertTrue(scheduler.schedule("b"));
     assignment.getValue().apply(OFFER);
   }
 
@@ -262,10 +262,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectAssigned(TASK_A);
 
     control.replay();
-    assertEquals(TRY_AGAIN, scheduler.schedule("b"));
+    assertFalse(scheduler.schedule("b"));
     // We don't act on the reservation made by b because we want to see timeout behaviour.
     clock.advance(reservationDuration);
-    assertEquals(SUCCESS, scheduler.schedule("a"));
+    assertTrue(scheduler.schedule("a"));
     firstAssignment.getValue().apply(OFFER);
   }
 
@@ -298,7 +298,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(SUCCESS, scheduler.schedule(Tasks.id(taskA)));
+    assertTrue(scheduler.schedule(Tasks.id(taskA)));
     assignment.getValue().apply(OFFER);
   }
 
