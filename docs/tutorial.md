@@ -46,6 +46,8 @@ this directory is the same as `/vagrant` inside the Vagrant VMs).
 
 The script has an intentional bug, which we will explain later on.
 
+<!-- NOTE: If you are changing this file, be sure to also update examples/vagrant/test_tutorial.sh.
+-->
 ```python
 import sys
 import time
@@ -69,6 +71,8 @@ Once we have our script/program, we need to create a *configuration
 file* that tells Aurora how to manage and launch our Job. Save the below
 code in the file `hello_world.aurora`.
 
+<!-- NOTE: If you are changing this file, be sure to also update examples/vagrant/test_tutorial.sh.
+-->
 ```python
 pkg_path = '/vagrant/hello_world.py'
 
