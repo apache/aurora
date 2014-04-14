@@ -20,13 +20,17 @@ test_task = Task(
 
 job = Job(
   name = 'flask_example',
-  cluster = 'example',
+  cluster = 'devcluster',
   instances = 2,
   task = test_task,
   role = getpass.getuser(),
   environment = 'test',
   contact = '{{role}}@localhost',
-  announce = Announcer())
+  # Since there is only one slave in devcluster allow both instances to run there.
+  constraints = {
+    'host': 'limit:2',
+  },
+)
 
 jobs = [ job ]
 

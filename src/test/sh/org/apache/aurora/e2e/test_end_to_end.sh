@@ -27,11 +27,11 @@ set -u -e -x
 . src/test/sh/org/apache/aurora/e2e/test_common.sh
 
 function run_dev() {
-  vagrant ssh devtools -c "$1"
+  vagrant ssh devcluster -c "$1"
 }
 
 function run_sched() {
-  vagrant ssh aurora-scheduler -c "$1"
+  vagrant ssh devcluster -c "$1"
 }
 
 devtools_setup() {
@@ -64,11 +64,11 @@ test_flask_example() {
   schedlen=$(_curl -s "$base_url/scheduler" | wc -l)
   # Length of the scheduler doc should be at least 40 lines.
   test $schedlen -ge 40
-   # User page is at least 200 lines
+   # User page is at least 195 lines
   rolelen=$(_curl -s "$base_url/scheduler/$_role" | wc -l)
-  test $rolelen -ge 200
+  test $rolelen -ge 195
   joblen=$(_curl "$base_url/scheduler/$_role/$_env/$_job" | wc -l)
-  test $joblen -ge 200
+  test $joblen -ge 195
 
   echo '== Updating test job'
   run_sched "/vagrant/$_testdir/aurora_client.pex update $jobkey $_updated_config"
@@ -89,11 +89,11 @@ RETCODE=1
 # Set up shorthands for test
 export EXAMPLE_DIR=/vagrant/src/test/sh/org/apache/aurora/e2e/flask
 TEST_DIR=deploy_test
-TEST_CLUSTER=example
+TEST_CLUSTER=devcluster
 TEST_ROLE=vagrant
 TEST_ENV=test
 TEST_JOB=flask_example
-TEST_SCHEDULER_IP=192.168.33.6
+TEST_SCHEDULER_IP=192.168.33.7
 TEST_ARGS=(
   $TEST_CLUSTER
   $TEST_ROLE

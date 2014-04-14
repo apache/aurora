@@ -48,7 +48,7 @@ collect_result() {
       echo "with your code. Either way, this script DNR merging to master. Note you may need to"
       echo "reconcile state manually."
       echo "!!!"
-      vagrant ssh aurora-scheduler -c "aurora kill example/vagrant/test/flask_example"
+      vagrant ssh devcluster -c "aurora killall devcluster/vagrant/test/flask_example"
     fi
     exit $RETCODE
   ) >&4 # Send to the stderr we had at startup.
