@@ -22,6 +22,7 @@ python_test_suite(
     pants(':test_clusters'),
     pants(':test_cluster_option'),
     pants(':test_http_signaler'),
+    pants(':test_shellify'),
   ]
 )
 
@@ -67,5 +68,13 @@ python_tests(
   dependencies = [
     pants('3rdparty/python:mox'),
     pants('src/main/python/apache/aurora/common:http_signaler'),
+  ]
+)
+
+python_tests(
+  name = 'test_shellify',
+  sources = ['test_shellify.py'],
+  dependencies = [
+    pants('src/main/python/apache/aurora/common:shellify'),
   ]
 )

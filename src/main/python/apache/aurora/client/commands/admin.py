@@ -19,7 +19,10 @@ from __future__ import print_function
 """Command-line client for managing admin-only interactions with the aurora scheduler.
 """
 
+import json
 import os
+import pipes
+import sys
 import subprocess
 
 from apache.aurora.client.api import AuroraClientAPI
@@ -35,6 +38,7 @@ from apache.aurora.client.base import (
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
+from apache.aurora.common.shellify import shellify
 
 from gen.apache.aurora.constants import ACTIVE_STATES, TERMINAL_STATES
 from gen.apache.aurora.ttypes import (
@@ -455,3 +459,24 @@ def sla_probe_hosts(cluster, percentage, duration):
             for d in sorted(job_details)]))
 
   print_results(results)
+
+@app.command
+@app.command_option('--sh', default=False, action="store_true",
+  help="Emit a shell script instead of JSON.")
+@app.command_option('--export', default=False, action="store_true",
+  help="Emit a shell script prefixed with 'export'.")
+@requires.exactly('cluster')
+def get_cluster_config(cluster):
+  """usage: get_cluster_config [--sh] [--export] CLUSTER
+
+  Dumps the configuration for CLUSTER. By default we emit a json blob to stdout equivalent to
+  an entry in clusters.json. With --sh a shell script is written to stdout that can be used
+  with eval in a script to load the cluster config. With --export the shell script is prefixed
+  with 'export '."""
+  options = app.get_options()
+  cluster = CLUSTERS[cluster]
+  if not options.sh:
+    json.dump(cluster, sys.stdout)
+  else:
+    for line in shellify(cluster, options.export, prefix = "AURORA_CLUSTER_"):
+      print(line)

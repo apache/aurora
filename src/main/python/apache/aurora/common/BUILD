@@ -61,6 +61,14 @@ python_library(
 )
 
 python_library(
+  name = 'shellify',
+  sources = ['shellify.py'],
+  dependencies = [
+    pants('3rdparty/python:twitter.common.lang'),
+  ],
+)
+
+python_library(
   name = 'common',
   dependencies = [
     pants(':aurora_job_key'),
@@ -68,6 +76,7 @@ python_library(
     pants(':cluster_option'),
     pants(':clusters'),
     pants(':http_signaler'),
+    pants(':shellify'),
     pants('src/main/python/apache/aurora/common/auth'),
 
     # covering dependency on gen.*
