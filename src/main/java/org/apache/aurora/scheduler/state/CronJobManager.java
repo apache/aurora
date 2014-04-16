@@ -172,7 +172,9 @@ public class CronJobManager implements EventSubscriber {
     shutdownRegistry.addAction(new Command() {
       @Override
       public void execute() {
-        cron.stopAsync().awaitTerminated();
+        // NOTE: We don't know ahead-of-time which thread will execute the shutdown command,
+        // so we shouldn't block here.
+        cron.stopAsync();
       }
     });
 
