@@ -41,6 +41,8 @@ def generatedDir = "$buildDir/generated-src"
 def generatedJavaDir = "$generatedDir/gen-java"
 def generatedJSDir = "$generatedDir/gen-js"
 
+def thriftVersion = '0.9.1'
+
 compileJava {
   sourceCompatibility = 1.7
   targetCompatibility = 1.7
@@ -136,13 +138,12 @@ jar {
 
 dependencies {
   def jerseyRev = '1.17.1'
-  def libthriftRev = '0.9.1'
   def log4jRev = '1.2.17'
   def slf4jRev = '1.6.1'
   def junitRev = '4.11'
 
   def guavaDep = 'com.google.guava:guava:16.0'
-  def thriftLib = "org.apache.thrift:libthrift:${libthriftRev}"
+  def thriftLib = "org.apache.thrift:libthrift:${thriftVersion}"
 
   compile 'aopalliance:aopalliance:1.0'
   compile 'com.google.code.findbugs:jsr305:2.0.1'
@@ -219,7 +220,7 @@ dependencies {
         // Force versions based on the dependencies we use from above
         'org.slf4j:slf4j-api' : slf4jRev,
         'log4j:log4j' : log4jRev,
-        'org.apache.thrift:libthrift' : libthriftRev,
+        'org.apache.thrift:libthrift' : thriftVersion,
         'junit:junit' : junitRev,
         // Force versions based on inter-dependency collisions
         'org.hamcrest:hamcrest-core' : '1.3',
@@ -234,15 +235,36 @@ checkstyle {
   sourceSets = [ sourceSets.main , sourceSets.test]
 }
 
-def thriftBinary = 'build-support/thrift/thrift-0.9.1/compiler/cpp/thrift'
-
+/**
+ * Check if Apache Thrift is all ready installed and is the same version as we
+ * depend on, otherwise compile the version in build-support. project.thrift will
+ * contain the path to the thrift executable when finished
+ */
 task bootstrapThrift {
-  inputs.file file(thriftBinary)
-  outputs.dir file(thriftBinary)
-  doLast {
-    exec {
-      executable = 'make'
-      args = ['-C', 'build-support/thrift']
+  project.ext.set('thrift', '')
+
+  try {
+    // Attempt to run thrift and get the version string back. if no version of thrift is available
+    // execute will throw an exception, catch and set project.thrift as empty to build the local version
+    def output = "thrift --version".execute().text.trim()
+    if(output == "Thrift version ${thriftVersion}") {
+      project.thrift = 'thrift'
+    }
+  } catch (IOException e) {
+    project.thrift = ''
+  }
+
+  // If thrift was not found or was the wrong version build our local copy
+  if (project.thrift.isEmpty()) {
+    project.thrift = "build-support/thrift/thrift-${thriftVersion}/compiler/cpp/thrift"
+
+    inputs.file file(project.thrift)
+    outputs.dir file(project.thrift)
+    doLast {
+      exec {
+        executable = 'make'
+        args = ['-C', 'build-support/thrift']
+      }
     }
   }
 }
@@ -256,7 +278,7 @@ task generateSources(dependsOn: 'bootstrapThrift') {
     outputDir.exists() || outputDir.mkdirs()
     inputFiles.each { File file ->
       exec {
-        executable = thriftBinary
+        executable = project.thrift
         args = ['--gen', 'java:hashcode', '--gen', 'js', '-o', outputDir, file]
       }
     }
