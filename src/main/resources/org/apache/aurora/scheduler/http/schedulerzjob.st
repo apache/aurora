@@ -280,6 +280,7 @@
         // Attach tooltips to task states
         jQuery('.task-status').each(function() {
           jQuery(this).popover({
+            container: 'body',
             placement: 'right',
             trigger: 'hover',
             title: jQuery(this).attr('status'),
