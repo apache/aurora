@@ -118,7 +118,7 @@ aurora_command create "create $JOB_KEY /vagrant/hello_world.aurora"
 await_task_in_state $JOB_KEY FAILED
 
 # Fix the bug in our test script.
-sed -i '' 's/xrang(/xrange(/' hello_world.py
+perl -pi -e 's|xrang\(|xrange\(|g' hello_world.py
 aurora_command update "update $JOB_KEY /vagrant/hello_world.aurora"
 await_task_in_state $JOB_KEY RUNNING
 
