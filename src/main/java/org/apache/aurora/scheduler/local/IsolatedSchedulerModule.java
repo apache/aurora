@@ -45,6 +45,7 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
+import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
@@ -54,6 +55,8 @@ import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.comm.DeletedTasks;
+import org.apache.aurora.gen.comm.SchedulerMessage;
 import org.apache.aurora.scheduler.DriverFactory;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
@@ -64,6 +67,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.local.FakeDriverFactory.FakeSchedulerDriver;
 import org.apache.aurora.scheduler.log.testing.FileLogStreamModule;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.Offer;
@@ -82,7 +86,7 @@ import org.apache.thrift.TException;
 
 /**
  * A module that binds a fake mesos driver factory and a local (non-replicated) storage system.
- * <p>
+ * <p/>
  * The easiest way to run the scheduler in local/isolated mode is by executing:
  * <pre>
  * $ ./pants goal bundle aurora:scheduler-local && ./aurora/scripts/scheduler.sh -c local
@@ -237,6 +241,25 @@ public class IsolatedSchedulerModule extends AbstractModule {
         }
       };
       executor.schedule(changeState, delaySeconds, TimeUnit.SECONDS);
+
+      if (state == TaskState.TASK_FINISHED) {
+        Runnable deleteSandBox = new Runnable() {
+          @Override
+          public void run() {
+            try {
+              scheduler.get().frameworkMessage(
+                  driver,
+                  Protos.ExecutorID.newBuilder().setValue("executor-id").build(),
+                  SlaveID.newBuilder().setValue("slave-id").build(),
+                  ThriftBinaryCodec.encode(
+                      SchedulerMessage.deletedTasks(new DeletedTasks(ImmutableSet.of(taskId)))));
+            } catch (Exception e) {
+              LOG.info("Error deleting tasks " + e);
+            }
+          }
+        };
+        executor.schedule(deleteSandBox, delaySeconds + 100, TimeUnit.SECONDS);
+      }
     }
 
     @Subscribe

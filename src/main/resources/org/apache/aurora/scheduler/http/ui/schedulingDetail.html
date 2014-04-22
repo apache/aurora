@@ -1,0 +1,23 @@
+<div class='scheduling-detail'>
+  <ul class='unstyled'>
+    <li>resources:
+      cpu: {{dataRow.schedulingDetail.numCpus | toCores}},
+      ram: {{dataRow.schedulingDetail.ramMb | scaleMb}},
+      disk: {{dataRow.schedulingDetail.diskMb | scaleMb}}
+    </li>
+    <li ng-if='dataRow.schedulingDetail.constraints'>
+      constraints: {{dataRow.schedulingDetail.constraints}}
+    </li>
+    <li>production: {{dataRow.schedulingDetail.production}}</li>
+    <li>service: {{dataRow.schedulingDetail.isService}}</li>
+    <li ng-if='dataRow.schedulingDetail.ports'>
+      ports: {{dataRow.schedulingDetail.ports}}
+    </li>
+    <li ng-if='dataRow.schedulingDetail.metadata'>
+      metadata: {{dataRow.schedulingDetail.metadata}}
+    </li>
+    <li ng-if='dataRow.schedulingDetail.contact'>
+      contact: {{dataRow.schedulingDetail.contact}}
+    </li>
+  </ul>
+</div>

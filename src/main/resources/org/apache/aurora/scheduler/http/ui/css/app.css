@@ -15,3 +15,26 @@
 .sort-descent:before {
   content: "\25B4";
 }
+
+ul.breadcrumb {
+  margin: 0 0 0;
+}
+
+.page-header {
+  margin: 0 0 0;
+  border-bottom: 0px;
+}
+
+.summaryButton {
+  margin-bottom: 10px;
+}
+
+.schedulingStatus {
+  border-bottom: 1px #aaaaaa dashed;
+}
+
+.bottomRight {
+  bottom: 10px;
+  right: 10px;
+  position: fixed;
+}

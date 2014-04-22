@@ -131,6 +131,10 @@ public class SchedulerMain extends AbstractApplication {
   private static final Arg<List<Class<? extends Module>>> EXTRA_MODULES =
       Arg.create((List<Class<? extends Module>>) ImmutableList.<Class<? extends Module>>of());
 
+  // TODO(Suman Karumuri): Rename viz_job_url_prefix to stats_job_url_prefix for consistency.
+  @CmdLine(name = "viz_job_url_prefix", help = "URL prefix for job container stats.")
+  private static final Arg<String> STATS_URL_PREFIX = Arg.create("");
+
   @Inject private SingletonService schedulerService;
   @Inject private LocalServiceRegistry serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
@@ -160,11 +164,12 @@ public class SchedulerMain extends AbstractApplication {
   static Iterable<? extends Module> getModules(
       String clusterName,
       String serverSetPath,
-      ClientConfig zkClientConfig) {
+      ClientConfig zkClientConfig,
+      String statsURLPrefix) {
 
     return ImmutableList.<Module>builder()
         .addAll(getSystemModules())
-        .add(new AppModule(clusterName, serverSetPath, zkClientConfig))
+        .add(new AppModule(clusterName, serverSetPath, zkClientConfig, statsURLPrefix))
         .addAll(getExtraModules())
         .add(new LogStorageModule())
         .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
@@ -215,7 +220,12 @@ public class SchedulerMain extends AbstractApplication {
 
     return ImmutableList.<Module>builder()
         .add(new BackupModule(SnapshotStoreImpl.class))
-        .addAll(getModules(CLUSTER_NAME.get(), SERVERSET_PATH.get(), zkClientConfig))
+        .addAll(
+            getModules(
+                CLUSTER_NAME.get(),
+                SERVERSET_PATH.get(),
+                zkClientConfig,
+                STATS_URL_PREFIX.get()))
         .add(new ZooKeeperClientModule(zkClientConfig))
         .add(configModule)
         .add(additional)

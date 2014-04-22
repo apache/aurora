@@ -1,0 +1,23 @@
+<div>
+  <div ng-show='error'>
+    <error/>
+  </div>
+
+  <div ng-hide='error'>
+    <div>
+      <breadcrumb/>
+    </div>
+
+    <div class='page-header'>
+      <h2 class='text-center'>{{title}}</h2>
+    </div>
+
+    <div>
+      <smart-table config='roleSummaryTableConfig'
+                   columns='roleSummaryColumns'
+                   rows='roleSummaries'
+                   class='table table-striped table-hover table-bordered table-condensed'>
+      </smart-table>
+    </div>
+  </div>
+</div>

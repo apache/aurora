@@ -45,8 +45,11 @@ public class ServerInfoInterceptorTest extends EasyMockTest {
   private AuroraAdmin.Iface realThrift;
   private AuroraAdmin.Iface decoratedThrift;
 
-  private static final IServerInfo SERVER_INFO =
-      IServerInfo.build(new ServerInfo().setClusterName("test").setThriftAPIVersion(1));
+  private static final IServerInfo SERVER_INFO = IServerInfo.build(
+      new ServerInfo()
+          .setClusterName("test")
+          .setThriftAPIVersion(1)
+          .setStatsUrlPrefix("fake_url"));
 
   private ServerInfoInterceptor interceptor;
 
@@ -86,9 +89,9 @@ public class ServerInfoInterceptorTest extends EasyMockTest {
         new ServerInfo().setClusterName("FAKECLUSTER").setThriftAPIVersion(100000);
 
     Response response = okResponse(
-            Result.getJobsResult(
-                new GetJobsResult().setConfigs(ImmutableSet.<JobConfiguration>of())))
-            .setServerInfo(previousServerInfo);
+        Result.getJobsResult(
+            new GetJobsResult().setConfigs(ImmutableSet.<JobConfiguration>of())))
+        .setServerInfo(previousServerInfo);
 
     expect(realThrift.getJobs(ROLE)).andReturn(response);
 

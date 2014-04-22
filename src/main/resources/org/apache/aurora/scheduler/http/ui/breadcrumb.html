@@ -1,0 +1,17 @@
+<div class='row-fluid'>
+  <ul class='breadcrumb'>
+    <li><a href='/scheduler'>Home</a><span ng-if='role' class='divider'>></span></li>
+
+    <li ng-if='role && !environment' class='active'>Role: {{role}}</a></li>
+    <li ng-if='role && environment'><a href='/scheduler/{{role}}'>Role: {{role}}</a>
+      <span class='divider'>></span></li>
+
+    <li ng-if='environment && !job' class='active'>Environment: {{environment}}</li>
+    <li ng-if='environment && job'>
+      <a href='/scheduler/{{role}}/{{environment}}'>Environment: {{environment}}</a>
+      <span class='divider'>></span>
+    </li>
+
+    <li ng-if='job' class='active'>Job: {{job}}</li>
+  </ul>
+</div>

@@ -1,50 +1,49 @@
 <!doctype html>
-<html lang="en" ng-app="auroraUI">
+<html lang='en' ng-app='auroraUI'>
 <head>
-  <meta charset="utf-8">
+  <meta charset='utf-8'>
+  <meta name='google' value='notranslate'>
+  <link rel='icon' href='/images/aurora.png' type='image/png'/>
   <title>Aurora UI</title>
-  <link rel="stylesheet" href="/css/app.css"/>
 </head>
 <body class='ng-cloak'>
 
-<div class='container'>
-  <div ng-controller='JobSummaryController'>
-    <div ng-show="{{error}}">
-      <p class="lead text-center text-warning"> {{reloadMsg}}</p>
-      <p class="text-center text-warning"> {{errorMsg}}</p>
-    </div>
-
-    <div ng-hide="{{error}}">
-      <div class='page-header'>
-        <h2 class="text-center">{{title}}</h2>
-      </div>
-      <div>
-        <smart-table config="globalConfig" columns="columnCollection" rows="rowCollection"
-                     class='table table-striped table-hover table-bordered table-condensed'>
-        </smart-table>
-      </div>
-    </div>
-  </div>
+<div class='container-fluid'>
+  <ng-view></ng-view>
 </div>
 
 <!-- Thrift -->
-<script src="/js/thrift.js"></script>
-<script src="/js/apiTypes.js"></script>
-<script src="/js/readOnlyScheduler.js"></script>
+<script src='/js/thrift.js'></script>
+<script src='/js/apiTypes.js'></script>
+<script src='/js/readOnlyScheduler.js'></script>
 
 <!-- Angular -->
-<script src="/js/angular.js"></script>
-<script src="/js/app.js"></script>
-<script src="/js/controllers.js"></script>
-<script src="/js/directives.js"></script>
-<script src="/js/services.js"></script>
+<script src='/js/angular.js'></script>
+<script src='/js/angular-route.js'></script>
+<script src='/js/app.js'></script>
+<script src='/js/controllers.js'></script>
+<script src='/js/directives.js'></script>
+<script src='/js/services.js'></script>
+<script src='/js/filters.js'></script>
 
 <!-- Bootstrap -->
-<script src="/js/jquery.min.js"></script>
-<script src="/js/bootstrap.min.js"></script>
-<link href="/css/bootstrap.min.css" rel="stylesheet">
+<script src='/js/jquery.min.js'></script>
+<script src='/js/bootstrap.min.js'></script>
+<link href='/css/bootstrap.min.css' rel='stylesheet'>
+<link href='/img/glyphicons-halflings.png' rel='stylesheet'>
+<link href='/css/bootstrap.icon-large.min.css' rel='stylesheet'>
+<link href='/img/glyphicons.png' rel='stylesheet'>
 
-<!--smart table-->
-<script src="/js/smartTable.js"></script>
+<!-- smart table -->
+<script src='/js/smartTable.js'></script>
+
+<!-- underscore -->
+<script src='/js/underscore.js'></script>
+
+<!-- moment.js -->
+<script src='/js/moment.js'></script>
+
+<!-- Load our css at the end so we can override bootstrap css properties as needed -->
+<link rel='stylesheet' href='/css/app.css'/>
 </body>
 </html>

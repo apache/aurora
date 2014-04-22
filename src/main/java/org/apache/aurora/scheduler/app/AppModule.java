@@ -72,11 +72,18 @@ class AppModule extends AbstractModule {
 
   private final String clusterName;
   private final String serverSetPath;
+  private final String statsUrlPrefix;
   private final ClientConfig zkClientConfig;
 
-  AppModule(String clusterName, String serverSetPath, ClientConfig zkClientConfig) {
+  AppModule(
+      String clusterName,
+      String serverSetPath,
+      ClientConfig zkClientConfig,
+      String statsUrlPrefix) {
+
     this.clusterName = checkNotBlank(clusterName);
     this.serverSetPath = checkNotBlank(serverSetPath);
+    this.statsUrlPrefix = statsUrlPrefix;
     this.zkClientConfig = checkNotNull(zkClientConfig);
   }
 
@@ -93,7 +100,8 @@ class AppModule extends AbstractModule {
         IServerInfo.build(
             new ServerInfo()
                 .setClusterName(clusterName)
-                .setThriftAPIVersion(THRIFT_API_VERSION)));
+                .setThriftAPIVersion(THRIFT_API_VERSION)
+                .setStatsUrlPrefix(statsUrlPrefix)));
 
     // Filter layering: notifier filter -> base impl
     PubsubEventModule.bind(binder(), SchedulingFilterImpl.class);

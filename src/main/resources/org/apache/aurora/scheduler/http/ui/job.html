@@ -1,0 +1,68 @@
+<div>
+  <div ng-show='error'>
+    <error/>
+  </div>
+
+  <div ng-hide='error'>
+    <div class='container-fluid'>
+      <div>
+        <breadcrumb/>
+      </div>
+
+      <div class='container-fluid'>
+        <div class='page-header'>
+          <h2 class='text-center'>
+            Job <em>{{job}}</em> in role <em>{{role}}</em> and environment <em>{{environment}}</em>
+            <span ng-if='jobDashboardUrl'>
+            <a ng-href='{{jobDashboardUrl}}' title='Container stats for this job'>
+              <i class='icon-large icon-stats'></i>
+            </a>
+            </span>
+          </h2>
+        </div>
+      </div>
+
+      <div class='container-fluid'>
+        <button class="btn summaryButton" ng-click='toggleSummaryVisibility()'>
+          {{summaryButtonText}}
+        </button>
+        <div ng-if='showSummary'>
+          <div class='row'>
+            <div class='span8'>
+              <smart-table config='taskSummaryTableConfig'
+                           columns='taskSummaryTableColumns'
+                           rows='taskSummary'
+                           class='table table-striped table-hover table-bordered table-condensed'>
+              </smart-table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class='container-fluid'>
+        <h3>Active tasks</h3>
+
+        <div>
+          <smart-table config='activeTasksTableConfig'
+                       columns='activeTasksTableColumns'
+                       rows='activeTasks'
+                       class='table table-striped table-hover table-bordered table-condensed'>
+          </smart-table>
+        </div>
+      </div>
+
+      <div class='container-fluid'>
+        <h3>Completed tasks</h3>
+        <smart-table config='completedTasksTableConfig'
+                     columns='completedTasksTableColumns'
+                     rows='completedTasks'
+                     class='table table-striped table-hover table-bordered table-condensed'>
+        </smart-table>
+      </div>
+
+      <div class='container-fluid'>
+        <a class='bottomRight' ng-click='toggleTaskInfoLinkVisibility()'>π</a>
+      </div>
+    </div>
+  </div>
+</div>

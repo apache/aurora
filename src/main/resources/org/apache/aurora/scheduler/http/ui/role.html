@@ -1,0 +1,67 @@
+<div>
+  <div ng-show='error'>
+    <error/>
+  </div>
+
+  <div ng-hide='error'>
+    <div>
+      <div>
+        <breadcrumb/>
+      </div>
+
+      <div>
+       <div class='container-fluid'>
+          <h2 class='page-header text-center'>
+            Jobs for role <em>{{role}}</em>
+            <span ng-if='environment'> and environment <em>{{environment}}</em></span>
+          </h2>
+        </div>
+
+        <div class='container-fluid'>
+         <div ng-if='!environment'>
+            <button class='btn summaryButton' ng-click='toggleResourceVisibility()'>
+              {{resourceButtonText}}
+            </button>
+          </div>
+
+          <div ng-show='showResources && !environment'>
+            <div class='row'>
+              <div class='span8'>
+                <div ng-controller="QuotaController">
+                  <div ng-show='error'>
+                    <error/>
+                  </div>
+
+                  <div ng-hide='error'>
+                    <smart-table config='resourcesTableConfig'
+                                 columns='resourcesTableColumns'
+                                 rows='resources'
+                                 class='table table-striped table-hover table-condensed'>
+                    </smart-table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class='container-fluid'>
+          <smart-table config='jobsTableConfig'
+                       columns='jobsTableColumns'
+                       rows='jobs'
+                       class='table table-striped table-hover table-bordered table-condensed'>
+          </smart-table>
+        </div>
+
+        <div class='container-fluid'>
+          <h2 class='text-center'>Cron jobs for role <em>{{role}}</em></h2>
+          <smart-table config='cronJobsTableConfig'
+                       columns='cronJobsTableColumns'
+                       rows='cronJobs'
+                       class='table table-striped table-hover table-bordered table-condensed'>
+          </smart-table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

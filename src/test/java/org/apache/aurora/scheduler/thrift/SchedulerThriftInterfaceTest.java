@@ -144,7 +144,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final IResourceAggregate CONSUMED =
       IResourceAggregate.build(new ResourceAggregate(0.0, 0, 0));
   private static final ServerInfo SERVER_INFO =
-      new ServerInfo().setClusterName("test").setThriftAPIVersion(THRIFT_API_VERSION);
+      new ServerInfo()
+          .setClusterName("test")
+          .setThriftAPIVersion(THRIFT_API_VERSION)
+          .setStatsUrlPrefix("fake_url");
   private static final APIVersion API_VERSION = new APIVersion().setMajor(THRIFT_API_VERSION);
   private static final String CRON_SCHEDULE = "0 * * * *";
 
@@ -318,7 +321,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private static IScheduledTask buildScheduledTask(String jobName) {
-     return IScheduledTask.build(new ScheduledTask()
+    return IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTask(new TaskConfig()
                 .setOwner(ROLE_IDENTITY)

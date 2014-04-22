@@ -1,0 +1,25 @@
+<task-status>
+  <div class='row'>
+    <div class='span4'>
+    <span title='{{formatedValue | scheduleStatusTooltip}}'>
+      <span ng-if='!showDetails'><i class='icon-plus'></i></span>
+      <span ng-if='showDetails'><i class='icon-minus'></i></span>
+      <span>
+        {{dataRow.latestActivity | toElapsedTime}} ago -
+        <span class='schedulingStatus'>{{formatedValue}}</span>
+        <span ng-if='statusMessage'>: {{statusMessage}}</span>
+      </span>
+    </span>
+
+      <ul ng-if='showDetails'>
+        <li ng-repeat='taskEvent in dataRow.taskEvents'>
+          {{taskEvent.date}} local -
+        <span title='{{taskEvent.status | scheduleStatusTooltip}}'>
+          <span class='schedulingStatus'>{{taskEvent.status}}</span>
+        </span>
+          <span ng-if='taskEvent.message'> - {{taskEvent.message}}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</task-status>

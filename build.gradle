@@ -363,6 +363,7 @@ run {
     '-vlog=INFO',
     '-testing_isolated_scheduler=true',
     '-testing_log_file_path=/tmp/testing_log_file',
+    '-viz_job_url_prefix=http://fake_viz_domain.com/stats?'
   ]
 }
 

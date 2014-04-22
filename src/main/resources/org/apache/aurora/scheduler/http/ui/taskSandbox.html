@@ -1,0 +1,13 @@
+<div class='row'>
+  <div class='span2'>
+    <span ng-if='dataRow.sandboxExists'>
+      <a ng-href='http://{{formatedValue}}:1338/task/{{dataRow.taskId}}'>
+        {{formatedValue}}
+      </a>
+    </span>
+
+    <span ng-if='!dataRow.sandboxExists'>
+      {{formatedValue}}
+    </span>
+  </div>
+</div>

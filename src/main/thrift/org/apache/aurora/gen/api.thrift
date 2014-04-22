@@ -436,6 +436,7 @@ struct JobSummaryResult {
 struct ServerInfo {
   1: string clusterName
   2: i32 thriftAPIVersion
+  3: string statsUrlPrefix  // A url prefix for job container stats.
 }
 
 union Result {

@@ -84,12 +84,7 @@ public class ServletModule extends AbstractModule {
         bind(HttpStatsFilter.class).in(Singleton.class);
         filter("/scheduler*").through(HttpStatsFilter.class);
         bind(LeaderRedirectFilter.class).in(Singleton.class);
-        // Servlets may assign a special meaning to trailing /, but this confuses AngularJS's
-        // resource loader. So, removing them for /scheduler* URLs using a UIRedirectFilter.
-        // TODO (skarumuri): Remove UIRedirectFilter when the /scheduler servlets are removed.
-        bind(UIRedirectFilter.class).in(Singleton.class);
         filter("/scheduler").through(LeaderRedirectFilter.class);
-        filter("/scheduler*").through(UIRedirectFilter.class);
 
         registerJerseyEndpoint("/cron", Cron.class);
         registerJerseyEndpoint("/maintenance", Maintenance.class);
@@ -97,7 +92,6 @@ public class ServletModule extends AbstractModule {
         registerJerseyEndpoint("/offers", Offers.class);
         registerJerseyEndpoint("/pendingtasks", PendingTasks.class);
         registerJerseyEndpoint("/quotas", Quotas.class);
-        registerJerseyEndpoint("/scheduler/", SchedulerzRole.class, SchedulerzJob.class);
         registerJerseyEndpoint("/slaves", Slaves.class);
         registerJerseyEndpoint("/structdump", StructDump.class);
         registerJerseyEndpoint("/utilization", Utilization.class);
@@ -108,48 +102,8 @@ public class ServletModule extends AbstractModule {
     registerJQueryAssets();
     registerBootstrapAssets();
 
-    registerAsset("assets/util.js", "/js/util.js");
-    registerAsset("assets/dictionary.js", "/js/dictionary.js");
     registerAsset("assets/images/viz.png", "/images/viz.png");
     registerAsset("assets/images/aurora.png", "/images/aurora.png");
-
-    // Register datatables
-    registerAsset("assets/datatables/css/jquery.dataTables.css", "/css/jquery.dataTables.css");
-    registerAsset("assets/datatables/images/back_disabled.png", "/images/back_disabled.png");
-    registerAsset(
-        "assets/datatables/images/back_enabled_hover.png",
-        "/images/back_enabled_hover.png");
-    registerAsset("assets/datatables/images/back_enabled.png", "/images/back_enabled.png");
-    registerAsset(
-        "assets/datatables/images/forward_disabled.png",
-        "/images/forward_disabled.png");
-    registerAsset(
-        "assets/datatables/images/forward_enabled_hover.png",
-        "/images/forward_enabled_hover.png");
-    registerAsset(
-        "assets/datatables/images/forward_enabled.png",
-        "/images/forward_enabled.png");
-    registerAsset(
-        "assets/datatables/images/sort_asc_disabled.png",
-        "/images/sort_asc_disabled.png");
-    registerAsset("assets/datatables/images/sort_asc.png", "/images/sort_asc.png");
-    registerAsset("assets/datatables/images/sort_both.png", "/images/sort_both.png");
-    registerAsset(
-        "assets/datatables/images/sort_desc_disabled.png",
-        "/images/sort_desc_disabled.png");
-    registerAsset("assets/datatables/images/sort_desc.png", "/images/sort_desc.png");
-    registerAsset(
-        "assets/datatables/js/jquery.dataTables.min.js",
-        "/js/jquery.dataTables.min.js");
-    registerAsset(
-        "assets/datatables/js/dataTables.bootstrap.js",
-        "/js/dataTables.bootstrap.js");
-    registerAsset(
-        "assets/datatables/js/dataTables.localstorage.js",
-        "/js/dataTables.localstorage.js");
-    registerAsset(
-        "assets/datatables/js/dataTables.htmlNumberType.js",
-        "/js/dataTables.htmlNumberType.js");
 
     registerUIClient();
 
@@ -175,6 +129,14 @@ public class ServletModule extends AbstractModule {
     registerAsset(BOOTSTRAP_PATH + "img/glyphicons-halflings.png",
         "/img/glyphicons-halflings.png",
         false);
+
+    // Register a complete set of large glyphicons from bootstrap-glyphicons project at
+    // http://marcoceppi.github.io/bootstrap-glyphicons/
+    // TODO(Suman Karumuri): Install the bootstrap-glyphicons via bower, once it is available.
+    registerAsset("bootstrap-glyphicons-master/glyphicons.png", "/img/glyphicons.png", false);
+    registerAsset("bootstrap-glyphicons-master/css/bootstrap.icon-large.min.css",
+        "/css/bootstrap.icon-large.min.css",
+        false);
   }
 
   /**
@@ -183,13 +145,29 @@ public class ServletModule extends AbstractModule {
   private void registerUIClient() {
     registerAsset("bower_components/smart-table/Smart-Table.debug.js", "/js/smartTable.js", false);
     registerAsset("bower_components/angular/angular.js", "/js/angular.js", false);
+    registerAsset("bower_components/angular-route/angular-route.js", "/js/angular-route.js", false);
+    registerAsset("bower_components/underscore/underscore.js", "/js/underscore.js", false);
+    registerAsset("bower_components/momentjs/moment.js", "/js/moment.js", false);
 
     registerAsset("ReadOnlyScheduler.js", "/js/readOnlyScheduler.js", false);
     registerAsset("api_types.js", "/js/apiTypes.js", false);
     registerAsset("thrift.js", "/js/thrift.js", false);
 
-    registerAsset("ui/index.html", "/scheduler");
+    registerAsset("ui/index.html", "/scheduler", true);
+    Registration.registerEndpoint(binder(), "/scheduler");
+
     registerAsset("ui/roleLink.html", "/roleLink.html");
+    registerAsset("ui/roleEnvLink.html", "/roleEnvLink.html");
+    registerAsset("ui/jobLink.html", "/jobLink.html");
+    registerAsset("ui/home.html", "/home.html");
+    registerAsset("ui/role.html", "/role.html");
+    registerAsset("ui/breadcrumb.html", "/breadcrumb.html");
+    registerAsset("ui/error.html", "/error.html");
+    registerAsset("ui/job.html", "/job.html");
+    registerAsset("ui/taskSandbox.html", "/taskSandbox.html");
+    registerAsset("ui/taskStatus.html", "/taskStatus.html");
+    registerAsset("ui/taskLink.html", "/taskLink.html");
+    registerAsset("ui/schedulingDetail.html", "/schedulingDetail.html");
 
     registerAsset("ui/css/app.css", "/css/app.css");
 
@@ -197,6 +175,7 @@ public class ServletModule extends AbstractModule {
     registerAsset("ui/js/controllers.js", "/js/controllers.js");
     registerAsset("ui/js/directives.js", "/js/directives.js");
     registerAsset("ui/js/services.js", "/js/services.js");
+    registerAsset("ui/js/filters.js", "/js/filters.js");
   }
 
   private void registerAsset(String resourceLocation, String registerLocation) {
