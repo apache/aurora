@@ -17,14 +17,10 @@
 
 apt-get update
 apt-get -y install \
-    automake \
     curl \
     git \
-    g++ \
     libcurl4-openssl-dev \
     libsasl2-dev \
-    libtool \
-    make \
     openjdk-7-jdk \
     python-dev \
     zookeeper
@@ -43,12 +39,19 @@ function build_all() {
   fi
 
   pushd aurora
+    # fetch the mesos egg, needed to build python components
     mkdir -p third_party
     pushd third_party
       wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.17.0_amd64.egg \
         -O mesos-0.17.0-py2.7-linux-x86_64.egg
     popd
     git pull
+
+    # install thrift, needed for code generation in the scheduler build
+    # TODO(wfarner): Move deb file out of jfarrell's individual hosting.
+    thrift_deb=thrift-compiler_0.9.1_amd64.deb
+    wget -c http://people.apache.org/~jfarrell/thrift/0.9.1/contrib/deb/ubuntu/12.04/$thrift_deb
+    dpkg --install $thrift_deb
 
     # build scheduler
     ./gradlew installApp
@@ -76,12 +79,12 @@ EOF
   sudo chown -R vagrant:vagrant aurora
 }
 
-function install_mesos() {
+function install_mesos {
   wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.17.0_amd64.deb
   dpkg --install mesos_0.17.0_amd64.deb
 }
 
-function install_aurora() {
+function install_aurora {
   # The bulk of the 'install' was done by the build, the result of which we access
   # through /home/vagrant.
   DIST_DIR=/home/vagrant/aurora/dist
@@ -113,7 +116,7 @@ function install_aurora() {
 EOF
 }
 
-function start_services() {
+function start_services {
   cp /vagrant/examples/vagrant/upstart/*.conf /etc/init
 
   start zookeeper

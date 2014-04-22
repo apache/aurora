@@ -145,7 +145,7 @@ identical, the job keys identify the same job.
 cluster names. For Vagrant, from the top-level of your Aurora repository clone,
 do:
 
-    $ vagrant ssh devcluster
+    $ vagrant ssh
 
 Followed by:
 
@@ -180,7 +180,7 @@ Or for our example:
 
 This returns:
 
-    $ vagrant ssh devcluster
+    $ vagrant ssh
     Welcome to Ubuntu 12.04 LTS (GNU/Linux 3.2.0-23-generic x86_64)
 
      * Documentation:  https://help.ubuntu.com/
