@@ -390,8 +390,6 @@ class ListJobsCommand(Verb):
     jobs = context.get_jobs_matching_key(context.options.jobspec)
     for j in jobs:
       context.print_out('%s/%s/%s/%s' % (j.cluster, j.role, j.env, j.name))
-    result = self.get_status_for_jobs(jobs, context)
-    context.print_out(result)
     return EXIT_OK
 
 class OpenCommand(Verb):

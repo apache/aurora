@@ -33,6 +33,7 @@ python_library(
   dependencies = [
     pants(':cli'),
     pants(':bridge'),
+    pants('3rdparty/python:twitter.common.python'),
     pants('src/main/python/apache/aurora/client/bin:aurora_client_lib')
   ]
 )

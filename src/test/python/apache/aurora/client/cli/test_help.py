@@ -44,7 +44,7 @@ class TestHelp(unittest.TestCase):
         side_effect=self.mock_print):
       self.cmd.execute(['help'])
       assert len(self.transcript) > 10
-      assert self.transcript[0] == 'Usage:'
+      assert self.transcript[1] == 'Usage:'
       assert '==Commands for jobs' in self.transcript
       assert '==Commands for quotas' in self.transcript
 

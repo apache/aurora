@@ -39,6 +39,8 @@ import logging
 import sys
 from uuid import uuid1
 
+from twitter.common.python.pex import PexInfo
+from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 
 # Constants for standard return codes.
 EXIT_OK = 0
@@ -69,6 +71,15 @@ def print_aurora_log(sev, msg, *args, **kwargs):
   extra['user'] = getpass.getuser()
   kwargs['extra'] = extra
   logger.log(sev, msg, *args, **kwargs)
+
+def get_client_version():
+  try:
+    pexpath = sys.argv[0]
+    pex_info = PexInfo.from_pex(PythonDirectoryWrapper.get(pexpath))
+    return ("%s@%s" % (pex_info.build_properties.get('sha', 'unknown'),
+        pex_info.build_properties.get('date', 'unknown')))
+  except (IOError, PythonDirectoryWrapper.Error):
+    return "VersionUnknown"
 
 
 class Context(object):
@@ -266,7 +277,7 @@ class CommandLine(object):
   @property
   def composed_help(self):
     """Get a fully composed, well-formatted help message"""
-    result = ["Usage:"]
+    result = ["Aurora Client version %s" % get_client_version(), "Usage:"]
     for noun in self.registered_nouns:
       result += ["==Commands for %ss" % noun]
       result += ["  %s" % s for s in self.nouns[noun].usage] + [""]
