@@ -59,16 +59,10 @@ test_flask_example() {
   echo '== Creating job'
   run_sched "/vagrant/$_testdir/aurora_client.pex create $jobkey $_base_config"
 
-  # Check that scheduler UI pages shown
+  # Check that scheduler /vars being exported
   base_url="http://$_sched_ip:8081"
-  schedlen=$(_curl -s "$base_url/scheduler" | wc -l)
-  # Length of the scheduler doc should be at least 40 lines.
-  test $schedlen -ge 40
-   # User page is at least 195 lines
-  rolelen=$(_curl -s "$base_url/scheduler/$_role" | wc -l)
-  test $rolelen -ge 195
-  joblen=$(_curl "$base_url/scheduler/$_role/$_env/$_job" | wc -l)
-  test $joblen -ge 195
+  uptime=$(_curl -s "$base_url/vars" | grep jvm_uptime_secs | wc -l)
+  test $uptime -eq 1
 
   echo '== Updating test job'
   run_sched "/vagrant/$_testdir/aurora_client.pex update $jobkey $_updated_config"
