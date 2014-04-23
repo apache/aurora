@@ -119,6 +119,14 @@ public final class Tasks {
   public static final Function<IScheduledTask, String> SCHEDULED_TO_SLAVE_HOST =
       Functions.compose(ASSIGNED_TO_SLAVE_HOST, SCHEDULED_TO_ASSIGNED);
 
+  public static final Function<ITaskEvent, ScheduleStatus> TASK_EVENT_TO_STATUS =
+      new Function<ITaskEvent, ScheduleStatus>() {
+        @Override
+        public ScheduleStatus apply(ITaskEvent input) {
+          return input.getStatus();
+        }
+      };
+
   /**
    * Different states that an active task may be in.
    */

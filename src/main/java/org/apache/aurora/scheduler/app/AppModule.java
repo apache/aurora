@@ -53,6 +53,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.http.ServletModule;
 import org.apache.aurora.scheduler.metadata.MetadataModule;
 import org.apache.aurora.scheduler.quota.QuotaModule;
+import org.apache.aurora.scheduler.sla.SlaModule;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.stats.AsyncStatsModule;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
@@ -116,6 +117,7 @@ class AppModule extends AbstractModule {
     install(new ServletModule());
     install(new SchedulerModule());
     install(new StateModule());
+    install(new SlaModule());
 
     bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
   }

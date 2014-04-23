@@ -22,7 +22,6 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -82,14 +81,6 @@ public interface RescheduleCalculator {
     private static final Predicate<ScheduleStatus> IS_ACTIVE_STATUS =
         Predicates.in(Tasks.ACTIVE_STATES);
 
-    private static final Function<ITaskEvent, ScheduleStatus> TO_STATUS =
-        new Function<ITaskEvent, ScheduleStatus>() {
-          @Override
-          public ScheduleStatus apply(ITaskEvent input) {
-            return input.getStatus();
-          }
-        };
-
     private static final Set<ScheduleStatus> INTERRUPTED_TASK_STATES =
         EnumSet.of(RESTARTING, KILLING, DRAINING);
 
@@ -104,7 +95,7 @@ public interface RescheduleCalculator {
 
         // Avoid penalizing tasks that were interrupted by outside action, such as a user
         // restarting them.
-        if (Iterables.any(Iterables.transform(events, TO_STATUS),
+        if (Iterables.any(Iterables.transform(events, Tasks.TASK_EVENT_TO_STATUS),
             Predicates.in(INTERRUPTED_TASK_STATES))) {
           return false;
         }
@@ -113,8 +104,9 @@ public interface RescheduleCalculator {
         ScheduleStatus terminalState = terminalEvent.getStatus();
         Preconditions.checkState(Tasks.isTerminated(terminalState));
 
-        ITaskEvent activeEvent =
-            Iterables.find(events, Predicates.compose(IS_ACTIVE_STATUS, TO_STATUS));
+        ITaskEvent activeEvent = Iterables.find(
+            events,
+            Predicates.compose(IS_ACTIVE_STATUS, Tasks.TASK_EVENT_TO_STATUS));
 
         long thresholdMs = settings.flappingTaskThreashold.as(Time.MILLISECONDS);
 

@@ -26,8 +26,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
-import org.apache.aurora.gen.ResourceAggregate;
-import org.apache.aurora.scheduler.quota.ResourceAggregates;
+import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -38,10 +37,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class SlotSizeCounter implements Runnable {
   private static final Map<String, IResourceAggregate> SLOT_SIZES = ImmutableMap.of(
-      "small", IResourceAggregate.build(new ResourceAggregate(1.0, 1024, 4096)),
-      "medium", IResourceAggregate.build(new ResourceAggregate(4.0, 8192, 16384)),
-      "large", IResourceAggregate.build(new ResourceAggregate(8.0, 16384, 32768)),
-      "xlarge", IResourceAggregate.build(new ResourceAggregate(16.0, 32768, 65536)));
+      "small", ResourceAggregates.SMALL,
+      "medium", ResourceAggregates.MEDIUM,
+      "large", ResourceAggregates.LARGE,
+      "xlarge", ResourceAggregates.XLARGE);
 
   private final Map<String, IResourceAggregate> slotSizes;
   private final MachineResourceProvider machineResourceProvider;

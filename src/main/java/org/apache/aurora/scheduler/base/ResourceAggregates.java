@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.quota;
+package org.apache.aurora.scheduler.base;
 
 import com.google.common.collect.Ordering;
 
@@ -24,8 +24,21 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
  * Convenience class for normalizing resource measures between tasks and offers.
  */
 public final class ResourceAggregates {
-  private static final IResourceAggregate EMPTY_RESOURCE_AGGREGATE =
+
+  public static final IResourceAggregate EMPTY =
       IResourceAggregate.build(new ResourceAggregate(0, 0, 0));
+
+  public static final IResourceAggregate SMALL =
+      IResourceAggregate.build(new ResourceAggregate(1.0, 1024, 4096));
+
+  public static final IResourceAggregate MEDIUM =
+      IResourceAggregate.build(new ResourceAggregate(4.0, 8192, 16384));
+
+  public static final IResourceAggregate LARGE =
+      IResourceAggregate.build(new ResourceAggregate(8.0, 16384, 32768));
+
+  public static final IResourceAggregate XLARGE =
+      IResourceAggregate.build(new ResourceAggregate(16.0, 32768, 65536));
 
   private ResourceAggregates() {
     // Utility class.
@@ -37,7 +50,7 @@ public final class ResourceAggregates {
    * @return A resource aggregate with all resource vectors zeroed.
    */
   public static IResourceAggregate none() {
-    return EMPTY_RESOURCE_AGGREGATE;
+    return EMPTY;
   }
 
   /**
