@@ -120,12 +120,7 @@ class Context(object):
 
 
 class ConfigurationPlugin(object):
-  """A component that can be plugged in to a command-line.
-  The component can add a set of options to the command-line.
-  After a context is created, but before a call is dispatched
-  to the noun/verb for execution, the plugin will have the opportunity
-  to process its parameters and perform whatever initialization it
-  requires on the context.
+  """A component that can be plugged in to a command-line to add new configuration options.
 
   For example, if a production environment is protected behind some
   kind of gateway, a ConfigurationPlugin could be created that
@@ -133,13 +128,39 @@ class ConfigurationPlugin(object):
   attempt to communicate with the environment.
   """
 
+  class Error(Exception):
+    def __init__(self, msg, code=0):
+      super(ConfigurationPlugin.Error, self).__init__(msg)
+      self.code = code
+      self.msg = msg
+
   @abstractmethod
   def get_options(self):
     """Return the set of options processed by this plugin"""
 
   @abstractmethod
-  def execute(self, context):
-    """Run the context/command line initialization code for this plugin."""
+  def before_dispatch(self, raw_args):
+    """Run some code before dispatching to the client.
+    Returns a potentially modified version of the command line arguments.
+    If a ConfigurationPlugin.Error exception is thrown, it aborts command execution.
+    """
+
+  @abstractmethod
+  def before_execution(self, context):
+    """Run the context/command line initialization code for this plugin before
+    invoking the command verb.
+    The before_execution method behaves as if it's part of the implementation of the
+    verb being invoked. It has access to the same context that will be used by the command.
+    Any errors that occur during the execution should be signalled using ConfigurationPlugin.Error.
+    """
+
+  @abstractmethod
+  def after_execution(self, context, result_code):
+    """Run cleanup code after the execution of the verb has completed.
+    This code should *not* ever throw exceptions. It's just cleanup code, and it shouldn't
+    ever change the result of invoking a verb. This can throw a ConfigurationPlugin.Error,
+    which will generate log records, but will not otherwise effect the execution of the command.
+    """
 
 
 class AuroraCommand(object):
@@ -282,6 +303,13 @@ class CommandLine(object):
     """
     print_aurora_log(logging.INFO, 'Command=(%s)', args)
     nouns = self.registered_nouns
+    try:
+      for plugin in self.plugins:
+        args = plugin.before_dispatch(args)
+    except ConfigurationPlugin.Error as e:
+      print('Error in configuration plugin before dispatch: %s' % e.msg, file=sys.stderr)
+      return e.code
+
     if args[0] == 'help':
       return self.help_cmd(args[1:])
     self.setup_options_parser()
@@ -293,9 +321,9 @@ class CommandLine(object):
     context.set_options(options)
     try:
       for plugin in self.plugins:
-        plugin.execute(context)
-    except Context.CommandError as c:
-      print('Error in configuration plugin: %s' % c.msg, file=sys.stderr)
+        plugin.before_execution(context)
+    except ConfigurationPlugin.Error as e:
+      print('Error in configuration plugin before execution: %s' % c.msg, file=sys.stderr)
       return c.code
     try:
       result = noun.execute(context)
@@ -303,6 +331,11 @@ class CommandLine(object):
         print_aurora_log(logging.INFO, 'Command terminated successfully')
       else:
         print_aurora_log(logging.INFO, 'Commmand terminated with error code %s', result)
+      for plugin in self.plugins:
+        try:
+          plugin.after_execution(context, result)
+        except ConfigurationPlugin.Error as e:
+          print_aurora_log(logging.INFO, 'Error executing post-execution extension hook:  %s', e.msg)
       return result
     except Context.CommandError as c:
       print_aurora_log(logging.INFO, 'Error executing command: %s', c.msg)

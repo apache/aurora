@@ -43,11 +43,29 @@ from mock import Mock, patch
 
 
 class BogusPlugin(ConfigurationPlugin):
+  """A test plugin, which uses all three plugin methods:
+  - before_dispatch changes the command-line arguments to remove "bogus_bogus" if it's found.
+    If it didn't work, we'll get an invalid parameter exception executing the test.
+  - before_execution processes the "bogosity" argument.
+  - after_execution sets a flag.
+  """
+
   def get_options(self):
     return [CommandOption('--bogosity', type=str, help='Permitted bogosity level')]
 
-  def execute(self, context):
+  def before_dispatch(self, args):
+    if args[0] == '--bogus_bogus':
+       args = args[1:]
+    return args
+
+
+  def before_execution(self, context):
     context.bogosity = context.options.bogosity
+
+  def after_execution(self, context, return_value):
+    context.after = True
+    raise self.Error("Oops")
+
 
 class TestPlugins(AuroraClientCommandTest):
 
@@ -123,7 +141,7 @@ class TestPlugins(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.register_plugin(BogusPlugin())
-        cmd.execute(['job', 'create', '--bogosity=maximum', '--wait-until=RUNNING',
+        cmd.execute(['--bogus_bogus', 'job', 'create', '--bogosity=maximum', '--wait-until=RUNNING',
             'west/bozo/test/hello', fp.name])
 
       # Now check that the right API calls got made.
@@ -132,6 +150,8 @@ class TestPlugins(AuroraClientCommandTest):
       self.assert_scheduler_called(api, mock_query, 2)
       # Check that the plugin did its job.
       assert mock_context.bogosity == "maximum"
+      assert mock_context.after == True
+
 
   def mock_print(self, str):
     for str in str.split('\n'):
