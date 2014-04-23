@@ -40,6 +40,9 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
+import org.apache.aurora.scheduler.cron.CronException;
+import org.apache.aurora.scheduler.cron.CronJobManager;
+import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -71,7 +74,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
   // TODO(wfarner): Consider changing this class to not be concerned with cron jobs, requiring the
   // caller to deal with the fork.
-  private final CronJobManager cronScheduler;
+  private final CronJobManager cronJobManager;
 
   // State manager handles persistence of task modifications and state transitions.
   private final StateManager stateManager;
@@ -83,7 +86,7 @@ class SchedulerCoreImpl implements SchedulerCore {
    * Creates a new core scheduler.
    *
    * @param storage Backing store implementation.
-   * @param cronScheduler Cron scheduler.
+   * @param cronJobManager Cron scheduler.
    * @param stateManager Persistent state manager.
    * @param taskIdGenerator Task ID generator.
    * @param quotaManager Quota manager.
@@ -91,13 +94,13 @@ class SchedulerCoreImpl implements SchedulerCore {
   @Inject
   public SchedulerCoreImpl(
       Storage storage,
-      CronJobManager cronScheduler,
+      CronJobManager cronJobManager,
       StateManager stateManager,
       TaskIdGenerator taskIdGenerator,
       QuotaManager quotaManager) {
 
     this.storage = checkNotNull(storage);
-    this.cronScheduler = cronScheduler;
+    this.cronJobManager = cronJobManager;
     this.stateManager = checkNotNull(stateManager);
     this.taskIdGenerator = checkNotNull(taskIdGenerator);
     this.quotaManager = checkNotNull(quotaManager);
@@ -108,7 +111,11 @@ class SchedulerCoreImpl implements SchedulerCore {
         storage,
         Query.jobScoped(job.getKey()).active()).isEmpty();
 
-    return hasActiveTasks || cronScheduler.hasJob(job.getKey());
+    return hasActiveTasks || cronJobManager.hasJob(job.getKey());
+  }
+
+  private static boolean isCron(SanitizedConfiguration config) {
+    return config.getJobConfig().isSetCronSchedule();
   }
 
   @Override
@@ -120,12 +127,19 @@ class SchedulerCoreImpl implements SchedulerCore {
       protected void execute(MutableStoreProvider storeProvider) throws ScheduleException {
         final IJobConfiguration job = sanitizedConfiguration.getJobConfig();
         if (hasActiveJob(job)) {
-          throw new ScheduleException("Job already exists: " + JobKeys.toPath(job));
+          throw new ScheduleException(
+              "Job already exists: " + JobKeys.canonicalString(job.getKey()));
         }
 
         validateTaskLimits(job.getTaskConfig(), job.getInstanceCount());
 
-        if (!cronScheduler.receiveJob(sanitizedConfiguration)) {
+        if (isCron(sanitizedConfiguration)) {
+          try {
+            cronJobManager.createJob(SanitizedCronJob.from(sanitizedConfiguration));
+          } catch (CronException e) {
+            throw new ScheduleException(e);
+          }
+        } else {
           LOG.info("Launching " + sanitizedConfiguration.getTaskConfigs().size() + " tasks.");
           stateManager.insertPendingTasks(sanitizedConfiguration.getTaskConfigs());
         }
@@ -219,7 +233,7 @@ class SchedulerCoreImpl implements SchedulerCore {
       // it.
       // TODO(maxim): Should be trivial to support killing multiple jobs instead.
       IJobKey jobKey = Iterables.getOnlyElement(JobKeys.from(query).get());
-      cronDeleted = cronScheduler.deleteJob(jobKey);
+      cronDeleted = cronJobManager.deleteJob(jobKey);
     }
 
     // Unless statuses were specifically supplied, only attempt to kill active tasks.

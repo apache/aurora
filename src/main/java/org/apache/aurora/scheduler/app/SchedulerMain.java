@@ -59,9 +59,7 @@ import org.apache.aurora.scheduler.DriverFactory;
 import org.apache.aurora.scheduler.DriverFactory.DriverFactoryImpl;
 import org.apache.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
-import org.apache.aurora.scheduler.cron.CronPredictor;
-import org.apache.aurora.scheduler.cron.CronScheduler;
-import org.apache.aurora.scheduler.cron.noop.NoopCronModule;
+import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.local.IsolatedSchedulerModule;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
@@ -115,17 +113,7 @@ public class SchedulerMain extends AbstractApplication {
       .add(CapabilityValidator.class)
       .build();
 
-  @CmdLine(name = "cron_module",
-      help = "A Guice module to provide cron bindings. NOTE: The default is a no-op.")
-  private static final Arg<? extends Class<? extends Module>> CRON_MODULE =
-      Arg.create(NoopCronModule.class);
-
-  private static final Iterable<Class<?>> CRON_MODULE_CLASSES = ImmutableList.<Class<?>>builder()
-      .add(CronPredictor.class)
-      .add(CronScheduler.class)
-      .build();
-
-  // TODO(Suman Karumuri): Pass in AUTH and CRON modules as extra modules
+  // TODO(Suman Karumuri): Pass in AUTH as extra module
   @CmdLine(name = "extra_modules",
       help = "A list of modules that provide additional functionality.")
   private static final Arg<List<Class<? extends Module>>> EXTRA_MODULES =
@@ -151,8 +139,7 @@ public class SchedulerMain extends AbstractApplication {
 
   private static Iterable<? extends Module> getExtraModules() {
     Builder<Module> modules = ImmutableList.builder();
-    modules.add(Modules.wrapInPrivateModule(AUTH_MODULE.get(), AUTH_MODULE_CLASSES))
-        .add(Modules.wrapInPrivateModule(CRON_MODULE.get(), CRON_MODULE_CLASSES));
+    modules.add(Modules.wrapInPrivateModule(AUTH_MODULE.get(), AUTH_MODULE_CLASSES));
 
     for (Class<? extends Module> moduleClass : EXTRA_MODULES.get()) {
       modules.add(Modules.getModule(moduleClass));
@@ -173,6 +160,7 @@ public class SchedulerMain extends AbstractApplication {
         .addAll(getExtraModules())
         .add(new LogStorageModule())
         .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
+        .add(new CronModule())
         .add(new ThriftModule())
         .add(new ThriftAuthModule())
         .build();

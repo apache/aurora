@@ -15,49 +15,19 @@
  */
 package org.apache.aurora.scheduler.cron;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Optional;
-import com.google.common.util.concurrent.Service;
+
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
 /**
  * An execution manager that executes work on a cron schedule.
  */
-public interface CronScheduler extends Service {
-  /**
-   * Schedules a task on a cron schedule.
-   *
-   * @param schedule Cron-style schedule.
-   * @param task Work to run when on the cron schedule.
-   * @return A unique ID to identify the scheduled cron task.
-   * @throws CronException when there was a failure to schedule, for example if {@code schedule}
-   *         is not a valid input.
-   * @throws IllegalStateException If the cron scheduler is not currently running.
-   */
-  String schedule(String schedule, Runnable task) throws CronException, IllegalStateException;
-
-  /**
-   * Removes a scheduled cron item.
-   *
-   * @param key Key previously returned from {@link #schedule(String, Runnable)}.
-   * @throws IllegalStateException If the cron scheduler is not currently running.
-   */
-  void deschedule(String key) throws IllegalStateException;
-
+public interface CronScheduler {
   /**
    * Gets the cron schedule associated with a scheduling key.
    *
-   * @param key Key previously returned from {@link #schedule(String, Runnable)}.
+   * @param key Key previously returned from {@link #schedule(CrontabEntry, Runnable)}.
    * @return The task's cron schedule, if a matching task was found.
-   * @throws IllegalStateException If the cron scheduler is not currently running.
    */
-  Optional<String> getSchedule(String key) throws IllegalStateException;
-
-  /**
-   * Checks to see if the scheduler would be accepted by the underlying scheduler.
-   *
-   * @param schedule Cron scheduler to validate.
-   * @return {@code true} if the schedule is valid.
-   */
-  boolean isValidSchedule(@Nullable String schedule);
+  Optional<CrontabEntry> getSchedule(IJobKey key);
 }
