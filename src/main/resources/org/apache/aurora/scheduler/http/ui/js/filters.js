@@ -19,7 +19,9 @@ auroraUI.filter('scheduleStatusTooltip', function () {
     PREEMPTING: 'This task is being killed to make resources available for a production task.',
     KILLING: 'A user request or cron invocation has requested the task be killed.',
     LOST: 'The task cannot be accounted for, usually a result of slave process or machine '
-      + 'failure.'
+      + 'failure.',
+    DRAINING: 'The task is being restarted since the host is undergoing scheduled maintenance.',
+    SANDBOX_DELETED: 'The task sandbox has been deleted by the executor.'
   };
 
   return function (value) {
