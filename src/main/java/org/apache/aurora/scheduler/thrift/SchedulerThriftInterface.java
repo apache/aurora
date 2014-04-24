@@ -100,14 +100,11 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
-import org.apache.aurora.scheduler.cron.CronException;
-import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
-import org.apache.aurora.scheduler.cron.CrontabEntry;
-import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
+import org.apache.aurora.scheduler.state.CronJobManager;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -269,7 +266,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       schedulerCore.createJob(sanitized);
       response.setResponseCode(OK)
           .setMessage(String.format("%d new tasks pending for job %s",
-              sanitized.getJobConfig().getInstanceCount(), JobKeys.canonicalString(job.getKey())));
+              sanitized.getJobConfig().getInstanceCount(), JobKeys.toPath(job)));
     } catch (LockException e) {
       response.setResponseCode(LOCK_ERROR).setMessage(e.getMessage());
     } catch (TaskDescriptionException | ScheduleException e) {
@@ -302,11 +299,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ILockKey.build(LockKey.job(jobKey.newBuilder())),
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-      cronJobManager.updateJob(SanitizedCronJob.fromUnsanitized(job));
+      cronJobManager.updateJob(SanitizedConfiguration.fromUnsanitized(job));
       return response.setResponseCode(OK).setMessage("Replaced template for: " + jobKey);
     } catch (LockException e) {
       return response.setResponseCode(LOCK_ERROR).setMessage(e.getMessage());
-    } catch (CronException | TaskDescriptionException e) {
+    } catch (TaskDescriptionException | ScheduleException e) {
       return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
   }
@@ -341,16 +338,21 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
     } catch (AuthFailedException e) {
-      return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+      response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+      return response;
     }
 
     try {
       cronJobManager.startJobNow(jobKey);
-      return response.setResponseCode(OK).setMessage("Cron run started.");
-    } catch (CronException e) {
-      return response.setResponseCode(INVALID_REQUEST)
+      response.setResponseCode(OK).setMessage("Cron run started.");
+    } catch (ScheduleException e) {
+      response.setResponseCode(INVALID_REQUEST)
           .setMessage("Failed to start cron job - " + e.getMessage());
+    } catch (TaskDescriptionException e) {
+      response.setResponseCode(ERROR).setMessage("Invalid task description: " + e.getMessage());
     }
+
+    return response;
   }
 
   // TODO(William Farner): Provide status information about cron jobs here.
@@ -408,14 +410,13 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       @Override
       public JobSummary apply(IJobKey jobKey) {
         IJobConfiguration job = jobs.get(jobKey);
-        JobSummary summary = new JobSummary()
+        JobSummary smry = new JobSummary()
             .setJob(job.newBuilder())
             .setStats(Jobs.getJobStats(tasks.get(jobKey)).newBuilder());
 
         return Strings.isNullOrEmpty(job.getCronSchedule())
-            ? summary
-            : summary.setNextCronRunMs(
-                cronPredictor.predictNextRun(CrontabEntry.parse(job.getCronSchedule())).getTime());
+            ? smry
+            : smry.setNextCronRunMs(cronPredictor.predictNextRun(job.getCronSchedule()).getTime());
       }
     };
 
@@ -869,8 +870,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               jobsByKey(jobStore, existingJob.getKey());
           switch (matches.size()) {
             case 0:
-              error = Optional.of(
-                  "No jobs found for key " + JobKeys.canonicalString(existingJob.getKey()));
+              error = Optional.of("No jobs found for key " + JobKeys.toPath(existingJob));
               break;
 
             case 1:
@@ -878,16 +878,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                   Iterables.getOnlyElement(matches.entries());
               IJobConfiguration storedJob = match.getValue();
               if (!storedJob.equals(existingJob)) {
-                error = Optional.of(
-                    "CAS compare failed for " + JobKeys.canonicalString(storedJob.getKey()));
+                error = Optional.of("CAS compare failed for " + JobKeys.toPath(storedJob));
               } else {
                 jobStore.saveAcceptedJob(match.getKey(), rewrittenJob);
               }
               break;
 
             default:
-              error = Optional.of("Multiple jobs found for key "
-                  + JobKeys.canonicalString(existingJob.getKey()));
+              error = Optional.of("Multiple jobs found for key " + JobKeys.toPath(existingJob));
           }
         }
         break;

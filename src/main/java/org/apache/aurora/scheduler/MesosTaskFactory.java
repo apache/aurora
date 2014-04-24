@@ -135,7 +135,7 @@ public interface MesosTaskFactory {
       }
       TaskInfo.Builder taskBuilder =
           TaskInfo.newBuilder()
-              .setName(JobKeys.canonicalString(Tasks.ASSIGNED_TO_JOB_KEY.apply(task)))
+              .setName(JobKeys.toPath(Tasks.ASSIGNED_TO_JOB_KEY.apply(task)))
               .setTaskId(TaskID.newBuilder().setValue(task.getTaskId()))
               .setSlaveId(slaveId)
               .addAllResources(resources)

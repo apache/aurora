@@ -49,7 +49,14 @@ public class StateModule extends AbstractModule {
     bind(LockManager.class).to(LockManagerImpl.class);
     bind(LockManagerImpl.class).in(Singleton.class);
 
+    bindCronJobManager(binder());
     bindMaintenanceController(binder());
+  }
+
+  @VisibleForTesting
+  static void bindCronJobManager(Binder binder) {
+    binder.bind(CronJobManager.class).in(Singleton.class);
+    PubsubEventModule.bindSubscriber(binder, CronJobManager.class);
   }
 
   @VisibleForTesting

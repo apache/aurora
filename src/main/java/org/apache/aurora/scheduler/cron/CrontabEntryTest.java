@@ -32,6 +32,7 @@ import static org.junit.Assert.assertTrue;
 public class CrontabEntryTest {
   @Test
   public void testHashCodeAndEquals() {
+
     List<CrontabEntry> entries = ImmutableList.of(
         CrontabEntry.parse("* * * * *"),
         CrontabEntry.parse("0-59 * * * *"),
@@ -151,18 +152,12 @@ public class CrontabEntryTest {
         "*/0 * * * *",
         "0-59/0 * * * *",
         "0-59/60 * * * *",
+        "* * * *, *",
         "* * 1 * 1"
     );
 
     for (String pattern : badPatterns) {
       assertNull(CrontabEntry.tryParse(pattern).orNull());
-    }
-  }
-
-  @Test
-  public void testExpectedTriggerPredictionsParse() {
-    for (ExpectedPrediction prediction : ExpectedPrediction.getAll()) {
-      prediction.parseCrontabEntry();
     }
   }
 }

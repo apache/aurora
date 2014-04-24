@@ -26,7 +26,7 @@ import javax.ws.rs.core.Response;
 
 import com.google.common.collect.ImmutableMap;
 
-import org.apache.aurora.scheduler.cron.CronJobManager;
+import org.apache.aurora.scheduler.state.CronJobManager;
 
 /**
  * HTTP interface to dump state of the internal cron scheduler.
@@ -50,6 +50,7 @@ public class Cron {
   public Response dumpContents() {
     Map<String, Object> response = ImmutableMap.<String, Object>builder()
         .put("scheduled", cronManager.getScheduledJobs())
+        .put("pending", cronManager.getPendingRuns())
         .build();
 
    return Response.ok(response).build();

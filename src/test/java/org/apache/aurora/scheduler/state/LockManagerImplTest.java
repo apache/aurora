@@ -133,6 +133,6 @@ public class LockManagerImplTest extends EasyMockTest {
 
   private void expectLockException(IJobKey key) {
     expectedException.expect(LockException.class);
-    expectedException.expectMessage(JobKeys.canonicalString(key));
+    expectedException.expectMessage(JobKeys.toPath(key));
   }
 }

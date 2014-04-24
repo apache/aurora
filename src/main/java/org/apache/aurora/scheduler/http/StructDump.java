@@ -25,6 +25,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.twitter.common.base.Closure;
 import com.twitter.common.thrift.Util;
@@ -33,7 +34,7 @@ import org.antlr.stringtemplate.StringTemplate;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.cron.CronJobManager;
+import org.apache.aurora.scheduler.state.CronJobManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
@@ -42,8 +43,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.thrift.TBase;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 /**
  * Servlet that prints out the raw configuration for a specified struct.
  */
@@ -51,13 +50,11 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class StructDump extends JerseyTemplateServlet {
 
   private final Storage storage;
-  private final CronJobManager cronJobManager;
 
   @Inject
-  public StructDump(Storage storage, CronJobManager cronJobManager) {
+  public StructDump(Storage storage) {
     super("structdump");
-    this.storage = checkNotNull(storage);
-    this.cronJobManager = checkNotNull(cronJobManager);
+    this.storage = Preconditions.checkNotNull(storage);
   }
 
   private static final String USAGE =
@@ -109,11 +106,11 @@ public class StructDump extends JerseyTemplateServlet {
       @PathParam("job") final String job) {
 
     final IJobKey jobKey = JobKeys.from(role, environment, job);
-    return dumpEntity("Cron job " + JobKeys.canonicalString(jobKey),
+    return dumpEntity("Cron job " + JobKeys.toPath(jobKey),
         new Work.Quiet<Optional<? extends TBase<?, ?>>>() {
           @Override
           public Optional<JobConfiguration> apply(StoreProvider storeProvider) {
-            return storeProvider.getJobStore().fetchJob(cronJobManager.getManagerKey(), jobKey)
+            return storeProvider.getJobStore().fetchJob(CronJobManager.MANAGER_KEY, jobKey)
                 .transform(IJobConfiguration.TO_BUILDER);
           }
         });

@@ -76,13 +76,10 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
-import org.apache.aurora.scheduler.cron.CronException;
-import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
-import org.apache.aurora.scheduler.cron.CrontabEntry;
-import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
+import org.apache.aurora.scheduler.state.CronJobManager;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -138,7 +135,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final IJobKey JOB_KEY = JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, JOB_NAME);
   private static final ILockKey LOCK_KEY = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
   private static final ILock LOCK = ILock.build(new Lock().setKey(LOCK_KEY.newBuilder()));
-  private static final JobConfiguration CRON_JOB = makeJob().setCronSchedule("* * * * *");
+  private static final JobConfiguration CRON_JOB = makeJob().setCronSchedule("test");
   private static final Lock DEFAULT_LOCK = null;
 
   private static final IResourceAggregate QUOTA =
@@ -669,7 +666,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testReplaceCronTemplate() throws Exception {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
-    cronJobManager.updateJob(anyObject(SanitizedCronJob.class));
+    cronJobManager.updateJob(anyObject(SanitizedConfiguration.class));
     control.replay();
 
     assertEquals(
@@ -704,9 +701,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testReplaceCronTemplateDoesNotExist() throws Exception {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
-    cronJobManager.updateJob(anyObject(SanitizedCronJob.class));
-    expectLastCall().andThrow(new CronException("Nope"));
-
+    cronJobManager.updateJob(
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB)));
+    expectLastCall().andThrow(new ScheduleException("Nope"));
     control.replay();
 
     assertEquals(
@@ -1011,7 +1008,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Set<JobSummary> ownedImmedieteJobSummaryOnly = ImmutableSet.of(
         new JobSummary().setJob(ownedImmediateJob).setStats(new JobStats().setActiveTaskCount(1)));
 
-    expect(cronPredictor.predictNextRun(CrontabEntry.parse(CRON_SCHEDULE)))
+    expect(cronPredictor.predictNextRun(CRON_SCHEDULE))
         .andReturn(new Date(nextCronRunMs))
         .anyTimes();
 

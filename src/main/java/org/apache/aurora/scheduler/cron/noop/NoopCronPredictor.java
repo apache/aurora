@@ -13,19 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.cron;
+package org.apache.aurora.scheduler.cron.noop;
 
 import java.util.Date;
 
+import org.apache.aurora.scheduler.cron.CronPredictor;
+
 /**
- * A utility function that predicts a cron run given a schedule.
+ * A cron predictor that always suggests that the next run is Unix epoch time.
+ *
+ * This class exists as a short term hack to get around a license compatibility issue - Real
+ * Implementation (TM) coming soon.
  */
-public interface CronPredictor {
-  /**
-   * Predicts the next date at which a cron schedule will trigger.
-   *
-   * @param schedule Cron schedule to predict the next time for.
-   * @return A prediction for the next time a cron will run.
-   */
-  Date predictNextRun(String schedule);
+class NoopCronPredictor implements CronPredictor {
+  @Override
+  public Date predictNextRun(String schedule) {
+    return new Date(0);
+  }
 }
