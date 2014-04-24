@@ -57,6 +57,7 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
+import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
@@ -376,6 +377,23 @@ public class StateManagerImplTest extends EasyMockTest {
         Optional.of(PENDING),
         ASSIGNED,
         Optional.<String>absent()));
+  }
+
+  @Test
+  public void testDeleteTasks() {
+    ITaskConfig task = makeTask(JIM, MY_JOB);
+    String taskId = "a";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, FINISHED);
+    eventSink.post(matchTasksDeleted(taskId));
+
+    control.replay();
+
+    insertTask(task, 0);
+    assignTask(taskId, HOST_A);
+    changeState(taskId, RUNNING);
+    changeState(taskId, FINISHED);
+    stateManager.deleteTasks(ImmutableSet.of(taskId));
   }
 
   private void expectStateTransitions(

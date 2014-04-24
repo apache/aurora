@@ -441,10 +441,15 @@ public class StateManagerImpl implements StateManager {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(final MutableStoreProvider storeProvider) {
-        for (String taskId : taskIds) {
+
+        Map<String, IScheduledTask> tasks = Maps.uniqueIndex(
+            storeProvider.getTaskStore().fetchTasks(Query.taskScoped(taskIds)),
+            Tasks.SCHEDULED_TO_ID);
+
+        for (Map.Entry<String, IScheduledTask> entry : tasks.entrySet()) {
           updateTaskAndExternalState(
-              taskId,
-              Optional.<IScheduledTask>absent(),
+              entry.getKey(),
+              Optional.of(entry.getValue()),
               Optional.<ScheduleStatus>absent(),
               Optional.<String>absent());
         }
