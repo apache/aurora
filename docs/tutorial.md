@@ -1,9 +1,6 @@
 Aurora Tutorial
 ---------------
 
-Before reading this document, you should read over the (short) [README](README.md)
-for the Aurora docs.
-
 - [Introduction](#introduction)
 - [Setup: Install Aurora](#setup-install-aurora)
 - [The Script](#the-script)
@@ -108,8 +105,8 @@ jobs = [
 ```
 
 For more about Aurora configuration files, see the [Configuration
-Tutorial](configurationtutorial.md) and the [Aurora + Thermos
-Reference](configurationreference.md) (preferably after finishing this
+Tutorial](configuration-tutorial.md) and the [Aurora + Thermos
+Reference](configuration-reference.md) (preferably after finishing this
 tutorial).
 
 ## What's Going On In That Configuration File?
@@ -259,10 +256,10 @@ The job page now shows the `hello_world` tasks as completed.
 
 Now that you've finished this Tutorial, you should read or do the following:
 
-- [The Aurora Configuration Tutorial](configurationtutorial.md), which provides more examples
+- [The Aurora Configuration Tutorial](configuration-tutorial.md), which provides more examples
   and best practices for writing Aurora configurations. You should also look at
-  the [Aurora + Thermos Configuration Reference](configurationreference.md).
-- The [Aurora User Guide](userguide.md) provides an overview of how Aurora, Mesos, and
+  the [Aurora + Thermos Configuration Reference](configuration-reference.md).
+- The [Aurora User Guide](user-guide.md) provides an overview of how Aurora, Mesos, and
   Thermos work "under the hood".
 - Explore the Aurora Client - use the `aurora help` subcommand, and read the
-  [Aurora Client Commands](clientcommands.md) document.
+  [Aurora Client Commands](client-commands.md) document.

@@ -236,15 +236,15 @@ Aurora configuration files. Their filenames end with the `.aurora`
 suffix, and you write them in Python making use of the Pystashio
 templating language, along
 with specific Aurora, Mesos, and Thermos commands and methods. See the
-[Configuration Guide and Reference](configurationreference.md) and
-[Configuration Tutorial](configurationtutorial.md).
+[Configuration Guide and Reference](configuration-reference.md) and
+[Configuration Tutorial](configuration-tutorial.md).
 
 Creating Jobs
 -------------
 
 You create and manipulate Aurora Jobs with the Aurora client, which starts all its
 command line commands with
-`aurora`. See [Aurora Client Commands](clientcommands.md) for details
+`aurora`. See [Aurora Client Commands](client-commands.md) for details
 about the Aurora Client.
 
 Interacting With Jobs
@@ -289,4 +289,4 @@ You interact with Aurora jobs either via:
   command help, `aurora help [command]`. **Note**: `aurora help open`
   returns `"subcommand open not found"` due to our reflection tricks not
   working on words that are also builtin Python function names. Or see the
-  [Aurora Client Commands](clientcommands.md) document.
+  [Aurora Client Commands](client-commands.md) document.

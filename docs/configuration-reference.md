@@ -46,7 +46,7 @@ cases.
 
 For examples of simple configurations to get something up and running
 quickly, check out the [Tutorial](tutorial.md). When you feel comfortable with the basics, move
-on to the [Configuration Tutorial](configurationtutorial.md) for more in-depth coverage of
+on to the [Configuration Tutorial](configuration-tutorial.md) for more in-depth coverage of
 configuration design.
 
 For additional basic configuration examples, see [the end of this document](#BasicExamples).
@@ -369,7 +369,7 @@ ordering constraints.
 ### Resource Object
 
 Specifies the amount of CPU, Ram, and disk resources the task needs. See the
-[Resource Isolation document](resourceisolation.md) for suggested values and to understand how
+[Resource Isolation document](resource-isolation.md) for suggested values and to understand how
 resources are allocated.
 
 <table border=1>

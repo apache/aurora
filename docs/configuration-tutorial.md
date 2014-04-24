@@ -66,11 +66,11 @@ via {{}} surrounded templates.
 
 When writing your `.aurora` file, you may use any Pystachio datatypes, as
 well as any objects shown in the [*Aurora+Thermos Configuration
-Reference*](configurationreference.md), without `import` statements - the
+Reference*](configuration-reference.md), without `import` statements - the
 Aurora config loader injects them automatically. Other than that, an `.aurora`
 file works like any other Python script.
 
-[*Aurora+Thermos Configuration Reference*](configurationreference.md)
+[*Aurora+Thermos Configuration Reference*](configuration-reference.md)
 has a full reference of all Aurora/Thermos defined Pystachio objects.
 
 ### Use Bottom-To-Top Object Ordering
@@ -620,7 +620,7 @@ The final three Job attributes each take an object as their value.
     scheduler automatically inserts reasonable defaults. Please do not
     set this field unless you are sure of what you are doing. See the
     section in the Aurora + Thermos Reference manual on [Specifying
-    Scheduling Constraints](configurationreference.md) for more information.
+    Scheduling Constraints](configuration-reference.md) for more information.
 
 ## The jobs List
 
@@ -637,7 +637,7 @@ The `.aurora` file format is just Python. However, `Job`, `Task`,
 `Process`, and other classes are defined by a templating library called
 *Pystachio*, a powerful tool for configuration specification and reuse.
 
-[Aurora+Thermos Configuration Reference](configurationreference.md)
+[Aurora+Thermos Configuration Reference](configuration-reference.md)
 has a full reference of all Aurora/Thermos defined Pystachio objects.
 
 When writing your `.aurora` file, you may use any Pystachio datatypes, as

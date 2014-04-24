@@ -12,9 +12,9 @@ To use and get up to speed on Aurora, you should look the docs in this directory
 
 1. How to [deploy Aurora](deploying-aurora-scheduler.md) or, how to [install Aurora on virtual machines on your private machine](vagrant.md) (the Tutorial uses the virtual machine approach).
 2. As a user, get started quickly with a [Tutorial](tutorial.md).
-3. For an overview of Aurora's process flow under the hood, see the [User Guide](userguide.md).
-4. To learn how to write a configuration file, look at our [Configuration Tutorial](configurationtutorial.md). From there, look at the [Aurora + Thermos Reference](configurationreference.md).
-5. Then read up on the [Aurora Command Line Client](clientcommands.md).
-6. Find out general information and useful tips about how Aurora does [Resource Isolation](resourceisolation.md).
+3. For an overview of Aurora's process flow under the hood, see the [User Guide](user-guide.md).
+4. To learn how to write a configuration file, look at our [Configuration Tutorial](configuration-tutorial.md). From there, look at the [Aurora + Thermos Reference](configuration-reference.md).
+5. Then read up on the [Aurora Command Line Client](client-commands.md).
+6. Find out general information and useful tips about how Aurora does [Resource Isolation](resource-isolation.md).
 
 To contact the Aurora Developer List, email [dev@aurora.incubator.apache.org](mailto:dev@aurora.incubator.apache.org). You may want to read the list [archives](http://mail-archives.apache.org/mod_mbox/incubator-aurora-dev/). You can also use the IRC channel `#aurora` on `irc.freenode.net`
