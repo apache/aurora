@@ -142,7 +142,7 @@ import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 
 /**
  * Aurora scheduler thrift server implementation.
- * <p>
+ * <p/>
  * Interfaces between users and the scheduler to access/modify jobs and perform cluster
  * administration tasks.
  */
@@ -403,7 +403,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response getJobSummary(@Nullable String maybeNullRole) {
     Optional<String> ownerRole = Optional.fromNullable(maybeNullRole);
 
-    final Multimap<IJobKey, IScheduledTask> tasks = getTasks(ownerRole);
+    final Multimap<IJobKey, IScheduledTask> tasks = getTasks(maybeRoleScoped(ownerRole));
     final Map<IJobKey, IJobConfiguration> jobs = getJobs(ownerRole, tasks);
 
     Function<IJobKey, JobSummary> makeJobSummary = new Function<IJobKey, JobSummary>() {
@@ -424,6 +424,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         FluentIterable.from(jobs.keySet()).transform(makeJobSummary).toSet();
 
     return okResponse(Result.jobSummaryResult(new JobSummaryResult().setSummaries(jobSummaries)));
+  }
+
+  private Query.Builder maybeRoleScoped(Optional<String> ownerRole) {
+    return ownerRole.isPresent()
+          ? Query.roleScoped(ownerRole.get())
+          : Query.unscoped();
   }
 
   private Map<IJobKey, IJobConfiguration> getJobs(
@@ -468,11 +474,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return jobs;
   }
 
-  private Multimap<IJobKey, IScheduledTask> getTasks(Optional<String> ownerRole) {
-    Query.Builder scope = ownerRole.isPresent()
-        ? Query.roleScoped(ownerRole.get())
-        : Query.unscoped();
-    return Tasks.byJobKey(Storage.Util.weaklyConsistentFetchTasks(storage, scope.active()));
+  private Multimap<IJobKey, IScheduledTask> getTasks(Query.Builder query) {
+    return Tasks.byJobKey(Storage.Util.weaklyConsistentFetchTasks(storage, query));
   }
 
   private static <T> Multimap<String, IJobKey> mapByRole(
@@ -490,7 +493,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return okResponse(Result.getJobsResult(
         new GetJobsResult()
             .setConfigs(IJobConfiguration.toBuildersSet(
-                getJobs(ownerRole, getTasks(ownerRole)).values()))));
+                getJobs(ownerRole, getTasks(maybeRoleScoped(ownerRole).active())).values()))));
   }
 
   private void validateLockForTasks(Optional<ILock> lock, Iterable<IScheduledTask> tasks)
@@ -665,9 +668,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response startMaintenance(Hosts hosts, SessionKey session) {
-      return okResponse(Result.startMaintenanceResult(
-          new StartMaintenanceResult()
-              .setStatuses(maintenance.startMaintenance(hosts.getHostNames()))));
+    return okResponse(Result.startMaintenanceResult(
+        new StartMaintenanceResult()
+            .setStatuses(maintenance.startMaintenance(hosts.getHostNames()))));
   }
 
   @Override
@@ -684,9 +687,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response endMaintenance(Hosts hosts, SessionKey session) {
-      return okResponse(Result.endMaintenanceResult(
-          new EndMaintenanceResult()
-              .setStatuses(maintenance.endMaintenance(hosts.getHostNames()))));
+    return okResponse(Result.endMaintenanceResult(
+        new EndMaintenanceResult()
+            .setStatuses(maintenance.endMaintenance(hosts.getHostNames()))));
   }
 
   @Override
@@ -815,8 +818,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     if (request.getRewriteCommandsSize() == 0) {
       return new Response()
-        .setResponseCode(ResponseCode.ERROR)
-        .setMessage("No rewrite commands provided.");
+          .setResponseCode(ResponseCode.ERROR)
+          .setMessage("No rewrite commands provided.");
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {

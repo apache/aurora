@@ -1003,7 +1003,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setOwner(ROLE_IDENTITY)
         .setInstanceCount(1)
         .setTaskConfig(ownedImmediateTaskInfo);
-    Query.Builder query = Query.roleScoped(ROLE).active();
+    Query.Builder query = Query.roleScoped(ROLE);
 
     Set<JobSummary> ownedImmedieteJobSummaryOnly = ImmutableSet.of(
         new JobSummary().setJob(ownedImmediateJob).setStats(new JobStats().setActiveTaskCount(1)));
