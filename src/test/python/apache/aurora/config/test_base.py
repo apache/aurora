@@ -29,7 +29,7 @@ from apache.aurora.config.schema.base import (
     Task,
 )
 
-from gen.apache.aurora.ttypes import Identity
+from gen.apache.aurora.api.ttypes import Identity
 
 
 resolve = PortResolver.resolve

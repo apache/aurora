@@ -18,7 +18,7 @@ import operator
 
 from copy import deepcopy
 
-from gen.apache.aurora.ttypes import ResourceAggregate, Response, ResponseCode
+from gen.apache.aurora.api.ttypes import ResourceAggregate, Response, ResponseCode
 
 from twitter.common import log
 

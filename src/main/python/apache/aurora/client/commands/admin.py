@@ -40,8 +40,8 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 from apache.aurora.common.shellify import shellify
 
-from gen.apache.aurora.constants import ACTIVE_STATES, TERMINAL_STATES
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import ACTIVE_STATES, TERMINAL_STATES
+from gen.apache.aurora.api.ttypes import (
     ResponseCode,
     ScheduleStatus,
     TaskQuery,

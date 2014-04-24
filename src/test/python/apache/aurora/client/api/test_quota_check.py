@@ -20,8 +20,8 @@ from copy import deepcopy
 
 from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck
 
-from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
+from gen.apache.aurora.api.ttypes import (
     GetQuotaResult,
     JobKey,
     ResourceAggregate,

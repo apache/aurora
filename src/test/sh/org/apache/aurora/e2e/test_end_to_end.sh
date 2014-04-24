@@ -40,8 +40,9 @@ devtools_setup() {
   branch=$(git branch | grep '*' | cut -c 3-)
   run_dev "if [ ! -d ~/test_dev ]; then git clone /vagrant ~/test_dev; fi"
   # Clean out any lingering build products; we want fresh.
+  run_dev "rm -rf ~/.pex"
   run_dev "cd ~/test_dev; git reset --hard; git clean -fdx"
-  run_dev "cd ~/test_dev ; git checkout $branch; git pull"
+  run_dev "cd ~/test_dev; git checkout $branch; git pull"
   run_dev "cd ~/test_dev; ./pants src/main/python/apache/aurora/client/bin:aurora_client"
   run_dev "cd ~/test_dev; ./pants src/test/sh/org/apache/aurora/e2e/flask:flask_example"
   if [ ! -d $_testdir ]

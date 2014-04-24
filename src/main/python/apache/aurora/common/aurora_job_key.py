@@ -16,8 +16,8 @@
 
 import re
 
-from gen.apache.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
-from gen.apache.aurora.ttypes import Identity, JobKey, TaskQuery
+from gen.apache.aurora.api.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
+from gen.apache.aurora.api.ttypes import Identity, JobKey, TaskQuery
 
 from twitter.common.lang import Compatibility, total_ordering
 

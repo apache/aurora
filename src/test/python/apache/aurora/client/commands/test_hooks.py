@@ -24,7 +24,7 @@ from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from twitter.common import app
 from twitter.common.contextutil import temporary_file
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
     Response,

@@ -22,8 +22,8 @@ import traceback
 from apache.aurora.common.auth import make_session_key, SessionKeyError
 from apache.aurora.common.cluster import Cluster
 
-from gen.apache.aurora import AuroraAdmin
-from gen.apache.aurora.constants import CURRENT_API_VERSION
+from gen.apache.aurora.api import AuroraAdmin
+from gen.apache.aurora.api.constants import CURRENT_API_VERSION
 
 from pystachio import Boolean, Default, Integer, String
 from thrift.protocol import TBinaryProtocol

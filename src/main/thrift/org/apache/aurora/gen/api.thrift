@@ -15,7 +15,7 @@
  */
 
 namespace java org.apache.aurora.gen
-namespace py gen.apache.aurora
+namespace py gen.apache.aurora.api
 
 // Thrift interface definition for the aurora scheduler.
 

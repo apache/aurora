@@ -23,10 +23,10 @@ from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset.endpoint import ServiceInstance
 
-import gen.apache.aurora.AuroraAdmin as AuroraAdmin
-import gen.apache.aurora.AuroraSchedulerManager as AuroraSchedulerManager
-from gen.apache.aurora.constants import DEFAULT_ENVIRONMENT, CURRENT_API_VERSION
-from gen.apache.aurora.ttypes import *
+import gen.apache.aurora.api.AuroraAdmin as AuroraAdmin
+import gen.apache.aurora.api.AuroraSchedulerManager as AuroraSchedulerManager
+from gen.apache.aurora.api.constants import DEFAULT_ENVIRONMENT, CURRENT_API_VERSION
+from gen.apache.aurora.api.ttypes import *
 
 from mox import IgnoreArg, IsA, Mox
 

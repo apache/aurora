@@ -54,8 +54,8 @@ from apache.aurora.client.cli.options import (
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME
+from gen.apache.aurora.api.ttypes import (
     ExecutorConfig,
     ResponseCode,
     ScheduleStatus,

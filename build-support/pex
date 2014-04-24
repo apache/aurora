@@ -17,7 +17,7 @@
 # Wrapper script for self-bootstrapping pex.
 set -e
 
-TWITTER_COMMON_PYTHON_VERSION=0.3.1
+TWITTER_COMMON_PYTHON_VERSION=0.5.4
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
 if ! [ -f "$HERE/pex.venv/BOOTSTRAPPED" ] || \

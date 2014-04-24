@@ -16,7 +16,7 @@
 
 import time
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
   Identity,
   ResponseCode,
   ScheduleStatus,

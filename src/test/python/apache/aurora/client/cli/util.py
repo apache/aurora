@@ -16,7 +16,7 @@
 
 import unittest
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Response,
     ResponseCode,

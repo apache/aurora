@@ -32,7 +32,7 @@ from apache.aurora.client.cli import (
 from apache.aurora.client.config import get_config
 from apache.aurora.client.factory import make_client
 
-from gen.apache.aurora.ttypes import ResponseCode
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 from twitter.common import log
 

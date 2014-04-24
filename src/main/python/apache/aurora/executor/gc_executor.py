@@ -33,12 +33,12 @@ from apache.thermos.core.helper import TaskKiller
 from apache.thermos.monitoring.detector import TaskDetector
 from apache.thermos.monitoring.garbage import TaskGarbageCollector
 
+from gen.apache.aurora.api.constants import TERMINAL_STATES
+from gen.apache.aurora.api.ttypes import ScheduleStatus
 from gen.apache.aurora.comm.ttypes import (
     AdjustRetainedTasks,
     DeletedTasks,
     SchedulerMessage)
-from gen.apache.aurora.constants import TERMINAL_STATES
-from gen.apache.aurora.ttypes import ScheduleStatus
 from gen.apache.thermos.ttypes import TaskState
 
 from .common.sandbox import DirectorySandbox, SandboxInterface

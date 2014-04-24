@@ -30,15 +30,15 @@ from apache.thermos.config.schema import (
     Task,
 )
 
-from gen.apache.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
-from gen.apache.aurora.test.constants import (
-    INVALID_IDENTIFIERS,
-    VALID_IDENTIFIERS,
-)
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
+from gen.apache.aurora.api.ttypes import (
     CronCollisionPolicy,
     JobKey,
     Identity,
+)
+from gen.apache.aurora.test.constants import (
+    INVALID_IDENTIFIERS,
+    VALID_IDENTIFIERS,
 )
 
 from pystachio import Map, String

@@ -57,12 +57,11 @@ from apache.aurora.client.options import (
     WAIT_UNTIL_OPTION)
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.constants import ACTIVE_STATES, CURRENT_API_VERSION, AURORA_EXECUTOR_NAME
-from gen.apache.aurora.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
+from gen.apache.aurora.api.constants import ACTIVE_STATES, CURRENT_API_VERSION, AURORA_EXECUTOR_NAME
+from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
 
 from twitter.common import app, log
 from twitter.common.python.pex import PexInfo
-from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 
 
 def get_job_config(job_spec, config_file, options):
@@ -102,12 +101,11 @@ def version(args):
   Prints information about the version of the aurora client being run.
   """
   try:
-    pexpath = sys.argv[0]
-    pex_info = PexInfo.from_pex(PythonDirectoryWrapper.get(pexpath))
+    pex_info = PexInfo.from_pex(sys.argv[0])
     print("Aurora client build info:")
     print("\tsha: %s" % pex_info.build_properties['sha'])
     print("\tdate: %s" % pex_info.build_properties['date'])
-  except (IOError, PythonDirectoryWrapper.Error):
+  except (IOError, OSError):
     print("Aurora client build info not available")
   print("Aurora API version: %s" % CURRENT_API_VERSION)
 

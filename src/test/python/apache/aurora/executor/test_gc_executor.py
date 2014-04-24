@@ -29,9 +29,9 @@ from apache.thermos.common.path import TaskPath
 from apache.thermos.config.schema import SimpleTask
 from apache.thermos.core.runner import TaskRunner
 
+from gen.apache.aurora.api.constants import LIVE_STATES, TERMINAL_STATES
+from gen.apache.aurora.api.ttypes import ScheduleStatus
 from gen.apache.aurora.comm.ttypes import AdjustRetainedTasks, SchedulerMessage
-from gen.apache.aurora.constants import LIVE_STATES, TERMINAL_STATES
-from gen.apache.aurora.ttypes import ScheduleStatus
 from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 import mock

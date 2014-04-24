@@ -26,9 +26,9 @@ from apache.aurora.client.api.sla import (
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 
-from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
-from gen.apache.aurora.constants import LIVE_STATES
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
+from gen.apache.aurora.api.constants import LIVE_STATES
+from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
     Response,

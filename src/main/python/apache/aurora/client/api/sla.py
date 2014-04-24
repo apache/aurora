@@ -23,8 +23,8 @@ from copy import deepcopy
 from apache.aurora.client.base import check_and_log_response
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.constants import LIVE_STATES
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import LIVE_STATES
+from gen.apache.aurora.api.ttypes import (
   Identity,
   Response,
   ResponseCode,

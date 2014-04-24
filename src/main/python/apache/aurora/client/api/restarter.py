@@ -14,8 +14,8 @@
 # limitations under the License.
 #
 
-from gen.apache.aurora.constants import ACTIVE_STATES
-from gen.apache.aurora.ttypes import ResponseCode
+from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 from .instance_watcher import InstanceWatcher
 from .updater_util import FailureThreshold

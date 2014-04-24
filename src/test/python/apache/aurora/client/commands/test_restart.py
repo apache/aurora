@@ -22,7 +22,7 @@ from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.client.api.health_check import InstanceWatcherHealthCheck, Retriable
 from twitter.common.contextutil import temporary_file
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     JobKey,
     PopulateJobResult,

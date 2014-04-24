@@ -20,7 +20,7 @@ from apache.aurora.config.port_resolver import PortResolver
 from apache.aurora.config.schema.base import MesosJob, MesosTaskInstance
 from apache.aurora.config.thrift import task_instance_from_job
 
-from gen.apache.aurora.ttypes import AssignedTask
+from gen.apache.aurora.api.ttypes import AssignedTask
 
 from pystachio import Ref
 from thrift.Thrift import TException

@@ -28,7 +28,7 @@ from apache.aurora.client.api.health_check import (
   StatusHealthCheck
 )
 
-from gen.apache.aurora.ttypes import *
+from gen.apache.aurora.api.ttypes import *
 
 import mox
 import pytest

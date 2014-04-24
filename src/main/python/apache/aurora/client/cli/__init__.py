@@ -40,7 +40,6 @@ import sys
 from uuid import uuid1
 
 from twitter.common.python.pex import PexInfo
-from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 
 # Constants for standard return codes.
 EXIT_OK = 0
@@ -75,10 +74,10 @@ def print_aurora_log(sev, msg, *args, **kwargs):
 def get_client_version():
   try:
     pexpath = sys.argv[0]
-    pex_info = PexInfo.from_pex(PythonDirectoryWrapper.get(pexpath))
+    pex_info = PexInfo.from_pex(pexpath)
     return ("%s@%s" % (pex_info.build_properties.get('sha', 'unknown'),
         pex_info.build_properties.get('date', 'unknown')))
-  except (IOError, PythonDirectoryWrapper.Error):
+  except (IOError, OSError):
     return "VersionUnknown"
 
 

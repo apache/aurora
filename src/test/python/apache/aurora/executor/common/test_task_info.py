@@ -26,7 +26,7 @@ from apache.aurora.config.schema.base import (
 )
 from apache.aurora.executor.common.task_info import mesos_task_instance_from_assigned_task
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
   AssignedTask,
   ExecutorConfig,
   TaskConfig,

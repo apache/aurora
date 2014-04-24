@@ -22,7 +22,7 @@ from apache.aurora.common.clusters import Clusters
 from apache.aurora.client.commands.core import list_jobs
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     GetJobsResult,
     JobKey,
 )

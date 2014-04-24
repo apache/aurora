@@ -21,8 +21,8 @@ from apache.aurora.client.api.disambiguator import LiveJobDisambiguator
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 
-from gen.apache.aurora.constants import ResponseCode
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import ResponseCode
+from gen.apache.aurora.api.ttypes import (
    Response,
    Result,
    GetJobsResult,

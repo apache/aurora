@@ -19,7 +19,7 @@ import unittest
 from apache.aurora.admin.host_maintenance import HostMaintenance
 from apache.aurora.common.cluster import Cluster
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     Hosts,
     Response,
     ResponseCode,

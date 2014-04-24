@@ -18,7 +18,7 @@ from abc import abstractmethod
 
 from apache.aurora.common.http_signaler import HttpSignaler
 
-from gen.apache.aurora.ttypes import ScheduleStatus
+from gen.apache.aurora.api.ttypes import ScheduleStatus
 
 from twitter.common import log
 from twitter.common.lang import Interface

@@ -20,7 +20,7 @@ import optparse
 import sys
 from urlparse import urljoin
 
-from gen.apache.aurora.ttypes import ResponseCode
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 from twitter.common import app, log
 

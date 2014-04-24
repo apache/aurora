@@ -14,8 +14,15 @@
 # limitations under the License.
 #
 
-from gen.apache.aurora.AuroraSchedulerManager import Client
-from gen.apache.aurora.ttypes import Response, ResponseCode, Result, ScheduleStatusResult, Identity, TaskQuery
+from gen.apache.aurora.api.AuroraSchedulerManager import Client
+from gen.apache.aurora.api.ttypes import (
+    Identity,
+    Response,
+    ResponseCode,
+    Result,
+    ScheduleStatusResult,
+    TaskQuery,
+)
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.job_monitor import JobMonitor
 

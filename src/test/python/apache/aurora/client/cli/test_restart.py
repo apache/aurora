@@ -23,7 +23,7 @@ from apache.aurora.client.cli.util import AuroraClientCommandTest
 
 from twitter.common.contextutil import temporary_file
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     JobKey,
     PopulateJobResult,

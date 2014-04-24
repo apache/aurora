@@ -22,7 +22,7 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
     JobKey,

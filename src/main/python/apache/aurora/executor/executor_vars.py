@@ -24,7 +24,6 @@ from twitter.common.metrics import (
     MutatorGauge,
     NamedGauge,
     Observable)
-from twitter.common.python.dirwrapper import PythonDirectoryWrapper
 from twitter.common.python.pex import PexInfo
 from twitter.common.quantity import Amount, Time
 from twitter.common.string.scanf import ScanfParser
@@ -62,9 +61,9 @@ class ExecutorVars(Observable, ExceptionalThread):
   @classmethod
   def get_release_from_binary(cls, binary):
     try:
-      pex_info = PexInfo.from_pex(PythonDirectoryWrapper.get(binary))
+      pex_info = PexInfo.from_pex(binary)
       return cls.get_release_from_tag(pex_info.build_properties.get('tag', ''))
-    except PythonDirectoryWrapper.Error:
+    except (IOError, OSError):
       return 'UNKNOWN'
 
   def __init__(self, clock=time):

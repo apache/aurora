@@ -25,7 +25,7 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from twitter.common.contextutil import temporary_file
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     Identity,
     ScheduleStatus,
     ScheduleStatusResult,

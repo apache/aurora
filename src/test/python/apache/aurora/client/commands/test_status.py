@@ -22,7 +22,7 @@ from apache.aurora.common.clusters import Clusters
 from apache.aurora.client.commands.core import status
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
     JobKey,

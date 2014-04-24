@@ -26,8 +26,8 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.config import AuroraConfig
 
-from gen.apache.aurora.constants import ACTIVE_STATES
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.ttypes import (
     AcquireLockResult,
     AddInstancesConfig,
     AssignedTask,

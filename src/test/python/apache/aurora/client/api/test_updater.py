@@ -23,9 +23,9 @@ from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck
 from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
 
-from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
-from gen.apache.aurora.constants import ACTIVE_STATES
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
+from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.ttypes import (
   AddInstancesConfig,
   AcquireLockResult,
   AssignedTask,

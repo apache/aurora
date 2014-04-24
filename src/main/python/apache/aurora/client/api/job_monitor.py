@@ -16,11 +16,11 @@
 
 import time
 
-from gen.apache.aurora.constants import (
+from gen.apache.aurora.api.constants import (
     LIVE_STATES,
     TERMINAL_STATES
 )
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     Identity,
     TaskQuery
 )

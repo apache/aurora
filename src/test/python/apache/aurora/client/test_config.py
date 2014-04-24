@@ -23,7 +23,7 @@ from apache.aurora.config import AuroraConfig
 from apache.aurora.config.loader import AuroraConfigLoader
 from apache.aurora.config.schema.base import Announcer, Job, MB, Resources, Task
 
-from gen.apache.aurora.constants import DEFAULT_ENVIRONMENT
+from gen.apache.aurora.api.constants import DEFAULT_ENVIRONMENT
 
 import pytest
 

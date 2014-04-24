@@ -28,7 +28,7 @@ from apache.aurora.client.cli.options import (
     ROLE_ARGUMENT,
 )
 
-from gen.apache.aurora.ttypes import ResponseCode
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize

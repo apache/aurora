@@ -19,8 +19,8 @@ import contextlib
 from apache.aurora.client.commands.run import run
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 
-from gen.apache.aurora.constants import LIVE_STATES
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import LIVE_STATES
+from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
     JobKey,

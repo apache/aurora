@@ -20,8 +20,8 @@ import unittest
 from apache.aurora.client.api.health_check import HealthCheck
 from apache.aurora.client.api.instance_watcher import InstanceWatcher
 
-from gen.apache.aurora.ttypes import *
-from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
+from gen.apache.aurora.api.ttypes import *
+from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
 
 import mox
 

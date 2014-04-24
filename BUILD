@@ -13,4 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-maven_layout()
+
+source_root('src/main/python', Page, PythonBinary, PythonLibrary)
+source_root('src/main/thrift', Page, PythonLibrary, PythonThriftLibrary)
+
+# TODO(wickman) get rid of PythonLibrary from src/test/python:
+#   src/test/python/apache/aurora/client/BUILD:python_library(
+#   src/test/python/apache/aurora/client/cli/BUILD:python_library(
+#   src/test/python/apache/aurora/client/commands/BUILD:python_library(
+source_root('src/test/python', Page, PythonTests, PythonTestSuite, PythonLibrary)

@@ -18,8 +18,8 @@ import json
 from collections import namedtuple
 from difflib import unified_diff
 
-from gen.apache.aurora.constants import ACTIVE_STATES
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.ttypes import (
     AddInstancesConfig,
     JobKey,
     Identity,

@@ -21,7 +21,7 @@ from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.config import GlobalHookRegistry
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.ttypes import ResponseCode
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 from twitter.common import log
 

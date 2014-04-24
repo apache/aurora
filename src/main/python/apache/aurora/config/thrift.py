@@ -24,8 +24,8 @@ from apache.aurora.config.schema.base import (
 )
 from apache.thermos.config.loader import ThermosTaskValidator
 
-from gen.apache.aurora.constants import GOOD_IDENTIFIER_PATTERN_PYTHON, AURORA_EXECUTOR_NAME
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import GOOD_IDENTIFIER_PATTERN_PYTHON, AURORA_EXECUTOR_NAME
+from gen.apache.aurora.api.ttypes import (
   Constraint,
   CronCollisionPolicy,
   ExecutorConfig,

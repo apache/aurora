@@ -24,7 +24,6 @@ python_thrift_library(
     'api.thrift',
     'internal_rpc.thrift',
   ],
-
 )
 
 python_thrift_library(

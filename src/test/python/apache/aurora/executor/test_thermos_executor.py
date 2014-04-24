@@ -47,8 +47,8 @@ from apache.thermos.common.path import TaskPath
 from apache.thermos.core.runner import TaskRunner
 from apache.thermos.monitoring.monitor import TaskMonitor
 
-from gen.apache.aurora.constants import AURORA_EXECUTOR_NAME
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME
+from gen.apache.aurora.api.ttypes import (
   AssignedTask,
   ExecutorConfig,
   Identity,

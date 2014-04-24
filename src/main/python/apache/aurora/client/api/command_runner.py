@@ -23,8 +23,8 @@ from apache.aurora.config.schema.base import MesosContext
 from apache.aurora.common.cluster import Cluster
 from apache.thermos.config.schema import ThermosContext
 
-from gen.apache.aurora.constants import LIVE_STATES
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import LIVE_STATES
+from gen.apache.aurora.api.ttypes import (
   Identity,
   ResponseCode,
   TaskQuery)

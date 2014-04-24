@@ -20,8 +20,8 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.auth import make_session_key
 from apache.aurora.common.cluster import Cluster
 
-from gen.apache.aurora.constants import LIVE_STATES
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import LIVE_STATES
+from gen.apache.aurora.api.ttypes import (
     Response,
     Identity,
     ResourceAggregate,

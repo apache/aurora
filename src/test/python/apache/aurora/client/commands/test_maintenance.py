@@ -24,7 +24,7 @@ from apache.aurora.client.commands.maintenance import (
     start_maintenance_hosts,
 )
 
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.ttypes import (
     DrainHostsResult,
     EndMaintenanceResult,
     Hosts,

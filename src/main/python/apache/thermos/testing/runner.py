@@ -42,6 +42,12 @@ from twitter.common.contextutil import temporary_file, environment_as
 
 class Runner(object):
   RUN_JOB_SCRIPT = """
+# this is a hack to process wheel nspkg declarations
+import os, sys, site
+for path in sys.path:
+  if path.endswith('.whl') and os.path.isdir(path):
+    site.addsitedir(path)
+
 import os
 import random
 import sys

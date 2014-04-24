@@ -19,7 +19,7 @@ set -o nounset
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
-PANTS_VERSION=0.0.14-dev2
+PANTS_VERSION=0.0.21
 if ! [[ -e "$HERE/build-support/pants-$PANTS_VERSION.pex" ]]; then
   echo "Building pants.pex @ $PANTS_VERSION"
   "$HERE/build-support/pex" \

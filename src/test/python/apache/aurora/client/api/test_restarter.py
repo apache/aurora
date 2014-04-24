@@ -19,8 +19,8 @@ from apache.aurora.client.api.instance_watcher import InstanceWatcher
 from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.AuroraSchedulerManager import Client as scheduler_client
-from gen.apache.aurora.ttypes import *
+from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
+from gen.apache.aurora.api.ttypes import *
 
 from mox import IgnoreArg, MoxTestBase
 

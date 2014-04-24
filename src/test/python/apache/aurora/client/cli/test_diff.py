@@ -24,8 +24,8 @@ from apache.aurora.client.cli import (
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
 
-from gen.apache.aurora.constants import ACTIVE_STATES
-from gen.apache.aurora.ttypes import (
+from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     ExecutorConfig,
     Identity,
