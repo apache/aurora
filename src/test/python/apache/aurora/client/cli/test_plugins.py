@@ -66,6 +66,8 @@ class BogusPlugin(ConfigurationPlugin):
     context.after = True
     raise self.Error("Oops")
 
+class EmptyPlugin(ConfigurationPlugin):
+  pass
 
 class TestPlugins(AuroraClientCommandTest):
 
@@ -152,6 +154,30 @@ class TestPlugins(AuroraClientCommandTest):
       assert mock_context.bogosity == "maximum"
       assert mock_context.after == True
 
+  def test_empty_plugins_in_create_job(self):
+    """Installs a plugin that doesn't implement any of the plugin methods.
+    Prior to AURORA-362, this would cause the client to crash with an empty
+    argument list.
+    """
+    mock_context = FakeAuroraCommandContext()
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
+      mock_query = self.create_mock_query()
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.INIT))
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+      api = mock_context.get_api('west')
+      api.create_job.return_value = self.get_createjob_response()
+
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.register_plugin(EmptyPlugin())
+        cmd.execute(['job', 'create', '--wait-until=RUNNING',
+            'west/bozo/test/hello', fp.name])
+      self.assert_create_job_called(api)
+      self.assert_scheduler_called(api, mock_query, 2)
 
   def mock_print(self, str):
     for str in str.split('\n'):

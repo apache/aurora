@@ -147,6 +147,7 @@ class ConfigurationPlugin(object):
   @abstractmethod
   def get_options(self):
     """Return the set of options processed by this plugin"""
+    return []
 
   @abstractmethod
   def before_dispatch(self, raw_args):
@@ -154,6 +155,7 @@ class ConfigurationPlugin(object):
     Returns a potentially modified version of the command line arguments.
     If a ConfigurationPlugin.Error exception is thrown, it aborts command execution.
     """
+    return raw_args
 
   @abstractmethod
   def before_execution(self, context):
