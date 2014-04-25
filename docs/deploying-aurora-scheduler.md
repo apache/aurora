@@ -81,25 +81,12 @@ In a cluster with `N` schedulers, the flag `-native_log_quorum_size` should be s
 `floor(N/2) + 1`. So in a cluster with 1 scheduler it should be set to `1`, in a cluster with 3 it
 should be set to `2`, and in a cluster of 5 it should be set to `3`.
 
-<table>
-  <thead>
-    <tr>
-      <th>Number of schedulers (N)
-      <th><code>-native_log_quorum_size</code> setting (<code>floor(N/2) + 1</code>)
-  <tbody>
-    <tr>
-      <td>1
-      <td>1
-    <tr>
-      <td>3
-      <td>2
-    <tr>
-      <td>5
-      <td>3
-    <tr>
-      <td>7
-      <td>4
-</table>
+  Number of schedulers (N) | ```-native_log_quorum_size``` setting (```floor(N/2) + 1```)
+  ------------------------ | -------------------------------------------------------------
+  1                        | 1
+  3                        | 2
+  5                        | 3
+  7                        | 4
 
 *Incorrectly setting this flag will cause data corruption to occur!*
 

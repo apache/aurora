@@ -84,39 +84,13 @@ Note that the `post_` and `err_` hooks for the same method can never both run fo
 
 You can associate `pre_`, `post_`, and `err_` hooks with the following methods. Since you do not directly interact with the methods, but rather the Aurora Command Line commands that call them, for each method we also list the command(s) that can call the method. Note that a different method or methods may be called by a command depending on how the command's other code executes. Similarly, multiple commands can call the same method. We also list the methods' argument signatures, which are used by their associated hooks. <a name="Chart"></a>
 
-<table border="1" cellpadding="0" cellspacing="0">
-  <tbody>
-    <tr>
-      <th>Aurora Client API Method</td>
-      <th>Client API Method Argument Signature</td>
-      <th>Aurora Command Line Command</td>
-    </tr>
-    <tr>
-      <td><code>cancel_update</code></td>
-      <td><code>self</code>, <code>job_key</code></td>
-      <td><code>cancel_update</code></td>
-    </tr>
-    <tr>
-      <td><code>create_job</code></td>
-      <td><code>self</code>, <code>config</code></td>
-      <td><code>create</code>, <code>runtask</code></td>
-    </tr>
-    <tr>
-      <td><code>restart</code></td>
-      <td><code>self</code>, <code>job_key</code>, <code>shards</code>, <code>update_config</code>, <code>health_check_interval_seconds</code></td>
-      <td><code>restart</code></td>
-    </tr>
-    <tr>
-      <td><code>update_job</code></td>
-      <td><code>self</code>, <code>config</code>, <code>health_check_interval_seconds=3</code>, <code>shards=None</code></td>
-      <td><code>update</code></td>
-     </tr>
-     <tr>
-       <td><code>kill_job</code></td>
-       <td><code>self</code>, <code>job_key</code>, <code>shards=None</code></td>
-       <td><code>kill</code></td>
-     </tr>
-   </table>
+  Aurora Client API Method | Client API Method Argument Signature | Aurora Command Line Command
+  -------------------------| ------------------------------------- | ---------------------------
+  ```cancel_update``` | ```self```, ```job_key``` | ```cancel_update```
+  ```create_job``` | ```self```, ```config``` | ```create```, <code>runtask
+  ```restart``` | ```self```, ```job_key```, ```shards```, ```update_config```, ```health_check_interval_seconds``` | ```restart```
+  ```update_job``` | ```self```, ```config```, ```health_check_interval_seconds=3```, ```shards=None``` | ```update```
+  ```kill_job``` | ```self```, ```job_key```, ```shards=None``` |  ```kill```
 
 Some specific examples:
 

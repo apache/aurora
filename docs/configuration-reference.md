@@ -59,49 +59,15 @@ behavior with its optional attributes. Remember, Processes are handled by Thermo
 
 ### Process Objects
 
-<table border=1>
-  <tbody>
-  <tr>
-   <th>Attribute Name</td>
-    <th>Type</td>
-    <th>Description</td>
-  </tr>
-  <tr>
-    <td><code><b>name</b></code></td>
-    <td>String</td>
-    <td>Process name (Required)</td>
-  </tr>
-  <tr>
-    <td><code>cmdline</code></td>
-    <td>String</td>
-    <td>Command line (Required)</td>
-  </tr>
-  <tr>
-    <td><code>max_failures</code></td>
-    <td>Integer</td>
-    <td>Maximum process failures (Default: 1)</td>
-  </tr>
-  <tr>
-    <td><code>daemon</code></td>
-    <td>Boolean</td>
-    <td>When True, this is a daemon process. (Default: False)</td>
-  </tr>
-  <tr>
-    <td><code>ephemeral</code></td>
-    <td>Boolean</td>
-    <td>When True, this is an ephemeral process. (Default: False)</td>
-  </tr>
-    <td><code>min_duration</code></td>
-    <td>Integer</td>
-    <td>Minimum duration between process restarts in seconds. (Default: 15)</td>
-  </tr>
-  <tr>
-    <td><code>final</code></td>
-    <td>Boolean</td>
-    <td>When True, this process is a finalizing one that should run last. (Default: False)</td>
-  </tr>
-</tbody>
-</table>
+  **Attribute Name**  | **Type**    | **Description**
+  ------------------- | :---------: | ---------------------------------
+   **name**           | String      | Process name (Required)
+   **cmdline**        | String      | Command line (Required)
+   **max_failures**   | Integer     | Maximum process failures (Default: 1)
+   **daemon**         | Boolean     | When True, this is a daemon process. (Default: False)
+   **ephemeral**      | Boolean     | When True, this is an ephemeral process. (Default: False)
+   **min_duration**   | Integer     | Minimum duration between process restarts in seconds. (Default: 15)
+   **final**          | Boolean     | When True, this process is a finalizing one that should run last. (Default: False)
 
 #### name
 
@@ -185,52 +151,17 @@ can be omitted. In Mesos, `resources` is also required.
 
 ### Task Object
 
-<table border=1>
-  <tbody>
-  <tr>
-   <th>param</td>
-    <th>type</td>
-    <th>description</td>
-  </tr>
-  <tr>
-    <td><code><b>name</b></code></td>
-    <td>String</td>
-    <td>Process name (Required) (Default: <code>{{processes0.name}})</td>
-  </tr>
-  <tr>
-    <td><code><b>processes<b></code></td>
-    <td>List of <code>Process</code> objects</td>
-    <td>List of <code>Process</code> objects bound to this task. (Required)</td>
-  </tr>
-  <tr>
-    <td><code>constraints</code></td>
-    <td>List of <code>Constraint<code> objects</td>
-    <td>List of <code>Constraint</code> objects constraining processes.</td>
-  </tr>
-  <tr>
-    <td><code><b>resources</b></code></td>
-    <td><code>Resource</code> object</td>
-    <td>Resource footprint. (Required)</td>
-  </tr>
-  <tr>
-    <td><code>max_failures</code></td>
-    <td>Integer</td>
-    <td>Maximum process failures before being considered failed (Default: 1)</td>
-  </tr>
-    <td><code>max_concurrency</code></td>
-    <td>Integer</td>
-    <td>Maximum number of concurrent processes (Default: 0, unlimited concurrency.)
-  </tr>
-  <tr>
-    <td><code>finalization_wait</code></td>
-    <td>Integer</td>
-    <td>Amount of time allocated for finalizing processes, in seconds. (Default: 30)
-  </tr>
-</tbody>
-</table>
+   **param**               | **type**                         | **description**
+   ---------               | :---------:                      | ---------------
+   ```name```              | String                           | Process name (Required) (Default: ```processes0.name```)
+   ```processes```         | List of ```Process``` objects    | List of ```Process``` objects bound to this task. (Required)
+   ```constraints```       | List of ```Constraint``` objects | List of ```Constraint``` objects constraining processes.
+   ```resources```         | ```Resource``` object            | Resource footprint. (Required)
+   ```max_failures```      | Integer                          | Maximum process failures before being considered failed (Default: 1)
+   ```max_concurrency```   | Integer                          | Maximum number of concurrent processes (Default: 0, unlimited concurrency.)
+   ```finalization_wait``` | Integer                          | Amount of time allocated for finalizing processes, in seconds. (Default: 30)
 
 #### name
-
 `name` is a string denoting the name of this task. It defaults to the name of the first Process in
 the list of Processes associated with the `processes` attribute.
 
@@ -351,20 +282,9 @@ which specifies its processes run sequentially in the order given. By
 default, all processes run in parallel when bound to a `Task` without
 ordering constraints.
 
-<table border=1>
-  <tbody>
-  <tr>
-   <th>param</td>
-    <th>type</td>
-    <th>description</td>
-  </tr>
-  <tr>
-    <td><code><b>order</b></code></td>
-    <td>List of String</td>
-    <td> List of processes by name (String) that should be run serially.</td>
-  </tr>
-  </tbody>
-</table>
+   param | type           | description
+   ----- | :----:         | -----------
+   order | List of String | List of processes by name (String) that should be run serially.
 
 ### Resource Object
 
@@ -372,125 +292,36 @@ Specifies the amount of CPU, Ram, and disk resources the task needs. See the
 [Resource Isolation document](resource-isolation.md) for suggested values and to understand how
 resources are allocated.
 
-<table border=1>
-  <tbody>
-  <tr>
-   <th>param</td>
-    <th>type</td>
-    <th>description</td>
-  </tr>
-  <tr>
-    <td><code>cpu</code></td>
-    <td>Float</td>
-    <td>Fractional number of cores required by the task.</td>
-  </tr>
-  <tr>
-    <td><code>ram</code></td>
-    <td>Integer</td>
-    <td>Bytes of RAM required by the task.</td>
-  </tr>
-  <tr>
-    <td><code>disk</code></td>
-    <td>Integer</td>
-    <td>Bytes of disk required by the task.</td>
-  </tr>
-  </tbody>
-</table>
+  param      | type    | description
+  -----      | :----:  | -----------
+  ```cpu```  | Float   | Fractional number of cores required by the task.
+  ```ram```  | Integer | Bytes of RAM required by the task.
+  ```disk``` | Integer | Bytes of disk required by the task.
 
 Job Schema
 ==========
 
 ### Job Objects
 
-<table border=1>
-  <tbody>
-    <tr>
-      <td><code>task</code></td>
-      <td>Task</td>
-      <td>The Task object to bind to this job. Required.</td></td>
-    </tr>
-    <tr>
-      <td><code>name</code></td>
-      <td>String</td>
-      <td>Job name. (Default: inherited from the task attribute's name)</td>
-    </tr>
-    <tr>
-      <td><code>role</code></td>
-      <td>String</td>
-      <td>Job role account. Required.</td>
-    </tr>
-    <tr>
-      <td><code>cluster</code></td>
-      <td>String</td>
-      <td>Cluster in which this job is scheduled. Required.</td>
-    </tr>
-    <tr>
-      <td><code>environment</code></td></td>
-      <td>String</td></td>
-      <td>Job environment, default <code>devel</code>. Must be one of <code>prod</code>, <code>devel</code>, <code>test</code> or <code>staging&lt;number&gt;</code>.</td>
-    </tr>
-    <tr>
-      <td><code>contact</code></td>
-      <td>String</td>
-      <td>Best email address to reach the owner of the job. For production jobs, this is usually a team mailing list.</td>
-    </tr>
-    <tr>
-      <td><code>instances</code></td>
-      <td>Integer</td>
-      <td>Number of instances (sometimes referred to as replicas or shards) of the task to create. (Default: 1)</td>
-    </tr>
-    <tr>
-      <td><code>cron_schedule</code> <strong>(Present, but not supported and a no-op)</strong></td>
-      <td>String</td>
-      <td>UTC Cron schedule in cron format. May only be used with non-service jobs. Default: None (not a cron job.)</td>
-    </tr>
-    <tr>
-      <td><code>cron_collision_policy</code> <strong>(Present, but not supported and a no-op)</strong></td>
-      <td>String</td>
-      <td>Policy to use when a cron job is triggered while a previous run is still active. KILL_EXISTING Kill the previous run, and schedule the new run CANCEL_NEW Let the previous run continue, and cancel the new run. RUN_OVERLAP Let the previous run continue, and schedule the new run. (Default: KILL_EXISTING)</td>
-    </tr>
-    <tr>
-      <td><code>update_config</code></td>
-      <td><code>update_config</code> object</td>
-      <td>Parameters for controlling the rate and policy of rolling updates. </td>
-    </tr>
-    <tr>
-      <td><code>constraints</code></td>
-      <td>dict</td>
-      <td>Scheduling constraints for the tasks. See the section on the <a href="#SchedulingConstraints">constraint specification language</a></td>
-    </tr>
-    <tr>
-      <td><code>service</code></td>
-      <td>Boolean</td>
-      <td>If True, restart tasks regardless of success or failure. (Default: False)</td>
-    </tr>
-    <tr>
-      <td><code>daemon</code></td>
-      <td>Boolean</td>
-      <td>A DEPRECATED alias for "service". (Default: False) </td>
-    </tr>
-    <tr>
-      <td><code>max_task_failures</code></td>
-      <td>Integer</td>
-      <td>Maximum number of failures after which the task is considered to have failed (Default: 1) Set to -1 to allow for infinite failures</td>
-    </tr>
-    <tr>
-      <td><code>priority</code></td>
-      <td>Integer</td>
-      <td>Preemption priority to give the task (Default 0). Tasks with higher priorities may preempt tasks at lower priorities.</td>
-    </tr>
-    <tr>
-      <td><code>production</code></td>
-      <td>Boolean</td>
-      <td>Whether or not this is a production task backed by quota (Default: False) Production jobs may preempt any non-production job, and may only be preempted by production jobs in the same role and of higher priority. To run jobs at this level, the job role must have the appropriate quota.</td>
-    </tr>
-    <tr>
-      <td><code>health_check_config</code></td>
-      <td><code>heath_check_config</code> object</td>
-      <td>Parameters for controlling a task's health checks via HTTP. Only used if a  health port was assigned with a command line wildcard.</td>
-    </tr>
-  </tbody>
-</table>
+   name | type | description
+   ------ | :-------: | -------
+  ```task``` | Task | The Task object to bind to this job. Required.
+  ```name``` | String | Job name. (Default: inherited from the task attribute's name)
+  ```role``` | String | Job role account. Required.
+  ```cluster``` | String | Cluster in which this job is scheduled. Required.
+   ```environment``` | String | Job environment, default ```devel```. Must be one of ```prod```, ```devel```, ```test``` or ```staging<number>```.
+  ```contact``` | String | Best email address to reach the owner of the job. For production jobs, this is usually a team mailing list.
+  ```instances```| Integer | Number of instances (sometimes referred to as replicas or shards) of the task to create. (Default: 1)
+   ```cron_schedule``` **(Present, but not supported and a no-op)** | String | UTC Cron schedule in cron format. May only be used with non-service jobs. Default: None (not a cron job.)
+  ```cron_collision_policy``` **(Present, but not supported and a no-op)** | String | Policy to use when a cron job is triggered while a previous run is still active. KILL_EXISTING Kill the previous run, and schedule the new run CANCEL_NEW Let the previous run continue, and cancel the new run. RUN_OVERLAP Let the previous run continue, and schedule the new run. (Default: KILL_EXISTING)
+  ```update_config``` | ```update_config``` object | Parameters for controlling the rate and policy of rolling updates.
+  ```constraints``` | dict | Scheduling constraints for the tasks. See the section on the [constraint specification language](#Specifying-Scheduling-Constraints)
+  ```service``` | Boolean | If True, restart tasks regardless of success or failure. (Default: False)
+  ```daemon``` | Boolean | A DEPRECATED alias for "service". (Default: False)
+  ```max_task_failures``` | Integer | Maximum number of failures after which the task is considered to have failed (Default: 1) Set to -1 to allow for infinite failures
+  ```priority``` | Integer | Preemption priority to give the task (Default 0). Tasks with higher priorities may preempt tasks at lower priorities.
+  ```production``` | Boolean |  Whether or not this is a production task backed by quota (Default: False). Production jobs may preempt any non-production job, and may only be preempted by production jobs in the same role and of higher priority. To run jobs at this level, the job role must have the appropriate quota.
+  ```health_check_config``` | ```heath_check_config``` object | Parameters for controlling a task's health checks via HTTP. Only used if a  health port was assigned with a command line wildcard.
 
 ### Services
 
@@ -506,64 +337,24 @@ either due to human error or machine failure.
 
 Parameters for controlling the rate and policy of rolling updates.
 
-<table border=1>
-  <tbody>
-    <tr>
-      <td><code>batch_size</code></td>
-      <td>Integer</td>
-      <td>Maximum number of shards to be updated in one iteration (Default: 1)</td>
-    </tr>
-    <tr>
-      <td><code>restart_threshold</code></td>
-      <td>Integer</td>
-      <td>Maximum number of seconds before a shard must move into the <code>RUNNING</code> state before considered a failure (Default: 60)</td>
-    </tr>
-    <tr>
-      <td><code>watch_secs</code></td>
-      <td>Integer</td>
-      <td>Minimum number of seconds a shard must remain in <code>RUNNING</code> state before considered a success (Default: 30)</td>
-    </tr>
-    <tr>
-      <td><code>max_per_shard_failures</code></td>
-      <td>Integer</td>
-      <td>Maximum number of restarts per shard during update. Increments total failure count when this limit is exceeded. (Default: 0)</td>
-    </tr>
-    <tr>
-      <td><code>max_total_failures</code></td>
-      <td>Integer</td>
-      <td>Maximum number of shard failures to be tolerated in total during an update. Cannot be greater than or equal to the total number of tasks in a job. (Default: 0)</td>
-    </tr>
-  </tbody>
-</table>
+| object                       | type     | description
+| ---------------------------- | :------: | ------------
+| ```batch_size```             | Integer  | Maximum number of shards to be updated in one iteration (Default: 1)
+| ```restart_threshold```      | Integer  | Maximum number of seconds before a shard must move into the ```RUNNING``` state before considered a failure (Default: 60)
+| ```watch_secs```             | Integer  | Minimum number of seconds a shard must remain in ```RUNNING``` state before considered a success (Default: 30)
+| ```max_per_shard_failures``` | Integer  | Maximum number of restarts per shard during update. Increments total failure count when this limit is exceeded. (Default: 0)
+| ```max_total_failures```     | Integer  | Maximum number of shard failures to be tolerated in total during an update. Cannot be greater than or equal to the total number of tasks in a job. (Default: 0)
 
 ### HealthCheckConfig Objects
 
 Parameters for controlling a task's health checks via HTTP.
 
-<table border=1>
-  <tbody>
-    <tr>
-      <td><code>initial_interval_secs</code></td>
-      <td>Integer</td>
-      <td>Initial delay for performing an HTTP health check. (Default: 60)</td>
-    </tr>
-    <tr>
-      <td><code>interval_secs</code></td>
-      <td>Integer</td>
-      <td>Interval on which to check the task's health via HTTP. (Default: 30)</td>
-    </tr>
-    <tr>
-      <td><code>timeout_secs</code></td>
-      <td>Integer</td>
-      <td>HTTP request timeout. (Default: 1)</td>
-    </tr>
-    <tr>
-      <td><code>max_consecutive_failures</code></td>
-      <td>Integer</td>
-      <td>Maximum number of consecutive failures that tolerated before considering a task unhealthy (Default: 0)</td>
-     </tr>
-    </tbody>
-</table>
+| object                         | type      | description
+| -------                        | :-------: | --------
+| ```initial_interval_secs```    | Integer   | Initial delay for performing an HTTP health check. (Default: 60)
+| ```interval_secs```            | Integer   | Interval on which to check the task's health via HTTP. (Default: 30)
+| ```timeout_secs```             | Integer   | HTTP request timeout. (Default: 1)
+| ```max_consecutive_failures``` | Integer   | Maximum number of consecutive failures that tolerated before considering a task unhealthy (Default: 0)
 
 Specifying Scheduling Constraints
 =================================
@@ -588,18 +379,10 @@ constrain Tasks within our Job. The value is how we constrain them.
 There are two types of constraints: *limit constraints* and *value
 constraints*.
 
-<table border=1>
-  <tbody>
-    <tr>
-      <td>Limit Constraint</td>
-      <td>A string that specifies a limit for a constraint. Starts with <code>'limit:</code> followed by an Integer and closing single quote, such as <code>'limit:1'</code>.</td>
-    </tr>
-    <tr>
-      <td>Value Constraint</td>
-      <td>A string that specifies a value for a constraint. To include a list of values, separate the values using commas. To negate the values of a constraint, start with a <code>!</code><code>.</code></td>
-    </tr>
-  </tbody>
-</table>
+| constraint    | description
+| ------------- | --------------
+| Limit         | A string that specifies a limit for a constraint. Starts with <code>'limit:</code> followed by an Integer and closing single quote, such as ```'limit:1'```.
+| Value         | A string that specifies a value for a constraint. To include a list of values, separate the values using commas. To negate the values of a constraint, start with a ```!``` ```.```
 
 You can also control machine diversity using constraints. The below
 constraint ensures that no more than two instances of your job may run
@@ -631,15 +414,9 @@ Aurora client or Aurora-provided services.
 The `mesos` namespace contains the `instance` variable that can be used
 to distinguish between Task replicas.
 
-<table border=1>
-  <tbody>
-    <tr>
-      <td><code>instance</code></td>
-      <td>Integer</td>
-      <td>The instance number of the created task. A job with 5 replicas has instance numbers 0, 1, 2, 3, and 4.</td>
-    </tr>
-  </tbody>
-</table>
+| variable name     | type       | description
+| --------------- | :--------: | -------------
+| ```instance```    | Integer    | The instance number of the created task. A job with 5 replicas has instance numbers 0, 1, 2, 3, and 4.
 
 ### thermos Namespace
 
@@ -647,20 +424,10 @@ The `thermos` namespace contains variables that work directly on the
 Thermos platform in addition to Aurora. This namespace is fully
 compatible with Tasks invoked via the `thermos` CLI.
 
-<table border=1>
-  <tbody>
-    <tr>
-      <td><code>ports</code></td>
-      <td>map of string to Integer</td>
-      <td>A map of names to port numbers</td>
-    </tr>
-    <tr>
-      <td><code>task_id</code></td>
-      <td>string</td>
-      <td>The task ID assigned to this task.</td>
-    </tr>
-  </tbody>
-</table>
+| variable      | type                     | description                        |
+| :----------:  | ---------                | ------------                       |
+| ```ports```   | map of string to Integer | A map of names to port numbers     |
+| ```task_id``` | string                   | The task ID assigned to this task. |
 
 The `thermos.ports` namespace is automatically populated by Aurora when
 invoking tasks on Mesos. When running the `thermos` command directly,
