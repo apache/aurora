@@ -42,8 +42,8 @@ function build_all() {
     # fetch the mesos egg, needed to build python components
     mkdir -p third_party
     pushd third_party
-      wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.17.0_amd64.egg \
-        -O mesos-0.17.0-py2.7-linux-x86_64.egg
+      wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.18.0_amd64.egg \
+        -O mesos-0.18.0-py2.7-linux-x86_64.egg
     popd
     git pull
 
@@ -80,8 +80,8 @@ EOF
 }
 
 function install_mesos {
-  wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.17.0_amd64.deb
-  dpkg --install mesos_0.17.0_amd64.deb
+  wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.18.0_amd64.deb
+  dpkg --install mesos_0.18.0_amd64.deb
 }
 
 function install_aurora {
