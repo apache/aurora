@@ -265,6 +265,7 @@ limitations under the License.
 
 jQuery (http://jquery.com/)
   Location: 3rdparty/javascript/bower_components/jquery
+            src/main/python/apache/thermos/observer/http/assets/jquery.js
   From: 'The jQuery Foundation' (http://www.jquery.com/)
   License:  MIT License
 
