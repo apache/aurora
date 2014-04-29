@@ -666,6 +666,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
   }
 
+  @Requires(whitelist = Capability.MACHINE_MAINTAINER)
   @Override
   public Response startMaintenance(Hosts hosts, SessionKey session) {
     return okResponse(Result.startMaintenanceResult(
@@ -673,18 +674,21 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             .setStatuses(maintenance.startMaintenance(hosts.getHostNames()))));
   }
 
+  @Requires(whitelist = Capability.MACHINE_MAINTAINER)
   @Override
   public Response drainHosts(Hosts hosts, SessionKey session) {
     return okResponse(Result.drainHostsResult(
         new DrainHostsResult().setStatuses(maintenance.drain(hosts.getHostNames()))));
   }
 
+  @Requires(whitelist = Capability.MACHINE_MAINTAINER)
   @Override
   public Response maintenanceStatus(Hosts hosts, SessionKey session) {
     return okResponse(Result.maintenanceStatusResult(
         new MaintenanceStatusResult().setStatuses(maintenance.getStatus(hosts.getHostNames()))));
   }
 
+  @Requires(whitelist = Capability.MACHINE_MAINTAINER)
   @Override
   public Response endMaintenance(Hosts hosts, SessionKey session) {
     return okResponse(Result.endMaintenanceResult(
