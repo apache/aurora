@@ -19,7 +19,7 @@ import functools
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.updater import Updater
-from apache.aurora.client.api.health_check import InstanceWatcherHealthCheck, Retriable
+from apache.aurora.client.api.health_check import StatusHealthCheck, Retriable
 from apache.aurora.client.api.quota_check import QuotaCheck
 from apache.aurora.client.cli import EXIT_INVALID_CONFIGURATION
 from apache.aurora.client.cli.client import AuroraCommandLine
@@ -175,7 +175,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
   @classmethod
   def setup_health_checks(cls, mock_api):
-    mock_health_check = Mock(spec=InstanceWatcherHealthCheck)
+    mock_health_check = Mock(spec=StatusHealthCheck)
     mock_health_check.health.return_value = Retriable.alive()
     return mock_health_check
 
@@ -198,7 +198,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
+        patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('apache.aurora.client.api.quota_check.QuotaCheck', return_value=mock_quota_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),

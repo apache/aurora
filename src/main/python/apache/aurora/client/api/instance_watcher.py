@@ -23,7 +23,7 @@ from gen.apache.aurora.api.ttypes import (
   TaskQuery,
 )
 
-from .health_check import InstanceWatcherHealthCheck
+from .health_check import StatusHealthCheck
 
 from twitter.common import log
 
@@ -68,7 +68,7 @@ class InstanceWatcher(object):
     """
     log.info('Watching instances: %s' % instance_ids)
     instance_ids = set(instance_ids)
-    health_check = health_check or InstanceWatcherHealthCheck()
+    health_check = health_check or StatusHealthCheck()
     now = self._clock.time()
     expected_healthy_by = now + self._restart_threshold
     max_time = now + self._restart_threshold + self._watch_secs

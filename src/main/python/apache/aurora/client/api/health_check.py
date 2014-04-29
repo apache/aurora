@@ -16,8 +16,6 @@
 
 from abc import abstractmethod
 
-from apache.aurora.common.http_signaler import HttpSignaler
-
 from gen.apache.aurora.api.ttypes import ScheduleStatus
 
 from twitter.common import log
@@ -79,61 +77,3 @@ class StatusHealthCheck(HealthCheck):
         return Retriable.alive()
     else:
       return Retriable.dead()
-
-
-class HttpHealthCheck(HealthCheck):
-  """Verifies the health of a task based on http health checks. A new http signaler is created for a
-  task iff,
-    1. The instance id of the task is unknown.
-    2. The instance id is known but the (host, port) is different for the task.
-  """
-  def __init__(self, http_signaler_factory=HttpSignaler):
-    self._http_signalers = {}
-    self._http_signaler_factory = http_signaler_factory
-
-  def health(self, task):
-    assigned_task = task.assignedTask
-    instance_id = assigned_task.instanceId
-    host_port = (assigned_task.slaveHost, assigned_task.assignedPorts['health'])
-    http_signaler = None
-    if instance_id in self._http_signalers:
-      checker_host_port, signaler = self._http_signalers.get(instance_id)
-      # Only reuse the health checker if it is for the same destination.
-      if checker_host_port == host_port:
-        http_signaler = signaler
-    if not http_signaler:
-      http_signaler = self._http_signaler_factory(host_port[1], host_port[0])
-      self._http_signalers[instance_id] = (host_port, http_signaler)
-    return Retriable.alive() if http_signaler.health()[0] else Retriable.dead()
-
-
-class ChainedHealthCheck(HealthCheck):
-  """Delegates health checks to configured health checkers."""
-  def __init__(self, *health_checkers):
-    self._health_checkers = health_checkers
-
-  def health(self, task):
-    for checker in self._health_checkers:
-      healthy, retriable = checker.health(task)
-      if not healthy:
-        return (healthy, retriable)
-    return Retriable.alive()
-
-
-class InstanceWatcherHealthCheck(HealthCheck):
-  """Makes the decision: if a task has health port, then use Status+HTTP, else use only status.
-     Caveat: Only works if either ALL tasks have a health port or none of them have a health port.
-  """
-  # TODO(atollenaere) Refactor the code to use the executor StatusChecker/HealthChecker instead
-
-  def __init__(self, http_signaler_factory=HttpSignaler):
-    self._has_health_port = False
-    self._health_checker = StatusHealthCheck()
-    self._http_signaler_factory = http_signaler_factory
-
-  def health(self, task):
-    if not self._has_health_port and 'health' in task.assignedTask.assignedPorts:
-      log.debug('Health port detected, enabling HTTP checks')
-      self._health_checker = ChainedHealthCheck(self._health_checker, HttpHealthCheck(self._http_signaler_factory))
-      self._has_health_port = True
-    return self._health_checker.health(task)

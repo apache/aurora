@@ -16,7 +16,7 @@
 import contextlib
 import functools
 
-from apache.aurora.client.api.health_check import InstanceWatcherHealthCheck, Retriable
+from apache.aurora.client.api.health_check import StatusHealthCheck, Retriable
 from apache.aurora.client.cli import EXIT_API_ERROR
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
@@ -57,7 +57,7 @@ class TestRestartCommand(AuroraClientCommandTest):
 
   @classmethod
   def setup_health_checks(cls, mock_api):
-    mock_health_check = Mock(spec=InstanceWatcherHealthCheck)
+    mock_health_check = Mock(spec=StatusHealthCheck)
     mock_health_check.health.return_value = Retriable.alive()
     return mock_health_check
 
@@ -69,7 +69,7 @@ class TestRestartCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
+        patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('time.sleep', return_value=None)
@@ -100,7 +100,7 @@ class TestRestartCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
+        patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('time.sleep', return_value=None)):
@@ -123,7 +123,7 @@ class TestRestartCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.api.instance_watcher.InstanceWatcherHealthCheck',
+        patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('time.sleep', return_value=None)):
