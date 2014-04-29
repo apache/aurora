@@ -478,7 +478,15 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       protected void execute(MutableStoreProvider unused)
           throws CodingException, InvalidPositionException, StreamAccessException {
 
-        persist(snapshotStore.createSnapshot());
+        LOG.info("Creating snapshot.");
+        Snapshot snapshot = snapshotStore.createSnapshot();
+        persist(snapshot);
+        LOG.info("Snapshot complete."
+                 + " host attrs: " + snapshot.getHostAttributesSize()
+                 + ", jobs: " + snapshot.getJobsSize()
+                 + ", locks: " + snapshot.getLocksSize()
+                 + ", quota confs: " + snapshot.getQuotaConfigurationsSize()
+                 + ", tasks: " + snapshot.getTasksSize());
       }
     });
   }
