@@ -40,6 +40,7 @@ import sys
 from uuid import uuid1
 
 from twitter.common.python.pex import PexInfo
+from .command_hooks import GlobalCommandHookRegistry
 
 # Constants for standard return codes.
 EXIT_OK = 0
@@ -308,6 +309,30 @@ class CommandLine(object):
       self.register_nouns()
     return self.nouns.keys()
 
+  def run_pre_hooks(self, context, noun, verb, args, command_hooks):
+    try:
+      for hook in command_hooks:
+        result = hook.pre_command(noun, verb, context, args)
+        if result != 0:
+          print_aurora_log(logging.INFO, 'Command hook %s aborted operation with error code %s' %
+              (hook.name, result))
+          self.print_out('Command aborted by command hook %s' % hook.name)
+          return result
+      return EXIT_OK
+    except (Context.CommandError, ConfigurationPlugin.Error) as c:
+      print_aurora_log(logging.INFO, 'Error executing command hook %s: %s' % (hook.name, c))
+      self.print_err('Error executing command hook %s: %s; aborting' % hook.name, c.msg)
+      return c.code
+
+  def run_post_hooks(self, context, noun, verb, args, result, command_hooks):
+    try:
+      for hook in command_hooks:
+        hook.post_command(noun, verb, context, args, result)
+    except (Context.CommandError, ConfigurationPlugin.Error) as c:
+      print_aurora_log(logging.INFO, 'Error executing post-command hook %s: %s' % (hook.name, c))
+      self.print_err('Error executing command hook %s: %s; aborting' % hook.name, c.msg)
+      return c.code
+
   def execute(self, args):
     """Execute a command.
     :param args: the command-line arguments for the command. This only includes arguments
@@ -337,21 +362,28 @@ class CommandLine(object):
     except ConfigurationPlugin.Error as e:
       print('Error in configuration plugin before execution: %s' % c.msg, file=sys.stderr)
       return c.code
+    command_hooks = GlobalCommandHookRegistry.get_command_hooks_for(options.noun, options.verb)
+    plugin_result = self.run_pre_hooks(context, options.noun, options.verb, args, command_hooks)
+    if plugin_result != 0:
+      return plugin_result
+
     try:
       result = noun.execute(context)
       if result == EXIT_OK:
         print_aurora_log(logging.INFO, 'Command terminated successfully')
+        self.run_post_hooks(options.noun, options.verb, context, args, result, command_hooks)
       else:
         print_aurora_log(logging.INFO, 'Commmand terminated with error code %s', result)
+
       for plugin in self.plugins:
         try:
           plugin.after_execution(context, result)
         except ConfigurationPlugin.Error as e:
-          print_aurora_log(logging.INFO, 'Error executing post-execution extension hook:  %s', e.msg)
+          print_aurora_log(logging.INFO, 'Error executing post-execution plugin: %s', e.msg)
       return result
     except Context.CommandError as c:
       print_aurora_log(logging.INFO, 'Error executing command: %s', c.msg)
-      print('Error executing command: %s' % c.msg, file=sys.stderr)
+      self.print_err('Error executing command: %s' % c.msg)
       return c.code
 
 

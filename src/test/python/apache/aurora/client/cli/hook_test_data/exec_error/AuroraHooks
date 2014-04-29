@@ -1,0 +1,30 @@
+from apache.aurora.client.cli.command_hooks import CommandHook
+
+class DynamicHook(CommandHook):
+
+  def __init__(self, succeed):
+    self.succeed = succeed
+    self.ran_pre = False
+    self.ran_post = False
+
+  def get_nouns(self):
+    return ['job']
+
+  def get_verbs(self, noun):
+    if noun == 'job':
+      return ['create', 'status' ]
+    else:
+      return []
+
+  def pre_command(self, noun, verb, context, commandline):
+    self.ran_pre = True
+    if self.succeed:
+      return 0
+    else:
+      return 1
+
+  def post_command(self, noun, verb, context, commandline, result):
+    self.ran_post = True
+
+
+hooks = [ DynamicHook(True), 1/0 ]

@@ -18,6 +18,7 @@ python_test_suite(
   name = 'all',
   dependencies = [
     pants(':bridge'),
+    pants(':command_hooks'),
     pants(':help'),
     pants(':job'),
     pants(':logging'),
@@ -45,6 +46,19 @@ python_tests(
     pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/client/cli'),
     pants('src/main/python/apache/aurora/client/cli:client'),
+  ]
+)
+
+python_tests(
+  name = 'command_hooks',
+  sources = [ 'test_command_hooks.py' ],
+  dependencies = [
+    pants(':util'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/client/cli'),
+    pants('src/main/python/apache/aurora/client/cli:client'),
+    pants('src/test/python/apache/aurora/client/commands:util')
   ]
 )
 

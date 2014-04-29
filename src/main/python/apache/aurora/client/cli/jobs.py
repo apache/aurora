@@ -304,7 +304,7 @@ class AbstractKillCommand(Verb):
         batch.append(instances_to_kill.pop())
       resp = api.kill_job(job, batch)
       if resp.responseCode is not ResponseCode.OK:
-        resp.print_log('Kill of shards %s failed with error %s' % (batch, resp.message))
+        context.print_log('Kill of shards %s failed with error %s' % (batch, resp.message))
         errors += 1
         if errors > context.options.max_total_failures:
           raise context.CommandError(EXIT_COMMAND_FAILURE,

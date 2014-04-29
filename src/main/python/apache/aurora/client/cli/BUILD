@@ -43,6 +43,7 @@ python_library(
   sources = [
     '__init__.py',
     'context.py',
+    'command_hooks.py',
     'jobs.py',
     'options.py',
     'quota.py',
