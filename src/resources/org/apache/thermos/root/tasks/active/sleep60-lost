@@ -1,0 +1,1 @@
+{"processes": [{"cmdline": "sleep 60; echo hello world", "daemon": 0, "max_failures": 1, "name": "sleep"}], "name": "sleep", "max_failures": 1, "min_successes": 0, "max_concurrency": 0, "resources": {"disk": 0, "best_effort": 0, "ram": 8388608, "cpu": 0.01}, "user": "{{thermos.user}}"}
