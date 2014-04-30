@@ -18,7 +18,13 @@ COMMONS_VERSION = '0.3.0'
 
 python_requirement('argparse==1.2.1')
 python_requirement('bottle==0.11.6')
-python_requirement('cherrypy==3.2.2')
+# As of twitter.pants==0.0.23, we no longer pull in dependencies transitively from
+# pypi (the equivalent of --allow-external in pip.)  We must specify explicitly
+# the repository link for anything whose distribution is not available directly from
+# repos specified in pants.ini.
+python_requirement(
+    'cherrypy==3.2.2',
+    repository='http://download.cherrypy.org/cherrypy/3.2.2/')
 python_requirement('Flask==0.9')
 python_requirement('mako==0.4.0')
 python_requirement('mesos==0.18.0')
