@@ -17,18 +17,12 @@ package org.apache.aurora.scheduler.sla;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Singleton;
@@ -39,6 +33,7 @@ import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -65,35 +60,14 @@ public class SlaModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
-        1,
-        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("SlaStat-%d").build()) {
-
-      @Override
-      protected void afterExecute(Runnable runnable, @Nullable Throwable throwable) {
-        super.afterExecute(runnable, throwable);
-        if (throwable != null) {
-          LOG.log(Level.SEVERE, throwable.toString(), throwable);
-        } else if (runnable instanceof Future) {
-          try {
-            Future<?> future = (Future<?>) runnable;
-            if (future.isDone()) {
-              future.get();
-            }
-          } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-          } catch (ExecutionException ee) {
-            LOG.log(Level.SEVERE, ee.toString(), ee);
-          }
-        }
-      }
-    };
-
     bind(MetricCalculatorSettings.class).toInstance(
         new MetricCalculatorSettings(SLA_REFRESH_RATE.get().as(Time.MILLISECONDS)));
 
     bind(MetricCalculator.class).in(Singleton.class);
-    bind(ScheduledExecutorService.class).annotatedWith(SlaExecutor.class).toInstance(executor);
+    bind(ScheduledExecutorService.class)
+        .annotatedWith(SlaExecutor.class)
+        .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SlaStat-%d", LOG));
+
     LifecycleModule.bindStartupAction(binder(), SlaUpdater.class);
   }
 

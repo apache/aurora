@@ -17,16 +17,15 @@ package org.apache.aurora.scheduler.stats;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.BindingAnnotation;
 import com.twitter.common.application.modules.LifecycleModule;
@@ -39,6 +38,7 @@ import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
@@ -58,6 +58,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class AsyncStatsModule extends AbstractModule {
 
+  private static final Logger LOG = Logger.getLogger(AsyncStatsModule.class.getName());
+
   @CmdLine(name = "async_task_stat_update_interval",
       help = "Interval on which to try to update resource consumption stats.")
   private static final Arg<Amount<Long, Time>> TASK_STAT_INTERVAL =
@@ -74,8 +76,8 @@ public class AsyncStatsModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(
-        new ThreadFactoryBuilder().setNameFormat("AsyncStat-%d").setDaemon(true).build());
+    final ScheduledExecutorService executor =
+        AsyncUtil.singleThreadLoggingScheduledExecutor("AsyncStat-%d", LOG);
 
     bind(TaskStatCalculator.class).in(Singleton.class);
     bind(CachedCounters.class).in(Singleton.class);

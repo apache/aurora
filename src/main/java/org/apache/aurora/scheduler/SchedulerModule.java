@@ -16,13 +16,12 @@
 package org.apache.aurora.scheduler;
 
 import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
@@ -36,6 +35,7 @@ import org.apache.aurora.scheduler.Driver.SettableDriver;
 import org.apache.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
 import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.mesos.Scheduler;
 
@@ -43,6 +43,8 @@ import org.apache.mesos.Scheduler;
  * Binding module for top-level scheduling logic.
  */
 public class SchedulerModule extends AbstractModule {
+
+  private static final Logger LOG = Logger.getLogger(SchedulerModule.class.getName());
 
   @CmdLine(name = "max_registration_delay",
       help = "Max allowable delay to allow the driver to register before aborting")
@@ -73,9 +75,9 @@ public class SchedulerModule extends AbstractModule {
         bind(LeadingOptions.class).toInstance(
             new LeadingOptions(MAX_REGISTRATION_DELAY.get(), MAX_LEADING_DURATION.get()));
 
-        final ScheduledExecutorService executor = Executors.newScheduledThreadPool(
-            1,
-            new ThreadFactoryBuilder().setNameFormat("Lifecycle-%d").setDaemon(true).build());
+        final ScheduledExecutorService executor =
+            AsyncUtil.singleThreadLoggingScheduledExecutor("Lifecycle-%d", LOG);
+
         bind(ScheduledExecutorService.class).toInstance(executor);
         bind(SchedulerLifecycle.class).in(Singleton.class);
         expose(SchedulerLifecycle.class);

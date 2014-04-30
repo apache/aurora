@@ -18,6 +18,7 @@ package org.apache.aurora.scheduler.async;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -29,7 +30,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.RateLimiter;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
@@ -39,6 +39,7 @@ import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -64,6 +65,8 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
  * cannot starve a 1 instance job.
  */
 public class TaskGroups implements EventSubscriber {
+
+  private static final Logger LOG = Logger.getLogger(TaskGroups.class.getName());
 
   private final ConcurrentMap<GroupKey, TaskGroup> groups = Maps.newConcurrentMap();
   private final ScheduledExecutorService executor;
@@ -155,11 +158,9 @@ public class TaskGroups implements EventSubscriber {
   }
 
   private static ScheduledExecutorService createThreadPool(ShutdownRegistry shutdownRegistry) {
-    // TODO(William Farner): Leverage ExceptionHandlingScheduledExecutorService:
-    // com.twitter.common.util.concurrent.ExceptionHandlingScheduledExecutorService
-    final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
-        1,
-        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("TaskScheduler-%d").build());
+    final ScheduledThreadPoolExecutor executor =
+        AsyncUtil.singleThreadLoggingScheduledExecutor("TaskScheduler-%d", LOG);
+
     Stats.exportSize("schedule_queue_size", executor.getQueue());
     shutdownRegistry.addAction(new Command() {
       @Override

@@ -21,7 +21,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.Date;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -45,6 +44,7 @@ import org.apache.aurora.gen.storage.RewriteTask;
 import org.apache.aurora.gen.storage.SaveAcceptedJob;
 import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.Snapshot;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.log.Log.Stream.InvalidPositionException;
 import org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
@@ -149,7 +149,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
     ScheduledExecutorSchedulingService(ShutdownRegistry shutdownRegistry,
         Amount<Long, Time> shutdownGracePeriod) {
-      scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+      scheduledExecutor = AsyncUtil.singleThreadLoggingScheduledExecutor("LogStorage-%d", LOG);
       shutdownRegistry.addAction(
           new ExecutorServiceShutdown(scheduledExecutor, shutdownGracePeriod));
     }

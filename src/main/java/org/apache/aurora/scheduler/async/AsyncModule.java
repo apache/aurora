@@ -27,7 +27,6 @@ import javax.inject.Singleton;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.util.concurrent.RateLimiter;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.BindingAnnotation;
@@ -53,6 +52,7 @@ import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
 import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 
@@ -177,9 +177,9 @@ public class AsyncModule extends AbstractModule {
   @Override
   protected void configure() {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
-    final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
-        ASYNC_WORKER_THREADS.get(),
-        new ThreadFactoryBuilder().setNameFormat("AsyncProcessor-%d").setDaemon(true).build());
+    final ScheduledThreadPoolExecutor executor =
+        AsyncUtil.loggingScheduledExecutor(ASYNC_WORKER_THREADS.get(), "AsyncProcessor-%d", LOG);
+
     Stats.exportSize("timeout_queue_size", executor.getQueue());
     Stats.export(new StatImpl<Long>("async_tasks_completed") {
       @Override
