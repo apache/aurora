@@ -206,20 +206,17 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void killTasks(Query.Builder query, final String user)
-      throws ScheduleException {
+  public synchronized void killTasks(Query.Builder query, final String user) {
 
     checkNotNull(query);
     LOG.info("Killing tasks matching " + query);
-
-    boolean cronDeleted = false;
 
     if (Query.isSingleJobScoped(query)) {
       // If this looks like a query for all tasks in a job, instruct the cron scheduler to delete
       // it.
       // TODO(maxim): Should be trivial to support killing multiple jobs instead.
       IJobKey jobKey = Iterables.getOnlyElement(JobKeys.from(query).get());
-      cronDeleted = cronScheduler.deleteJob(jobKey);
+      cronScheduler.deleteJob(jobKey);
     }
 
     // Unless statuses were specifically supplied, only attempt to kill active tasks.
@@ -227,28 +224,18 @@ class SchedulerCoreImpl implements SchedulerCore {
         ? query.byStatus(ACTIVE_STATES)
         : query;
 
-    int tasksAffected = storage.write(new MutateWork.Quiet<Integer>() {
+    storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      public Integer apply(MutableStoreProvider storeProvider) {
-        int total = 0;
+      public void execute(MutableStoreProvider storeProvider) {
         for (String taskId : Tasks.ids(storeProvider.getTaskStore().fetchTasks(taskQuery))) {
-          boolean changed = stateManager.changeState(
+          stateManager.changeState(
               taskId,
               Optional.<ScheduleStatus>absent(),
               KILLING,
               Optional.of("Killed by " + user));
-
-          if (changed) {
-            total++;
-          }
         }
-        return total;
       }
     });
-
-    if (!cronDeleted && (tasksAffected == 0)) {
-      throw new ScheduleException("No jobs to kill");
-    }
   }
 
   @Override

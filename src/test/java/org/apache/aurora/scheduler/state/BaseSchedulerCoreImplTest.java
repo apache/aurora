@@ -616,11 +616,18 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
         assertEquals(KILLING, getTask(taskId).getStatus());
       }
 
-      // SImulate a KILLED ack from the executor.
+      // Simulate a KILLED ack from the executor.
       changeStatus(Query.roleScoped(ROLE_A), KILLED);
       assertTrue(
           getTasks(Query.jobScoped(KEY_A).active()).isEmpty());
     }
+  }
+
+  @Test
+  public void testKillNoTasksDoesNotThrow() throws Exception {
+    control.replay();
+    buildScheduler();
+    scheduler.killTasks(Query.roleScoped("role_absent"), OWNER_A.getUser());
   }
 
   private IExpectationSetters<Long> expectTaskNotThrottled() {

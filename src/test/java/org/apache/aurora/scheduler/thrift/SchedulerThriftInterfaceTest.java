@@ -421,17 +421,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testKillNonExistentTasks() throws Exception {
-    Query.Builder query = Query.unscoped().byJob(JOB_KEY);
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
 
     expectAuth(ROOT, true);
 
     scheduler.killTasks(query, USER);
-    expectLastCall().andThrow(new ScheduleException("No jobs matching query"));
-    storageUtil.expectTaskFetch(query);
+    storageUtil.expectTaskFetch(query).times(2);
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
+    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
   }
 
   @Test

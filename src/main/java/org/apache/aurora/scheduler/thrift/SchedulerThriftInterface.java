@@ -566,8 +566,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       schedulerCore.killTasks(Query.arbitrary(query), context.get().getIdentity());
     } catch (LockException e) {
       return response.setResponseCode(LOCK_ERROR).setMessage(e.getMessage());
-    } catch (ScheduleException e) {
-      return response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
 
     // TODO(William Farner): Move this into the client.
