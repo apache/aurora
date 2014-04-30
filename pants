@@ -19,12 +19,14 @@ set -o nounset
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
-PANTS_VERSION=0.0.21
+PANTS_VERSION=0.0.23
 if ! [[ -e "$HERE/build-support/pants-$PANTS_VERSION.pex" ]]; then
   echo "Building pants.pex @ $PANTS_VERSION"
   "$HERE/build-support/pex" \
+    -v \
     --requirement "twitter.pants==$PANTS_VERSION" \
     --entry-point twitter.pants.bin.pants_exe:main \
+    --repo http://effbot.org/downloads \
     -p "$HERE/build-support/pants-$PANTS_VERSION.pex.tmp"
   mv "$HERE/build-support/pants-$PANTS_VERSION.pex.tmp" "$HERE/build-support/pants-$PANTS_VERSION.pex"  # 2PC
   echo "Built pants-$PANTS_VERSION.pex"
