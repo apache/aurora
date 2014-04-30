@@ -15,9 +15,8 @@
  */
 package org.apache.aurora.scheduler.base;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -26,6 +25,7 @@ import java.util.logging.Logger;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.easymock.EasyMock;
+import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -36,52 +36,66 @@ import static org.easymock.EasyMock.expectLastCall;
 public class AsyncUtilTest extends EasyMockTest {
   private Logger logger;
   private ScheduledThreadPoolExecutor executor;
+  private CountDownLatch latch;
 
   @Before
   public void setUp() {
     logger = createMock(Logger.class);
+    latch = new CountDownLatch(1);
     executor = AsyncUtil.singleThreadLoggingScheduledExecutor("Test-%d", logger);
   }
 
-  @Test(expected = ExecutionException.class)
+  @Test
   public void testScheduleLogging() throws Exception {
     logger.log(
         eq(Level.SEVERE),
         contains("Expected exception."),
         EasyMock.<ExecutionException>anyObject());
 
-    expectLastCall().times(1);
+    expectLastCall().andAnswer(new IAnswer<Object>() {
+      @Override
+      public Object answer() throws Throwable {
+        latch.countDown();
+        return null;
+      }
+    }).once();
 
     control.replay();
 
-    ScheduledFuture<?> future = executor.schedule(new Runnable() {
+    executor.schedule(new Runnable() {
       @Override
       public void run() {
         throw new IllegalArgumentException("Expected exception.");
       }
     }, 0, TimeUnit.MILLISECONDS);
 
-    future.get();
+    latch.await();
   }
 
-  @Test(expected = ExecutionException.class)
+  @Test
   public void testSubmitLogging() throws Exception {
     logger.log(
         eq(Level.SEVERE),
         contains("Expected exception."),
         EasyMock.<ExecutionException>anyObject());
 
-    expectLastCall().times(1);
+    expectLastCall().andAnswer(new IAnswer<Object>() {
+      @Override
+      public Object answer() throws Throwable {
+        latch.countDown();
+        return null;
+      }
+    }).once();
 
     control.replay();
 
-    Future<?> future = executor.submit(new Runnable() {
+    executor.submit(new Runnable() {
       @Override
       public void run() {
         throw new IllegalArgumentException("Expected exception.");
       }
     });
 
-    future.get();
+    latch.await();
   }
 }
