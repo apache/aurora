@@ -16,7 +16,7 @@
 #
 """Utility to show outstanding reviews for the project
 
-Usage: list-missing-shipits [--rb-server=RB_SERVER_URL]
+Usage: list-missing-shipits [--server=RB_SERVER_URL]
 """
 from __future__ import print_function
 
