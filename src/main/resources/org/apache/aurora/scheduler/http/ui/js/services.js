@@ -47,7 +47,7 @@ auroraUI.factory(
           var id = new Identity();
           id.role = role;
           var taskQuery = new TaskQuery();
-          taskQuery.identity = id;
+          taskQuery.owner = id;
           taskQuery.environment = environment;
           taskQuery.jobName = jobName;
           var response = auroraClient.getSchedulerClient().getTasksStatus(taskQuery);
