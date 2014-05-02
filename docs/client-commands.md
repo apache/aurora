@@ -319,7 +319,7 @@ In addition to the required job key argument, there are eight
 - `--restart_threshold`: Defaults to `60`, the maximum number of
   seconds before a shard must move into the `RUNNING` state before
   it's considered a failure.
-- `--watch_secs`: Defaults to `30`, the minimum number of seconds a
+- `--watch_secs`: Defaults to `45`, the minimum number of seconds a
   shard must remain in `RUNNING` state before considered a success.
 
 Cron Jobs

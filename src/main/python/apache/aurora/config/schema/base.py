@@ -52,15 +52,15 @@ class PackerObject(Struct):
 class UpdateConfig(Struct):
   batch_size                  = Default(Integer, 1)
   restart_threshold           = Default(Integer, 60)
-  watch_secs                  = Default(Integer, 30)
+  watch_secs                  = Default(Integer, 45)
   max_per_shard_failures      = Default(Integer, 0)
   max_total_failures          = Default(Integer, 0)
   rollback_on_failure         = Default(Boolean, True)
 
 
 class HealthCheckConfig(Struct):
-  initial_interval_secs    = Default(Float, 60.0)
-  interval_secs            = Default(Float, 30.0)
+  initial_interval_secs    = Default(Float, 15.0)
+  interval_secs            = Default(Float, 10.0)
   timeout_secs             = Default(Float, 1.0)
   max_consecutive_failures = Default(Integer, 0)
 
@@ -86,7 +86,7 @@ class MesosTaskInstance(Struct):
   role                       = Required(String)
   announce                   = Announcer
   environment                = Default(String, DEFAULT_ENVIRONMENT)
-  health_check_interval_secs = Default(Integer, 30) # DEPRECATED (MESOS-2649)
+  health_check_interval_secs = Default(Integer, 10) # DEPRECATED (MESOS-2649)
   health_check_config        = Default(HealthCheckConfig, HealthCheckConfig())
 
 

@@ -341,7 +341,7 @@ Parameters for controlling the rate and policy of rolling updates.
 | ---------------------------- | :------: | ------------
 | ```batch_size```             | Integer  | Maximum number of shards to be updated in one iteration (Default: 1)
 | ```restart_threshold```      | Integer  | Maximum number of seconds before a shard must move into the ```RUNNING``` state before considered a failure (Default: 60)
-| ```watch_secs```             | Integer  | Minimum number of seconds a shard must remain in ```RUNNING``` state before considered a success (Default: 30)
+| ```watch_secs```             | Integer  | Minimum number of seconds a shard must remain in ```RUNNING``` state before considered a success (Default: 45)
 | ```max_per_shard_failures``` | Integer  | Maximum number of restarts per shard during update. Increments total failure count when this limit is exceeded. (Default: 0)
 | ```max_total_failures```     | Integer  | Maximum number of shard failures to be tolerated in total during an update. Cannot be greater than or equal to the total number of tasks in a job. (Default: 0)
 
@@ -351,8 +351,8 @@ Parameters for controlling a task's health checks via HTTP.
 
 | object                         | type      | description
 | -------                        | :-------: | --------
-| ```initial_interval_secs```    | Integer   | Initial delay for performing an HTTP health check. (Default: 60)
-| ```interval_secs```            | Integer   | Interval on which to check the task's health via HTTP. (Default: 30)
+| ```initial_interval_secs```    | Integer   | Initial delay for performing an HTTP health check. (Default: 15)
+| ```interval_secs```            | Integer   | Interval on which to check the task's health via HTTP. (Default: 10)
 | ```timeout_secs```             | Integer   | HTTP request timeout. (Default: 1)
 | ```max_consecutive_failures``` | Integer   | Maximum number of consecutive failures that tolerated before considering a task unhealthy (Default: 0)
 

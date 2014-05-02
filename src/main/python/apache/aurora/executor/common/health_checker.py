@@ -39,7 +39,7 @@ class HealthCheckerThread(StatusChecker, ExceptionalThread):
   """
   def __init__(self,
                health_checker,
-               interval_secs=30,
+               interval_secs=10,
                initial_interval_secs=None,
                max_consecutive_failures=0,
                clock=time):

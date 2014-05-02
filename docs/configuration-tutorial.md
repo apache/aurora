@@ -589,7 +589,7 @@ The final three Job attributes each take an object as their value.
     -   `restart_threshold`: An integer, defaulting to `60`, specifying
         the maximum number of seconds before a shard must move into the
         `RUNNING` state before considered a failure.
-    -   `watch_secs`: An integer, defaulting to `30`, specifying the
+    -   `watch_secs`: An integer, defaulting to `45`, specifying the
         minimum number of seconds a shard must remain in the `RUNNING`
         state before considered a success.
     -   `max_per_shard_failures`: An integer, defaulting to `0`,
@@ -604,9 +604,9 @@ The final three Job attributes each take an object as their value.
     parameters for controlling a Task's health checks via HTTP. Only
     used if a health port was assigned with a command line wildcard. The
     `HealthCheckConfig` parameters are:
-    -   `initial_interval_secs`: An integer, defaulting to `60`,
+    -   `initial_interval_secs`: An integer, defaulting to `15`,
         specifying the initial delay for doing an HTTP health check.
-    -   `interval_secs`: An integer, defaulting to `30`, specifying the
+    -   `interval_secs`: An integer, defaulting to `10`, specifying the
         number of seconds in the interval between checking the Task's
         health.
     -   `timeout_secs`: An integer, defaulting to `1`, specifying the
