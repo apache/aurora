@@ -32,6 +32,7 @@ from gen.apache.aurora.api.ttypes import (
 )
 
 from .instance_watcher import InstanceWatcher
+from .job_monitor import JobMonitor
 from .quota_check import CapacityRequest, QuotaCheck
 from .scheduler_client import SchedulerProxy
 from .updater_util import FailureThreshold, UpdaterConfig
@@ -57,12 +58,14 @@ class Updater(object):
                health_check_interval_seconds,
                scheduler=None,
                instance_watcher=None,
-               quota_check=None):
+               quota_check=None,
+               job_monitor=None):
     self._config = config
     self._job_key = JobKey(role=config.role(), environment=config.environment(), name=config.name())
     self._health_check_interval_seconds = health_check_interval_seconds
     self._scheduler = scheduler or SchedulerProxy(config.cluster())
     self._quota_check = quota_check or QuotaCheck(self._scheduler)
+    self._job_monitor = job_monitor or JobMonitor(self._scheduler, self._config.job_key())
     try:
       self._update_config = UpdaterConfig(**config.update_config().get())
     except ValueError as e:
@@ -263,7 +266,6 @@ class Updater(object):
     if unchanged:
       log.info('Skipping unchanged instances: %s' % unchanged)
 
-    # Kill is a blocking call in scheduler -> no need to watch it yet.
     self._kill_instances(to_kill)
     self._add_instances(to_add, operation_configs.to_config)
     return to_add
@@ -278,6 +280,9 @@ class Updater(object):
       log.info('Killing instances: %s' % instance_ids)
       query = self._create_task_query(instanceIds=frozenset(int(s) for s in instance_ids))
       self._check_and_log_response(self._scheduler.killTasks(query, self._lock))
+      res = self._job_monitor.wait_until(JobMonitor.terminal, instance_ids, with_timeout=True)
+      if not res:
+        raise self.Error('Tasks were not killed in time.')
       log.info('Instances killed')
 
   def _add_instances(self, instance_ids, to_config):

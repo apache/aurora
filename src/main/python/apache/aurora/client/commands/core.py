@@ -94,6 +94,13 @@ def get_job_config(job_spec, config_file, options):
       select_role=select_role,
       select_env=select_env)
 
+
+def wait_kill_tasks(scheduler, job_key, instances=None):
+  monitor = JobMonitor(scheduler, job_key)
+  if not monitor.wait_until(monitor.terminal, instances=instances, with_timeout=True):
+    die('Tasks were not killed in time.')
+
+
 @app.command
 def version(args):
   """usage: version
@@ -142,15 +149,14 @@ def create(job_spec, config_file):
     print("Error: %s" % v)
     sys.exit(1)
   api = make_client(config.cluster())
-  monitor = JobMonitor(api, config.role(), config.environment(), config.name())
   resp = api.create_job(config)
   check_and_log_response(resp)
   handle_open(api.scheduler_proxy.scheduler_client().url, config.role(), config.environment(),
       config.name())
   if options.wait_until == 'RUNNING':
-    monitor.wait_until(monitor.running_or_finished)
+    JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.running_or_finished)
   elif options.wait_until == 'FINISHED':
-    monitor.wait_until(monitor.terminal)
+    JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.terminal)
 
 
 @app.command
@@ -407,6 +413,8 @@ def kill(args, options):
   resp = api.kill_job(job_key, options.shards, config=config)
   check_and_log_response(resp)
   handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
+  wait_kill_tasks(api.scheduler_proxy, job_key, options.shards)
+
 
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
@@ -424,6 +432,7 @@ def killall(args, options):
   resp = api.kill_job(job_key, None, config=config)
   check_and_log_response(resp)
   handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
+  wait_kill_tasks(api.scheduler_proxy, job_key)
 
 
 @app.command

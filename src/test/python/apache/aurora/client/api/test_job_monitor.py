@@ -13,42 +13,103 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import unittest
 
 from gen.apache.aurora.api.AuroraSchedulerManager import Client
 from gen.apache.aurora.api.ttypes import (
+    AssignedTask,
     Identity,
     Response,
     ResponseCode,
     Result,
+    ScheduleStatus,
     ScheduleStatusResult,
+    ScheduledTask,
+    TaskEvent,
     TaskQuery,
 )
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.job_monitor import JobMonitor
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from mox import MoxTestBase
-
-ROLE = 'johndoe'
-ENV = 'test'
-JOB_NAME = 'test_job'
+from mock import Mock
 
 
-class JobMonitorTest(MoxTestBase):
+class FakeClock(object):
+  def sleep(self, seconds):
+    pass
+
+
+class JobMonitorTest(unittest.TestCase):
 
   def setUp(self):
+    self._scheduler = Mock()
+    self._job_key = AuroraJobKey('cl', 'johndoe', 'test', 'test_job')
+    self._clock = FakeClock()
 
-    super(JobMonitorTest, self).setUp()
-    self.mock_api = self.mox.CreateMock(AuroraClientAPI)
-    self.mock_scheduler = self.mox.CreateMock(Client)
-    self.mock_api.scheduler_proxy = self.mock_scheduler
+  def create_task(self, status, id):
+    return ScheduledTask(
+        assignedTask=AssignedTask(
+            instanceId=id,
+            taskId=id),
+        status=status,
+        taskEvents=[TaskEvent(
+            status=status,
+            timestamp=10)]
+    )
+  def mock_get_tasks(self, tasks, response_code=None):
+    response_code = ResponseCode.OK if response_code is None else response_code
+    resp = Response(responseCode=response_code, message='test')
+    resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
+    self._scheduler.getTasksStatus.return_value = resp
 
-  def test_init(self):
-    result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[]))
-    response = Response(responseCode=ResponseCode.OK, message="test", result=result)
-    query = TaskQuery(owner=Identity(role=ROLE), environment=ENV, jobName=JOB_NAME)
+  def expect_task_status(self, once=False, instances=None):
+    query = TaskQuery(
+        owner=Identity(role=self._job_key.role),
+        environment=self._job_key.env,
+        jobName=self._job_key.name)
+    if instances is not None:
+      query.instanceIds = frozenset([int(s) for s in instances])
 
-    self.mock_scheduler.getTasksStatus(query).AndReturn(response)
+    if once:
+      self._scheduler.getTasksStatus.assert_called_once_with(query)
+    else:
+      self._scheduler.getTasksStatus.assert_called_with(query)
 
-    self.mox.ReplayAll()
+  def test_wait_until_state(self):
+    self.mock_get_tasks([
+        self.create_task(ScheduleStatus.RUNNING, '1'),
+        self.create_task(ScheduleStatus.RUNNING, '2'),
+        self.create_task(ScheduleStatus.FAILED, '3'),
+    ])
 
-    JobMonitor(self.mock_api, ROLE, ENV, JOB_NAME)
+    monitor = JobMonitor(self._scheduler, self._job_key)
+    assert monitor.wait_until(monitor.running_or_finished)
+    self.expect_task_status(once=True)
+
+  def test_empty_job_succeeds(self):
+    self.mock_get_tasks([])
+
+    monitor = JobMonitor(self._scheduler, self._job_key)
+    assert monitor.wait_until(monitor.running_or_finished)
+    self.expect_task_status(once=True)
+
+  def test_wait_with_instances(self):
+    self.mock_get_tasks([
+        self.create_task(ScheduleStatus.FAILED, '2'),
+    ])
+
+    monitor = JobMonitor(self._scheduler, self._job_key)
+    assert monitor.wait_until(monitor.terminal, instances=[2])
+    self.expect_task_status(once=True, instances=[2])
+
+  def test_wait_until_timeout(self):
+    self.mock_get_tasks([
+        self.create_task(ScheduleStatus.RUNNING, '1'),
+        self.create_task(ScheduleStatus.RUNNING, '2'),
+        self.create_task(ScheduleStatus.RUNNING, '3'),
+    ])
+
+    monitor = JobMonitor(self._scheduler, self._job_key, clock=self._clock)
+    assert not monitor.wait_until(monitor.terminal, with_timeout=True)
+    self.expect_task_status()

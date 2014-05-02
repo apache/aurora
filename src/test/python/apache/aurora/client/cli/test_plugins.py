@@ -149,7 +149,7 @@ class TestPlugins(AuroraClientCommandTest):
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       self.assert_create_job_called(api)
-      self.assert_scheduler_called(api, mock_query, 2)
+      self.assert_scheduler_called(api, mock_query, 1)
       # Check that the plugin did its job.
       assert mock_context.bogosity == "maximum"
       assert mock_context.after == True
@@ -177,7 +177,7 @@ class TestPlugins(AuroraClientCommandTest):
         cmd.execute(['job', 'create', '--wait-until=RUNNING',
             'west/bozo/test/hello', fp.name])
       self.assert_create_job_called(api)
-      self.assert_scheduler_called(api, mock_query, 2)
+      self.assert_scheduler_called(api, mock_query, 1)
 
   def mock_print(self, str):
     for str in str.split('\n'):

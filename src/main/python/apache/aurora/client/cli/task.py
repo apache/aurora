@@ -27,7 +27,6 @@ import sys
 import time
 
 from apache.aurora.client.api.command_runner import DistributedCommandRunner
-from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,

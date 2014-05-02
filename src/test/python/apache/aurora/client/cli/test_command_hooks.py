@@ -137,7 +137,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
             fp.name])
 
       self.assert_create_job_called(api)
-      self.assert_scheduler_called(api, mock_query, 2)
+      self.assert_scheduler_called(api, mock_query, 1)
       assert command_hook.ran_pre
       assert command_hook.ran_post
 

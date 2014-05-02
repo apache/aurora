@@ -21,8 +21,11 @@ from gen.apache.aurora.api.ttypes import (
     Response,
     ResponseCode,
     Result,
+    ScheduleStatus,
     ScheduleStatusResult,
     ScheduledTask,
+    TaskConfig,
+    TaskEvent,
 )
 
 from apache.aurora.client.cli.context import AuroraCommandContext
@@ -129,24 +132,33 @@ class AuroraClientCommandTest(unittest.TestCase):
     return mock_api_factory, mock_scheduler_client
 
   @classmethod
-  def create_status_call_result(cls):
+  def create_status_call_result(cls, mock_task=None):
     status_response = cls.create_simple_success_response()
     schedule_status = Mock(spec=ScheduleStatusResult)
     status_response.result.scheduleStatusResult = schedule_status
-    mock_task_config = Mock()
     # This should be a list of ScheduledTask's.
     schedule_status.tasks = []
-    for i in range(20):
-      task_status = Mock(spec=ScheduledTask)
-      task_status.assignedTask = Mock(spec=AssignedTask)
-      task_status.assignedTask.instanceId = i
-      task_status.assignedTask.taskId = "Task%s" % i
-      task_status.assignedTask.slaveId = "Slave%s" % i
-      task_status.slaveHost = "Slave%s" % i
-      task_status.assignedTask.task = mock_task_config
-      schedule_status.tasks.append(task_status)
+    if mock_task is None:
+      for i in range(20):
+        schedule_status.tasks.append(cls.create_mock_task(i))
+    else:
+      schedule_status.tasks.append(mock_task)
     return status_response
 
+  @classmethod
+  def create_mock_task(cls, instance_id, status=ScheduleStatus.RUNNING):
+    mock_task = Mock(spec=ScheduledTask)
+    mock_task.assignedTask = Mock(spec=AssignedTask)
+    mock_task.assignedTask.instanceId = instance_id
+    mock_task.assignedTask.taskId = "Task%s" % instance_id
+    mock_task.assignedTask.slaveId = "Slave%s" % instance_id
+    mock_task.assignedTask.task = Mock(spec=TaskConfig)
+    mock_task.slaveHost = "Slave%s" % instance_id
+    mock_task.status = status
+    mock_task_event = Mock(spec=TaskEvent)
+    mock_task_event.timestamp = 1000
+    mock_task.taskEvents = [mock_task_event]
+    return mock_task
 
   @classmethod
   def setup_get_tasks_status_calls(cls, scheduler):

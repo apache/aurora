@@ -19,9 +19,11 @@ from os import environ
 from unittest import TestCase
 
 from apache.aurora.client.api.instance_watcher import InstanceWatcher
+from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck
 from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
 from gen.apache.aurora.api.constants import ACTIVE_STATES
@@ -95,6 +97,9 @@ class FakeConfig(object):
   def job(self):
     return self.job_config
 
+  def job_key(self):
+    return AuroraJobKey(self.cluster(), self.role(), self.environment(), self.name())
+
   def instances(self):
     return self.job_config.instanceCount
 
@@ -117,6 +122,7 @@ class UpdaterTest(TestCase):
     self._session_key = 'test_session'
     self._lock = 'test_lock'
     self._instance_watcher = MockObject(InstanceWatcher)
+    self._job_monitor = MockObject(JobMonitor)
     self._scheduler = MockObject(scheduler_client)
     self._scheduler_proxy = FakeSchedulerProxy('test-cluster', self._scheduler, self._session_key)
     self._quota_check = MockObject(QuotaCheck)
@@ -129,11 +135,13 @@ class UpdaterTest(TestCase):
     Replay(self._scheduler)
     Replay(self._instance_watcher)
     Replay(self._quota_check)
+    Replay(self._job_monitor)
 
   def verify_mocks(self):
     Verify(self._scheduler)
     Verify(self._instance_watcher)
     Verify(self._quota_check)
+    Verify(self._job_monitor)
 
   def init_updater(self, update_config):
     self._config = FakeConfig(self._role, self._name, self._env, update_config)
@@ -142,7 +150,8 @@ class UpdaterTest(TestCase):
         3,
         self._scheduler_proxy,
         self._instance_watcher,
-        self._quota_check)
+        self._quota_check,
+        self._job_monitor)
 
   def expect_watch_instances(self, instance_ids, failed_instances=[]):
     self._instance_watcher.watch(instance_ids).AndReturn(set(failed_instances))
@@ -183,7 +192,7 @@ class UpdaterTest(TestCase):
         self._lock,
         self._session_key).AndReturn(response)
 
-  def expect_kill(self, instance_ids, response_code=None):
+  def expect_kill(self, instance_ids, response_code=None, monitor_result=True):
     response_code = ResponseCode.OK if response_code is None else response_code
     response = Response(responseCode=response_code, message='test')
     query = TaskQuery(
@@ -193,6 +202,11 @@ class UpdaterTest(TestCase):
         statuses=ACTIVE_STATES,
         instanceIds=frozenset([int(s) for s in instance_ids]))
     self._scheduler.killTasks(query, self._lock, self._session_key).AndReturn(response)
+    if response_code != ResponseCode.OK:
+      return
+
+    self._job_monitor.wait_until(JobMonitor.terminal, instance_ids, with_timeout=True).AndReturn(
+        monitor_result)
 
   def expect_add(self, instance_ids, task_config, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
@@ -648,6 +662,23 @@ class UpdaterTest(TestCase):
     self.expect_populate(job_config)
     self.expect_quota_check(5, 5)
     self.expect_kill([0, 1, 2], response_code=ResponseCode.INVALID_REQUEST)
+    self.replay_mocks()
+
+    self.update_and_expect_response(ResponseCode.ERROR)
+    self.verify_mocks()
+
+  def test_update_kill_timeout(self):
+    """Test job monitor timeout while waiting for tasks killed."""
+    old_configs = self.make_task_configs(5)
+    new_config = deepcopy(old_configs[0])
+    new_config.priority = 5
+    job_config = self.make_job_config(new_config, 5)
+    self._config.job_config = job_config
+    self.expect_start()
+    self.expect_get_tasks(old_configs)
+    self.expect_populate(job_config)
+    self.expect_quota_check(5, 5)
+    self.expect_kill([0, 1, 2], monitor_result=False)
     self.replay_mocks()
 
     self.update_and_expect_response(ResponseCode.ERROR)

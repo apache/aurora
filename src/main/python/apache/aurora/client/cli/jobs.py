@@ -16,6 +16,7 @@
 
 from __future__ import print_function
 from datetime import datetime
+import logging
 import json
 import os
 import pprint
@@ -31,6 +32,7 @@ from apache.aurora.client.cli import (
     EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER,
     EXIT_OK,
+    EXIT_TIMEOUT,
     Noun,
     Verb,
 )
@@ -117,7 +119,6 @@ class CreateJobCommand(Verb):
   def execute(self, context):
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
     api = context.get_api(config.cluster())
-    monitor = JobMonitor(api, config.role(), config.environment(), config.name())
     resp = api.create_job(config)
     if resp.responseCode == ResponseCode.INVALID_REQUEST:
       raise context.CommandError(EXIT_INVALID_PARAMETER, 'Job not found')
@@ -126,9 +127,9 @@ class CreateJobCommand(Verb):
     if context.options.open_browser:
       context.open_job_page(api, config)
     if context.options.wait_until == 'RUNNING':
-      monitor.wait_until(monitor.running_or_finished)
+      JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.running_or_finished)
     elif context.options.wait_until == 'FINISHED':
-      monitor.wait_until(monitor.terminal)
+      JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.terminal)
     return EXIT_OK
 
 
@@ -285,6 +286,13 @@ class AbstractKillCommand(Verb):
         MAX_TOTAL_FAILURES_OPTION,
         NO_BATCHING_OPTION]
 
+  def wait_kill_tasks(self, context, scheduler, job_key, instances=None):
+    monitor = JobMonitor(scheduler, job_key)
+    if not monitor.wait_until(JobMonitor.terminal, instances=instances, with_timeout=True):
+      context.print_err('Tasks were not killed in time.')
+      return EXIT_TIMEOUT
+    return EXIT_OK
+
   def kill_in_batches(self, context, job, instances_arg):
     api = context.get_api(job.cluster)
     # query the job, to get the list of active instances.
@@ -303,8 +311,11 @@ class AbstractKillCommand(Verb):
       for i in range(min(context.options.batch_size, len(instances_to_kill))):
         batch.append(instances_to_kill.pop())
       resp = api.kill_job(job, batch)
-      if resp.responseCode is not ResponseCode.OK:
-        context.print_log('Kill of shards %s failed with error %s' % (batch, resp.message))
+      if resp.responseCode is not ResponseCode.OK or self.wait_kill_tasks(
+          context, api.scheduler_proxy, job, batch) is not EXIT_OK:
+
+        context.print_log(logging.INFO,
+                          'Kill of shards %s failed with error %s' % (batch, resp.message))
         errors += 1
         if errors > context.options.max_total_failures:
           raise context.CommandError(EXIT_COMMAND_FAILURE,
@@ -336,9 +347,10 @@ class KillCommand(AbstractKillCommand):
     api = context.get_api(job.cluster)
     if context.options.no_batching:
       resp = api.kill_job(job, instances_arg)
-      if resp.responseCode != ResponseCode.OK:
-        context.print_err('Job %s not found' % job, file=sys.stderr)
-        return EXIT_INVALID_PARAMETER
+      context.check_and_log_response(resp)
+      wait_result = self.wait_kill_tasks(context, api.scheduler_proxy, job, instances_arg)
+      if wait_result is not EXIT_OK:
+        return wait_result
     else:
       self.kill_in_batches(context, job, instances_arg)
     if context.options.open_browser:
@@ -363,9 +375,10 @@ class KillAllJobCommand(AbstractKillCommand):
     api = context.get_api(job.cluster)
     if context.options.no_batching:
       resp = api.kill_job(job, None)
-      if resp.responseCode != ResponseCode.OK:
-        context.print_err('Job %s not found' % job, file=sys.stderr)
-        return EXIT_INVALID_PARAMETER
+      context.check_and_log_response(resp)
+      wait_result = self.wait_kill_tasks(context, api.scheduler_proxy, job)
+      if wait_result is not EXIT_OK:
+        return wait_result
     else:
       self.kill_in_batches(context, job, None)
     if context.options.open_browser:

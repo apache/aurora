@@ -71,13 +71,9 @@ class TestClientCreateCommand(AuroraClientCommandTest):
   def create_mock_status_query_result(cls, scheduleStatus):
     mock_query_result = cls.create_simple_success_response()
     mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    if scheduleStatus == ScheduleStatus.INIT:
-      # status query result for before job is launched.
-      mock_query_result.result.scheduleStatusResult.tasks = []
-    else:
-      mock_task_one = cls.create_mock_task('hello', 0, 1000, scheduleStatus)
-      mock_task_two = cls.create_mock_task('hello', 1, 1004, scheduleStatus)
-      mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]
+    mock_task_one = cls.create_mock_task('hello', 0, 1000, scheduleStatus)
+    mock_task_two = cls.create_mock_task('hello', 1, 1004, scheduleStatus)
+    mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]
     return mock_query_result
 
   @classmethod
@@ -127,7 +123,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # the job is created, and once after. So we need to set up mocks for the query results.
       mock_query = self.create_mock_query()
       mock_scheduler_proxy.getTasksStatus.side_effect = [
-        self.create_mock_status_query_result(ScheduleStatus.INIT),
         self.create_mock_status_query_result(ScheduleStatus.RUNNING)
       ]
 
@@ -146,7 +141,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       self.assert_create_job_called(mock_api)
-      self.assert_scheduler_called(mock_api, mock_query, 2)
+      self.assert_scheduler_called(mock_api, mock_query, 1)
       # make_client should have been called once.
       make_client.assert_called_with('west')
 
@@ -162,12 +157,12 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         patch('twitter.common.app.get_options', return_value=mock_options)) as (sleep, make_client,
         options):
       mock_query = self.create_mock_query()
+      mock_options.wait_until = 'FINISHED'
       mock_query_results = [
-          self.create_mock_status_query_result(ScheduleStatus.INIT),
           self.create_mock_status_query_result(ScheduleStatus.PENDING),
           self.create_mock_status_query_result(ScheduleStatus.PENDING),
           self.create_mock_status_query_result(ScheduleStatus.RUNNING),
-          self.create_mock_status_query_result(ScheduleStatus.FINISHED)
+          self.create_mock_status_query_result(ScheduleStatus.FINISHED),
       ]
       mock_scheduler_proxy.getTasksStatus.side_effect = mock_query_results
       mock_api.create_job.return_value = self.get_createjob_response()
@@ -193,11 +188,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (make_client,
         options):
-      mock_query = self.create_mock_query()
-      mock_query_results = [
-          self.create_mock_status_query_result(ScheduleStatus.INIT)
-      ]
-      mock_scheduler_proxy.getTasksStatus.side_effect = mock_query_results
       mock_api.create_job.return_value = self.get_failed_createjob_response()
       # This is the real test: invoke create as if it had been called by the command line.
       with temporary_file() as fp:
@@ -209,9 +199,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       self.assert_create_job_called(mock_api)
 
-      # getTasksStatus was called once, before the create_job
-      assert mock_scheduler_proxy.getTasksStatus.call_count == 1
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(mock_query)
       # make_client should have been called once.
       make_client.assert_called_with('west')
 
@@ -228,11 +215,9 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         options):
       mock_query = self.create_mock_query()
       mock_query_results = [
-          self.create_mock_status_query_result(ScheduleStatus.INIT),
           self.create_mock_status_query_result(ScheduleStatus.PENDING),
           self.create_mock_status_query_result(ScheduleStatus.PENDING),
-          self.create_mock_status_query_result(ScheduleStatus.RUNNING),
-          self.create_mock_status_query_result(ScheduleStatus.FINISHED)
+          self.create_mock_status_query_result(ScheduleStatus.RUNNING)
       ]
       mock_scheduler_proxy.getTasksStatus.side_effect = mock_query_results
       mock_api.create_job.return_value = self.get_createjob_response()
@@ -243,7 +228,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
       # Now check that the right API calls got made.
       self.assert_create_job_called(mock_api)
-      self.assert_scheduler_called(mock_api, mock_query, 4)
+      self.assert_scheduler_called(mock_api, mock_query, 3)
       # make_client should have been called once.
       make_client.assert_called_with('west')
 

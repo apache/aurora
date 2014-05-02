@@ -57,6 +57,7 @@ python_library(
   name = 'job_monitor',
   sources = ['job_monitor.py'],
   dependencies = [
+    pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.quantity'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
@@ -127,6 +128,7 @@ python_library(
   dependencies = [
     pants(':scheduler_client'),
     pants(':instance_watcher'),
+    pants(':job_monitor'),
     pants(':updater_util'),
     pants(':quota_check'),
     pants('3rdparty/python:twitter.common.log'),

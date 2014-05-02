@@ -20,6 +20,7 @@ from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.api.health_check import StatusHealthCheck, Retriable
+from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import QuotaCheck
 from apache.aurora.client.cli import EXIT_INVALID_CONFIGURATION
 from apache.aurora.client.cli.client import AuroraCommandLine
@@ -184,6 +185,13 @@ class TestUpdateCommand(AuroraClientCommandTest):
     mock_quota_check = Mock(spec=QuotaCheck)
     mock_quota_check.validate_quota_from_requested.return_value = \
         cls.create_simple_success_response()
+    return mock_quota_check
+
+  @classmethod
+  def setup_job_monitor(cls):
+    mock_job_monitor = Mock(spec=JobMonitor)
+    mock_job_monitor.wait_until.return_value = True
+    return mock_job_monitor
 
   def test_updater_simple(self):
     # Test the client-side updater logic in its simplest case: everything succeeds,
@@ -191,6 +199,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
     mock_quota_check = self.setup_quota_check()
+    mock_job_monitor = self.setup_job_monitor()
     self.setup_mock_scheduler_for_simple_update(mock_api)
     # This doesn't work, because:
     # - The mock_context stubs out the API.
@@ -200,7 +209,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
-        patch('apache.aurora.client.api.quota_check.QuotaCheck', return_value=mock_quota_check),
+        patch('apache.aurora.client.api.updater.JobMonitor', return_value=mock_job_monitor),
+        patch('apache.aurora.client.api.updater.QuotaCheck', return_value=mock_quota_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('time.sleep', return_value=None)):
       with temporary_file() as fp:

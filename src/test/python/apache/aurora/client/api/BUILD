@@ -40,7 +40,7 @@ python_tests(
 python_tests(name = 'job_monitor',
   sources = ['test_job_monitor.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
+    pants('3rdparty/python:mock'),
     pants('src/main/python/apache/aurora/client/api:api'),
     pants('src/main/python/apache/aurora/client/api:job_monitor'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
@@ -99,6 +99,7 @@ python_tests(name = 'updater',
   sources = ['test_updater.py'],
   dependencies = [
     pants('3rdparty/python:mox'),
+    pants('src/main/python/apache/aurora/common:aurora_job_key'),
     pants('src/main/python/apache/aurora/client/api:updater'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
     pants('src/test/python/apache/aurora/client:fake_scheduler_proxy'),

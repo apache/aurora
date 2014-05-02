@@ -57,13 +57,9 @@ class TestClientCreateCommand(AuroraClientCommandTest):
   def create_mock_status_query_result(cls, scheduleStatus):
     mock_query_result = cls.create_simple_success_response()
     mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    if scheduleStatus == ScheduleStatus.INIT:
-      # status query result for before job is launched.
-      mock_query_result.result.scheduleStatusResult.tasks = []
-    else:
-      mock_task_one = cls.create_mock_task('hello', 0, 1000, scheduleStatus)
-      mock_task_two = cls.create_mock_task('hello', 1, 1004, scheduleStatus)
-      mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]
+    mock_task_one = cls.create_mock_task('hello', 0, 1000, scheduleStatus)
+    mock_task_two = cls.create_mock_task('hello', 1, 1004, scheduleStatus)
+    mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]
     return mock_query_result
 
   @classmethod
@@ -99,13 +95,15 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     # We'll patch out create_context, which will give us a fake context
     # object, and everything can be stubbed through that.
     mock_context = FakeAuroraCommandContext()
-    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       # After making the client, create sets up a job monitor.
       # The monitor uses TaskQuery to get the tasks. It's called at least twice:once before
       # the job is created, and once after. So we need to set up mocks for the query results.
       mock_query = self.create_mock_query()
       mock_context.add_expected_status_query_result(
-        self.create_mock_status_query_result(ScheduleStatus.INIT))
+        self.create_mock_status_query_result(ScheduleStatus.PENDING))
       mock_context.add_expected_status_query_result(
         self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api('west')
@@ -133,8 +131,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         patch('time.sleep'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       mock_query = self.create_mock_query()
-      for result in [ScheduleStatus.INIT, ScheduleStatus.PENDING, ScheduleStatus.PENDING,
-          ScheduleStatus.RUNNING, ScheduleStatus.FINISHED]:
+      for result in [ScheduleStatus.PENDING, ScheduleStatus.PENDING, ScheduleStatus.RUNNING]:
         mock_context.add_expected_status_query_result(self.create_mock_status_query_result(result))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
@@ -147,7 +144,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         # Now check that the right API calls got made.
         # Check that create_job was called exactly once, with an AuroraConfig parameter.
         self.assert_create_job_called(api)
-        self.assert_scheduler_called(api, mock_query, 4)
+        self.assert_scheduler_called(api, mock_query, 3)
 
   def test_create_job_failed(self):
     """Run a test of the "create" command against a mocked-out API:
@@ -172,8 +169,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       self.assert_create_job_called(api)
 
-      # getTasksStatus was called once, before the create_job
-      assert api.scheduler_proxy.getTasksStatus.call_count == 1
 
   def test_create_job_failed_invalid_config(self):
     """Run a test of the "create" command against a mocked-out API, with a configuration
