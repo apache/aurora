@@ -83,7 +83,7 @@ class Bridge(object):
     if len(args) == 1:
       args.append('help')
     for cl in self.command_processors:
-      if args[1] == 'help':
+      if args[1] == 'help' or args[1] == '--help':
         self.show_help(args)
         return 0
       if args[1] in cl.get_commands():
