@@ -43,6 +43,7 @@ from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.config import get_config, GlobalHookRegistry
 from apache.aurora.client.factory import make_client, make_client_factory
 from apache.aurora.client.options import (
+    BATCH_OPTION,
     CLUSTER_CONFIG_OPTION,
     CLUSTER_INVOKE_OPTION,
     CLUSTER_NAME_OPTION,
@@ -52,6 +53,7 @@ from apache.aurora.client.options import (
     FROM_JOBKEY_OPTION,
     HEALTH_CHECK_INTERVAL_SECONDS_OPTION,
     JSON_OPTION,
+    MAX_FAILURES_OPTION,
     OPEN_BROWSER_OPTION,
     SHARDS_OPTION,
     WAIT_UNTIL_OPTION)
@@ -396,6 +398,8 @@ def list_jobs(cluster_and_role):
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(SHARDS_OPTION)
 @app.command_option(DISABLE_HOOKS_OPTION)
+@app.command_option(BATCH_OPTION)
+@app.command_option(MAX_FAILURES_OPTION)
 def kill(args, options):
   """usage: kill --shards=shardspec cluster/role/env/job
 
@@ -410,16 +414,64 @@ def kill(args, options):
       args, options, make_client_factory())
   options = app.get_options()
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
-  resp = api.kill_job(job_key, options.shards, config=config)
-  check_and_log_response(resp)
+  if options.batch_size is not None:
+    kill_in_batches(api, job_key, options.shards, options.batch_size, options.max_failures_option)
+  else:
+    resp = api.kill_job(job_key, options.shards, config=config)
+    check_and_log_response(resp)
   handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
   wait_kill_tasks(api.scheduler_proxy, job_key, options.shards)
+
+
+
+def kill_in_batches(api, job_key, instances_arg, batch_size, max_failures):
+  """ Common behavior shared by kill and killAll for killing instances in
+  a sequence of batches.
+  """
+  def make_batches(instances, batch_size):
+    result = []
+    while (len(instances) > 0):
+      batch = []
+      for i in range(min(batch_size, len(instances))):
+        batch.append(instances.pop())
+      result.append(batch)
+    return result
+
+
+  resp = api.check_status(job_key)
+  if resp.responseCode is not ResponseCode.OK:
+    log.error("Job %s could not be found" % job_key)
+    exit(1)
+  tasks = resp.result.scheduleStatusResult.tasks or None
+  if batch_size is not None and batch_size > 0 and tasks is not None:
+    instance_ids = set(instance.assignedTask.instanceId for instance in tasks)
+    instances_to_kill = instance_ids & set(instances_arg or instance_ids)
+    errors = 0
+    for batch in make_batches(instances_to_kill, batch_size):
+      resp = api.kill_job(job_key, batch)
+      if resp.responseCode is not ResponseCode.OK:
+        log.info("Kill of shards %s failed with error %s" % (batch, resp.message))
+        print('ERROR IN KILL_JOB')
+        errors += 1
+        if errors > max_failures:
+          log.error("Exceeded maximum number of errors while killing instances")
+          exit(1)
+    if errors > 0:
+      print("Warning: errors occurred during batch kill")
+      exit(1)
+  else:
+    if tasks is None or len(tasks) == 0:
+      log.error('No tasks to kill found for job %s' % job_key)
+      return 1
+
 
 
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
 @app.command_option(DISABLE_HOOKS_OPTION)
+@app.command_option(BATCH_OPTION)
+@app.command_option(MAX_FAILURES_OPTION)
 def killall(args, options):
   """usage: killall cluster/role/env/job
   Kills all tasks in a running job, blocking until all specified tasks have been terminated.
@@ -429,8 +481,11 @@ def killall(args, options):
   config_file = args[1] if len(args) > 1 else None  # the config for hooks
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
   api = make_client(job_key.cluster)
-  resp = api.kill_job(job_key, None, config=config)
-  check_and_log_response(resp)
+  if options.batch_size is not None:
+    kill_in_batches(api, job_key, None, options.batch_size, options.max_failures_option)
+  else:
+    resp = api.kill_job(job_key, None, config=config)
+    check_and_log_response(resp)
   handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
   wait_kill_tasks(api.scheduler_proxy, job_key)
 

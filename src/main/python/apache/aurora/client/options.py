@@ -21,6 +21,7 @@ from apache.thermos.common.options import add_binding_to
 
 
 __all__ = (
+  'BATCH_OPTION',
   'CLUSTER_CONFIG_OPTION',
   'CLUSTER_INVOKE_OPTION',
   'CLUSTER_NAME_OPTION',
@@ -31,6 +32,7 @@ __all__ = (
   'FROM_JOBKEY_OPTION',
   'HEALTH_CHECK_INTERVAL_SECONDS_OPTION',
   'JSON_OPTION',
+  'MAX_FAILURES_OPTION',
   'OPEN_BROWSER_OPTION',
   'SHARDS_OPTION',
   'SSH_USER_OPTION',
@@ -129,6 +131,18 @@ SHARDS_OPTION = optparse.Option(
     help='A list of shard ids to act on. Can either be a comma-separated list (e.g. 0,1,2) '
     'or a range (e.g. 0-2) or any combination of the two (e.g. 0-2,5,7-9). If not set, '
     'all shards will be acted on.')
+
+
+BATCH_OPTION = optparse.Option(
+    '--batch_size', type='int', dest='batch_size', default=None,
+    help='The maximum number of instances to act on at a time')
+
+
+MAX_FAILURES_OPTION = optparse.Option(
+  '--max_total_failures',
+  type='int',
+  default=1,
+  help='The maximum number of errors in a batch operation before the operation should abort')
 
 
 FROM_JOBKEY_OPTION = optparse.Option('--from', dest='rename_from', type='string', default=None,
