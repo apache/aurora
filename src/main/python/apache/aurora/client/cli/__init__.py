@@ -61,23 +61,29 @@ EXIT_UNKNOWN_ERROR = 20
 # invocation, and "user", which contains the username of the user who invoked
 # the client.
 
-logger = logging.getLogger('aurora_client')
+logger = logging.getLogger("aurora_client")
 CLIENT_ID = uuid1()
 
 
+# A location where you can find a site-specific file containing
+# global hook skip rules. This can be something like a link into a file stored in a git
+# repos.
+GLOBAL_HOOK_SKIP_RULES_URL = None
+
+
 def print_aurora_log(sev, msg, *args, **kwargs):
-  extra = kwargs.get('extra', {})
-  extra['clientid'] = CLIENT_ID
-  extra['user'] = getpass.getuser()
-  kwargs['extra'] = extra
+  extra = kwargs.get("extra", {})
+  extra["clientid"] = CLIENT_ID
+  extra["user"] = getpass.getuser()
+  kwargs["extra"] = extra
   logger.log(sev, msg, *args, **kwargs)
 
 def get_client_version():
   try:
     pexpath = sys.argv[0]
     pex_info = PexInfo.from_pex(pexpath)
-    return ("%s@%s" % (pex_info.build_properties.get('sha', 'unknown'),
-        pex_info.build_properties.get('date', 'unknown')))
+    return ("%s@%s" % (pex_info.build_properties.get("sha", "unknown"),
+        pex_info.build_properties.get("date", "unknown")))
   except (IOError, OSError):
     return "VersionUnknown"
 
@@ -104,21 +110,25 @@ class Context(object):
     """
     self.options = options
 
+  def set_args(self, args):
+    """Add the raw argument list to a context."""
+    self.args = args
+
   def print_out(self, msg, indent=0):
     """Prints output to standard out with indent.
     For debugging purposes, it's nice to be able to patch this and capture output.
     """
-    indent_str = ' ' * indent
-    lines = msg.split('\n')
+    indent_str = " " * indent
+    lines = msg.split("\n")
     for line in lines:
-      print('%s%s' % (indent_str, line))
+      print("%s%s" % (indent_str, line))
 
   def print_err(self, msg, indent=0):
     """Prints output to standard error, with an indent."""
-    indent_str = ' ' * indent
-    lines = msg.split('\n')
+    indent_str = " " * indent
+    lines = msg.split("\n")
     for line in lines:
-      print('%s%s' % (indent_str, line), file=sys.stderr)
+      print("%s%s" % (indent_str, line), file=sys.stderr)
 
   def print_log(self, severity, msg, *args, **kwargs):
     """Print a message to a log.
@@ -153,15 +163,14 @@ class ConfigurationPlugin(object):
   @abstractmethod
   def before_dispatch(self, raw_args):
     """Run some code before dispatching to the client.
-    Returns a potentially modified version of the command line arguments.
-    If a ConfigurationPlugin.Error exception is thrown, it aborts command execution.
+    If a ConfigurationPlugin.Error exception is thrown, aborts the command execution.
     """
     return raw_args
 
   @abstractmethod
   def before_execution(self, context):
     """Run the context/command line initialization code for this plugin before
-    invoking the command verb.
+    invoking the verb.
     The before_execution method behaves as if it's part of the implementation of the
     verb being invoked. It has access to the same context that will be used by the command.
     Any errors that occur during the execution should be signalled using ConfigurationPlugin.Error.
@@ -226,7 +235,7 @@ class CommandLine(object):
     if self.nouns is None:
       self.nouns = {}
     if not isinstance(noun, Noun):
-      raise TypeError('register_noun requires a Noun argument')
+      raise TypeError("register_noun requires a Noun argument")
     self.nouns[noun.name] = noun
     noun.set_commandline(self)
 
@@ -236,7 +245,7 @@ class CommandLine(object):
   def setup_options_parser(self):
     """ Builds the options parsing for the application."""
     self.parser = argparse.ArgumentParser()
-    subparser = self.parser.add_subparsers(dest='noun')
+    subparser = self.parser.add_subparsers(dest="noun")
     for (name, noun) in self.nouns.items():
       noun_parser = subparser.add_parser(name, help=noun.help)
       noun.internal_setup_options_parser(noun_parser)
@@ -256,7 +265,7 @@ class CommandLine(object):
         return EXIT_OK
       else:
         self.print_err('Unknown noun "%s"' % args[0])
-        self.print_err('Valid nouns are: %s' % [k for k in self.nouns])
+        self.print_err("Valid nouns are: %s" % [k for k in self.nouns])
         return EXIT_INVALID_PARAMETER
     elif len(args) == 2:
       if args[0] in self.nouns:
@@ -269,10 +278,10 @@ class CommandLine(object):
           self.print_err('Valid verbs for "%s" are: %s' % (args[0], verbs))
           return EXIT_INVALID_PARAMETER
       else:
-        self.print_err('Unknown noun %s' % args[0])
+        self.print_err("Unknown noun %s" % args[0])
         return EXIT_INVALID_PARAMETER
     else:
-      self.print_err('Unknown help command: %s' % (' '.join(args)))
+      self.print_err("Unknown help command: %s" % (" ".join(args)))
       self.print_err(self.composed_help)
       return EXIT_INVALID_PARAMETER
 
@@ -309,81 +318,80 @@ class CommandLine(object):
       self.register_nouns()
     return self.nouns.keys()
 
-  def run_pre_hooks(self, context, noun, verb, args, command_hooks):
-    try:
-      for hook in command_hooks:
-        result = hook.pre_command(noun, verb, context, args)
-        if result != 0:
-          print_aurora_log(logging.INFO, 'Command hook %s aborted operation with error code %s' %
-              (hook.name, result))
-          self.print_out('Command aborted by command hook %s' % hook.name)
-          return result
-      return EXIT_OK
-    except (Context.CommandError, ConfigurationPlugin.Error) as c:
-      print_aurora_log(logging.INFO, 'Error executing command hook %s: %s' % (hook.name, c))
-      self.print_err('Error executing command hook %s: %s; aborting' % hook.name, c.msg)
-      return c.code
+  def _setup(self, args):
+    GlobalCommandHookRegistry.setup(GLOBAL_HOOK_SKIP_RULES_URL)
+    nouns = self.registered_nouns
+    for plugin in self.plugins:
+      args = plugin.before_dispatch(args)
+    return args
 
-  def run_post_hooks(self, context, noun, verb, args, result, command_hooks):
+  def _parse_args(self, args):
+    self.setup_options_parser()
+    options = self.parser.parse_args(args)
+    if options.noun not in self.nouns:
+      raise ValueError("Unknown command: %s" % options.noun)
+    noun = self.nouns[options.noun]
+    context = noun.create_context()
+    context.set_options(options)
+    context.set_args(args)
+    return (noun, context)
+
+  def _run_pre_hooks_and_plugins(self, context, args):
     try:
-      for hook in command_hooks:
-        hook.post_command(noun, verb, context, args, result)
-    except (Context.CommandError, ConfigurationPlugin.Error) as c:
-      print_aurora_log(logging.INFO, 'Error executing post-command hook %s: %s' % (hook.name, c))
-      self.print_err('Error executing command hook %s: %s; aborting' % hook.name, c.msg)
+      context.selected_hooks = GlobalCommandHookRegistry.get_required_hooks(context,
+          context.options.skip_hooks, context.options.noun, context.options.verb)
+    except Context.CommandError as c:
       return c.code
+    try:
+      for plugin in self.plugins:
+        plugin.before_execution(context)
+    except ConfigurationPlugin.Error as e:
+      print("Error in configuration plugin before execution: %s" % c.msg, file=sys.stderr)
+      return c.code
+    plugin_result = GlobalCommandHookRegistry.run_pre_hooks(context, context.options.noun,
+        context.options.verb)
+    if plugin_result != EXIT_OK:
+      return plugin_result
+    else:
+      return EXIT_OK
+
+  def _run_post_plugins(self, context, result):
+    for plugin in self.plugins:
+      try:
+        plugin.after_execution(context, result)
+      except ConfigurationPlugin.Error as e:
+        print_aurora_log(logging.INFO, "Error executing post-execution plugin: %s", e.msg)
 
   def execute(self, args):
     """Execute a command.
     :param args: the command-line arguments for the command. This only includes arguments
         that should be parsed by the application; it does not include sys.argv[0].
     """
-    print_aurora_log(logging.INFO, 'Command=(%s)', args)
-    nouns = self.registered_nouns
     try:
-      for plugin in self.plugins:
-        args = plugin.before_dispatch(args)
+      args = self._setup(args)
     except ConfigurationPlugin.Error as e:
-      print('Error in configuration plugin before dispatch: %s' % e.msg, file=sys.stderr)
+      print("Error in configuration plugin before dispatch: %s" % e.msg, file=sys.stderr)
       return e.code
-
-    if args[0] == 'help':
+    if args[0] == "help":
       return self.help_cmd(args[1:])
-    self.setup_options_parser()
-    options = self.parser.parse_args(args)
-    if options.noun not in nouns:
-      raise ValueError('Unknown command: %s' % options.noun)
-    noun = self.nouns[options.noun]
-    context = noun.create_context()
-    context.set_options(options)
-    try:
-      for plugin in self.plugins:
-        plugin.before_execution(context)
-    except ConfigurationPlugin.Error as e:
-      print('Error in configuration plugin before execution: %s' % c.msg, file=sys.stderr)
-      return c.code
-    command_hooks = GlobalCommandHookRegistry.get_command_hooks_for(options.noun, options.verb)
-    plugin_result = self.run_pre_hooks(context, options.noun, options.verb, args, command_hooks)
-    if plugin_result != 0:
-      return plugin_result
-
+    noun, context = self._parse_args(args)
+    print_aurora_log(logging.INFO, "Command=(%s)", args)
+    pre_result = self._run_pre_hooks_and_plugins(context, args)
+    if pre_result is not EXIT_OK:
+      return pre_result
     try:
       result = noun.execute(context)
       if result == EXIT_OK:
-        print_aurora_log(logging.INFO, 'Command terminated successfully')
-        self.run_post_hooks(options.noun, options.verb, context, args, result, command_hooks)
+        print_aurora_log(logging.INFO, "Command terminated successfully")
+        GlobalCommandHookRegistry.run_post_hooks(context, context.options.noun, context.options.verb,
+            result)
       else:
-        print_aurora_log(logging.INFO, 'Commmand terminated with error code %s', result)
-
-      for plugin in self.plugins:
-        try:
-          plugin.after_execution(context, result)
-        except ConfigurationPlugin.Error as e:
-          print_aurora_log(logging.INFO, 'Error executing post-execution plugin: %s', e.msg)
+        print_aurora_log(logging.INFO, "Commmand terminated with error code %s", result)
+      self._run_post_plugins(context, result)
       return result
     except Context.CommandError as c:
-      print_aurora_log(logging.INFO, 'Error executing command: %s', c.msg)
-      self.print_err('Error executing command: %s' % c.msg)
+      print_aurora_log(logging.INFO, "Error executing command: %s", c.msg)
+      self.print_err("Error executing command: %s" % c.msg)
       return c.code
 
 
@@ -402,14 +410,17 @@ class Noun(AuroraCommand):
   def register_verb(self, verb):
     """Add an operation supported for this noun."""
     if not isinstance(verb, Verb):
-      raise TypeError('register_verb requires a Verb argument')
+      raise TypeError("register_verb requires a Verb argument")
     self.verbs[verb.name] = verb
     verb._register(self)
 
   def internal_setup_options_parser(self, argparser):
-    """Internal driver for the options processing framework."""
+    """Internal driver for the options processing framework.
+    This gets the options from all of the verb for this noun, and assembles them
+    into a python argparse subparser for this noun.
+    """
     self.setup_options_parser(argparser)
-    subparser = argparser.add_subparsers(dest='verb')
+    subparser = argparser.add_subparsers(dest="verb")
     for (name, verb) in self.verbs.items():
       vparser = subparser.add_parser(name, help=verb.help)
       for opt in verb.get_options():
@@ -417,6 +428,8 @@ class Noun(AuroraCommand):
       for plugin in self.commandline.plugins:
         for opt in plugin.get_options():
           opt.add_to_parser(vparser)
+      for opt in GlobalCommandHookRegistry.get_options():
+        opt.add_to_parser(vparser)
 
   @property
   def usage(self):
@@ -434,11 +447,11 @@ class Noun(AuroraCommand):
     result = ['Usage for noun "%s":' % self.name]
     result += ["    %s %s" % (self.name, self.verbs[verb].usage) for verb in self.verbs]
     result += [self.help]
-    return '\n'.join(result)
+    return "\n".join(result)
 
   def execute(self, context):
     if context.options.verb not in self.verbs:
-      raise self.InvalidVerbException('Noun %s does not have a verb %s' %
+      raise self.InvalidVerbException("Noun %s does not have a verb %s" %
           (self.name, context.options.verb))
     return self.verbs[context.options.verb].execute(context)
 

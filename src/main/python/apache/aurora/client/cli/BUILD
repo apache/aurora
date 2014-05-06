@@ -52,6 +52,7 @@ python_library(
   ],
   dependencies = [
     pants('3rdparty/python:argparse'),
+    pants('3rdparty/python:requests'),
     pants('3rdparty/python:twitter.common.python'),
     pants('3rdparty/python:twitter.common.quantity'),
     pants('src/main/python/apache/aurora/client/api:command_runner'),

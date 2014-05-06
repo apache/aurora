@@ -137,50 +137,98 @@ command(s) they're allowed to run.  All of that is specified in a
 special system file located in `/etc/sudoers` on a typical unix
 machine.
 
+In a world of distributed systems, this approach has one grave
+weakness. An aurora client can be located on any machine that has
+network access to a Mesos/Aurora cluster. It can be run by a user in
+pretty much any way they want - from a machine they control, from a
+special chroot they created, etc. Relying an a file being in a special
+location on their machine isn't sufficient - it's too easy to
+maliciously or erroneously run a command in an environment with an
+invalid hooks exceptions file.
+
+Instead, we've got two basic choices: hook exception rules can be
+baked into the client executable, or they can be provided in a
+network location.
+
 ### Specifying when hooks can be skipped
 
-The sudoers file has a terrible syntax, so I'm not going to try to
-adopt it; instead, I'm going to stick with the Pystachio-based
-configuration syntax that we use in Aurora. A rule that permits a
-group of users to skip hooks is defined using a Pystachio struct:
+#### Hooks File
 
-    class HookRule(Struct):
-      roles = List(String)
-      commands = Map(String, List(String))
-      arg_patterns = List(String)
-	  hooks = List(String)
+The module `apache.aurora.client.cli` contains a variable named
+`GLOBAL_HOOK_SKIP_RULES_URL`. In the default distribution of Aurora, tihs variable contains
+`None`. Users can modify this value for their local environments, providing
+a site specific URL. If users attempt to bypass command hooks, and this
+URL is not `None`, then the client will fetch the contents of that URL, and
+attempt to interpret it as a hooks exception file.
 
-* `roles` is a list of role names, or regular expressions that range over role
-  names. This rule gives permission to those users to skip hooks.
+The hooks exception file is written in JSON, with the following structure:
+
+    { "rulename":
+      {
+      "hooks": [ "hook-name ", ... ],
+      "users": [ string, ...],
+      "commands": { "job": ["kill", "killall", ...], ... },
+      "arg-patterns": [ "regexp-str", ... ]
+      },
+	  ...
+    }
+
+* `hooks` is a list of hook identifiers which can be skipped by a user
+  that satisfies this rule. If omitted, then this rule applies to _all hooks_.
+  (Omitting the `hooks` field is equivalent to giving it the value `['*']`.)
+* `users` is a list of user names, or glob expressions that range over user
+  names. This rule gives permission to those users to skip hooks. If omitted,
+  then this rule allows _any user_ to skip hooks that satisfy the rest of this rule.
+  Note that this is _user_ names, not
+  _role_ names: the rules specify users that are allowed to skip commands.
+  Some users that are allowed to work with a role account may be allowed to
+  skip, while others cannot.
 * `commands` is a map from nouns to lists of verbs. If a command `aurora n v`
   is being executed, this rule allows the hooks to be skipped if
-  `v` is in `commands[n]`. If this is empty, then all commands can be skipped.
-* `arg_patterns` is a list of regular expressions ranging over parameters.
+  `v` is in `commands[n]`. If this is omitted, then it allows hooks to be skipped for all
+  commands that satisfy the rest of the rule.
+* `arg_patterns` is a list of glob patterns ranging over parameters.
   If any of the parameters of the command match the parameters in this list,
-  the hook can be skipped.
-* `hooks` is a list of hook identifiers which can be skipped by a user
-  that satisfies this rule.
-
-The hooks file defines a global variable `hook_rules`, which is a list of
-`HookRule` objects. If any of the hook rules matches, then the command
-can be run with hooks skipped.
+  the hook can be skipped. If ommitted, then this applies regardless of arguments.
 
 For example, the following is a hook rules file which allows:
-* The admin (role admin) to skip any hook.
+* The user "root" to skip any hook.
 * Any user to skip hooks for test jobs.
 * A specific group of users to skip hooks for jobs in cluster `east`
 * Another group of users to skip hooks for `job kill` in cluster `west`.
 
-    allow_admin = HookRule(roles=['admin'])
-    allow_test = HookRule(roles=['.*'],  arg_patterns=['.*/.*/test/.*'])
-    allow_east_users = HookRule(roles=['john', 'mary', 'mike', 'sue'],
-        arg_patterns=['east/.*/.*./*'])
-    allow_west_kills = HookRule(roles=['anne', 'bill', 'chris'],
-      commands = { 'job': ['kill']}, arg_patterns = ['west/.*/.*./*'])
+    {
+      "allow-admin": { "users": ["root"] },
+	  "allow-test": { "users": ["\*"], "arg-patterns": ["\*/\*/test/\*"] },
+	  "allow-east-users": { "users"=['john', 'mary', 'mike', 'sue'],
+          "arg-patterns": ["east/\*/\*/\*"] },
+	  "allow-west-kills": { "users": ["anne", "bill", "chris"],
+          "commands": { "job": ["kill"]}, "arg-patterns" = ["west/\*/\*/\*"] }
+    }
 
-    hook_rules = [allow_admin, allow_test, allow_east_users, allow_west_kills]
+#### Programmatic Hooks Exceptions
 
-## Skipping Hooks
+The `GlobalHooksRegistry` contains the method `add_hooks_exception`, which allows
+users to register local hooks exceptions using the `ConfigurationPlugin` mechanism.
+A hooks exception object implements the following interface:
+
+    class HooksException(object):
+	  def allow_exception(self, hooks, role, noun, verb, args):
+	    """Params:
+        - hooks: a list of hook-names that the user wants to skip. If this
+		  is ommitted, then this applies to all hooks.
+		- role: the role requesting that hooks be skipped.
+		- noun, verb: the noun and verb being executed.
+		- the other command-line arguments.
+		Returns: True if the user should be allowed to skip the requested hooks.
+		"""
+	    return False
+
+When a user supplies the `--skip-hooks` argument, `allow_exception` is invoked on
+each of the `HooksException` arguments. If _any_ of the hooks exception objects
+returns `True`, then the user will be permitted to skip the hooks.
+
+### Skipping Hooks
 
 To skip a hook, a user uses a command-line option, `--skip-hooks`. The option can either
 specify specific hooks to skip, or "all":
@@ -193,6 +241,12 @@ specify specific hooks to skip, or "all":
 
 ## Changes
 
+4/30:
+* Rule exceptions are defined in JSON, and they are specified to be loaded from
+  a URL, not from a local file.
+* Rule exceptions specify users, not roles.
+
+4/27:
 Major changes between this and the last version of this proposal.
 * Command hooks can't be declared in a configuration file. There's a simple
   reason why: hooks run before a command's implementation is invoked.
