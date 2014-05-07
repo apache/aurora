@@ -55,6 +55,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
+import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
 import static org.apache.aurora.scheduler.async.GcExecutorLauncher.SYSTEM_TASK_PREFIX;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -171,6 +172,20 @@ public class GcExecutorLauncherTest extends EasyMockTest {
         driver,
         Suppliers.ofInstance("gc"));
     assertFalse(gcExecutorLauncher.willUse(OFFER));
+  }
+
+  @Test
+  public void testFiltersSandboxDeleted() {
+    IScheduledTask a = makeTask(JOB_A, FAILED);
+    IScheduledTask b = makeTask(JOB_A, SANDBOX_DELETED);
+
+    expectGetTasksByHost(HOST, a, b);
+    expectAdjustRetainedTasks(a);
+
+    control.replay();
+
+    // First call - no items in the cache, no tasks collected.
+    assertTrue(gcExecutorLauncher.willUse(OFFER));
   }
 
   private void expectAdjustRetainedTasks(IScheduledTask... tasks) {

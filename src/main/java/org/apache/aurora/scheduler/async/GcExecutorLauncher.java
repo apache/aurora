@@ -15,6 +15,7 @@
  */
 package org.apache.aurora.scheduler.async;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -26,6 +27,7 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
@@ -42,6 +44,7 @@ import com.twitter.common.util.Random;
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.comm.AdjustRetainedTasks;
 import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.TaskLauncher;
@@ -171,10 +174,12 @@ public class GcExecutorLauncher implements TaskLauncher {
   private TaskInfo makeGcTask(String hostName, SlaveID slaveId) {
     Set<IScheduledTask> tasksOnHost =
         Storage.Util.weaklyConsistentFetchTasks(storage, Query.slaveScoped(hostName));
-    AdjustRetainedTasks message = new AdjustRetainedTasks()
-        .setRetainedTasks(Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS));
+
+    Map<String, ScheduleStatus> tasks = Maps.filterValues(
+        Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS),
+        Predicates.not(Predicates.equalTo(ScheduleStatus.SANDBOX_DELETED)));
     tasksCreated.incrementAndGet();
-    return makeGcTask(hostName, slaveId, message);
+    return makeGcTask(hostName, slaveId, new AdjustRetainedTasks().setRetainedTasks(tasks));
   }
 
   private boolean sufficientResources(Offer offer) {
