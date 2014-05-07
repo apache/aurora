@@ -15,7 +15,7 @@
 #
 
 python_binary(
-  name='client',
+  name='aurora2',
   entry_point = 'apache.aurora.client.cli.client:proxy_main',
   dependencies = [
     pants(':client_lib')

@@ -26,12 +26,18 @@ set -u -e -x
 
 . src/test/sh/org/apache/aurora/e2e/test_common.sh
 
+
 function run_dev() {
-  vagrant ssh devcluster -c "$1"
+  vagrant ssh devtools -c "$1"
 }
 
 function run_sched() {
-  vagrant ssh devcluster -c "$1"
+  vagrant ssh aurora-scheduler -c "$1"
+}
+
+function check_url_live() {
+  test $(curl -sL -w '%{http_code}' $1 -o /dev/null) == 200
+
 }
 
 devtools_setup() {
@@ -40,17 +46,16 @@ devtools_setup() {
   branch=$(git rev-parse --abbrev-ref HEAD)
   run_dev "if [ ! -d ~/test_dev ]; then git clone /vagrant ~/test_dev; fi"
   # Clean out any lingering build products; we want fresh.
-  run_dev "rm -rf ~/.pex"
   run_dev "cd ~/test_dev; git reset --hard; git clean -fdx"
-  run_dev "cd ~/test_dev; git checkout $branch; git pull"
-  run_dev "cd ~/test_dev; ./pants src/main/python/apache/aurora/client/bin:aurora_client"
+  run_dev "cd ~/test_dev ; git checkout $branch; git pull"
+  run_dev "cd ~/test_dev; ./pants src/main/python/apache/aurora/client/cli:aurora2"
   run_dev "cd ~/test_dev; ./pants src/test/sh/org/apache/aurora/e2e/flask:flask_example"
   if [ ! -d $_testdir ]
     then
       mkdir $_testdir
     fi
   run_dev "cd ~/test_dev; cp dist/flask_example.pex /vagrant/$_testdir"
-  run_dev "cd ~/test_dev; cp dist/aurora_client.pex /vagrant/$_testdir"
+  run_dev "cd ~/test_dev; cp dist/$CLIENT_NAME /vagrant/$_testdir"
 }
 
 test_flask_example() {
@@ -58,37 +63,38 @@ test_flask_example() {
   local _base_config=$7 _updated_config=$8
   jobkey="$_cluster/$_role/$_env/$_job"
   echo '== Creating job'
-  run_sched "/vagrant/$_testdir/aurora_client.pex create $jobkey $_base_config"
+  run_sched "/vagrant/$_testdir/$CLIENT_NAME job create $jobkey $_base_config"
 
-  # Check that scheduler /vars being exported
+  # Check that scheduler UI pages shown
   base_url="http://$_sched_ip:8081"
-  uptime=$(_curl -s "$base_url/vars" | grep jvm_uptime_secs | wc -l)
-  test $uptime -eq 1
+  check_url_live "$base_url/scheduler"
+  check_url_live "$base_url/scheduler/$_role"
+  check_url_live "$base_url/scheduler/$_role/$_env/$_job"
 
   echo '== Updating test job'
-  run_sched "/vagrant/$_testdir/aurora_client.pex update $jobkey $_updated_config"
+  run_sched "/vagrant/$_testdir/$CLIENT_NAME job update $jobkey $_updated_config"
 
-  #echo "== Probing job via 'aurora run'"
   # TODO(mchucarroll): Get "run" working: the vagrant configuration currently doesn't set up ssh
   # to allow automatic logins to the slaves. "aurora run" therefore tries to prompt the user for
   # a password, finds that it's not running in a TTY, and aborts.
-  runlen=$(run_sched "/vagrant/$_testdir/aurora_client.pex run $jobkey 'pwd'" | wc -l)
+  runlen=$(run_sched "/vagrant/$_testdir/$CLIENT_NAME task run $jobkey 'pwd'" | wc -l)
   test $runlen -eq 2
 
-  run_sched "/vagrant/$_testdir/aurora_client.pex get_quota --cluster=$_cluster $_role"
+  run_sched "/vagrant/$_testdir/$CLIENT_NAME quota get $_cluster/$_role"
 
-  run_sched "/vagrant/$_testdir/aurora_client.pex killall  $jobkey"
+  run_sched "/vagrant/$_testdir/$CLIENT_NAME job killall  $jobkey"
 }
 
 RETCODE=1
 # Set up shorthands for test
+export CLIENT_NAME=aurora2.pex
 export EXAMPLE_DIR=/vagrant/src/test/sh/org/apache/aurora/e2e/flask
 TEST_DIR=deploy_test
-TEST_CLUSTER=devcluster
+TEST_CLUSTER=example
 TEST_ROLE=vagrant
 TEST_ENV=test
 TEST_JOB=flask_example
-TEST_SCHEDULER_IP=192.168.33.7
+TEST_SCHEDULER_IP=192.168.33.6
 TEST_ARGS=(
   $TEST_CLUSTER
   $TEST_ROLE
@@ -102,6 +108,8 @@ TEST_ARGS=(
 
 trap collect_result EXIT
 vagrant up
+
+
 # wipe the pseudo-deploy dir, and then create it fresh, to guarantee that the
 # test runs clean.
 rm -rf $TEST_DIR

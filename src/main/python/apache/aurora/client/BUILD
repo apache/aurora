@@ -104,7 +104,7 @@ python_library(
     name = 'apache.aurora.clientv2',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
   ).with_binaries(
-    aurora_client_v2 = pants('src/main/python/apache/aurora/client/cli:client'),
+    aurora2 = pants('src/main/python/apache/aurora/client/cli:aurora2'),
   )
 )
 
