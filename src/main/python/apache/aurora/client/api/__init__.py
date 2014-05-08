@@ -199,8 +199,11 @@ class AuroraClientAPI(object):
     self._assert_valid_job_key(job_key)
     return Sla(self._scheduler_proxy).get_job_uptime_vector(job_key)
 
-  def sla_get_safe_domain_vector(self, hosts=None):
-    return Sla(self._scheduler_proxy).get_domain_uptime_vector(self._cluster, hosts)
+  def sla_get_safe_domain_vector(self, min_instance_count, hosts=None):
+    return Sla(self._scheduler_proxy).get_domain_uptime_vector(
+        self._cluster,
+        min_instance_count,
+        hosts)
 
   def _assert_valid_job_key(self, job_key):
     if not isinstance(job_key, AuroraJobKey):

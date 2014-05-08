@@ -54,6 +54,7 @@ class SlaTest(unittest.TestCase):
     self._name = 'job'
     self._env = 'test'
     self._job_key = AuroraJobKey(self._cluster.name, self._role, self._env, self._name)
+    self._min_count = 1
 
   def mock_get_tasks(self, tasks, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
@@ -110,7 +111,7 @@ class SlaTest(unittest.TestCase):
     self.expect_task_status_call_job_scoped()
 
   def assert_safe_domain_result(self, host, percentage, duration, in_limit=None, out_limit=None):
-    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    vector = self._sla.get_domain_uptime_vector(self._cluster, self._min_count)
     result = vector.get_safe_hosts(percentage, duration, in_limit)
     assert 1 == len(result), ('Expected length:%s Actual length:%s' % (1, len(result)))
     assert host in result, ('Expected host:%s not found in result' % host)
@@ -127,7 +128,7 @@ class SlaTest(unittest.TestCase):
     self.expect_task_status_call_cluster_scoped()
 
   def assert_probe_hosts_result(self, hosts, percent, duration):
-    vector = self._sla.get_domain_uptime_vector(self._cluster, hosts)
+    vector = self._sla.get_domain_uptime_vector(self._cluster, self._min_count, hosts)
     result = vector.probe_hosts(percent, duration)
     assert len(hosts) == len(result), ('Expected length:%s Actual length:%s' % (1, len(result)))
     return result
@@ -231,7 +232,7 @@ class SlaTest(unittest.TestCase):
 
   def test_domain_uptime_no_tasks(self):
     self.mock_get_tasks([])
-    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    vector = self._sla.get_domain_uptime_vector(self._cluster, self._min_count)
     assert 0 == len(vector.get_safe_hosts(50, 400)), 'Length must be empty.'
     self.expect_task_status_call_cluster_scoped()
 
@@ -240,23 +241,34 @@ class SlaTest(unittest.TestCase):
         self.create_task(100, 1, 'h1', 'j1'),
         self.create_task(200, 2, 'h2', 'j1')
     ])
-    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    vector = self._sla.get_domain_uptime_vector(self._cluster, self._min_count)
     assert 0 == len(vector.get_safe_hosts(50, 400)), 'Length must be empty.'
+    self.expect_task_status_call_cluster_scoped()
+
+  def test_domain_uptime_no_result_min_count_filtered(self):
+    self.mock_get_tasks([
+        self.create_task(100, 1, 'h1', 'j1'),
+        self.create_task(400, 2, 'h2', 'j1'),
+        self.create_task(400, 3, 'h3', 'j1'),
+        self.create_task(100, 1, 'h2', 'j2')
+    ])
+    vector = self._sla.get_domain_uptime_vector(self._cluster, 4)
+    assert 0 == len(vector.get_safe_hosts(10, 200)), 'Length must be empty.'
     self.expect_task_status_call_cluster_scoped()
 
   def test_domain_uptime(self):
     self.mock_get_tasks([
-      self.create_task(100, 1, 'h1', 'j1'),
-      self.create_task(200, 2, 'h2', 'j1'),
-      self.create_task(100, 1, 'h2', 'j2')
+        self.create_task(100, 1, 'h1', 'j1'),
+        self.create_task(200, 2, 'h2', 'j1'),
+        self.create_task(100, 1, 'h2', 'j2')
     ])
     self.assert_safe_domain_result('h1', 50, 200)
 
   def test_domain_uptime_with_override(self):
     self.mock_get_tasks([
-      self.create_task(100, 1, 'h1', self._name),
-      self.create_task(200, 2, 'h2', self._name),
-      self.create_task(100, 1, 'h2', 'j2')
+        self.create_task(100, 1, 'h1', self._name),
+        self.create_task(200, 2, 'h2', self._name),
+        self.create_task(100, 1, 'h2', 'j2')
     ])
 
     job_override = {
@@ -270,12 +282,12 @@ class SlaTest(unittest.TestCase):
 
   def test_domain_uptime_not_production(self):
     self.mock_get_tasks([
-      self.create_task(100, 1, 'h1', self._name, False),
-      self.create_task(200, 2, 'h2', self._name, False),
-      self.create_task(100, 1, 'h2', self._name, False)
+        self.create_task(100, 1, 'h1', self._name, False),
+        self.create_task(200, 2, 'h2', self._name, False),
+        self.create_task(100, 1, 'h2', self._name, False)
     ])
 
-    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    vector = self._sla.get_domain_uptime_vector(self._cluster, self._min_count)
     assert 0 == len(vector.get_safe_hosts(50, 200)), 'Length must be empty.'
     self.expect_task_status_call_cluster_scoped()
 
@@ -284,19 +296,19 @@ class SlaTest(unittest.TestCase):
     task.assignedTask.task.production = None
     self.mock_get_tasks([task])
 
-    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    vector = self._sla.get_domain_uptime_vector(self._cluster, self._min_count)
     assert 0 == len(vector.get_safe_hosts(50, 200)), 'Length must be empty.'
     self.expect_task_status_call_cluster_scoped()
 
 
   def test_probe_hosts_no_hosts(self):
     self.mock_get_tasks([])
-    vector = self._sla.get_domain_uptime_vector(self._cluster)
+    vector = self._sla.get_domain_uptime_vector(self._cluster, self._min_count)
     assert 0 == len(vector.probe_hosts(90, 200))
 
   def test_probe_hosts_no_tasks(self):
     self.mock_get_tasks([])
-    vector = self._sla.get_domain_uptime_vector(self._cluster, hosts=['h1', 'h2'])
+    vector = self._sla.get_domain_uptime_vector(self._cluster, self._min_count, hosts=['h1', 'h2'])
     assert 0 == len(vector.probe_hosts(90, 200))
 
   def test_probe_hosts_no_result(self):
@@ -306,6 +318,16 @@ class SlaTest(unittest.TestCase):
     ])
     vector = self._sla.get_domain_uptime_vector(self._cluster, ['h1', 'h2'])
     assert 0 == len(vector.probe_hosts(90, 200))
+
+  def test_probe_hosts_no_result_min_count_filtered(self):
+    self.mock_get_tasks([
+        self.create_task(100, 1, 'h3', 'j1'),
+        self.create_task(100, 1, 'h4', 'j1'),
+        self.create_task(100, 1, 'h5', 'j1'),
+        self.create_task(100, 1, 'h4', 'j2')
+    ])
+    vector = self._sla.get_domain_uptime_vector(self._cluster, 4, ['h1'])
+    assert 0 == len(vector.probe_hosts(50, 50))
 
   def test_probe_hosts_safe(self):
     self.mock_get_tasks([
@@ -365,7 +387,7 @@ class SlaTest(unittest.TestCase):
           AuroraJobKey(self._cluster.name, self._role, self._env, 'j4')
       ])
 
-      self._sla.get_domain_uptime_vector(self._cluster, hosts)
+      self._sla.get_domain_uptime_vector(self._cluster, self._min_count, hosts)
       mock_query.assert_has_calls([call(hosts=hosts), call(job_keys=jobs)], any_order=False)
 
   def test_task_query(self):

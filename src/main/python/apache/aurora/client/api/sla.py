@@ -150,16 +150,17 @@ class DomainUpTimeSlaVector(object):
       - host: Map of hostname -> job_key. Provides logical mapping between hosts and their jobs.
      Exposes an API for querying safe domain details.
   """
+  DEFAULT_MIN_INSTANCE_COUNT = 2
 
   JobUpTimeLimit = namedtuple('JobUpTimeLimit', ['job', 'percentage', 'duration_secs'])
   JobUpTimeDetails = namedtuple('JobUpTimeDetails',
       ['job', 'predicted_percentage', 'safe', 'safe_in_secs'])
 
-  def __init__(self, cluster, tasks, hosts=None):
+  def __init__(self, cluster, tasks, min_instance_count=DEFAULT_MIN_INSTANCE_COUNT, hosts=None):
     self._cluster = cluster
     self._tasks = tasks
     self._now = time.time()
-    self._tasks_by_job, self._jobs_by_host = self._init_mappings()
+    self._tasks_by_job, self._jobs_by_host = self._init_mappings(min_instance_count)
     self._host_filter = hosts
 
   def get_safe_hosts(self, percentage, duration, job_limits=None):
@@ -244,13 +245,18 @@ class DomainUpTimeSlaVector(object):
 
     return filtered_percentage, total_count, filtered_vector
 
-  def _init_mappings(self):
+  def _init_mappings(self, count):
     jobs = defaultdict(list)
-    hosts = defaultdict(list)
     for task in self._tasks:
       if task.assignedTask.task.production:
-        job_key = job_key_from_scheduled(task, self._cluster)
-        jobs[job_key].append(task)
+        jobs[job_key_from_scheduled(task, self._cluster)].append(task)
+
+    # Filter jobs by the min instance count.
+    jobs = defaultdict(list, ((job, tasks) for job, tasks in jobs.items() if len(tasks) >= count))
+
+    hosts = defaultdict(list)
+    for job_key, tasks in jobs.items():
+      for task in tasks:
         hosts[task.assignedTask.slaveHost].append(job_key)
 
     return jobs, hosts
@@ -270,16 +276,21 @@ class Sla(object):
     """
     return JobUpTimeSlaVector(self._get_tasks(task_query(job_key=job_key)))
 
-  def get_domain_uptime_vector(self, cluster, hosts=None):
+  def get_domain_uptime_vector(self, cluster, min_instance_count, hosts=None):
     """Returns a DomainUpTimeSlaVector object with all available job uptimes.
 
     Arguments:
     cluster -- Cluster to get vector for.
+    min_instance_count -- Minimum job instance count to consider for domain uptime calculations.
     hosts -- optional list of hostnames to query by.
     """
     tasks = self._get_tasks(task_query(hosts=hosts)) if hosts else None
     job_keys = set(job_key_from_scheduled(t, cluster) for t in tasks) if tasks else None
-    return DomainUpTimeSlaVector(cluster, self._get_tasks(task_query(job_keys=job_keys)), hosts)
+    return DomainUpTimeSlaVector(
+        cluster,
+        self._get_tasks(task_query(job_keys=job_keys)),
+        min_instance_count=min_instance_count,
+        hosts=hosts)
 
   def _get_tasks(self, task_query):
     resp = self._scheduler.getTasksStatus(task_query)

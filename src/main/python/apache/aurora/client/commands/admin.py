@@ -20,6 +20,7 @@ from __future__ import print_function
 """
 
 import json
+import optparse
 import os
 import pipes
 import sys
@@ -50,6 +51,15 @@ from gen.apache.aurora.api.ttypes import (
 from twitter.common import app, log
 from twitter.common.quantity import Amount, Data, Time
 from twitter.common.quantity.parse_simple import parse_data, parse_time
+
+
+MIN_SLA_INSTANCE_COUNT = optparse.Option(
+    '--min_job_instance_count',
+    dest='min_instance_count',
+    type=int,
+    default=10,
+    help='Min job instance count to consider for SLA purposes. Default 10.'
+)
 
 
 def print_results(results):
@@ -346,6 +356,7 @@ def scheduler_snapshot(cluster):
          'cluster-wide command line percentage and duration values.'
          'The file can have multiple lines in the following format:'
          '"cluster/role/env/job percentage duration". Example: cl/mesos/prod/labrat 95 2h')
+@app.command_option(MIN_SLA_INSTANCE_COUNT)
 @requires.exactly('cluster', 'percentage', 'duration')
 def sla_list_safe_domain(cluster, percentage, duration):
   """usage: sla_list_safe_domain
@@ -353,6 +364,7 @@ def sla_list_safe_domain(cluster, percentage, duration):
             [--include_hosts=filename]
             [--list_jobs]
             [--override_jobs=filename]
+            [--min_job_instance_count]
             cluster percentage duration
 
   Returns a list of relevant hosts where it would be safe to kill
@@ -396,7 +408,7 @@ def sla_list_safe_domain(cluster, percentage, duration):
 
   vector = AuroraClientAPI(
       CLUSTERS[cluster],
-      options.verbosity).sla_get_safe_domain_vector(include_hosts)
+      options.verbosity).sla_get_safe_domain_vector(options.min_instance_count, include_hosts)
   hosts = vector.get_safe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), override_jobs)
 
   results = []
@@ -416,11 +428,13 @@ def sla_list_safe_domain(cluster, percentage, duration):
 @app.command
 @app.command_option(FILENAME_OPTION)
 @app.command_option(HOSTS_OPTION)
+@app.command_option(MIN_SLA_INSTANCE_COUNT)
 @requires.exactly('cluster', 'percentage', 'duration')
 def sla_probe_hosts(cluster, percentage, duration):
   """usage: sla_probe_hosts
             [--filename=filename]
             [--hosts=hosts]
+            [--min_job_instance_count]
             cluster percentage duration
 
   Probes individual hosts with respect to their job SLA.
@@ -444,7 +458,9 @@ def sla_probe_hosts(cluster, percentage, duration):
   sla_duration = parse_time(duration)
   hosts = parse_hosts(options.filename, options.hosts)
 
-  vector = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).sla_get_safe_domain_vector(hosts)
+  vector = AuroraClientAPI(
+      CLUSTERS[cluster],
+      options.verbosity).sla_get_safe_domain_vector(options.min_instance_count, hosts)
   probed_hosts = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS))
 
   results = []

@@ -29,13 +29,17 @@ from twitter.common.contextutil import temporary_file
 from mock import Mock, patch
 
 
+MIN_INSTANCE_COUNT = 1
+
+
 class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
 
   @classmethod
   def setup_mock_options(cls, exclude=None, include=None, override=None,
                          exclude_list=None, include_list=None, list_jobs=False):
     mock_options = Mock(spec=['exclude_filename', 'exclude_hosts', 'include_filename',
-        'include_hosts', 'override_filename', 'list_jobs', 'verbosity', 'disable_all_hooks'])
+        'include_hosts', 'override_filename', 'list_jobs', 'verbosity', 'disable_all_hooks',
+        'min_instance_count'])
 
     mock_options.exclude_filename = exclude
     mock_options.exclude_hosts = exclude_list
@@ -45,6 +49,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
     mock_options.list_jobs = list_jobs
     mock_options.verbosity = False
     mock_options.disable_all_hooks = False
+    mock_options.min_instance_count = MIN_INSTANCE_COUNT
     return mock_options
 
   @classmethod
@@ -153,7 +158,8 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
 
         sla_list_safe_domain(['west', '50', '100s'])
 
-        mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with([hostname])
+        mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(
+            MIN_INSTANCE_COUNT, [hostname])
         mock_vector.get_safe_hosts.assert_called_once_with(50.0, 100.0, {})
         mock_print_results.assert_called_once_with([hostname])
 
@@ -177,7 +183,8 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
 
       sla_list_safe_domain(['west', '50', '100s'])
 
-      mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(hosts)
+      mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(
+          MIN_INSTANCE_COUNT, hosts)
       mock_vector.get_safe_hosts.assert_called_once_with(50.0, 100.0, {})
       mock_print_results.assert_called_once_with(hosts)
 
@@ -311,12 +318,13 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
         mock_api,
         mock_print_results,
         test_clusters,
-        mock_options):
+        options):
 
       mock_api.return_value.sla_get_safe_domain_vector.return_value = mock_vector
       sla_probe_hosts(['west', '90', '200s'])
 
-      mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(hosts)
+      mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(
+          mock_options.min_instance_count, hosts)
       mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0)
       mock_print_results.assert_called_once_with([
           'h0\twest/role/env/job0\t80.00\tTrue\t0',
@@ -339,12 +347,13 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
           mock_api,
           mock_print_results,
           test_clusters,
-          mock_options):
+          options):
 
         mock_api.return_value.sla_get_safe_domain_vector.return_value = mock_vector
         sla_probe_hosts(['west', '90', '200s'])
 
-        mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(['h0'])
+        mock_api.return_value.sla_get_safe_domain_vector.assert_called_once_with(
+          mock_options.min_instance_count, ['h0'])
         mock_vector.probe_hosts.assert_called_once_with(90.0, 200.0)
         mock_print_results.assert_called_once_with([
             'h0\twest/role/env/job0\t80.00\tFalse\tn/a'
