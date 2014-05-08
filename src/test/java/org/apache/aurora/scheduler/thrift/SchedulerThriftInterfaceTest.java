@@ -339,30 +339,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
     expectAuth(ROOT, false);
     expectAuth(ROLE, true);
-    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME)).times(2);
+    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME));
     scheduler.killTasks(query, USER);
-    storageUtil.expectTaskFetch(query);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
 
     control.replay();
 
     assertOkResponse(thrift.killTasks(query.get(), LOCK.newBuilder(), SESSION));
-  }
-
-  @Test
-  public void testKillTasksDelayed() throws Exception {
-    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-    IScheduledTask task = buildScheduledTask(JOB_NAME);
-    expectAuth(ROOT, false);
-    expectAuth(ROLE, true);
-    scheduler.killTasks(query, USER);
-    storageUtil.expectTaskFetch(query, task).times(2);
-    storageUtil.expectTaskFetch(query);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
-
-    control.replay();
-
-    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -401,7 +384,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAuth(ROOT, true);
     scheduler.killTasks(query, USER);
-    storageUtil.expectTaskFetch(query).times(2);
+    storageUtil.expectTaskFetch(query);
 
     control.replay();
 
@@ -426,7 +409,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROOT, true);
 
     scheduler.killTasks(query, USER);
-    storageUtil.expectTaskFetch(query).times(2);
+    storageUtil.expectTaskFetch(query);
 
     control.replay();
 
@@ -509,9 +492,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testMachineMaintenanceAccessDenied() throws Exception {
-    Hosts hosts = new Hosts()
-        .setHostNames(ImmutableSet.of("host1"));
-    Set<HostStatus> statuses = ImmutableSet.of();
+    Hosts hosts = new Hosts().setHostNames(ImmutableSet.of("host1"));
 
     expectAuth(ROOT, false).times(4);
     expectAuth(MACHINE_MAINTAINER, false).times(4);
@@ -1269,7 +1250,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME));
     scheduler.killTasks(query, USER);
-    storageUtil.expectTaskFetch(query.active());
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
 
     control.replay();

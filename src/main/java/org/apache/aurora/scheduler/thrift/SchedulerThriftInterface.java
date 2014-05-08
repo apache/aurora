@@ -44,13 +44,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.MorePreconditions;
-import com.twitter.common.base.Supplier;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Time;
-import com.twitter.common.util.BackoffHelper;
 
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
@@ -150,16 +144,6 @@ import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
-  @CmdLine(name = "kill_task_initial_backoff",
-      help = "Initial backoff delay while waiting for the tasks to transition to KILLED.")
-  private static final Arg<Amount<Long, Time>> KILL_TASK_INITIAL_BACKOFF =
-      Arg.create(Amount.of(1L, Time.SECONDS));
-
-  @CmdLine(name = "kill_task_max_backoff",
-      help = "Max backoff delay while waiting for the tasks to transition to KILLED.")
-  private static final Arg<Amount<Long, Time>> KILL_TASK_MAX_BACKOFF =
-      Arg.create(Amount.of(1L, Time.MINUTES));
-
   private static final Function<IScheduledTask, String> GET_ROLE = Functions.compose(
       new Function<ITaskConfig, String>() {
         @Override
@@ -179,8 +163,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final CronJobManager cronJobManager;
   private final CronPredictor cronPredictor;
   private final QuotaManager quotaManager;
-  private final Amount<Long, Time> killTaskInitialBackoff;
-  private final Amount<Long, Time> killTaskMaxBackoff;
 
   @Inject
   SchedulerThriftInterface(
@@ -204,9 +186,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         maintenance,
         cronJobManager,
         cronPredictor,
-        quotaManager,
-        KILL_TASK_INITIAL_BACKOFF.get(),
-        KILL_TASK_MAX_BACKOFF.get());
+        quotaManager);
   }
 
   @VisibleForTesting
@@ -220,9 +200,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       MaintenanceController maintenance,
       CronJobManager cronJobManager,
       CronPredictor cronPredictor,
-      QuotaManager quotaManager,
-      Amount<Long, Time> initialBackoff,
-      Amount<Long, Time> maxBackoff) {
+      QuotaManager quotaManager) {
 
     this.storage = checkNotNull(storage);
     this.schedulerCore = checkNotNull(schedulerCore);
@@ -234,8 +212,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.cronJobManager = checkNotNull(cronJobManager);
     this.cronPredictor = checkNotNull(cronPredictor);
     this.quotaManager = checkNotNull(quotaManager);
-    this.killTaskInitialBackoff = checkNotNull(initialBackoff);
-    this.killTaskMaxBackoff = checkNotNull(maxBackoff);
   }
 
   @Override
@@ -568,32 +544,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return response.setResponseCode(LOCK_ERROR).setMessage(e.getMessage());
     }
 
-    // TODO(William Farner): Move this into the client.
-    BackoffHelper backoff = new BackoffHelper(killTaskInitialBackoff, killTaskMaxBackoff, true);
-    final Query.Builder activeQuery = Query.arbitrary(query.setStatuses(Tasks.ACTIVE_STATES));
-    try {
-      backoff.doUntilSuccess(new Supplier<Boolean>() {
-        @Override
-        public Boolean get() {
-          Set<IScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, activeQuery);
-          if (tasks.isEmpty()) {
-            LOG.info("Tasks all killed, done waiting.");
-            return true;
-          } else {
-            LOG.info("Jobs not yet killed, waiting...");
-            return false;
-          }
-        }
-      });
-      response.setResponseCode(OK).setMessage("Tasks killed.");
-    } catch (InterruptedException e) {
-      LOG.warning("Interrupted while trying to kill tasks: " + e);
-      Thread.currentThread().interrupt();
-      response.setResponseCode(ERROR).setMessage("killTasks thread was interrupted.");
-    } catch (BackoffHelper.BackoffStoppedException e) {
-      response.setResponseCode(ERROR).setMessage("Tasks were not killed in time.");
-    }
-    return response;
+    return response.setResponseCode(OK);
   }
 
   @Override
