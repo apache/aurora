@@ -57,7 +57,7 @@ python_tests(
     pants('3rdparty/python:mock'),
     pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/client/cli'),
-    pants('src/main/python/apache/aurora/client/cli:client'),
+    pants('src/main/python/apache/aurora/client/cli:client_lib'),
     pants('src/test/python/apache/aurora/client/commands:util')
   ]
 )
