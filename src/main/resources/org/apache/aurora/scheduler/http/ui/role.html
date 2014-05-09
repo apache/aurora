@@ -10,7 +10,7 @@
       </div>
 
       <div>
-       <div class='container-fluid'>
+        <div class='container-fluid'>
           <h2 class='page-header text-center'>
             Jobs for role <em>{{role}}</em>
             <span ng-if='environment'> and environment <em>{{environment}}</em></span>
@@ -18,13 +18,7 @@
         </div>
 
         <div class='container-fluid'>
-         <div ng-if='!environment'>
-            <button class='btn summaryButton' ng-click='toggleResourceVisibility()'>
-              {{resourceButtonText}}
-            </button>
-          </div>
-
-          <div ng-show='showResources && !environment'>
+          <div ng-show='!environment'>
             <div class='row'>
               <div class='span8'>
                 <div ng-controller="QuotaController">
@@ -33,6 +27,7 @@
                   </div>
 
                   <div ng-hide='error'>
+                    <h4>Resource consumption</h4>
                     <smart-table config='resourcesTableConfig'
                                  columns='resourcesTableColumns'
                                  rows='resources'

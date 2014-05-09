@@ -77,16 +77,6 @@ auroraUIControllers.controller('JobSummaryController',
 
     $scope.error = '';
 
-    var showResourcesMsg = 'Show Resource Consumption';
-    var hideResourcesMsg = 'Hide Resource Consumption';
-    $scope.showResources = false;
-    $scope.resourceButtonText = showResourcesMsg;
-
-    $scope.toggleResourceVisibility = function () {
-      $scope.showResources = !$scope.showResources;
-      $scope.resourceButtonText = ($scope.showResources ? showResourcesMsg : hideResourcesMsg);
-    };
-
     $scope.jobsTableColumns = [
       {label: 'Job Type', map: 'jobType'},
       {label: 'Environment', map: 'environment', cellTemplateUrl: '/roleEnvLink.html'},
