@@ -6,6 +6,8 @@
   </span>
 
   <span ng-if='!dataRow.sandboxExists'>
-    {{formatedValue}}
+    <abbr title='This sandbox link is disabled because the sandbox disk space has been reclaimed.'>
+      {{formatedValue}}
+    </abbr>
   </span>
 </div>
