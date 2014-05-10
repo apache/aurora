@@ -178,6 +178,55 @@ class TestClientKillCommand(AuroraClientCommandTest):
       api.kill_job.assert_called_with(AuroraJobKey.from_path('west/bozo/test/hello'), instances)
       self.assert_scheduler_called(api, self.get_expected_task_query(instances), 2)
 
+  def test_kill_job_with_invalid_instances_strict(self):
+    """Test kill client-side API logic."""
+    mock_context = FakeAuroraCommandContext()
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      api = mock_context.get_api('west')
+      self.setup_get_tasks_status_calls(api.scheduler_proxy)
+      api.kill_job.return_value = self.get_kill_job_response()
+      mock_context.add_expected_status_query_result(self.create_status_call_result(
+          self.create_mock_task(ScheduleStatus.KILLED)))
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--no-batching', '--strict',
+            'west/bozo/test/hello/0,2,4-6,11-20'])
+
+      # Now check that the right API calls got made.
+      assert api.kill_job.call_count == 0
+
+
+  def test_kill_job_with_invalid_instances_nonstrict(self):
+    """Test kill client-side API logic."""
+    mock_context = FakeAuroraCommandContext()
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      api = mock_context.get_api('west')
+      self.setup_get_tasks_status_calls(api.scheduler_proxy)
+      api.kill_job.return_value = self.get_kill_job_response()
+      mock_context.add_expected_status_query_result(self.create_status_call_result(
+          self.create_mock_task(ScheduleStatus.KILLED)))
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--no-batching',
+            'west/bozo/test/hello/0,2,4-6,11-13'])
+
+      # Now check that the right API calls got made.
+      assert api.kill_job.call_count == 1
+      instances = [0, 2, 4, 5, 6, 11, 12, 13]
+      api.kill_job.assert_called_with(AuroraJobKey.from_path('west/bozo/test/hello'), instances)
+      self.assert_scheduler_called(api, self.get_expected_task_query(instances), 2)
+
+
   def test_kill_job_with_instances_batched(self):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()

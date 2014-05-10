@@ -261,6 +261,12 @@ SSH_USER_OPTION = CommandOption('--ssh-user', '-l', default=None,
     help='ssh as this username instead of the job\'s role')
 
 
+STRICT_OPTION = CommandOption('--strict', default=False, action='store_true',
+    help=("Check instances and generate an error for instance ranges in parameters "
+    "that are larger than the actual set of instances in the job"))
+
+
+
 TASK_INSTANCE_ARGUMENT = CommandOption('task_instance', type=parse_task_instance_key,
     help='A task instance specifier, in the form CLUSTER/ROLE/ENV/NAME/INSTANCE')
 
@@ -268,6 +274,3 @@ TASK_INSTANCE_ARGUMENT = CommandOption('task_instance', type=parse_task_instance
 WATCH_OPTION = CommandOption('--watch-secs', type=int, default=30,
     help='Minimum number of seconds a instance must remain in RUNNING state before considered a '
          'success.')
-
-
-

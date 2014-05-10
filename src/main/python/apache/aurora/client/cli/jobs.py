@@ -52,6 +52,7 @@ from apache.aurora.client.cli.options import (
     JSON_WRITE_OPTION,
     MAX_TOTAL_FAILURES_OPTION,
     NO_BATCHING_OPTION,
+    STRICT_OPTION,
     WATCH_OPTION,
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -335,7 +336,7 @@ class KillCommand(AbstractKillCommand):
     return "Kill instances in a scheduled job"
 
   def get_options(self):
-    return super(KillCommand, self).get_options() + [INSTANCES_SPEC_ARGUMENT]
+    return super(KillCommand, self).get_options() + [INSTANCES_SPEC_ARGUMENT, STRICT_OPTION]
 
   def execute(self, context):
     job = context.options.instance_spec.jobkey
@@ -344,6 +345,8 @@ class KillCommand(AbstractKillCommand):
       raise context.CommandError(EXIT_INVALID_PARAMETER,
           'The instances list cannot be omitted in a kill command!; '
           'use killall to kill all instances')
+    if context.options.strict:
+      context.verify_shards_option_validity(job, instances_arg)
     api = context.get_api(job.cluster)
     if context.options.no_batching:
       resp = api.kill_job(job, instances_arg)
@@ -446,6 +449,7 @@ class RestartCommand(Verb):
              help='Maximum number of seconds before a shard must move into the RUNNING state '
                  'before considered a failure.'),
         MAX_TOTAL_FAILURES_OPTION,
+        STRICT_OPTION,
         CommandOption('--rollback-on-failure', default=True, action='store_false',
             help='If false, prevent update from performing a rollback.'),
         INSTANCES_SPEC_ARGUMENT, CONFIG_ARGUMENT]
@@ -459,6 +463,8 @@ Restarts are fully controlled client-side, so aborting halts the restart."""
     job = context.options.instance_spec.jobkey
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
+    if instances != None and context.options.strict:
+      context.verify_shards_option_validity(job, instances)
     api = context.get_api(job.cluster)
     config = (context.get_job_config(job, context.options.config_file)
         if context.options.config_file else None)
@@ -571,7 +577,7 @@ class UpdateCommand(Verb):
 
   def get_options(self):
     return [FORCE_OPTION, BIND_OPTION, JSON_READ_OPTION, HEALTHCHECK_OPTION,
-        INSTANCES_SPEC_ARGUMENT, CONFIG_ARGUMENT]
+        INSTANCES_SPEC_ARGUMENT, STRICT_OPTION, CONFIG_ARGUMENT]
 
   @property
   def help(self):
@@ -618,6 +624,8 @@ to preview what changes will take effect.
     job = context.options.instance_spec.jobkey
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
+    if instances != None and context.options.strict:
+      context.verify_shards_option_validity(job, instances)
     config = context.get_job_config(job, context.options.config_file)
     api = context.get_api(config.cluster())
     if not context.options.force:

@@ -90,6 +90,30 @@ class TestRestartCommand(AuroraClientCommandTest):
         mock_scheduler_proxy.restartShards.assert_called_with(JobKey(environment=self.TEST_ENV,
             role=self.TEST_ROLE, name=self.TEST_JOB), [15, 16, 17, 18, 19], None)
 
+  def test_restart_invalid_shards(self):
+    # Test the client-side restart when a shard argument is too large, and it's
+    # using strict mode.
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_health_check = self.setup_health_checks(mock_api)
+    self.setup_mock_scheduler_for_simple_restart(mock_api)
+    with contextlib.nested(
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
+            return_value=mock_health_check),
+        patch('time.time', side_effect=functools.partial(self.fake_time, self)),
+        patch('time.sleep', return_value=None)
+    ):
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'restart', '--batch-size=5', '--strict', 'west/bozo/test/hello/0-100',
+            fp.name])
+
+        assert mock_scheduler_proxy.getTasksStatus.call_count == 1
+        assert mock_scheduler_proxy.restartShards.call_count == 0
+
   def test_restart_failed_status(self):
     # Test the client-side updater logic in its simplest case: everything succeeds, and no rolling
     # updates.
