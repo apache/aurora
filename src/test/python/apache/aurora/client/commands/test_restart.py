@@ -134,8 +134,6 @@ class TestRestartCommand(AuroraClientCommandTest):
             role=self.TEST_ROLE, name=self.TEST_JOB), [15, 16, 17, 18, 19], None)
 
   def test_restart_failed_status(self):
-    # Test the client-side updater logic in its simplest case: everything succeeds, and no rolling
-    # updates.
     mock_options = self.setup_mock_options()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)

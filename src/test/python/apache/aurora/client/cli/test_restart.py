@@ -115,8 +115,6 @@ class TestRestartCommand(AuroraClientCommandTest):
         assert mock_scheduler_proxy.restartShards.call_count == 0
 
   def test_restart_failed_status(self):
-    # Test the client-side updater logic in its simplest case: everything succeeds, and no rolling
-    # updates.
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
     self.setup_mock_scheduler_for_simple_restart(mock_api)
@@ -136,6 +134,39 @@ class TestRestartCommand(AuroraClientCommandTest):
         assert mock_scheduler_proxy.getTasksStatus.call_count == 1
         assert mock_scheduler_proxy.restartShards.call_count == 0
         assert result == EXIT_API_ERROR
+
+  def test_restart_no_such_job_with_instances(self):
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_health_check = self.setup_health_checks(mock_api)
+    self.setup_mock_scheduler_for_simple_restart(mock_api)
+    # Make getTasksStatus return an error, which is what happens when a job is not found.
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_error_response()
+    mock_logger = Mock()
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.print_aurora_log'),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
+            return_value=mock_health_check),
+        patch('time.time', side_effect=functools.partial(self.fake_time, self)),
+        patch('time.sleep', return_value=None)) as (mock_log, _, _, _, _, _):
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        result = cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello/1-3', fp.name])
+        # We need to check tat getTasksStatus was called, but that restartShards wasn't.
+        # In older versions of the client, if shards were specified, but the job didn't
+        # exist, the error wouldn't be detected unti0 restartShards was called, which generated
+        # the wrong error message.
+        assert mock_scheduler_proxy.getTasksStatus.call_count == 1
+        assert mock_scheduler_proxy.restartShards.call_count == 0
+        assert result == EXIT_API_ERROR
+        # Error message should be written to log, and it should be what was returned
+        # by the getTasksStatus call.
+        mock_log.assert_called_with(20, 'Error executing command: %s', 'Damn')
+
+
 
   def test_restart_failed_restart(self):
     # Test the client-side updater logic in its simplest case: everything succeeds, and no rolling

@@ -44,18 +44,18 @@ class Restarter(object):
         health_check_interval_seconds)
 
   def restart(self, instances):
+    # Verify that this operates on a valid job.
+    query = self._job_key.to_thrift_query()
+    query.statuses = ACTIVE_STATES
+    status = self._scheduler.getTasksStatus(query)
+    if status.responseCode != ResponseCode.OK:
+      return status
+
     failure_threshold = FailureThreshold(
         self._update_config.max_per_instance_failures,
         self._update_config.max_total_failures)
 
     if not instances:
-      query = self._job_key.to_thrift_query()
-      query.statuses = ACTIVE_STATES
-      status = self._scheduler.getTasksStatus(query)
-
-      if status.responseCode != ResponseCode.OK:
-        return status
-
       tasks = status.result.scheduleStatusResult.tasks
 
       instances = sorted(task.assignedTask.instanceId for task in tasks)

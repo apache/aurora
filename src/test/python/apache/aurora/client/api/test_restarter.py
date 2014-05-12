@@ -66,6 +66,7 @@ class TestRestarter(MoxTestBase):
     self.mock_instance_watcher.watch(instances).AndReturn([])
 
   def test_restart_one_iteration(self):
+    self.mock_status_active_tasks([0, 1, 3, 4, 5])
     self.mock_restart_instances([0, 1])
 
     self.mox.ReplayAll()
@@ -78,6 +79,7 @@ class TestRestarter(MoxTestBase):
     self.mock_restart_instances([5])
 
   def test_rolling_restart(self):
+    self.mock_status_active_tasks([0, 1, 3, 4, 5])
     self.mock_three_iterations()
 
     self.mox.ReplayAll()
