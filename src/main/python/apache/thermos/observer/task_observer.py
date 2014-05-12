@@ -442,6 +442,7 @@ class TaskObserver(ExceptionalThread, Lockable):
       {
         process_name: string
         process_run: int
+        (optional) return_code: int
         state: string [WAITING, FORKED, RUNNING, SUCCESS, KILLED, FAILED, LOST]
         (optional) start_time: seconds from epoch
         (optional) stop_time: seconds from epoch
@@ -463,6 +464,8 @@ class TaskObserver(ExceptionalThread, Lockable):
         d.update(start_time=process_run.start_time)
       if process_run.stop_time:
         d.update(stop_time=process_run.stop_time)
+      if process_run.return_code:
+        d.update(return_code=process_run.return_code)
       return d
 
   @Lockable.sync

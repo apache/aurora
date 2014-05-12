@@ -104,14 +104,15 @@
      <table class="table table-bordered table-condensed table-striped" style="empty-cells:show;">
      <thead>
        <tr>
-         <th colspan=3> process </th>
+         <th colspan=4> process </th>
          <th colspan=2> time </th>
          <th colspan=2> used </th>
          <th colspan=2> logs </th>
        </tr>
 
        <tr>
-         <th> name </th> <th> run </th> <th> status </th> <th> started </th> <th> finished </th>
+         <th> name </th> <th> run </th> <th> status </th> <th> return code </th>
+         <th> started </th> <th> finished </th>
          <th> cpu </th> <th> ram </th>
          <th> stdout </th> <th> stderr </th>
        </tr>
@@ -123,6 +124,7 @@
          <td> <a href="/process/${task_id}/${proc["process_name"]}">${proc["process_name"]}</a> </td>
          <td> ${proc["process_run"]} </td>
          <td> ${proc["state"]} </td>
+         <td> ${proc["return_code"] if "return_code" in proc else ""} </td>
          <td> ${pretty_time(proc["start_time"]) if "start_time" in proc else ""} </td>
          <td> ${pretty_time(proc["stop_time"]) if "stop_time" in proc else ""} </td>
          <td> ${'%.3f' % proc["used"]["cpu"] if "used" in proc else ""} </td>

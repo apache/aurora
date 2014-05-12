@@ -126,13 +126,6 @@ class BottleObserver(HttpServer, StaticAssets, TaskObserverFileBrowser, TaskObse
     all_processes[current_run_number] = current_run
     for run in range(current_run_number):
       all_processes[run] = self._observer.process(task_id, process_id, run)
-    def convert_process_tuple(run_tuple):
-      process_tuple = dict(state = run_tuple['state'])
-      if 'start_time' in run_tuple:
-        process_tuple.update(start_time = run_tuple['start_time'])
-      if 'stop_time' in run_tuple:
-        process_tuple.update(stop_time = run_tuple['stop_time'])
-      return process_tuple
 
     template = {
       'task_id': task_id,
@@ -143,7 +136,6 @@ class BottleObserver(HttpServer, StaticAssets, TaskObserverFileBrowser, TaskObse
       },
     }
     template['process'].update(**all_processes[current_run_number].get('used', {}))
-    template['runs'] = dict((run, convert_process_tuple(run_tuple))
-        for run, run_tuple in all_processes.items())
-    log.info('Rendering template is: %s' % template)
+    template['runs'] = all_processes
+    log.debug('Rendering template is: %s' % template)
     return template
