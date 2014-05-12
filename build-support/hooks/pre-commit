@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+#
+# Copyright 2014 Apache Software Foundation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -e
+
+if [ $SKIP_AURORA_HOOKS ]; then
+  echo "Skipping hooks."
+  exit 0
+fi
+
+HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+
+echo "Performing Python import order check."
+if ! $HERE/../../build-support/isort-check >&/dev/null; then
+  echo ""
+  echo ""
+  echo "** PYTHON IMPORT ORDER CHECK FAILED"
+  echo "*"
+  echo "* please run: build-support/isort-run"
+  echo "*"
+  echo "**"
+  echo ""
+  exit 1
+else
+  echo "SUCCESS"
+fi
+
