@@ -130,3 +130,26 @@ class DistributedCommandRunner(object):
     threadpool = ThreadPool(processes=parallelism)
     for result in threadpool.imap_unordered(self.execute, self.process_arguments(command, **kw)):
       print result
+
+class InstanceDistributedCommandRunner(DistributedCommandRunner):
+  """A distributed command runner that only runs on specified instances of a job."""
+
+  @classmethod
+  def query_from(cls, role, env, job, instances=None):
+    return TaskQuery(statuses=LIVE_STATES, owner=Identity(role), jobName=job, environment=env, instanceIds=instances)
+
+  def __init__(self, cluster, role, env, job, ssh_user=None, instances=None):
+    super(InstanceDistributedCommandRunner, self).__init__(cluster, role, env, [job], ssh_user)
+    self._job = job
+    self._ssh_user = ssh_user if ssh_user else self._role
+    self.instances = instances
+
+  def resolve(self):
+    resp = self._api.query(self.query_from(self._role, self._env, self._job, self.instances))
+    if resp.responseCode == ResponseCode.OK:
+      for task in resp.result.scheduleStatusResult.tasks:
+        yield task
+    else:
+      print_aurora_log(logging.ERROR,
+          "Error: could not retrieve task information for run command: %s" % resp.message)
+      raise ValueError("Could not retrieve task information: %s" % resp.message)

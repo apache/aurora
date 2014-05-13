@@ -103,7 +103,7 @@ def parse_qualified_role(rolestr):
   return role_parts
 
 
-ALL_INSTANCES = 'all'
+ALL_INSTANCES = None
 
 
 def parse_instances(instances):

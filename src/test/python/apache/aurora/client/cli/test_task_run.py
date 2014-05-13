@@ -88,6 +88,20 @@ class TestRunCommand(AuroraClientCommandTest):
 
   def test_successful_run(self):
     """Test the run command."""
+    self.generic_test_successful_run(['task', 'run', 'west/bozo/test/hello', 'ls'], None)
+
+  def test_successful_run_with_instances(self):
+    """Test the run command."""
+    self.generic_test_successful_run(['task', 'run', 'west/bozo/test/hello/1-3', 'ls'], [1, 2, 3])
+
+  def generic_test_successful_run(self, cmd_args, instances):
+    """Common structure of all successful run tests.
+    Params:
+      cmd_args: the arguments to pass to the aurora command line to run this test.
+      instances: the list of instances that should be passed to a status query.
+         (The status query is the only visible difference between a sharded
+         run, and an all-instances run in the test.)
+    """
     # Calls api.check_status, which calls scheduler_proxy.getJobs
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
@@ -96,7 +110,7 @@ class TestRunCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.cli.task.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
+        patch('apache.aurora.client.api.command_runner.InstanceDistributedCommandRunner.sandbox_args',
             return_value=sandbox_args),
         patch('subprocess.Popen', return_value=self.create_mock_process())) as (
             mock_scheduler_proxy_class,
@@ -105,13 +119,15 @@ class TestRunCommand(AuroraClientCommandTest):
             mock_runner_args_patch,
             mock_subprocess):
       cmd = AuroraCommandLine()
-      cmd.execute(['task', 'run', 'west/bozo/test/hello', 'ls'])
+      cmd.execute(cmd_args)
       # The status command sends a getTasksStatus query to the scheduler,
-      # and then prints the result.
+      # and then prints the result. The use of shards, above, should change
+      # this query - that's the focus of the instances test.
       mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='bozo'),
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
-              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING])))
+              ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING]),
+          instanceIds=instances))
 
       # The mock status call returns 3 three ScheduledTasks, so three commands should have been run
       assert mock_subprocess.call_count == 3
@@ -119,7 +135,6 @@ class TestRunCommand(AuroraClientCommandTest):
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'],
           stderr=-2, stdout=-1)
-
 
 class TestSshCommand(AuroraClientCommandTest):
   @classmethod

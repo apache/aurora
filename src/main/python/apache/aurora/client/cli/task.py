@@ -31,7 +31,7 @@ from pystachio.config import Config
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
 
-from apache.aurora.client.api.command_runner import DistributedCommandRunner
+from apache.aurora.client.api.command_runner import DistributedCommandRunner, InstanceDistributedCommandRunner
 from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
@@ -51,6 +51,7 @@ from apache.aurora.client.cli.options import (
     EXECUTOR_SANDBOX_OPTION,
     FORCE_OPTION,
     HEALTHCHECK_OPTION,
+    INSTANCES_SPEC_ARGUMENT,
     JOBSPEC_ARGUMENT,
     JSON_READ_OPTION,
     JSON_WRITE_OPTION,
@@ -74,7 +75,7 @@ class RunCommand(Verb):
   def help(self):
     return """Usage: aurora task run cluster/role/env/job cmd
 
-  Runs a shell command on all machines currently hosting instances of a single job.
+  Runs a shell command on machines currently hosting instances of a single job.
 
   This feature supports the same command line wildcards that are used to
   populate a job's commands.
@@ -88,15 +89,15 @@ class RunCommand(Verb):
             help='Number of threads to use'),
         SSH_USER_OPTION,
         EXECUTOR_SANDBOX_OPTION,
-        JOBSPEC_ARGUMENT,
+        INSTANCES_SPEC_ARGUMENT,
         CommandOption('cmd', type=str)
     ]
 
   def execute(self, context):
     # TODO(mchucarroll): add options to specify which instances to run on (AURORA-198)
-    cluster_name, role, env, name = context.options.jobspec
+    (cluster_name, role, env, name), instances = context.options.instance_spec
     cluster = CLUSTERS[cluster_name]
-    dcr = DistributedCommandRunner(cluster, role, env, [name], context.options.ssh_user)
+    dcr = InstanceDistributedCommandRunner(cluster, role, env, name, context.options.ssh_user, instances)
     dcr.run(context.options.cmd, parallelism=context.options.num_threads,
         executor_sandbox=context.options.executor_sandbox)
 
