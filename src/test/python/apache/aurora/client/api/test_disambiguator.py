@@ -16,23 +16,16 @@
 
 import functools
 
+import mox
+import pytest
+
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.disambiguator import LiveJobDisambiguator
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 
 from gen.apache.aurora.api.constants import ResponseCode
-from gen.apache.aurora.api.ttypes import (
-   Response,
-   Result,
-   GetJobsResult,
-   JobConfiguration,
-   JobKey,
-)
-
-import mox
-import pytest
-
+from gen.apache.aurora.api.ttypes import GetJobsResult, JobConfiguration, JobKey, Response, Result
 
 TEST_CLUSTER = Cluster(name = 'smf1')
 

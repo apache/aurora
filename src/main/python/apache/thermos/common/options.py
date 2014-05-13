@@ -16,6 +16,7 @@
 
 from pystachio import Ref
 
+
 class ParseError(Exception):
   pass
 

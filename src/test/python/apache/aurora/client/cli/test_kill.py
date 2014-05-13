@@ -17,6 +17,7 @@
 import contextlib
 import unittest
 
+from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import EXIT_TIMEOUT
@@ -25,19 +26,16 @@ from apache.aurora.client.cli.options import parse_instances
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
-from twitter.common.contextutil import temporary_file
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
+    ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
-    ScheduledTask,
     TaskEvent,
-    TaskQuery,
+    TaskQuery
 )
-
-from mock import Mock, patch
 
 
 class TestInstancesParser(unittest.TestCase):

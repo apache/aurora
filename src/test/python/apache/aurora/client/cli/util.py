@@ -16,24 +16,24 @@
 
 import unittest
 
-from gen.apache.aurora.api.ttypes import (
-    AssignedTask,
-    Response,
-    ResponseCode,
-    Result,
-    ScheduleStatus,
-    ScheduleStatusResult,
-    ScheduledTask,
-    TaskConfig,
-    TaskEvent,
-)
+from mock import Mock
 
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
 
-from mock import Mock
+from gen.apache.aurora.api.ttypes import (
+    AssignedTask,
+    Response,
+    ResponseCode,
+    Result,
+    ScheduledTask,
+    ScheduleStatus,
+    ScheduleStatusResult,
+    TaskConfig,
+    TaskEvent
+)
 
 
 class FakeAuroraCommandContext(AuroraCommandContext):

@@ -14,14 +14,10 @@
 # limitations under the License.
 #
 
-from apache.aurora.common.cluster import Cluster
-
-from pystachio import (
-    Default,
-    Integer,
-    Required,
-    String)
 import pytest
+from pystachio import Default, Integer, Required, String
+
+from apache.aurora.common.cluster import Cluster
 
 
 def test_simple():

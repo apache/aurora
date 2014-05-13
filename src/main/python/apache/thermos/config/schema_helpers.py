@@ -17,17 +17,10 @@
 """Helpers for composing Thermos workflows."""
 import itertools
 
-from .schema_base import (
-   Constraint,
-   GB,
-   Process,
-   Resources,
-   Task,
-)
-
 from pystachio import Empty, List
 from twitter.common.lang import Compatibility
 
+from .schema_base import Constraint, GB, Process, Resources, Task
 
 __all__ = (
   # shorthand for process ordering constraint

@@ -69,4 +69,3 @@ class TaskObserverJSONBindings(object):
     if task_ids:
       task_ids = urllib.unquote(task_ids).split(',')
     return self._observer.processes(task_ids)
-

@@ -22,22 +22,16 @@ import sys
 import tempfile
 import time
 
-from apache.aurora.config.schema.base import (
-    MB,
-    MesosTaskInstance,
-    Process,
-    Resources,
-    Task,
-)
+from twitter.common import log
+from twitter.common.contextutil import temporary_dir
+from twitter.common.dirutil import safe_rmtree
+from twitter.common.log.options import LogOptions
+from twitter.common.quantity import Amount, Time
+
+from apache.aurora.config.schema.base import MB, MesosTaskInstance, Process, Resources, Task
 from apache.aurora.executor.common.sandbox import DirectorySandbox
 from apache.aurora.executor.common.status_checker import ExitState
 from apache.aurora.executor.thermos_task_runner import ThermosTaskRunner
-from twitter.common import log
-from twitter.common.log.options import LogOptions
-from twitter.common.dirutil import safe_rmtree
-from twitter.common.quantity import Amount, Time
-from twitter.common.contextutil import temporary_dir
-
 
 TASK = MesosTaskInstance(
     instance=0,

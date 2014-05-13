@@ -19,17 +19,17 @@
 
 from __future__ import print_function
 
-from abc import abstractmethod
-from fnmatch import fnmatch
 import getpass
 import logging
 import os
 import sys
-
-from apache.aurora.client.cli.options import CommandOption
+from abc import abstractmethod
+from fnmatch import fnmatch
 
 import requests
 from twitter.common.lang import Compatibility
+
+from apache.aurora.client.cli.options import CommandOption
 
 # Ugly workaround to avoid cyclic dependency.
 EXIT_PERMISSION_VIOLATION = 8

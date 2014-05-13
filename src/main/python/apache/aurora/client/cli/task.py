@@ -18,13 +18,18 @@
 """
 
 from __future__ import print_function
-from datetime import datetime
+
 import json
 import os
 import pprint
 import subprocess
 import sys
 import time
+from datetime import datetime
+
+from pystachio.config import Config
+from thrift.protocol import TJSONProtocol
+from thrift.TSerialization import serialize
 
 from apache.aurora.client.api.command_runner import DistributedCommandRunner
 from apache.aurora.client.api.updater_util import UpdaterConfig
@@ -34,7 +39,7 @@ from apache.aurora.client.cli import (
     EXIT_INVALID_PARAMETER,
     EXIT_OK,
     Noun,
-    Verb,
+    Verb
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
@@ -51,22 +56,13 @@ from apache.aurora.client.cli.options import (
     JSON_WRITE_OPTION,
     SSH_USER_OPTION,
     TASK_INSTANCE_ARGUMENT,
-    WATCH_OPTION,
+    WATCH_OPTION
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME
-from gen.apache.aurora.api.ttypes import (
-    ExecutorConfig,
-    ResponseCode,
-    ScheduleStatus,
-)
-
-from pystachio.config import Config
-from thrift.TSerialization import serialize
-from thrift.protocol import TJSONProtocol
-
+from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
 
 
 class RunCommand(Verb):

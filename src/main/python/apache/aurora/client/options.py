@@ -19,7 +19,6 @@ import optparse
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.thermos.common.options import add_binding_to
 
-
 __all__ = (
   'BATCH_OPTION',
   'CLUSTER_CONFIG_OPTION',

@@ -14,27 +14,22 @@
 # limitations under the License.
 #
 
-from contextlib import closing
 import errno
 import os
 import signal
 import time
-
-from apache.thermos.common.ckpt import CheckpointDispatcher
-from apache.thermos.common.path import TaskPath
-
-from gen.apache.thermos.ttypes import (
-  ProcessState,
-  ProcessStatus,
-  RunnerCkpt,
-  TaskState,
-  TaskStatus)
+from contextlib import closing
 
 import psutil
 from twitter.common import log
 from twitter.common.dirutil import lock_file, safe_mkdir
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordWriter
+
+from apache.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.common.path import TaskPath
+
+from gen.apache.thermos.ttypes import ProcessState, ProcessStatus, RunnerCkpt, TaskState, TaskStatus
 
 
 class TaskKiller(object):

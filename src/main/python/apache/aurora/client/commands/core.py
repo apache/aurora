@@ -20,26 +20,30 @@
 from __future__ import print_function
 
 import collections
-from datetime import datetime
 import json
 import os
 import pprint
 import subprocess
 import sys
 import time
+from datetime import datetime
 from tempfile import NamedTemporaryFile
 
+from twitter.common import app, log
+from twitter.common.python.pex import PexInfo
+
+from apache.aurora.client.api.disambiguator import LiveJobDisambiguator
+from apache.aurora.client.api.job_monitor import JobMonitor
+from apache.aurora.client.api.quota_check import print_quota
+from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.base import (
     check_and_log_response,
     deprecation_warning,
     die,
     handle_open,
     requires,
-    synthesize_url)
-from apache.aurora.client.api.disambiguator import LiveJobDisambiguator
-from apache.aurora.client.api.job_monitor import JobMonitor
-from apache.aurora.client.api.quota_check import print_quota
-from apache.aurora.client.api.updater_util import UpdaterConfig
+    synthesize_url
+)
 from apache.aurora.client.config import get_config, GlobalHookRegistry
 from apache.aurora.client.factory import make_client, make_client_factory
 from apache.aurora.client.options import (
@@ -56,14 +60,12 @@ from apache.aurora.client.options import (
     MAX_FAILURES_OPTION,
     OPEN_BROWSER_OPTION,
     SHARDS_OPTION,
-    WAIT_UNTIL_OPTION)
+    WAIT_UNTIL_OPTION
+)
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.api.constants import ACTIVE_STATES, CURRENT_API_VERSION, AURORA_EXECUTOR_NAME
+from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME, CURRENT_API_VERSION
 from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
-
-from twitter.common import app, log
-from twitter.common.python.pex import PexInfo
 
 
 def get_job_config(job_spec, config_file, options):

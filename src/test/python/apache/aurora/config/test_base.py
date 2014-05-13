@@ -15,7 +15,6 @@
 #
 
 import pytest
-
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.config import AuroraConfig, PortResolver
@@ -26,11 +25,10 @@ from apache.aurora.config.schema.base import (
     Job,
     Process,
     Resources,
-    Task,
+    Task
 )
 
 from gen.apache.aurora.api.ttypes import Identity
-
 
 resolve = PortResolver.resolve
 

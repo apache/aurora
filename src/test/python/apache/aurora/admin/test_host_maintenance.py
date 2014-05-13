@@ -16,18 +16,13 @@
 
 import unittest
 
-from apache.aurora.admin.host_maintenance import HostMaintenance
-from apache.aurora.common.cluster import Cluster
-
-from gen.apache.aurora.api.ttypes import (
-    Hosts,
-    Response,
-    ResponseCode,
-)
-
 import mock
 import pytest
 
+from apache.aurora.admin.host_maintenance import HostMaintenance
+from apache.aurora.common.cluster import Cluster
+
+from gen.apache.aurora.api.ttypes import Hosts, Response, ResponseCode
 
 DEFAULT_CLUSTER = Cluster(
     name='us-west',

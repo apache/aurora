@@ -14,10 +14,9 @@
 # limitations under the License.
 #
 
-from abc import abstractmethod, abstractproperty
-
 import getpass
 import time
+from abc import abstractmethod, abstractproperty
 
 from twitter.common.lang import Interface
 

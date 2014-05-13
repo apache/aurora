@@ -26,25 +26,6 @@ import os
 import threading
 import time
 
-from apache.thermos.common.ckpt import CheckpointDispatcher
-from apache.thermos.common.path import TaskPath
-from apache.thermos.core.inspector import CheckpointInspector
-from apache.thermos.core.helper import TaskKiller
-from apache.thermos.monitoring.detector import TaskDetector
-from apache.thermos.monitoring.garbage import TaskGarbageCollector
-
-from gen.apache.aurora.api.constants import TERMINAL_STATES
-from gen.apache.aurora.api.ttypes import ScheduleStatus
-from gen.apache.aurora.comm.ttypes import (
-    AdjustRetainedTasks,
-    DeletedTasks,
-    SchedulerMessage)
-from gen.apache.thermos.ttypes import TaskState
-
-from .common.sandbox import DirectorySandbox, SandboxInterface
-from .executor_base import ExecutorBase
-from .executor_detector import ExecutorDetector
-
 import mesos_pb2 as mesos_pb
 import psutil
 from thrift.TSerialization import deserialize as thrift_deserialize
@@ -55,6 +36,21 @@ from twitter.common.metrics import Observable
 from twitter.common.metrics.gauge import AtomicGauge
 from twitter.common.quantity import Amount, Time
 
+from apache.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.common.path import TaskPath
+from apache.thermos.core.helper import TaskKiller
+from apache.thermos.core.inspector import CheckpointInspector
+from apache.thermos.monitoring.detector import TaskDetector
+from apache.thermos.monitoring.garbage import TaskGarbageCollector
+
+from .common.sandbox import DirectorySandbox, SandboxInterface
+from .executor_base import ExecutorBase
+from .executor_detector import ExecutorDetector
+
+from gen.apache.aurora.api.constants import TERMINAL_STATES
+from gen.apache.aurora.api.ttypes import ScheduleStatus
+from gen.apache.aurora.comm.ttypes import AdjustRetainedTasks, DeletedTasks, SchedulerMessage
+from gen.apache.thermos.ttypes import TaskState
 
 THERMOS_TO_TWITTER_STATES = {
     TaskState.ACTIVE: ScheduleStatus.RUNNING,

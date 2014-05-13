@@ -14,13 +14,15 @@
 # limitations under the License.
 #
 
-import os
 import grp
+import os
 import pwd
 import random
 import threading
 import time
 
+import mock
+import pytest
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.recordio import ThriftRecordReader
@@ -29,9 +31,6 @@ from apache.thermos.common.path import TaskPath
 from apache.thermos.core.process import Process
 
 from gen.apache.thermos.ttypes import RunnerCkpt
-
-import mock
-import pytest
 
 
 class TestProcess(Process):

@@ -17,13 +17,15 @@
 import contextlib
 import unittest
 
-from apache.aurora.common.cluster import Cluster
-from apache.aurora.common.clusters import Clusters
+from mock import Mock, patch
+from twitter.common.contextutil import temporary_file
+
 from apache.aurora.client.commands.core import kill, killall
+from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
-from twitter.common.contextutil import temporary_file
-from apache.aurora.client.commands.util import AuroraClientCommandTest
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import Clusters
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -33,13 +35,10 @@ from gen.apache.aurora.api.ttypes import (
     Result,
     ScheduledTask,
     ScheduleStatus,
-    ScheduledTask,
     ScheduleStatusResult,
     TaskEvent,
-    TaskQuery,
+    TaskQuery
 )
-
-from mock import Mock, patch
 
 
 class TestClientKillCommand(AuroraClientCommandTest):

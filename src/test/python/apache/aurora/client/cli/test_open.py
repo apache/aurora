@@ -16,10 +16,12 @@
 
 import contextlib
 
-from apache.aurora.client.cli import EXIT_OK, EXIT_INVALID_PARAMETER
+from mock import Mock, patch
+
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
-from mock import Mock, patch
+
 
 class TestClientOpenCommand(AuroraClientCommandTest):
 
@@ -61,5 +63,3 @@ class TestClientOpenCommand(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       self.assertRaises(SystemExit, cmd.execute, (['job', 'open']))
       assert mock_context.showed_urls == []
-
-

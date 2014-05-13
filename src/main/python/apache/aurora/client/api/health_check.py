@@ -16,10 +16,10 @@
 
 from abc import abstractmethod
 
-from gen.apache.aurora.api.ttypes import ScheduleStatus
-
 from twitter.common import log
 from twitter.common.lang import Interface
+
+from gen.apache.aurora.api.ttypes import ScheduleStatus
 
 
 class HealthCheck(Interface):

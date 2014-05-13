@@ -14,18 +14,18 @@
 # limitations under the License.
 #
 
-from apache.aurora.client.api.restarter import Restarter
+from mox import IgnoreArg, MoxTestBase
+
 from apache.aurora.client.api.instance_watcher import InstanceWatcher
+from apache.aurora.client.api.restarter import Restarter
 from apache.aurora.client.api.updater_util import UpdaterConfig
+from apache.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
 from gen.apache.aurora.api.ttypes import *
 
-from mox import IgnoreArg, MoxTestBase
-
 # test space
-from apache.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
 
 
 SESSION_KEY = 'test_session'

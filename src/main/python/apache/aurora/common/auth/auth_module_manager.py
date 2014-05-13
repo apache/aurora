@@ -16,10 +16,9 @@
 
 from twitter.common import log
 
-from gen.apache.aurora.api.ttypes import SessionKey
-
 from .auth_module import AuthModule, InsecureAuthModule
 
+from gen.apache.aurora.api.ttypes import SessionKey
 
 _INSECURE_AUTH_MODULE = InsecureAuthModule()
 _AUTH_MODULES = {

@@ -15,10 +15,7 @@
 #
 
 from copy import copy
-from optparse import (
-    NO_DEFAULT,
-    OptionValueError,
-    Option)
+from optparse import NO_DEFAULT, Option, OptionValueError
 
 
 def _check_mesos_cluster(option, opt, value):

@@ -14,12 +14,11 @@
 # limitations under the License.
 #
 
-from apache.aurora.config.loader import AuroraConfigLoader
+import code
 
 from twitter.common.lang import Compatibility
 
+from apache.aurora.config.loader import AuroraConfigLoader
 
-
-import code
 code.interact('Mesos Config REPL', 
     local=Compatibility.exec_function(AuroraConfigLoader.DEFAULT_SCHEMA, globals()))

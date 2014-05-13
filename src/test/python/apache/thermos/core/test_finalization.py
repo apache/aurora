@@ -14,12 +14,9 @@
 # limitations under the License.
 #
 
-from apache.thermos.config.schema import (
-  Constraint,
-  Process,
-  Task
-)
+from apache.thermos.config.schema import Constraint, Process, Task
 from apache.thermos.testing.runner import RunnerTestBase
+
 from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 

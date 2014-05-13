@@ -15,26 +15,27 @@
 #
 
 from __future__ import print_function
-from collections import namedtuple
-from fnmatch import fnmatch
+
 import logging
 import sys
+from collections import namedtuple
+from fnmatch import fnmatch
 
-from apache.aurora.common.clusters import CLUSTERS
-from apache.aurora.common.aurora_job_key import AuroraJobKey
+from twitter.common import log
+
 from apache.aurora.client.base import synthesize_url
 from apache.aurora.client.cli import (
     Context,
     EXIT_API_ERROR,
     EXIT_INVALID_CONFIGURATION,
-    EXIT_INVALID_PARAMETER,
+    EXIT_INVALID_PARAMETER
 )
 from apache.aurora.client.config import get_config
 from apache.aurora.client.factory import make_client
+from apache.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.common.clusters import CLUSTERS
 
 from gen.apache.aurora.api.ttypes import ResponseCode
-
-from twitter.common import log
 
 # Utility type, representing job keys with wildcards.
 PartialJobKey = namedtuple('PartialJobKey', ['cluster', 'role', 'env', 'name'])

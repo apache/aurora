@@ -17,9 +17,10 @@
 import itertools
 import os
 
-from apache.aurora.executor.executor_detector import ExecutorDetector
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_mkdir
+
+from apache.aurora.executor.executor_detector import ExecutorDetector
 
 
 class Match(object):

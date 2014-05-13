@@ -17,19 +17,18 @@
 import inspect
 import unittest
 
-from apache.aurora.common.cluster import Cluster
-import apache.aurora.client.api.scheduler_client as scheduler_client
+from mox import IgnoreArg, IsA, Mox
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset.endpoint import ServiceInstance
 
+import apache.aurora.client.api.scheduler_client as scheduler_client
+from apache.aurora.common.cluster import Cluster
+
 import gen.apache.aurora.api.AuroraAdmin as AuroraAdmin
 import gen.apache.aurora.api.AuroraSchedulerManager as AuroraSchedulerManager
-from gen.apache.aurora.api.constants import DEFAULT_ENVIRONMENT, CURRENT_API_VERSION
+from gen.apache.aurora.api.constants import CURRENT_API_VERSION, DEFAULT_ENVIRONMENT
 from gen.apache.aurora.api.ttypes import *
-
-from mox import IgnoreArg, IsA, Mox
-
 
 ROLE = 'foorole'
 JOB_NAME = 'barjobname'

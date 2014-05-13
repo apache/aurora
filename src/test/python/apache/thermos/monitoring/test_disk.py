@@ -16,16 +16,15 @@
 
 import atexit
 import os
-from tempfile import mkstemp
-import time
 import sys
-
-from twitter.common.quantity import Amount, Data, Time
-from twitter.common.dirutil import safe_mkdtemp
-from apache.thermos.monitoring.disk import DiskCollector
-from apache.thermos.monitoring.disk import InotifyDiskCollector
+import time
+from tempfile import mkstemp
 
 import pytest
+from twitter.common.dirutil import safe_mkdtemp
+from twitter.common.quantity import Amount, Data, Time
+
+from apache.thermos.monitoring.disk import DiskCollector, InotifyDiskCollector
 
 TEST_AMOUNT_1 = Amount(100, Data.MB)
 TEST_AMOUNT_2 = Amount(10, Data.MB)

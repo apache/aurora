@@ -16,9 +16,10 @@
 
 import random
 
-from apache.thermos.config.schema import Task, Process
+from apache.thermos.config.schema import Process, Task
 from apache.thermos.testing.runner import Runner
-from gen.apache.thermos.ttypes import TaskState, ProcessState
+
+from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 
 def flaky_task():

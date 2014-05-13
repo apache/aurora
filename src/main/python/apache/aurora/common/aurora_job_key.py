@@ -16,10 +16,10 @@
 
 import re
 
+from twitter.common.lang import Compatibility, total_ordering
+
 from gen.apache.aurora.api.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
 from gen.apache.aurora.api.ttypes import Identity, JobKey, TaskQuery
-
-from twitter.common.lang import Compatibility, total_ordering
 
 
 # TODO(ksweeney): This can just probably just extend namedtuple.

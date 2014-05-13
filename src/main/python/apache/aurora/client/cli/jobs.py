@@ -15,15 +15,20 @@
 #
 
 from __future__ import print_function
-from datetime import datetime
-import logging
+
 import json
+import logging
 import os
 import pprint
 import subprocess
 import sys
-from tempfile import NamedTemporaryFile
 import time
+from datetime import datetime
+from tempfile import NamedTemporaryFile
+
+from pystachio.config import Config
+from thrift.protocol import TJSONProtocol
+from thrift.TSerialization import serialize
 
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.updater_util import UpdaterConfig
@@ -34,7 +39,7 @@ from apache.aurora.client.cli import (
     EXIT_OK,
     EXIT_TIMEOUT,
     Noun,
-    Verb,
+    Verb
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
@@ -53,20 +58,12 @@ from apache.aurora.client.cli.options import (
     MAX_TOTAL_FAILURES_OPTION,
     NO_BATCHING_OPTION,
     STRICT_OPTION,
-    WATCH_OPTION,
+    WATCH_OPTION
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME
-from gen.apache.aurora.api.ttypes import (
-    ExecutorConfig,
-    ResponseCode,
-    ScheduleStatus,
-)
-
-from pystachio.config import Config
-from thrift.TSerialization import serialize
-from thrift.protocol import TJSONProtocol
+from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
 
 
 def arg_type_jobkey(key):

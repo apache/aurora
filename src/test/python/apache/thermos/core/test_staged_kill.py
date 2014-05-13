@@ -20,22 +20,16 @@ import sys
 import threading
 import time
 
+import pytest
 from twitter.common.process import ProcessProviderFactory
 from twitter.common.quantity import Amount, Time
-from apache.thermos.config.schema import (
-  Task,
-  Resources,
-  Process)
+
+from apache.thermos.config.schema import Process, Resources, Task
 from apache.thermos.core.runner import TaskRunner
 from apache.thermos.monitoring.monitor import TaskMonitor
 from apache.thermos.testing.runner import Runner
 
-from gen.apache.thermos.ttypes import (
-  TaskState,
-  ProcessState
-)
-
-import pytest
+from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 sleepy_process = Process(
   name = "sleepy",

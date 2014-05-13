@@ -22,16 +22,11 @@ from apache.aurora.config.schema.base import (
     MesosTaskInstance,
     Process,
     Resources,
-    Task,
+    Task
 )
 from apache.aurora.executor.common.task_info import mesos_task_instance_from_assigned_task
 
-from gen.apache.aurora.api.ttypes import (
-  AssignedTask,
-  ExecutorConfig,
-  TaskConfig,
-)
-
+from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, TaskConfig
 
 BASE_MTI = MesosTaskInstance(instance = 0, role = getpass.getuser())
 BASE_TASK = Task(resources = Resources(cpu=1.0, ram=16*MB, disk=32*MB))

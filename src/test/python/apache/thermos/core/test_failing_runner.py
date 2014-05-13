@@ -14,12 +14,11 @@
 # limitations under the License.
 #
 
-from apache.thermos.config.schema import Task, Resources, Process
+from apache.thermos.config.schema import Process, Resources, Task
 from apache.thermos.testing.runner import RunnerTestBase
-from gen.apache.thermos.ttypes import (
-  TaskState,
-  ProcessState
-)
+
+from gen.apache.thermos.ttypes import ProcessState, TaskState
+
 
 class TestFailingRunner(RunnerTestBase):
   @classmethod

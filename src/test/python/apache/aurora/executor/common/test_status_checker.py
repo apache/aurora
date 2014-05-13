@@ -21,7 +21,7 @@ from apache.aurora.executor.common.status_checker import (
     ExitState,
     Healthy,
     StatusChecker,
-    StatusResult,
+    StatusResult
 )
 
 

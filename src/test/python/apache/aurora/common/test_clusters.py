@@ -17,12 +17,11 @@
 import json
 import os
 
-from apache.aurora.common.clusters import Clusters, Parser
-from twitter.common.contextutil import temporary_dir
-
 import pytest
 import yaml
+from twitter.common.contextutil import temporary_dir
 
+from apache.aurora.common.clusters import Clusters, Parser
 
 TEST_YAML = """
 __default: &default

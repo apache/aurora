@@ -26,16 +26,17 @@ Task state machines.
 
 import os
 
-from gen.apache.thermos.ttypes import (
-  ProcessState,
-  ProcessStatus,
-  RunnerCkpt,
-  RunnerState,
-  TaskState,
-)
-
 from twitter.common import log
 from twitter.common.recordio import RecordIO, ThriftRecordReader
+
+from gen.apache.thermos.ttypes import (
+    ProcessState,
+    ProcessStatus,
+    RunnerCkpt,
+    RunnerState,
+    TaskState
+)
+
 
 class UniversalStateHandler(object):
   """

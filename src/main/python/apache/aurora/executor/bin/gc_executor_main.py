@@ -21,14 +21,14 @@ slave.
 
 """
 
-from apache.aurora.executor.executor_detector import ExecutorDetector
-from apache.aurora.executor.gc_executor import ThermosGCExecutor
-from apache.thermos.common.path import TaskPath
-
 import mesos
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.metrics.sampler import DiskMetricWriter
+
+from apache.aurora.executor.executor_detector import ExecutorDetector
+from apache.aurora.executor.gc_executor import ThermosGCExecutor
+from apache.thermos.common.path import TaskPath
 
 app.configure(debug=True)
 

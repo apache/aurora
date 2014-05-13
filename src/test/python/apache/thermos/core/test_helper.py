@@ -16,18 +16,13 @@
 
 import time
 
-from twitter.common.quantity import Time
-from apache.thermos.core.helper import TaskRunnerHelper as TRH
-
-from gen.apache.thermos.ttypes import (
-    ProcessStatus,
-    RunnerHeader,
-    RunnerState,
-)
-
 import mock
 import psutil
+from twitter.common.quantity import Time
 
+from apache.thermos.core.helper import TaskRunnerHelper as TRH
+
+from gen.apache.thermos.ttypes import ProcessStatus, RunnerHeader, RunnerState
 
 USER1 = 'user1'
 PID = 12345

@@ -16,16 +16,13 @@
 
 import subprocess
 
+from twitter.common import app
+
+from apache.aurora.client.api.command_runner import DistributedCommandRunner
 from apache.aurora.client.base import check_and_log_response, die
 from apache.aurora.client.factory import make_client
-from apache.aurora.client.options import (
-    EXECUTOR_SANDBOX_OPTION,
-    SSH_USER_OPTION,
-)
+from apache.aurora.client.options import EXECUTOR_SANDBOX_OPTION, SSH_USER_OPTION
 from apache.aurora.common.aurora_job_key import AuroraJobKey
-from apache.aurora.client.api.command_runner import DistributedCommandRunner
-
-from twitter.common import app
 
 
 @app.command

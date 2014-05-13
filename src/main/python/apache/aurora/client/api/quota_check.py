@@ -15,12 +15,11 @@
 #
 
 import operator
-
 from copy import deepcopy
 
-from gen.apache.aurora.api.ttypes import ResourceAggregate, Response, ResponseCode
-
 from twitter.common import log
+
+from gen.apache.aurora.api.ttypes import ResourceAggregate, Response, ResponseCode
 
 
 class CapacityRequest(object):
@@ -110,4 +109,3 @@ def print_quota(quota, msg, subj):
   ]
   log.info('%s for %s:\n\t%s' %
            (msg, subj, '\n\t'.join(['%s\t%s' % (k, v) for (k, v) in quota_fields])))
-

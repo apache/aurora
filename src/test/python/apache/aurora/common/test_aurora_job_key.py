@@ -18,6 +18,7 @@ import unittest
 
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
+
 # TODO(ksweeney): Moar coverage
 class AuroraJobKeyTest(unittest.TestCase):
   def test_basic(self):

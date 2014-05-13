@@ -17,10 +17,10 @@
 import contextlib
 import unittest
 
+from mock import patch
+
 from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
-
-from mock import patch
 
 
 class TestHelp(unittest.TestCase):

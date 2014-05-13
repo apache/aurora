@@ -20,18 +20,19 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.auth import make_session_key
 from apache.aurora.common.cluster import Cluster
 
-from gen.apache.aurora.api.constants import LIVE_STATES
-from gen.apache.aurora.api.ttypes import (
-    Response,
-    Identity,
-    ResourceAggregate,
-    ResponseCode,
-    TaskQuery)
-
 from .restarter import Restarter
 from .scheduler_client import SchedulerProxy
 from .sla import Sla
 from .updater import Updater
+
+from gen.apache.aurora.api.constants import LIVE_STATES
+from gen.apache.aurora.api.ttypes import (
+    Identity,
+    ResourceAggregate,
+    Response,
+    ResponseCode,
+    TaskQuery
+)
 
 
 class AuroraClientAPI(object):

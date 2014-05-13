@@ -17,22 +17,12 @@
 import os
 from textwrap import dedent
 
-from apache.thermos.config.schema import (
-  order,
-  Process,
-  Resources,
-  SequentialTask,
-  Task,
-  Tasks,
-)
+import pytest
+
+from apache.thermos.config.schema import order, Process, Resources, SequentialTask, Task, Tasks
 from apache.thermos.testing.runner import RunnerTestBase
 
-from gen.apache.thermos.ttypes import (
-  TaskState,
-  ProcessState
-)
-
-import pytest
+from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 
 class TestRunnerBasic(RunnerTestBase):

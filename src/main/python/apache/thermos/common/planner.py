@@ -22,11 +22,12 @@ TaskPlanner:
   - a non-ephemeral process cannot depend upon an ephemeral process
 """
 
-from collections import defaultdict, namedtuple
 import copy
-from functools import partial
 import sys
 import time
+from collections import defaultdict, namedtuple
+from functools import partial
+
 
 class Planner(object):
   """

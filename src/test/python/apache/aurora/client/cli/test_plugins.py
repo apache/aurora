@@ -16,7 +16,20 @@
 
 import contextlib
 
+from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
+
+from apache.aurora.client.cli import (
+    ConfigurationPlugin,
+    EXIT_COMMAND_FAILURE,
+    EXIT_INVALID_CONFIGURATION,
+    EXIT_OK
+)
+from apache.aurora.client.cli.client import AuroraCommandLine
+from apache.aurora.client.cli.options import CommandOption
+from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.config import AuroraConfig
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -25,21 +38,8 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatus,
     ScheduleStatusResult,
     TaskEvent,
-    TaskQuery,
+    TaskQuery
 )
-
-from apache.aurora.client.cli import (
-    ConfigurationPlugin,
-    EXIT_COMMAND_FAILURE,
-    EXIT_INVALID_CONFIGURATION,
-    EXIT_OK,
-)
-from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.options import CommandOption
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
-from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
-from apache.aurora.config import AuroraConfig
-from mock import Mock, patch
 
 
 class BogusPlugin(ConfigurationPlugin):
@@ -202,4 +202,3 @@ class TestPlugins(AuroraClientCommandTest):
       assert not any('list' in t for t in self.transcript)
       assert "Options:" in self.transcript
       assert any('bogosity' in t for t in self.transcript)
-

@@ -14,8 +14,6 @@
 # limitations under the License.
 #
 
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-from collections import defaultdict
 import getpass
 import os
 import signal
@@ -23,37 +21,8 @@ import subprocess
 import tempfile
 import threading
 import time
-
-from apache.aurora.config.schema.base import (
-    HealthCheckConfig,
-    MB,
-    MesosJob,
-    MesosTaskInstance,
-    Process,
-    Resources,
-    Task,
-)
-from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
-from apache.aurora.executor.common.health_checker import HealthCheckerProvider
-from apache.aurora.executor.common.sandbox import DirectorySandbox, SandboxProvider
-from apache.aurora.executor.common.task_runner import TaskError
-from apache.aurora.executor.status_manager import StatusManager
-from apache.aurora.executor.thermos_task_runner import (
-    DefaultThermosTaskRunnerProvider,
-    ThermosTaskRunner,
-)
-from apache.aurora.executor.aurora_executor import AuroraExecutor
-from apache.thermos.common.path import TaskPath
-from apache.thermos.core.runner import TaskRunner
-from apache.thermos.monitoring.monitor import TaskMonitor
-
-from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME
-from gen.apache.aurora.api.ttypes import (
-  AssignedTask,
-  ExecutorConfig,
-  Identity,
-  TaskConfig,
-)
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from collections import defaultdict
 
 import mesos_pb2 as mesos_pb
 from thrift.TSerialization import serialize
@@ -64,6 +33,31 @@ from twitter.common.exceptions import ExceptionalThread
 from twitter.common.log.options import LogOptions
 from twitter.common.quantity import Amount, Time
 
+from apache.aurora.config.schema.base import (
+    HealthCheckConfig,
+    MB,
+    MesosJob,
+    MesosTaskInstance,
+    Process,
+    Resources,
+    Task
+)
+from apache.aurora.executor.aurora_executor import AuroraExecutor
+from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
+from apache.aurora.executor.common.health_checker import HealthCheckerProvider
+from apache.aurora.executor.common.sandbox import DirectorySandbox, SandboxProvider
+from apache.aurora.executor.common.task_runner import TaskError
+from apache.aurora.executor.status_manager import StatusManager
+from apache.aurora.executor.thermos_task_runner import (
+    DefaultThermosTaskRunnerProvider,
+    ThermosTaskRunner
+)
+from apache.thermos.common.path import TaskPath
+from apache.thermos.core.runner import TaskRunner
+from apache.thermos.monitoring.monitor import TaskMonitor
+
+from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME
+from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, Identity, TaskConfig
 
 if 'THERMOS_DEBUG' in os.environ:
   LogOptions.set_stderr_log_level('google:DEBUG')

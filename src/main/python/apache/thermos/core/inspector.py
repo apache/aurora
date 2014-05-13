@@ -14,23 +14,19 @@
 # limitations under the License.
 #
 
+import pwd
 from collections import namedtuple
 from contextlib import closing
-import pwd
-
-from apache.thermos.common.ckpt import CheckpointDispatcher
-from apache.thermos.common.path import TaskPath
-
-from gen.apache.thermos.ttypes import (
-  ProcessState,
-  RunnerCkpt,
-  RunnerState)
-
-from .muxer import ProcessMuxer
 
 from twitter.common import log
 from twitter.common.recordio import RecordIO, ThriftRecordReader
 
+from apache.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.common.path import TaskPath
+
+from .muxer import ProcessMuxer
+
+from gen.apache.thermos.ttypes import ProcessState, RunnerCkpt, RunnerState
 
 CheckpointInspection = namedtuple('CheckpointInspection',
     ['runner_latest_update',

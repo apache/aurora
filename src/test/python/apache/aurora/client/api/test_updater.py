@@ -18,6 +18,9 @@ from copy import deepcopy
 from os import environ
 from unittest import TestCase
 
+from mox import MockObject, Replay, Verify
+from pytest import raises
+
 from apache.aurora.client.api.instance_watcher import InstanceWatcher
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck
@@ -28,34 +31,31 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
-  AddInstancesConfig,
-  AcquireLockResult,
-  AssignedTask,
-  Constraint,
-  ExecutorConfig,
-  JobConfiguration,
-  JobKey,
-  Identity,
-  LimitConstraint,
-  Lock,
-  LockKey,
-  LockValidation,
-  Metadata,
-  PopulateJobResult,
-  ResourceAggregate,
-  Response,
-  ResponseCode,
-  Result,
-  ScheduleStatusResult,
-  ScheduledTask,
-  TaskConfig,
-  TaskConstraint,
-  TaskQuery,
-  ValueConstraint,
+    AcquireLockResult,
+    AddInstancesConfig,
+    AssignedTask,
+    Constraint,
+    ExecutorConfig,
+    Identity,
+    JobConfiguration,
+    JobKey,
+    LimitConstraint,
+    Lock,
+    LockKey,
+    LockValidation,
+    Metadata,
+    PopulateJobResult,
+    ResourceAggregate,
+    Response,
+    ResponseCode,
+    Result,
+    ScheduledTask,
+    ScheduleStatusResult,
+    TaskConfig,
+    TaskConstraint,
+    TaskQuery,
+    ValueConstraint
 )
-
-from mox import MockObject, Replay, Verify
-from pytest import raises
 
 # Debug output helper -> enables log.* in source.
 if 'UPDATER_DEBUG' in environ:
@@ -827,4 +827,3 @@ class UpdaterTest(TestCase):
 
     self.update_and_expect_response(ResponseCode.ERROR)
     self.verify_mocks()
-

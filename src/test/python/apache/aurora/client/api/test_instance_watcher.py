@@ -14,16 +14,16 @@
 # limitations under the License.
 #
 
-from math import ceil
 import unittest
+from math import ceil
+
+import mox
 
 from apache.aurora.client.api.health_check import HealthCheck
 from apache.aurora.client.api.instance_watcher import InstanceWatcher
 
-from gen.apache.aurora.api.ttypes import *
 from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
-
-import mox
+from gen.apache.aurora.api.ttypes import *
 
 
 class FakeClock(object):

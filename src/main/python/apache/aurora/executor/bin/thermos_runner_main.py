@@ -14,11 +14,10 @@
 # limitations under the License.
 #
 
-from apache.aurora.executor.thermos_runner import proxy_main as runner_proxy_main
-
 from twitter.common import app
 from twitter.common.log.options import LogOptions
 
+from apache.aurora.executor.thermos_runner import proxy_main as runner_proxy_main
 
 LogOptions.set_simple(True)
 

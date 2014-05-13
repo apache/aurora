@@ -14,13 +14,13 @@
 # limitations under the License.
 #
 
+from argparse import ArgumentTypeError
 from collections import namedtuple
-
-from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from twitter.common.lang import Compatibility
 from twitter.common.quantity.parse_simple import parse_time
-from argparse import ArgumentTypeError
+
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 
 class CommandOption(object):

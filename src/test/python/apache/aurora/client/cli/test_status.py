@@ -16,6 +16,13 @@
 
 import contextlib
 
+from mock import call, Mock, patch
+
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER
+from apache.aurora.client.cli.client import AuroraCommandLine
+from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+from apache.aurora.common.aurora_job_key import AuroraJobKey
+
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
@@ -25,17 +32,8 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatusResult,
     TaskConfig,
     TaskEvent,
-    TaskQuery,
+    TaskQuery
 )
-
-from apache.aurora.client.cli import (
-    EXIT_INVALID_PARAMETER
-)
-from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.common.aurora_job_key import AuroraJobKey
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
-
-from mock import call, Mock, patch
 
 
 class TestJobStatus(AuroraClientCommandTest):

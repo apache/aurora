@@ -14,20 +14,20 @@
 # limitations under the License.
 #
 
-from abc import abstractmethod
-from collections import namedtuple
 import os
 import sys
 import time
+from abc import abstractmethod
+from collections import namedtuple
+
+from twitter.common.dirutil import safe_bsize, safe_delete, safe_rmtree
+from twitter.common.lang import Interface
+from twitter.common.quantity import Amount, Data, Time
 
 from apache.thermos.common.ckpt import CheckpointDispatcher
 from apache.thermos.common.path import TaskPath
 
 from .detector import TaskDetector
-
-from twitter.common.dirutil import safe_delete, safe_rmtree, safe_bsize
-from twitter.common.lang import Interface
-from twitter.common.quantity import Amount, Data, Time
 
 
 class TaskGarbageCollector(object):

@@ -18,18 +18,9 @@ import json
 from collections import namedtuple
 from difflib import unified_diff
 
-from gen.apache.aurora.api.constants import ACTIVE_STATES
-from gen.apache.aurora.api.ttypes import (
-    AddInstancesConfig,
-    JobKey,
-    Identity,
-    Lock,
-    LockKey,
-    LockValidation,
-    Response,
-    ResponseCode,
-    TaskQuery,
-)
+from thrift.protocol import TJSONProtocol
+from thrift.TSerialization import serialize
+from twitter.common import log
 
 from .instance_watcher import InstanceWatcher
 from .job_monitor import JobMonitor
@@ -37,9 +28,19 @@ from .quota_check import CapacityRequest, QuotaCheck
 from .scheduler_client import SchedulerProxy
 from .updater_util import FailureThreshold, UpdaterConfig
 
-from thrift.protocol import TJSONProtocol
-from thrift.TSerialization import serialize
-from twitter.common import log
+from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.ttypes import (
+    AddInstancesConfig,
+    Identity,
+    JobKey,
+    Lock,
+    LockKey,
+    LockValidation,
+    Response,
+    ResponseCode,
+    TaskQuery
+)
+
 
 class Updater(object):
   """Update the instances of a job in batches."""

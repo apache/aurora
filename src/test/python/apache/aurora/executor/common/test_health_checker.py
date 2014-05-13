@@ -17,11 +17,10 @@
 import time
 import unittest
 
+import mox
 from twitter.common.testing.clock import ThreadedClock
 
 from apache.aurora.executor.common.health_checker import HealthCheckerThread
-
-import mox
 
 
 def thread_yield():

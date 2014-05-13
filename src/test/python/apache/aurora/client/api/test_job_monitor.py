@@ -15,6 +15,12 @@
 #
 import unittest
 
+from mock import Mock
+
+from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.client.api.job_monitor import JobMonitor
+from apache.aurora.common.aurora_job_key import AuroraJobKey
+
 from gen.apache.aurora.api.AuroraSchedulerManager import Client
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -22,17 +28,12 @@ from gen.apache.aurora.api.ttypes import (
     Response,
     ResponseCode,
     Result,
+    ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
-    ScheduledTask,
     TaskEvent,
-    TaskQuery,
+    TaskQuery
 )
-from apache.aurora.client.api import AuroraClientAPI
-from apache.aurora.client.api.job_monitor import JobMonitor
-from apache.aurora.common.aurora_job_key import AuroraJobKey
-
-from mock import Mock
 
 
 class FakeClock(object):

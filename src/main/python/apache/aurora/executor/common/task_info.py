@@ -16,16 +16,17 @@
 
 import json
 
+from pystachio import Ref
+from thrift.Thrift import TException
+from thrift.TSerialization import deserialize as thrift_deserialize
+from twitter.common import log
+
 from apache.aurora.config.port_resolver import PortResolver
 from apache.aurora.config.schema.base import MesosJob, MesosTaskInstance
 from apache.aurora.config.thrift import task_instance_from_job
 
 from gen.apache.aurora.api.ttypes import AssignedTask
 
-from pystachio import Ref
-from thrift.Thrift import TException
-from thrift.TSerialization import deserialize as thrift_deserialize
-from twitter.common import log
 
 def assigned_task_from_mesos_task(task):
   """Deserialize AssignedTask from a launchTask task protocol buffer."""

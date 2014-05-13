@@ -24,22 +24,17 @@ as their corresponding Thrift structs:
 
 """
 
-import os
 import copy
 import errno
+import os
 import threading
-
-from apache.thermos.common.ckpt import CheckpointDispatcher
-
-from gen.apache.thermos.ttypes import (
-  ProcessState,
-  RunnerCkpt,
-  RunnerState,
-  TaskState,
-)
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
+
+from apache.thermos.common.ckpt import CheckpointDispatcher
+
+from gen.apache.thermos.ttypes import ProcessState, RunnerCkpt, RunnerState, TaskState
 
 
 class TaskMonitor(object):

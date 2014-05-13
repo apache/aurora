@@ -14,10 +14,10 @@
 # limitations under the License.
 #
 
-from abc import abstractmethod, abstractproperty
 import inspect
 import os
 import sys
+from abc import abstractmethod, abstractproperty
 
 from twitter.common.lang import Interface
 

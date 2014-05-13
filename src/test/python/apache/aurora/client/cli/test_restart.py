@@ -16,12 +16,13 @@
 import contextlib
 import functools
 
-from apache.aurora.client.api.health_check import StatusHealthCheck, Retriable
+from mock import Mock, patch
+from twitter.common.contextutil import temporary_file
+
+from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
 from apache.aurora.client.cli import EXIT_API_ERROR
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
-
-from twitter.common.contextutil import temporary_file
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -29,10 +30,8 @@ from gen.apache.aurora.api.ttypes import (
     PopulateJobResult,
     ScheduledTask,
     ScheduleStatusResult,
-    TaskConfig,
+    TaskConfig
 )
-
-from mock import Mock, patch
 
 
 class TestRestartCommand(AuroraClientCommandTest):

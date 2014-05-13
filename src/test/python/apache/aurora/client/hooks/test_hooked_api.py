@@ -16,12 +16,11 @@
 
 from inspect import getargspec
 
-from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI, NonHookedAuroraClientAPI
-from apache.aurora.client.api import AuroraClientAPI
-from apache.aurora.common.cluster import Cluster
-
 from mock import Mock
 
+from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI, NonHookedAuroraClientAPI
+from apache.aurora.common.cluster import Cluster
 
 API_METHODS = ('cancel_update', 'create_job', 'kill_job', 'restart', 'start_cronjob', 'update_job')
 API_METHODS_WITH_CONFIG_PARAM_ADDED = ('cancel_update', 'kill_job', 'restart', 'start_cronjob')
@@ -69,5 +68,3 @@ def test_api_methods_params(method_name):
   else:
     assert nonhooked_argspec == hooked_argspec
   assert nonhooked_argspec == nonhooked_argspec
-
-

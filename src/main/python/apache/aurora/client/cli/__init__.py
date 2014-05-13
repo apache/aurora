@@ -32,14 +32,15 @@ For example:
 
 from __future__ import print_function
 
-from abc import abstractmethod
 import argparse
 import getpass
 import logging
 import sys
+from abc import abstractmethod
 from uuid import uuid1
 
 from twitter.common.python.pex import PexInfo
+
 from .command_hooks import GlobalCommandHookRegistry
 
 # Constants for standard return codes.

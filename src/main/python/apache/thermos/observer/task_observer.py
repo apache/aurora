@@ -21,10 +21,15 @@ finished Thermos tasks on a system. The primary entry point is the TaskObserver,
 polls a designated Thermos checkpoint root and collates information about all tasks it discovers.
 
 """
-from operator import attrgetter
 import os
 import threading
 import time
+from operator import attrgetter
+
+from twitter.common import log
+from twitter.common.exceptions import ExceptionalThread
+from twitter.common.lang import Lockable
+from twitter.common.quantity import Amount, Time
 
 from apache.thermos.common.path import TaskPath
 from apache.thermos.monitoring.detector import TaskDetector
@@ -32,14 +37,9 @@ from apache.thermos.monitoring.monitor import TaskMonitor
 from apache.thermos.monitoring.process import ProcessSample
 from apache.thermos.monitoring.resource import ResourceMonitorBase, TaskResourceMonitor
 
-from gen.apache.thermos.ttypes import ProcessState, TaskState
-
 from .observed_task import ActiveObservedTask, FinishedObservedTask
 
-from twitter.common import log
-from twitter.common.exceptions import ExceptionalThread
-from twitter.common.lang import Lockable
-from twitter.common.quantity import Amount, Time
+from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 
 class TaskObserver(ExceptionalThread, Lockable):

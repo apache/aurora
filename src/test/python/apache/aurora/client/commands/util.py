@@ -16,17 +16,13 @@
 
 import unittest
 
+from mock import Mock
+
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
 
-from gen.apache.aurora.api.ttypes import (
-    Response,
-    ResponseCode,
-    Result,
-)
-
-from mock import Mock
+from gen.apache.aurora.api.ttypes import Response, ResponseCode, Result
 
 
 class AuroraClientCommandTest(unittest.TestCase):

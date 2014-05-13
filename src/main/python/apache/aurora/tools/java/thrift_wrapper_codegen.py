@@ -19,7 +19,6 @@ from __future__ import print_function
 import os
 import re
 import sys
-
 from optparse import OptionParser
 
 

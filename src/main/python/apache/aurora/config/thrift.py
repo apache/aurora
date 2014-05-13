@@ -17,30 +17,26 @@
 import getpass
 import re
 
-from apache.aurora.config.schema.base import (
-  HealthCheckConfig,
-  MesosContext,
-  MesosTaskInstance,
-)
-from apache.thermos.config.loader import ThermosTaskValidator
-
-from gen.apache.aurora.api.constants import GOOD_IDENTIFIER_PATTERN_PYTHON, AURORA_EXECUTOR_NAME
-from gen.apache.aurora.api.ttypes import (
-  Constraint,
-  CronCollisionPolicy,
-  ExecutorConfig,
-  Identity,
-  JobConfiguration,
-  JobKey,
-  LimitConstraint,
-  Metadata,
-  TaskConfig,
-  TaskConstraint,
-  ValueConstraint,
-)
-
 from pystachio import Empty, Ref
 from twitter.common.lang import Compatibility
+
+from apache.aurora.config.schema.base import HealthCheckConfig, MesosContext, MesosTaskInstance
+from apache.thermos.config.loader import ThermosTaskValidator
+
+from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME, GOOD_IDENTIFIER_PATTERN_PYTHON
+from gen.apache.aurora.api.ttypes import (
+    Constraint,
+    CronCollisionPolicy,
+    ExecutorConfig,
+    Identity,
+    JobConfiguration,
+    JobKey,
+    LimitConstraint,
+    Metadata,
+    TaskConfig,
+    TaskConstraint,
+    ValueConstraint
+)
 
 __all__ = (
   'InvalidConfig',

@@ -14,16 +14,16 @@
 # limitations under the License.
 #
 
-from abc import abstractproperty
 import os
-
-from apache.thermos.config.loader import ThermosTaskWrapper
-from apache.thermos.config.schema import ThermosContext
-from apache.thermos.common.ckpt import CheckpointDispatcher
+from abc import abstractproperty
 
 from pystachio import Environment
 from twitter.common import log
 from twitter.common.lang import AbstractClass
+
+from apache.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.config.loader import ThermosTaskWrapper
+from apache.thermos.config.schema import ThermosContext
 
 
 class ObservedTask(AbstractClass):

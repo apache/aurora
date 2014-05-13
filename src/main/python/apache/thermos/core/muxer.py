@@ -14,13 +14,13 @@
 # limitations under the License.
 #
 
-import os
 import errno
-
-from gen.apache.thermos.ttypes import RunnerCkpt
+import os
 
 from twitter.common import log
 from twitter.common.recordio import ThriftRecordReader
+
+from gen.apache.thermos.ttypes import RunnerCkpt
 
 
 class ProcessMuxer(object):

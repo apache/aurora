@@ -17,10 +17,10 @@
 import contextlib
 import os
 
-from apache.aurora.client.cli import (
-    EXIT_INVALID_CONFIGURATION,
-    EXIT_INVALID_PARAMETER
-)
+from mock import Mock, patch
+from twitter.common.contextutil import temporary_file
+
+from apache.aurora.client.cli import EXIT_INVALID_CONFIGURATION, EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
 
@@ -37,11 +37,8 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatusResult,
     TaskConfig,
     TaskEvent,
-    TaskQuery,
+    TaskQuery
 )
-
-from mock import Mock, patch
-from twitter.common.contextutil import temporary_file
 
 
 class TestDiffCommand(AuroraClientCommandTest):

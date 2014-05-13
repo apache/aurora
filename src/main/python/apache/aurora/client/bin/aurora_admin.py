@@ -14,13 +14,12 @@
 # limitations under the License.
 #
 
-from apache.aurora.client.base import generate_terse_usage
-from apache.aurora.client.commands import admin, help, maintenance
-from apache.aurora.client.options import add_verbosity_options
-
 from twitter.common import app
 from twitter.common.log.options import LogOptions
 
+from apache.aurora.client.base import generate_terse_usage
+from apache.aurora.client.commands import admin, help, maintenance
+from apache.aurora.client.options import add_verbosity_options
 
 app.register_commands_from(admin, help, maintenance)
 add_verbosity_options()

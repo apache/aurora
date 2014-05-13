@@ -16,12 +16,13 @@
 import contextlib
 import functools
 
+from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.api.updater import Updater
-from apache.aurora.client.api.health_check import StatusHealthCheck, Retriable
+from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import QuotaCheck
+from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.cli import EXIT_INVALID_CONFIGURATION
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
@@ -42,8 +43,6 @@ from gen.apache.aurora.api.ttypes import (
     TaskConfig,
     TaskQuery
 )
-
-from mock import Mock, patch
 
 
 class TestUpdateCommand(AuroraClientCommandTest):

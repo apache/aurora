@@ -14,13 +14,13 @@
 # limitations under the License.
 #
 
-from gen.apache.aurora.api.constants import ACTIVE_STATES
-from gen.apache.aurora.api.ttypes import ResponseCode
+from twitter.common import log
 
 from .instance_watcher import InstanceWatcher
 from .updater_util import FailureThreshold
 
-from twitter.common import log
+from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 
 class Restarter(object):

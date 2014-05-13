@@ -16,22 +16,14 @@
 
 from __future__ import print_function
 
-from apache.aurora.client.cli import (
-    EXIT_INVALID_PARAMETER,
-    EXIT_OK,
-    Noun,
-    Verb,
-)
-from apache.aurora.client.cli.context import AuroraCommandContext
-from apache.aurora.client.cli.options import (
-    JSON_WRITE_OPTION,
-    ROLE_ARGUMENT,
-)
-
-from gen.apache.aurora.api.ttypes import ResponseCode
-
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
+
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK, Noun, Verb
+from apache.aurora.client.cli.context import AuroraCommandContext
+from apache.aurora.client.cli.options import JSON_WRITE_OPTION, ROLE_ARGUMENT
+
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 
 class GetQuotaCmd(Verb):

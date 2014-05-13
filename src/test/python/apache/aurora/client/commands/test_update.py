@@ -18,17 +18,19 @@ import contextlib
 import functools
 import unittest
 
-from apache.aurora.common.cluster import Cluster
-from apache.aurora.common.clusters import Clusters
+from mock import Mock, patch
+from twitter.common.contextutil import temporary_file
+
+from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
+from apache.aurora.client.api.job_monitor import JobMonitor
+from apache.aurora.client.api.quota_check import QuotaCheck
+from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.commands.core import update
 from apache.aurora.client.commands.util import AuroraClientCommandTest
-from apache.aurora.client.api.updater import Updater
-from apache.aurora.client.api.health_check import StatusHealthCheck, Retriable
-from apache.aurora.client.api.quota_check import QuotaCheck
-from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.clusters import Clusters
 from apache.aurora.config import AuroraConfig
-from twitter.common.contextutil import temporary_file
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
@@ -46,8 +48,6 @@ from gen.apache.aurora.api.ttypes import (
     TaskConfig,
     TaskQuery
 )
-
-from mock import Mock, patch
 
 
 class TestUpdateCommand(AuroraClientCommandTest):

@@ -16,6 +16,7 @@
 
 import os
 
+import pytest
 from twitter.common.contextutil import temporary_dir, temporary_file
 
 from apache.aurora.client import config
@@ -24,9 +25,6 @@ from apache.aurora.config.loader import AuroraConfigLoader
 from apache.aurora.config.schema.base import Announcer, Job, MB, Resources, Task
 
 from gen.apache.aurora.api.constants import DEFAULT_ENVIRONMENT
-
-import pytest
-
 
 MESOS_CONFIG_BASE = """
 HELLO_WORLD = Job(

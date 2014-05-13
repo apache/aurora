@@ -16,18 +16,12 @@
 
 import time
 
-from gen.apache.aurora.api.constants import (
-    LIVE_STATES,
-    TERMINAL_STATES
-)
-from gen.apache.aurora.api.ttypes import (
-    Identity,
-    TaskQuery
-)
-
 from thrift.transport import TTransport
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
+
+from gen.apache.aurora.api.constants import LIVE_STATES, TERMINAL_STATES
+from gen.apache.aurora.api.ttypes import Identity, TaskQuery
 
 
 class JobMonitor(object):

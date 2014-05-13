@@ -16,18 +16,17 @@
 
 from __future__ import print_function
 
-from collections import Mapping, namedtuple
-from contextlib import contextmanager
 import itertools
 import json
 import os
 import sys
-
-from .cluster import Cluster
+from collections import Mapping, namedtuple
+from contextlib import contextmanager
 
 from pystachio import Required, String
 from twitter.common.collections import maybe_list
 
+from .cluster import Cluster
 
 try:
   import yaml

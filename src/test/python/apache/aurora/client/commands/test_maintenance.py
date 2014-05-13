@@ -16,13 +16,15 @@
 
 import contextlib
 
-from apache.aurora.client.commands.util import AuroraClientCommandTest
+from mock import Mock, patch
+
 from apache.aurora.client.commands.maintenance import (
     end_maintenance_hosts,
     host_maintenance_status,
     perform_maintenance_hosts,
-    start_maintenance_hosts,
+    start_maintenance_hosts
 )
+from apache.aurora.client.commands.util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
     DrainHostsResult,
@@ -31,10 +33,8 @@ from gen.apache.aurora.api.ttypes import (
     HostStatus,
     MaintenanceMode,
     MaintenanceStatusResult,
-    StartMaintenanceResult,
+    StartMaintenanceResult
 )
-
-from mock import Mock, patch
 
 
 class TestMaintenanceCommands(AuroraClientCommandTest):

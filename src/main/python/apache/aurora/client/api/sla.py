@@ -16,7 +16,6 @@
 
 import math
 import time
-
 from collections import defaultdict, namedtuple
 from copy import deepcopy
 
@@ -24,13 +23,7 @@ from apache.aurora.client.base import check_and_log_response
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.constants import LIVE_STATES
-from gen.apache.aurora.api.ttypes import (
-  Identity,
-  Response,
-  ResponseCode,
-  ScheduleStatus,
-  TaskQuery
-)
+from gen.apache.aurora.api.ttypes import Identity, Response, ResponseCode, ScheduleStatus, TaskQuery
 
 
 def job_key_from_scheduled(task, cluster):

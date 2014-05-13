@@ -18,6 +18,8 @@ from __future__ import absolute_import
 
 from collections import defaultdict
 
+from pystachio import Empty, Environment, Ref
+
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config.schema.base import MesosContext
 from apache.thermos.config.loader import PortExtractor, ThermosTaskWrapper
@@ -25,9 +27,8 @@ from apache.thermos.config.schema import ThermosContext
 
 from .loader import AuroraConfigLoader
 from .port_resolver import PortResolver
-from .thrift import convert as convert_thrift, InvalidConfig as InvalidThriftConfig
-
-from pystachio import Empty, Environment, Ref
+from .thrift import convert as convert_thrift
+from .thrift import InvalidConfig as InvalidThriftConfig
 
 __all__ = ('AuroraConfig', 'PortResolver')
 

@@ -17,13 +17,15 @@
 import contextlib
 import unittest
 
+from mock import Mock, patch
+from pystachio.config import Config
+from twitter.common import app
+from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.commands.core import create
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.config import AuroraConfig
-from twitter.common import app
-from twitter.common.contextutil import temporary_file
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -35,11 +37,8 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatus,
     ScheduleStatusResult,
     TaskEvent,
-    TaskQuery,
+    TaskQuery
 )
-
-from mock import Mock, patch
-from pystachio.config import Config
 
 
 class TestClientCreateCommand(AuroraClientCommandTest):

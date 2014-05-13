@@ -16,15 +16,16 @@
 
 from __future__ import print_function
 
-"""Command-line client for managing admin-only interactions with the aurora scheduler.
-"""
-
 import json
 import optparse
 import os
 import pipes
-import sys
 import subprocess
+import sys
+
+from twitter.common import app, log
+from twitter.common.quantity import Amount, Data, Time
+from twitter.common.quantity.parse_simple import parse_data, parse_time
 
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.sla import DomainUpTimeSlaVector
@@ -42,15 +43,14 @@ from apache.aurora.common.clusters import CLUSTERS
 from apache.aurora.common.shellify import shellify
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES, TERMINAL_STATES
-from gen.apache.aurora.api.ttypes import (
-    ResponseCode,
-    ScheduleStatus,
-    TaskQuery,
-)
+from gen.apache.aurora.api.ttypes import ResponseCode, ScheduleStatus, TaskQuery
 
-from twitter.common import app, log
-from twitter.common.quantity import Amount, Data, Time
-from twitter.common.quantity.parse_simple import parse_data, parse_time
+"""Command-line client for managing admin-only interactions with the aurora scheduler.
+"""
+
+
+
+
 
 
 MIN_SLA_INSTANCE_COUNT = optparse.Option(

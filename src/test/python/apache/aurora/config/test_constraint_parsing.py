@@ -14,8 +14,9 @@
 # limitations under the License.
 #
 
-import pytest
 import unittest
+
+import pytest
 
 from apache.aurora.config.thrift import constraints_to_thrift
 

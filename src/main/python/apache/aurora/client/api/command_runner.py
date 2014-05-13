@@ -14,23 +14,20 @@
 # limitations under the License.
 #
 
-from multiprocessing.pool import ThreadPool
 import posixpath
 import subprocess
-
-from apache.aurora.client.api import AuroraClientAPI
-from apache.aurora.config.schema.base import MesosContext
-from apache.aurora.common.cluster import Cluster
-from apache.thermos.config.schema import ThermosContext
-
-from gen.apache.aurora.api.constants import LIVE_STATES
-from gen.apache.aurora.api.ttypes import (
-  Identity,
-  ResponseCode,
-  TaskQuery)
+from multiprocessing.pool import ThreadPool
 
 from pystachio import Environment, Required, String
 from twitter.common import log
+
+from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.common.cluster import Cluster
+from apache.aurora.config.schema.base import MesosContext
+from apache.thermos.config.schema import ThermosContext
+
+from gen.apache.aurora.api.constants import LIVE_STATES
+from gen.apache.aurora.api.ttypes import Identity, ResponseCode, TaskQuery
 
 
 class CommandRunnerTrait(Cluster.Trait):

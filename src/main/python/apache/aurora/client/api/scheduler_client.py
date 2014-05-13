@@ -19,12 +19,6 @@ import threading
 import time
 import traceback
 
-from apache.aurora.common.auth import make_session_key, SessionKeyError
-from apache.aurora.common.cluster import Cluster
-
-from gen.apache.aurora.api import AuroraAdmin
-from gen.apache.aurora.api.constants import CURRENT_API_VERSION
-
 from pystachio import Boolean, Default, Integer, String
 from thrift.protocol import TBinaryProtocol
 from thrift.transport import TSocket, TTransport
@@ -33,6 +27,12 @@ from twitter.common.quantity import Amount, Time
 from twitter.common.rpc.transports.tsslsocket import DelayedHandshakeTSSLSocket
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset import ServerSet
+
+from apache.aurora.common.auth import make_session_key, SessionKeyError
+from apache.aurora.common.cluster import Cluster
+
+from gen.apache.aurora.api import AuroraAdmin
+from gen.apache.aurora.api.constants import CURRENT_API_VERSION
 
 
 class SchedulerClientTrait(Cluster.Trait):

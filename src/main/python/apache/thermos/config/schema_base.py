@@ -14,19 +14,7 @@
 # limitations under the License.
 #
 
-from pystachio import (
-  Boolean,
-  Default,
-  Empty,
-  Float,
-  Integer,
-  List,
-  Map,
-  Required,
-  String,
-  Struct
-)
-
+from pystachio import Boolean, Default, Empty, Float, Integer, List, Map, Required, String, Struct
 
 # Define constants for resources
 BYTES = 1

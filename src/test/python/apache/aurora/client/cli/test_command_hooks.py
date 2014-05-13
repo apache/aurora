@@ -16,15 +16,8 @@
 
 import contextlib
 
-from gen.apache.aurora.api.ttypes import (
-    AssignedTask,
-    Identity,
-    ScheduledTask,
-    ScheduleStatus,
-    ScheduleStatusResult,
-    TaskEvent,
-    TaskQuery,
-)
+from mock import Mock, patch
+from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import EXIT_PERMISSION_VIOLATION
 from apache.aurora.client.cli.client import AuroraCommandLine
@@ -32,8 +25,15 @@ from apache.aurora.client.cli.command_hooks import CommandHook, GlobalCommandHoo
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.config import AuroraConfig
 
-from mock import Mock, patch
-from twitter.common.contextutil import temporary_file
+from gen.apache.aurora.api.ttypes import (
+    AssignedTask,
+    Identity,
+    ScheduledTask,
+    ScheduleStatus,
+    ScheduleStatusResult,
+    TaskEvent,
+    TaskQuery
+)
 
 
 class HookForTesting(CommandHook):

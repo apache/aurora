@@ -17,8 +17,8 @@
 import mimetypes
 import os
 
-from bottle import HTTPResponse
 import pkg_resources
+from bottle import HTTPResponse
 from twitter.common import log
 from twitter.common.http.server import HttpServer
 

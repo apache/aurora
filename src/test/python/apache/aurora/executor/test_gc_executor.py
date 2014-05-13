@@ -14,15 +14,25 @@
 # limitations under the License.
 #
 
-from collections import namedtuple
 import contextlib
 import functools
-from itertools import product
 import os
 import shutil
 import threading
 import time
 import unittest
+from collections import namedtuple
+from itertools import product
+
+import mesos_pb2 as mesos
+import mock
+from thrift.TSerialization import deserialize as thrift_deserialize
+from thrift.TSerialization import serialize as thrift_serialize
+from twitter.common.concurrent import deadline, Timeout
+from twitter.common.contextutil import temporary_dir
+from twitter.common.dirutil import safe_rmtree
+from twitter.common.quantity import Amount, Time
+from twitter.common.testing.clock import ThreadedClock
 
 from apache.aurora.executor.gc_executor import ThermosGCExecutor
 from apache.thermos.common.path import TaskPath
@@ -33,17 +43,6 @@ from gen.apache.aurora.api.constants import LIVE_STATES, TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import ScheduleStatus
 from gen.apache.aurora.comm.ttypes import AdjustRetainedTasks, SchedulerMessage
 from gen.apache.thermos.ttypes import ProcessState, TaskState
-
-import mock
-import mesos_pb2 as mesos
-from thrift.TSerialization import serialize as thrift_serialize
-from thrift.TSerialization import deserialize as thrift_deserialize
-from twitter.common.concurrent import deadline, Timeout
-from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import safe_rmtree
-from twitter.common.quantity import Amount, Time
-from twitter.common.testing.clock import ThreadedClock
-
 
 ACTIVE_TASKS = ('sleep60-lost',)
 
@@ -648,4 +647,3 @@ class TestRealGC(unittest.TestCase):
       task_id = self.setup_task(self.HELLO_WORLD, root, finished=True)
       gcs = self.run_gc(root, task_id, retain=True)
       assert len(gcs) == 0
-

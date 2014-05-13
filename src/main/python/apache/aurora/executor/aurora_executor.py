@@ -19,23 +19,19 @@ import threading
 import time
 import traceback
 
-from .common.kill_manager import KillManager
-from .common.sandbox import DirectorySandbox, SandboxProvider
-from .common.status_checker import ChainedStatusChecker, ExitState
-from .common.task_info import assigned_task_from_mesos_task
-from .common.task_runner import (
-    TaskError,
-    TaskRunner,
-    TaskRunnerProvider,
-)
-from .executor_base import ExecutorBase
-from .status_manager import StatusManager
-
 import mesos_pb2 as mesos_pb
 from twitter.common import log
 from twitter.common.concurrent import deadline, defer, Timeout
 from twitter.common.metrics import Observable
 from twitter.common.quantity import Amount, Time
+
+from .common.kill_manager import KillManager
+from .common.sandbox import DirectorySandbox, SandboxProvider
+from .common.status_checker import ChainedStatusChecker, ExitState
+from .common.task_info import assigned_task_from_mesos_task
+from .common.task_runner import TaskError, TaskRunner, TaskRunnerProvider
+from .executor_base import ExecutorBase
+from .status_manager import StatusManager
 
 
 class DefaultSandboxProvider(SandboxProvider):

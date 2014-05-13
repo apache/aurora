@@ -17,7 +17,12 @@
 import logging
 from logging import Handler
 
+from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
+
+from apache.aurora.client.cli.client import AuroraCommandLine
+from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+from apache.aurora.config import AuroraConfig
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -26,13 +31,8 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatus,
     ScheduleStatusResult,
     TaskEvent,
-    TaskQuery,
+    TaskQuery
 )
-
-from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
-from apache.aurora.config import AuroraConfig
-from mock import Mock, patch
 
 
 class MockHandler(Handler):

@@ -15,19 +15,16 @@
 #
 
 import contextlib
-
 from collections import defaultdict
+
+from mock import Mock, patch
+from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.sla import DomainUpTimeSlaVector
 from apache.aurora.client.commands.admin import sla_list_safe_domain, sla_probe_hosts
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.common.aurora_job_key import AuroraJobKey
-
-from twitter.common.contextutil import temporary_file
-
-from mock import Mock, patch
-
 
 MIN_INSTANCE_COUNT = 1
 

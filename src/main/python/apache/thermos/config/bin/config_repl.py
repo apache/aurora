@@ -14,6 +14,8 @@
 # limitations under the License.
 #
 
-from apache.thermos.config.schema import *
 from code import interact
+
+from apache.thermos.config.schema import *
+
 interact('Thermos Config REPL', local=locals())

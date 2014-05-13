@@ -14,16 +14,16 @@
 # limitations under the License.
 #
 
-from collections import defaultdict
 import time
+from collections import defaultdict
+
+from twitter.common import log
+from twitter.common.quantity import Amount, Time
 
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.base import check_and_log_response
 
 from gen.apache.aurora.api.ttypes import Hosts, MaintenanceMode
-
-from twitter.common import log
-from twitter.common.quantity import Amount, Time
 
 
 def group_by_host(hostname):

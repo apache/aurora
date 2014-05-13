@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-from twitter.common.contextutil import temporary_file, open_zip
+from twitter.common.contextutil import open_zip, temporary_file
 
 from apache.aurora.executor.executor_vars import ExecutorVars
 

@@ -17,12 +17,9 @@
 import time
 import unittest
 
-from apache.aurora.client.api.sla import (
-    DomainUpTimeSlaVector,
-    JobUpTimeSlaVector,
-    Sla,
-    task_query
-)
+from mock import call, Mock, patch
+
+from apache.aurora.client.api.sla import DomainUpTimeSlaVector, JobUpTimeSlaVector, Sla, task_query
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 
@@ -34,15 +31,13 @@ from gen.apache.aurora.api.ttypes import (
     Response,
     ResponseCode,
     Result,
+    ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
-    ScheduledTask,
     TaskConfig,
     TaskEvent,
     TaskQuery
 )
-
-from mock import call, Mock, patch
 
 
 class SlaTest(unittest.TestCase):

@@ -18,13 +18,12 @@ import os
 import pprint
 from xml.sax.saxutils import escape
 
-from .templating import HttpTemplate
-
 import bottle
 from mako.template import Template
 from twitter.common import log
 from twitter.common.http import HttpServer
 
+from .templating import HttpTemplate
 
 MB = 1024 * 1024
 DEFAULT_CHUNK_LENGTH = MB

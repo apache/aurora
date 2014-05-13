@@ -14,22 +14,15 @@
 # limitations under the License.
 #
 
-import os
 import optparse
+import os
 import subprocess
-
-from apache.aurora.admin.host_maintenance import HostMaintenance
-from apache.aurora.client.base import (
-    die,
-    FILENAME_OPTION,
-    HOSTS_OPTION,
-    parse_hosts,
-    requires
-)
-from apache.aurora.common.clusters import CLUSTERS
 
 from twitter.common import app, log
 
+from apache.aurora.admin.host_maintenance import HostMaintenance
+from apache.aurora.client.base import die, FILENAME_OPTION, HOSTS_OPTION, parse_hosts, requires
+from apache.aurora.common.clusters import CLUSTERS
 
 GROUPING_OPTION = optparse.Option(
     '--grouping',

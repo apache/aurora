@@ -14,11 +14,11 @@
 # limitations under the License.
 #
 
-from abc import abstractmethod, abstractproperty
 import getpass
 import grp
 import os
 import pwd
+from abc import abstractmethod, abstractproperty
 
 from twitter.common import log
 from twitter.common.dirutil import safe_mkdir, safe_rmtree

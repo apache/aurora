@@ -26,7 +26,6 @@ import re
 import sys
 from collections import defaultdict
 
-
 IMPORT_RE = re.compile('import(?: static)? (.*);')
 def get_group(import_statement):
   matcher = IMPORT_RE.match(import_statement)

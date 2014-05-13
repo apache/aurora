@@ -17,15 +17,12 @@
 import contextlib
 import json
 
+from mock import patch
+
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 
-from gen.apache.aurora.api.ttypes import (
-  GetQuotaResult,
-  ResourceAggregate,
-  )
-
-from mock import patch
+from gen.apache.aurora.api.ttypes import GetQuotaResult, ResourceAggregate
 
 
 class TestGetQuotaCommand(AuroraClientCommandTest):

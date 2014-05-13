@@ -15,8 +15,9 @@
 #
 
 import unittest
-
 from copy import deepcopy
+
+from mock import Mock
 
 from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck
 
@@ -27,9 +28,8 @@ from gen.apache.aurora.api.ttypes import (
     ResourceAggregate,
     Response,
     ResponseCode,
-    Result)
-
-from mock import Mock
+    Result
+)
 
 
 class QuotaCheckTest(unittest.TestCase):

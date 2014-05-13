@@ -18,6 +18,7 @@ import collections
 
 from twitter.common import log
 
+
 class UpdaterConfig(object):
   """
   For updates involving a health check,

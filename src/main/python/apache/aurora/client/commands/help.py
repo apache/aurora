@@ -19,9 +19,9 @@ from __future__ import print_function
 import collections
 import sys
 
-from apache.aurora.client.base import die
-
 from twitter.common import app
+
+from apache.aurora.client.base import die
 
 
 def make_commands_str(commands):

@@ -22,29 +22,22 @@ import subprocess
 import threading
 import time
 
+from twitter.common import log
+from twitter.common.dirutil import chmod_plus_x, safe_mkdtemp
+from twitter.common.log.options import LogOptions
+from twitter.common.quantity import Amount, Time
+
 from apache.aurora.common.http_signaler import HttpSignaler
 from apache.thermos.common.path import TaskPath
 from apache.thermos.config.loader import ThermosTaskWrapper
 from apache.thermos.core import runner as core
 from apache.thermos.monitoring.monitor import TaskMonitor
 
-from gen.apache.thermos.ttypes import TaskState
-
 from .common.status_checker import ExitState, StatusResult
-from .common.task_info import (
-    mesos_task_instance_from_assigned_task,
-    resolve_ports,
-)
-from .common.task_runner import (
-    TaskError,
-    TaskRunner,
-    TaskRunnerProvider,
-)
+from .common.task_info import mesos_task_instance_from_assigned_task, resolve_ports
+from .common.task_runner import TaskError, TaskRunner, TaskRunnerProvider
 
-from twitter.common import log
-from twitter.common.dirutil import chmod_plus_x, safe_mkdtemp
-from twitter.common.log.options import LogOptions
-from twitter.common.quantity import Amount, Time
+from gen.apache.thermos.ttypes import TaskState
 
 
 class ThermosTaskRunner(TaskRunner):

@@ -16,6 +16,9 @@
 
 import unittest
 
+import mox
+import pytest
+
 from apache.aurora.client.api.health_check import (
     HealthCheck,
     NotRetriable,
@@ -23,16 +26,7 @@ from apache.aurora.client.api.health_check import (
     StatusHealthCheck
 )
 
-from gen.apache.aurora.api.ttypes import (
-    AssignedTask,
-    ScheduledTask,
-    ScheduleStatus,
-    TaskConfig
-)
-
-import mox
-import pytest
-
+from gen.apache.aurora.api.ttypes import AssignedTask, ScheduledTask, ScheduleStatus, TaskConfig
 
 PENDING = ScheduleStatus.PENDING
 RUNNING = ScheduleStatus.RUNNING

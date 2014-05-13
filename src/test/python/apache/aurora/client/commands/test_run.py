@@ -16,6 +16,8 @@
 
 import contextlib
 
+from mock import Mock, patch
+
 from apache.aurora.client.commands.run import run
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 
@@ -29,10 +31,8 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatusResult,
     TaskConfig,
     TaskEvent,
-    TaskQuery,
+    TaskQuery
 )
-
-from mock import Mock, patch
 
 
 class TestRunCommand(AuroraClientCommandTest):

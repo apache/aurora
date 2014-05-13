@@ -19,11 +19,11 @@
 from operator import attrgetter
 from time import time
 
-from .process import ProcessSample
-
-from psutil import Process
-from psutil import NoSuchProcess, AccessDenied, Error as PsutilError
+from psutil import Error as PsutilError
+from psutil import AccessDenied, NoSuchProcess, Process
 from twitter.common import log
+
+from .process import ProcessSample
 
 
 def process_to_sample(process):
@@ -104,4 +104,3 @@ class ProcessTreeCollector(object):
   def procs(self):
     """ Number of active processes in the tree """
     return len(self._sampled_tree)
-

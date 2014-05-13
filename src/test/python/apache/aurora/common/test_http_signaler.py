@@ -14,14 +14,13 @@
 # limitations under the License.
 #
 
-from socket import timeout as SocketTimeout
 import unittest
+from socket import timeout as SocketTimeout
 
+import mox
 from twitter.common.lang import Compatibility
 
 from apache.aurora.common.http_signaler import HttpSignaler
-
-import mox
 
 if Compatibility.PY3:
   import urllib.request as urllib_request

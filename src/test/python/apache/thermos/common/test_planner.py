@@ -15,6 +15,7 @@
 #
 
 import pytest
+
 from apache.thermos.common.planner import Planner
 
 

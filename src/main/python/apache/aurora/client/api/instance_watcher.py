@@ -16,16 +16,11 @@
 
 import time
 
-from gen.apache.aurora.api.ttypes import (
-  Identity,
-  ResponseCode,
-  ScheduleStatus,
-  TaskQuery,
-)
+from twitter.common import log
 
 from .health_check import StatusHealthCheck
 
-from twitter.common import log
+from gen.apache.aurora.api.ttypes import Identity, ResponseCode, ScheduleStatus, TaskQuery
 
 
 class Instance(object):

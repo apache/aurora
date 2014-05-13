@@ -16,12 +16,11 @@
 
 import os
 
-from apache.aurora.executor.common.sandbox import DirectorySandbox, SandboxInterface
-
-from twitter.common.contextutil import temporary_dir
-
 import mock
 import pytest
+from twitter.common.contextutil import temporary_dir
+
+from apache.aurora.executor.common.sandbox import DirectorySandbox, SandboxInterface
 
 
 def test_directory_sandbox():

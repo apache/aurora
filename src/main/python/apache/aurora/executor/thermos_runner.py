@@ -20,13 +20,12 @@ import signal
 import sys
 import traceback
 
+from twitter.common import app, log
+
 from apache.thermos.common.options import add_port_to
 from apache.thermos.common.planner import TaskPlanner
 from apache.thermos.config.loader import ThermosConfigLoader
 from apache.thermos.core.runner import TaskRunner
-
-from twitter.common import app, log
-
 
 app.add_option(
     "--thermos_json",

@@ -18,7 +18,6 @@
 
 from __future__ import print_function
 
-from collections import namedtuple
 import getpass
 import os
 import pprint
@@ -26,36 +25,30 @@ import pwd
 import re
 import sys
 import time
-
-from apache.thermos.common.path import TaskPath
-from apache.thermos.common.ckpt import CheckpointDispatcher
-from apache.thermos.common.options import add_port_to, add_binding_to
-from apache.thermos.config.loader import ThermosConfigLoader, ThermosTaskWrapper
-from apache.thermos.config.schema import (
-  Process,
-  Resources,
-  Task)
-from apache.thermos.core.helper import TaskRunnerHelper
-from apache.thermos.core.runner import TaskRunner
-from apache.thermos.monitoring.detector import TaskDetector
-from apache.thermos.monitoring.garbage import TaskGarbageCollector, DefaultCollector
-from apache.thermos.monitoring.monitor import TaskMonitor
-
-from gen.apache.thermos.ttypes import (
-  ProcessState,
-  RunnerCkpt,
-  RunnerState,
-  TaskState)
+from collections import namedtuple
 
 from pystachio import Ref
 from pystachio.naming import frozendict
 from twitter.common import app, log
-from twitter.common.log.options import LogOptions
 from twitter.common.dirutil import du, tail_f
 from twitter.common.dirutil.tail import tail as tail_closed
-from twitter.common.quantity import Amount, Time, Data
-from twitter.common.quantity.parse_simple import parse_time, parse_data
+from twitter.common.log.options import LogOptions
+from twitter.common.quantity import Amount, Data, Time
+from twitter.common.quantity.parse_simple import parse_data, parse_time
 from twitter.common.recordio import RecordIO, ThriftRecordReader
+
+from apache.thermos.common.ckpt import CheckpointDispatcher
+from apache.thermos.common.options import add_binding_to, add_port_to
+from apache.thermos.common.path import TaskPath
+from apache.thermos.config.loader import ThermosConfigLoader, ThermosTaskWrapper
+from apache.thermos.config.schema import Process, Resources, Task
+from apache.thermos.core.helper import TaskRunnerHelper
+from apache.thermos.core.runner import TaskRunner
+from apache.thermos.monitoring.detector import TaskDetector
+from apache.thermos.monitoring.garbage import DefaultCollector, TaskGarbageCollector
+from apache.thermos.monitoring.monitor import TaskMonitor
+
+from gen.apache.thermos.ttypes import ProcessState, RunnerCkpt, RunnerState, TaskState
 
 app.add_option("--root", dest="root", metavar="PATH",
                default=TaskPath.DEFAULT_CHECKPOINT_ROOT,

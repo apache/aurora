@@ -16,9 +16,9 @@
 
 import os
 
-from .loader import AuroraConfigLoader
-
 import pkg_resources
+
+from .loader import AuroraConfigLoader
 
 
 class Recipes(object):

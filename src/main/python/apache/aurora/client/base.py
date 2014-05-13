@@ -14,15 +14,15 @@
 # limitations under the License.
 #
 
-from collections import defaultdict
 import functools
 import optparse
 import sys
+from collections import defaultdict
 from urlparse import urljoin
 
-from gen.apache.aurora.api.ttypes import ResponseCode
-
 from twitter.common import app, log
+
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 
 LOCKED_WARNING = """

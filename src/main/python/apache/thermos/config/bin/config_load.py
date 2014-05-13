@@ -15,13 +15,13 @@
 #
 
 import copy
-import sys
 import json
 import pprint
-
-from apache.thermos.config.loader import ThermosConfigLoader
+import sys
 
 from twitter.common import app
+
+from apache.thermos.config.loader import ThermosConfigLoader
 
 
 def main(args):

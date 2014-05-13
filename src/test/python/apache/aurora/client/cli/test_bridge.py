@@ -85,4 +85,3 @@ class TestBridgedCommandLine(unittest.TestCase):
     bridge2 = Bridge([self.two, self.one, self.three])
     assert bridge1.execute(['test', 'three']) == 1
     assert bridge2.execute(['test', 'three']) == 2
-

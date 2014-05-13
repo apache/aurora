@@ -41,48 +41,50 @@ terminal state.
 
 """
 
-from contextlib import contextmanager
 import errno
-from functools import partial
 import os
 import socket
 import sys
 import time
 import traceback
-
-from apache.thermos.common.ckpt import (
-  CheckpointDispatcher,
-  UniversalStateHandler,
-  ProcessStateHandler,
-  TaskStateHandler)
-from apache.thermos.common.path import TaskPath
-from apache.thermos.common.planner import TaskPlanner
-from apache.thermos.config.loader import (
-  ThermosConfigLoader,
-  ThermosProcessWrapper,
-  ThermosTaskWrapper,
-  ThermosTaskValidator)
-from apache.thermos.config.schema import ThermosContext
-
-from gen.apache.thermos.ttypes import (
-  ProcessState,
-  ProcessStatus,
-  RunnerCkpt,
-  RunnerHeader,
-  RunnerState,
-  TaskState,
-  TaskStatus,
-)
-
-from .helper import TaskRunnerHelper
-from .muxer import ProcessMuxer
-from .process import Process
+from contextlib import contextmanager
+from functools import partial
 
 from pystachio import Environment
 from twitter.common import log
 from twitter.common.dirutil import safe_mkdir
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader
+
+from apache.thermos.common.ckpt import (
+    CheckpointDispatcher,
+    ProcessStateHandler,
+    TaskStateHandler,
+    UniversalStateHandler
+)
+from apache.thermos.common.path import TaskPath
+from apache.thermos.common.planner import TaskPlanner
+from apache.thermos.config.loader import (
+    ThermosConfigLoader,
+    ThermosProcessWrapper,
+    ThermosTaskValidator,
+    ThermosTaskWrapper
+)
+from apache.thermos.config.schema import ThermosContext
+
+from .helper import TaskRunnerHelper
+from .muxer import ProcessMuxer
+from .process import Process
+
+from gen.apache.thermos.ttypes import (
+    ProcessState,
+    ProcessStatus,
+    RunnerCkpt,
+    RunnerHeader,
+    RunnerState,
+    TaskState,
+    TaskStatus
+)
 
 
 # TODO(wickman) Currently this is messy because of all the private access into ._runner.

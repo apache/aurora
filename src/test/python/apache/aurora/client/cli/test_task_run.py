@@ -15,12 +15,13 @@
 #
 
 import contextlib
+
 from mock import Mock, patch
 
 from apache.aurora.client.cli import EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -31,7 +32,7 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatusResult,
     TaskConfig,
     TaskEvent,
-    TaskQuery,
+    TaskQuery
 )
 
 
@@ -191,4 +192,3 @@ class TestSshCommand(AuroraClientCommandTest):
       mock_subprocess.assert_called_with(['ssh', '-t', 'bozo@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])
-

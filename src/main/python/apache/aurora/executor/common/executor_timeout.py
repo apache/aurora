@@ -15,8 +15,8 @@
 #
 
 from twitter.common import log
-from twitter.common.quantity import Amount, Time
 from twitter.common.exceptions import ExceptionalThread
+from twitter.common.quantity import Amount, Time
 
 
 class ExecutorTimeout(ExceptionalThread):

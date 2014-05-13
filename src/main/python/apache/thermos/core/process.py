@@ -22,7 +22,6 @@ commandline in a subprocess of its own.
 
 """
 
-from abc import abstractmethod
 import getpass
 import grp
 import os
@@ -31,23 +30,15 @@ import signal
 import subprocess
 import sys
 import time
+from abc import abstractmethod
 
-
-from gen.apache.thermos.ttypes import (
-    ProcessState,
-    ProcessStatus,
-    RunnerCkpt,
-)
-
-from twitter.common.dirutil import (
-    lock_file,
-    safe_mkdir,
-    safe_open,
-)
-from twitter.common.lang import Interface
 from twitter.common import log
+from twitter.common.dirutil import lock_file, safe_mkdir, safe_open
+from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Time
 from twitter.common.recordio import ThriftRecordReader, ThriftRecordWriter
+
+from gen.apache.thermos.ttypes import ProcessState, ProcessStatus, RunnerCkpt
 
 
 class Platform(Interface):
