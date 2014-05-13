@@ -670,6 +670,10 @@ def restart(args, options):
 
   Restarts are fully controlled client-side, so aborting halts the restart.
   """
+  if options.max_total_failures < 0:
+    print("max_total_failures option must be >0, but you specified %s" % options.max_total_failures,
+      file=sys.stderr)
+    exit(1)
   maybe_disable_hooks(options)
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())

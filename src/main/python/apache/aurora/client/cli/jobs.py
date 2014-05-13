@@ -457,6 +457,15 @@ class RestartCommand(Verb):
 Restarts are fully controlled client-side, so aborting halts the restart."""
 
   def execute(self, context):
+    # Check for negative max_total_failures option - negative is an error.
+    # for per-shard failures, negative means "no limit", so it's allowed.
+    if context.options.max_total_failures < 0:
+      context.print_err("max_total_failures option must be >0, but you specified %s" %
+          context.options.max_total_failures)
+      context.print_log(logging.INFO, "Error: max_total_failures option=%s" %
+          context.options.max_total_failures)
+      return EXIT_INVALID_PARAMETER
+
     job = context.options.instance_spec.jobkey
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)

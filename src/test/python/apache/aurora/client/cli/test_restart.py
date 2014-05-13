@@ -20,7 +20,7 @@ from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
-from apache.aurora.client.cli import EXIT_API_ERROR
+from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
 
@@ -107,11 +107,12 @@ class TestRestartCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'restart', '--batch-size=5', '--strict', 'west/bozo/test/hello/0-100',
-            fp.name])
-
-        assert mock_scheduler_proxy.getTasksStatus.call_count == 1
+        result = cmd.execute(['job', 'restart', '--batch-size=5', '--max-total-failures=-1',
+            'west/bozo/test/hello', fp.name])
+        assert result == EXIT_INVALID_PARAMETER
+        assert mock_scheduler_proxy.getTasksStatus.call_count == 0
         assert mock_scheduler_proxy.restartShards.call_count == 0
+
 
   def test_restart_failed_status(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
@@ -164,8 +165,6 @@ class TestRestartCommand(AuroraClientCommandTest):
         # Error message should be written to log, and it should be what was returned
         # by the getTasksStatus call.
         mock_log.assert_called_with(20, 'Error executing command: %s', 'Damn')
-
-
 
   def test_restart_failed_restart(self):
     # Test the client-side updater logic in its simplest case: everything succeeds, and no rolling
