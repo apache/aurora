@@ -137,7 +137,7 @@ class MetricCalculator implements Runnable {
     this.metricCache = CacheBuilder.newBuilder().build(
         new CacheLoader<String, Counter>() {
           public Counter load(String key) {
-            return new Counter(statsProvider);
+            return new Counter(statsProvider.untracked());
           }
         });
   }

@@ -43,10 +43,12 @@ public class MetricCalculatorTest extends EasyMockTest {
   @Before
   public void setUp() throws Exception {
     StatsProvider statsProvider = createMock(StatsProvider.class);
+    StatsProvider untracked = createMock(StatsProvider.class);
     MetricCalculatorSettings settings = new MetricCalculatorSettings(10000);
     storageUtil = new StorageTestUtil(this);
     calculator = new MetricCalculator(storageUtil.storage, clock, settings, statsProvider);
-    expect(statsProvider.makeGauge(EasyMock.anyString(), EasyMock.<Supplier<Number>>anyObject()))
+    expect(statsProvider.untracked()).andReturn(untracked).anyTimes();
+    expect(untracked.makeGauge(EasyMock.anyString(), EasyMock.<Supplier<Number>>anyObject()))
         .andReturn(EasyMock.<Stat<Number>>anyObject())
         .anyTimes();
   }
@@ -54,10 +56,11 @@ public class MetricCalculatorTest extends EasyMockTest {
   @Test
   public void runTest() {
     clock.advance(Amount.of(10L, Time.SECONDS));
-    storageUtil.expectTaskFetch(Query.unscoped(),
-            SlaTestUtil.makeTask(ImmutableMap.of(clock.nowMillis() - 1000, PENDING), 0),
-            SlaTestUtil.makeTask(ImmutableMap.of(clock.nowMillis() - 2000, PENDING), 1),
-            SlaTestUtil.makeTask(ImmutableMap.of(clock.nowMillis() - 3000, PENDING), 2));
+    storageUtil.expectTaskFetch(
+        Query.unscoped(),
+        SlaTestUtil.makeTask(ImmutableMap.of(clock.nowMillis() - 1000, PENDING), 0),
+        SlaTestUtil.makeTask(ImmutableMap.of(clock.nowMillis() - 2000, PENDING), 1),
+        SlaTestUtil.makeTask(ImmutableMap.of(clock.nowMillis() - 3000, PENDING), 2));
     storageUtil.expectOperations();
 
     control.replay();
