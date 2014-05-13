@@ -426,7 +426,7 @@ auroraUIControllers.controller('JobController',
         statusMessage: latestTaskEvent.message,
         host: task.assignedTask.slaveHost || '',
         latestActivity: _.isEmpty(sortedTaskEvents) ? 0 : latestTaskEvent.timestamp,
-        duration: getDuration(sortedTaskEvents, isActive),
+        duration: getDuration(sortedTaskEvents),
         isActive: isActive,
         taskId: task.assignedTask.taskId,
         taskEvents: summarizeTaskEvents(sortedTaskEvents),
@@ -435,16 +435,20 @@ auroraUIControllers.controller('JobController',
       };
     }
 
-    function getDuration(sortedTaskEvents, isActive) {
-      if (!isActive || _.isEmpty(sortedTaskEvents)) {
-        return 0;
-      }
-
+    function getDuration(sortedTaskEvents) {
       var runningTaskEvent = _.find(sortedTaskEvents, function (taskEvent) {
         return taskEvent.status === ScheduleStatus.RUNNING;
       });
 
-      return runningTaskEvent ? _.last(sortedTaskEvents).timestamp - runningTaskEvent.timestamp : 0;
+      if (runningTaskEvent) {
+        var nextEvent = sortedTaskEvents[_.indexOf(sortedTaskEvents, runningTaskEvent) + 1];
+
+        return nextEvent
+          ? nextEvent.timestamp - runningTaskEvent.timestamp
+          : moment().valueOf() - runningTaskEvent.timestamp;
+      }
+
+      return 0;
     }
 
     function summarizeTaskEvents(taskEvents) {
