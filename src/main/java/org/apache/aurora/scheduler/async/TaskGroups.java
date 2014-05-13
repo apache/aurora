@@ -110,11 +110,11 @@ public class TaskGroups implements EventSubscriber {
 
     this.executor = checkNotNull(executor);
     checkNotNull(rateLimiter);
-    this.taskScheduler = checkNotNull(taskScheduler);
+    checkNotNull(taskScheduler);
     this.backoff = checkNotNull(backoff);
     this.rescheduleCalculator = checkNotNull(rescheduleCalculator);
 
-    final TaskScheduler ratelLimitedScheduler = new TaskScheduler() {
+    this.taskScheduler = new TaskScheduler() {
       @Override
       public boolean schedule(String taskId) {
         rateLimiter.acquire();

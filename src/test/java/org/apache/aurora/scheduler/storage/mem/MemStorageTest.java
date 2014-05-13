@@ -119,7 +119,7 @@ public class MemStorageTest extends TearDownTestCase {
                 .setEnvironment("env-" + taskId))));
   }
 
-  private class CustomException extends RuntimeException {
+  private static class CustomException extends RuntimeException {
   }
 
   private <T, E extends RuntimeException> void expectWriteFail(MutateWork<T, E> work) {

@@ -49,6 +49,7 @@ public class TaskGroupsTest extends EasyMockTest {
   private ScheduledExecutorService executor;
   private BackoffStrategy backoffStrategy;
   private TaskScheduler taskScheduler;
+  private RateLimiter rateLimiter;
   private RescheduleCalculator rescheduleCalculator;
 
   private TaskGroups taskGroups;
@@ -58,11 +59,12 @@ public class TaskGroupsTest extends EasyMockTest {
     executor = createMock(ScheduledExecutorService.class);
     backoffStrategy = createMock(BackoffStrategy.class);
     taskScheduler = createMock(TaskScheduler.class);
+    rateLimiter = createMock(RateLimiter.class);
     rescheduleCalculator = createMock(RescheduleCalculator.class);
     taskGroups = new TaskGroups(
         executor,
         backoffStrategy,
-        RateLimiter.create(10000),
+        rateLimiter,
         taskScheduler,
         rescheduleCalculator);
   }
@@ -78,6 +80,7 @@ public class TaskGroupsTest extends EasyMockTest {
         return null;
       }
     });
+    expect(rateLimiter.acquire()).andReturn(0D);
     expect(taskScheduler.schedule("a")).andReturn(true);
 
     control.replay();
@@ -99,6 +102,7 @@ public class TaskGroupsTest extends EasyMockTest {
     expect(backoffStrategy.calculateBackoffMs(0)).andReturn(0L).atLeastOnce();
     Capture<Runnable> evaluate = expectEvaluate();
 
+    expect(rateLimiter.acquire()).andReturn(0D);
     expect(taskScheduler.schedule(Tasks.id(task))).andAnswer(new IAnswer<Boolean>() {
       @Override
       public Boolean answer() {

@@ -1,0 +1,72 @@
+<FindBugsFilter>
+  <!-- Warnings triggered in thrift-generated code. -->
+  <Match>
+    <Or>
+      <Package name="org.apache.aurora.gen" />
+      <Package name="org.apache.aurora.gen.comm" />
+      <Package name="org.apache.aurora.gen.storage" />
+      <Package name="org.apache.aurora.gen.test" />
+      <!-- Un-namespaced structs used by the executor. -->
+      <Class name="ProcessState" />
+      <Class name="ProcessStatus" />
+      <Class name="RunnerHeader" />
+      <Class name="RunnerState" />
+      <Class name="TaskStatus" />
+    </Or>
+    <Or>
+      <Bug pattern="BC_IMPOSSIBLE_CAST" />
+      <Bug pattern="CN_IDIOM" />
+      <Bug pattern="DLS_DEAD_LOCAL_STORE" />
+      <Bug pattern="NM_CLASS_NAMING_CONVENTION" />
+    </Or>
+  </Match>
+
+  <!-- Method is intentionally only callable by EventBus. -->
+  <Match>
+    <Class name="org.apache.aurora.scheduler.events.PubsubEventModule$1" />
+    <Bug pattern="UMAC_UNCALLABLE_METHOD_OF_ANONYMOUS_CLASS" />
+  </Match>
+
+  <!-- Technical debt. -->
+  <Match>
+    <Class name="org.apache.aurora.scheduler.log.mesos.MesosLog$LogStream" />
+    <Bug pattern="IS2_INCONSISTENT_SYNC" />
+  </Match>
+  <Match>
+    <Class name="org.apache.aurora.scheduler.storage.mem.MemAttributeStore" />
+    <Bug pattern="RV_RETURN_VALUE_OF_PUTIFABSENT_IGNORED" />
+  </Match>
+  <Match>
+    <Class name="org.apache.aurora.scheduler.http.Utilization" />
+    <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
+  </Match>
+  <Match>
+    <Class name="~org\.apache\.aurora.*$" />
+    <Bug pattern="NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE" />
+  </Match>
+  <Match>
+    <Or>
+      <Class name="org.apache.aurora.scheduler.log.testing.FileLogTest" />
+      <Class name="org.apache.aurora.scheduler.storage.backup.StorageBackup$StorageBackupImpl" />
+      <Class name="org.apache.aurora.scheduler.storage.backup.StorageBackupTest" />
+    </Or>
+    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
+  </Match>
+  <Match>
+    <Or>
+      <Class name="org.apache.aurora.scheduler.app.SchedulerIT$IntPosition" />
+      <Class name="org.apache.aurora.scheduler.log.mesos.MesosLog$LogStream$LogPosition" />
+      <Class name="org.apache.aurora.scheduler.log.testing.FileLog$FileStream$CounterPosition" />
+    </Or>
+    <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
+  </Match>
+  <Match>
+    <Or>
+      <Class name="org.apache.aurora.scheduler.cron.testing.AbstractCronIT" />
+      <Class name="org.apache.aurora.scheduler.log.mesos.MesosLogTest" />
+      <Class name="org.apache.aurora.scheduler.thrift.ThriftIT" />
+      <Class name="org.apache.aurora.scheduler.thrift.ThriftIT$1" />
+    </Or>
+    <Bug pattern="DM_DEFAULT_ENCODING" />
+  </Match>
+</FindBugsFilter>

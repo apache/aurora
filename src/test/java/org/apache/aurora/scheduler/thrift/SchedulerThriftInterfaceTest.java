@@ -957,7 +957,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testGetJobSummary() throws Exception {
-    int nextCronRunMs = 100;
+    long nextCronRunMs = 100;
     TaskConfig ownedCronJobTask = nonProductionTask()
         .setJobName(JobKeys.TO_JOB_NAME.apply(JOB_KEY))
         .setOwner(ROLE_IDENTITY)

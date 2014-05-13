@@ -18,7 +18,6 @@ package org.apache.aurora.scheduler.cron.noop;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
-import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CronScheduler;
 import org.junit.Before;
 import org.junit.Test;
@@ -30,13 +29,11 @@ public class NoopCronIT {
   private static final String SCHEDULE = "* * * * *";
 
   private CronScheduler cronScheduler;
-  private CronPredictor cronPredictor;
 
   @Before
   public void setUp() {
     Injector injector = Guice.createInjector(new NoopCronModule());
     cronScheduler = injector.getInstance(CronScheduler.class);
-    cronPredictor = injector.getInstance(CronPredictor.class);
   }
 
   @Test

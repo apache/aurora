@@ -263,7 +263,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
   }
 
   private AtomicInteger curPosition = new AtomicInteger();
-  private class IntPosition implements Position {
+  private static class IntPosition implements Position {
     private final int pos;
 
     IntPosition(int pos) {

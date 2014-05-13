@@ -17,6 +17,7 @@
 apply plugin: 'about'
 apply plugin: 'application'
 apply plugin: 'checkstyle'
+apply plugin: 'findbugs'
 apply plugin: 'idea'
 apply plugin: 'jacoco'
 apply plugin: 'java'
@@ -233,6 +234,14 @@ dependencies {
 
 checkstyle {
   sourceSets = [ sourceSets.main , sourceSets.test]
+}
+
+tasks.withType(FindBugs) {
+  reports {
+    xml.enabled = false
+    html.enabled = true
+  }
+  excludeFilter = rootProject.file('config/findbugs/excludeFilter.xml')
 }
 
 /**

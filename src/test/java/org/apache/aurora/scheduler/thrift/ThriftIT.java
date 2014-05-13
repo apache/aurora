@@ -95,7 +95,7 @@ public class ThriftIT extends EasyMockTest {
     }
   };
 
-  private class CapabilityValidatorFake implements CapabilityValidator {
+  private static class CapabilityValidatorFake implements CapabilityValidator {
     private final SessionValidator validator;
 
     CapabilityValidatorFake(SessionValidator validator) {
