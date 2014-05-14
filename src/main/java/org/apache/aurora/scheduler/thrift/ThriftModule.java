@@ -39,7 +39,7 @@ public class ThriftModule extends AbstractModule {
     Registration.registerServlet(binder(), "/api", SchedulerAPIServlet.class, true);
     // NOTE: GzipFilter is applied only to /api instead of globally because the Jersey-managed
     // servlets from ServletModule have a conflicting filter applied to them.
-    Registration.registerServletFilter(binder(), GzipFilter.class, "/api");
+    Registration.registerServletFilter(binder(), GzipFilter.class, "/api/*");
 
     install(new AopModule());
   }
