@@ -15,17 +15,20 @@
  */
 package org.apache.aurora.scheduler.base;
 
+import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
-import com.google.common.base.Strings;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -83,9 +86,9 @@ public final class JobKeys {
    */
   public static boolean isValid(@Nullable IJobKey jobKey) {
     return jobKey != null
-        && !Strings.isNullOrEmpty(jobKey.getRole())
-        && !Strings.isNullOrEmpty(jobKey.getEnvironment())
-        && !Strings.isNullOrEmpty(jobKey.getName());
+        && ConfigurationManager.isGoodIdentifier(jobKey.getRole())
+        && ConfigurationManager.isGoodIdentifier(jobKey.getEnvironment())
+        && ConfigurationManager.isGoodIdentifier(jobKey.getName());
   }
 
   /**
@@ -132,25 +135,32 @@ public final class JobKeys {
   }
 
   /**
-   * Create a "/"-delimited String representation of a job key, suitable for logging but not
-   * necessarily suitable for use as a unique identifier.
+   * Create a "/"-delimited representation of job key usable as a unique identifier in this cluster.
    *
+   * It is guaranteed that {@code k.equals(JobKeys.parse(JobKeys.canonicalString(k))}.
+   *
+   * @see #parse(String)
    * @param jobKey Key to represent.
-   * @return "/"-delimited representation of the key.
+   * @return Canonical "/"-delimited representation of the key.
    */
-  public static String toPath(IJobKey jobKey) {
-    return jobKey.getRole() + "/" + jobKey.getEnvironment() + "/" + jobKey.getName();
+  public static String canonicalString(IJobKey jobKey) {
+    return Joiner.on("/").join(jobKey.getRole(), jobKey.getEnvironment(), jobKey.getName());
   }
 
   /**
-   * Create a "/"-delimited String representation of job key, suitable for logging but not
-   * necessarily suitable for use as a unique identifier.
+   * Create a job key from a "role/environment/name" representation.
    *
-   * @param job Job to represent.
-   * @return "/"-delimited representation of the job's key.
+   * It is guaranteed that {@code k.equals(JobKeys.parse(JobKeys.canonicalString(k))}.
+   *
+   * @see #canonicalString(IJobKey)
+   * @param string Input to parse.
+   * @return Parsed representation.
+   * @throws IllegalArgumentException when the string fails to parse.
    */
-  public static String toPath(IJobConfiguration job) {
-    return toPath(job.getKey());
+  public static IJobKey parse(String string) throws IllegalArgumentException {
+    List<String> components = Splitter.on("/").splitToList(string);
+    checkArgument(components.size() == 3);
+    return from(components.get(0), components.get(1), components.get(2));
   }
 
   /**

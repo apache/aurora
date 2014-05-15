@@ -125,7 +125,7 @@ class LockManagerImpl implements LockManager {
   private static String formatLockKey(ILockKey lockKey) {
     switch (lockKey.getSetField()) {
       case JOB:
-        return JobKeys.toPath(lockKey.getJob());
+        return JobKeys.canonicalString(lockKey.getJob());
       default:
         return "Unknown lock key type: " + lockKey.getSetField();
     }

@@ -250,9 +250,6 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
   if unbound:
     raise InvalidConfig('Config contains unbound variables: %s' % ' '.join(map(str, unbound)))
 
-  cron_schedule = not_empty_or(job.cron_schedule(), '')
-  cron_policy = select_cron_policy(job.cron_policy(), job.cron_collision_policy())
-
   task.executorConfig = ExecutorConfig(
       name=AURORA_EXECUTOR_NAME,
       data=filter_aliased_fields(underlying).json_dumps())
@@ -260,7 +257,7 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
   return JobConfiguration(
       key=key,
       owner=owner,
-      cronSchedule=cron_schedule,
-      cronCollisionPolicy=cron_policy,
+      cronSchedule=not_empty_or(job.cron_schedule(), None),
+      cronCollisionPolicy=select_cron_policy(job.cron_policy(), job.cron_collision_policy()),
       taskConfig=task,
       instanceCount=fully_interpolated(job.instances()))

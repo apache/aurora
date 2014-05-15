@@ -164,9 +164,15 @@ public final class ConfigurationManager {
     // Utility class.
   }
 
-  @VisibleForTesting
-  static boolean isGoodIdentifier(String identifier) {
-    return GOOD_IDENTIFIER.matcher(identifier).matches()
+  /**
+   * Verifies that an identifier is an acceptable name component.
+   *
+   * @param identifier Identifier to check.
+   * @return false if the identifier is null or invalid.
+   */
+  public static boolean isGoodIdentifier(@Nullable String identifier) {
+    return identifier != null
+        && GOOD_IDENTIFIER.matcher(identifier).matches()
         && (identifier.length() <= MAX_IDENTIFIER_LENGTH);
   }
 

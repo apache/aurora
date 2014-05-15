@@ -244,7 +244,7 @@ public class TaskGroups implements EventSubscriber {
 
     @Override
     public String toString() {
-      return JobKeys.toPath(Tasks.INFO_TO_JOB_KEY.apply(canonicalTask));
+      return JobKeys.canonicalString(Tasks.INFO_TO_JOB_KEY.apply(canonicalTask));
     }
   }
 }

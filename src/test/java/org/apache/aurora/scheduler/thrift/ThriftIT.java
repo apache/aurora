@@ -34,8 +34,8 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
-import org.apache.aurora.scheduler.cron.CronScheduler;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -149,7 +149,7 @@ public class ThriftIT extends EasyMockTest {
 
           @Override
           protected void configure() {
-            bindMock(CronScheduler.class);
+            bindMock(CronJobManager.class);
             bindMock(MaintenanceController.class);
             bindMock(Recovery.class);
             bindMock(SchedulerCore.class);

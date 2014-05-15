@@ -119,7 +119,7 @@ interface SlaGroup {
       return Multimaps.index(tasks, Functions.compose(new Function<IJobKey, String>() {
         @Override
         public String apply(IJobKey jobKey) {
-          return "sla_" + JobKeys.toPath(jobKey) + "_";
+          return "sla_" + JobKeys.canonicalString(jobKey) + "_";
         }
       }, Tasks.SCHEDULED_TO_JOB_KEY));
     }

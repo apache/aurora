@@ -27,5 +27,5 @@ public interface CronPredictor {
    * @param schedule Cron schedule to predict the next time for.
    * @return A prediction for the next time a cron will run.
    */
-  Date predictNextRun(String schedule);
+  Date predictNextRun(CrontabEntry schedule);
 }
