@@ -245,6 +245,37 @@ tasks.withType(FindBugs) {
   excludeFilter = rootProject.file('config/findbugs/excludeFilter.xml')
 }
 
+task checkPython() {
+  def py_versions = ['python2.7', 'python2.6', 'python']
+
+  project.ext.set('py', '')
+
+  py_versions.each { python_exe ->
+    if (project.py.isEmpty()) {
+      // Look for the first version of python listed in py_versions greater than 2.6.
+      // Execute will throw an exception if that python command does not exist,
+      // and set project.py to be empty
+      try {
+        def check = "import sys; sys.stdout.write(str(sys.version_info > (2,6) and sys.version_info < (3,)))"
+        def cmd = [python_exe, "-c", check].execute()
+        def output = cmd.in.text.trim()
+
+        if(output.toLowerCase() == 'true') {
+          project.py = python_exe
+        }
+      } catch (Exception e) {
+          project.py = ''
+      }
+    }
+  }
+
+  doLast {
+    if (project.py.isEmpty()) {
+      throw new GradleException('Build requires Python 2.6 or Python 2.7')
+    }
+  }
+}
+
 /**
  * Check if Apache Thrift is all ready installed and is the same version as we
  * depend on, otherwise compile the version in build-support. project.thrift will
@@ -279,7 +310,7 @@ task bootstrapThrift {
   }
 }
 
-task generateSources(dependsOn: 'bootstrapThrift') {
+task generateSources(dependsOn: ['bootstrapThrift', 'checkPython']) {
   ext.inputFiles = fileTree(dir: 'src/main/thrift').matching { include '**/*.thrift' }
   ext.outputDir = file(generatedDir)
   inputs.file inputFiles
@@ -302,7 +333,7 @@ task generateSources(dependsOn: 'bootstrapThrift') {
     iStructs.each {
       def structName = it
       exec {
-        executable = 'python'
+        executable = project.py
         args = ['src/main/python/apache/aurora/tools/java/thrift_wrapper_codegen.py',
                 'src/main/thrift/org/apache/aurora/gen/api.thrift',
                 structName,
