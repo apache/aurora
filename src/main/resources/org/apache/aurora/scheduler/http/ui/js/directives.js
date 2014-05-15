@@ -82,4 +82,48 @@ auroraUI.directive('schedulingDetail', function () {
   return {
     restrict: 'C'
   };
-})
+});
+
+auroraUI.directive('groupSummary', function() {
+  return {
+    restrict: 'E',
+    templateUrl: '/groupSummary.html',
+    scope: {
+      'groups': '=',
+      'visibleGroups': '=?'
+    },
+    replace: true,
+    link: function(scope) {
+      scope.visibleGroups = scope.visibleGroups || [];
+
+      scope.toggleVisibleGroup = function(index) {
+        var i = _.indexOf(scope.visibleGroups, index, true);
+        if (i > -1) {
+          scope.visibleGroups.splice(i, 1);
+        } else {
+          scope.visibleGroups.push(index);
+          scope.visibleGroups.sort();
+        }
+      }
+
+      scope.showAllGroups = function() {
+        scope.visibleGroups = _.range(scope.groups.length);
+      }
+
+      scope.hideAllGroups = function() {
+        scope.visibleGroups = [];
+      }
+    }
+  };
+});
+
+auroraUI.directive('configSummary', function() {
+  return {
+    restrict: 'E',
+    scope: {
+      'group': '='
+    },
+    templateUrl: '/configSummary.html',
+    replace: true
+  }
+});

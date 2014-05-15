@@ -1,0 +1,44 @@
+<table class="table table-bordered configDetails" style="border-left:5px solid {{group.color}}">
+  <tr>
+    <th colspan="3">
+      configuration details for instances {{group.label}}
+    </th>
+  <tr>
+    <td class="cellLabel" rowspan="3">resources</td>
+    <td>cpu</td>
+    <td>{{group.summary.schedulingDetail.numCpus | toCores}}</td>
+  </tr>
+  <tr>
+    <td>ram</td>
+    <td>{{group.summary.schedulingDetail.ramMb | scaleMb}}</td>
+  </tr>
+  <tr>
+    <td>disk</td>
+    <td>{{group.summary.schedulingDetail.diskMb | scaleMb}}</td>
+  </tr>
+  <tr>
+    <td class="cellLabel">constraints</td>
+    <td colspan="2">{{group.summary.schedulingDetail.constraints}}</td>
+  </tr>
+  <tr>
+    <td class="cellLabel">production</td>
+    <td colspan="2">{{group.summary.schedulingDetail.production}}</td>
+  </tr>
+  <tr>
+    <td class="cellLabel">service</td>
+    <td colspan="2">{{group.summary.schedulingDetail.isService}}</td>
+  </tr>
+  <tr ng-if='group.summary.schedulingDetail.ports'>
+    <td class="cellLabel">ports</td>
+    <td colspan="2">{{group.summary.schedulingDetail.ports}}</td>
+  </tr>
+  <tr ng-if='group.summary.schedulingDetail.metadata'>
+    <td class="cellLabel">metadata</td>
+    <td colspan="2">{{group.summary.schedulingDetail.metadata}}</td>
+  </tr>
+  <tr ng-if='group.summary.schedulingDetail.contact'>
+    <td class="cellLabel">contact</td>
+    <td colspan="2">{{group.summary.schedulingDetail.contact}}
+    </td>
+  </tr>
+</table>

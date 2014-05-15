@@ -232,34 +232,6 @@ auroraUIControllers.controller('JobController',
     $scope.environment = $routeParams.environment;
     $scope.job = $routeParams.job;
 
-    $scope.taskSummary = [];
-    $scope.taskSummaryTableColumns = [
-      {label: 'Instances',
-        map: 'range',
-        isSortable: false,
-        formatFunction: function (range) {
-          return range.start === range.end ? range.start : range.start + '-' + range.end;
-        }
-      },
-      {label: 'Details',
-        map: 'schedulingDetail',
-        isSortable: false,
-        cellTemplateUrl: '/schedulingDetail.html'
-      }
-    ];
-
-    $scope.taskSummaryTableConfig = summaryTableConfig;
-
-    var showSummary = 'Show Summary';
-    var hideSummary = 'Hide Summary';
-    $scope.summaryButtonText = showSummary;
-    $scope.showSummary = false;
-
-    $scope.toggleSummaryVisibility = function () {
-      $scope.showSummary = !$scope.showSummary;
-      $scope.summaryButtonText = $scope.showSummary ? hideSummary : showSummary;
-    };
-
     var taskTableConfig = {
       isGlobalSearchActivated: false,
       isPaginationEnabled: true,
@@ -319,6 +291,33 @@ auroraUIControllers.controller('JobController',
 
     $scope.activeTasks = getTasksForJob($scope.role, $scope.environment, $scope.job);
 
+    function buildGroupSummary($scope) {
+      var colors = [
+        'steelblue',
+        'indianred',
+        'darkseagreen',
+        'sandybrown',
+        'plum'
+      ];
+
+      var total = _.reduce($scope.taskSummary, function(m, n) {
+        return m + ((n.range.end - n.range.start) + 1);
+      }, 0);
+
+      $scope.groupSummary = $scope.taskSummary.map(function(summary, i) {
+        var count = (summary.range.end - summary.range.start) + 1;
+        var percentage = (count / total) * 100;
+
+        return {
+          label: summary.range.start + '-' + summary.range.end,
+          value: count,
+          percentage: percentage,
+          summary: summary,
+          color: colors[i % colors.length]
+        }
+      });
+    }
+
     function getTasksForJob(role, environment, job) {
       var response = auroraClient.getTasks(role, environment, job);
 
@@ -330,6 +329,7 @@ auroraUIControllers.controller('JobController',
       $scope.jobDashboardUrl = getJobDashboardUrl(response.statsUrlPrefix);
 
       $scope.taskSummary = taskUtil.summarizeActiveTaskConfigs(response.tasks);
+      buildGroupSummary($scope);
 
       var tasks = _.map(response.tasks, function (task) {
         return summarizeTask(task);

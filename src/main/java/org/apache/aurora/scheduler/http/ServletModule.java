@@ -169,6 +169,8 @@ public class ServletModule extends AbstractModule {
     registerAsset("ui/taskStatus.html", "/taskStatus.html");
     registerAsset("ui/taskLink.html", "/taskLink.html");
     registerAsset("ui/schedulingDetail.html", "/schedulingDetail.html");
+    registerAsset("ui/groupSummary.html", "/groupSummary.html");
+    registerAsset("ui/configSummary.html", "/configSummary.html");
 
     registerAsset("ui/css/app.css", "/css/app.css");
 

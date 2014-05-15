@@ -1,0 +1,24 @@
+<div class='container-fluid'>
+  <h3>Configuration Overview</h3>
+  <div class="instanceGroups">
+    <div ng-repeat="g in groups" class="groupSummary" style="width:{{g.percentage}}%;background-color:{{g.color}}">
+      <a title="view instances {{g.label}}" class="groupLabel" ng-click="toggleVisibleGroup($index)">
+       {{g.label}}
+      </a>
+    </div>
+  </div>
+  <ul class="visibleGroups" ng-if="visibleGroups.length > 0">
+    <li ng-repeat="index in visibleGroups">
+      <div class='activeGroup'>
+        <config-summary group="groups[index]"></config-summary>
+      </div>
+    </li>
+  </ul>
+  <a ng-click="showAllGroups()" ng-if="visibleGroups.length < groups.length">
+    show <span ng-if="groups.length > 1">all</span><span ng-if="groups.length === 1">config</span>
+  </a>
+  <span ng-if="visibleGroups.length < groups.length && visibleGroups.length > 0"> | </span>
+  <a ng-if="visibleGroups.length > 0" ng-click="hideAllGroups()">
+    hide <span ng-if="groups.length > 1">all</span><span ng-if="groups.length === 1">config</span>
+  </a>
+</div>

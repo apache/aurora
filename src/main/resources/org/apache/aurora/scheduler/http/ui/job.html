@@ -44,22 +44,7 @@
         </div>
       </div>
 
-      <div class='container-fluid'>
-        <button class="btn summaryButton" ng-click='toggleSummaryVisibility()'>
-          {{summaryButtonText}}
-        </button>
-        <div ng-if='showSummary'>
-          <div class='row'>
-            <div class='span8'>
-              <smart-table config='taskSummaryTableConfig'
-                           columns='taskSummaryTableColumns'
-                           rows='taskSummary'
-                           class='table table-striped table-hover table-bordered table-condensed'>
-              </smart-table>
-            </div>
-          </div>
-        </div>
-      </div>
+      <group-summary groups="groupSummary"></group-summary>
 
       <div class='container-fluid'>
         <h3>Active tasks</h3>

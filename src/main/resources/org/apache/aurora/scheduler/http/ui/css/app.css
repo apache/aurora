@@ -47,3 +47,70 @@ ul.breadcrumb {
   right: 10px;
   position: fixed;
 }
+
+.groupSummary {
+  float: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.activeGroup {
+  margin-top: 10px;
+}
+
+.activeGroup .unstyled {
+  padding: 1em;
+}
+
+.instanceGroups:after, .visibleGroups:after{
+  clear: both;
+  content: "";
+  display: block;
+}
+
+.groupLabel {
+  padding: 0.5em 1em;
+  border-right: 1px dashed white;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  display: block;
+}
+
+.groupLabel:hover, .groupLabel:active {
+  color: white;
+}
+
+.groupSummary:last-of-type .groupLabel {
+  border-right: 0;
+}
+
+.groupHeader {
+  color: white;
+  padding: 0.5em 1em;
+}
+
+.configDetails {
+  width: 350px;
+  font-size: 12px;
+}
+
+.configDetails td {
+  padding: 3px 8px;
+}
+
+.configDetails .cellLabel {
+  font-weight: bold;
+}
+
+.visibleGroups {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+.visibleGroups li {
+  padding: 0;
+  margin-right: 5px;
+  float: left;
+}
