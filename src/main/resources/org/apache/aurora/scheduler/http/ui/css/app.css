@@ -4,6 +4,15 @@
   display: none !important;
 }
 
+.header {
+  margin-bottom: 10px;
+  border-bottom: darkgray 1px solid;
+}
+
+.logo {
+  width: 200px;
+}
+
 .pagination {
   text-align: center;
 }

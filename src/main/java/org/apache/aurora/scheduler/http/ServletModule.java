@@ -104,6 +104,7 @@ public class ServletModule extends AbstractModule {
 
     registerAsset("assets/images/viz.png", "/images/viz.png");
     registerAsset("assets/images/aurora.png", "/images/aurora.png");
+    registerAsset("assets/images/aurora_logo.png", "/images/aurora_logo.png");
 
     registerUIClient();
 
