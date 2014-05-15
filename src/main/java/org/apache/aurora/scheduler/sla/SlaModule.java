@@ -23,17 +23,24 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.eventbus.Subscribe;
 import com.google.inject.AbstractModule;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Singleton;
+
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.scheduler.base.AsyncUtil;
+import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
+import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -50,41 +57,67 @@ public class SlaModule extends AbstractModule {
 
   private static final Logger LOG = Logger.getLogger(SlaModule.class.getName());
 
-  @CmdLine(name = "sla_stat_refresh_rate", help = "The SLA stat refresh rate.")
-  private static final Arg<Amount<Long, Time>> SLA_REFRESH_RATE =
+  @Positive
+  @CmdLine(name = "sla_stat_refresh_interval", help = "The SLA stat refresh interval.")
+  private static final Arg<Amount<Long, Time>> SLA_REFRESH_INTERVAL =
       Arg.create(Amount.of(1L, Time.MINUTES));
 
+  @VisibleForTesting
   @BindingAnnotation
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-  private @interface SlaExecutor { }
+  @interface SlaExecutor { }
+
+  private final Amount<Long, Time> refreshInterval;
+
+  @VisibleForTesting
+  SlaModule(Amount<Long, Time> refreshInterval) {
+    this.refreshInterval = refreshInterval;
+  }
+
+  public SlaModule() {
+    this(SLA_REFRESH_INTERVAL.get());
+  }
 
   @Override
   protected void configure() {
-    bind(MetricCalculatorSettings.class).toInstance(
-        new MetricCalculatorSettings(SLA_REFRESH_RATE.get().as(Time.MILLISECONDS)));
+    bind(MetricCalculatorSettings.class)
+        .toInstance(new MetricCalculatorSettings(refreshInterval.as(Time.MILLISECONDS)));
 
     bind(MetricCalculator.class).in(Singleton.class);
     bind(ScheduledExecutorService.class)
         .annotatedWith(SlaExecutor.class)
         .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SlaStat-%d", LOG));
 
+    PubsubEventModule.bindSubscriber(binder(), SlaUpdater.class);
     LifecycleModule.bindStartupAction(binder(), SlaUpdater.class);
   }
 
-  static class SlaUpdater implements Command {
+  static class SlaUpdater implements Command, EventSubscriber {
     private final ScheduledExecutorService executor;
     private final MetricCalculator calculator;
+    private final MetricCalculatorSettings settings;
 
     @Inject
-    SlaUpdater(@SlaExecutor ScheduledExecutorService executor, MetricCalculator calculator) {
+    SlaUpdater(
+        @SlaExecutor ScheduledExecutorService executor,
+        MetricCalculator calculator,
+        MetricCalculatorSettings settings) {
+
       this.executor = checkNotNull(executor);
       this.calculator = checkNotNull(calculator);
+      this.settings = checkNotNull(settings);
+    }
+
+    @Subscribe
+    public void schedulerActive(SchedulerActive event) {
+      long interval = settings.getRefreshRateMs();
+      executor.scheduleAtFixedRate(calculator, interval, interval, TimeUnit.MILLISECONDS);
+      LOG.info(String.format("Scheduled SLA calculation with %d msec interval.", interval));
     }
 
     @Override
     public void execute() throws RuntimeException {
-      long interval = SLA_REFRESH_RATE.get().as(Time.SECONDS);
-      executor.scheduleAtFixedRate(calculator, interval, interval, TimeUnit.SECONDS);
+      // Execution scheduled on SchedulerActive event.
     }
   }
 }

@@ -97,6 +97,10 @@ class MetricCalculator implements Runnable {
     MetricCalculatorSettings(long refreshRateMs) {
       this.refreshRateMs = refreshRateMs;
     }
+
+    long getRefreshRateMs() {
+      return refreshRateMs;
+    }
   }
 
   private static class Counter implements Supplier<Number> {
@@ -152,7 +156,7 @@ class MetricCalculator implements Runnable {
                 Tasks.SCHEDULED_TO_INFO)).toList();
 
     long nowMs = clock.nowMillis();
-    long intervalStartMs = nowMs - settings.refreshRateMs;
+    long intervalStartMs = nowMs - settings.getRefreshRateMs();
 
     for (Entry<AlgorithmType, GroupType> slaMetric : METRICS.entries()) {
       for (Entry<String, Collection<IScheduledTask>> namedGroup
