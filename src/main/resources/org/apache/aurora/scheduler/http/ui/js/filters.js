@@ -61,11 +61,23 @@ auroraUI.filter('scaleMb', function () {
 auroraUI.filter('toCores', function () {
   return  function (count) {
     return count + ' cores';
-  }
+  };
 });
 
 auroraUI.filter('toElapsedTime', function () {
   return function (timestamp) {
     return moment.duration(moment().valueOf() - timestamp).humanize();
-  }
+  };
+});
+
+auroraUI.filter('toUtcTime', function () {
+  return function (timestamp, timezone) {
+    return moment(timestamp).utc().format('MM/DD h:mm:ss') + ' UTC';
+  };
+});
+
+auroraUI.filter('toLocalTime', function () {
+  return function (timestamp, timezone) {
+    return moment(timestamp).format('MM/DD h:mm:ss') + ' LOCAL';
+  };
 });

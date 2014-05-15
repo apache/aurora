@@ -88,26 +88,7 @@ auroraUIControllers.controller('JobSummaryController',
       {label: 'Failed Tasks', map: 'failedTasks'}
     ];
 
-    $scope.cronJobsTableColumns = [
-      {label: 'Environment', map: 'environment', cellTemplateUrl: '/roleEnvLink.html'},
-      {label: 'Job Name', map: 'jobName'},
-      {label: 'Tasks', map: 'tasks'},
-      {label: 'Schedule', map: 'schedule'},
-      {label: 'Next Run',
-        map: 'nextCronRun',
-        formatFunction: function (value, format) {
-          return printDate(value);
-        }
-      },
-      {label: 'Collision Policy', map: 'collisionPolicy'},
-      {label: 'Metadata', map: 'metadata'}
-    ];
-
     $scope.jobsTableConfig = infoTableConfig;
-
-    $scope.cronJobsTableConfig = infoTableConfig;
-
-    $scope.cronJobs = [];
 
     $scope.jobs = getJobs();
 
@@ -131,27 +112,7 @@ auroraUIControllers.controller('JobSummaryController',
         return summary.jobName;
       };
 
-      $scope.cronJobs = _.chain(jobSummaries)
-        .filter(function (summary) {
-          return isCronJob(summary.job);
-        })
-        .map(function (summary) {
-          return {
-            role: $scope.role, // required for roleEnvLink directive
-            environment: summary.job.key.environment,
-            jobName: summary.job.taskConfig.jobName,
-            tasks: summary.job.instanceCount,
-            schedule: summary.job.cronSchedule,
-            nextCronRun: summary.nextCronRunMs,
-            collisionPolicy: getCronCollisionPolicy(summary.job.cronCollisionPolicy),
-            metadata: getMetadata(summary.job.taskConfig.metadata)
-          };
-        })
-        .sortBy(byJobName)
-        .value();
-
       return _.chain(jobSummaries)
-        .reject(isCronJobWithNoTasks)
         .map(function (summary) {
           return {
             role: $scope.role, // required for roleEnvLink directive
@@ -174,59 +135,11 @@ auroraUIControllers.controller('JobSummaryController',
         return 'service';
       }
 
-      if (isCronJob(job)) {
+      if (job.cronSchedule !== null) {
         return 'cron';
       }
 
       return 'adhoc';
-    }
-
-    function isCronJob(job) {
-      return job.cronSchedule !== null;
-    }
-
-    function isCronJobWithNoTasks(summary) {
-      var stats = summary.stats;
-      var taskCount = stats.pendingTaskCount
-        + stats.activeTaskCount
-        + stats.finishedTaskCount
-        + stats.failedTaskCount;
-      return isCronJob(summary.job) && taskCount === 0;
-    }
-
-    function getMetadata(attributes) {
-      return _.map(attributes,function (attribute) {
-        return attribute.key + ': ' + attribute.value;
-      }).join(', ');
-    }
-
-    function getCronCollisionPolicy(cronCollisionPolicy) {
-      return _.keys(CronCollisionPolicy)[cronCollisionPolicy ? cronCollisionPolicy : 0];
-    }
-
-    // TODO(Suman Karumuri): Replace printDate with a more user friendly directive.
-    function printDate(timestamp) {
-      function pad(number) {
-        number = '' + number;
-        if (number.length < 2) {
-          return '0' + number;
-        }
-        return number;
-      }
-
-      var d = new Date(timestamp);
-      return pad(d.getUTCMonth() + 1) + '/'
-        + pad(d.getUTCDate()) + ' '
-        + pad(d.getUTCHours()) + ':'
-        + pad(d.getUTCMinutes()) + ':'
-        + pad(d.getUTCSeconds())
-        + ' UTC ('
-        + pad(d.getMonth() + 1) + '/'
-        + pad(d.getDate()) + ' '
-        + pad(d.getHours()) + ':'
-        + pad(d.getMinutes()) + ':'
-        + pad(d.getSeconds())
-        + ' local)';
     }
   });
 
@@ -274,6 +187,39 @@ auroraUIControllers.controller('QuotaController',
           nonProdConsumption: $filter('scaleMb')(consumption.nonProdConsumption.diskMb)
         }
       ];
+    }
+  }
+);
+
+auroraUIControllers.controller('CronJobSummaryController',
+  function ($scope, $filter, cronJobSummaryService) {
+    $scope.cronJobSummaryTableConfig = summaryTableConfig;
+
+    $scope.cronJobSummaryTableColumns = [
+      {label: 'Number of tasks', map: 'tasks', isSortable: false},
+      {label: 'Cron Schedule', map: 'schedule', isSortable: false},
+      {label: 'Next Cron Run', map: 'nextCronRun', isSortable: false},
+      {label: 'Collision Policy', map: 'collisionPolicy', isSortable: false},
+      {label: 'Metadata', map: 'metadata', isSortable: false}
+    ];
+
+    $scope.error = '';
+    $scope.cronJobSummary = [];
+
+    var cronJobSummary = cronJobSummaryService.getCronJobSummary($scope.role, $scope.environment,
+      $scope.job);
+
+    if (cronJobSummary.error) {
+      $scope.error = 'Error fetching cron job summary: ' + cronJobSummary.error;
+      return [];
+    }
+
+    if (cronJobSummary.cronJobSummary) {
+      var nextCronRunTs = cronJobSummary.cronJobSummary.nextCronRun;
+      cronJobSummary.cronJobSummary.nextCronRun =
+        $filter('toLocalTime')(nextCronRunTs) + ', ' + $filter('toUtcTime')(nextCronRunTs);
+
+      $scope.cronJobSummary = [cronJobSummary.cronJobSummary];
     }
   }
 );

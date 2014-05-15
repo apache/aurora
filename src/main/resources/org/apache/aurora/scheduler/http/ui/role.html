@@ -18,7 +18,7 @@
         </div>
 
         <div class='container-fluid'>
-          <div ng-show='!environment'>
+         <div ng-show='!environment'>
             <div class='row'>
               <div class='span8'>
                 <div ng-controller="QuotaController">
@@ -44,15 +44,6 @@
           <smart-table config='jobsTableConfig'
                        columns='jobsTableColumns'
                        rows='jobs'
-                       class='table table-striped table-hover table-bordered table-condensed'>
-          </smart-table>
-        </div>
-
-        <div class='container-fluid'>
-          <h2 class='text-center'>Cron jobs for role <em>{{role}}</em></h2>
-          <smart-table config='cronJobsTableConfig'
-                       columns='cronJobsTableColumns'
-                       rows='cronJobs'
                        class='table table-striped table-hover table-bordered table-condensed'>
           </smart-table>
         </div>

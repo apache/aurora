@@ -337,18 +337,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     Set<IScheduledTask> tasks =
         Storage.Util.weaklyConsistentFetchTasks(storage, Query.arbitrary(query));
 
-    Response response = new Response();
-
-    if (tasks.isEmpty()) {
-      response.setResponseCode(INVALID_REQUEST)
-          .setMessage("No tasks found for query: " + query);
-    } else {
-      response.setResponseCode(OK)
-          .setResult(Result.scheduleStatusResult(
-              new ScheduleStatusResult().setTasks(IScheduledTask.toBuildersList(tasks))));
-    }
-
-    return response;
+    return new Response().setResponseCode(OK)
+        .setResult(Result.scheduleStatusResult(
+            new ScheduleStatusResult().setTasks(IScheduledTask.toBuildersList(tasks))));
   }
 
   @Override
@@ -403,8 +394,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   private Query.Builder maybeRoleScoped(Optional<String> ownerRole) {
     return ownerRole.isPresent()
-          ? Query.roleScoped(ownerRole.get())
-          : Query.unscoped();
+        ? Query.roleScoped(ownerRole.get())
+        : Query.unscoped();
   }
 
   private Map<IJobKey, IJobConfiguration> getJobs(

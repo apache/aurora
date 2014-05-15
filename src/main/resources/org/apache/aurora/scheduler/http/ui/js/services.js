@@ -213,3 +213,52 @@ auroraUI.factory(
     };
     return taskUtil;
   });
+
+auroraUI.factory(
+  'cronJobSummaryService',
+  [ 'auroraClient',
+    function (auroraClient) {
+      var cronJobSmrySvc = {
+        getCronJobSummary: function (role, env, jobName) {
+          var summaries = auroraClient.getJobSummary(role);
+
+          if (summaries.error) {
+            return {error: 'Failed to fetch cron schedule from scheduler.'};
+          }
+
+          var cronJobSummary = _.chain(summaries.jobs)
+            .filter(function (summary) {
+              // fetch the cron job with a matching name and env.
+              var job = summary.job;
+              return job.cronSchedule !== null
+                && job.key.environment === env
+                && job.taskConfig.jobName === jobName;
+            })
+            .map(function (summary) {
+              // summarize the cron job.
+              return {
+                tasks: summary.job.instanceCount,
+                schedule: summary.job.cronSchedule,
+                nextCronRun: summary.nextCronRunMs,
+                collisionPolicy: cronJobSmrySvc.getCronCollisionPolicy(summary.job.cronCollisionPolicy),
+                metadata: cronJobSmrySvc.getMetadata(summary.job.taskConfig.metadata)
+              };
+            })
+            .last() // there will always be 1 job in this list.
+            .value();
+
+          return {error: '', cronJobSummary: cronJobSummary}
+        },
+
+        getMetadata: function (attributes) {
+          return _.map(attributes,function (attribute) {
+            return attribute.key + ': ' + attribute.value;
+          }).join(', ');
+        },
+
+        getCronCollisionPolicy: function (cronCollisionPolicy) {
+          return _.keys(CronCollisionPolicy)[cronCollisionPolicy ? cronCollisionPolicy : 0];
+        }
+      };
+      return cronJobSmrySvc;
+    }]);
