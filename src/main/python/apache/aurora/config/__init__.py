@@ -274,6 +274,9 @@ class AuroraConfig(object):
   def update_config(self):
     return self._job.update_config()
 
+  def health_check_config(self):
+    return self._job.health_check_config()
+
   def add_metadata(self, key, value):
     self._metadata.append((key, value))
 

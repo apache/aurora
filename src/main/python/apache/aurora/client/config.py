@@ -127,10 +127,28 @@ Based on your job size (%s) you should use max_total_failures >= %s.
 See http://go/auroraconfig for details.
 '''
 
+WATCH_SECS_INSUFFICIENT_ERROR_FORMAT = '''
+You have specified an insufficiently short watch period (%d seconds) in your update configuration.
+Your update will always succeed. In order for the updater to detect health check failures,
+UpdateConfig.watch_secs must be greater than %d seconds to account for an initial
+health check interval (%d seconds) plus %d consecutive failures at a check interval of %d seconds.
+'''
+
+RESTART_THRESHOLD_INSUFFICIENT_ERROR = '''
+restart_threshold in update_config must be greater than watch_secs.
+'''
 
 def _validate_update_config(config):
   job_size = config.instances()
-  max_failures = config.update_config().max_total_failures().get()
+  update_config = config.update_config()
+  health_check_config = config.health_check_config()
+
+  max_failures = update_config.max_total_failures().get()
+  watch_secs = update_config.watch_secs().get()
+  restart_threshold = update_config.restart_threshold().get()
+  initial_interval_secs = health_check_config.initial_interval_secs().get()
+  max_consecutive_failures = health_check_config.max_consecutive_failures().get()
+  interval_secs = health_check_config.interval_secs().get()
 
   if max_failures >= job_size:
     die(UPDATE_CONFIG_MAX_FAILURES_ERROR % (job_size, job_size - 1))
@@ -139,6 +157,14 @@ def _validate_update_config(config):
     min_failure_threshold = int(math.floor(job_size * 0.02))
     if max_failures < min_failure_threshold:
       die(UPDATE_CONFIG_DEDICATED_THRESHOLD_ERROR % (job_size, min_failure_threshold))
+
+  target_watch = initial_interval_secs + (max_consecutive_failures * interval_secs)
+  if watch_secs <= target_watch:
+    die(WATCH_SECS_INSUFFICIENT_ERROR_FORMAT %
+        (watch_secs, target_watch, initial_interval_secs, max_consecutive_failures, interval_secs))
+
+  if restart_threshold <= watch_secs:
+    die(RESTART_THRESHOLD_INSUFFICIENT_ERROR)
 
 
 HEALTH_CHECK_INTERVAL_SECS_ERROR = '''
@@ -167,8 +193,8 @@ def _inject_default_environment(config):
 
 
 def validate_config(config, env=None):
-  _validate_update_config(config)
   _validate_health_check_config(config)
+  _validate_update_config(config)
   _validate_announce_configuration(config)
   _validate_environment_name(config)
 

@@ -84,8 +84,8 @@ HELLO_WORLD = Job(
   %(inner)s
   update_config = UpdateConfig(
     batch_size = 5,
-    restart_threshold = 30,
-    watch_secs = 10,
+    restart_threshold = 60,
+    watch_secs = 45,
     max_per_shard_failures = 2,
   ),
   task = Task(

@@ -21,6 +21,7 @@ from twitter.common.contextutil import temporary_dir, temporary_file
 
 from apache.aurora.client import config
 from apache.aurora.config import AuroraConfig
+from apache.aurora.config.schema.base import HealthCheckConfig, UpdateConfig
 from apache.aurora.config.loader import AuroraConfigLoader
 from apache.aurora.config.schema.base import Announcer, Job, MB, Resources, Task
 
@@ -30,7 +31,7 @@ MESOS_CONFIG_BASE = """
 HELLO_WORLD = Job(
   name = 'hello_world',
   role = 'john_doe',
-  cluster = 'smf1-test',
+  cluster = 'test-cluster',
   environment = 'test',
   %s
   task = Task(
@@ -66,7 +67,6 @@ def test_get_config_announces():
     with temporary_file() as fp:
       fp.write(good_config)
       fp.flush()
-      config.get_config('hello_world', fp.name)
 
       fp.seek(0)
       config.get_config('hello_world', fp)
@@ -80,14 +80,14 @@ def test_get_config_select():
     fp.seek(0)
     config.get_config(
         'hello_world', fp, select_env='test',
-        select_role='john_doe', select_cluster='smf1-test')
+        select_role='john_doe', select_cluster='test-cluster')
 
     fp.seek(0)
     with pytest.raises(ValueError) as cm:
       config.get_config(
           'hello_world', fp, select_env='staging42',
-          select_role='moua', select_cluster='smf1-test')
-    assert 'smf1-test/john_doe/test/hello_world' in str(cm.value.message)
+          select_role='moua', select_cluster='test-cluster')
+    assert 'test-cluster/john_doe/test/hello_world' in str(cm.value.message)
 
 
 def test_include():
@@ -115,7 +115,7 @@ def test_environment_names():
   BAD = ('Prod', ' prod', 'prod ', 'tEst', 'production', 'staging 2', 'stagingA')
   GOOD = ('prod', 'devel', 'test', 'staging', 'staging001', 'staging1', 'staging1234')
   base_job = Job(
-      name='hello_world', role='john_doe', cluster='smf1-test',
+      name='hello_world', role='john_doe', cluster='test-cluster',
       task=Task(name='main', processes=[],
                 resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
 
@@ -130,7 +130,7 @@ def test_environment_names():
 
 def test_inject_default_environment():
   base_job = Job(
-      name='hello_world', role='john_doe', cluster='smf1-test',
+      name='hello_world', role='john_doe', cluster='test-cluster',
       task=Task(name='main', processes=[],
                 resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
 
@@ -145,7 +145,7 @@ def test_inject_default_environment():
 
 def test_dedicated_portmap():
   base_job = Job(
-      name='hello_world', role='john_doe', cluster='smf1-test',
+      name='hello_world', role='john_doe', cluster='test-cluster',
       task=Task(name='main', processes=[],
                 resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
 
@@ -164,3 +164,55 @@ def test_dedicated_portmap():
     config._validate_announce_configuration(
         AuroraConfig(base_job(announce=Announcer(portmap={'http': 80}),
                               constraints={'foo': 'bar'})))
+
+
+def test_update_config_passes_with_default_values():
+  base_job = Job(
+    name='hello_world', role='john_doe', cluster='test-cluster',
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+
+  config._validate_update_config(AuroraConfig(base_job))
+
+def test_update_config_passes_with_min_requirement_values():
+  base_job = Job(
+    name='hello_world', role='john_doe', cluster='test-cluster',
+    update_config = UpdateConfig(watch_secs=26),
+    health_check_config = HealthCheckConfig(max_consecutive_failures=1),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+
+  config._validate_update_config(AuroraConfig(base_job))
+
+def test_update_config_fails_insufficient_watch_secs_less_than_target():
+  base_job = Job(
+    name='hello_world', role='john_doe', cluster='test-cluster',
+    update_config = UpdateConfig(watch_secs=10),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+
+  with pytest.raises(SystemExit):
+    config._validate_update_config(AuroraConfig(base_job))
+
+
+def test_update_config_fails_insufficient_watch_secs_equal_to_target():
+  base_job = Job(
+    name='hello_world', role='john_doe', cluster='test-cluster',
+    update_config = UpdateConfig(watch_secs=25),
+    health_check_config = HealthCheckConfig(max_consecutive_failures=1),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+
+  with pytest.raises(SystemExit):
+    config._validate_update_config(AuroraConfig(base_job))
+
+
+def test_update_config_fails_insufficient_restart_threshold():
+  base_job = Job(
+    name='hello_world', role='john_doe', cluster='test-cluster',
+    update_config = UpdateConfig(watch_secs=70),
+    task=Task(name='main', processes=[],
+              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
+
+  with pytest.raises(SystemExit):
+    config._validate_update_config(AuroraConfig(base_job))

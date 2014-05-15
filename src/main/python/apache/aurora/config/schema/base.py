@@ -117,7 +117,7 @@ class MesosJob(Struct):
   production                 = Default(Boolean, False)
   priority                   = Default(Integer, 0)
   health_check_interval_secs = Integer # DEPRECATED in favor of health_check_config (MESOS-2649).
-  health_check_config        = HealthCheckConfig
+  health_check_config        = Default(HealthCheckConfig, HealthCheckConfig())
   task_links                 = Map(String, String)
 
   enable_hooks = Default(Boolean, False)  # enable client API hooks; from env python-list 'hooks'
