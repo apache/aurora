@@ -139,7 +139,7 @@ if [[ $publish == 1 ]]; then
   git push origin --tags
 fi
 
-dist_name="aurora-${current_version}-incubating"
+dist_name="apache-aurora-${current_version}-incubating"
 
 dist_dir=${base_dir}/dist
 release_dir=${dist_dir}/${current_version}

@@ -189,7 +189,7 @@ git commit -m "Updating .auroraversion to ${current_version_tag}."
 
 echo "Building the source distribution"
 dist_dir=${base_dir}/dist
-dist_name="aurora-${current_version_tag}-incubating"
+dist_name="apache-aurora-${current_version_tag}-incubating"
 
 mkdir -p ${dist_dir}
 git archive --prefix=${dist_name}/ -o ${dist_dir}/${dist_name}.tar.gz HEAD
