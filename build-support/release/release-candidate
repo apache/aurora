@@ -203,10 +203,8 @@ gpg --armor --output ${dist_dir}/${dist_name}.tar.gz.asc --detach-sig ${dist_dir
 echo "Creating checksums"
 # md5
 gpg --print-md MD5 ${dist_name}.tar.gz > ${dist_name}.tar.gz.md5
-gpg --print-md MD5 ${dist_name}.tar.gz.asc > ${dist_name}.tar.gz.asc.md5
 # sha
 shasum ${dist_name}.tar.gz > ${dist_name}.tar.gz.sha
-shasum ${dist_name}.tar.gz.asc > ${dist_name}.tar.gz.asc.sha
 
 # Publish release candidate to svn and commit and push the new git branch
 if [[ $publish == 1 ]]; then
