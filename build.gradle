@@ -21,6 +21,7 @@ apply plugin: 'findbugs'
 apply plugin: 'idea'
 apply plugin: 'jacoco'
 apply plugin: 'java'
+apply plugin: 'js'
 apply plugin: 'license'
 apply plugin: 'maven-publish'
 apply plugin: 'project-report'
@@ -34,6 +35,7 @@ buildscript {
     classpath 'com.github.ben-manes:gradle-versions-plugin:0.4'
     classpath 'com.github.goldin.plugins.gradle:about:0.3.1'
     classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.7.0'
+    classpath 'com.eriwen:gradle-js-plugin:1.11.1'
   }
 }
 
@@ -275,6 +277,38 @@ task checkPython() {
     }
   }
 }
+
+/**
+ * There is a jshint target recommended in the README for gradle-js-plugin
+ * but it does not work. This workaround from here:
+ * https://github.com/eriwen/gradle-js-plugin/issues/73
+ */
+task jsHint(type:com.eriwen.gradle.js.tasks.JsHintTask) {
+  source = fileTree('src/main/resources/org/apache/aurora/scheduler/http/ui/js/')
+  dest file("${buildDir}/jshint.out")
+  // Set this to false once JS code complies with JSHint.
+  ignoreExitCode true
+  outputToStdOut true
+  jshint.options = [
+    // See: http://www.jshint.com/docs/options/ for explanation.
+    browser: true,
+    camelcase: true,
+    curly: true,
+    eqeqeq: true,
+    indent: 2,
+    quotmark: true,
+    trailing: true,
+    undef: true,
+    unused: true
+  ]
+  jshint.predef = [
+    '_': true,
+    'angular': true,
+    'moment': true,
+    'Thrift': true
+  ]
+}
+tasks.checkstyleMain.dependsOn(jsHint)
 
 /**
  * Check if Apache Thrift is all ready installed and is the same version as we
