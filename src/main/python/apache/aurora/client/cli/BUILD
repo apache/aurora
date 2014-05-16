@@ -42,6 +42,7 @@ python_library(
   name='cli',
   sources = [
     '__init__.py',
+    'config.py',
     'context.py',
     'command_hooks.py',
     'jobs.py',

@@ -30,6 +30,8 @@ class AuroraCommandLine(CommandLine):
     super(AuroraCommandLine, self).register_nouns()
     from apache.aurora.client.cli.jobs import Job
     self.register_noun(Job())
+    from apache.aurora.client.cli.config import ConfigNoun
+    self.register_noun(ConfigNoun())
     from apache.aurora.client.cli.quota import Quota
     self.register_noun(Quota())
     from apache.aurora.client.cli.sla import Sla

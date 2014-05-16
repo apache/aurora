@@ -21,6 +21,7 @@ python_test_suite(
     pants(':command_hooks'),
     pants(':help'),
     pants(':job'),
+    pants(':config'),
     pants(':logging'),
     pants(':plugins'),
     pants(':quota'),
@@ -79,6 +80,19 @@ python_tests(
   sources = [ 'test_bridge.py' ],
   dependencies = [
     pants('src/main/python/apache/aurora/client/cli:bridge'),
+  ]
+)
+
+python_tests(
+  name = 'config',
+  sources = [ 'test_config_noun.py' ],
+  dependencies = [
+    pants(':util'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/client/cli'),
+    pants('src/main/python/apache/aurora/client/cli:client_lib'),
+    pants('src/test/python/apache/aurora/client/commands:util')
   ]
 )
 
