@@ -322,7 +322,7 @@ class TestZookeeperSchedulerClient(unittest.TestCase):
       zk_scheduler_client = TestZookeeperSchedulerClient(Cluster(proxy_url=None))
       self.mox.StubOutWithMock(zk_scheduler_client, '_connect_scheduler')
       mock_zk.stop()
-      zk_scheduler_client._connect_scheduler(host, port, False)
+      zk_scheduler_client._connect_scheduler(host, port)
 
       self.mox.ReplayAll()
 

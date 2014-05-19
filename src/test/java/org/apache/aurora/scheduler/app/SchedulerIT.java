@@ -36,7 +36,6 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.net.HostAndPort;
 import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.Atomics;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -62,7 +61,6 @@ import com.twitter.common.zookeeper.ZooKeeperClient;
 import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule;
 import com.twitter.common.zookeeper.guice.client.ZooKeeperClientModule.ClientConfig;
 import com.twitter.common.zookeeper.testing.BaseZooKeeperTest;
-import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
@@ -237,19 +235,16 @@ public class SchedulerIT extends BaseZooKeeperTest {
     });
   }
 
-  private HostAndPort awaitSchedulerReady() throws Exception {
-    return executor.submit(new Callable<HostAndPort>() {
+  private void awaitSchedulerReady() throws Exception {
+    executor.submit(new Callable<Void>() {
       @Override
-      public HostAndPort call() throws Exception {
-        final AtomicReference<HostAndPort> thriftEndpoint = Atomics.newReference();
+      public Void call() throws Exception {
         ServerSet schedulerService = new ServerSetImpl(zkClient, SERVERSET_PATH);
         final CountDownLatch schedulerReady = new CountDownLatch(1);
         schedulerService.watch(new HostChangeMonitor<ServiceInstance>() {
           @Override
           public void onChange(ImmutableSet<ServiceInstance> hostSet) {
             if (!hostSet.isEmpty()) {
-              Endpoint endpoint = Iterables.getOnlyElement(hostSet).getServiceEndpoint();
-              thriftEndpoint.set(HostAndPort.fromParts(endpoint.getHost(), endpoint.getPort()));
               schedulerReady.countDown();
             }
           }
@@ -257,7 +252,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         // A timeout is used because certain types of assertion errors (mocks) will not surface
         // until the main test thread exits this body of code.
         assertTrue(schedulerReady.await(5L, TimeUnit.MINUTES));
-        return thriftEndpoint.get();
+        return null;
       }
     }).get();
   }

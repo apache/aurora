@@ -15,11 +15,8 @@
  */
 package org.apache.aurora.scheduler.thrift;
 
-import javax.inject.Singleton;
-
 import com.google.inject.AbstractModule;
 import com.twitter.common.application.http.Registration;
-import com.twitter.common.application.modules.LifecycleModule;
 
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.scheduler.thrift.aop.AopModule;
@@ -33,8 +30,6 @@ public class ThriftModule extends AbstractModule {
   @Override
   protected void configure() {
     bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
-    bind(ThriftServer.class).in(Singleton.class);
-    LifecycleModule.bindServiceRunner(binder(), ThriftServerLauncher.class);
 
     Registration.registerServlet(binder(), "/api", SchedulerAPIServlet.class, true);
     // NOTE: GzipFilter is applied only to /api instead of globally because the Jersey-managed

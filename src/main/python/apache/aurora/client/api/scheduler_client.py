@@ -20,11 +20,10 @@ import time
 import traceback
 
 from pystachio import Boolean, Default, Integer, String
-from thrift.protocol import TBinaryProtocol
-from thrift.transport import TSocket, TTransport
+from thrift.protocol import TJSONProtocol
+from thrift.transport import THttpClient, TTransport
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
-from twitter.common.rpc.transports.tsslsocket import DelayedHandshakeTSSLSocket
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset import ServerSet
 
@@ -42,7 +41,6 @@ class SchedulerClientTrait(Cluster.Trait):
   scheduler_uri     = String
   proxy_url         = String
   auth_mechanism    = Default(String, 'UNAUTHENTICATED')
-  use_thrift_ssl    = Default(Boolean, False)
 
 
 class SchedulerClient(object):
@@ -61,21 +59,20 @@ class SchedulerClient(object):
     cluster = cluster.with_trait(SchedulerClientTrait)
     if cluster.zk:
       return ZookeeperSchedulerClient(
-          cluster, port=cluster.zk_port, ssl=cluster.use_thrift_ssl, **kwargs)
+          cluster, port=cluster.zk_port, **kwargs)
     elif cluster.scheduler_uri:
       try:
         host, port = cluster.scheduler_uri.split(':', 2)
         port = int(port)
       except ValueError:
         raise ValueError('Malformed Cluster scheduler_uri: %s' % cluster.scheduler_uri)
-      return DirectSchedulerClient(host, port, ssl=cluster.use_thrift_ssl)
+      return DirectSchedulerClient(host, port)
     else:
       raise ValueError('"cluster" does not specify zk or scheduler_uri')
 
-  def __init__(self, verbose=False, ssl=False):
+  def __init__(self, verbose=False):
     self._client = None
     self._verbose = verbose
-    self._ssl = ssl
 
   def get_thrift_client(self):
     if self._client is None:
@@ -88,13 +85,9 @@ class SchedulerClient(object):
     return None
 
   @staticmethod
-  def _connect_scheduler(host, port, with_ssl=False):
-    if with_ssl:
-      socket = DelayedHandshakeTSSLSocket(host, port, delay_handshake=True, validate=False)
-    else:
-      socket = TSocket.TSocket(host, port)
-    transport = TTransport.TBufferedTransport(socket)
-    protocol = TBinaryProtocol.TBinaryProtocol(transport)
+  def _connect_scheduler(host, port):
+    transport = THttpClient('http://%s:%s/api' % (host, port))
+    protocol = TJSONProtocol.TJSONProtocol(transport)
     schedulerClient = AuroraAdmin.Client(protocol)
     for _ in range(SchedulerClient.THRIFT_RETRIES):
       try:
@@ -123,11 +116,10 @@ class ZookeeperSchedulerClient(SchedulerClient):
     zk = TwitterKazooClient.make(str('%s:%s' % (cluster.zk, port)), verbose=verbose)
     return zk, ServerSet(zk, cluster.scheduler_zk_path, **kw)
 
-  def __init__(self, cluster, port=2181, ssl=False, verbose=False):
-    SchedulerClient.__init__(self, verbose=verbose, ssl=ssl)
+  def __init__(self, cluster, port=2181, verbose=False):
+    SchedulerClient.__init__(self, verbose=verbose)
     self._cluster = cluster
     self._zkport = port
-    self._endpoint = None
     self._http = None
 
   def _connect(self):
@@ -141,10 +133,9 @@ class ZookeeperSchedulerClient(SchedulerClient):
     if len(serverset_endpoints) == 0:
       raise self.CouldNotConnect('No schedulers detected in %s!' % self._cluster.name)
     instance = serverset_endpoints[0]
-    self._endpoint = instance.service_endpoint
     self._http = instance.additional_endpoints.get('http')
     zk.stop()
-    return self._connect_scheduler(self._endpoint.host, self._endpoint.port, self._ssl)
+    return self._connect_scheduler(self._http.host, self._http.port)
 
   @property
   def url(self):
@@ -158,13 +149,13 @@ class ZookeeperSchedulerClient(SchedulerClient):
 
 
 class DirectSchedulerClient(SchedulerClient):
-  def __init__(self, host, port, ssl=False):
-    SchedulerClient.__init__(self, verbose=True, ssl=ssl)
+  def __init__(self, host, port):
+    SchedulerClient.__init__(self, verbose=True)
     self._host = host
     self._port = port
 
   def _connect(self):
-    return self._connect_scheduler(self._host, self._port, with_ssl=self._ssl)
+    return self._connect_scheduler(self._host, self._port)
 
   @property
   def url(self):

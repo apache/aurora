@@ -231,14 +231,15 @@ public class SchedulerMain extends AbstractApplication {
 
     LeadershipListener leaderListener = schedulerLifecycle.prepare();
 
-    Optional<InetSocketAddress> primarySocket = serviceRegistry.getPrimarySocket();
-    if (!primarySocket.isPresent()) {
-      throw new IllegalStateException("No primary service registered with LocalServiceRegistry.");
+    Optional<InetSocketAddress> httpSocket =
+        Optional.fromNullable(serviceRegistry.getAuxiliarySockets().get("http"));
+    if (!httpSocket.isPresent()) {
+      throw new IllegalStateException("No HTTP service registered with LocalServiceRegistry.");
     }
 
     try {
       schedulerService.lead(
-          primarySocket.get(),
+          httpSocket.get(),
           serviceRegistry.getAuxiliarySockets(),
           leaderListener);
     } catch (Group.WatchException e) {
