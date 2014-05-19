@@ -53,7 +53,7 @@ def test_simple_config():
     environment=HELLO_WORLD.environment().get(),
     name=HELLO_WORLD.name().get())
   assert job.owner == Identity(role=HELLO_WORLD.role().get(), user=getpass.getuser())
-  assert job.cronSchedule == ''
+  assert job.cronSchedule == None
   assert tti.jobName == 'hello_world'
   assert tti.isService == False
   assert tti.numCpus == 0.1
