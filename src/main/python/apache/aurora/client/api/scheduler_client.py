@@ -58,8 +58,7 @@ class SchedulerClient(object):
       raise TypeError('"cluster" must be an instance of Cluster, got %s' % type(cluster))
     cluster = cluster.with_trait(SchedulerClientTrait)
     if cluster.zk:
-      return ZookeeperSchedulerClient(
-          cluster, port=cluster.zk_port, **kwargs)
+      return ZookeeperSchedulerClient(cluster, port=cluster.zk_port, **kwargs)
     elif cluster.scheduler_uri:
       try:
         host, port = cluster.scheduler_uri.split(':', 2)
@@ -86,7 +85,7 @@ class SchedulerClient(object):
 
   @staticmethod
   def _connect_scheduler(host, port):
-    transport = THttpClient('http://%s:%s/api' % (host, port))
+    transport = THttpClient.THttpClient('http://%s:%s/api' % (host, port))
     protocol = TJSONProtocol.TJSONProtocol(transport)
     schedulerClient = AuroraAdmin.Client(protocol)
     for _ in range(SchedulerClient.THRIFT_RETRIES):
