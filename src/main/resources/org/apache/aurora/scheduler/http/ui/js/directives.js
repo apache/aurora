@@ -13,117 +13,121 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-'use strict';
+(function () {
+  /*global auroraUI:false */
+  'use strict';
 
-auroraUI.directive('roleLink', function () {
-  return {
-    restrict: 'C',
-    template: '<a ng-href="/scheduler/{{formatedValue}}">{{formatedValue}}</a>'
-  };
-});
+  auroraUI.directive('roleLink', function () {
+    return {
+      restrict: 'C',
+      template: '<a ng-href="/scheduler/{{formatedValue}}">{{formatedValue}}</a>'
+    };
+  });
 
-auroraUI.directive('roleEnvLink', function () {
-  return {
-    restrict: 'C',
-    template: '<a ng-href="/scheduler/{{dataRow.role}}/{{formatedValue}}">{{formatedValue}}</a>'
-  };
-});
+  auroraUI.directive('roleEnvLink', function () {
+    return {
+      restrict: 'C',
+      template: '<a ng-href="/scheduler/{{dataRow.role}}/{{formatedValue}}">{{formatedValue}}</a>'
+    };
+  });
 
-auroraUI.directive('jobLink', function () {
-  return {
-    restrict: 'C',
-    template: '<a ng-href="/scheduler/{{dataRow.role}}/{{dataRow.environment}}/{{formatedValue}}">'
-      + '{{formatedValue}}</a>'
-  };
-});
+  auroraUI.directive('jobLink', function () {
+    return {
+      restrict: 'C',
+      template:
+        '<a ng-href="/scheduler/{{dataRow.role}}/{{dataRow.environment}}/{{formatedValue}}">' +
+        '{{formatedValue}}</a>'
+    };
+  });
 
-auroraUI.directive('breadcrumb', function () {
-  return {
-    restrict: 'E',
-    templateUrl: '/breadcrumb.html'
-  };
-});
+  auroraUI.directive('breadcrumb', function () {
+    return {
+      restrict: 'E',
+      templateUrl: '/breadcrumb.html'
+    };
+  });
 
-auroraUI.directive('error', function () {
-  return {
-    restrict: 'E',
-    templateUrl: '/error.html'
-  };
-});
+  auroraUI.directive('error', function () {
+    return {
+      restrict: 'E',
+      templateUrl: '/error.html'
+    };
+  });
 
-auroraUI.directive('taskSandboxLink', function () {
-  return {
-    restrict: 'E',
-    templateUrl: '/taskSandbox.html'
-  };
-});
+  auroraUI.directive('taskSandboxLink', function () {
+    return {
+      restrict: 'E',
+      templateUrl: '/taskSandbox.html'
+    };
+  });
 
-auroraUI.directive('taskStatus', function () {
-  return {
-    restrict: 'E',
-    replace: true,
-    link: function (scope, element, attrs, ctrl) {
-      element.on('click', function (e) {
-        scope.showDetails = !scope.showDetails;
-      });
-    }
-  };
-});
-
-auroraUI.directive('taskLink', function () {
-  return {
-    restrict: 'C',
-    template: '<a class="span4" ng-href="/structdump/task/{{formatedValue}}" target="_self">' +
-      '{{formatedValue}}</a>'
-  };
-});
-
-auroraUI.directive('schedulingDetail', function () {
-  return {
-    restrict: 'C'
-  };
-});
-
-auroraUI.directive('groupSummary', function() {
-  return {
-    restrict: 'E',
-    templateUrl: '/groupSummary.html',
-    scope: {
-      'groups': '=',
-      'visibleGroups': '=?'
-    },
-    replace: true,
-    link: function(scope) {
-      scope.visibleGroups = scope.visibleGroups || [];
-
-      scope.toggleVisibleGroup = function(index) {
-        var i = _.indexOf(scope.visibleGroups, index, true);
-        if (i > -1) {
-          scope.visibleGroups.splice(i, 1);
-        } else {
-          scope.visibleGroups.push(index);
-          scope.visibleGroups.sort();
-        }
+  auroraUI.directive('taskStatus', function () {
+    return {
+      restrict: 'E',
+      replace: true,
+      link: function (scope, element, attrs, ctrl) {
+        element.on('click', function (e) {
+          scope.showDetails = !scope.showDetails;
+        });
       }
+    };
+  });
 
-      scope.showAllGroups = function() {
-        scope.visibleGroups = _.range(scope.groups.length);
+  auroraUI.directive('taskLink', function () {
+    return {
+      restrict: 'C',
+      template: '<a class="span4" ng-href="/structdump/task/{{formatedValue}}" target="_self">' +
+        '{{formatedValue}}</a>'
+    };
+  });
+
+  auroraUI.directive('schedulingDetail', function () {
+    return {
+      restrict: 'C'
+    };
+  });
+
+  auroraUI.directive('groupSummary', function () {
+    return {
+      restrict: 'E',
+      templateUrl: '/groupSummary.html',
+      scope: {
+        'groups': '=',
+        'visibleGroups': '=?'
+      },
+      replace: true,
+      link: function (scope) {
+        scope.visibleGroups = scope.visibleGroups || [];
+
+        scope.toggleVisibleGroup = function (index) {
+          var i = _.indexOf(scope.visibleGroups, index, true);
+          if (i > -1) {
+            scope.visibleGroups.splice(i, 1);
+          } else {
+            scope.visibleGroups.push(index);
+            scope.visibleGroups.sort();
+          }
+        };
+
+        scope.showAllGroups = function () {
+          scope.visibleGroups = _.range(scope.groups.length);
+        };
+
+        scope.hideAllGroups = function () {
+          scope.visibleGroups = [];
+        };
       }
+    };
+  });
 
-      scope.hideAllGroups = function() {
-        scope.visibleGroups = [];
-      }
-    }
-  };
-});
-
-auroraUI.directive('configSummary', function() {
-  return {
-    restrict: 'E',
-    scope: {
-      'group': '='
-    },
-    templateUrl: '/configSummary.html',
-    replace: true
-  }
-});
+  auroraUI.directive('configSummary', function () {
+    return {
+      restrict: 'E',
+      scope: {
+        'group': '='
+      },
+      templateUrl: '/configSummary.html',
+      replace: true
+    };
+  });
+})();

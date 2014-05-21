@@ -293,7 +293,7 @@ task jsHint(type:com.eriwen.gradle.js.tasks.JsHintTask) {
   source = fileTree('src/main/resources/org/apache/aurora/scheduler/http/ui/js/')
   dest file("${buildDir}/jshint.out")
   // Set this to false once JS code complies with JSHint.
-  ignoreExitCode true
+  ignoreExitCode false
   outputToStdOut true
   jshint.options = [
     // See: http://www.jshint.com/docs/options/ for explanation.
@@ -302,10 +302,12 @@ task jsHint(type:com.eriwen.gradle.js.tasks.JsHintTask) {
     curly: true,
     eqeqeq: true,
     indent: 2,
+    maxlen: 100,
     quotmark: true,
     trailing: true,
     undef: true,
-    unused: true
+    unused: 'vars',
+    white: true
   ]
   jshint.predef = [
     '_': true,
