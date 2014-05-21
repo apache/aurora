@@ -24,6 +24,7 @@ apply plugin: 'java'
 apply plugin: 'js'
 apply plugin: 'license'
 apply plugin: 'maven-publish'
+apply plugin: 'pmd'
 apply plugin: 'project-report'
 apply plugin: 'versions'
 
@@ -245,6 +246,11 @@ tasks.withType(FindBugs) {
     html.enabled = true
   }
   excludeFilter = rootProject.file('config/findbugs/excludeFilter.xml')
+}
+
+pmd {
+  sourceSets = [ sourceSets.main ]
+  toolVersion = '5.1.1'
 }
 
 task checkPython() {

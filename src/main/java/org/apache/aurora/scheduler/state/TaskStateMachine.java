@@ -249,7 +249,7 @@ class TaskStateMachine {
         // Max failures is ignored when set to -1.
         int maxFailures = task.get().getAssignedTask().getTask().getMaxTaskFailures();
         boolean belowMaxFailures =
-            (maxFailures == -1) || (task.get().getFailureCount() < (maxFailures - 1));
+            maxFailures == -1 || task.get().getFailureCount() < (maxFailures - 1);
         if (isService || belowMaxFailures) {
           addFollowup(RESCHEDULE);
         } else {
@@ -481,10 +481,10 @@ class TaskStateMachine {
                   // (save followed by delete), but it shows a wart with this catch-all behavior.
                   // Strongly consider pushing the SAVE_STATE behavior to each transition handler.
                   boolean pendingDeleteHack =
-                      !(((from == PENDING) || (from == THROTTLED)) && (to == KILLING));
+                      !((from == PENDING || from == THROTTLED) && to == KILLING);
 
                   // Don't bother saving state of a task that is being removed.
-                  if ((to != DELETED) && pendingDeleteHack) {
+                  if (to != DELETED && pendingDeleteHack) {
                     addFollowup(SAVE_STATE);
                   }
                   previousState = Optional.of(from);

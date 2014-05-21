@@ -96,10 +96,10 @@ public class Resources {
    *    equivalents from {@code other}, otherwise {@code false}.
    */
   public boolean greaterThanOrEqual(Resources other) {
-    return (numCpus >= other.numCpus)
-        && (disk.as(Data.MB) >= other.disk.as(Data.MB))
-        && (ram.as(Data.MB) >= other.ram.as(Data.MB))
-        && (numPorts >= other.numPorts);
+    return numCpus >= other.numCpus
+        && disk.as(Data.MB) >= other.disk.as(Data.MB)
+        && ram.as(Data.MB) >= other.ram.as(Data.MB)
+        && numPorts >= other.numPorts;
   }
 
   /**
@@ -244,7 +244,7 @@ public class Resources {
   private static int getNumAvailablePorts(List<Resource> resource) {
     int offeredPorts = 0;
     for (Range range : getPortRanges(resource)) {
-      offeredPorts += 1 + (range.getEnd() - range.getBegin());
+      offeredPorts += 1 + range.getEnd() - range.getBegin();
     }
     return offeredPorts;
   }

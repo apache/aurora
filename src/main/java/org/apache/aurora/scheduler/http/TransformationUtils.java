@@ -47,7 +47,7 @@ final class TransformationUtils {
         public String apply(Range<Integer> range) {
           int lower = range.lowerEndpoint();
           int upper = range.upperEndpoint();
-          return (lower == upper) ? String.valueOf(lower) : (lower + " - " + upper);
+          return lower == upper ? String.valueOf(lower) : lower + " - " + upper;
         }
       };
 

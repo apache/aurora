@@ -83,8 +83,8 @@ public interface SchedulingFilter {
 
       Veto other = (Veto) o;
       return Objects.equal(reason, other.reason)
-          && (score == other.score)
-          && (valueMismatch == other.valueMismatch);
+          && score == other.score
+          && valueMismatch == other.valueMismatch;
     }
 
     @Override

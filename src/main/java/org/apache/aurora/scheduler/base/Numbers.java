@@ -53,7 +53,7 @@ public final class Numbers {
       int start = iterator.next();
       int end = start;
       // Increment the end until the range is non-contiguous.
-      while (iterator.hasNext() && (iterator.peek() == (end + 1))) {
+      while (iterator.hasNext() && iterator.peek() == end + 1) {
         end++;
         iterator.next();
       }

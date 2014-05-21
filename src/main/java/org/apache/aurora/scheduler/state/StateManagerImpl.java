@@ -255,7 +255,7 @@ public class StateManagerImpl implements StateManager {
 
         // CAS operation fails if the task does not exist, or the states don't match.
         if (casState.isPresent()
-            && (!task.isPresent() || (casState.get() != task.get().getStatus()))) {
+            && (!task.isPresent() || casState.get() != task.get().getStatus())) {
 
           return false;
         }

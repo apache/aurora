@@ -54,7 +54,7 @@ public class TransitionResult {
     }
 
     TransitionResult other = (TransitionResult) o;
-    return (success == other.success)
+    return success == other.success
         && Objects.equal(sideEffects, other.sideEffects);
   }
 

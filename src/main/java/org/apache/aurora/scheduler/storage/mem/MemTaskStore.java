@@ -123,7 +123,7 @@ class MemTaskStore implements TaskStore.Mutable {
     long start = System.nanoTime();
     ImmutableSet<IScheduledTask> result = matches(query).transform(TO_SCHEDULED).toSet();
     long durationNanos = System.nanoTime() - start;
-    Level level = (durationNanos >= slowQueryThresholdNanos) ? Level.INFO : Level.FINE;
+    Level level = durationNanos >= slowQueryThresholdNanos ? Level.INFO : Level.FINE;
     if (LOG.isLoggable(level)) {
       Long time = Amount.of(durationNanos, Time.NANOSECONDS).as(Time.MILLISECONDS);
       LOG.log(level, "Query took " + time + " ms: " + query.get());
@@ -232,53 +232,41 @@ class MemTaskStore implements TaskStore.Mutable {
         IScheduledTask task = canonicalTask.task;
         ITaskConfig config = task.getAssignedTask().getTask();
         if (query.getOwner() != null) {
-          if (!StringUtils.isBlank(query.getOwner().getRole())) {
-            if (!query.getOwner().getRole().equals(config.getOwner().getRole())) {
-              return false;
-            }
+          if (!StringUtils.isBlank(query.getOwner().getRole())
+              && !query.getOwner().getRole().equals(config.getOwner().getRole())) {
+            return false;
           }
-          if (!StringUtils.isBlank(query.getOwner().getUser())) {
-            if (!query.getOwner().getUser().equals(config.getOwner().getUser())) {
-              return false;
-            }
-          }
-        }
-        if (query.getEnvironment() != null) {
-          if (!query.getEnvironment().equals(config.getEnvironment())) {
+          if (!StringUtils.isBlank(query.getOwner().getUser())
+              && !query.getOwner().getUser().equals(config.getOwner().getUser())) {
             return false;
           }
         }
-        if (query.getJobName() != null) {
-          if (!query.getJobName().equals(config.getJobName())) {
-            return false;
-          }
+        if (query.getEnvironment() != null
+            && !query.getEnvironment().equals(config.getEnvironment())) {
+          return false;
+        }
+        if (query.getJobName() != null && !query.getJobName().equals(config.getJobName())) {
+          return false;
         }
 
-        if (query.getJobKeysSize() > 0) {
-          if (!query.getJobKeys().contains(JobKeys.from(config).newBuilder())) {
-            return false;
-          }
+        if (query.getJobKeysSize() > 0
+            && !query.getJobKeys().contains(JobKeys.from(config).newBuilder())) {
+          return false;
         }
-        if (query.getTaskIds() != null) {
-          if (!query.getTaskIds().contains(Tasks.id(task))) {
+        if (query.getTaskIds() != null && !query.getTaskIds().contains(Tasks.id(task))) {
             return false;
-          }
         }
 
-        if (query.getStatusesSize() > 0) {
-          if (!query.getStatuses().contains(task.getStatus())) {
-            return false;
-          }
+        if (query.getStatusesSize() > 0 && !query.getStatuses().contains(task.getStatus())) {
+          return false;
         }
-        if (query.getSlaveHostsSize() > 0) {
-          if (!query.getSlaveHosts().contains(task.getAssignedTask().getSlaveHost())) {
-            return false;
-          }
+        if (query.getSlaveHostsSize() > 0
+            && !query.getSlaveHosts().contains(task.getAssignedTask().getSlaveHost())) {
+          return false;
         }
-        if (query.getInstanceIdsSize() > 0) {
-          if (!query.getInstanceIds().contains(task.getAssignedTask().getInstanceId())) {
-            return false;
-          }
+        if (query.getInstanceIdsSize() > 0
+            && !query.getInstanceIds().contains(task.getAssignedTask().getInstanceId())) {
+          return false;
         }
 
         return true;

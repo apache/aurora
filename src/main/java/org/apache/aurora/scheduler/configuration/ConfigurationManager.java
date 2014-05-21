@@ -173,7 +173,7 @@ public final class ConfigurationManager {
   public static boolean isGoodIdentifier(@Nullable String identifier) {
     return identifier != null
         && GOOD_IDENTIFIER.matcher(identifier).matches()
-        && (identifier.length() <= MAX_IDENTIFIER_LENGTH);
+        && identifier.length() <= MAX_IDENTIFIER_LENGTH;
   }
 
   private static void checkNotNull(Object value, String error) throws TaskDescriptionException {

@@ -76,9 +76,9 @@ class UserTaskLauncher implements TaskLauncher {
       ScheduleStatus translatedState = Conversions.convertProtoState(status.getState());
       // TODO(William Farner): Remove this hack once Mesos API change is done.
       //                       Tracked by: https://issues.apache.org/jira/browse/MESOS-343
-      if ((translatedState == ScheduleStatus.FAILED)
-          && (message != null)
-          && (message.contains(MEMORY_LIMIT_EXCEEDED))) {
+      if (translatedState == ScheduleStatus.FAILED
+          && message != null
+          && message.contains(MEMORY_LIMIT_EXCEEDED)) {
         message = MEMORY_LIMIT_DISPLAY;
       }
 

@@ -132,7 +132,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     }
 
     private static int scale(double value, int range) {
-      return Math.min(Veto.MAX_SCORE, (int) ((Veto.MAX_SCORE * value)) / range);
+      return Math.min(Veto.MAX_SCORE, (int) (Veto.MAX_SCORE * value) / range);
     }
 
     @VisibleForTesting

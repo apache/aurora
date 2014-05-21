@@ -225,7 +225,7 @@ public interface PubsubEvent {
   public static class DriverRegistered implements PubsubEvent {
     @Override
     public boolean equals(Object o) {
-      return (o != null) && getClass().equals(o.getClass());
+      return o != null && getClass().equals(o.getClass());
     }
 
     @Override
@@ -237,7 +237,7 @@ public interface PubsubEvent {
   public static class DriverDisconnected implements PubsubEvent {
     @Override
     public boolean equals(Object o) {
-      return (o != null) && getClass().equals(o.getClass());
+      return o != null && getClass().equals(o.getClass());
     }
 
     @Override
@@ -249,7 +249,7 @@ public interface PubsubEvent {
   public static class SchedulerActive implements PubsubEvent {
     @Override
     public boolean equals(Object o) {
-      return (o != null) && getClass().equals(o.getClass());
+      return o != null && getClass().equals(o.getClass());
     }
 
     @Override

@@ -56,7 +56,7 @@ public final class Query {
    */
   public static boolean isJobScoped(Builder taskQuery) {
     TaskQuery q = taskQuery.get();
-    return (q.isSetOwner() && q.getOwner().isSetRole() && q.isSetEnvironment() && q.isSetJobName())
+    return q.isSetOwner() && q.getOwner().isSetRole() && q.isSetEnvironment() && q.isSetJobName()
         || q.isSetJobKeys();
   }
 

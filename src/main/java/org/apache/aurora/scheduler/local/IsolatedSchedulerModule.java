@@ -201,21 +201,21 @@ public class IsolatedSchedulerModule extends AbstractModule {
           Identity mesosUser = new Identity("mesos", "mesos");
           for (int i = 0; i < 20; i++) {
             JobConfiguration service = createJob("serviceJob" + i, mesosUser);
-            service.getTaskConfig().setProduction((i % 2) == 0);
+            service.getTaskConfig().setProduction(i % 2 == 0);
             service.getTaskConfig().setIsService(true);
             submitJob(service);
           }
 
           for (int i = 0; i < 20; i++) {
             JobConfiguration adhocJob = createJob("adhocJob" + i, mesosUser);
-            adhocJob.getTaskConfig().setProduction((i % 2) == 0);
+            adhocJob.getTaskConfig().setProduction(i % 2 == 0);
             adhocJob.getTaskConfig();
             submitJob(adhocJob);
           }
 
           for (int i = 0; i < 20; i++) {
             JobConfiguration cron = createJob("cronJob" + i, mesosUser);
-            cron.getTaskConfig().setProduction((i % 2) == 0);
+            cron.getTaskConfig().setProduction(i % 2 == 0);
             cron.setCronSchedule("* * * * *");
             submitJob(cron);
           }

@@ -250,7 +250,7 @@ public interface OfferQueue extends EventSubscriber {
           return false;
         }
         HostOffer other = (HostOffer) o;
-        return Objects.equal(offer, other.offer) && (mode == other.mode);
+        return Objects.equal(offer, other.offer) && mode == other.mode;
       }
 
       @Override

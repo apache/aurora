@@ -169,7 +169,7 @@ public class NearestFit implements EventSubscriber {
       if (valueMismatchOld == valueMismatchNew) {
         if (newVetoes.size() < vetoes.size()) {
           update(newVetoes);
-        } else if ((newVetoes.size() == vetoes.size()) && (score(newVetoes) < score(vetoes))) {
+        } else if (newVetoes.size() == vetoes.size() && score(newVetoes) < score(vetoes)) {
           update(newVetoes);
         }
       } else if (valueMismatchOld) {
