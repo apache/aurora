@@ -13,16 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from __future__ import print_function
 from sys import argv
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
-from flask import Flask
+class RequestHandler(BaseHTTPRequestHandler):
+  def do_GET(self):
+    self.send_response(200)
+    self.send_header('Content-Type', 'text/plain')
+    self.end_headers()
+    self.wfile.write('Hello!\n')
 
-app = Flask(__name__)
 
-@app.route("/")
-def hello():
-  return "Hello Twitter"
-
-app.run(
-  host="0.0.0.0",
-  port=int(argv[1]))
+server = HTTPServer(('', int(argv[1])), RequestHandler)
+print('Listening on port %s' % argv[1])
+server.serve_forever()

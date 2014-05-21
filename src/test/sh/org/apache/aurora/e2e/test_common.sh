@@ -21,16 +21,6 @@
 # Preserve original stderr so output from signal handlers doesn't get redirected to /dev/null.
 exec 4>&2
 
-_aurora_built=false
-aurora() {
-  if ! $_aurora_built
-  then
-    ./pants src/main/python/apache/aurora/client/bin:aurora_client
-    _aurora_built=true
-  fi
-  ./dist/aurora_client.pex "$@"
-}
-
 _curl() { curl --silent --fail --retry 4 --retry-delay 10 "$@" ; }
 
 collect_result() {
@@ -48,7 +38,7 @@ collect_result() {
       echo "with your code. Either way, this script DNR merging to master. Note you may need to"
       echo "reconcile state manually."
       echo "!!!"
-      vagrant ssh devcluster -c "aurora killall devcluster/vagrant/test/flask_example"
+      vagrant ssh -c "aurora killall devcluster/vagrant/test/http_example"
     fi
     exit $RETCODE
   ) >&4 # Send to the stderr we had at startup.

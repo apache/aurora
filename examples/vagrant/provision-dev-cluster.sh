@@ -33,10 +33,14 @@ update-alternatives --set java /usr/lib/jvm/java-7-openjdk-amd64/jre/bin/java
 hostname 192.168.33.7
 
 function build_all() {
-  if [ ! -d aurora ]; then
-    echo Cloning aurora repo
-    git clone /vagrant aurora
-  fi
+  echo Copying aurora source code
+  rsync -urzvh /vagrant/ aurora \
+      --exclude '.gradle' \
+      --exclude '.pants.d' \
+      --exclude 'dist/*' \
+      --exclude 'build-support/*.venv' \
+      --exclude 'build-support/thrift/thrift-*' \
+      --exclude '*.pyc'
 
   pushd aurora
     # fetch the mesos egg, needed to build python components
@@ -45,7 +49,6 @@ function build_all() {
       wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_0.18.0_amd64.egg \
         -O mesos-0.18.0-py2.7-linux-x86_64.egg
     popd
-    git pull
 
     # install thrift, needed for code generation in the scheduler build
     # TODO(wfarner): Move deb file out of jfarrell's individual hosting.
@@ -59,6 +62,7 @@ function build_all() {
     # build clients
     ./pants src/main/python/apache/aurora/client/bin:aurora_admin
     ./pants src/main/python/apache/aurora/client/bin:aurora_client
+    ./pants src/main/python/apache/aurora/client/cli:aurora2
 
     # build executors/observers
     ./pants src/main/python/apache/aurora/executor/bin:gc_executor
@@ -101,6 +105,7 @@ function install_aurora {
 
   # Ensure clients are in the default PATH.
   ln -s $DIST_DIR/aurora_client.pex /usr/local/bin/aurora
+  ln -s $DIST_DIR/aurora2.pex /usr/local/bin/aurora2
   ln -s $DIST_DIR/aurora_admin.pex /usr/local/bin/aurora_admin
 
   mkdir -p /etc/aurora
