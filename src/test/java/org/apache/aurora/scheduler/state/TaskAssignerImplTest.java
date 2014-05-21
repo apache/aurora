@@ -115,7 +115,6 @@ public class TaskAssignerImplTest extends EasyMockTest {
     assertEquals(Optional.of(TASK_INFO), assigner.maybeAssign(OFFER, TASK, emptyJob));
   }
 
-
   @Test
   public void testAssignVetoes() {
     expect(filter.filter(

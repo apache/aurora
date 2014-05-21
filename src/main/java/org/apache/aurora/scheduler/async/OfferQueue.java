@@ -57,7 +57,7 @@ import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
 
 /**
- * Tracks the Offers currently known by the scheduler
+ * Tracks the Offers currently known by the scheduler.
  */
 public interface OfferQueue extends EventSubscriber {
 

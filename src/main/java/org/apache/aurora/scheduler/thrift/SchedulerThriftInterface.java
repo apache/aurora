@@ -679,7 +679,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return okResponse(Result.getQuotaResult(result));
   }
 
-
   @Requires(whitelist = Capability.PROVISIONER)
   @Override
   public Response setQuota(

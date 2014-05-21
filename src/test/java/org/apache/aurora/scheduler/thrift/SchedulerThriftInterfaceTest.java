@@ -755,7 +755,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         thrift.descheduleCronJob(CRON_JOB.getKey(), DEFAULT_LOCK, SESSION));
   }
 
-
   @Test
   public void testRewriteShardTaskMissing() throws Exception {
     InstanceKey instance = new InstanceKey(JobKeys.from("foo", "bar", "baz").newBuilder(), 0);

@@ -67,7 +67,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A task launcher that periodically initiates garbage collection on a host, re-using a single
- * garbage collection executor
+ * garbage collection executor.
  */
 public class GcExecutorLauncher implements TaskLauncher {
   private static final Logger LOG = Logger.getLogger(GcExecutorLauncher.class.getName());

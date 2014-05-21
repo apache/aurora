@@ -15,7 +15,6 @@
  */
 package org.apache.aurora.scheduler.state;
 
-
 import java.util.Set;
 import java.util.logging.Logger;
 

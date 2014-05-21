@@ -86,7 +86,6 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setFrameworkId(frameworkId)
         .setVersion(CURRENT_API_VERSION);
 
-
     storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);
     expect(storageUtil.quotaStore.fetchQuotas())

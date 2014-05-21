@@ -54,7 +54,7 @@ public final class ResourceAggregates {
   }
 
   /**
-   * a * m
+   * a * m.
    */
   public static IResourceAggregate scale(IResourceAggregate a, int m) {
     return IResourceAggregate.build(new ResourceAggregate()
@@ -64,7 +64,7 @@ public final class ResourceAggregates {
   }
 
   /**
-   * a / b
+   * a / b.
    * <p>
    * This calculates how many times {@code b} "fits into" {@code a}.  Behavior is undefined when
    * {@code b} contains resources with a value of zero.

@@ -78,7 +78,6 @@ public class ConfigurationManagerTest {
           .setRole("owner-role")
           .setUser("owner-user"));
 
-
   @Test
   public void testIsGoodIdentifier() {
     for (String identifier : VALID_IDENTIFIERS) {

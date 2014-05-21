@@ -146,7 +146,7 @@ public interface MaintenanceController {
     }
 
     /**
-     * Notifies the MaintenanceController that a task has changed state
+     * Notifies the MaintenanceController that a task has changed state.
      *
      * @param change Event
      */

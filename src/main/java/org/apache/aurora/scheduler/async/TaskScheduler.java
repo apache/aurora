@@ -92,7 +92,7 @@ interface TaskScheduler extends EventSubscriber {
    */
   class TaskSchedulerImpl implements TaskScheduler {
     /**
-     * Binding annotation for the time duration of reservations
+     * Binding annotation for the time duration of reservations.
      */
     @BindingAnnotation
     @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)

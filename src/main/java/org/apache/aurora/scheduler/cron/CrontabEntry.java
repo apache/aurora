@@ -193,7 +193,6 @@ public final class CrontabEntry {
     return getDayOfMonth().encloses(DAY_OF_MONTH);
   }
 
-
   @VisibleForTesting
   boolean hasWildcardMonth() {
     return getMonth().encloses(MONTH);
@@ -259,7 +258,7 @@ public final class CrontabEntry {
 
   /**
    * Returns a parsable string representation schedule such that
-   * c.equals(CrontabEntry.parse(c.toString())
+   * {@code c.equals(CrontabEntry.parse(c.toString())}.
    */
   @Override
   public String toString() {
@@ -389,15 +388,18 @@ public final class CrontabEntry {
         return ImmutableRangeSet.of(enclosure);
       }
 
-      Matcher matcher;
-      if ((matcher = NUMBER.matcher(rawComponent)).matches()) {
+      Matcher matcher = NUMBER.matcher(rawComponent);
+      if (matcher.matches()) {
         int number = Integer.parseInt(matcher.group("number"));
         Range<Integer> range = Range.singleton(number).canonical(DiscreteDomain.integers());
 
         checkArgument(enclosure.encloses(range), enclosure + " does not enclose " + range);
 
         return ImmutableRangeSet.of(range);
-      } else if ((matcher = RANGE.matcher(rawComponent)).matches()) {
+      }
+
+      matcher = RANGE.matcher(rawComponent);
+      if (matcher.matches()) {
         int lower = Integer.parseInt(matcher.group("lower"));
         int upper = Integer.parseInt(matcher.group("upper"));
         Range<Integer> range = Range.closed(lower, upper).canonical(DiscreteDomain.integers());
@@ -405,7 +407,10 @@ public final class CrontabEntry {
         checkArgument(enclosure.encloses(range), enclosure + " does not enclose " + range);
 
         return ImmutableRangeSet.of(range);
-      } else if ((matcher = WILDCARD_WITH_SKIP.matcher(rawComponent)).matches()) {
+      }
+
+      matcher = WILDCARD_WITH_SKIP.matcher(rawComponent);
+      if (matcher.matches()) {
         int skip = Integer.parseInt(matcher.group("skip"));
         int start = enclosure.lowerEndpoint();
 
@@ -416,7 +421,10 @@ public final class CrontabEntry {
           rangeSet.add(Range.singleton(i).canonical(DiscreteDomain.integers()));
         }
         return rangeSet.build();
-      } else if ((matcher = RANGE_WITH_SKIP.matcher(rawComponent)).matches()) {
+      }
+
+      matcher = RANGE_WITH_SKIP.matcher(rawComponent);
+      if (matcher.matches()) {
         final int lower = Integer.parseInt(matcher.group("lower"));
         final int upper = Integer.parseInt(matcher.group("upper"));
         final int skip = Integer.parseInt(matcher.group("skip"));
@@ -431,10 +439,10 @@ public final class CrontabEntry {
           rangeSet.add(Range.singleton(i).canonical(DiscreteDomain.integers()));
         }
         return rangeSet.build();
-      } else {
-        throw new IllegalArgumentException(
-            "Cron schedule component " + rawComponent + " does not match any known patterns.");
       }
+
+      throw new IllegalArgumentException(
+          "Cron schedule component " + rawComponent + " does not match any known patterns.");
     }
 
     private RangeSet<Integer> parseMinute() {

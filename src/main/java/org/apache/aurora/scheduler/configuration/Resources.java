@@ -205,7 +205,7 @@ public class Resources {
   }
 
   /**
-   * a - b
+   * a - b.
    */
   public static Resources subtract(Resources a, Resources b) {
     return new Resources(
@@ -216,14 +216,14 @@ public class Resources {
   }
 
   /**
-   * sum(a, b)
+   * sum(a, b).
    */
   public static Resources sum(Resources a, Resources b) {
     return sum(ImmutableList.of(a, b));
   }
 
   /**
-   * sum(rs)
+   * sum(rs).
    */
   public static Resources sum(Iterable<Resources> rs) {
     Resources sum = none();

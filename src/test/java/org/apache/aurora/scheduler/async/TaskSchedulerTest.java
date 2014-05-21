@@ -233,7 +233,6 @@ public class TaskSchedulerTest extends EasyMockTest {
                 .setEnvironment("env-" + taskId))));
   }
 
-
   private IScheduledTask makeTask(String taskId, ScheduleStatus status) {
     return IScheduledTask.build(makeTask(taskId).newBuilder().setStatus(status));
   }
