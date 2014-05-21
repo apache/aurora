@@ -719,6 +719,44 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testScheduleCronJob() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    cronJobManager.createJob(anyObject(SanitizedCronJob.class));
+    control.replay();
+    assertResponse(OK, thrift.scheduleCronJob(CRON_JOB, DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testUpdateScheduledCronJob() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
+    cronJobManager.updateJob(anyObject(SanitizedCronJob.class));
+    control.replay();
+    assertResponse(OK, thrift.scheduleCronJob(CRON_JOB, DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testDescheduleCronJob() throws Exception {
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expect(cronJobManager.deleteJob(JOB_KEY)).andReturn(true);
+    control.replay();
+    assertResponse(OK, thrift.descheduleCronJob(CRON_JOB.getKey(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testDescheduleCronJobWithError() throws Exception {
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expect(cronJobManager.deleteJob(JOB_KEY)).andReturn(false);
+    control.replay();
+    assertResponse(INVALID_REQUEST,
+        thrift.descheduleCronJob(CRON_JOB.getKey(), DEFAULT_LOCK, SESSION));
+  }
+
+
+  @Test
   public void testRewriteShardTaskMissing() throws Exception {
     InstanceKey instance = new InstanceKey(JobKeys.from("foo", "bar", "baz").newBuilder(), 0);
 

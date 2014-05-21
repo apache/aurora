@@ -142,9 +142,11 @@ class SchedulerCoreImpl implements SchedulerCore {
         }
 
         validateTaskLimits(job.getTaskConfig(), job.getInstanceCount());
-
+        // TODO(mchucarroll): deprecate cron as a part of create/kill job.(AURORA-454)
         if (isCron(sanitizedConfiguration)) {
           try {
+            LOG.warning("Deprecated behavior: scheduling job " + job.getKey()
+                + " with cron via createJob (AURORA_454)");
             cronJobManager.createJob(SanitizedCronJob.from(sanitizedConfiguration));
           } catch (CronException e) {
             throw new ScheduleException(e);
@@ -239,7 +241,10 @@ class SchedulerCoreImpl implements SchedulerCore {
       // If this looks like a query for all tasks in a job, instruct the cron scheduler to delete
       // it.
       // TODO(maxim): Should be trivial to support killing multiple jobs instead.
+      // TODO(mchucarroll): deprecate cron as a part of create/kill job.  (AURORA-454)
       IJobKey jobKey = Iterables.getOnlyElement(JobKeys.from(query).get());
+      LOG.warning("Deprecated behavior: descheduling job " + jobKey
+          + " with cron via killTasks. (See AURORA-454)");
       cronJobManager.deleteJob(jobKey);
     }
 

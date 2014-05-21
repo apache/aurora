@@ -16,11 +16,11 @@
 
 '''Command-line tooling infrastructure for aurora client v2.
 
-This provides a framework for a noun/verb command-line application. The application is structured
-around a collection of basic objects (nouns) that can be manipulated by the command line, where
-each type of object provides a collection of operations (verbs). Every command invocation
-consists of the name of the noun, followed by one of the verbs for that noun, followed by other
-arguments needed by the verb.
+This module provides a framework for a noun/verb command-line application.
+In this framework, an application is structured around a collection of basic objects (nouns)
+that can be manipulated by the command line, where each type of object provides a collection
+of operations (verbs). Every command invocation consists of the name of the noun, followed by
+one of the verbs for that noun, followed by other arguments needed by the verb.
 
 For example:
 - To create a job, the noun is "job", the verb is "create":

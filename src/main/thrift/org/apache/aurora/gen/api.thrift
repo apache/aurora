@@ -502,6 +502,15 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   // name already exists in the cluster.
   Response createJob(1: JobConfiguration description, 3: Lock lock, 2: SessionKey session)
 
+  // Enters a job into the cron schedule, without actually starting the job.
+  // If the job is already present in the schedule, this will update the schedule
+  // entry with the new configuration.
+  Response scheduleCronJob(1: JobConfiguration description, 3: Lock lock, 2: SessionKey session)
+
+  // Removes a job from the cron schedule. The request will be denied if the
+  // job was not previously scheduled with scheduleCronJob.
+  Response descheduleCronJob(4: JobKey job, 3: Lock lock, 2: SessionKey session)
+
   // Starts a cron job immediately.  The request will be denied if the specified job does not
   // exist for the role account, or the job is not a cron job.
   Response startCronJob(4: JobKey job, 3: SessionKey session)

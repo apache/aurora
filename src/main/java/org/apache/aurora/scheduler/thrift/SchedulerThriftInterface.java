@@ -251,7 +251,102 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     } catch (TaskDescriptionException | ScheduleException e) {
       response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
     }
+    return response;
+  }
 
+  private static boolean isCron(SanitizedConfiguration config) {
+    if (!config.getJobConfig().isSetCronSchedule()) {
+      return false;
+    } else if (StringUtils.isEmpty(config.getJobConfig().getCronSchedule())) {
+      // TODO(ksweeney): Remove this in 0.7.0 (AURORA-424).
+      LOG.warning("Got service config with empty string cron schedule. aurora-0.7.x "
+          + "will interpret this as cron job and cause an error.");
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+  @Override
+  public Response scheduleCronJob(
+      JobConfiguration mutableJob,
+      @Nullable Lock mutableLock,
+      SessionKey session) {
+
+    IJobConfiguration job = IJobConfiguration.build(mutableJob);
+    IJobKey jobKey = JobKeys.assertValid(job.getKey());
+    checkNotNull(session);
+
+    Response response = new Response();
+
+    try {
+      sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
+    } catch (AuthFailedException e) {
+      return response.setResponseCode(AUTH_FAILED).setMessage(e.getMessage());
+    }
+
+    try {
+      SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
+
+      lockManager.validateIfLocked(
+          ILockKey.build(LockKey.job(jobKey.newBuilder())),
+          Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
+
+      if (!isCron(sanitized)) {
+        LOG.info("Invalid attempt to schedule non-cron job "
+            + sanitized.getJobConfig().getKey()
+            + " with cron.");
+        response.setResponseCode(INVALID_REQUEST)
+            .setMessage("Job " + sanitized.getJobConfig().getKey()
+            + " has no cron schedule");
+        return response;
+      }
+      try {
+        // TODO(mchucarroll): Merge CronJobManager.createJob/updateJob
+        if (cronJobManager.hasJob(sanitized.getJobConfig().getKey())) {
+          // The job already has a schedule: so update it.
+          cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
+        } else {
+          cronJobManager.createJob(SanitizedCronJob.from(sanitized));
+        }
+      } catch (CronException e) {
+        response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+        return response;
+      }
+      response.setResponseCode(OK)
+          .setMessage(String.format("Job %s scheduled with cron schedule '%s",
+               sanitized.getJobConfig().getKey(), sanitized.getJobConfig().getCronSchedule()));
+    } catch (LockException e) {
+      response.setResponseCode(LOCK_ERROR).setMessage(e.getMessage());
+    } catch (TaskDescriptionException e) {
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+    }
+    return response;
+  }
+
+  @Override
+  public Response descheduleCronJob(
+      JobKey mutableJobKey,
+      @Nullable Lock mutableLock,
+      SessionKey session) {
+
+    Response response = new Response();
+    try {
+      IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
+      lockManager.validateIfLocked(
+          ILockKey.build(LockKey.job(jobKey.newBuilder())),
+          Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
+
+      if (!cronJobManager.deleteJob(jobKey)) {
+        response.setResponseCode(INVALID_REQUEST)
+            .setMessage("Job " + jobKey + " is not scheduled with cron");
+        return response;
+      }
+      response.setResponseCode(OK)
+          .setMessage(String.format("Job %s removed from cron schedule", jobKey));
+    } catch (LockException e) {
+      response.setResponseCode(INVALID_REQUEST).setMessage(e.getMessage());
+    }
     return response;
   }
 
