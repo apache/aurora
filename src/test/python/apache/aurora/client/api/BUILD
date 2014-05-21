@@ -62,6 +62,7 @@ python_tests(name = 'restarter',
 python_tests(name = 'scheduler_client',
   sources = ['test_scheduler_client.py'],
   dependencies = [
+    pants('3rdparty/python:mock'),
     pants('3rdparty/python:mox'),
     pants('src/main/python/apache/aurora/client/api:scheduler_client'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),

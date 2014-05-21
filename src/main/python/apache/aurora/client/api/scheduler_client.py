@@ -84,7 +84,7 @@ class SchedulerClient(object):
     return None
 
   @staticmethod
-  def _connect_scheduler(host, port):
+  def _connect_scheduler(host, port, clock=time):
     transport = THttpClient.THttpClient('http://%s:%s/api' % (host, port))
     protocol = TJSONProtocol.TJSONProtocol(transport)
     schedulerClient = AuroraAdmin.Client(protocol)
@@ -93,7 +93,7 @@ class SchedulerClient(object):
         transport.open()
         return schedulerClient
       except TTransport.TTransportException:
-        time.sleep(SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
+        clock.sleep(SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
         continue
       except Exception as e:
         # Monkey-patched proxies, like socks, can generate a proxy error here.

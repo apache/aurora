@@ -15,9 +15,12 @@
 #
 
 import inspect
+import time
 import unittest
 
+import mock
 from mox import IgnoreArg, IsA, Mox
+from thrift.transport import THttpClient, TTransport
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset.endpoint import ServiceInstance
@@ -339,3 +342,12 @@ class TestZookeeperSchedulerClient(unittest.TestCase):
       assert zk_scheduler_client.url == 'http://%s:%d' % (host, port)
     finally:
       TestZookeeperSchedulerClient.get_scheduler_serverset = original_method
+
+class TestSchedulerClient(unittest.TestCase):
+  @mock.patch('thrift.transport.THttpClient.THttpClient', spec=THttpClient.THttpClient)
+  def test_connect_scheduler(self, MockTHttpClient):
+    MockTHttpClient.return_value.open.side_effect = [TTransport.TTransportException, True]
+    mock_time = mock.Mock(spec=time)
+    scheduler_client.SchedulerClient._connect_scheduler('scheduler.example.com', 1337, mock_time)
+    assert MockTHttpClient.return_value.open.call_count is 2
+    mock_time.sleep.assert_called_once_with(scheduler_client.SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
