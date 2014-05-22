@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+var auroraUI;
 (function () {
   'use strict';
 
   // Declare app level module which depends on filters, and services
-  var auroraUI = angular.module('auroraUI',
+  auroraUI = angular.module('auroraUI',
     ['ngRoute', 'auroraUI.controllers', 'smartTable.table']);
 
   auroraUI.config(function ($routeProvider, $locationProvider) {
