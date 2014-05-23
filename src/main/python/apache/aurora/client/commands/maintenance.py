@@ -62,8 +62,6 @@ def end_maintenance_hosts(cluster):
 
 
 @app.command
-@app.command_option('--groups_per_batch', dest='groups_per_batch', default=1,
-    help='Number of groups to operate on at a time.')
 @app.command_option('--post_drain_script', dest='post_drain_script', default=None,
     help='Path to a script to run for each host.')
 @app.command_option(FILENAME_OPTION)
@@ -72,7 +70,6 @@ def end_maintenance_hosts(cluster):
 @requires.exactly('cluster')
 def perform_maintenance_hosts(cluster):
   """usage: perform_maintenance_hosts {--filename=filename | --hosts=hosts}
-                                      [--groups_per_batch=num]
                                       [--post_drain_script=path]
                                       [--grouping=function]
                                       cluster
@@ -94,7 +91,6 @@ def perform_maintenance_hosts(cluster):
 
   HostMaintenance(CLUSTERS[cluster], options.verbosity).perform_maintenance(
       drainable_hosts,
-      groups_per_batch=int(options.groups_per_batch),
       callback=drained_callback,
       grouping_function=options.grouping)
 

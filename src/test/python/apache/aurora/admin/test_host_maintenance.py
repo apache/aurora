@@ -46,14 +46,10 @@ def test_default_grouping():
     'foo001.example.com',
   ]
 
-  batches = list(HostMaintenance.iter_batches(example_host_list, 1))
+  batches = list(HostMaintenance.iter_batches(example_host_list))
   assert batches[0] == Hosts(set(['bar337.example.com']))
   assert batches[1] == Hosts(set(['foo001.example.com']))
   assert batches[2] == Hosts(set(['xyz321.example.com']))
-
-  batches = list(HostMaintenance.iter_batches(example_host_list, 2))
-  assert batches[0] == Hosts(set(['bar337.example.com', 'foo001.example.com']))
-  assert batches[1] == Hosts(set(['xyz321.example.com']))
 
 
 def rack_grouping(hostname):
@@ -73,7 +69,7 @@ def test_rack_grouping():
   ]
 
   try:
-    batches = list(HostMaintenance.iter_batches(example_host_list, 1, 'by_rack'))
+    batches = list(HostMaintenance.iter_batches(example_host_list, 'by_rack'))
     assert batches[0] == Hosts(set([
         'west-aaa-001.example.com',
         'west-aaa-002.example.com'
@@ -83,15 +79,6 @@ def test_rack_grouping():
         'east-xyz-003.example.com',
         'east-xyz-004.example.com',
     ]))
-
-    batches = list(HostMaintenance.iter_batches(example_host_list, 2, 'by_rack'))
-    assert batches[0] == Hosts(set(example_host_list))
-
-    batches = list(HostMaintenance.iter_batches(example_host_list, 3, 'by_rack'))
-    assert batches[0] == Hosts(set(example_host_list))
-
-    with pytest.raises(ValueError):
-      list(HostMaintenance.iter_batches(example_host_list, 0))
 
   finally:
     HostMaintenance.GROUPING_FUNCTIONS = old_grouping_functions
