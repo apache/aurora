@@ -20,6 +20,14 @@ tests use
 
     ./gradlew clean build
 
+Running the build with code quality checks
+------------------------------------------
+To speed up development iteration, the plain gradle commands will not run static analysis tools.
+However, you should run these before posting a review diff, and **always** run this before pushing a
+commit to origin/master.
+
+    ./gradlew build -Pq
+
 Creating a bundle for deployment
 --------------------------------
 Gradle can create a zip file containing Aurora, all of its dependencies, and a launch script with

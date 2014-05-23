@@ -236,6 +236,23 @@ dependencies {
   }
 }
 
+// For normal developer builds, avoid running the often-time-consuming code quality checks.
+// Jenkins will always run these, and developers are encouraged to run these before posting diffs
+// and pushing to master.
+def runCodeQuality = project.hasProperty('q')
+def codeQualityTasks = [
+    Checkstyle,
+    FindBugs,
+    nl.javadude.gradle.plugins.license.License,
+    JacocoReport,
+    Pmd
+]
+codeQualityTasks.each {
+  tasks.withType(it) {
+    enabled = runCodeQuality
+  }
+}
+
 checkstyle {
   sourceSets = [ sourceSets.main , sourceSets.test]
 }

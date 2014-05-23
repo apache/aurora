@@ -20,7 +20,7 @@ set -ex
 date
 
 # Run all Java tests
-./gradlew clean build
+./gradlew -Pq clean build
 
 # Run all Python tests
 ./pants src/test/python:all -vxs
