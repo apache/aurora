@@ -302,7 +302,7 @@ class SlaTest(unittest.TestCase):
     assert 0 == len(vector.probe_hosts(90, 200))
 
   def test_probe_hosts_no_tasks(self):
-    self.mock_get_tasks([])
+    self.mock_get_tasks([], response_code=ResponseCode.INVALID_REQUEST)
     vector = self._sla.get_domain_uptime_vector(self._cluster, self._min_count, hosts=['h1', 'h2'])
     assert 0 == len(vector.probe_hosts(90, 200))
 

@@ -40,16 +40,16 @@ def die(msg):
   log.fatal(msg)
   sys.exit(1)
 
-def check_and_log_response(resp):
+def log_response(resp):
   log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
-  if resp.responseCode != ResponseCode.OK:
-    check_and_log_locked_response(resp)
-    sys.exit(1)
 
-def check_and_log_locked_response(resp):
-  if resp.responseCode == ResponseCode.LOCK_ERROR:
-    log.info(LOCKED_WARNING)
+def check_and_log_response(resp):
+  log_response(resp)
+  if resp.responseCode != ResponseCode.OK:
+    if resp.responseCode == ResponseCode.LOCK_ERROR:
+      log.info(LOCKED_WARNING)
+    sys.exit(1)
 
 def deprecation_warning(text):
   log.warning('')

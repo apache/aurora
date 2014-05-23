@@ -19,7 +19,7 @@ import time
 from collections import defaultdict, namedtuple
 from copy import deepcopy
 
-from apache.aurora.client.base import check_and_log_response
+from apache.aurora.client.base import log_response
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.constants import LIVE_STATES
@@ -287,5 +287,7 @@ class Sla(object):
 
   def _get_tasks(self, task_query):
     resp = self._scheduler.getTasksStatus(task_query)
-    check_and_log_response(resp)
+    log_response(resp)
+    if resp.responseCode != ResponseCode.OK:
+      return []
     return resp.result.scheduleStatusResult.tasks
