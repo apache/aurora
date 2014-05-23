@@ -387,7 +387,7 @@ class CommandLine(object):
         GlobalCommandHookRegistry.run_post_hooks(context, context.options.noun, context.options.verb,
             result)
       else:
-        print_aurora_log(logging.INFO, "Commmand terminated with error code %s", result)
+        print_aurora_log(logging.INFO, "Command terminated with error code %s", result)
       self._run_post_plugins(context, result)
       return result
     except Context.CommandError as c:
