@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 #
-# Copyright 2013 Apache Software Foundation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -128,7 +127,6 @@ STRUCT_COLLECTION_FIELD_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
 PACKAGE_NAME = 'org.apache.aurora.scheduler.storage.entities'
 
 CLASS_TEMPLATE = '''/*
- * Copyright 2013 Apache Software Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
