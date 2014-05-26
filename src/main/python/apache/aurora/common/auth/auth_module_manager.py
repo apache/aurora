@@ -1,5 +1,4 @@
 #
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -46,7 +45,7 @@ def register_auth_module(auth_module):
 
 def make_session_key(auth_mechanism='UNAUTHENTICATED'):
   """
-    Attempts to create a session key by calling the auth module registered to the auth mechanism. 
+    Attempts to create a session key by calling the auth module registered to the auth mechanism.
     If an auth module does not exist for an auth mechanism, an InsecureAuthModule will be used.
   """
   if not _AUTH_MODULES:

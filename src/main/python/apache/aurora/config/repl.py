@@ -1,5 +1,4 @@
 #
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -19,5 +18,5 @@ from twitter.common.lang import Compatibility
 
 from apache.aurora.config.loader import AuroraConfigLoader
 
-code.interact('Mesos Config REPL', 
+code.interact('Mesos Config REPL',
     local=Compatibility.exec_function(AuroraConfigLoader.DEFAULT_SCHEMA, globals()))

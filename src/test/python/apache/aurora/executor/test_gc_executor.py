@@ -1,5 +1,4 @@
 #
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -77,7 +76,7 @@ def thread_yield():
 
 def setup_tree(td, lose=False):
   safe_rmtree(td)
-  
+
   # TODO(wickman) These should be referred as resources= in the python_target instead.
   shutil.copytree('src/resources/org/apache/thermos/root', td)
 
