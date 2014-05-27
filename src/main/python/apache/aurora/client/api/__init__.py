@@ -125,7 +125,7 @@ class AuroraClientAPI(object):
     log.info("Canceling update on job %s" % job_key)
     resp = Updater.cancel_update(self._scheduler_proxy, job_key)
     if resp.responseCode != ResponseCode.OK:
-      log.error('Error cancelling the update: %s' % resp.message)
+      log.error('Error cancelling the update: %s' % resp.messageDEPRECATED)
     return resp
 
   def restart(self, job_key, instances, updater_config, health_check_interval_seconds):

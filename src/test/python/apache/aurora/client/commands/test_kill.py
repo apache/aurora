@@ -230,7 +230,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """
     status_response = Mock(spec=Response)
     status_response.responseCode = ResponseCode.OK
-    status_response.message = "Ok"
+    status_response.messageDEPRECATED = "Ok"
     status_response.result = Mock(spec=Result)
     schedule_status = Mock(spec=ScheduleStatusResult)
     status_response.result.scheduleStatusResult = schedule_status

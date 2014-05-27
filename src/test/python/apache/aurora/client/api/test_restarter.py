@@ -54,7 +54,7 @@ class TestRestarter(MoxTestBase):
         FakeSchedulerProxy(CLUSTER, self.mock_scheduler, SESSION_KEY), self.mock_instance_watcher)
 
   def mock_restart_instances(self, instances, lock=None):
-    response = Response(responseCode=ResponseCode.OK, message='test')
+    response = Response(responseCode=ResponseCode.OK, messageDEPRECATED='test')
 
     self.mock_scheduler.restartShards(
         JOB.to_thrift(),
@@ -91,7 +91,7 @@ class TestRestarter(MoxTestBase):
           status=ScheduleStatus.RUNNING,
           assignedTask=AssignedTask(task=TaskConfig(), instanceId=i)
       ))
-    response = Response(responseCode=ResponseCode.OK, message='test')
+    response = Response(responseCode=ResponseCode.OK, messageDEPRECATED='test')
     response.result = Result()
     response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
 
@@ -106,7 +106,7 @@ class TestRestarter(MoxTestBase):
     self.restarter.restart(None)
 
   def mock_status_no_active_task(self):
-    response = Response(responseCode=ResponseCode.INVALID_REQUEST, message='test')
+    response = Response(responseCode=ResponseCode.INVALID_REQUEST, messageDEPRECATED='test')
     self.mock_scheduler.getTasksStatus(IgnoreArg()).AndReturn(response)
 
   def test_restart_no_instance_active(self):
@@ -117,7 +117,7 @@ class TestRestarter(MoxTestBase):
     self.restarter.restart(None)
 
   def mock_restart_fails(self):
-    response = Response(responseCode=ResponseCode.ERROR, message='test error')
+    response = Response(responseCode=ResponseCode.ERROR, messageDEPRECATED='test error')
 
     self.mock_scheduler.restartShards(
         JOB.to_thrift(),
@@ -134,7 +134,7 @@ class TestRestarter(MoxTestBase):
     assert self.restarter.restart(None).responseCode == ResponseCode.ERROR
 
   def mock_restart_watch_fails(self, instances):
-    response = Response(responseCode=ResponseCode.OK, message='test')
+    response = Response(responseCode=ResponseCode.OK, messageDEPRECATED='test')
 
     self.mock_scheduler.restartShards(
         JOB.to_thrift(),

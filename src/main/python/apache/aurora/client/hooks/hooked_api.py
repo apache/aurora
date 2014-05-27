@@ -85,7 +85,7 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
     def __str__(self):
       return '%s: %s: %s' % (self.__class__.__name__,
           ResponseCode._VALUES_TO_NAMES.get(self.response.responseCode, 'UNKNOWN'),
-          self.response.message)
+          self.response.messageDEPRECATED)
 
   @classmethod
   def _meta_hook(cls, hook, hook_method):

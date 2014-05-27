@@ -35,6 +35,7 @@ import org.apache.aurora.auth.CapabilityValidator.Capability;
 import org.apache.aurora.auth.SessionValidator.AuthFailedException;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.scheduler.thrift.Util;
 import org.apache.aurora.scheduler.thrift.auth.Requires;
 
 /**
@@ -95,8 +96,8 @@ class UserCapabilityInterceptor implements MethodInterceptor {
     }
 
     // User is not permitted to perform this operation.
-    return Interceptors.properlyTypedResponse(
-        method,
+    return Util.addMessage(
+        Util.emptyResponse(),
         ResponseCode.AUTH_FAILED,
         "Session identified by '" + key
             + "' does not have the required capability to perform this action: " + whitelist);

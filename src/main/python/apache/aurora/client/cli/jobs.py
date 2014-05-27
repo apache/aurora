@@ -119,7 +119,7 @@ class CreateJobCommand(Verb):
     if resp.responseCode == ResponseCode.INVALID_REQUEST:
       raise context.CommandError(EXIT_INVALID_PARAMETER, 'Job not found')
     elif resp.responseCode == ResponseCode.ERROR:
-      raise context.CommandError(EXIT_COMMAND_FAILURE, resp.message)
+      raise context.CommandError(EXIT_COMMAND_FAILURE, resp.messageDEPRECATED)
     if context.options.open_browser:
       context.open_job_page(api, config)
     if context.options.wait_until == 'RUNNING':
@@ -185,7 +185,7 @@ alternate diff program by setting the DIFF_VIEWER environment variable."""
     resp = api.populate_job_config(config)
     if resp.responseCode != ResponseCode.OK:
       raise context.CommandError(EXIT_INVALID_CONFIGURATION,
-          'Error loading configuration: %s' % resp.message)
+          'Error loading configuration: %s' % resp.messageDEPRECATED)
     local_tasks = resp.result.populateJobResult.populated
     diff_program = os.environ.get('DIFF_VIEWER', 'diff')
     with NamedTemporaryFile() as local:
@@ -311,7 +311,7 @@ class AbstractKillCommand(Verb):
           context, api.scheduler_proxy, job, batch) is not EXIT_OK:
 
         context.print_log(logging.INFO,
-                          'Kill of shards %s failed with error %s' % (batch, resp.message))
+            'Kill of shards %s failed with error %s' % (batch, resp.messageDEPRECATED))
         errors += 1
         if errors > context.options.max_total_failures:
           raise context.CommandError(EXIT_COMMAND_FAILURE,
@@ -609,12 +609,12 @@ to preview what changes will take effect.
       # NOTE(mchucarroll): we assume here that updating a cron schedule and updating a
       # running job are different operations; in client v1, they were both done with update.
       raise context.CommandError(EXIT_COMMAND_FAILURE,
-          'Server could not find running job to update: %s' % resp.message)
+          'Server could not find running job to update: %s' % resp.messageDEPRECATED)
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     resp = api.populate_job_config(config)
     if resp.responseCode != ResponseCode.OK:
       raise context.CommandError(EXIT_COMMAND_FAILURE,
-          'Server could not populate job config for comparison: %s' % resp.message)
+          'Server could not populate job config for comparison: %s' % resp.messageDEPRECATED)
     local_task_count = len(resp.result.populateJobResult.populated)
     remote_task_count = len(remote_tasks)
     if (local_task_count >= 4 * remote_task_count or
@@ -637,7 +637,7 @@ to preview what changes will take effect.
     resp = api.update_job(config, context.options.healthcheck_interval_seconds,
         instances)
     if resp.responseCode != ResponseCode.OK:
-      raise context.CommandError(EXIT_COMMAND_FAILURE, 'Update failed: %s' % resp.message)
+      raise context.CommandError(EXIT_COMMAND_FAILURE, 'Update failed: %s' % resp.messageDEPRECATED)
     return EXIT_OK
 
 

@@ -131,7 +131,8 @@ class SshCommand(Verb):
     api = context.get_api(cluster)
     resp = api.query(api.build_query(role, name, set([int(instance)]), env=env))
     if resp.responseCode != ResponseCode.OK:
-      raise context.CommandError('Unable to get information about instance: %s' % resp.message)
+      raise context.CommandError('Unable to get information about instance: %s'
+          % resp.messageDEPRECATED)
     first_task = resp.result.scheduleStatusResult.tasks[0]
     remote_cmd = context.options.command or 'bash'
     command = DistributedCommandRunner.substitute(remote_cmd, first_task,

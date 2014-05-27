@@ -50,7 +50,7 @@ class LiveJobDisambiguatorTest(mox.MoxTestBase):
   def _expect_get_jobs(self, *envs):
     self._api.get_jobs(self.ROLE).AndReturn(Response(
       responseCode=ResponseCode.OK,
-      message='Mock OK',
+      messageDEPRECATED='Mock OK',
       result = Result(getJobsResult=GetJobsResult(
         configs=set(JobConfiguration(key=JobKey(role=self.ROLE, environment=env, name=self.NAME))
         for env in envs)))))

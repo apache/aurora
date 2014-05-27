@@ -32,8 +32,7 @@ import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.SessionKey;
-
-import static org.apache.aurora.scheduler.thrift.aop.Interceptors.properlyTypedResponse;
+import org.apache.aurora.scheduler.thrift.Util;
 
 /**
  * A method interceptor that logs all invocations as well as any unchecked exceptions thrown from
@@ -43,9 +42,9 @@ class LoggingInterceptor implements MethodInterceptor {
 
   private static final Logger LOG = Logger.getLogger(LoggingInterceptor.class.getName());
 
-  @Inject private CapabilityValidator validator;
+  @Inject
+  private CapabilityValidator validator;
 
-  // TODO(wfarner): Scrub updateToken when it is identifiable by type.
   private final Map<Class<?>, Function<Object, String>> printFunctions =
       ImmutableMap.<Class<?>, Function<Object, String>>of(
           JobConfiguration.class,
@@ -88,7 +87,7 @@ class LoggingInterceptor implements MethodInterceptor {
       return invocation.proceed();
     } catch (RuntimeException e) {
       LOG.log(Level.WARNING, "Uncaught exception while handling " + message, e);
-      return properlyTypedResponse(invocation.getMethod(), ResponseCode.ERROR, e.getMessage());
+      return Util.addMessage(Util.emptyResponse(), ResponseCode.ERROR, e.getMessage());
     }
   }
 }

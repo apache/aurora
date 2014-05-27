@@ -149,5 +149,5 @@ class InstanceDistributedCommandRunner(DistributedCommandRunner):
         yield task
     else:
       print_aurora_log(logging.ERROR,
-          "Error: could not retrieve task information for run command: %s" % resp.message)
-      raise ValueError("Could not retrieve task information: %s" % resp.message)
+          "Error: could not retrieve task information for run command: %s" % resp.messageDEPRECATED)
+      raise ValueError("Could not retrieve task information: %s" % resp.messageDEPRECATED)

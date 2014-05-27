@@ -74,7 +74,7 @@ class InstanceWatcherTest(unittest.TestCase):
 
   def expect_get_statuses(self, instance_ids=WATCH_INSTANCES, num_calls=EXPECTED_CYCLES):
     tasks = [self.create_task(instance_id) for instance_id in instance_ids]
-    response = Response(responseCode=ResponseCode.OK, message='test')
+    response = Response(responseCode=ResponseCode.OK, messageDEPRECATED='test')
     response.result = Result()
     response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
 
@@ -84,7 +84,7 @@ class InstanceWatcherTest(unittest.TestCase):
 
   def expect_io_error_in_get_statuses(self, instance_ids=WATCH_INSTANCES, num_calls=EXPECTED_CYCLES):
     tasks = [self.create_task(instance_id) for instance_id in instance_ids]
-    response = Response(responseCode=ResponseCode.OK, message='test')
+    response = Response(responseCode=ResponseCode.OK, messageDEPRECATED='test')
     response.result = Result()
     response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
 

@@ -141,5 +141,5 @@ class InstanceWatcher(object):
       tasks = resp.result.scheduleStatusResult.tasks
 
     log.debug('Response from scheduler: %s (message: %s)'
-        % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+        % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.messageDEPRECATED))
     return tasks

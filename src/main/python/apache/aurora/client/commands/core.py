@@ -186,11 +186,11 @@ def diff(job_spec, config_file):
   api = make_client(cluster)
   resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
   if resp.responseCode != ResponseCode.OK:
-    die('Request failed, server responded with "%s"' % resp.message)
+    die('Request failed, server responded with "%s"' % resp.messageDEPRECATED)
   remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
   resp = api.populate_job_config(config)
   if resp.responseCode != ResponseCode.OK:
-    die('Request failed, server responded with "%s"' % resp.message)
+    die('Request failed, server responded with "%s"' % resp.messageDEPRECATED)
   local_tasks = resp.result.populateJobResult.populated
 
   pp = pprint.PrettyPrinter(indent=2)
@@ -450,7 +450,7 @@ def kill_in_batches(api, job_key, instances_arg, batch_size, max_failures):
     for batch in make_batches(instances_to_kill, batch_size):
       resp = api.kill_job(job_key, batch)
       if resp.responseCode is not ResponseCode.OK:
-        log.info("Kill of shards %s failed with error %s" % (batch, resp.message))
+        log.info("Kill of shards %s failed with error %s" % (batch, resp.messageDEPRECATED))
         print('ERROR IN KILL_JOB')
         errors += 1
         if errors > max_failures:
@@ -593,11 +593,11 @@ def update(job_spec, config_file):
     resp = api.query(api.build_query(config.role(), config.name(),
         statuses=ACTIVE_STATES, env=config.environment()))
     if resp.responseCode != ResponseCode.OK:
-      die('Could not get job status from server for comparison: %s' % resp.message)
+      die('Could not get job status from server for comparison: %s' % resp.messageDEPRECATED)
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     resp = api.populate_job_config(config)
     if resp.responseCode != ResponseCode.OK:
-      die('Server could not populate job config for comparison: %s' % resp.message)
+      die('Server could not populate job config for comparison: %s' % resp.messageDEPRECATED)
     local_task_count = len(resp.result.populateJobResult.populated)
     remote_task_count = len(remote_tasks)
     if (local_task_count >= 4 * remote_task_count or local_task_count <= 4 * remote_task_count

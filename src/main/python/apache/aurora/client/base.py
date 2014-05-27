@@ -40,7 +40,7 @@ def die(msg):
 
 def log_response(resp):
   log.info('Response from scheduler: %s (message: %s)'
-      % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+      % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.messageDEPRECATED))
 
 def check_and_log_response(resp):
   log_response(resp)

@@ -454,14 +454,19 @@ union Result {
   18: JobSummaryResult jobSummaryResult
 }
 
+struct ResponseDetail {
+  1: string message
+}
+
 struct Response {
   1: ResponseCode responseCode
-  2: string message
-  // TODO(Suman Karumuri): Remove version field
-  // version field is deprecated.
+  // TODO(wfarner): Remove the message field in 0.7.0. (AURORA-466)
+  2: optional string messageDEPRECATED
+  // TODO(wfarner): Remove version field in 0.7.0. (AURORA-467)
   4: APIVersion DEPRECATEDversion
   5: ServerInfo serverInfo
   3: optional Result result
+  6: list<ResponseDetail> details
 }
 
 // A service that provides all the read only calls to the Aurora scheduler.

@@ -99,7 +99,7 @@ class Updater(object):
     if resp.responseCode == ResponseCode.OK:
       self._lock = None
     else:
-      log.error('There was an error finalizing the update: %s' % resp.message)
+      log.error('There was an error finalizing the update: %s' % resp.messageDEPRECATED)
     return resp
 
   def _update(self, instance_configs):
@@ -422,7 +422,7 @@ class Updater(object):
         instanceIds=instanceIds)
 
   def _failed_response(self, message):
-    return Response(responseCode=ResponseCode.ERROR, message=message)
+    return Response(responseCode=ResponseCode.ERROR, messageDEPRECATED=message)
 
   def update(self, instances=None):
     """Performs the job update, blocking until it completes.
@@ -484,7 +484,7 @@ class Updater(object):
 
     Raises Error in case of unexpected response status.
     """
-    name, message = ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message
+    name, message = ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.messageDEPRECATED
     if resp.responseCode == ResponseCode.OK:
       log.debug('Response from scheduler: %s (message: %s)' % (name, message))
     else:

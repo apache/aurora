@@ -72,7 +72,7 @@ class Restarter(object):
 
       resp = self._scheduler.restartShards(self._job_key.to_thrift(), batch, self._lock)
       if resp.responseCode != ResponseCode.OK:
-        log.error('Error restarting instances: %s', resp.message)
+        log.error('Error restarting instances: %s', resp.messageDEPRECATED)
         return resp
 
       failed_instances = self._instance_watcher.watch(batch)

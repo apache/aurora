@@ -13,10 +13,14 @@
  */
 package org.apache.aurora.scheduler.thrift;
 
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.Date;
 import java.util.Set;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -57,6 +61,7 @@ import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
+import org.apache.aurora.gen.ResponseDetail;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.RoleSummary;
@@ -126,6 +131,7 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class SchedulerThriftInterfaceTest extends EasyMockTest {
@@ -203,7 +209,23 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
       }
     };
     Injector injector = Guice.createInjector(testModule, new AopModule());
-    thrift = injector.getInstance(AuroraAdmin.Iface.class);
+    final AuroraAdmin.Iface realThrift = injector.getInstance(AuroraAdmin.Iface.class);
+
+    // Capture all API method calls to validate response objects.
+    Class<AuroraAdmin.Iface> thriftClass = AuroraAdmin.Iface.class;
+    thrift = (AuroraAdmin.Iface) Proxy.newProxyInstance(
+        thriftClass.getClassLoader(),
+        new Class<?>[] {thriftClass},
+        new InvocationHandler() {
+          @Override
+          public Object invoke(Object o, Method method, Object[] args) throws Throwable {
+            System.out.println("Invoking " + method);
+            Response response = (Response) method.invoke(realThrift, args);
+            assertTrue(response.isSetResponseCode());
+            assertNotNull(response.getDetails());
+            return response;
+          }
+        });
   }
 
   private void setUpValidationExpectations() throws Exception {
@@ -278,6 +300,18 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         thrift.createJob(job.newBuilder(), LOCK.newBuilder(), SESSION));
   }
 
+  private void assertMessageMatches(Response response, final String string) {
+    // TODO(wfarner): This test coverage could be much better.  Circle back to apply more thorough
+    // response contents testing throughout.
+    assertEquals(string, response.getMessageDEPRECATED());
+    assertTrue(Iterables.any(response.getDetails(), new Predicate<ResponseDetail>() {
+      @Override
+      public boolean apply(ResponseDetail detail) {
+        return detail.getMessage().equals(string);
+      }
+    }));
+  }
+
   @Test
   public void testCreateJobFailsNoExecutorConfig() throws Exception {
     JobConfiguration job = makeJob();
@@ -287,7 +321,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Response response = thrift.createJob(job, LOCK.newBuilder(), SESSION);
     assertResponse(INVALID_REQUEST, response);
-    assertTrue(response.getMessage().contains("Configuration"));
+    // TODO(wfarner): Don't rely on a magic string here, reference a constant from the source.
+    assertMessageMatches(response, "Configuration may not be null");
   }
 
   @Test
@@ -588,7 +623,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Response resp = thrift.restartShards(JOB_KEY.newBuilder(), shards, DEFAULT_LOCK, SESSION);
     assertResponse(INVALID_REQUEST, resp);
-    assertEquals(message, resp.getMessage());
+    assertMessageMatches(resp, message);
   }
 
   @Test
@@ -1089,7 +1124,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private Response okResponse(Result result) {
-    return new Response()
+    return Util.emptyResponse()
         .setResponseCode(OK)
         .setDEPRECATEDversion(API_VERSION)
         .setServerInfo(SERVER_INFO)

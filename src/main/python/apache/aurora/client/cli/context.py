@@ -90,9 +90,9 @@ class AuroraCommandContext(Context):
 
   def check_and_log_response(self, resp):
     self.print_log(logging.INFO, 'Response from scheduler: %s (message: %s)'
-        % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.message))
+        % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.messageDEPRECATED))
     if resp.responseCode != ResponseCode.OK:
-      raise self.CommandError(EXIT_API_ERROR, resp.message)
+      raise self.CommandError(EXIT_API_ERROR, resp.messageDEPRECATED)
 
   @classmethod
   def parse_partial_jobkey(cls, key):
@@ -120,7 +120,7 @@ class AuroraCommandContext(Context):
       api = self.get_api(cluster)
       resp = api.get_jobs(role)
       if resp.responseCode is not ResponseCode.OK:
-        raise self.CommandError(EXIT_COMMAND_FAILURE, resp.message)
+        raise self.CommandError(EXIT_COMMAND_FAILURE, resp.messageDEPRECATED)
       result.extend([AuroraJobKey(cluster, job.key.role, job.key.environment, job.key.name)
           for job in resp.result.getJobsResult.configs])
     return result
@@ -159,7 +159,7 @@ class AuroraCommandContext(Context):
     api = self.get_api(key.cluster)
     resp = api.check_status(key)
     if resp.responseCode is not ResponseCode.OK:
-      raise self.CommandError(EXIT_INVALID_PARAMETER, resp.message)
+      raise self.CommandError(EXIT_INVALID_PARAMETER, resp.messageDEPRECATED)
     return resp.result.scheduleStatusResult.tasks or None
 
   def get_active_instances(self, key):

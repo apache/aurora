@@ -51,7 +51,7 @@ class SlaTest(unittest.TestCase):
 
   def mock_get_tasks(self, tasks, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, message='test')
+    resp = Response(responseCode=response_code, messageDEPRECATED='test')
     resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
     self._scheduler.getTasksStatus.return_value = resp
 

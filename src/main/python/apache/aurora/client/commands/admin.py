@@ -155,7 +155,7 @@ def query(args, options):
   query_info = api.query(api.build_query(role, job, instances=instances, statuses=states))
   tasks = query_info.result.scheduleStatusResult.tasks
   if query_info.responseCode != ResponseCode.OK:
-    die('Failed to query scheduler: %s' % query_info.message)
+    die('Failed to query scheduler: %s' % query_info.messageDEPRECATED)
   if tasks is None:
     return
 

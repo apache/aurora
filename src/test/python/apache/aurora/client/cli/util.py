@@ -95,7 +95,7 @@ class AuroraClientCommandTest(unittest.TestCase):
   def create_blank_response(cls, code, msg):
     response = Mock(spec=Response)
     response.responseCode = code
-    response.message = msg
+    response.messageDEPRECATED = msg
     response.result = Mock(spec=Result)
     return response
 

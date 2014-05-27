@@ -75,13 +75,13 @@ class QuotaCheck(object):
 
     Returns: ResponseCode.OK if check is successful.
     """
-    resp_ok = Response(responseCode=ResponseCode.OK, message='Quota check successful.')
+    resp_ok = Response(responseCode=ResponseCode.OK, messageDEPRECATED='Quota check successful.')
     if not production:
       return resp_ok
 
     resp = self._scheduler.getQuota(job_key.role)
     if resp.responseCode != ResponseCode.OK:
-      log.error('Failed to get quota from scheduler: %s' % resp.message)
+      log.error('Failed to get quota from scheduler: %s' % resp.messageDEPRECATED)
       return resp
 
     allocated = CapacityRequest(resp.result.getQuotaResult.quota)
@@ -94,7 +94,9 @@ class QuotaCheck(object):
       print_quota(allocated.quota(), 'Total allocated quota', job_key.role)
       print_quota(consumed.quota(), 'Consumed quota', job_key.role)
       print_quota(requested.quota(), 'Requested', job_key.name)
-      return Response(responseCode=ResponseCode.INVALID_REQUEST, message='Failed quota check.')
+      return Response(
+          responseCode=ResponseCode.INVALID_REQUEST,
+          messageDEPRECATED='Failed quota check.')
 
     return resp_ok
 

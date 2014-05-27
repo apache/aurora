@@ -156,14 +156,14 @@ class UpdaterTest(TestCase):
 
   def expect_populate(self, job_config, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, message='test')
+    resp = Response(responseCode=response_code, messageDEPRECATED='test')
     result = set([deepcopy(job_config.taskConfig)])
     resp.result = Result(populateJobResult=PopulateJobResult(populated=result))
     self._scheduler.populateJobConfig(job_config).AndReturn(resp)
 
   def expect_get_tasks(self, tasks, ignore_ids=None, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, message='test')
+    response = Response(responseCode=response_code, messageDEPRECATED='test')
     scheduled = []
     for index, task in enumerate(tasks):
       if not ignore_ids or index not in ignore_ids:
@@ -178,12 +178,12 @@ class UpdaterTest(TestCase):
 
   def expect_cron_replace(self, job_config, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, message='test')
+    resp = Response(responseCode=response_code, messageDEPRECATED='test')
     self._scheduler.replaceCronTemplate(job_config, self._lock, self._session_key).AndReturn(resp)
 
   def expect_restart(self, instance_ids, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, message='test')
+    response = Response(responseCode=response_code, messageDEPRECATED='test')
     self._scheduler.restartShards(
         self._job_key,
         instance_ids,
@@ -192,7 +192,7 @@ class UpdaterTest(TestCase):
 
   def expect_kill(self, instance_ids, response_code=None, monitor_result=True):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, message='test')
+    response = Response(responseCode=response_code, messageDEPRECATED='test')
     query = TaskQuery(
         owner=Identity(role=self._job_key.role),
         environment=self._job_key.environment,
@@ -208,7 +208,7 @@ class UpdaterTest(TestCase):
 
   def expect_add(self, instance_ids, task_config, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, message='test')
+    response = Response(responseCode=response_code, messageDEPRECATED='test')
     add_config = AddInstancesConfig(
         key=self._job_key,
         taskConfig=task_config,
@@ -217,13 +217,13 @@ class UpdaterTest(TestCase):
 
   def expect_start(self, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, message='test')
+    response = Response(responseCode=response_code, messageDEPRECATED='test')
     response.result = Result(acquireLockResult=AcquireLockResult(lock=self._lock))
     self._scheduler.acquireLock(LockKey(job=self._job_key), self._session_key).AndReturn(response)
 
   def expect_finish(self, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, message='test')
+    response = Response(responseCode=response_code, messageDEPRECATED='test')
     self._scheduler.releaseLock(
         self._lock,
         LockValidation.CHECKED,
@@ -231,7 +231,7 @@ class UpdaterTest(TestCase):
 
   def expect_quota_check(self, num_released, num_acquired, response_code=None, prod=True):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, message='test')
+    response = Response(responseCode=response_code, messageDEPRECATED='test')
     released = CapacityRequest(ResourceAggregate(
         numCpus=num_released * self._num_cpus,
         ramMb=num_released * self._num_ram,
