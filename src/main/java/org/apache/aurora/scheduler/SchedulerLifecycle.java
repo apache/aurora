@@ -147,10 +147,7 @@ public class SchedulerLifecycle implements EventSubscriber {
     private final LeadingOptions leadingOptions;
     private final ScheduledExecutorService executorService;
 
-    private DefaultDelayedActions(
-        LeadingOptions leadingOptions,
-        ScheduledExecutorService executorService) {
-
+    DefaultDelayedActions(LeadingOptions leadingOptions, ScheduledExecutorService executorService) {
       this.leadingOptions = checkNotNull(leadingOptions);
       this.executorService = checkNotNull(executorService);
     }

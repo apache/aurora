@@ -128,13 +128,13 @@ public class LeaderRedirect {
           .append(req.getScheme())
           .append("://")
           .append(target.getHostText())
-          .append(":")
+          .append(':')
           .append(target.getPort())
           .append(req.getRequestURI());
 
       String queryString = req.getQueryString();
       if (queryString != null) {
-        redirect.append("?").append(queryString);
+        redirect.append('?').append(queryString);
       }
 
       return Optional.of(redirect.toString());

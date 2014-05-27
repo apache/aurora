@@ -69,7 +69,7 @@ public class LogOpMatcher implements IArgumentMatcher {
   public static final class StreamMatcher {
     private final Stream stream;
 
-    private StreamMatcher(Stream stream) {
+    StreamMatcher(Stream stream) {
       this.stream = Preconditions.checkNotNull(stream);
     }
 
@@ -106,6 +106,6 @@ public class LogOpMatcher implements IArgumentMatcher {
    */
   private static byte[] sameEntry(LogEntry entry) {
     EasyMock.reportMatcher(new LogOpMatcher(entry));
-    return null;
+    return new byte[] {};
   }
 }

@@ -49,7 +49,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.commons.lang.StringUtils;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -112,19 +111,6 @@ class SchedulerCoreImpl implements SchedulerCore {
     return hasActiveTasks || cronJobManager.hasJob(job.getKey());
   }
 
-  private static boolean isCron(SanitizedConfiguration config) {
-    if (!config.getJobConfig().isSetCronSchedule()) {
-      return false;
-    } else if (StringUtils.isEmpty(config.getJobConfig().getCronSchedule())) {
-      // TODO(ksweeney): Remove this in 0.7.0 (AURORA-423).
-      LOG.warning("Got service config with empty string cron schedule. aurora-0.7.x "
-          + "will interpret this as cron job and cause an error.");
-      return false;
-    } else {
-      return true;
-    }
-  }
-
   @Override
   public synchronized void createJob(final SanitizedConfiguration sanitizedConfiguration)
       throws ScheduleException {
@@ -140,7 +126,7 @@ class SchedulerCoreImpl implements SchedulerCore {
 
         validateTaskLimits(job.getTaskConfig(), job.getInstanceCount());
         // TODO(mchucarroll): deprecate cron as a part of create/kill job.(AURORA-454)
-        if (isCron(sanitizedConfiguration)) {
+        if (sanitizedConfiguration.isCron()) {
           try {
             LOG.warning("Deprecated behavior: scheduling job " + job.getKey()
                 + " with cron via createJob (AURORA_454)");

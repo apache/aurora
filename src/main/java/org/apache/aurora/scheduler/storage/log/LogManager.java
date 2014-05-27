@@ -319,7 +319,7 @@ public final class LogManager {
       private final MessageDigest digest;
       private final int maxEntrySizeBytes;
 
-      private EntrySerializer(MessageDigest digest, Amount<Integer, Data> maxEntrySize) {
+      EntrySerializer(MessageDigest digest, Amount<Integer, Data> maxEntrySize) {
         this.digest = checkNotNull(digest);
         maxEntrySizeBytes = maxEntrySize.as(Data.BYTES);
       }
@@ -374,7 +374,7 @@ public final class LogManager {
           new Transaction().setSchemaVersion(storageConstants.CURRENT_SCHEMA_VERSION);
       private final AtomicBoolean committed = new AtomicBoolean(false);
 
-      private StreamTransaction() {
+      StreamTransaction() {
         // supplied by factory method
       }
 

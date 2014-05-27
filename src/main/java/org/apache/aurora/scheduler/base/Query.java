@@ -148,11 +148,11 @@ public final class Query {
   public static final class Builder implements Supplier<TaskQuery> {
     private final TaskQuery query;
 
-    private Builder() {
+    Builder() {
       this.query = new TaskQuery();
     }
 
-    private Builder(final TaskQuery query) {
+    Builder(final TaskQuery query) {
       this.query = checkNotNull(query); // It is expected that the caller calls deepCopy.
     }
 

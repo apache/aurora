@@ -46,7 +46,7 @@ public interface AttributeStore {
    * Attributes are considered mostly ephemeral and extremely low risk when inconsistency
    * is present.
    */
-  public interface Mutable extends AttributeStore {
+  interface Mutable extends AttributeStore {
 
     /**
      * Deletes all attributes in the store.
@@ -72,7 +72,7 @@ public interface AttributeStore {
     boolean setMaintenanceMode(String host, MaintenanceMode mode);
   }
 
-  public static final class Util {
+  final class Util {
     private Util() {
     }
 
@@ -90,5 +90,4 @@ public interface AttributeStore {
           ? attributes.get().getAttributes() : ImmutableList.<Attribute>of();
     }
   }
-
 }

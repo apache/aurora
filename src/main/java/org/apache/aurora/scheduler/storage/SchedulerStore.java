@@ -27,7 +27,7 @@ public interface SchedulerStore {
    */
   @Nullable String fetchFrameworkId();
 
-  public interface Mutable extends SchedulerStore {
+  interface Mutable extends SchedulerStore {
     /**
      * Stores the given framework id overwriting any previously saved id.
      *

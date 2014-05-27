@@ -21,6 +21,7 @@ import com.google.common.base.Optional;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.Lock;
+import org.apache.aurora.gen.LockKey._Fields;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -121,11 +122,8 @@ class LockManagerImpl implements LockManager {
   }
 
   private static String formatLockKey(ILockKey lockKey) {
-    switch (lockKey.getSetField()) {
-      case JOB:
-        return JobKeys.canonicalString(lockKey.getJob());
-      default:
-        return "Unknown lock key type: " + lockKey.getSetField();
-    }
+    return lockKey.getSetField() == _Fields.JOB
+        ? JobKeys.canonicalString(lockKey.getJob())
+        : "Unknown lock key type: " + lockKey.getSetField();
   }
 }

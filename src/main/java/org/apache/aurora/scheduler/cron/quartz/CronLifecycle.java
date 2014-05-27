@@ -32,6 +32,7 @@ import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -79,7 +80,7 @@ class CronLifecycle extends AbstractIdleService implements PubsubEvent.EventSubs
   }
 
   @Override
-  protected void startUp() throws Exception {
+  protected void startUp() throws SchedulerException {
     LOG.info("Starting Quartz cron scheduler" + scheduler.getSchedulerName() + ".");
     scheduler.start();
     RUNNING_FLAG.set(1);
@@ -104,7 +105,7 @@ class CronLifecycle extends AbstractIdleService implements PubsubEvent.EventSubs
   }
 
   @Override
-  protected void shutDown() throws Exception {
+  protected void shutDown() throws SchedulerException {
     LOG.info("Shutting down Quartz cron scheduler.");
     scheduler.shutdown();
     RUNNING_FLAG.set(0);

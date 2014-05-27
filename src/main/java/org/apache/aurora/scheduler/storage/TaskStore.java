@@ -36,12 +36,12 @@ public interface TaskStore {
    */
   ImmutableSet<IScheduledTask> fetchTasks(Query.Builder query);
 
-  public interface Mutable extends TaskStore {
+  interface Mutable extends TaskStore {
 
     /**
      * A convenience interface to allow callers to more concisely implement a task mutation.
      */
-    public interface TaskMutation extends Function<IScheduledTask, IScheduledTask> {
+    interface TaskMutation extends Function<IScheduledTask, IScheduledTask> {
     }
 
     /**

@@ -28,7 +28,7 @@ public final class CommandUtil {
   }
 
   private static String uriBasename(String uri) {
-    int lastSlash = uri.lastIndexOf("/");
+    int lastSlash = uri.lastIndexOf('/');
     if (lastSlash == -1) {
       return uri;
     } else {

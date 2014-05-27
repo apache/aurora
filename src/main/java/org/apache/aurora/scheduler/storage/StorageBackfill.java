@@ -84,7 +84,9 @@ public final class StorageBackfill {
         // We want to keep exactly one task from this shard, so sort the IDs and keep the
         // highest (newest) in the hopes that it is legitimately running.
         String newestTask = Iterables.getLast(Sets.newTreeSet(activeTasksInShard));
-        if (!Tasks.id(task).equals(newestTask)) {
+        if (Tasks.id(task).equals(newestTask)) {
+          LOG.info("Retaining task " + Tasks.id(task));
+        } else {
           task.setStatus(ScheduleStatus.KILLED);
           task.addToTaskEvents(new TaskEvent(clock.nowMillis(), ScheduleStatus.KILLED)
               .setMessage("Killed duplicate shard."));
@@ -92,8 +94,6 @@ public final class StorageBackfill {
           // condition between the time the scheduler is actually available without hitting
           // IllegalStateException (see DriverImpl).
           // driver.killTask(Tasks.id(task));
-        } else {
-          LOG.info("Retaining task " + Tasks.id(task));
         }
       }
     }

@@ -39,7 +39,7 @@ public interface LockStore {
    */
   Optional<ILock> fetchLock(ILockKey lockKey);
 
-  public interface Mutable extends LockStore {
+  interface Mutable extends LockStore {
     /**
      * Saves a new lock or overwrites the existing one with same LockKey.
      *

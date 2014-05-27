@@ -51,11 +51,11 @@ class MemAttributeStore implements Mutable {
   @Override
   public boolean setMaintenanceMode(String host, MaintenanceMode mode) {
     HostAttributes stored = hostAttributes.get(host);
-    if (stored != null) {
+    if (stored == null) {
+      return false;
+    } else {
       stored.setMode(mode);
       return true;
-    } else {
-      return false;
     }
   }
 

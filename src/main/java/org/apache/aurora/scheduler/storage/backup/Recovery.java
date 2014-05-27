@@ -93,7 +93,7 @@ public interface Recovery {
    * Thrown when a recovery operation could not be completed due to internal errors or improper
    * invocation order.
    */
-  public static class RecoveryException extends Exception {
+  class RecoveryException extends Exception {
     RecoveryException(String message) {
       super(message);
     }

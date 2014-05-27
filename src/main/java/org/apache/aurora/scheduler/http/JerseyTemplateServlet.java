@@ -26,12 +26,14 @@ import org.antlr.stringtemplate.StringTemplate;
 
 /**
  * Base class for common functions needed in a jersey stringtemplate servlet.
+ *
+ * TODO(wfarner): This class should be composed rather than extended.  Turn it into a helper class.
  */
-abstract class JerseyTemplateServlet {
+class JerseyTemplateServlet {
 
   private final StringTemplateHelper templateHelper;
 
-  JerseyTemplateServlet(String templatePath) {
+  protected JerseyTemplateServlet(String templatePath) {
     templateHelper = new StringTemplateHelper(getClass(), templatePath, true);
   }
 

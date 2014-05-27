@@ -89,7 +89,7 @@ public class CronModule extends AbstractModule {
   }
 
   @Provides
-  private TimeZone provideTimeZone() {
+  TimeZone provideTimeZone() {
     TimeZone timeZone = TimeZone.getTimeZone(CRON_TIMEZONE.get());
     TimeZone systemTimeZone = TimeZone.getDefault();
     if (!timeZone.equals(systemTimeZone)) {
@@ -109,7 +109,7 @@ public class CronModule extends AbstractModule {
    */
   @Provides
   @Singleton
-  private static synchronized Scheduler provideScheduler(AuroraCronJobFactory jobFactory) {
+  static synchronized Scheduler provideScheduler(AuroraCronJobFactory jobFactory) {
     SimpleThreadPool threadPool = new SimpleThreadPool(NUM_THREADS.get(), Thread.NORM_PRIORITY);
     threadPool.setMakeThreadsDaemons(true);
 

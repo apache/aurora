@@ -324,7 +324,7 @@ public final class ConfigurationManager {
 
       IValueConstraint valueConstraint = constraint.getConstraint().getValue();
 
-      if (!(valueConstraint.getValues().size() == 1)) {
+      if (valueConstraint.getValues().size() != 1) {
         throw new TaskDescriptionException("A dedicated constraint must have exactly one value");
       }
 

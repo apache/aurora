@@ -119,13 +119,13 @@ public class BackupModule extends PrivateModule {
   }
 
   @Provides
-  private File provideBackupDir() {
+  File provideBackupDir() {
     if (!unvalidatedBackupDir.exists()) {
-      if (!unvalidatedBackupDir.mkdirs()) {
+      if (unvalidatedBackupDir.mkdirs()) {
+        LOG.info("Created backup dir " + unvalidatedBackupDir.getPath() + ".");
+      } else {
         throw new IllegalArgumentException(
             "Unable to create backup dir " + unvalidatedBackupDir.getPath() + ".");
-      } else {
-        LOG.info("Created backup dir " + unvalidatedBackupDir.getPath() + ".");
       }
     }
 
@@ -138,7 +138,7 @@ public class BackupModule extends PrivateModule {
   }
 
   @Provides
-  private BackupConfig provideBackupConfig(File backupDir) {
+  BackupConfig provideBackupConfig(File backupDir) {
     return new BackupConfig(backupDir, MAX_SAVED_BACKUPS.get(), BACKUP_INTERVAL.get());
   }
 }

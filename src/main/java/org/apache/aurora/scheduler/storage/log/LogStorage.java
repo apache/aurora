@@ -343,7 +343,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   }
 
   private static final class RecoveryFailedException extends SchedulerException {
-    private RecoveryFailedException(Throwable cause) {
+    RecoveryFailedException(Throwable cause) {
       super(cause);
     }
   }
@@ -451,10 +451,10 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
           try {
             snapshot();
           } catch (StorageException e) {
-            if (e.getCause() != null) {
-              LOG.log(Level.WARNING, e.getMessage(), e.getCause());
-            } else {
+            if (e.getCause() == null) {
               LOG.log(Level.WARNING, "StorageException when attempting to snapshot.", e);
+            } else {
+              LOG.log(Level.WARNING, e.getMessage(), e.getCause());
             }
           }
         }

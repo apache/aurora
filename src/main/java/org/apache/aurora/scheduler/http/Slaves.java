@@ -46,7 +46,7 @@ import static org.apache.aurora.scheduler.storage.Storage.Work;
 @Path("/slaves")
 public class Slaves extends JerseyTemplateServlet {
   private final String clusterName;
-  private Storage storage;
+  private final Storage storage;
 
   /**
    * Injected constructor.

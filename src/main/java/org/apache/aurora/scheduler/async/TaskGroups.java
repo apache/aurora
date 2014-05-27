@@ -34,7 +34,6 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
-import com.twitter.common.util.Clock;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.scheduler.base.AsyncUtil;
@@ -87,7 +86,6 @@ public class TaskGroups implements EventSubscriber {
       ShutdownRegistry shutdownRegistry,
       TaskGroupsSettings settings,
       TaskScheduler taskScheduler,
-      Clock clock,
       RescheduleCalculator rescheduleCalculator) {
 
     this(

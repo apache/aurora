@@ -76,7 +76,7 @@ public interface Driver {
   /**
    * Mesos driver implementation.
    */
-  static class DriverImpl implements SettableDriver {
+  class DriverImpl implements SettableDriver {
     private static final Logger LOG = Logger.getLogger(Driver.class.getName());
 
     /**

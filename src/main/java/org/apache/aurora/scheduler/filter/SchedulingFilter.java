@@ -32,7 +32,7 @@ public interface SchedulingFilter {
    * is only intended to be used for relative ranking of vetoes for determining which veto against
    * a scheduling assignment is 'weakest'.
    */
-  public static class Veto {
+  class Veto {
     public static final int MAX_SCORE = 1000;
 
     private final String reason;

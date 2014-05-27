@@ -252,7 +252,7 @@ public interface Storage {
   /**
    * Utility functions for interacting with a Storage instance.
    */
-  public final class Util {
+  final class Util {
 
     private Util() {
       // Utility class.

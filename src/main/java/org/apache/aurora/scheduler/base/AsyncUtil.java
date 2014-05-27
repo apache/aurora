@@ -58,19 +58,21 @@ public final class AsyncUtil {
         // See java.util.concurrent.ThreadPoolExecutor#afterExecute(Runnable, Throwable)
         // for more details and an implementation example.
         super.afterExecute(runnable, throwable);
-        if (throwable != null) {
-          logger.log(Level.SEVERE, throwable.toString(), throwable);
-        } else if (runnable instanceof Future) {
-          try {
-            Future<?> future = (Future<?>) runnable;
-            if (future.isDone()) {
-              future.get();
+        if (throwable == null) {
+          if (runnable instanceof Future) {
+            try {
+              Future<?> future = (Future<?>) runnable;
+              if (future.isDone()) {
+                future.get();
+              }
+            } catch (InterruptedException ie) {
+              Thread.currentThread().interrupt();
+            } catch (ExecutionException ee) {
+              logger.log(Level.SEVERE, ee.toString(), ee);
             }
-          } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
-          } catch (ExecutionException ee) {
-            logger.log(Level.SEVERE, ee.toString(), ee);
           }
+        } else {
+          logger.log(Level.SEVERE, throwable.toString(), throwable);
         }
       }
     };

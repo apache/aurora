@@ -97,7 +97,7 @@ class AuroraCronJob implements Job {
     private final Map<Integer, ITaskConfig> pendingTasks;
     private final Set<String> activeTaskIds;
 
-    private DeferredLaunch(Map<Integer, ITaskConfig> pendingTasks, Set<String> activeTaskIds) {
+    DeferredLaunch(Map<Integer, ITaskConfig> pendingTasks, Set<String> activeTaskIds) {
       this.pendingTasks = pendingTasks;
       this.activeTaskIds = activeTaskIds;
     }

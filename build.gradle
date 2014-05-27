@@ -264,7 +264,30 @@ tasks.withType(FindBugs) {
 }
 
 pmd {
-  sourceSets = [ sourceSets.main ]
+  sourceSets = [sourceSets.main]
+  // PMD rule set names match XML files stored in the PMD jar.  For example, with 5.11 you can
+  // see all the rules included with:
+  //   $ find ~/.gradle -name pmd-5.1.1.jar | xargs zipinfo -1 | egrep java/.*.xml | head -n 5
+  //    rulesets/java/clone.xml
+  //    rulesets/java/basic.xml
+  //    rulesets/java/strings.xml
+  //    rulesets/java/sunsecure.xml
+  //    rulesets/java/codesize.xml
+  // The format is straightforward: 'java-basic' refers to rulesets/java/basic.xml.
+  ruleSets = [
+      'java-basic',
+      'java-braces',
+      // TODO(wfarner): Circle back to (at least partially) re-enable the rules below.
+      //'java-design',
+      'java-empty',
+      //'java-imports',
+      'java-junit',
+      //'java-logging-java',
+      //'java-naming',
+      'java-typeresolution',
+      'java-unnecessary',
+      'java-unusedcode']
+  ruleSetFiles = fileTree('config/pmd/')
   toolVersion = '5.1.1'
 }
 

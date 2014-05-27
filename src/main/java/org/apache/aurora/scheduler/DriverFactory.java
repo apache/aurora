@@ -48,7 +48,7 @@ import org.apache.mesos.SchedulerDriver;
  */
 public interface DriverFactory extends Function<String, SchedulerDriver> {
 
-  static class DriverFactoryImpl implements DriverFactory {
+  class DriverFactoryImpl implements DriverFactory {
     private static final Logger LOG = Logger.getLogger(DriverFactory.class.getName());
 
     @NotNull
@@ -136,11 +136,11 @@ public interface DriverFactory extends Function<String, SchedulerDriver> {
           .setCheckpoint(REQUIRE_SLAVE_CHECKPOINT.get())
           .setFailoverTimeout(FRAMEWORK_FAILOVER_TIMEOUT.get().as(Time.SECONDS));
 
-      if (frameworkId != null) {
+      if (frameworkId == null) {
+        LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
+      } else {
         LOG.info("Found persisted framework ID: " + frameworkId);
         frameworkInfo.setId(FrameworkID.newBuilder().setValue(frameworkId));
-      } else {
-        LOG.warning("Did not find a persisted framework ID, connecting as a new framework.");
       }
 
       if (FRAMEWORK_AUTHENTICATION_FILE.hasAppliedValue()) {

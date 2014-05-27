@@ -50,7 +50,7 @@ public interface JobStore {
    */
   Set<String> fetchManagerIds();
 
-  public interface Mutable extends JobStore {
+  interface Mutable extends JobStore {
     /**
      * Saves the job configuration for a job that has been accepted by the scheduler. Acts as an
      * update if the managerId already exists.

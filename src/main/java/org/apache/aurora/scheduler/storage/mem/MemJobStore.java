@@ -88,10 +88,10 @@ class MemJobStore implements JobStore.Mutable {
     checkNotNull(jobKey);
 
     Optional<Manager> manager = Optional.fromNullable(managers.getIfPresent(managerId));
-    if (!manager.isPresent()) {
-      return Optional.absent();
-    } else {
+    if (manager.isPresent()) {
       return Optional.fromNullable(manager.get().jobs.get(jobKey));
+    } else {
+      return Optional.absent();
     }
   }
 

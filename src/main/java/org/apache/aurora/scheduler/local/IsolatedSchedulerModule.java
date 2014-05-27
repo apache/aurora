@@ -14,16 +14,12 @@
 package org.apache.aurora.scheduler.local;
 
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
@@ -34,7 +30,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.Subscribe;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
@@ -56,6 +51,7 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.comm.DeletedTasks;
 import org.apache.aurora.gen.comm.SchedulerMessage;
 import org.apache.aurora.scheduler.DriverFactory;
+import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.Resources;
@@ -136,24 +132,8 @@ public class IsolatedSchedulerModule extends AbstractModule {
     }
 
     private static ScheduledExecutorService createThreadPool(ShutdownRegistry shutdownRegistry) {
-      final ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
-          1,
-          new ThreadFactoryBuilder().setDaemon(true).setNameFormat("TaskScheduler-%d").build()) {
-
-        @Override
-        protected void afterExecute(Runnable runnable, @Nullable Throwable throwable) {
-          if (throwable != null) {
-            LOG.log(Level.WARNING, "Error: " + throwable, throwable);
-          } else if (runnable instanceof Future) {
-            Future<?> future = (Future<?>) runnable;
-            try {
-              future.get();
-            } catch (InterruptedException | ExecutionException e) {
-              e.printStackTrace();
-            }
-          }
-        }
-      };
+      final ScheduledThreadPoolExecutor executor =
+          AsyncUtil.loggingScheduledExecutor(1, "TaskScheduler-%d", LOG);
       Stats.exportSize("schedule_queue_size", executor.getQueue());
       shutdownRegistry.addAction(new Command() {
         @Override

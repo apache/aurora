@@ -104,13 +104,13 @@ public interface OfferQueue extends EventSubscriber {
    * The delay is calculated for each offer that is received, so the return delay may be
    * fixed or variable.
    */
-  public interface OfferReturnDelay extends Supplier<Amount<Integer, Time>> {
+  interface OfferReturnDelay extends Supplier<Amount<Integer, Time>> {
   }
 
   /**
    * Thrown when there was an unexpected failure trying to launch a task.
    */
-  static class LaunchException extends Exception {
+  class LaunchException extends Exception {
     LaunchException(String msg) {
       super(msg);
     }
@@ -151,7 +151,13 @@ public interface OfferQueue extends EventSubscriber {
       // There's also a chance that we return an offer for compaction ~simultaneously with the
       // same-host offer being canceled/returned.  This is also fine.
       Optional<HostOffer> sameSlave = hostOffers.get(offer.getSlaveId());
-      if (!sameSlave.isPresent()) {
+      if (sameSlave.isPresent()) {
+        // If there are existing offers for the slave, decline all of them so the master can
+        // compact all of those offers into a single offer and send them back.
+        LOG.info("Returning offers for " + offer.getSlaveId().getValue() + " for compaction.");
+        decline(offer.getId());
+        removeAndDecline(sameSlave.get().offer.getId());
+      } else {
         hostOffers.add(new HostOffer(offer, maintenance.getMode(offer.getHostname())));
         executor.schedule(
             new Runnable() {
@@ -162,12 +168,6 @@ public interface OfferQueue extends EventSubscriber {
             },
             returnDelay.get().as(Time.MILLISECONDS),
             TimeUnit.MILLISECONDS);
-      } else {
-        // If there are existing offers for the slave, decline all of them so the master can
-        // compact all of those offers into a single offer and send them back.
-        LOG.info("Returning offers for " + offer.getSlaveId().getValue() + " for compaction.");
-        decline(offer.getId());
-        removeAndDecline(sameSlave.get().offer.getId());
       }
     }
 

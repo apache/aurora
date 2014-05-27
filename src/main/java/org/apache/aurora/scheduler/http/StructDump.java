@@ -123,10 +123,10 @@ public class StructDump extends JerseyTemplateServlet {
       public void execute(StringTemplate template) {
         template.setAttribute("id", id);
         Optional<? extends TBase<?, ?>> struct = storage.weaklyConsistentRead(work);
-        if (!struct.isPresent()) {
-          template.setAttribute("exception", "Entity not found");
-        } else {
+        if (struct.isPresent()) {
           template.setAttribute("structPretty", Util.prettyPrint(struct.get()));
+        } else {
+          template.setAttribute("exception", "Entity not found");
         }
       }
     });

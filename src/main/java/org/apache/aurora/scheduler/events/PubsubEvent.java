@@ -34,13 +34,13 @@ public interface PubsubEvent {
   /**
    * Interface with no functionality, but identifies a class as supporting task pubsub events.
    */
-  public interface EventSubscriber {
+  interface EventSubscriber {
   }
 
   /**
    * Event sent when tasks were deleted.
    */
-  public static class TasksDeleted implements PubsubEvent {
+  class TasksDeleted implements PubsubEvent {
     private final Set<IScheduledTask> tasks;
 
     public TasksDeleted(Set<IScheduledTask> tasks) {
@@ -76,8 +76,10 @@ public interface PubsubEvent {
 
   /**
    * Event sent when a task changed state.
+   * <p>
+   * This class is final as it should only be constructed through declared factory methods.
    */
-  public static final class TaskStateChange implements PubsubEvent {
+  final class TaskStateChange implements PubsubEvent {
     private final IScheduledTask task;
     private final Optional<ScheduleStatus> oldState;
 
@@ -156,7 +158,7 @@ public interface PubsubEvent {
   /**
    * Event sent when a host changed maintenance state.
    */
-  public static class HostMaintenanceStateChange implements PubsubEvent {
+  class HostMaintenanceStateChange implements PubsubEvent {
     private final HostStatus status;
 
     public HostMaintenanceStateChange(HostStatus status) {
@@ -186,7 +188,7 @@ public interface PubsubEvent {
   /**
    * Event sent when a scheduling assignment was vetoed.
    */
-  public static class Vetoed implements PubsubEvent {
+  class Vetoed implements PubsubEvent {
     private final String taskId;
     private final Set<Veto> vetoes;
 
@@ -220,7 +222,7 @@ public interface PubsubEvent {
     }
   }
 
-  public static class DriverRegistered implements PubsubEvent {
+  class DriverRegistered implements PubsubEvent {
     @Override
     public boolean equals(Object o) {
       return o != null && getClass().equals(o.getClass());
@@ -232,7 +234,7 @@ public interface PubsubEvent {
     }
   }
 
-  public static class DriverDisconnected implements PubsubEvent {
+  class DriverDisconnected implements PubsubEvent {
     @Override
     public boolean equals(Object o) {
       return o != null && getClass().equals(o.getClass());
@@ -244,7 +246,7 @@ public interface PubsubEvent {
     }
   }
 
-  public static class SchedulerActive implements PubsubEvent {
+  class SchedulerActive implements PubsubEvent {
     @Override
     public boolean equals(Object o) {
       return o != null && getClass().equals(o.getClass());

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.configuration;
 
 import java.util.Map;
+import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
@@ -26,11 +27,14 @@ import com.google.common.collect.Range;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.commons.lang.StringUtils;
 
 /**
  * Wrapper for a configuration that has been fully-sanitized and populated with defaults.
  */
 public final class SanitizedConfiguration {
+
+  private static final Logger LOG = Logger.getLogger(SanitizedConfiguration.class.getName());
 
   private final IJobConfiguration sanitized;
   private final Map<Integer, ITaskConfig> tasks;
@@ -71,6 +75,24 @@ public final class SanitizedConfiguration {
   // TODO(William Farner): Rework this API now that all configs are identical.
   public Map<Integer, ITaskConfig> getTaskConfigs() {
     return tasks;
+  }
+
+  /**
+   * Determines whether this job is configured as a cron job.
+   *
+   * @return {@code true} if this is a cron job, otherwise {@code false}.
+   */
+  public boolean isCron() {
+    if (getJobConfig().isSetCronSchedule()) {
+      if (StringUtils.isEmpty(getJobConfig().getCronSchedule())) {
+        // TODO(ksweeney): Remove this in 0.7.0 (AURORA-423).
+        LOG.warning("Got service config with empty string cron schedule. aurora-0.7.x "
+            + "will interpret this as cron job and cause an error.");
+        return false;
+      }
+      return true;
+    }
+    return false;
   }
 
   @Override

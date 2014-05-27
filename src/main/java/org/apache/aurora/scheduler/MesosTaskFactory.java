@@ -61,7 +61,7 @@ public interface MesosTaskFactory {
    */
   TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException;
 
-  static class ExecutorConfig {
+  class ExecutorConfig {
     private final String executorPath;
 
     public ExecutorConfig(String executorPath) {
@@ -73,7 +73,7 @@ public interface MesosTaskFactory {
     }
   }
 
-  static class MesosTaskFactoryImpl implements MesosTaskFactory {
+  class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = Logger.getLogger(MesosTaskFactoryImpl.class.getName());
     private static final String EXECUTOR_PREFIX = "thermos-";
 

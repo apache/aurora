@@ -38,7 +38,7 @@ public interface QuotaStore {
    */
   Map<String, IResourceAggregate> fetchQuotas();
 
-  public interface Mutable extends QuotaStore {
+  interface Mutable extends QuotaStore {
 
     /**
      * Deletes all quotas.

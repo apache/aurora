@@ -30,6 +30,7 @@ import org.apache.aurora.GuiceUtils.AllowUnchecked;
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.comm.SchedulerMessage;
+import org.apache.aurora.gen.comm.SchedulerMessage._Fields;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -180,7 +181,7 @@ class MesosSchedulerImpl implements Scheduler {
   @Override
   public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
     String info = status.hasData() ? status.getData().toStringUtf8() : null;
-    String infoMsg = info != null ? " with info " + info : "";
+    String infoMsg = info == null ? "" : " with info " + info;
     String coreMsg = status.hasMessage() ? " with core message " + status.getMessage() : "";
     LOG.info("Received status update for task " + status.getTaskId().getValue()
         + " in state " + status.getState() + infoMsg + coreMsg);
@@ -236,20 +237,16 @@ class MesosSchedulerImpl implements Scheduler {
         return;
       }
 
-      switch (schedulerMsg.getSetField()) {
-        case DELETED_TASKS:
-          for (String taskId : schedulerMsg.getDeletedTasks().getTaskIds()) {
-            stateManager.changeState(
-                taskId,
-                Optional.<ScheduleStatus>absent(),
-                ScheduleStatus.SANDBOX_DELETED,
-                Optional.of("Sandbox disk space reclaimed."));
-          }
-          break;
-
-        default:
-          LOG.warning("Received unhandled scheduler message type: " + schedulerMsg.getSetField());
-          break;
+      if (schedulerMsg.getSetField() == _Fields.DELETED_TASKS) {
+        for (String taskId : schedulerMsg.getDeletedTasks().getTaskIds()) {
+          stateManager.changeState(
+              taskId,
+              Optional.<ScheduleStatus>absent(),
+              ScheduleStatus.SANDBOX_DELETED,
+              Optional.of("Sandbox disk space reclaimed."));
+        }
+      } else {
+        LOG.warning("Received unhandled scheduler message type: " + schedulerMsg.getSetField());
       }
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);

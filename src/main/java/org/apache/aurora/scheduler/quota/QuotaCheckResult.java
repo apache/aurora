@@ -49,6 +49,10 @@ public class QuotaCheckResult {
     private Resource(String unit) {
       this.unit = unit;
     }
+
+    String getUnit() {
+      return unit;
+    }
   }
 
   private final Optional<String> details;
@@ -107,7 +111,7 @@ public class QuotaCheckResult {
           .append(" quota exceeded by ")
           .append(String.format("%.2f", b - a))
           .append(" ")
-          .append(resource.unit);
+          .append(resource.getUnit());
     }
 
     return result;

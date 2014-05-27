@@ -41,6 +41,10 @@ public class ReadWriteLockManager {
     private LockType(LockMode mode) {
       this.mode = mode;
     }
+
+    LockMode getMode() {
+      return mode;
+    }
   }
 
   private static class LockState {
@@ -53,14 +57,14 @@ public class ReadWriteLockManager {
         initialLockMode = mode;
         stateChanged = true;
       }
-      if (initialLockMode == mode) {
+      if (initialLockMode.equals(mode)) {
         lockCount++;
       }
       return stateChanged;
     }
 
     private void lockReleased(LockMode mode) {
-      if (initialLockMode == mode) {
+      if (initialLockMode.equals(mode)) {
         lockCount--;
         if (lockCount == 0) {
           initialLockMode = LockMode.NONE;
@@ -95,7 +99,7 @@ public class ReadWriteLockManager {
       lock.writeLock().lock();
     }
 
-    return lockState.get().lockAcquired(type.mode);
+    return lockState.get().lockAcquired(type.getMode());
   }
 
   /**
@@ -112,7 +116,7 @@ public class ReadWriteLockManager {
       lock.writeLock().unlock();
     }
 
-    lockState.get().lockReleased(type.mode);
+    lockState.get().lockReleased(type.getMode());
   }
 
   /**

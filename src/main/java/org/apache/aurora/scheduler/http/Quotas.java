@@ -89,7 +89,7 @@ public class Quotas {
     private final long ramMb;
     private final long diskMb;
 
-    private ResourceAggregateBean(double cpu, long ramMb, long diskMb) {
+    ResourceAggregateBean(double cpu, long ramMb, long diskMb) {
       this.cpu = cpu;
       this.ramMb = ramMb;
       this.diskMb = diskMb;

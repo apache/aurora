@@ -60,7 +60,7 @@ public interface SessionValidator {
   /**
    * Thrown when authentication is not successful.
    */
-  public static class AuthFailedException extends Exception {
+  class AuthFailedException extends Exception {
     public AuthFailedException(String msg) {
       super(msg);
     }

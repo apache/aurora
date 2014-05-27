@@ -112,7 +112,7 @@ public class Resources {
           .add(Resources.makeMesosResource(CPUS, numCpus))
           .add(Resources.makeMesosResource(DISK_MB, disk.as(Data.MB)))
           .add(Resources.makeMesosResource(RAM_MB, ram.as(Data.MB)));
-    if (selectedPorts.size() > 0) {
+    if (selectedPorts.isEmpty()) {
         resourceBuilder.add(Resources.makeMesosRangeResource(Resources.PORTS, selectedPorts));
     }
 

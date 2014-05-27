@@ -67,6 +67,7 @@ import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.ListBackupsResult;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.LockKey._Fields;
 import org.apache.aurora.gen.LockValidation;
 import org.apache.aurora.gen.MaintenanceStatusResult;
 import org.apache.aurora.gen.PopulateJobResult;
@@ -252,19 +253,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return response;
   }
 
-  private static boolean isCron(SanitizedConfiguration config) {
-    if (!config.getJobConfig().isSetCronSchedule()) {
-      return false;
-    } else if (StringUtils.isEmpty(config.getJobConfig().getCronSchedule())) {
-      // TODO(ksweeney): Remove this in 0.7.0 (AURORA-424).
-      LOG.warning("Got service config with empty string cron schedule. aurora-0.7.x "
-          + "will interpret this as cron job and cause an error.");
-      return false;
-    } else {
-      return true;
-    }
-  }
-
   @Override
   public Response scheduleCronJob(
       JobConfiguration mutableJob,
@@ -290,7 +278,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ILockKey.build(LockKey.job(jobKey.newBuilder())),
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-      if (!isCron(sanitized)) {
+      if (!sanitized.isCron()) {
         LOG.info("Invalid attempt to schedule non-cron job "
             + sanitized.getJobConfig().getKey()
             + " with cron.");
@@ -870,14 +858,95 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         }
 
         Response resp = new Response();
-        if (!errors.isEmpty()) {
-          resp.setResponseCode(ResponseCode.WARNING).setMessage(Joiner.on(", ").join(errors));
-        } else {
+        if (errors.isEmpty()) {
           resp.setResponseCode(OK).setMessage("All rewrites completed successfully.");
+        } else {
+          resp.setResponseCode(ResponseCode.WARNING).setMessage(Joiner.on(", ").join(errors));
         }
         return resp;
       }
     });
+  }
+
+  private Optional<String> rewriteJob(JobConfigRewrite jobRewrite, JobStore.Mutable jobStore) {
+    IJobConfiguration existingJob = IJobConfiguration.build(jobRewrite.getOldJob());
+    IJobConfiguration rewrittenJob;
+    Optional<String> error = Optional.absent();
+    try {
+      rewrittenJob = ConfigurationManager.validateAndPopulate(
+          IJobConfiguration.build(jobRewrite.getRewrittenJob()));
+    } catch (TaskDescriptionException e) {
+      // We could add an error here, but this is probably a hint of something wrong in
+      // the client that's causing a bad configuration to be applied.
+      throw Throwables.propagate(e);
+    }
+
+    if (existingJob.getKey().equals(rewrittenJob.getKey())) {
+      if (existingJob.getOwner().equals(rewrittenJob.getOwner())) {
+        Multimap<String, IJobConfiguration> matches = jobsByKey(jobStore, existingJob.getKey());
+        switch (matches.size()) {
+          case 0:
+            error = Optional.of(
+                "No jobs found for key " + JobKeys.canonicalString(existingJob.getKey()));
+            break;
+
+          case 1:
+            Map.Entry<String, IJobConfiguration> match =
+                Iterables.getOnlyElement(matches.entries());
+            IJobConfiguration storedJob = match.getValue();
+            if (storedJob.equals(existingJob)) {
+              jobStore.saveAcceptedJob(match.getKey(), rewrittenJob);
+            } else {
+              error = Optional.of(
+                  "CAS compare failed for " + JobKeys.canonicalString(storedJob.getKey()));
+            }
+            break;
+
+          default:
+            error = Optional.of("Multiple jobs found for key "
+                + JobKeys.canonicalString(existingJob.getKey()));
+        }
+      } else {
+        error = Optional.of("Disallowing rewrite attempting to change job owner.");
+      }
+    } else {
+      error = Optional.of("Disallowing rewrite attempting to change job key.");
+    }
+
+    return error;
+  }
+
+  private Optional<String> rewriteInstance(
+      InstanceConfigRewrite instanceRewrite,
+      MutableStoreProvider storeProvider) {
+
+    InstanceKey instanceKey = instanceRewrite.getInstanceKey();
+    Optional<String> error = Optional.absent();
+    Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
+        Query.instanceScoped(IJobKey.build(instanceKey.getJobKey()),
+            instanceKey.getInstanceId())
+            .active());
+    Optional<IAssignedTask> task =
+        Optional.fromNullable(Iterables.getOnlyElement(tasks, null))
+            .transform(Tasks.SCHEDULED_TO_ASSIGNED);
+
+    if (task.isPresent()) {
+      if (task.get().getTask().newBuilder().equals(instanceRewrite.getOldTask())) {
+        ITaskConfig newConfiguration = ITaskConfig.build(
+            ConfigurationManager.applyDefaultsIfUnset(instanceRewrite.getRewrittenTask()));
+        boolean changed = storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(
+            task.get().getTaskId(), newConfiguration);
+        if (!changed) {
+          error = Optional.of("Did not change " + task.get().getTaskId());
+        }
+      } else {
+        error = Optional.of("CAS compare failed for " + instanceKey);
+      }
+    } else {
+      error = Optional.of("No active task found for " + instanceKey);
+    }
+
+    return error;
   }
 
   private Optional<String> rewriteConfig(
@@ -887,73 +956,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     Optional<String> error = Optional.absent();
     switch (command.getSetField()) {
       case JOB_REWRITE:
-        JobConfigRewrite jobRewrite = command.getJobRewrite();
-        IJobConfiguration existingJob = IJobConfiguration.build(jobRewrite.getOldJob());
-        IJobConfiguration rewrittenJob;
-        try {
-          rewrittenJob = ConfigurationManager.validateAndPopulate(
-              IJobConfiguration.build(jobRewrite.getRewrittenJob()));
-        } catch (TaskDescriptionException e) {
-          // We could add an error here, but this is probably a hint of something wrong in
-          // the client that's causing a bad configuration to be applied.
-          throw Throwables.propagate(e);
-        }
-        if (!existingJob.getKey().equals(rewrittenJob.getKey())) {
-          error = Optional.of("Disallowing rewrite attempting to change job key.");
-        } else if (!existingJob.getOwner().equals(rewrittenJob.getOwner())) {
-          error = Optional.of("Disallowing rewrite attempting to change job owner.");
-        } else {
-          JobStore.Mutable jobStore = storeProvider.getJobStore();
-          Multimap<String, IJobConfiguration> matches =
-              jobsByKey(jobStore, existingJob.getKey());
-          switch (matches.size()) {
-            case 0:
-              error = Optional.of(
-                  "No jobs found for key " + JobKeys.canonicalString(existingJob.getKey()));
-              break;
-
-            case 1:
-              Map.Entry<String, IJobConfiguration> match =
-                  Iterables.getOnlyElement(matches.entries());
-              IJobConfiguration storedJob = match.getValue();
-              if (!storedJob.equals(existingJob)) {
-                error = Optional.of(
-                    "CAS compare failed for " + JobKeys.canonicalString(storedJob.getKey()));
-              } else {
-                jobStore.saveAcceptedJob(match.getKey(), rewrittenJob);
-              }
-              break;
-
-            default:
-              error = Optional.of("Multiple jobs found for key "
-                  + JobKeys.canonicalString(existingJob.getKey()));
-          }
-        }
+        error = rewriteJob(command.getJobRewrite(), storeProvider.getJobStore());
         break;
 
       case INSTANCE_REWRITE:
-        InstanceConfigRewrite instanceRewrite = command.getInstanceRewrite();
-        InstanceKey instanceKey = instanceRewrite.getInstanceKey();
-        Iterable<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(
-            Query.instanceScoped(IJobKey.build(instanceKey.getJobKey()),
-                instanceKey.getInstanceId())
-                .active());
-        Optional<IAssignedTask> task =
-            Optional.fromNullable(Iterables.getOnlyElement(tasks, null))
-                .transform(Tasks.SCHEDULED_TO_ASSIGNED);
-        if (!task.isPresent()) {
-          error = Optional.of("No active task found for " + instanceKey);
-        } else if (!task.get().getTask().newBuilder().equals(instanceRewrite.getOldTask())) {
-          error = Optional.of("CAS compare failed for " + instanceKey);
-        } else {
-          ITaskConfig newConfiguration = ITaskConfig.build(
-              ConfigurationManager.applyDefaultsIfUnset(instanceRewrite.getRewrittenTask()));
-          boolean changed = storeProvider.getUnsafeTaskStore().unsafeModifyInPlace(
-              task.get().getTaskId(), newConfiguration);
-          if (!changed) {
-            error = Optional.of("Did not change " + task.get().getTaskId());
-          }
-        }
+        error = rewriteInstance(command.getInstanceRewrite(), storeProvider);
         break;
 
       default:
@@ -1006,12 +1013,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   private String getRoleFromLockKey(ILockKey lockKey) {
-    switch (lockKey.getSetField()) {
-      case JOB:
-        JobKeys.assertValid(lockKey.getJob());
-        return lockKey.getJob().getRole();
-      default:
-        throw new IllegalArgumentException("Unhandled LockKey: " + lockKey.getSetField());
+    if (lockKey.getSetField() == _Fields.JOB) {
+      JobKeys.assertValid(lockKey.getJob());
+      return lockKey.getJob().getRole();
+    } else {
+      throw new IllegalArgumentException("Unhandled LockKey: " + lockKey.getSetField());
     }
   }
 
