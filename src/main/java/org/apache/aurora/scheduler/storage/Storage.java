@@ -206,17 +206,17 @@ public interface Storage {
   <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E;
 
   /**
+   * Requests the underlying storage prepare its data set; ie: initialize schemas, begin syncing
+   * out of date data, etc.  This method should not block.
+   *
+   * @throws StorageException if there was a problem preparing storage.
+   */
+   void prepare() throws StorageException;
+
+  /**
    * A non-volatile storage that has additional methods to control its lifecycle.
    */
   interface NonVolatileStorage extends Storage {
-    /**
-     * Requests the underlying storage prepare its data set; ie: initialize schemas, begin syncing
-     * out of date data, etc.  This method should not block.
-     *
-     * @throws StorageException if there was a problem preparing storage.
-     */
-    void prepare() throws StorageException;
-
     /**
      * Prepares the underlying storage for serving traffic.
      *

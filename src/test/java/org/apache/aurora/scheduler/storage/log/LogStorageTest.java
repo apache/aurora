@@ -134,6 +134,8 @@ public class LogStorageTest extends EasyMockTest {
     stream = createMock(Stream.class);
     streamMatcher = LogOpMatcher.matcherFor(stream);
     position = createMock(Position.class);
+
+    storageUtil.storage.prepare();
   }
 
   @Test

@@ -85,8 +85,8 @@ public class LogStorageModule extends AbstractModule {
         .toInstance(MAX_LOG_ENTRY_SIZE.get());
     bind(LogManager.class).in(Singleton.class);
     bind(Boolean.class).annotatedWith(SnapshotSetting.class).toInstance(DEFLATE_SNAPSHOTS.get());
-
     bind(LogStorage.class).in(Singleton.class);
+
     install(CallOrderEnforcingStorage.wrappingModule(LogStorage.class));
     bind(DistributedSnapshotStore.class).to(LogStorage.class);
   }

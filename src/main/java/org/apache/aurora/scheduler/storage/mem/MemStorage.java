@@ -13,11 +13,20 @@
  */
 package org.apache.aurora.scheduler.storage.mem;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.inject.BindingAnnotation;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.Key;
+import com.twitter.common.inject.Bindings;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.SlidingStats;
 import com.twitter.common.stats.StatImpl;
@@ -32,6 +41,7 @@ import org.apache.aurora.scheduler.storage.ReadWriteLockManager.LockType;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
+import org.apache.aurora.scheduler.storage.db.DbModule;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -58,16 +68,26 @@ public class MemStorage implements Storage {
 
   private final MutableStoreProvider storeProvider;
   private final ReadWriteLockManager lockManager = new ReadWriteLockManager();
+  private final Storage delegatedStore;
+
+  /**
+   * Identifies a storage layer to be delegated to instead of mem storage.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ ElementType.PARAMETER, ElementType.METHOD })
+  @BindingAnnotation
+  public @interface Delegated { }
 
   @Inject
   MemStorage(
       final SchedulerStore.Mutable schedulerStore,
       final JobStore.Mutable jobStore,
       final TaskStore.Mutable taskStore,
-      final LockStore.Mutable lockStore,
+      @Delegated final LockStore.Mutable lockStore,
+      @Delegated final Storage delegated,
       final QuotaStore.Mutable quotaStore,
       final AttributeStore.Mutable attributeStore) {
-
+    this.delegatedStore = delegated;
     storeProvider = new MutableStoreProvider() {
       @Override
       public SchedulerStore.Mutable getSchedulerStore() {
@@ -117,14 +137,14 @@ public class MemStorage implements Storage {
    * Creates a new empty in-memory storage for use in testing.
    */
   @VisibleForTesting
-  public static MemStorage newEmptyStorage() {
-    return new MemStorage(
-        new MemSchedulerStore(),
-        new MemJobStore(),
-        new MemTaskStore(),
-        new MemLockStore(),
-        new MemQuotaStore(),
-        new MemAttributeStore());
+  public static Storage newEmptyStorage() {
+    Injector injector = Guice.createInjector(
+        new DbModule(Bindings.annotatedKeyFactory(Delegated.class)),
+        new MemStorageModule(Bindings.annotatedKeyFactory(Volatile.class)));
+
+    Storage storage = injector.getInstance(Key.get(Storage.class, Volatile.class));
+    storage.prepare();
+    return storage;
   }
 
   private <S extends StoreProvider, T, E extends Exception> T doWork(
@@ -161,6 +181,11 @@ public class MemStorage implements Storage {
   @Override
   public <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E {
     return doWork(LockType.WRITE, storeProvider, work, writeStats, writeLockWaitNanos);
+  }
+
+  @Override
+  public void prepare() throws StorageException {
+    delegatedStore.prepare();
   }
 
   @Timed("mem_storage_weakly_consistent_read_operation")

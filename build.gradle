@@ -152,6 +152,7 @@ dependencies {
   compile guavaDep
   compile 'com.google.inject:guice:3.0'
   compile 'com.google.protobuf:protobuf-java:2.5.0'
+  compile 'com.h2database:h2:1.4.177'
   compile "com.sun.jersey:jersey-core:${jerseyRev}"
   compile "com.sun.jersey:jersey-json:${jerseyRev}"
   compile "com.sun.jersey:jersey-server:${jerseyRev}"
@@ -165,6 +166,8 @@ dependencies {
   compile 'org.apache.mesos:mesos:0.18.0'
   compile thriftLib
   compile 'org.apache.zookeeper:zookeeper:3.3.4'
+  compile 'org.mybatis:mybatis:3.2.7'
+  compile 'org.mybatis:mybatis-guice:3.6'
   compile 'org.quartz-scheduler:quartz:2.2.1'
   compile "org.slf4j:slf4j-api:${slf4jRev}"
   compile "org.slf4j:slf4j-jdk14:${slf4jRev}"

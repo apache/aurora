@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.base;
 
 import java.util.List;
 import java.util.Set;
+
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;

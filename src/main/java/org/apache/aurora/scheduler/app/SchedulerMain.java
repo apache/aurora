@@ -61,9 +61,12 @@ import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.local.IsolatedSchedulerModule;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
+import org.apache.aurora.scheduler.storage.db.DbModule;
+import org.apache.aurora.scheduler.storage.db.MigrationModule;
 import org.apache.aurora.scheduler.storage.log.LogStorage;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
+import org.apache.aurora.scheduler.storage.mem.MemStorage.Delegated;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.thrift.ThriftConfiguration;
 import org.apache.aurora.scheduler.thrift.ThriftModule;
@@ -159,6 +162,11 @@ public class SchedulerMain extends AbstractApplication {
         .add(new LogStorageModule())
         .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
         .add(new CronModule())
+        .add(new DbModule(Bindings.annotatedKeyFactory(Delegated.class)))
+        .add(new MigrationModule(
+            Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class),
+            Bindings.annotatedKeyFactory(Delegated.class))
+        )
         .add(new ThriftModule())
         .add(new ThriftAuthModule())
         .build();

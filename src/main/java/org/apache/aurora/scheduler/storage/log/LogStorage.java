@@ -292,6 +292,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
   @Override
   public synchronized void prepare() {
+    writeBehindStorage.prepare();
     // Open the log to make a log replica available to the scheduler group.
     try {
       streamManager = logManager.open();
