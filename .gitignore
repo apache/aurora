@@ -12,7 +12,7 @@ build/
 build-support/*.pex
 build-support/*.venv
 build-support/virtualenv-*
-dist/
+dist/*
 gradle-app.setting
 out/
 third_party/
