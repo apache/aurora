@@ -23,7 +23,7 @@
         </div>
       </div>
 
-      <div ng-controller="CronJobSummaryController">
+      <div ng-controller='CronJobSummaryController'>
         <div ng-show='error'>
           <error/>
         </div>
@@ -45,28 +45,59 @@
         </div>
       </div>
 
-      <group-summary groups="groupSummary"></group-summary>
+      <tabset justified='true'>
+        <tab heading='Active tasks ({{activeTasks.length}})' title='All Active tasks for this job.'>
+          <div class='task-tab'>
+            <div class='group-summary'>
+              <group-summary groups='groupSummary'></group-summary>
+            </div>
+            <div class='container-fluid'>
+              <smart-table config='activeTasksTableConfig'
+                           columns='activeTasksTableColumns'
+                           rows='activeTasks'
+                           class='table table-striped table-hover table-bordered table-condensed'>
+              </smart-table>
+            </div>
+          </div>
+        </tab>
 
-      <div class='container-fluid'>
-        <h3>Active tasks</h3>
+        <tab heading='Completed tasks ({{completedTasks.length}})'
+             title='All completed tasks for this job.'>
+          <div class='task-tab container-fluid completed-tasks-tab'>
+            <smart-table config='completedTasksTableConfig'
+                         columns='completedTasksTableColumns'
+                         rows='completedTasks'
+                         class='table table-striped table-hover table-bordered table-condensed'>
+            </smart-table>
+          </div>
+        </tab>
 
-        <div>
-          <smart-table config='activeTasksTableConfig'
-                       columns='activeTasksTableColumns'
-                       rows='activeTasks'
-                       class='table table-striped table-hover table-bordered table-condensed'>
-          </smart-table>
-        </div>
-      </div>
+        <tab heading='All tasks' title='Both active and completed tasks for this job.'>
+          <div class='task-tab'>
+            <div class='group-summary'>
+              <group-summary groups='groupSummary'></group-summary>
+            </div>
 
-      <div class='container-fluid'>
-        <h3>Completed tasks</h3>
-        <smart-table config='completedTasksTableConfig'
-                     columns='completedTasksTableColumns'
-                     rows='completedTasks'
-                     class='table table-striped table-hover table-bordered table-condensed'>
-        </smart-table>
-      </div>
+            <div class='container-fluid'>
+              <h3>Active Tasks</h3>
+              <smart-table config='activeTasksTableConfig'
+                           columns='activeTasksTableColumns'
+                           rows='activeTasks'
+                           class='table table-striped table-hover table-bordered table-condensed'>
+              </smart-table>
+            </div>
+
+            <div class='container-fluid'>
+              <h3>Completed Tasks</h3>
+              <smart-table config='completedTasksTableConfig'
+                           columns='completedTasksTableColumns'
+                           rows='completedTasks'
+                           class='table table-striped table-hover table-bordered table-condensed'>
+              </smart-table>
+            </div>
+          </div>
+        </tab>
+      </tabset>
 
       <div class='container-fluid'>
         <a class='bottomRight' ng-click='toggleTaskInfoLinkVisibility()'>π</a>

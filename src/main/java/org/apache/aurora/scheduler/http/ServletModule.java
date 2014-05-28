@@ -143,6 +143,9 @@ public class ServletModule extends AbstractModule {
     registerAsset("bower_components/angular-route/angular-route.js", "/js/angular-route.js", false);
     registerAsset("bower_components/underscore/underscore.js", "/js/underscore.js", false);
     registerAsset("bower_components/momentjs/moment.js", "/js/moment.js", false);
+    registerAsset("bower_components/angular-bootstrap/ui-bootstrap-tpls.min.js",
+        "/js/ui-bootstrap-tpls.js",
+        false);
 
     registerAsset("ReadOnlyScheduler.js", "/js/readOnlyScheduler.js", false);
     registerAsset("api_types.js", "/js/apiTypes.js", false);

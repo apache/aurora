@@ -17,7 +17,7 @@ var auroraUI;
 
   // Declare app level module which depends on filters, and services
   auroraUI = angular.module('auroraUI',
-    ['ngRoute', 'auroraUI.controllers', 'smartTable.table']);
+    ['ngRoute', 'auroraUI.controllers', 'smartTable.table', 'ui.bootstrap']);
 
   auroraUI.config(function ($routeProvider, $locationProvider) {
     $routeProvider.when('/scheduler',

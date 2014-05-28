@@ -24,7 +24,7 @@
     isPaginationEnabled: true,
     itemsByPage: 25,
     maxSize: 8,
-    selectionMode: 'single',
+    selectionMode: 'single'
   };
 
   var summaryTableConfig = {

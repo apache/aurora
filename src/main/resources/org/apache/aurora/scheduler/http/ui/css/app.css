@@ -63,7 +63,7 @@ ul.breadcrumb {
   padding: 1em;
 }
 
-.instanceGroups:after, .visibleGroups:after{
+.instanceGroups:after, .visibleGroups:after {
   clear: both;
   content: "";
   display: block;
@@ -126,4 +126,18 @@ div.pagination {
 
 .smart-table-global-search {
   padding: 1em;
+}
+
+.group-summary {
+  padding-bottom: 10px;
+}
+
+.task-tab {
+  border-left: 1px solid #ddd;
+  border-right: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
+}
+
+.completed-tasks-tab {
+  padding-top: 10px;
 }
