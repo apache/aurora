@@ -61,6 +61,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.local.FakeDriverFactory.FakeSchedulerDriver;
 import org.apache.aurora.scheduler.log.testing.FileLogStreamModule;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.FrameworkID;
@@ -197,6 +198,15 @@ public class IsolatedSchedulerModule extends AbstractModule {
             cron.setCronSchedule("* * * * *");
             submitJob(cron);
           }
+
+          JobConfiguration bigService = createJob("bigJob",
+              mesosUser,
+              2000,
+              RandomStringUtils.random(300));
+
+          bigService.getTaskConfig().setProduction(true);
+          bigService.getTaskConfig().setIsService(true);
+          submitJob(bigService);
         }
       });
 
@@ -267,10 +277,19 @@ public class IsolatedSchedulerModule extends AbstractModule {
     }
 
     private JobConfiguration createJob(String jobName, Identity owner) {
+      return createJob(jobName, owner, 5, "opaque");
+    }
+
+    private JobConfiguration createJob(
+        String jobName,
+        Identity owner,
+        int instanceCount,
+        String executorConfig) {
+
       return new JobConfiguration()
           .setKey(JobKeys.from(owner.getRole(), "test", jobName).newBuilder())
           .setOwner(owner)
-          .setInstanceCount(5)
+          .setInstanceCount(instanceCount)
           .setTaskConfig(new TaskConfig()
               .setOwner(owner)
               .setJobName(jobName)
@@ -281,7 +300,7 @@ public class IsolatedSchedulerModule extends AbstractModule {
               .setMetadata(ImmutableSet.of(
                   new Metadata("role", owner.getRole()),
                   new Metadata("package", "15")))
-              .setExecutorConfig(new ExecutorConfig("aurora", "opaque")));
+              .setExecutorConfig(new ExecutorConfig("aurora", executorConfig)));
     }
 
     private void submitJob(JobConfiguration job) {
