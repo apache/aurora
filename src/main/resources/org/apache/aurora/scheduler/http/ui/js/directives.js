@@ -74,7 +74,7 @@
   auroraUI.directive('taskLink', function () {
     return {
       restrict: 'C',
-      template: '<a class="span4" ng-href="/structdump/task/{{formatedValue}}" target="_self">' +
+      template: '<a class="col-md-8" ng-href="/structdump/task/{{formatedValue}}" target="_self">' +
         '{{formatedValue}}</a>'
     };
   });

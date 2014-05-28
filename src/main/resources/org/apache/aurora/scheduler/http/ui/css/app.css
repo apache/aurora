@@ -13,8 +13,9 @@
   width: 200px;
 }
 
-.pagination {
-  text-align: center;
+.dashboard-url {
+  font-size: .85em;
+  color: darkslategray;
 }
 
 .sort-ascent:before {
@@ -113,4 +114,16 @@ ul.breadcrumb {
   padding: 0;
   margin-right: 5px;
   float: left;
+}
+
+.pagination {
+  text-align: center;
+}
+
+div.pagination {
+  width: 100%;
+}
+
+.smart-table-global-search {
+  padding: 1em;
 }

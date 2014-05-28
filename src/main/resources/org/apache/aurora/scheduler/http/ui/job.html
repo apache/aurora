@@ -14,8 +14,9 @@
           <h2 class='text-center'>
             Job <em>{{job}}</em> in role <em>{{role}}</em> and environment <em>{{environment}}</em>
             <span ng-if='jobDashboardUrl'>
-            <a ng-href='{{jobDashboardUrl}}' title='Container stats for this job'>
-              <i class='icon-large icon-stats'></i>
+            <a class='dashboard-url' ng-href='{{jobDashboardUrl}}'
+               title='Container stats for this job'>
+              <i class='glyphicon glyphicon-stats'></i>
             </a>
             </span>
           </h2>

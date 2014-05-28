@@ -24,7 +24,7 @@
     isPaginationEnabled: true,
     itemsByPage: 25,
     maxSize: 8,
-    selectionMode: 'single'
+    selectionMode: 'single',
   };
 
   var summaryTableConfig = {
@@ -68,6 +68,7 @@
       }
 
       $scope.roleSummaryTableConfig = infoTableConfig;
+      $scope.roleSummaryTableConfig.columnSpan = $scope.roleSummaryColumns.length;
     });
 
   auroraUIControllers.controller('JobSummaryController',
@@ -89,6 +90,7 @@
       ];
 
       $scope.jobsTableConfig = infoTableConfig;
+      $scope.jobsTableConfig.columnSpan = $scope.jobsTableColumns.length;
 
       $scope.jobs = getJobs();
 

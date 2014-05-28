@@ -1,25 +1,14 @@
 {
-  "author": "Laurent Renard",
-  "name": "smart-table",
-  "description": "A grid/table module for angular js",
-  "version": "0.1.5",
-  "homepage": "http://lorenzofox3.github.io/smart-table-website/",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/lorenzofox3/bower-smart-table.git"
-  },
-  "main": "./Smart-Table.min.js",
-  "dependencies": {
-    "angular": "1.0.7"
-  },
-  "_release": "0.1.5",
+  "name": "Smart-Table",
+  "homepage": "https://github.com/lorenzofox3/Smart-Table",
+  "_release": "ca3e2d53e8",
   "_resolution": {
-    "type": "version",
-    "tag": "v0.1.5",
-    "commit": "36adf6a69f83f1c28c16d21416555a63c7f75be8"
+    "type": "branch",
+    "branch": "master",
+    "commit": "ca3e2d53e880ce59c487230bc35b61dfe9cf6c96"
   },
-  "_source": "git://github.com/lorenzofox3/bower-smart-table.git",
-  "_target": "~0.1.5",
-  "_originalSource": "smart-table",
+  "_source": "git://github.com/lorenzofox3/Smart-Table.git",
+  "_target": "*",
+  "_originalSource": "git://github.com/lorenzofox3/Smart-Table",
   "_direct": true
 }

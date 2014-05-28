@@ -1,8 +1,8 @@
 <task-status>
   <div>
     <span title='{{formatedValue | scheduleStatusTooltip}}'>
-      <span ng-if='!showDetails'><i class='icon-plus'></i></span>
-      <span ng-if='showDetails'><i class='icon-minus'></i></span>
+      <span ng-if='!showDetails'><i class='glyphicon glyphicon-plus'></i></span>
+      <span ng-if='showDetails'><i class='glyphicon glyphicon-minus'></i></span>
       <span>
         {{dataRow.latestActivity | toElapsedTime}} ago -
         <span class='schedulingStatus'>{{formatedValue}}</span>

@@ -111,30 +111,26 @@ public class ServletModule extends AbstractModule {
   }
 
   private void registerJQueryAssets() {
-    registerAsset("bower_components/jquery/jquery.js", "/js/jquery.min.js", false);
+    registerAsset("bower_components/jquery/dist/jquery.js", "/js/jquery.min.js", false);
   }
 
   private void registerBootstrapAssets() {
-    final String BOOTSTRAP_PATH = "bower_components/bootstrap.css/";
+    final String BOOTSTRAP_PATH = "bower_components/bootstrap/";
 
-    registerAsset(BOOTSTRAP_PATH + "js/bootstrap.min.js", "/js/bootstrap.min.js", false);
-    registerAsset(BOOTSTRAP_PATH + "css/bootstrap.min.css", "/css/bootstrap.min.css", false);
-    registerAsset(BOOTSTRAP_PATH + "css/bootstrap-responsive.min.css",
-        "/css/bootstrap-responsive.min.css",
-        false);
-    registerAsset(BOOTSTRAP_PATH + "img/glyphicons-halflings-white.png",
-        "/img/glyphicons-halflings-white.png",
-        false);
-    registerAsset(BOOTSTRAP_PATH + "img/glyphicons-halflings.png",
-        "/img/glyphicons-halflings.png",
-        false);
+    registerAsset(BOOTSTRAP_PATH + "dist/js/bootstrap.min.js", "/js/bootstrap.min.js", false);
+    registerAsset(BOOTSTRAP_PATH + "dist/css/bootstrap.min.css", "/css/bootstrap.min.css", false);
 
-    // Register a complete set of large glyphicons from bootstrap-glyphicons project at
-    // http://marcoceppi.github.io/bootstrap-glyphicons/
-    // TODO(Suman Karumuri): Install the bootstrap-glyphicons via bower, once it is available.
-    registerAsset("bootstrap-glyphicons-master/glyphicons.png", "/img/glyphicons.png", false);
-    registerAsset("bootstrap-glyphicons-master/css/bootstrap.icon-large.min.css",
-        "/css/bootstrap.icon-large.min.css",
+    registerAsset(BOOTSTRAP_PATH + "dist/fonts/glyphicons-halflings-regular.eot",
+        "/fonts/glyphicons-halflings-regular.eot",
+        false);
+    registerAsset(BOOTSTRAP_PATH + "dist/fonts/glyphicons-halflings-regular.svg",
+        "/fonts/glyphicons-halflings-regular.svg",
+        false);
+    registerAsset(BOOTSTRAP_PATH + "dist/fonts/glyphicons-halflings-regular.ttf",
+        "/fonts/glyphicons-halflings-regular.ttf",
+        false);
+    registerAsset(BOOTSTRAP_PATH + "dist/fonts/glyphicons-halflings-regular.woff",
+        "/fonts/glyphicons-halflings-regular.woff",
         false);
   }
 
@@ -213,6 +209,15 @@ public class ServletModule extends AbstractModule {
       return MediaType.HTML_UTF_8;
     } else if (filePath.endsWith(".css")) {
       return MediaType.CSS_UTF_8;
+    } else if (filePath.endsWith(".svg")) {
+      return MediaType.SVG_UTF_8;
+    } else if (filePath.endsWith(".ttf")
+        || filePath.endsWith(".eot")
+        || filePath.endsWith(".woff")) {
+
+      // MediaType doesn't have any mime types for fonts. Instead of magic strings, we let the
+      // browser interpret the mime type and modern browsers can do this well.
+      return MediaType.ANY_TYPE;
     } else {
       throw new IllegalArgumentException("Could not determine media type for " + filePath);
     }
