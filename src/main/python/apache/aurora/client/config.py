@@ -132,10 +132,6 @@ UpdateConfig.watch_secs must be greater than %d seconds to account for an initia
 health check interval (%d seconds) plus %d consecutive failures at a check interval of %d seconds.
 '''
 
-RESTART_THRESHOLD_INSUFFICIENT_ERROR = '''
-restart_threshold in update_config must be greater than watch_secs.
-'''
-
 def _validate_update_config(config):
   job_size = config.instances()
   update_config = config.update_config()
@@ -143,7 +139,6 @@ def _validate_update_config(config):
 
   max_failures = update_config.max_total_failures().get()
   watch_secs = update_config.watch_secs().get()
-  restart_threshold = update_config.restart_threshold().get()
   initial_interval_secs = health_check_config.initial_interval_secs().get()
   max_consecutive_failures = health_check_config.max_consecutive_failures().get()
   interval_secs = health_check_config.interval_secs().get()
@@ -160,9 +155,6 @@ def _validate_update_config(config):
   if watch_secs <= target_watch:
     die(WATCH_SECS_INSUFFICIENT_ERROR_FORMAT %
         (watch_secs, target_watch, initial_interval_secs, max_consecutive_failures, interval_secs))
-
-  if restart_threshold <= watch_secs:
-    die(RESTART_THRESHOLD_INSUFFICIENT_ERROR)
 
 
 HEALTH_CHECK_INTERVAL_SECS_ERROR = '''

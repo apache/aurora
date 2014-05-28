@@ -203,14 +203,3 @@ def test_update_config_fails_insufficient_watch_secs_equal_to_target():
 
   with pytest.raises(SystemExit):
     config._validate_update_config(AuroraConfig(base_job))
-
-
-def test_update_config_fails_insufficient_restart_threshold():
-  base_job = Job(
-    name='hello_world', role='john_doe', cluster='test-cluster',
-    update_config = UpdateConfig(watch_secs=70),
-    task=Task(name='main', processes=[],
-              resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-
-  with pytest.raises(SystemExit):
-    config._validate_update_config(AuroraConfig(base_job))
