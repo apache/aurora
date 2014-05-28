@@ -403,7 +403,7 @@ task generateSources(dependsOn: ['bootstrapThrift', 'checkPython']) {
     inputFiles.each { File file ->
       exec {
         executable = project.thrift
-        args = ['--gen', 'java:hashcode', '--gen', 'js', '-o', outputDir, file]
+        args = ['--gen', 'java:hashcode', '--gen', 'js:jquery', '-o', outputDir, file]
       }
     }
     // TODO(wfarner): Change codegen tool to generate for all structs in a thrift file.
