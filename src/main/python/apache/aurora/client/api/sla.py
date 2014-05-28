@@ -17,7 +17,7 @@ import time
 from collections import defaultdict, namedtuple
 from copy import deepcopy
 
-from apache.aurora.client.base import log_response
+from apache.aurora.client.base import DEFAULT_GROUPING, group_hosts, log_response
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.constants import LIVE_STATES
@@ -151,10 +151,15 @@ class DomainUpTimeSlaVector(object):
     self._cluster = cluster
     self._tasks = tasks
     self._now = time.time()
-    self._tasks_by_job, self._jobs_by_host = self._init_mappings(min_instance_count)
+    self._tasks_by_job, self._jobs_by_host, self._hosts_by_job = self._init_mappings(
+        min_instance_count)
     self._host_filter = hosts
 
-  def get_safe_hosts(self, percentage, duration, job_limits=None):
+  def get_safe_hosts(self,
+      percentage,
+      duration,
+      job_limits=None,
+      grouping_function=DEFAULT_GROUPING):
     """Returns hosts safe to restart with respect to their job SLA.
        Every host is analyzed separately without considering other job hosts.
 
@@ -163,32 +168,34 @@ class DomainUpTimeSlaVector(object):
        duration -- default task uptime duration in seconds. Used if job_limits mapping is not found.
        job_limits -- optional SLA override map. Key: job key. Value JobUpTimeLimit. If specified,
                      replaces default percentage/duration within the job context.
+       grouping_function -- grouping function to use to group hosts.
     """
-    safe_hosts = defaultdict(list)
-    for host, job_keys in self._jobs_by_host.items():
-      if self._host_filter and host not in self._host_filter:
-        continue
+    safe_groups = []
+    for hosts, job_keys in self._iter_groups(
+        self._jobs_by_host.keys(), grouping_function, self._host_filter):
 
-      safe_limits = []
+      safe_hosts = defaultdict(list)
       for job_key in job_keys:
+        job_hosts = hosts.intersection(self._hosts_by_job[job_key])
         job_duration = duration
         job_percentage = percentage
         if job_limits and job_key in job_limits:
           job_duration = job_limits[job_key].duration_secs
           job_percentage = job_limits[job_key].percentage
 
-        filtered_percentage, _, _ = self._simulate_host_down(job_key, host, job_duration)
-        safe_limits.append(self.JobUpTimeLimit(job_key, filtered_percentage, job_duration))
-
+        filtered_percentage, _, _ = self._simulate_hosts_down(job_key, job_hosts, job_duration)
         if filtered_percentage < job_percentage:
           break
 
+        for host in job_hosts:
+          safe_hosts[host].append(self.JobUpTimeLimit(job_key, filtered_percentage, job_duration))
+
       else:
-        safe_hosts[host] = safe_limits
+        safe_groups.append(safe_hosts)
 
-    return safe_hosts
+    return safe_groups
 
-  def probe_hosts(self, percentage, duration):
+  def probe_hosts(self, percentage, duration, grouping_function=DEFAULT_GROUPING):
     """Returns predicted job SLAs following the removal of provided hosts.
 
        For every given host creates a list of JobUpTimeDetails with predicted job SLA details
@@ -199,12 +206,15 @@ class DomainUpTimeSlaVector(object):
        Arguments:
        percentage -- task up count percentage.
        duration -- task uptime duration in seconds.
+       grouping_function -- grouping function to use to group hosts.
     """
-    probed_hosts = defaultdict(list)
-    for host in self._host_filter or []:
-      for job_key in self._jobs_by_host.get(host, []):
-        filtered_percentage, total_count, filtered_vector = self._simulate_host_down(
-            job_key, host, duration)
+    probed_groups = []
+    for hosts, job_keys in self._iter_groups(self._host_filter or [], grouping_function):
+      probed_hosts = defaultdict(list)
+      for job_key in job_keys:
+        job_hosts = hosts.intersection(self._hosts_by_job[job_key])
+        filtered_percentage, total_count, filtered_vector = self._simulate_hosts_down(
+            job_key, job_hosts, duration)
 
         # Calculate wait time to SLA in case down host violates job's SLA.
         if filtered_percentage < percentage:
@@ -214,21 +224,41 @@ class DomainUpTimeSlaVector(object):
           safe = True
           wait_to_sla = 0
 
-        probed_hosts[host].append(
-            self.JobUpTimeDetails(job_key, filtered_percentage, safe, wait_to_sla))
+        for host in job_hosts:
+          probed_hosts[host].append(
+              self.JobUpTimeDetails(job_key, filtered_percentage, safe, wait_to_sla))
 
-    return probed_hosts
+      if probed_hosts:
+        probed_groups.append(probed_hosts)
 
-  def _simulate_host_down(self, job_key, host, duration):
+    return probed_groups
+
+  def _iter_groups(self, hosts_to_group, grouping_function, host_filter=None):
+    groups = group_hosts(hosts_to_group, grouping_function)
+    for _, hosts in sorted(groups.items(), key=lambda v: v[0]):
+      job_keys = set()
+      for host in hosts:
+        if host_filter and host not in self._host_filter:
+          continue
+        job_keys = job_keys.union(self._jobs_by_host.get(host, set()))
+      yield hosts, job_keys
+
+  def _create_group_results(self, group, uptime_details):
+    result = defaultdict(list)
+    for host in group.keys():
+      result[host].append(uptime_details)
+
+
+  def _simulate_hosts_down(self, job_key, hosts, duration):
     unfiltered_tasks = self._tasks_by_job[job_key]
 
     # Get total job task count to use in SLA calculation.
     total_count = len(unfiltered_tasks)
 
-    # Get a list of job tasks that would remain after the affected host goes down
+    # Get a list of job tasks that would remain after the affected hosts go down
     # and create an SLA vector with these tasks.
     filtered_tasks = [task for task in unfiltered_tasks
-                      if task.assignedTask.slaveHost != host]
+                      if task.assignedTask.slaveHost not in hosts]
     filtered_vector = JobUpTimeSlaVector(filtered_tasks, self._now)
 
     # Calculate the SLA that would be in effect should the host go down.
@@ -237,20 +267,24 @@ class DomainUpTimeSlaVector(object):
     return filtered_percentage, total_count, filtered_vector
 
   def _init_mappings(self, count):
-    jobs = defaultdict(list)
+    tasks_by_job = defaultdict(list)
     for task in self._tasks:
       if task.assignedTask.task.production:
-        jobs[job_key_from_scheduled(task, self._cluster)].append(task)
+        tasks_by_job[job_key_from_scheduled(task, self._cluster)].append(task)
 
     # Filter jobs by the min instance count.
-    jobs = defaultdict(list, ((job, tasks) for job, tasks in jobs.items() if len(tasks) >= count))
+    tasks_by_job = defaultdict(list, ((job, tasks) for job, tasks
+        in tasks_by_job.items() if len(tasks) >= count))
 
-    hosts = defaultdict(list)
-    for job_key, tasks in jobs.items():
+    jobs_by_host = defaultdict(set)
+    hosts_by_job = defaultdict(set)
+    for job_key, tasks in tasks_by_job.items():
       for task in tasks:
-        hosts[task.assignedTask.slaveHost].append(job_key)
+        host = task.assignedTask.slaveHost
+        jobs_by_host[host].add(job_key)
+        hosts_by_job[job_key].add(host)
 
-    return jobs, hosts
+    return tasks_by_job, jobs_by_host, hosts_by_job
 
 
 class Sla(object):

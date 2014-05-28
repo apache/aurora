@@ -19,18 +19,16 @@ import subprocess
 from twitter.common import app, log
 
 from apache.aurora.admin.host_maintenance import HostMaintenance
-from apache.aurora.client.base import die, FILENAME_OPTION, HOSTS_OPTION, parse_hosts, requires
+from apache.aurora.client.base import (
+    die,
+    FILENAME_OPTION,
+    get_grouping_or_die,
+    GROUPING_OPTION,
+    HOSTS_OPTION,
+    parse_hosts,
+    requires
+)
 from apache.aurora.common.clusters import CLUSTERS
-
-GROUPING_OPTION = optparse.Option(
-    '--grouping',
-    type='choice',
-    choices=HostMaintenance.GROUPING_FUNCTIONS.keys(),
-    metavar='GROUPING',
-    default=HostMaintenance.DEFAULT_GROUPING,
-    dest='grouping',
-    help='Grouping function to use to group hosts.  Options: %s.  Default: %%default' % (
-        ', '.join(HostMaintenance.GROUPING_FUNCTIONS.keys())))
 
 
 @app.command
@@ -78,6 +76,7 @@ def perform_maintenance_hosts(cluster):
   """
   options = app.get_options()
   drainable_hosts = parse_hosts(options.filename, options.hosts)
+  get_grouping_or_die(options.grouping)
 
   if options.post_drain_script:
     if not os.path.exists(options.post_drain_script):

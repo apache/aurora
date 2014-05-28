@@ -106,6 +106,45 @@ HOSTS_OPTION = optparse.Option(
     help='Comma separated list of hosts')
 
 
+def group_by_host(hostname):
+  return hostname
+
+DEFAULT_GROUPING = 'by_host'
+GROUPING_FUNCTIONS = {
+    'by_host': group_by_host,
+}
+
+def add_grouping(name, function):
+  GROUPING_FUNCTIONS[name] = function
+
+def remove_grouping(name):
+  GROUPING_FUNCTIONS.pop(name)
+
+def get_grouping_or_die(grouping_function):
+  try:
+    return GROUPING_FUNCTIONS[grouping_function]
+  except KeyError:
+    die('Unknown grouping function %s. Must be one of: %s'
+        % (grouping_function, GROUPING_FUNCTIONS.keys()))
+
+def group_hosts(hostnames, grouping_function=DEFAULT_GROUPING):
+  grouping_function = get_grouping_or_die(grouping_function)
+  groups = defaultdict(set)
+  for hostname in hostnames:
+    groups[grouping_function(hostname)].add(hostname)
+  return groups
+
+
+GROUPING_OPTION = optparse.Option(
+    '--grouping',
+    type='string',
+    metavar='GROUPING',
+    default=DEFAULT_GROUPING,
+    dest='grouping',
+    help='Grouping function to use to group hosts.  Options: %s.  Default: %%default' % (
+        ', '.join(GROUPING_FUNCTIONS.keys())))
+
+
 def parse_host_list(host_list):
   hosts = [hostname.strip() for hostname in host_list.split(",")]
   if not hosts:

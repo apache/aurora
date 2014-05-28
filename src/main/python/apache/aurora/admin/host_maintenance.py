@@ -19,13 +19,14 @@ from twitter.common import log
 from twitter.common.quantity import Amount, Time
 
 from apache.aurora.client.api import AuroraClientAPI
-from apache.aurora.client.base import check_and_log_response
+from apache.aurora.client.base import (
+    check_and_log_response,
+    DEFAULT_GROUPING,
+    group_hosts,
+    GROUPING_FUNCTIONS
+)
 
 from gen.apache.aurora.api.ttypes import Hosts, MaintenanceMode
-
-
-def group_by_host(hostname):
-  return hostname
 
 
 class HostMaintenance(object):
@@ -33,26 +34,11 @@ class HostMaintenance(object):
   mode so they can be operated upon without causing LOST tasks.
   """
 
-  DEFAULT_GROUPING = 'by_host'
-  GROUPING_FUNCTIONS = {
-    'by_host': group_by_host,
-  }
   START_MAINTENANCE_DELAY = Amount(30, Time.SECONDS)
 
   @classmethod
-  def group_hosts(cls, hostnames, grouping_function=DEFAULT_GROUPING):
-    try:
-      grouping_function = cls.GROUPING_FUNCTIONS[grouping_function]
-    except KeyError:
-      raise ValueError('Unknown grouping function %s!' % grouping_function)
-    groups = defaultdict(set)
-    for hostname in hostnames:
-      groups[grouping_function(hostname)].add(hostname)
-    return groups
-
-  @classmethod
   def iter_batches(cls, hostnames, grouping_function=DEFAULT_GROUPING):
-    groups = cls.group_hosts(hostnames, grouping_function)
+    groups = group_hosts(hostnames, grouping_function)
     groups = sorted(groups.items(), key=lambda v: v[0])
     for group in groups:
       yield Hosts(group[1])

@@ -18,6 +18,7 @@ import mock
 import pytest
 
 from apache.aurora.admin.host_maintenance import HostMaintenance
+from apache.aurora.client.base import add_grouping, remove_grouping
 from apache.aurora.common.cluster import Cluster
 
 from gen.apache.aurora.api.ttypes import Hosts, Response, ResponseCode
@@ -55,8 +56,7 @@ def rack_grouping(hostname):
 
 
 def test_rack_grouping():
-  old_grouping_functions = HostMaintenance.GROUPING_FUNCTIONS.copy()
-  HostMaintenance.GROUPING_FUNCTIONS['by_rack'] = rack_grouping
+  add_grouping('by_rack', rack_grouping)
 
   example_host_list = [
     'west-aaa-001.example.com',
@@ -79,4 +79,4 @@ def test_rack_grouping():
     ]))
 
   finally:
-    HostMaintenance.GROUPING_FUNCTIONS = old_grouping_functions
+    remove_grouping('by_rack')

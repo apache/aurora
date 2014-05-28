@@ -31,6 +31,8 @@ from apache.aurora.client.base import (
     check_and_log_response,
     die,
     FILENAME_OPTION,
+    get_grouping_or_die,
+    GROUPING_OPTION,
     HOSTS_OPTION,
     parse_hosts,
     parse_hosts_optional,
@@ -43,12 +45,7 @@ from apache.aurora.common.shellify import shellify
 from gen.apache.aurora.api.constants import ACTIVE_STATES, TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import ResponseCode, ScheduleStatus, TaskQuery
 
-"""Command-line client for managing admin-only interactions with the aurora scheduler.
-"""
-
-
-
-
+"""Command-line client for managing admin-only interactions with the aurora scheduler."""
 
 
 MIN_SLA_INSTANCE_COUNT = optparse.Option(
@@ -333,36 +330,40 @@ def scheduler_snapshot(cluster):
 
 
 @app.command
-@app.command_option('-I', '--include_file', dest='include_filename', default=None,
-    help='Inclusion filter. An optional text file listing host names (one per line)'
-         'to include into the result set if found.')
-@app.command_option('-i', '--include_hosts', dest='include_hosts', default=None,
-    help='Inclusion filter. An optional comma-separated list of host names'
-         'to include into the result set if found.')
 @app.command_option('-X', '--exclude_file', dest='exclude_filename', default=None,
     help='Exclusion filter. An optional text file listing host names (one per line)'
          'to exclude from the result set if found.')
 @app.command_option('-x', '--exclude_hosts', dest='exclude_hosts', default=None,
     help='Exclusion filter. An optional comma-separated list of host names'
          'to exclude from the result set if found.')
+@app.command_option(GROUPING_OPTION)
+@app.command_option('-I', '--include_file', dest='include_filename', default=None,
+    help='Inclusion filter. An optional text file listing host names (one per line)'
+         'to include into the result set if found.')
+@app.command_option('-i', '--include_hosts', dest='include_hosts', default=None,
+    help='Inclusion filter. An optional comma-separated list of host names'
+         'to include into the result set if found.')
 @app.command_option('-l', '--list_jobs', dest='list_jobs', default=False, action='store_true',
     help='Lists all affected job keys with projected new SLAs if their tasks get killed'
          'in the following column format:\n'
          'HOST  JOB  PREDICTED_SLA  DURATION_SECONDS')
+@app.command_option(MIN_SLA_INSTANCE_COUNT)
 @app.command_option('-o', '--override_file', dest='override_filename', default=None,
     help='An optional text file to load job specific SLAs that will override'
          'cluster-wide command line percentage and duration values.'
          'The file can have multiple lines in the following format:'
          '"cluster/role/env/job percentage duration". Example: cl/mesos/prod/labrat 95 2h')
-@app.command_option(MIN_SLA_INSTANCE_COUNT)
 @requires.exactly('cluster', 'percentage', 'duration')
 def sla_list_safe_domain(cluster, percentage, duration):
   """usage: sla_list_safe_domain
-            [--exclude_hosts=filename]
-            [--include_hosts=filename]
+            [--exclude_file=FILENAME]
+            [--exclude_hosts=HOSTS]
+            [--grouping=GROUPING]
+            [--include_file=FILENAME]
+            [--include_hosts=HOSTS]
             [--list_jobs]
-            [--override_jobs=filename]
-            [--min_job_instance_count]
+            [--min_job_instance_count=COUNT]
+            [--override_jobs=FILENAME]
             cluster percentage duration
 
   Returns a list of relevant hosts where it would be safe to kill
@@ -376,6 +377,12 @@ def sla_list_safe_domain(cluster, percentage, duration):
   Applied to all jobs except those listed in --override_jobs file.
   Format: XdYhZmWs (each field is optional but must be in that order.)
   Examples: 5m, 1d3h45m.
+
+  NOTE: if --grouping option is specified and is set to anything other than
+        default (by_host) the results will be processed and filtered based
+        on the grouping function on a all-or-nothing basis. In other words,
+        the group is 'safe' IFF it is safe to kill tasks on all hosts in the
+        group at the same time.
   """
   def parse_jobs_file(filename):
     result = {}
@@ -403,36 +410,41 @@ def sla_list_safe_domain(cluster, percentage, duration):
   exclude_hosts = parse_hosts_optional(options.exclude_hosts, options.exclude_filename)
   include_hosts = parse_hosts_optional(options.include_hosts, options.include_filename)
   override_jobs = parse_jobs_file(options.override_filename) if options.override_filename else {}
+  get_grouping_or_die(options.grouping)
 
   vector = AuroraClientAPI(
       CLUSTERS[cluster],
       options.verbosity).sla_get_safe_domain_vector(options.min_instance_count, include_hosts)
-  hosts = vector.get_safe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), override_jobs)
+  groups = vector.get_safe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS),
+      override_jobs, options.grouping)
 
   results = []
-  for host in sorted(hosts.keys()):
-    if exclude_hosts and host in exclude_hosts:
-      continue
+  for group in groups:
+    for host in sorted(group.keys()):
+      if exclude_hosts and host in exclude_hosts:
+        continue
 
-    if options.list_jobs:
-      results.append('\n'.join(['%s\t%s\t%.2f\t%d' %
-          (host, d.job.to_path(), d.percentage, d.duration_secs) for d in sorted(hosts[host])]))
-    else:
-      results.append('%s' % host)
+      if options.list_jobs:
+        results.append('\n'.join(['%s\t%s\t%.2f\t%d' %
+            (host, d.job.to_path(), d.percentage, d.duration_secs) for d in sorted(group[host])]))
+      else:
+        results.append('%s' % host)
 
   print_results(results)
 
 
 @app.command
 @app.command_option(FILENAME_OPTION)
+@app.command_option(GROUPING_OPTION)
 @app.command_option(HOSTS_OPTION)
 @app.command_option(MIN_SLA_INSTANCE_COUNT)
 @requires.exactly('cluster', 'percentage', 'duration')
 def sla_probe_hosts(cluster, percentage, duration):
   """usage: sla_probe_hosts
-            [--filename=filename]
-            [--hosts=hosts]
-            [--min_job_instance_count]
+            [--filename=FILENAME]
+            [--grouping=GROUPING]
+            [--hosts=HOSTS]
+            [--min_job_instance_count=COUNT]
             cluster percentage duration
 
   Probes individual hosts with respect to their job SLA.
@@ -455,22 +467,24 @@ def sla_probe_hosts(cluster, percentage, duration):
   sla_percentage = parse_sla_percentage(percentage)
   sla_duration = parse_time(duration)
   hosts = parse_hosts(options.filename, options.hosts)
+  get_grouping_or_die(options.grouping)
 
   vector = AuroraClientAPI(
       CLUSTERS[cluster],
       options.verbosity).sla_get_safe_domain_vector(options.min_instance_count, hosts)
-  probed_hosts = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS))
+  groups = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), options.grouping)
 
   results = []
-  for host, job_details in sorted(probed_hosts.items()):
-    results.append('\n'.join(
-        ['%s\t%s\t%.2f\t%s\t%s' %
-            (host,
-             d.job.to_path(),
-             d.predicted_percentage,
-             d.safe,
-             'n/a' if d.safe_in_secs is None else d.safe_in_secs)
-            for d in sorted(job_details)]))
+  for group in groups:
+    for host, job_details in sorted(group.items()):
+      results.append('\n'.join(
+          ['%s\t%s\t%.2f\t%s\t%s' %
+              (host,
+               d.job.to_path(),
+               d.predicted_percentage,
+               d.safe,
+               'n/a' if d.safe_in_secs is None else d.safe_in_secs)
+              for d in sorted(job_details)]))
 
   print_results(results)
 
