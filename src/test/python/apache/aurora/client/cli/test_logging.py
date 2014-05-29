@@ -100,7 +100,7 @@ class TestLogging(AuroraClientCommandTest):
     """
     mock_log_handler = MockHandler()
     logger = logging.getLogger('aurora_client')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     logger.addHandler(mock_log_handler)
     # We'll patch out create_context, which will give us a fake context
     # object, and everything can be stubbed through that.
@@ -124,9 +124,9 @@ class TestLogging(AuroraClientCommandTest):
             fp.name])
 
       # Check that things were logged correctly:
-      # there should be two entries, with the clientid and username;
-      # the first entry should log the command being invoked.
-      assert ("'job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello'" in
-          mock_log_handler.logs[0].getMessage())
+      # there should be at least two entries, with the clientid and username;
+      # and one entry should log the command being invoked.
+      assert any(("'job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello'" in
+          r.getMessage()) for r in mock_log_handler.logs)
       assert mock_log_handler.logs[0].clientid == mock_log_handler.logs[1].clientid
       assert mock_log_handler.logs[0].user == mock_log_handler.logs[1].user

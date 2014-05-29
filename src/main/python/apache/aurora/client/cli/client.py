@@ -15,6 +15,8 @@ import sys
 
 from apache.aurora.client.cli import CommandLine
 from apache.aurora.client.cli.bridge import Bridge, CommandProcessor
+from apache.aurora.client.cli.logsetup import setup_default_log_handlers
+import logging
 
 
 class AuroraCommandLine(CommandLine):
@@ -52,6 +54,7 @@ class AuroraClientV2CommandProcessor(CommandProcessor):
     return self.commandline.registered_nouns
 
   def execute(self, args):
+    setup_default_log_handlers(logging.INFO)
     return self.commandline.execute(args[1:])
 
 
@@ -69,7 +72,6 @@ class AuroraClientV1CommandProcessor(CommandProcessor):
   def execute(self, args):
     from apache.aurora.client.bin.aurora_client import proxy_main as clientone_proxy_main
     return clientone_proxy_main()
-
 
 def proxy_main():
   v2 = AuroraClientV2CommandProcessor()

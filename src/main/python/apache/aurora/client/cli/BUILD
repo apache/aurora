@@ -45,6 +45,7 @@ python_library(
     'command_hooks.py',
     'cron.py',
     'jobs.py',
+    'logsetup.py',
     'options.py',
     'quota.py',
     'sla.py',

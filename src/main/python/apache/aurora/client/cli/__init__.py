@@ -40,6 +40,7 @@ from uuid import uuid1
 from twitter.common.python.pex import PexInfo
 
 from .command_hooks import GlobalCommandHookRegistry
+from .logsetup import TRANSCRIPT
 
 # Constants for standard return codes.
 EXIT_OK = 0
@@ -374,7 +375,7 @@ class CommandLine(object):
     if args[0] == "help":
       return self.help_cmd(args[1:])
     noun, context = self._parse_args(args)
-    print_aurora_log(logging.INFO, "Command=(%s)", args)
+    print_aurora_log(TRANSCRIPT, "Command=(%s)", args)
     pre_result = self._run_pre_hooks_and_plugins(context, args)
     if pre_result is not EXIT_OK:
       return pre_result
