@@ -60,7 +60,7 @@ tasks.matching { it instanceof Compile && it.getName() != 'compileGeneratedJava'
 }
 
 task wrapper(type: Wrapper) {
-  gradleVersion = '1.11'
+  gradleVersion = '1.12'
 }
 
 task sourceJar(type: Jar) {
