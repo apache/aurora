@@ -32,6 +32,8 @@ import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.application.modules.LocalServiceRegistry;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
@@ -41,6 +43,7 @@ import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.SchedulerCore;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
+import org.mortbay.servlet.GzipFilter;
 
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_RESPONSE_FILTERS;
@@ -50,6 +53,14 @@ import static com.sun.jersey.api.json.JSONConfiguration.FEATURE_POJO_MAPPING;
  * Binding module for scheduler HTTP servlets.
  */
 public class ServletModule extends AbstractModule {
+
+  @CmdLine(name = "enable_cors_support", help = "Enable CORS support for thrift end points.")
+  private static final Arg<Boolean> ENABLE_CORS_SUPPORT = Arg.create(false);
+
+  // More info on CORS can be found at http://enable-cors.org/index.html
+  @CmdLine(name = "enable_cors_for",
+      help = "List of domains for which CORS support should be enabled.")
+  private static final Arg<String> ENABLE_CORS_FOR = Arg.create("*");
 
   private static final Map<String, String> CONTAINER_PARAMS = ImmutableMap.of(
       FEATURE_POJO_MAPPING, Boolean.TRUE.toString(),
@@ -62,6 +73,13 @@ public class ServletModule extends AbstractModule {
     requireBinding(CronJobManager.class);
     requireBinding(IServerInfo.class);
     requireBinding(QuotaManager.class);
+
+    // Register /api end point
+    Registration.registerServlet(binder(), "/api", SchedulerAPIServlet.class, true);
+
+    // NOTE: GzipFilter is applied only to /api instead of globally because the Jersey-managed
+    // servlets have a conflicting filter applied to them.
+    Registration.registerServletFilter(binder(), GzipFilter.class, "/api/*");
 
     // Bindings required for the leader redirector.
     requireBinding(LocalServiceRegistry.class);
@@ -83,6 +101,12 @@ public class ServletModule extends AbstractModule {
         filter("/scheduler*").through(HttpStatsFilter.class);
         bind(LeaderRedirectFilter.class).in(Singleton.class);
         filter("/scheduler").through(LeaderRedirectFilter.class);
+
+        // Add CORS support for all /api end points.
+        if (ENABLE_CORS_SUPPORT.get()) {
+          bind(CorsFilter.class).toInstance(new CorsFilter(ENABLE_CORS_FOR.get()));
+          filter("/api*").through(CorsFilter.class);
+        }
 
         registerJerseyEndpoint("/cron", Cron.class);
         registerJerseyEndpoint("/maintenance", Maintenance.class);

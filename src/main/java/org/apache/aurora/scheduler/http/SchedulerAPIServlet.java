@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.thrift;
+package org.apache.aurora.scheduler.http;
 
 import javax.inject.Inject;
 
