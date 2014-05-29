@@ -203,6 +203,8 @@ BROWSER_OPTION = CommandOption('--open-browser', default=False, dest='open_brows
 CONFIG_ARGUMENT = CommandOption('config_file', type=str,
     help='pathname of the aurora configuration file contain the job specification')
 
+CONFIG_OPTION = CommandOption('--config', type=str, default=None,
+    help='pathname of the aurora configuration file contain the job specification')
 
 EXECUTOR_SANDBOX_OPTION = CommandOption('--executor-sandbox', action='store_true',
      default=False, help='Run the command in the executor sandbox instead of the task sandbox')

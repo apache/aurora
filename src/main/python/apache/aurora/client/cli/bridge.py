@@ -65,15 +65,14 @@ class Bridge(object):
       for cp in self.command_processors:
         print("========== help for %s ==========" % cp.name)
         cp.execute(args)
-      return
+      return 0
     elif len(args) >= 3:
       discriminator = args[2]
       for cp in self.command_processors:
         if discriminator in cp.get_commands():
-          cp.execute(args)
-          return
+          return cp.execute(args)
       if self.default is not None:
-        self.default.execute(args)
+        return self.default.execute(args)
 
 
   def execute(self, args):

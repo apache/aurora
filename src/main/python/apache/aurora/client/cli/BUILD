@@ -43,6 +43,7 @@ python_library(
     'config.py',
     'context.py',
     'command_hooks.py',
+    'cron.py',
     'jobs.py',
     'options.py',
     'quota.py',

@@ -26,6 +26,8 @@ class AuroraCommandLine(CommandLine):
 
   def register_nouns(self):
     super(AuroraCommandLine, self).register_nouns()
+    from apache.aurora.client.cli.cron import CronNoun
+    self.register_noun(CronNoun())
     from apache.aurora.client.cli.jobs import Job
     self.register_noun(Job())
     from apache.aurora.client.cli.config import ConfigNoun
