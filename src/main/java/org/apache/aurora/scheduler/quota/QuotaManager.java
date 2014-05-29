@@ -138,7 +138,7 @@ public interface QuotaManager {
 
       return QuotaCheckResult.greaterOrEqual(
           quotaInfo.guota(),
-          add(quotaInfo.prodConsumption(), additionalRequested));
+          add(quotaInfo.getProdConsumption(), additionalRequested));
     }
 
     private static IResourceAggregate fromTasks(Iterable<ITaskConfig> tasks) {

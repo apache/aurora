@@ -58,13 +58,13 @@ import static com.google.common.base.Preconditions.checkNotNull;
 class MesosSchedulerImpl implements Scheduler {
   private static final Logger LOG = Logger.getLogger(MesosSchedulerImpl.class.getName());
 
-  private final AtomicLong resourceOffers = Stats.exportLong("scheduler_resource_offers");
-  private final AtomicLong failedStatusUpdates = Stats.exportLong("scheduler_status_updates");
-  private final AtomicLong frameworkDisconnects =
+  private final AtomicLong totalResourceOffers = Stats.exportLong("scheduler_resource_offers");
+  private final AtomicLong totalFailedStatusUpdates = Stats.exportLong("scheduler_status_updates");
+  private final AtomicLong totalFrameworkDisconnects =
       Stats.exportLong("scheduler_framework_disconnects");
-  private final AtomicLong frameworkReregisters =
+  private final AtomicLong totalFrameworkReregisters =
       Stats.exportLong("scheduler_framework_reregisters");
-  private final AtomicLong lostExecutors = Stats.exportLong("scheduler_lost_executors");
+  private final AtomicLong totalLostExecutors = Stats.exportLong("scheduler_lost_executors");
 
   private final List<TaskLauncher> taskLaunchers;
 
@@ -72,7 +72,7 @@ class MesosSchedulerImpl implements Scheduler {
   private final StateManager stateManager;
   private final Lifecycle lifecycle;
   private final EventSink eventSink;
-  private volatile boolean registered = false;
+  private volatile boolean isRegistered = false;
 
   /**
    * Creates a new scheduler.
@@ -119,27 +119,27 @@ class MesosSchedulerImpl implements Scheduler {
         storeProvider.getSchedulerStore().saveFrameworkId(frameworkId.getValue());
       }
     });
-    registered = true;
+    isRegistered = true;
     eventSink.post(new DriverRegistered());
   }
 
   @Override
   public void disconnected(SchedulerDriver schedulerDriver) {
     LOG.warning("Framework disconnected.");
-    frameworkDisconnects.incrementAndGet();
+    totalFrameworkDisconnects.incrementAndGet();
     eventSink.post(new DriverDisconnected());
   }
 
   @Override
   public void reregistered(SchedulerDriver schedulerDriver, MasterInfo masterInfo) {
     LOG.info("Framework re-registered with master " + masterInfo);
-    frameworkReregisters.incrementAndGet();
+    totalFrameworkReregisters.incrementAndGet();
   }
 
   @Timed("scheduler_resource_offers")
   @Override
   public void resourceOffers(SchedulerDriver driver, final List<Offer> offers) {
-    Preconditions.checkState(registered, "Must be registered before receiving offers.");
+    Preconditions.checkState(isRegistered, "Must be registered before receiving offers.");
 
     // Store all host attributes in a single write operation to prevent other threads from
     // securing the storage lock between saves.  We also save the host attributes before passing
@@ -158,8 +158,10 @@ class MesosSchedulerImpl implements Scheduler {
     });
 
     for (Offer offer : offers) {
-      log(Level.FINE, "Received offer: %s", offer);
-      resourceOffers.incrementAndGet();
+      if (LOG.isLoggable(Level.FINE)) {
+        LOG.log(Level.FINE, String.format("Received offer: %s", offer));
+      }
+      totalResourceOffers.incrementAndGet();
       for (TaskLauncher launcher : taskLaunchers) {
         if (launcher.willUse(offer)) {
           break;
@@ -203,7 +205,7 @@ class MesosSchedulerImpl implements Scheduler {
     }
 
     LOG.warning("Unhandled status update " + status);
-    failedStatusUpdates.incrementAndGet();
+    totalFailedStatusUpdates.incrementAndGet();
   }
 
   @Override
@@ -217,7 +219,7 @@ class MesosSchedulerImpl implements Scheduler {
       int status) {
 
     LOG.info("Lost executor " + executorID);
-    lostExecutors.incrementAndGet();
+    totalLostExecutors.incrementAndGet();
   }
 
   @Timed("scheduler_framework_message")
@@ -250,12 +252,6 @@ class MesosSchedulerImpl implements Scheduler {
       }
     } catch (ThriftBinaryCodec.CodingException e) {
       LOG.log(Level.SEVERE, "Failed to decode framework message.", e);
-    }
-  }
-
-  private static void log(Level level, String message, Object... args) {
-    if (LOG.isLoggable(level)) {
-      LOG.log(level, String.format(message, args));
     }
   }
 }

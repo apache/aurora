@@ -49,7 +49,7 @@ public class QuotaInfo {
    *
    * @return Production job consumption.
    */
-  public IResourceAggregate prodConsumption() {
+  public IResourceAggregate getProdConsumption() {
     return prodConsumption;
   }
 
@@ -58,7 +58,7 @@ public class QuotaInfo {
    *
    * @return Non production job consumption.
    */
-  public IResourceAggregate nonProdConsumption() {
+  public IResourceAggregate getNonProdConsumption() {
     return nonProdConsumption;
   }
 }

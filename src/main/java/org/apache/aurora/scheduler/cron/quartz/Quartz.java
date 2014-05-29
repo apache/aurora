@@ -89,7 +89,7 @@ final class Quartz {
   /**
    * Convert a Quartz JobKey to an Aurora IJobKey.
    */
-  static IJobKey auroraJobKey(org.quartz.JobKey jobKey) {
+  static IJobKey auroraJobKey(JobKey jobKey) {
     return JobKeys.parse(jobKey.getName());
   }
 

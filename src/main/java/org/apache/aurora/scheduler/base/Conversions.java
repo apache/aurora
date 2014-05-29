@@ -79,8 +79,8 @@ public final class Conversions {
   /**
    * Typedef to make anonymous implementation more concise.
    */
-  private abstract static class AttributeConverter
-      implements Function<Entry<String, Collection<Protos.Attribute>>, Attribute> {
+  private interface AttributeConverter
+      extends Function<Entry<String, Collection<Protos.Attribute>>, Attribute> {
   }
 
   private static final Function<Protos.Attribute, String> VALUE_CONVERTER =

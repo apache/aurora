@@ -280,13 +280,8 @@ pmd {
   ruleSets = [
       'java-basic',
       'java-braces',
-      // TODO(wfarner): Circle back to (at least partially) re-enable the rules below.
-      //'java-design',
       'java-empty',
-      //'java-imports',
       'java-junit',
-      //'java-logging-java',
-      //'java-naming',
       'java-typeresolution',
       'java-unnecessary',
       'java-unusedcode']

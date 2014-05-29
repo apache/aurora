@@ -344,7 +344,7 @@ public interface Preemptor {
             stateManager.changeState(
                 toPreempt.getTaskId(),
                 Optional.<ScheduleStatus>absent(),
-                ScheduleStatus.PREEMPTING,
+                PREEMPTING,
                 Optional.of("Preempting in favor of " + pendingTask.getTaskId()));
             tasksPreempted.incrementAndGet();
           }

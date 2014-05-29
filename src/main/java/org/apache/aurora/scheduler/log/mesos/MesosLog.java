@@ -172,9 +172,9 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
           }
         };
 
-    private final OpStats read = new OpStats("read");
-    private final OpStats append = new OpStats("append");
-    private final OpStats truncate = new OpStats("truncate");
+    private final OpStats readStats = new OpStats("read");
+    private final OpStats appendStats = new OpStats("append");
+    private final OpStats truncateStats = new OpStats("truncate");
     private final AtomicLong entriesSkipped =
         Stats.exportLong("scheduler_log_native_native_entries_skipped");
 
@@ -284,13 +284,13 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
                 return true;
               }
             } catch (TimeoutException e) {
-              read.timeouts.getAndIncrement();
+              readStats.timeouts.getAndIncrement();
               throw new StreamAccessException("Timeout reading from log.", e);
             } catch (Log.OperationFailedException e) {
-              read.failures.getAndIncrement();
+              readStats.failures.getAndIncrement();
               throw new StreamAccessException("Problem reading from log", e);
             } finally {
-              read.timing.accumulate(System.nanoTime() - start);
+              readStats.timing.accumulate(System.nanoTime() - start);
             }
           }
           return false;
@@ -313,7 +313,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
     public LogPosition append(final byte[] contents) throws StreamAccessException {
       checkNotNull(contents);
 
-      Log.Position position = mutate(append, new Mutation<Log.Position>() {
+      Log.Position position = mutate(appendStats, new Mutation<Log.Position>() {
         @Override
         public Log.Position apply(WriterInterface logWriter)
             throws TimeoutException, Log.WriterFailedException {
@@ -331,7 +331,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       Preconditions.checkArgument(position instanceof LogPosition);
 
       final Log.Position before = ((LogPosition) position).unwrap();
-      mutate(truncate, new Mutation<Void>() {
+      mutate(truncateStats, new Mutation<Void>() {
         @Override
         public Void apply(WriterInterface logWriter)
             throws TimeoutException, Log.WriterFailedException {

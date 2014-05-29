@@ -19,7 +19,6 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
@@ -60,7 +59,7 @@ class SlotSizeCounter implements Runnable {
     private final boolean dedicated;
 
     public MachineResource(IResourceAggregate size, boolean dedicated) {
-      this.size = Preconditions.checkNotNull(size);
+      this.size = checkNotNull(size);
       this.dedicated = dedicated;
     }
 

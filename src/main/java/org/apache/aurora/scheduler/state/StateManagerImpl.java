@@ -203,7 +203,7 @@ public class StateManagerImpl implements StateManager {
       Set<String> portNames,
       Set<Integer> allocatedPorts) {
 
-    Preconditions.checkNotNull(portNames);
+    checkNotNull(portNames);
 
     // Expand ports.
     Map<String, Integer> ports = Maps.newHashMap();

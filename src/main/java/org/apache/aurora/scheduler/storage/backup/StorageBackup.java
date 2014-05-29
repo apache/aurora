@@ -22,6 +22,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -122,7 +123,7 @@ public interface StorageBackup {
       this.delegate = checkNotNull(delegate);
       this.clock = checkNotNull(clock);
       this.config = checkNotNull(config);
-      backupDateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm");
+      backupDateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm", Locale.ENGLISH);
       backupIntervalMs = config.interval.as(Time.MILLISECONDS);
       lastBackupMs = clock.nowMillis();
     }

@@ -73,9 +73,10 @@ public class QuotaManagerImplTest extends EasyMockTest {
     QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ROLE);
     assertEquals(quota, quotaInfo.guota());
     assertEquals(
-        IResourceAggregate.build(new ResourceAggregate(3, 3, 3)), quotaInfo.prodConsumption());
+        IResourceAggregate.build(new ResourceAggregate(3, 3, 3)), quotaInfo.getProdConsumption());
     assertEquals(
-        IResourceAggregate.build(new ResourceAggregate(2, 2, 2)), quotaInfo.nonProdConsumption());
+        IResourceAggregate.build(new ResourceAggregate(2, 2, 2)),
+        quotaInfo.getNonProdConsumption());
   }
 
   @Test
@@ -90,8 +91,8 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ROLE);
     assertEquals(quota, quotaInfo.guota());
-    assertEquals(ResourceAggregates.none(), quotaInfo.prodConsumption());
-    assertEquals(ResourceAggregates.none(), quotaInfo.nonProdConsumption());
+    assertEquals(ResourceAggregates.none(), quotaInfo.getProdConsumption());
+    assertEquals(ResourceAggregates.none(), quotaInfo.getNonProdConsumption());
   }
 
   @Test

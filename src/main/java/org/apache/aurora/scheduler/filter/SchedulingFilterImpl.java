@@ -89,7 +89,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   /**
    * Convenience class for a rule that will only ever have a single veto.
    */
-  private abstract static class SingleVetoRule implements FilterRule {
+  private abstract static class AbstractSingleVetoRule implements FilterRule {
     @Override
     public final Iterable<Veto> apply(ITaskConfig task) {
       return doApply(task).asSet();
@@ -141,7 +141,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   private Iterable<FilterRule> rulesFromOffer(final ResourceSlot available) {
     return ImmutableList.<FilterRule>of(
-        new SingleVetoRule() {
+        new AbstractSingleVetoRule() {
           @Override
           public Optional<Veto> doApply(ITaskConfig task) {
             return CPU.maybeVeto(
@@ -149,7 +149,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
                 ResourceSlot.from(task).getNumCpus());
           }
         },
-        new SingleVetoRule() {
+        new AbstractSingleVetoRule() {
           @Override
           public Optional<Veto> doApply(ITaskConfig task) {
             return RAM.maybeVeto(
@@ -157,14 +157,14 @@ public class SchedulingFilterImpl implements SchedulingFilter {
                 ResourceSlot.from(task).getRam().as(Data.MB));
           }
         },
-        new SingleVetoRule() {
+        new AbstractSingleVetoRule() {
           @Override
           public Optional<Veto> doApply(ITaskConfig task) {
             return DISK.maybeVeto(available.getDisk().as(Data.MB),
                 ResourceSlot.from(task).getDisk().as(Data.MB));
           }
         },
-        new SingleVetoRule() {
+        new AbstractSingleVetoRule() {
           @Override
           public Optional<Veto> doApply(ITaskConfig task) {
             return PORTS.maybeVeto(available.getNumPorts(),

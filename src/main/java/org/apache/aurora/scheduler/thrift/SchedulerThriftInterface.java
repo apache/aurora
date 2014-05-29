@@ -41,7 +41,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
-import com.twitter.common.base.MorePreconditions;
 
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
@@ -621,7 +620,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       SessionKey session) {
 
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
-    MorePreconditions.checkNotBlank(shardIds);
+    checkNotBlank(shardIds);
     checkNotNull(session);
 
     Response response = Util.emptyResponse();
@@ -653,8 +652,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ownerRole);
     GetQuotaResult result = new GetQuotaResult(quotaInfo.guota().newBuilder())
-        .setProdConsumption(quotaInfo.prodConsumption().newBuilder())
-        .setNonProdConsumption(quotaInfo.nonProdConsumption().newBuilder());
+        .setProdConsumption(quotaInfo.getProdConsumption().newBuilder())
+        .setNonProdConsumption(quotaInfo.getNonProdConsumption().newBuilder());
 
     return okResponse(Result.getQuotaResult(result));
   }
@@ -943,7 +942,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       ConfigRewrite command,
       MutableStoreProvider storeProvider) {
 
-    Optional<String> error = Optional.absent();
+    Optional<String> error;
     switch (command.getSetField()) {
       case JOB_REWRITE:
         error = rewriteJob(command.getJobRewrite(), storeProvider.getJobStore());

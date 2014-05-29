@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.cron;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -369,7 +370,7 @@ public final class CrontabEntry {
     }
 
     private String replaceNameAliases(String rawComponent, Map<String, Integer> names) {
-      String component = rawComponent.toUpperCase();
+      String component = rawComponent.toUpperCase(Locale.ENGLISH);
       for (Map.Entry<String, Integer> entry : names.entrySet()) {
         if (component.contains(entry.getKey())) {
           component = component.replaceAll(entry.getKey(), entry.getValue().toString());

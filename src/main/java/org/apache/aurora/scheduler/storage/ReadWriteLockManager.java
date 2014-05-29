@@ -24,7 +24,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * a read-locked thread to a write-locked thread, which would otherwise deadlock.
  */
 public class ReadWriteLockManager {
-  private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  private final ReentrantReadWriteLock managedLock = new ReentrantReadWriteLock();
 
   private enum LockMode {
     NONE,
@@ -91,12 +91,12 @@ public class ReadWriteLockManager {
     checkNotNull(type);
 
     if (LockType.READ == type) {
-      lock.readLock().lock();
+      managedLock.readLock().lock();
     } else {
       Preconditions.checkState(lockState.get().initialLockMode != LockMode.READ,
           "A read operation may not be upgraded to a write operation.");
 
-      lock.writeLock().lock();
+      managedLock.writeLock().lock();
     }
 
     return lockState.get().lockAcquired(type.getMode());
@@ -111,9 +111,9 @@ public class ReadWriteLockManager {
     checkNotNull(type);
 
     if (LockType.READ == type) {
-      lock.readLock().unlock();
+      managedLock.readLock().unlock();
     } else {
-      lock.writeLock().unlock();
+      managedLock.writeLock().unlock();
     }
 
     lockState.get().lockReleased(type.getMode());
@@ -126,6 +126,6 @@ public class ReadWriteLockManager {
    * @return The estimated number of threads waiting for this lock.
    */
   public int getQueueLength() {
-    return lock.getQueueLength();
+    return managedLock.getQueueLength();
   }
 }

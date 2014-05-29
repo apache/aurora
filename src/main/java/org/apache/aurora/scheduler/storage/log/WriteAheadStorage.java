@@ -116,7 +116,7 @@ class WriteAheadStorage extends ForwardingStore implements
     this.attributeStore = checkNotNull(attributeStore);
   }
 
-  private void log(Op op) {
+  private void write(Op op) {
     Preconditions.checkState(
         transactionManager.hasActiveTransaction(),
         "Mutating operations must be within a transaction.");
@@ -128,7 +128,7 @@ class WriteAheadStorage extends ForwardingStore implements
   public void saveFrameworkId(final String frameworkId) {
     checkNotNull(frameworkId);
 
-    log(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
+    write(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
     schedulerStore.saveFrameworkId(frameworkId);
   }
 
@@ -140,7 +140,7 @@ class WriteAheadStorage extends ForwardingStore implements
 
     boolean mutated = taskStore.unsafeModifyInPlace(taskId, taskConfiguration);
     if (mutated) {
-      log(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration.newBuilder())));
+      write(Op.rewriteTask(new RewriteTask(taskId, taskConfiguration.newBuilder())));
     }
     return mutated;
   }
@@ -150,7 +150,7 @@ class WriteAheadStorage extends ForwardingStore implements
   public void deleteTasks(final Set<String> taskIds) {
     checkNotNull(taskIds);
 
-    log(Op.removeTasks(new RemoveTasks(taskIds)));
+    write(Op.removeTasks(new RemoveTasks(taskIds)));
     taskStore.deleteTasks(taskIds);
   }
 
@@ -159,7 +159,7 @@ class WriteAheadStorage extends ForwardingStore implements
   public void saveTasks(final Set<IScheduledTask> newTasks) {
     checkNotNull(newTasks);
 
-    log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(newTasks))));
+    write(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(newTasks))));
     taskStore.saveTasks(newTasks);
   }
 
@@ -181,7 +181,7 @@ class WriteAheadStorage extends ForwardingStore implements
     }
 
     // TODO(William Farner): Avoid writing an op when mutated is empty.
-    log(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
+    write(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))));
     return mutated;
   }
 
@@ -191,7 +191,7 @@ class WriteAheadStorage extends ForwardingStore implements
     checkNotNull(role);
     checkNotNull(quota);
 
-    log(Op.saveQuota(new SaveQuota(role, quota.newBuilder())));
+    write(Op.saveQuota(new SaveQuota(role, quota.newBuilder())));
     quotaStore.saveQuota(role, quota);
   }
 
@@ -209,7 +209,7 @@ class WriteAheadStorage extends ForwardingStore implements
     attributeStore.saveHostAttributes(attrs);
     Optional<HostAttributes> updated = getHostAttributes(attrs.getHost());
     if (!saved.equals(updated)) {
-      log(Op.saveHostAttributes(new SaveHostAttributes(updated.get())));
+      write(Op.saveHostAttributes(new SaveHostAttributes(updated.get())));
     }
   }
 
@@ -218,7 +218,7 @@ class WriteAheadStorage extends ForwardingStore implements
   public void removeJob(final IJobKey jobKey) {
     checkNotNull(jobKey);
 
-    log(Op.removeJob(new RemoveJob().setJobKey(jobKey.newBuilder())));
+    write(Op.removeJob(new RemoveJob().setJobKey(jobKey.newBuilder())));
     jobStore.removeJob(jobKey);
   }
 
@@ -228,7 +228,7 @@ class WriteAheadStorage extends ForwardingStore implements
     checkNotNull(managerId);
     checkNotNull(jobConfig);
 
-    log(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())));
+    write(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())));
     jobStore.saveAcceptedJob(managerId, jobConfig);
   }
 
@@ -237,7 +237,7 @@ class WriteAheadStorage extends ForwardingStore implements
   public void removeQuota(final String role) {
     checkNotNull(role);
 
-    log(Op.removeQuota(new RemoveQuota(role)));
+    write(Op.removeQuota(new RemoveQuota(role)));
     quotaStore.removeQuota(role);
   }
 
@@ -246,7 +246,7 @@ class WriteAheadStorage extends ForwardingStore implements
   public void saveLock(final ILock lock) {
     checkNotNull(lock);
 
-    log(Op.saveLock(new SaveLock(lock.newBuilder())));
+    write(Op.saveLock(new SaveLock(lock.newBuilder())));
     lockStore.saveLock(lock);
   }
 
@@ -255,7 +255,7 @@ class WriteAheadStorage extends ForwardingStore implements
   public void removeLock(final ILockKey lockKey) {
     checkNotNull(lockKey);
 
-    log(Op.removeLock(new RemoveLock(lockKey.newBuilder())));
+    write(Op.removeLock(new RemoveLock(lockKey.newBuilder())));
     lockStore.removeLock(lockKey);
   }
 
@@ -297,7 +297,7 @@ class WriteAheadStorage extends ForwardingStore implements
     Optional<HostAttributes> saved = getHostAttributes(host);
     if (saved.isPresent()) {
       HostAttributes attributes = saved.get().setMode(mode);
-      log(Op.saveHostAttributes(new SaveHostAttributes(attributes)));
+      write(Op.saveHostAttributes(new SaveHostAttributes(attributes)));
       attributeStore.saveHostAttributes(attributes);
       return true;
     }

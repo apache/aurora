@@ -171,9 +171,11 @@ class MemTaskStore implements TaskStore.Mutable {
       Task removed = tasks.remove(id);
       if (removed != null) {
         for (SecondaryIndex<?> index : secondaryIndices) {
-          index.remove(removed.task);
+          index.remove(removed.storedTask);
         }
-        configInterner.removeAssociation(removed.task.getAssignedTask().getTask().newBuilder(), id);
+        configInterner.removeAssociation(
+            removed.storedTask.getAssignedTask().getTask().newBuilder(),
+            id);
       }
     }
   }
@@ -189,14 +191,14 @@ class MemTaskStore implements TaskStore.Mutable {
 
     ImmutableSet.Builder<IScheduledTask> mutated = ImmutableSet.builder();
     for (Task original : matches(query).toList()) {
-      IScheduledTask maybeMutated = mutator.apply(original.task);
-      if (!original.task.equals(maybeMutated)) {
+      IScheduledTask maybeMutated = mutator.apply(original.storedTask);
+      if (!original.storedTask.equals(maybeMutated)) {
         Preconditions.checkState(
-            Tasks.id(original.task).equals(Tasks.id(maybeMutated)),
+            Tasks.id(original.storedTask).equals(Tasks.id(maybeMutated)),
             "A task's ID may not be mutated.");
         tasks.put(Tasks.id(maybeMutated), toTask.apply(maybeMutated));
         for (SecondaryIndex<?> index : secondaryIndices) {
-          index.replace(original.task, maybeMutated);
+          index.replace(original.storedTask, maybeMutated);
         }
 
         mutated.add(maybeMutated);
@@ -216,7 +218,7 @@ class MemTaskStore implements TaskStore.Mutable {
     if (stored == null) {
       return false;
     } else {
-      ScheduledTask updated = stored.task.newBuilder();
+      ScheduledTask updated = stored.storedTask.newBuilder();
       updated.getAssignedTask().setTask(taskConfiguration.newBuilder());
       tasks.put(taskId, toTask.apply(IScheduledTask.build(updated)));
       return true;
@@ -227,7 +229,7 @@ class MemTaskStore implements TaskStore.Mutable {
     return new Predicate<Task>() {
       @Override
       public boolean apply(Task canonicalTask) {
-        IScheduledTask task = canonicalTask.task;
+        IScheduledTask task = canonicalTask.storedTask;
         ITaskConfig config = task.getAssignedTask().getTask();
         if (query.getOwner() != null) {
           if (!StringUtils.isBlank(query.getOwner().getRole())
@@ -311,7 +313,7 @@ class MemTaskStore implements TaskStore.Mutable {
       new Function<Task, IScheduledTask>() {
         @Override
         public IScheduledTask apply(Task task) {
-          return task.task;
+          return task.storedTask;
         }
       };
 
@@ -319,16 +321,18 @@ class MemTaskStore implements TaskStore.Mutable {
       Functions.compose(Tasks.SCHEDULED_TO_ID, TO_SCHEDULED);
 
   private static class Task {
-    private final IScheduledTask task;
+    private final IScheduledTask storedTask;
 
-    Task(IScheduledTask task, Interner<TaskConfig, String> interner) {
-      interner.removeAssociation(task.getAssignedTask().getTask().newBuilder(), Tasks.id(task));
+    Task(IScheduledTask storedTask, Interner<TaskConfig, String> interner) {
+      interner.removeAssociation(
+          storedTask.getAssignedTask().getTask().newBuilder(),
+          Tasks.id(storedTask));
       TaskConfig canonical = interner.addAssociation(
-          task.getAssignedTask().getTask().newBuilder(),
-          Tasks.id(task));
-      ScheduledTask builder = task.newBuilder();
+          storedTask.getAssignedTask().getTask().newBuilder(),
+          Tasks.id(storedTask));
+      ScheduledTask builder = storedTask.newBuilder();
       builder.getAssignedTask().setTask(canonical);
-      this.task = IScheduledTask.build(builder);
+      this.storedTask = IScheduledTask.build(builder);
     }
 
     @Override
@@ -338,12 +342,12 @@ class MemTaskStore implements TaskStore.Mutable {
       }
 
       Task other = (Task) o;
-      return task.equals(other.task);
+      return storedTask.equals(other.storedTask);
     }
 
     @Override
     public int hashCode() {
-      return task.hashCode();
+      return storedTask.hashCode();
     }
   }
 

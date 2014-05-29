@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.http;
 
 import java.io.StringWriter;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -160,7 +161,7 @@ public class Utilization {
   }
 
   private MetricType getTypeByName(String name) throws WebApplicationException {
-    MetricType type = MetricType.valueOf(name.toUpperCase());
+    MetricType type = MetricType.valueOf(name.toUpperCase(Locale.ENGLISH));
     if (type == null) {
       throw new WebApplicationException(
           Response.status(Status.BAD_REQUEST).entity("Invalid metric type.").build());
