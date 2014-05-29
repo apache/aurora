@@ -20,7 +20,6 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
@@ -119,13 +118,11 @@ public interface MesosTaskFactory {
       }
 
       ITaskConfig config = task.getTask();
-      List<Resource> resources;
-      if (task.isSetAssignedPorts()) {
-        resources = Resources.from(config)
-            .toResourceList(ImmutableSet.copyOf(task.getAssignedPorts().values()));
-      } else {
-        resources = ImmutableList.of();
-      }
+      // TODO(wfarner): Re-evaluate if/why we need to continue handling unset assignedPorts field.
+      List<Resource> resources = Resources.from(config)
+          .toResourceList(task.isSetAssignedPorts()
+              ? ImmutableSet.copyOf(task.getAssignedPorts().values())
+              : ImmutableSet.<Integer>of());
 
       if (LOG.isLoggable(Level.FINE)) {
         LOG.fine("Setting task resources to "

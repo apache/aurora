@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
@@ -112,8 +113,8 @@ public class Resources {
           .add(Resources.makeMesosResource(CPUS, numCpus))
           .add(Resources.makeMesosResource(DISK_MB, disk.as(Data.MB)))
           .add(Resources.makeMesosResource(RAM_MB, ram.as(Data.MB)));
-    if (selectedPorts.isEmpty()) {
-        resourceBuilder.add(Resources.makeMesosRangeResource(Resources.PORTS, selectedPorts));
+    if (!selectedPorts.isEmpty()) {
+      resourceBuilder.add(Resources.makeMesosRangeResource(Resources.PORTS, selectedPorts));
     }
 
     return resourceBuilder.build();
@@ -312,7 +313,8 @@ public class Resources {
    * @param values Values to translate into ranges.
    * @return A mesos ranges resource.
    */
-  static Resource makeMesosRangeResource(String name, Set<Integer> values) {
+  @VisibleForTesting
+  public static Resource makeMesosRangeResource(String name, Set<Integer> values) {
     return Resource.newBuilder()
         .setName(name)
         .setType(Type.RANGES)

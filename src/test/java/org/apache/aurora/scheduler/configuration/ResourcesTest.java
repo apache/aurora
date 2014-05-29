@@ -22,7 +22,9 @@ import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
+import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.configuration.Resources.InsufficientResourcesException;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Value.Range;
@@ -31,6 +33,9 @@ import org.apache.mesos.Protos.Value.Type;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class ResourcesTest {
@@ -74,6 +79,12 @@ public class ResourcesTest {
     } catch (InsufficientResourcesException e) {
       // Expected.
     }
+  }
+
+  @Test
+  public void testGetNoPorts() {
+    Resource portsResource = createPortRange(Pair.of(1, 5));
+    assertEquals(ImmutableSet.<Integer>of(), Resources.getPorts(createOffer(portsResource), 0));
   }
 
   private static final Resources NEGATIVE_ONE =
@@ -158,6 +169,80 @@ public class ResourcesTest {
   public void testRangeResourceContiguous() {
     expectRanges(ImmutableSet.of(Pair.of(1L, 2L), Pair.of(4L, 5L), Pair.of(7L, 9L)),
         ImmutableSet.of(8, 2, 4, 5, 7, 9, 1));
+  }
+
+  private static final ITaskConfig TASK = ITaskConfig.build(new TaskConfig()
+      .setNumCpus(1.0)
+      .setRamMb(1024)
+      .setDiskMb(2048)
+      .setRequestedPorts(ImmutableSet.of("http", "debug")));
+
+  private static void assertLeftIsLarger(Resources left, Resources right) {
+    assertTrue(left.greaterThanOrEqual(right));
+    assertFalse(right.greaterThanOrEqual(left));
+  }
+
+  @Test
+  public void testAccessors() {
+    Resources resources = Resources.from(TASK);
+    assertEquals(TASK.getNumCpus(), resources.getNumCpus(), 1e-9);
+    assertEquals(Amount.of(TASK.getRamMb(), Data.MB), resources.getRam());
+    assertEquals(Amount.of(TASK.getDiskMb(), Data.MB), resources.getDisk());
+    assertEquals(TASK.getRequestedPorts().size(), resources.getNumPorts());
+
+    assertTrue(resources.greaterThanOrEqual(resources));
+    assertLeftIsLarger(
+        resources,
+        Resources.from(ITaskConfig.build(TASK.newBuilder().setNumCpus(0.5))));
+    assertLeftIsLarger(
+        resources,
+        Resources.from(ITaskConfig.build(TASK.newBuilder().setRamMb(512))));
+    assertLeftIsLarger(
+        resources,
+        Resources.from(ITaskConfig.build(TASK.newBuilder().setDiskMb(1024))));
+    assertLeftIsLarger(
+        resources,
+        Resources.from(
+            ITaskConfig.build(TASK.newBuilder().setRequestedPorts(ImmutableSet.of("http")))));
+  }
+
+  @Test
+  public void testToResourceList() {
+    Resources resources = Resources.from(TASK);
+    Set<Integer> ports = ImmutableSet.of(80, 443);
+    assertEquals(
+        ImmutableSet.of(
+            Resources.makeMesosResource(Resources.CPUS, TASK.getNumCpus()),
+            Resources.makeMesosResource(Resources.RAM_MB, TASK.getRamMb()),
+            Resources.makeMesosResource(Resources.DISK_MB, TASK.getDiskMb()),
+            Resources.makeMesosRangeResource(Resources.PORTS, ports)),
+        ImmutableSet.copyOf(resources.toResourceList(ports)));
+  }
+
+  @Test
+  public void testToResourceListInversible() {
+    Resources resources = Resources.from(TASK);
+    Resources inverse = Resources.from(resources.toResourceList(ImmutableSet.of(80, 443)));
+    assertEquals(resources, inverse);
+    assertEquals(resources.hashCode(), inverse.hashCode());
+  }
+
+  @Test
+  public void testEqualsBadType() {
+    Resources resources = Resources.from(TASK);
+    assertNotEquals(resources, "Hello");
+    assertNotEquals(resources, null);
+  }
+
+  @Test
+  public void testToResourceListNoPorts() {
+    Resources resources = Resources.from(TASK);
+    assertEquals(
+        ImmutableSet.of(
+            Resources.makeMesosResource(Resources.CPUS, TASK.getNumCpus()),
+            Resources.makeMesosResource(Resources.RAM_MB, TASK.getRamMb()),
+            Resources.makeMesosResource(Resources.DISK_MB, TASK.getDiskMb())),
+        ImmutableSet.copyOf(resources.toResourceList(ImmutableSet.<Integer>of())));
   }
 
   private void expectRanges(Set<Pair<Long, Long>> expected, Set<Integer> values) {
