@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.cron.quartz;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
@@ -35,6 +36,7 @@ import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
+import org.quartz.CronTrigger;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
@@ -183,12 +185,13 @@ public class CronJobManagerImplTest extends EasyMockTest {
 
   @Test
   public void testGetScheduledJobs() throws Exception {
-    JobDetail jobDetail = createMock(JobDetail.class);
+    CronTrigger cronTrigger = createMock(CronTrigger.class);
     expect(scheduler.getJobKeys(EasyMock.<GroupMatcher<JobKey>>anyObject()))
         .andReturn(ImmutableSet.of(QuartzTestUtil.QUARTZ_JOB_KEY));
-    expect(scheduler.getJobDetail(QuartzTestUtil.QUARTZ_JOB_KEY))
-        .andReturn(jobDetail);
-    expect(jobDetail.getDescription()).andReturn("* * * * *");
+    EasyMock.
+        <List<? extends Trigger>>expect(scheduler.getTriggersOfJob(QuartzTestUtil.QUARTZ_JOB_KEY))
+        .andReturn(ImmutableList.of(cronTrigger));
+    expect(cronTrigger.getDescription()).andReturn("* * * * *");
 
     control.replay();
 

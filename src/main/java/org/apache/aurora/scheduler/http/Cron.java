@@ -24,7 +24,10 @@ import javax.ws.rs.core.Response;
 
 import com.google.common.collect.ImmutableMap;
 
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.cron.CronJobManager;
+import org.apache.aurora.scheduler.cron.CrontabEntry;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
 /**
  * HTTP interface to dump state of the internal cron scheduler.
@@ -46,10 +49,11 @@ public class Cron {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   public Response dumpContents() {
-    Map<String, Object> response = ImmutableMap.<String, Object>builder()
-        .put("scheduled", cronManager.getScheduledJobs())
-        .build();
+    ImmutableMap.Builder<String, String> scheduled = ImmutableMap.builder();
+    for (Map.Entry<IJobKey, CrontabEntry> entry : cronManager.getScheduledJobs().entrySet()) {
+      scheduled.put(JobKeys.canonicalString(entry.getKey()), entry.getValue().toString());
+    }
 
-   return Response.ok(response).build();
+    return Response.ok(ImmutableMap.<String, Object>of("scheduled", scheduled.build())).build();
   }
 }

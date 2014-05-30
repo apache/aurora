@@ -22,6 +22,7 @@ import javax.inject.Inject;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.aurora.gen.CronCollisionPolicy;
@@ -36,7 +37,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
-import org.quartz.JobDetail;
+import org.quartz.CronTrigger;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
@@ -240,10 +241,15 @@ class CronJobManagerImpl implements CronJobManager {
     ImmutableMap.Builder<IJobKey, CrontabEntry> scheduledJobs = ImmutableMap.builder();
     try {
       for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.<JobKey>anyGroup())) {
-        Optional<JobDetail> jobDetail = Optional.fromNullable(scheduler.getJobDetail(jobKey));
-        if (jobDetail.isPresent()) {
+        // The quartz API allows jobs to have multiple triggers. We don't use that feature but
+        // we're defensive here since this function is used for debugging.
+        Optional<CronTrigger> trigger = FluentIterable.from(scheduler.getTriggersOfJob(jobKey))
+            .filter(CronTrigger.class)
+            .first();
+        if (trigger.isPresent()) {
           scheduledJobs.put(
-              Quartz.auroraJobKey(jobKey), CrontabEntry.parse(jobDetail.get().getDescription()));
+              Quartz.auroraJobKey(jobKey),
+              Quartz.crontabEntry(trigger.get()));
         }
       }
     } catch (SchedulerException e) {
