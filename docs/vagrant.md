@@ -14,5 +14,6 @@ Troubleshooting
 ---------------
 Most of the vagrant related problems can be fixed by the following steps:
 * Destroying the vagrant environment with `vagrant destroy`
+* Killing any orphaned VMs (see AURORA-499) with `virtualbox` UI or `VBoxManage` command line tool
 * Cleaning the repository of build artifacts and other intermediate output with `git clean -fdx`
 * Bringing up the vagrant environment with `vagrant up`
