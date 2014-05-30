@@ -310,8 +310,12 @@
           var count = (summary.range.end - summary.range.start) + 1;
           var percentage = (count / total) * 100;
 
+          var label = (summary.range.start === summary.range.end) ?
+            summary.range.start :
+            summary.range.start + '-' + summary.range.end;
+
           return {
-            label: summary.range.start + '-' + summary.range.end,
+            label: label,
             value: count,
             percentage: percentage,
             summary: summary,
