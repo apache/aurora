@@ -102,10 +102,10 @@ def test_registry():
   binding_helper.unregister_all()
   assert len(binding_helper._BINDING_HELPERS) == 0
 
-  UncachedHelper.register()
+  BindingHelper.register(UncachedHelper())
   assert len(binding_helper._BINDING_HELPERS) == 1
 
-  CachedHelper.register()
+  BindingHelper.register(CachedHelper())
   assert len(binding_helper._BINDING_HELPERS) == 2
 
   binding_helper.unregister_all()
@@ -114,8 +114,8 @@ def test_registry():
 
 def test_helper_types():
   binding_helper.unregister_all()
-  UncachedHelper.register()
-  CachedHelper.register()
+  BindingHelper.register(UncachedHelper())
+  BindingHelper.register(CachedHelper())
 
   uncached_helper = binding_helper._BINDING_HELPERS[0]
   cached_helper = binding_helper._BINDING_HELPERS[1]

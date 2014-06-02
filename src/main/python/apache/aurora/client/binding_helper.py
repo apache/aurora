@@ -63,9 +63,10 @@ class BindingHelper(Interface):
   (because a human reader wants to know the version of the package, not the meaningless
   HDFS URL.
   """
-  @classmethod
-  def register(cls):
-    _BINDING_HELPERS.append(cls())
+  @staticmethod
+  def register(helper):
+    _BINDING_HELPERS.append(helper)
+
 
   def apply(self, config, env=None, binding_dict=None):
     for match in self.matcher.match(config.raw()):
