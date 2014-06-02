@@ -22,12 +22,12 @@ fi
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
 echo "Performing Python import order check."
-if ! $HERE/../../build-support/isort-check >&/dev/null; then
+if ! $HERE/../../build-support/python/isort-check >&/dev/null; then
   echo ""
   echo ""
   echo "** PYTHON IMPORT ORDER CHECK FAILED"
   echo "*"
-  echo "* please run: build-support/isort-run"
+  echo "* please run: build-support/python/isort-run"
   echo "*"
   echo "**"
   echo ""
@@ -36,3 +36,17 @@ else
   echo "SUCCESS"
 fi
 
+echo "Performing Python checkstyle."
+if ! $HERE/../../build-support/python/checkstyle-check >&/dev/null; then
+  echo ""
+  echo ""
+  echo "** PYTHON CHECKSTYLE FAILED"
+  echo "*"
+  echo "* For more information please run: build-support/python/checkstyle-check"
+  echo "*"
+  echo "**"
+  echo ""
+  exit 1
+else
+  echo "SUCCESS"
+fi

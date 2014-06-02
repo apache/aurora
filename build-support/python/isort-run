@@ -11,22 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-# Wrapper script for running isort
 set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-ISORT_VERSION=3.8.0
-
-if ! [ -f "$HERE/isort.venv/BOOTSTRAPPED" ] || \
-    [ x`cat "$HERE/isort.venv/BOOTSTRAPPED"` != x$ISORT_VERSION ]; then
-  echo Bootstrapping isort @ $ISORT_VERSION
-  rm -fr "$HERE/isort.venv"
-  "$HERE/virtualenv" "$HERE/isort.venv"
-  source "$HERE/isort.venv/bin/activate"
-  pip install "isort==$ISORT_VERSION"
-  echo $ISORT_VERSION > "$HERE/isort.venv/BOOTSTRAPPED"
-fi
-
-source "$HERE/isort.venv/bin/activate"
-exec isort "$@"
+$HERE/isort -ns __init__.py -rc $HERE/../../src

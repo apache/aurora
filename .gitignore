@@ -11,6 +11,7 @@
 build/
 build-support/*.pex
 build-support/*.venv
+build-support/python/*.venv
 build-support/virtualenv-*
 dist/*
 gradle-app.setting

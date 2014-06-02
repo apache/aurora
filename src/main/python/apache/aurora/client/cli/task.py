@@ -29,7 +29,10 @@ from pystachio.config import Config
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
 
-from apache.aurora.client.api.command_runner import DistributedCommandRunner, InstanceDistributedCommandRunner
+from apache.aurora.client.api.command_runner import (
+    DistributedCommandRunner,
+    InstanceDistributedCommandRunner
+)
 from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
