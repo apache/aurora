@@ -32,6 +32,7 @@ python_library(
     pants(':cli'),
     pants(':bridge'),
     pants('3rdparty/python:twitter.common.python'),
+    pants('src/main/python/apache/aurora/client/bin:aurora_admin_lib'),
     pants('src/main/python/apache/aurora/client/bin:aurora_client_lib')
   ]
 )
