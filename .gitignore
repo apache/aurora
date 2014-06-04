@@ -1,19 +1,20 @@
-.idea/
+# SYNTAX NOTE: dist/ will ignore any directory named dist. Use dist/* to ignore dist in project root.
+.idea/*
 *.iml
 *.ipr
 *.iws
 *.pyc
 *~
 .coverage
-.gradle/
+.gradle/*
 .pants.*
-.vagrant/
-build/
+.vagrant/*
+build/*
 build-support/*.pex
 build-support/*.venv
 build-support/python/*.venv
 build-support/virtualenv-*
 dist/*
 gradle-app.setting
-out/
-third_party/
+out/*
+third_party/*
