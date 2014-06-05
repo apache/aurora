@@ -57,6 +57,7 @@ python_tests(
 python_tests(
   name='admin',
   sources = [
+    'test_admin.py',
     'test_admin_sla.py',
   ],
   dependencies = [

@@ -78,7 +78,9 @@ def parse_sla_percentage(percentage):
     help='Format string of job/task items to print out.')
 # TODO(ksweeney): Allow query by environment here.
 def query(args, options):
-  """usage: query [--shards=N[,N,...]]
+  """usage: query [--force]
+                  [--listformat=FORMAT]
+                  [--shards=N[,N,...]]
                   [--states=State[,State,...]]
                   cluster [role [job]]
 
@@ -134,11 +136,11 @@ def query(args, options):
 
   #  Figure out "expensive" queries here and bone if they do not have --force
   #  - Does not specify role
-  if role is None and not options.force:
+  if not role and not options.force:
     die('--force is required for expensive queries (no role specified)')
 
   #  - Does not specify job
-  if job is None and not options.force:
+  if not job and not options.force:
     die('--force is required for expensive queries (no job specified)')
 
   #  - Specifies status outside of ACTIVE_STATES
@@ -147,9 +149,10 @@ def query(args, options):
 
   api = AuroraClientAPI(CLUSTERS[cluster], options.verbosity)
   query_info = api.query(api.build_query(role, job, instances=instances, statuses=states))
-  tasks = query_info.result.scheduleStatusResult.tasks
   if query_info.responseCode != ResponseCode.OK:
     die('Failed to query scheduler: %s' % query_info.messageDEPRECATED)
+
+  tasks = query_info.result.scheduleStatusResult.tasks
   if tasks is None:
     return
 
