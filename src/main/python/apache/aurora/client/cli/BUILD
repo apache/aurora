@@ -20,6 +20,14 @@ python_binary(
   ],
 )
 
+python_binary(
+  name='aurora2_so',
+  entry_point = 'apache.aurora.client.cli.standalone_client:proxy_main',
+  dependencies = [
+    pants(':client_lib')
+  ]
+)
+
 python_library(
   name = 'bridge',
   sources = ['bridge.py']
@@ -49,8 +57,9 @@ python_library(
     'logsetup.py',
     'options.py',
     'quota.py',
+    'standalone_client.py',
     'sla.py',
-    'task.py'
+    'task.py',
   ],
   dependencies = [
     pants('3rdparty/python:argparse'),

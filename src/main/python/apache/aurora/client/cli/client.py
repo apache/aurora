@@ -16,31 +16,14 @@ import sys
 from apache.aurora.client.cli import CommandLine
 from apache.aurora.client.cli.bridge import Bridge, CommandProcessor
 from apache.aurora.client.cli.logsetup import setup_default_log_handlers
+from apache.aurora.client.cli.standalone_client import AuroraCommandLine
 import logging
 
 
-class AuroraCommandLine(CommandLine):
-  """The CommandLine implementation for the Aurora client v2 command line."""
-
-  @classmethod
-  def get_description(cls):
-    return 'Aurora client command line'
-
-  def register_nouns(self):
-    super(AuroraCommandLine, self).register_nouns()
-    from apache.aurora.client.cli.cron import CronNoun
-    self.register_noun(CronNoun())
-    from apache.aurora.client.cli.jobs import Job
-    self.register_noun(Job())
-    from apache.aurora.client.cli.config import ConfigNoun
-    self.register_noun(ConfigNoun())
-    from apache.aurora.client.cli.quota import Quota
-    self.register_noun(Quota())
-    from apache.aurora.client.cli.sla import Sla
-    self.register_noun(Sla())
-    from apache.aurora.client.cli.task import Task
-    self.register_noun(Task())
-
+# TODO(mchucarroll): the entire bridged executable mechanism here is
+# intended to be deprecated once clientv2 has proven to be stable
+# and adopted by most users. Once we reach that point, this should
+# be replaced by the standalone executable defined in standalone_client.py.
 
 class AuroraClientV2CommandProcessor(CommandProcessor):
   def __init__(self):
