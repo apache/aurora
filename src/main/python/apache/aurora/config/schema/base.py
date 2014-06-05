@@ -12,6 +12,9 @@
 # limitations under the License.
 #
 
+# Disable checkstyle for this entire file as it is a pystachio schema.
+# checkstyle: noqa
+
 from apache.thermos.config.schema import *
 
 from gen.apache.aurora.api.constants import DEFAULT_ENVIRONMENT

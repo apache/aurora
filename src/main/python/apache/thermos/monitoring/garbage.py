@@ -136,9 +136,9 @@ class DefaultCollector(TaskGarbageCollectionPolicy):
         verbose: boolean (whether or not to log)  [default: False]
         logger: callable (function to call with log messages) [default: sys.stdout.write]
     """
-    self._max_age = kw.get('max_age', Amount(10**10, Time.DAYS))
-    self._max_space = kw.get('max_space', Amount(10**10, Data.TB))
-    self._max_tasks = kw.get('max_tasks', 10**10)
+    self._max_age = kw.get('max_age', Amount(10 ** 10, Time.DAYS))
+    self._max_space = kw.get('max_space', Amount(10 ** 10, Data.TB))
+    self._max_tasks = kw.get('max_tasks', 10 ** 10)
     self._include_metadata = kw.get('include_metadata', True)
     self._include_logs = kw.get('include_logs', True)
     self._verbose = kw.get('verbose', False)

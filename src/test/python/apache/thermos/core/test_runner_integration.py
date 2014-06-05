@@ -15,36 +15,35 @@
 import os
 from textwrap import dedent
 
-import pytest
-
-from apache.thermos.config.schema import order, Process, Resources, SequentialTask, Task, Tasks
+from apache.thermos.config.schema import Process, Resources, SequentialTask, Task, Tasks
 from apache.thermos.testing.runner import RunnerTestBase
 
 from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 
 class TestRunnerBasic(RunnerTestBase):
-  portmap = {'named_port': 8123}
+  portmap = {'named_port': 8123}  # noqa
 
   @classmethod
   def task(cls):
-    hello_template = Process(cmdline = "echo 1")
-    t1 = hello_template(name = "t1", cmdline = "echo 1 port {{thermos.ports[named_port]}}")
-    t2 = hello_template(name = "t2")
-    t3 = hello_template(name = "t3")
-    t4 = hello_template(name = "t4")
-    t5 = hello_template(name = "t5")
-    t6 = hello_template(name = "t6")
-    tsk = Task(name = "complex", processes = [t1, t2, t3, t4, t5, t6])
+    hello_template = Process(cmdline="echo 1")
+    t1 = hello_template(name="t1", cmdline="echo 1 port {{thermos.ports[named_port]}}")
+    t2 = hello_template(name="t2")
+    t3 = hello_template(name="t3")
+    t4 = hello_template(name="t4")
+    t5 = hello_template(name="t5")
+    t6 = hello_template(name="t6")
+    tsk = Task(name="complex", processes=[t1, t2, t3, t4, t5, t6])
     # three ways of tasks: t1 t2, t3 t4, t5 t6
-    tsk = tsk(constraints = [{'order': ['t1', 't3']},
-                             {'order': ['t1', 't4']},
-                             {'order': ['t2', 't3']},
-                             {'order': ['t2', 't4']},
-                             {'order': ['t3', 't5']},
-                             {'order': ['t3', 't6']},
-                             {'order': ['t4', 't5']},
-                             {'order': ['t4', 't6']}])
+    tsk = tsk(constraints=[
+        {'order': ['t1', 't3']},
+        {'order': ['t1', 't4']},
+        {'order': ['t2', 't3']},
+        {'order': ['t2', 't4']},
+        {'order': ['t3', 't5']},
+        {'order': ['t3', 't6']},
+        {'order': ['t4', 't5']},
+        {'order': ['t4', 't6']}])
     return tsk
 
   def test_runner_state_success(self):
@@ -66,7 +65,7 @@ class TestRunnerBasic(RunnerTestBase):
 
   def test_runner_has_expected_processes(self):
     processes = self.state.processes
-    process_names = set(['t%d'%k for k in range(1,7)])
+    process_names = set(['t%d' % k for k in range(1, 7)])
     actual_process_names = set(processes.keys())
     assert process_names == actual_process_names, "runner didn't run expected set of processes!"
     for process in processes:
@@ -77,7 +76,7 @@ class TestRunnerBasic(RunnerTestBase):
       history = self.state.processes[process]
       assert history[-1].state == ProcessState.SUCCESS
       if len(history) > 1:
-        for run in range(len(history)-1):
+        for run in range(len(history) - 1):
           assert history[run].state != ProcessState.SUCCESS, (
             "nonterminal processes must not be in SUCCESS state!")
 
@@ -91,14 +90,14 @@ class TestRunnerBasic(RunnerTestBase):
 class TestConcurrencyBasic(RunnerTestBase):
   @classmethod
   def task(cls):
-    hello_template = Process(cmdline = "sleep 1")
+    hello_template = Process(cmdline="sleep 1")
     tsk = Task(
-      name = "complex",
-      processes = [hello_template(name = "process1"),
-                   hello_template(name = "process2"),
-                   hello_template(name = "process3")],
-      resources = Resources(cpu = 1.0, ram = 16*1024*1024, disk = 16*1024),
-      max_concurrency = 1)
+      name="complex",
+      processes=[hello_template(name="process1"),
+                 hello_template(name="process2"),
+                 hello_template(name="process3")],
+      resources=Resources(cpu=1.0, ram=16 * 1024 * 1024, disk=16 * 1024),
+      max_concurrency=1)
     return tsk
 
   def test_runner_state_success(self):
@@ -119,45 +118,44 @@ class TestConcurrencyBasic(RunnerTestBase):
 class TestRunnerEnvironment(RunnerTestBase):
   @classmethod
   def task(cls):
-    setup_bashrc = Process(name = "setup_bashrc", cmdline = dedent(
-    """
-    mkdir -p .profile.d
-    cat <<EOF > .thermos_profile
-    for i in .profile.d/*.sh ; do
-      if [ -r "\\$i" ]; then
-        . \\$i
-      fi
-    done
-    EOF
-    """))
+    setup_bashrc = Process(name="setup_bashrc", cmdline=dedent(
+        """
+        mkdir -p .profile.d
+        cat <<EOF > .thermos_profile
+        for i in .profile.d/*.sh ; do
+          if [ -r "\\$i" ]; then
+            . \\$i
+          fi
+        done
+        EOF
+        """))
 
-    setup_foo = Process(name = "setup_foo", cmdline = dedent(
-    """
-    cat <<EOF > .profile.d/setup_foo.sh
-    export FOO=1
-    EOF
-    """))
+    setup_foo = Process(name="setup_foo", cmdline=dedent(
+        """
+        cat <<EOF > .profile.d/setup_foo.sh
+        export FOO=1
+        EOF
+        """))
 
-    setup_bar = Process(name = "setup_bar", cmdline = dedent(
-    """
-    cat <<EOF > .profile.d/setup_bar.sh
-    export BAR=2
-    EOF
-    """))
+    setup_bar = Process(name="setup_bar", cmdline=dedent(
+        """
+        cat <<EOF > .profile.d/setup_bar.sh
+        export BAR=2
+        EOF
+        """))
 
-    foo_recipe = SequentialTask(processes = [setup_bashrc, setup_foo])
-    bar_recipe = SequentialTask(processes = [setup_bashrc, setup_bar])
+    foo_recipe = SequentialTask(processes=[setup_bashrc, setup_foo])
+    bar_recipe = SequentialTask(processes=[setup_bashrc, setup_bar])
     all_recipes = Tasks.combine(foo_recipe, bar_recipe)
 
-    run = Process(name = "run", cmdline = dedent(
-    """
-    echo $FOO $BAR > expected_output.txt
-    """
-    ))
+    run = Process(name="run", cmdline=dedent(
+        """
+        echo $FOO $BAR > expected_output.txt
+        """))
 
-    my_task = Task(processes = [run],
-                   resources = Resources(cpu = 1.0, ram = 16*1024*1024, disk = 16*1024))
-    return Tasks.concat(all_recipes, my_task, name = "my_task")
+    my_task = Task(processes=[run],
+                   resources=Resources(cpu=1.0, ram=16 * 1024 * 1024, disk=16 * 1024))
+    return Tasks.concat(all_recipes, my_task, name="my_task")
 
   def test_runner_state_success(self):
     assert self.state.statuses[-1].state == TaskState.SUCCESS

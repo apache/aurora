@@ -14,7 +14,6 @@
 
 import contextlib
 import os
-import sys
 from socket import timeout as SocketTimeout
 
 from twitter.common import log

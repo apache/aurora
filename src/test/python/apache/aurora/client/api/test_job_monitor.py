@@ -15,11 +15,9 @@ import unittest
 
 from mock import Mock
 
-from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.api.AuroraSchedulerManager import Client
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
@@ -56,6 +54,7 @@ class JobMonitorTest(unittest.TestCase):
             status=status,
             timestamp=10)]
     )
+
   def mock_get_tasks(self, tasks, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
     resp = Response(responseCode=response_code, messageDEPRECATED='test')

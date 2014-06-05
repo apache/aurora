@@ -24,13 +24,7 @@ from .sla import Sla
 from .updater import Updater
 
 from gen.apache.aurora.api.constants import LIVE_STATES
-from gen.apache.aurora.api.ttypes import (
-    Identity,
-    ResourceAggregate,
-    Response,
-    ResponseCode,
-    TaskQuery
-)
+from gen.apache.aurora.api.ttypes import Identity, ResourceAggregate, ResponseCode, TaskQuery
 
 
 class AuroraClientAPI(object):
@@ -139,9 +133,12 @@ class AuroraClientAPI(object):
     return resp
 
   def restart(self, job_key, instances, updater_config, health_check_interval_seconds):
-    """Perform a rolling restart of the job. If instances is None or [], restart all instances. Returns
-       the scheduler response for the last restarted batch of instances (which allows the client to
-       show the job URL), or the status check response if no tasks were active.
+    """Perform a rolling restart of the job.
+
+       If instances is None or [], restart all instances.  Returns the
+       scheduler response for the last restarted batch of instances (which
+       allows the client to show the job URL), or the status check response
+       if no tasks were active.
     """
     self._assert_valid_job_key(job_key)
 

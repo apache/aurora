@@ -39,10 +39,8 @@ class CommandOption(object):
     self.type = kwargs.get('type')
     self.help = kwargs.get('help', '')
 
-
   def is_mandatory(self):
     return self.kwargs.get('required', not self.name.startswith('--'))
-
 
   def get_displayname(self):
     """Get a display name for a the expected format of a parameter value"""
@@ -58,7 +56,6 @@ class CommandOption(object):
       displayname = "value"
     return displayname
 
-
   def render_usage(self):
     """Create a usage string for this option"""
     if not self.name.startswith('--'):
@@ -72,7 +69,6 @@ class CommandOption(object):
       return "[%s=%s]" % (self.name, self.kwargs["choices"])
     else:
       return "[%s=%s]" % (self.name, self.get_displayname())
-
 
   def render_help(self):
     """Render a full help message for this option"""
@@ -153,7 +149,7 @@ def parse_percentiles(percentiles):
   return sorted(map(parse_percentile, percentiles.split(','))) if percentiles else None
 
 
-TaskInstanceKey = namedtuple('TaskInstanceKey', [ 'jobkey', 'instance' ])
+TaskInstanceKey = namedtuple('TaskInstanceKey', ['jobkey', 'instance'])
 
 
 def parse_task_instance_key(key):
@@ -264,7 +260,6 @@ SSH_USER_OPTION = CommandOption('--ssh-user', '-l', default=None,
 STRICT_OPTION = CommandOption('--strict', default=False, action='store_true',
     help=("Check instances and generate an error for instance ranges in parameters "
     "that are larger than the actual set of instances in the job"))
-
 
 
 TASK_INSTANCE_ARGUMENT = CommandOption('task_instance', type=parse_task_instance_key,

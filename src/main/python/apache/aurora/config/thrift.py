@@ -51,8 +51,8 @@ def constraints_to_thrift(constraints):
   result = set()
   for attribute, constraint_value in constraints.items():
     assert isinstance(attribute, Compatibility.string) and (
-           isinstance(constraint_value, Compatibility.string)), (
-      "Both attribute name and value in constraints must be string")
+        isinstance(constraint_value, Compatibility.string)), (
+            "Both attribute name and value in constraints must be string")
     constraint = Constraint()
     constraint.name = attribute
     task_constraint = TaskConstraint()
@@ -230,7 +230,7 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
   underlying, refs = job.interpolate()
 
   # need to fake an instance id for the sake of schema checking
-  underlying_checked = underlying.bind(mesos = {'instance': 31337})
+  underlying_checked = underlying.bind(mesos={'instance': 31337})
   try:
     ThermosTaskValidator.assert_valid_task(underlying_checked.task())
   except ThermosTaskValidator.InvalidTaskError as e:

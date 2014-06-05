@@ -22,13 +22,14 @@ from gen.apache.thermos.ttypes import RunnerCkpt
 
 
 class ProcessMuxer(object):
-  class ProcessExists(Exception): pass
-  class ProcessNotFound(Exception): pass
-  class CorruptCheckpoint(Exception): pass
+  class Error(Exception): pass
+  class ProcessExists(Error): pass
+  class ProcessNotFound(Error): pass
+  class CorruptCheckpoint(Error): pass
 
   def __init__(self, pathspec):
-    self._processes = {} # process_name => fp
-    self._watermarks = {} # process_name => sequence high watermark
+    self._processes = {}  # process_name => fp
+    self._watermarks = {}  # process_name => sequence high watermark
     self._pathspec = pathspec
 
   def __del__(self):
@@ -38,7 +39,7 @@ class ProcessMuxer(object):
   def register(self, process_name, watermark=0):
     log.debug('registering %s' % process_name)
     if process_name in self._processes:
-      raise ProcessMuxer.ProcessExists("Process %s is already registered" % process_name)
+      raise self.ProcessExists("Process %s is already registered" % process_name)
     self._processes[process_name] = None
     self._watermarks[process_name] = watermark
 
@@ -48,7 +49,7 @@ class ProcessMuxer(object):
         process_ckpt = self._pathspec.given(process=process_name).getpath('process_checkpoint')
         log.debug('ProcessMuxer binding %s => %s' % (process_name, process_ckpt))
         try:
-          self._processes[process_name] = open(process_ckpt, 'r')
+          self._processes[process_name] = open(process_ckpt, 'r')  # noqa
         except IOError as e:
           if e.errno == errno.ENOENT:
             log.debug('  => bind failed, checkpoint not available yet.')
@@ -92,7 +93,7 @@ class ProcessMuxer(object):
   def unregister(self, process_name):
     log.debug('unregistering %s' % process_name)
     if process_name not in self._processes:
-      raise ProcessMuxer.ProcessNotFound("No trace of process: %s" % process_name)
+      raise self.ProcessNotFound("No trace of process: %s" % process_name)
     else:
       self._watermarks.pop(process_name)
       fp = self._processes.pop(process_name)
@@ -111,8 +112,8 @@ class ProcessMuxer(object):
     rr = ThriftRecordReader(fp, RunnerCkpt)
     old_pos = fp.tell()
     try:
-      expected_new_pos = os.fstat(fp.fileno()).st_size
-    except OSError as e:
+      os.fstat(fp.fileno()).st_size
+    except OSError:
       log.debug('ProcessMuxer could not fstat for process %s' % process)
       return False
     update = rr.try_read()
@@ -137,7 +138,7 @@ class ProcessMuxer(object):
     for handle in filter(None, self._processes.values()):
       try:
         fstat = os.fstat(handle.fileno())
-      except OSError as e:
+      except OSError:
         log.error('Unable to fstat %s!' % handle.name)
         continue
       if handle.tell() > fstat.st_size:

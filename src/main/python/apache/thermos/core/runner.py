@@ -39,14 +39,12 @@ terminal state.
 
 """
 
-import errno
 import os
 import socket
 import sys
 import time
 import traceback
 from contextlib import contextmanager
-from functools import partial
 
 from pystachio import Environment
 from twitter.common import log
@@ -64,7 +62,6 @@ from apache.thermos.common.path import TaskPath
 from apache.thermos.common.planner import TaskPlanner
 from apache.thermos.config.loader import (
     ThermosConfigLoader,
-    ThermosProcessWrapper,
     ThermosTaskValidator,
     ThermosTaskWrapper
 )
@@ -279,7 +276,7 @@ class TaskRunnerStage(object):
     raise NotImplementedError
 
 
-class TaskRunnerStage_ACTIVE(TaskRunnerStage):
+class TaskRunnerStage_ACTIVE(TaskRunnerStage):  # noqa
   """
     Run the regular plan (i.e. normal, non-finalizing processes.)
   """
@@ -315,7 +312,7 @@ class TaskRunnerStage_ACTIVE(TaskRunnerStage):
     return TaskState.CLEANING
 
 
-class TaskRunnerStage_CLEANING(TaskRunnerStage):
+class TaskRunnerStage_CLEANING(TaskRunnerStage):  # noqa
   """
     Start the cleanup of the regular plan (e.g. if it failed.)  On ACTIVE -> CLEANING,
     we send SIGTERMs to all still-running processes.  We wait at most finalization_wait
@@ -323,6 +320,7 @@ class TaskRunnerStage_CLEANING(TaskRunnerStage):
     prior to that point in time, we transition to FINALIZING, which kicks into gear
     the finalization schedule (if any.)
   """
+
   def run(self):
     log.debug('TaskRunnerStage[CLEANING]: Finalization remaining: %s' %
         self.runner._finalization_remaining())
@@ -336,7 +334,7 @@ class TaskRunnerStage_CLEANING(TaskRunnerStage):
     return TaskState.FINALIZING
 
 
-class TaskRunnerStage_FINALIZING(TaskRunnerStage):
+class TaskRunnerStage_FINALIZING(TaskRunnerStage):  # noqa
   """
     Run the finalizing plan, specifically the plan of tasks with the 'final'
     bit marked (e.g. log savers, checkpointers and the like.)  Anything in this
@@ -446,7 +444,7 @@ class TaskRunner(object):
       raise TypeError('planner_class must be a TaskPlanner.')
     self._clock = clock
     launch_time = self._clock.time()
-    launch_time_ms = '%06d' % int((launch_time - int(launch_time)) * 10**6)
+    launch_time_ms = '%06d' % int((launch_time - int(launch_time)) * (10 ** 6))
     if not task_id:
       self._task_id = '%s-%s.%s' % (task.name(),
                                     time.strftime('%Y%m%d-%H%M%S', time.localtime(launch_time)),
@@ -481,11 +479,11 @@ class TaskRunner(object):
       ThermosTaskValidator.assert_same_task(self._pathspec, self._task)
     except ThermosTaskValidator.InvalidTaskError as e:
       raise self.InvalidTask('Invalid task: %s' % e)
-    self._plan = None # plan currently being executed (updated by Handlers)
+    self._plan = None  # plan currently being executed (updated by Handlers)
     self._regular_plan = planner_class(self._task, clock=clock,
-        process_filter=lambda proc: proc.final().get() == False)
+        process_filter=lambda proc: proc.final().get() is False)
     self._finalizing_plan = planner_class(self._task, clock=clock,
-        process_filter=lambda proc: proc.final().get() == True)
+        process_filter=lambda proc: proc.final().get() is True)
     self._chroot = chroot
     self._sandbox = sandbox
     self._terminal_state = None
@@ -496,7 +494,7 @@ class TaskRunner(object):
     self._finalization_start = None
     self._preemption_deadline = None
     self._watcher = ProcessMuxer(self._pathspec)
-    self._state   = RunnerState(processes = {})
+    self._state = RunnerState(processes={})
 
     # create runner state
     universal_handler = universal_handler or TaskRunnerUniversalHandler
@@ -542,14 +540,14 @@ class TaskRunner(object):
       file lock on the checkpoint stream.
     """
     if self.is_terminal():
-      raise TaskRunner.StateError('Cannot take control of a task in terminal state.')
+      raise self.StateError('Cannot take control of a task in terminal state.')
     if self._sandbox:
       safe_mkdir(self._sandbox)
     ckpt_file = self._pathspec.getpath('runner_checkpoint')
     try:
       self._ckpt = TaskRunnerHelper.open_checkpoint(ckpt_file, force=force, state=self._state)
     except TaskRunnerHelper.PermissionError:
-      raise TaskRunner.PermissionError('Unable to open checkpoint %s' % ckpt_file)
+      raise self.PermissionError('Unable to open checkpoint %s' % ckpt_file)
     log.debug('Flipping recovery mode off.')
     self._recovery = False
     self._set_task_status(self.task_state())
@@ -589,12 +587,11 @@ class TaskRunner(object):
     """
     ckpt_file = self._pathspec.getpath('runner_checkpoint')
     if os.path.exists(ckpt_file):
-      fp = open(ckpt_file, "r")
-      ckpt_recover = ThriftRecordReader(fp, RunnerCkpt)
-      for record in ckpt_recover:
-        log.debug('Replaying runner checkpoint record: %s' % record)
-        self._dispatcher.dispatch(self._state, record, recovery=True)
-      ckpt_recover.close()
+      with open(ckpt_file, 'r') as fp:
+        ckpt_recover = ThriftRecordReader(fp, RunnerCkpt)
+        for record in ckpt_recover:
+          log.debug('Replaying runner checkpoint record: %s' % record)
+          self._dispatcher.dispatch(self._state, record, recovery=True)
 
   def _replay_process_ckpts(self):
     """
@@ -618,7 +615,7 @@ class TaskRunner(object):
     if self._state.header is None:
       header = RunnerHeader(
         task_id=self._task_id,
-        launch_time_ms=int(self._launch_time*1000),
+        launch_time_ms=int(self._launch_time * 1000),
         sandbox=self._sandbox,
         log_dir=self._log_dir,
         hostname=socket.gethostname(),
@@ -643,8 +640,8 @@ class TaskRunner(object):
     if self._finalization_start is None:
       return sys.float_info.max
     else:
-     waited = max(0, self._clock.time() - self._finalization_start)
-     return max(0, finalization_allocation - waited)
+      waited = max(0, self._clock.time() - self._finalization_start)
+      return max(0, finalization_allocation - waited)
 
   def _set_process_status(self, process_name, process_state, **kw):
     if 'sequence_number' in kw:
@@ -725,7 +722,7 @@ class TaskRunner(object):
 
     def forked_but_never_came_up():
       return current_run.state == ProcessState.FORKED and (
-        self._clock.time() - current_run.fork_time > TaskRunner.LOST_TIMEOUT.as_(Time.SECONDS))
+        self._clock.time() - current_run.fork_time > self.LOST_TIMEOUT.as_(Time.SECONDS))
 
     def running_but_coordinator_died():
       if current_run.state != ProcessState.RUNNING:
@@ -846,7 +843,6 @@ class TaskRunner(object):
       self._run()
 
   def _run(self):
-    iteration_time = self.MAX_ITERATION_TIME.as_(Time.SECONDS)
     while not self.is_terminal():
       start = self._clock.time()
       # step 1: execute stage corresponding to the state we're currently in

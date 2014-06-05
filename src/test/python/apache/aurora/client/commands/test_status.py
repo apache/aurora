@@ -13,14 +13,11 @@
 #
 
 import contextlib
-import unittest
 
 from mock import Mock, patch
 
 from apache.aurora.client.commands.core import status
 from apache.aurora.client.commands.util import AuroraClientCommandTest
-from apache.aurora.common.cluster import Cluster
-from apache.aurora.common.clusters import Clusters
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -146,10 +143,8 @@ class TestListJobs(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options)) as (
-      mock_scheduler_proxy_class,
-      mock_clusters,
-      options):
+        patch('twitter.common.app.get_options', return_value=mock_options)
+    ) as (mock_scheduler_proxy_class, mock_clusters, options):
       status(['west/mchucarroll/test/hello'], mock_options)
 
       mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',

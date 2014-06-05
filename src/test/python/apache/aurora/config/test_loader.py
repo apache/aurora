@@ -16,17 +16,16 @@ import json
 import tempfile
 
 import pytest
-from pystachio import Environment
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.loader import AuroraConfigLoader
-from apache.thermos.config.loader import ThermosTaskWrapper
 
 
 BAD_MESOS_CONFIG = """
 3 2 1 3 2 4 2 3
 """
+
 
 MESOS_CONFIG = """
 HELLO_WORLD = MesosJob(
@@ -41,6 +40,7 @@ HELLO_WORLD = MesosJob(
 )
 jobs = [HELLO_WORLD]
 """
+
 
 def test_enoent():
   nonexistent_file = tempfile.mktemp()
@@ -97,6 +97,6 @@ def test_pick():
   hello_world = env['jobs'][0]
   assert AuroraConfig.pick(env, 'hello_world', None) == hello_world
 
-  env['jobs'][0] = env['jobs'][0](name = 'something_{{else}}')
+  env['jobs'][0] = env['jobs'][0](name='something_{{else}}')
   assert str(AuroraConfig.pick(env, 'something_else', [{'else': 'else'}]).name()) == (
       'something_else')

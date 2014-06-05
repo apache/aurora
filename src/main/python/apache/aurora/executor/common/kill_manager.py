@@ -19,6 +19,7 @@ class KillManager(StatusChecker):
   """
     A health interface that provides a kill-switch for a task monitored by the status manager.
   """
+
   def __init__(self):
     self._killed = False
     self._reason = None

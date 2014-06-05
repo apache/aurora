@@ -51,12 +51,11 @@ def validate_loaded_clusters(clusters):
     cluster = clusters[cluster_name]
     assert cluster.name == cluster_name
     assert cluster.dc == cluster_name
-    assert cluster.force_notunnel == False
+    assert cluster.force_notunnel is False
     assert cluster.slave_root == '/var/lib/mesos'
     assert cluster.slave_run_directory == 'latest'
     assert cluster.auth_mechanism == 'UNAUTHENTICATED'
   assert clusters['cluster1'].zk == 'zookeeper.cluster1.example.com'
-
 
 
 def test_load_json():

@@ -105,10 +105,10 @@ class ProxyDriver(object):
   def stop(self):
     self.stopped.set()
 
-  def sendStatusUpdate(self, update):
+  def sendStatusUpdate(self, update):  # noqa
     self.updates.append(StatusUpdate(update.state, update.task_id.value))
 
-  def sendFrameworkMessage(self, message):
+  def sendFrameworkMessage(self, message):  # noqa
     self.messages.append(thrift_deserialize(SchedulerMessage(), message))
 
 
@@ -261,12 +261,14 @@ def test_state_reconciliation_terminal_active():
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (0, 0, 1)
 
+
 def test_state_reconciliation_corrupt_tasks():
   for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
     tgc, driver = make_pair({}, {'foo': st0}, corrupt_tasks=['foo'])
     lgc, rgc, updates = tgc.reconcile_states(driver, {'foo': st1})
     assert tgc.len_results == (0, 0, 0, 0)
     assert llen(lgc, rgc, updates) == (1, 0, 0)
+
 
 def test_state_reconciliation_terminal_nexist():
   for st0, st1 in product(THERMOS_TERMINALS, LIVE_STATES):
@@ -329,8 +331,8 @@ def run_gc_with(active_executors, retained_tasks, lose=False):
     assert len(executor._gc_task_queue) == 0
     assert not executor._task_id
   assert len(proxy_driver.updates) >= 1
-  if not lose: # if the task is lost it will be cleaned out of band (by clean_orphans),
-               # so we don't care when the GC task actually finishes
+  if not lose:  # if the task is lost it will be cleaned out of band (by clean_orphans),
+                # so we don't care when the GC task actually finishes
     assert proxy_driver.updates[-1][0] == mesos.TASK_FINISHED
     assert proxy_driver.updates[-1][1] == TASK_ID
   return executor, proxy_driver
@@ -563,8 +565,9 @@ class TestRealGC(unittest.TestCase):
   """
     Test functions against the actual garbage_collect() functionality of the GC executor
   """
+
   def setUp(self):
-    self.HELLO_WORLD= SimpleTask(name="foo", command="echo hello world")
+    self.HELLO_WORLD = SimpleTask(name="foo", command="echo hello world")
 
   def setup_task(self, task, root, finished=False, corrupt=False):
     """Set up the checkpoint stream for the given task in the given checkpoint root, optionally
@@ -590,15 +593,28 @@ class TestRealGC(unittest.TestCase):
   def run_gc(self, root, task_id, retain=False):
     """Run the garbage collection process against the given task_id in the given checkpoint root"""
     class FakeTaskKiller(object):
-      def __init__(self, task_id, checkpoint_root): pass
-      def kill(self): pass
-      def lose(self): pass
+      def __init__(self, task_id, checkpoint_root):
+        pass
+
+      def kill(self):
+        pass
+
+      def lose(self):
+        pass
+
     class FakeTaskGarbageCollector(object):
-      def __init__(self, root): pass
-      def erase_logs(self, task_id): pass
-      def erase_metadata(self, task_id): pass
+      def __init__(self, root):
+        pass
+
+      def erase_logs(self, task_id):
+        pass
+
+      def erase_metadata(self, task_id):
+        pass
+
     class FastThermosGCExecutor(ThermosGCExecutor):
       POLL_WAIT = Amount(1, Time.MICROSECONDS)
+
     detector = functools.partial(FakeExecutorDetector, task_id) if retain else FakeExecutorDetector
     executor = FastThermosGCExecutor(
         checkpoint_root=root,

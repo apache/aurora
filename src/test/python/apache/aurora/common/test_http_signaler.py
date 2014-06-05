@@ -69,7 +69,7 @@ class TestHttpSignaler(unittest.TestCase):
     self._mox.StubOutWithMock(urllib_request, 'urlopen')
     urllib_request.urlopen(
         'http://localhost:%s/health' % self.PORT, None, timeout=1.0).AndRaise(
-        SocketTimeout('Timed out'))
+            SocketTimeout('Timed out'))
 
     self._mox.ReplayAll()
 

@@ -12,8 +12,6 @@
 # limitations under the License.
 #
 
-import unittest
-
 import pytest
 
 from apache.aurora.config.thrift import constraints_to_thrift
@@ -25,7 +23,7 @@ def test_parsing_constraints():
   }
   c = constraints_to_thrift(constraints_dict).pop()
   assert c.name == 'int'
-  assert c.constraint.value.negated == False
+  assert c.constraint.value.negated is False
   assert c.constraint.value.values == set(['2'])
 
   # Test negated value
@@ -34,7 +32,7 @@ def test_parsing_constraints():
   }
   c = constraints_to_thrift(constraints_dict).pop()
   assert c.name == '!str'
-  assert c.constraint.value.negated == True
+  assert c.constraint.value.negated
   assert c.constraint.value.values == set(['foo'])
 
   # Test list
@@ -43,7 +41,7 @@ def test_parsing_constraints():
   }
   c = constraints_to_thrift(constraints_dict).pop()
   assert c.name == 'set'
-  assert c.constraint.value.negated == False
+  assert c.constraint.value.negated is False
   assert c.constraint.value.values == set(['1', '2', '3', 'a', 'b', 'c'])
 
   constraints_dict = {
@@ -51,7 +49,7 @@ def test_parsing_constraints():
   }
   c = constraints_to_thrift(constraints_dict).pop()
   assert c.name == '!set'
-  assert c.constraint.value.negated == True
+  assert c.constraint.value.negated
   assert c.constraint.value.values == set(['1', '2', '3', 'a', 'b', 'c'])
 
   # Test limit
@@ -66,4 +64,4 @@ def test_parsing_constraints():
     'limit': 'limit:a',
   }
   with pytest.raises(ValueError):
-    constraints = constraints_to_thrift(constraints_dict)
+    constraints_to_thrift(constraints_dict)

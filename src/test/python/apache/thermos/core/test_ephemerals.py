@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-from apache.thermos.config.schema import Process, Resources, Task
+from apache.thermos.config.schema import Process, Task
 from apache.thermos.testing.runner import RunnerTestBase
 
 from gen.apache.thermos.ttypes import ProcessState, TaskState
@@ -22,11 +22,11 @@ class TestEphemeralTask(RunnerTestBase):
   @classmethod
   def task(cls):
     task = Task(
-      name = "task_with_ephemeral",
-      processes = [
-        Process(name = "ephemeral_sleepy", ephemeral=True, cmdline="sleep 10"),
-        Process(name = "sleepy", cmdline="sleep 1")
-      ])
+        name="task_with_ephemeral",
+        processes=[
+          Process(name="ephemeral_sleepy", ephemeral=True, cmdline="sleep 10"),
+          Process(name="sleepy", cmdline="sleep 1")
+        ])
     return task.interpolate()[0]
 
   def test_runner_state(self):

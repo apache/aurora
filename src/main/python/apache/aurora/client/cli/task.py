@@ -17,54 +17,24 @@
 
 from __future__ import print_function
 
-import json
-import os
-import pprint
 import subprocess
-import sys
-import time
-from datetime import datetime
-
-from pystachio.config import Config
-from thrift.protocol import TJSONProtocol
-from thrift.TSerialization import serialize
 
 from apache.aurora.client.api.command_runner import (
     DistributedCommandRunner,
     InstanceDistributedCommandRunner
 )
-from apache.aurora.client.api.updater_util import UpdaterConfig
-from apache.aurora.client.cli import (
-    EXIT_COMMAND_FAILURE,
-    EXIT_INVALID_CONFIGURATION,
-    EXIT_INVALID_PARAMETER,
-    EXIT_OK,
-    Noun,
-    Verb
-)
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, Noun, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
-    BATCH_OPTION,
-    BIND_OPTION,
-    BROWSER_OPTION,
     CommandOption,
-    CONFIG_ARGUMENT,
     EXECUTOR_SANDBOX_OPTION,
-    FORCE_OPTION,
-    HEALTHCHECK_OPTION,
     INSTANCES_SPEC_ARGUMENT,
-    JOBSPEC_ARGUMENT,
-    JSON_READ_OPTION,
-    JSON_WRITE_OPTION,
     SSH_USER_OPTION,
-    TASK_INSTANCE_ARGUMENT,
-    WATCH_OPTION
+    TASK_INSTANCE_ARGUMENT
 )
-from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 
-from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME
-from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 
 class RunCommand(Verb):
@@ -98,7 +68,8 @@ class RunCommand(Verb):
     # TODO(mchucarroll): add options to specify which instances to run on (AURORA-198)
     (cluster_name, role, env, name), instances = context.options.instance_spec
     cluster = CLUSTERS[cluster_name]
-    dcr = InstanceDistributedCommandRunner(cluster, role, env, name, context.options.ssh_user, instances)
+    dcr = InstanceDistributedCommandRunner(
+        cluster, role, env, name, context.options.ssh_user, instances)
     dcr.run(context.options.cmd, parallelism=context.options.num_threads,
         executor_sandbox=context.options.executor_sandbox)
 
@@ -150,9 +121,11 @@ class SshCommand(Verb):
         port, name = tunnel.split(':')
         port = int(port)
       except ValueError:
-        die('Could not parse tunnel: %s.  Must be of form PORT:NAME' % tunnel)
+        raise context.CommandError(EXIT_INVALID_PARAMETER,
+            'Could not parse tunnel: %s.  Must be of form PORT:NAME' % tunnel)
       if name not in first_task.assignedTask.assignedPorts:
-        die('Task %s has no port named %s' % (first_task.assignedTask.taskId, name))
+        raise context.CommandError(EXIT_INVALID_PARAMETER,
+            'Task %s has no port named %s' % (first_task.assignedTask.taskId, name))
       ssh_command += [
           '-L', '%d:%s:%d' % (port, slave_host, first_task.assignedTask.assignedPorts[name])]
 

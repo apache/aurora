@@ -13,17 +13,13 @@
 #
 
 import contextlib
-import unittest
 
 from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.commands.core import cancel_update
 from apache.aurora.client.commands.util import AuroraClientCommandTest
-from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
-from apache.aurora.common.cluster import Cluster
-from apache.aurora.common.clusters import Clusters
 
 from gen.apache.aurora.api.ttypes import (
     Identity,
@@ -83,7 +79,6 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
     assert mock_api.cancel_update.called_with(
         AuroraJobKey(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB),
         config=None)
-
 
   def test_simple_successful_cancel_update(self):
     """Run a test of the "kill" command against a mocked-out API:

@@ -23,7 +23,7 @@ class TestRegularFinalizingTask(RunnerTestBase):
   def task(cls):
     main = Process(name="main", cmdline="date && echo hello world")
     finalizer = Process(name="finalizer", cmdline="date", final=True)
-    task = Task(name="task_with_finalizer", processes = [main, finalizer])
+    task = Task(name="task_with_finalizer", processes=[main, finalizer])
     return task.interpolate()[0]
 
   def test_runner_state(self):

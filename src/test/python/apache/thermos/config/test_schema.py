@@ -20,7 +20,6 @@ from apache.thermos.config.schema import (
     concat_tasks,
     Constraint,
     java_options,
-    List,
     order,
     Process,
     python_options,
@@ -49,6 +48,7 @@ def test_order():
 
   with pytest.raises(ValueError):
     order(None)
+
 
 def test_add_resources():
   assert Units.resources_sum(Resources(), Resources()) == Resources(cpu=0, ram=0, disk=0)
@@ -120,14 +120,13 @@ def test_tasklets():
   recipe_ruby19 = SequentialTask(processes=[install_thermosrc, setup_ruby19])
   recipe_php = SequentialTask(processes=[install_thermosrc, setup_php])
   all_recipes = Tasks.combine(recipe_py3k, recipe_ruby19, recipe_php)
-  my_task = Task(processes = [Process(name='my_process')])
-  my_new_task = Tasks.concat(all_recipes, my_task)(name = 'my_task')
+  my_task = Task(processes=[Process(name='my_process')])
+  my_new_task = Tasks.concat(all_recipes, my_task)(name='my_task')
 
   # TODO(wickman) Probably should have Tasks.combine/concat do constraint
   # minimization since many constraints are redundant.
   for p in (install_thermosrc, setup_py3k, setup_ruby19, setup_php):
     assert p in my_new_task.processes()
-
 
 
 def test_render_options():

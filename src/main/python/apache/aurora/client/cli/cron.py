@@ -21,7 +21,7 @@ from apache.aurora.client.cli import (
     EXIT_INVALID_PARAMETER,
     EXIT_OK,
     Noun,
-    Verb,
+    Verb
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
@@ -30,7 +30,7 @@ from apache.aurora.client.cli.options import (
     CONFIG_ARGUMENT,
     CONFIG_OPTION,
     JOBSPEC_ARGUMENT,
-    JSON_READ_OPTION,
+    JSON_READ_OPTION
 )
 
 from gen.apache.aurora.api.ttypes import ResponseCode

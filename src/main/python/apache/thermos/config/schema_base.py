@@ -12,6 +12,8 @@
 # limitations under the License.
 #
 
+# checkstyle: noqa
+
 from pystachio import Boolean, Default, Empty, Float, Integer, List, Map, Required, String, Struct
 
 # Define constants for resources

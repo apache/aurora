@@ -12,21 +12,13 @@
 # limitations under the License.
 #
 
-import contextlib
-
 from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.cli import (
-    ConfigurationPlugin,
-    EXIT_COMMAND_FAILURE,
-    EXIT_INVALID_CONFIGURATION,
-    EXIT_OK
-)
+from apache.aurora.client.cli import ConfigurationPlugin, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.options import CommandOption
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
-from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.config import AuroraConfig
 
 from gen.apache.aurora.api.ttypes import (
@@ -53,9 +45,8 @@ class BogusPlugin(ConfigurationPlugin):
 
   def before_dispatch(self, args):
     if args[0] == '--bogus_bogus':
-       args = args[1:]
+      args = args[1:]
     return args
-
 
   def before_execution(self, context):
     context.bogosity = context.options.bogosity
@@ -64,8 +55,10 @@ class BogusPlugin(ConfigurationPlugin):
     context.after = True
     raise self.Error("Oops")
 
+
 class EmptyPlugin(ConfigurationPlugin):
   pass
+
 
 class TestPlugins(AuroraClientCommandTest):
 
@@ -150,7 +143,7 @@ class TestPlugins(AuroraClientCommandTest):
       self.assert_scheduler_called(api, mock_query, 1)
       # Check that the plugin did its job.
       assert mock_context.bogosity == "maximum"
-      assert mock_context.after == True
+      assert mock_context.after
 
   def test_empty_plugins_in_create_job(self):
     """Installs a plugin that doesn't implement any of the plugin methods.
@@ -184,7 +177,6 @@ class TestPlugins(AuroraClientCommandTest):
   def mock_print_err(self, str):
     for str in str.split('\n'):
       self.err_transcript.append(str)
-
 
   def test_plugin_options_in_help(self):
     cmd = AuroraCommandLine()

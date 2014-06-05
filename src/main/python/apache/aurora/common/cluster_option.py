@@ -13,7 +13,7 @@
 #
 
 from copy import copy
-from optparse import NO_DEFAULT, Option, OptionValueError
+from optparse import Option, OptionValueError
 
 
 def _check_mesos_cluster(option, opt, value):

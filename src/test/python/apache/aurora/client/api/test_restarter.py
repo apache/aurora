@@ -21,22 +21,28 @@ from apache.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
-from gen.apache.aurora.api.ttypes import *
-
-# test space
-
+from gen.apache.aurora.api.ttypes import (
+    AssignedTask,
+    Response,
+    ResponseCode,
+    Result,
+    ScheduledTask,
+    ScheduleStatus,
+    ScheduleStatusResult,
+    TaskConfig
+)
 
 SESSION_KEY = 'test_session'
-CLUSTER='smfd'
+CLUSTER = 'smfd'
 JOB = AuroraJobKey(CLUSTER, 'johndoe', 'test', 'test_job')
 HEALTH_CHECK_INTERVAL_SECONDS = 5
 UPDATER_CONFIG = UpdaterConfig(
-    2, # batch_size
-    23, # restart_threshold
-    45, #watch_secs
-    0, # max_per_instance_failures
-    0, # max_total_failures
-    True # rollback_on_failure
+    batch_size=2,
+    restart_threshold=23,
+    watch_secs=45,
+    max_per_shard_failures=0,
+    max_total_failures=0,
+    rollback_on_failure=True,
 )
 
 

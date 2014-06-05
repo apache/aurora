@@ -19,7 +19,6 @@ from twitter.common import log
 
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.config import GlobalHookRegistry
-from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.ttypes import ResponseCode
 
@@ -181,4 +180,5 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
   def update_job(self, config, health_check_interval_seconds=3, instances=None):
     return self._hooked_call(config, None,
         _partial(super(HookedAuroraClientAPI, self).update_job,
-            config, health_check_interval_seconds=health_check_interval_seconds, instances=instances))
+            config, health_check_interval_seconds=health_check_interval_seconds,
+            instances=instances))

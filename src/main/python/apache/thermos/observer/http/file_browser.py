@@ -13,11 +13,9 @@
 #
 
 import os
-import pprint
 from xml.sax.saxutils import escape
 
 import bottle
-from mako.template import Template
 from twitter.common import log
 from twitter.common.http import HttpServer
 

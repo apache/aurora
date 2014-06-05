@@ -12,8 +12,10 @@
 # limitations under the License.
 #
 from __future__ import print_function
-from sys import argv
+
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from sys import argv
+
 
 class RequestHandler(BaseHTTPRequestHandler):
   def do_GET(self):

@@ -18,7 +18,7 @@ import mock
 import pytest
 from twitter.common.contextutil import temporary_dir
 
-from apache.aurora.executor.common.sandbox import DirectorySandbox, SandboxInterface
+from apache.aurora.executor.common.sandbox import DirectorySandbox
 
 
 def test_directory_sandbox():

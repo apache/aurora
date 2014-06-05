@@ -26,7 +26,6 @@ from .base import die
 # TODO(wickman) Kill make_client and make_client_factory as part of MESOS-3801.
 # These are currently necessary indirections for the LiveJobDisambiguator among
 # other things but can go away once those are scrubbed.
-
 def make_client_factory():
   verbose = getattr(app.get_options(), 'verbosity', 'normal') == 'verbose'
   class TwitterAuroraClientAPI(HookedAuroraClientAPI):

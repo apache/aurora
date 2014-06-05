@@ -12,5 +12,5 @@
 # limitations under the License.
 #
 
-from .schema_base import *
-from .schema_helpers import *
+from .schema_base import *  # noqa
+from .schema_helpers import *  # noqa

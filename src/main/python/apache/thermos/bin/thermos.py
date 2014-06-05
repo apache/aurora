@@ -23,15 +23,12 @@ import pwd
 import re
 import sys
 import time
-from collections import namedtuple
 
-from pystachio import Ref
 from pystachio.naming import frozendict
 from twitter.common import app, log
-from twitter.common.dirutil import du, tail_f
+from twitter.common.dirutil import tail_f
 from twitter.common.dirutil.tail import tail as tail_closed
 from twitter.common.log.options import LogOptions
-from twitter.common.quantity import Amount, Data, Time
 from twitter.common.quantity.parse_simple import parse_data, parse_time
 from twitter.common.recordio import RecordIO, ThriftRecordReader
 
@@ -101,9 +98,9 @@ def daemonize():
   daemon_fork()
   os.setsid()
   daemon_fork()
-  sys.stdin, sys.stdout, sys.stderr = (open('/dev/null', 'r'),
-                                       open('/dev/null', 'a+'),
-                                       open('/dev/null', 'a+', 0))
+  sys.stdin, sys.stdout, sys.stderr = (open('/dev/null', 'r'),  # noqa
+                                       open('/dev/null', 'a+'),  # noqa
+                                       open('/dev/null', 'a+', 0))  # noqa
 
 
 def tasks_from_re(expressions, root, state=None):
@@ -274,16 +271,16 @@ def simplerun(args, options):
   """
   try:
     cutoff = args.index('--')
-    cmdline = ' '.join(args[cutoff+1:])
+    cmdline = ' '.join(args[cutoff + 1:])
   except ValueError:
     cmdline = ' '.join(args)
 
   print("Running command: '%s'" % cmdline)
 
   thermos_task = ThermosTaskWrapper(Task(
-    name = options.name,
-    resources = Resources(cpu = 1.0, ram = 256 * 1024 * 1024, disk = 0),
-    processes = [Process(name = options.name, cmdline = cmdline)]))
+    name=options.name,
+    resources=Resources(cpu=1.0, ram=256 * 1024 * 1024, disk=0),
+    processes=[Process(name=options.name, cmdline=cmdline)]))
 
   _really_run(thermos_task,
               options.root,
@@ -339,7 +336,7 @@ def read(args, options):
     print('Recovered Task States:')
     for task_status in state.statuses:
       print('  %s [pid: %d] => %s' % (
-        time.asctime(time.localtime(task_status.timestamp_ms/1000.0)),
+        time.asctime(time.localtime(task_status.timestamp_ms / 1000.0)),
         task_status.runner_pid,
         TaskState._VALUES_TO_NAMES[task_status.state]))
     print('Recovered Processes:')
@@ -431,10 +428,11 @@ def gc(args, options):
     gc_options['max_space'] = parse_data(options.max_space)
   if options.max_tasks is not None:
     gc_options['max_tasks'] = int(options.max_tasks)
-  gc_options.update(include_data = not options.keep_data,
-                    include_metadata = not options.keep_metadata,
-                    include_logs = not options.keep_logs,
-                    verbose = True, logger = print)
+  gc_options.update(include_data=not options.keep_data,
+                    include_metadata=not options.keep_metadata,
+                    include_logs=not options.keep_logs,
+                    verbose=True,
+                    logger=print)
   tgc = TaskGarbageCollector(root=options.root)
 
   if args:
@@ -496,7 +494,7 @@ def status(args, options):
     checkpoint_stat = os.stat(checkpoint_filename)
     try:
       checkpoint_owner = pwd.getpwuid(checkpoint_stat.st_uid).pw_name
-    except:
+    except KeyError:
       checkpoint_owner = 'uid:%s' % checkpoint_stat.st_uid
     print('  %-20s [owner: %8s]' % (task_id, checkpoint_owner), end='')
     if options.verbose == 0:
@@ -508,7 +506,7 @@ def status(args, options):
         return
       print('  state: %8s' % TaskState._VALUES_TO_NAMES.get(state.statuses[-1].state, 'Unknown'),
         end='')
-      print(' start: %25s' % time.asctime(time.localtime(state.header.launch_time_ms/1000.0)))
+      print(' start: %25s' % time.asctime(time.localtime(state.header.launch_time_ms / 1000.0)))
     if options.verbose > 1:
       print('    user: %s' % state.header.user, end='')
       if state.header.ports:
@@ -557,7 +555,6 @@ def status(args, options):
     sys.exit(1)
 
 
-
 @app.command
 @app.command_option("--stderr", default=False, dest='use_stderr', action='store_true',
                     help="Tail stderr instead of stdout")
@@ -595,7 +592,7 @@ def tail(args, options):
      run=run, log_dir=log_dir).getpath('process_logdir')
   logfile = os.path.join(logdir, 'stderr' if options.use_stderr else 'stdout')
 
-  monitor = TaskMonitor(TaskPath(root = options.root), args[0])
+  monitor = TaskMonitor(TaskPath(root=options.root), args[0])
   def log_is_active():
     active_processes = monitor.get_active_processes()
     for process_status, process_run in active_processes:
@@ -621,8 +618,8 @@ def tail(args, options):
         next_check = time.time() + 5.0
 
 
-@app.command
-def help(args, options):
+@app.command(name='help')
+def help_command(args, options):
   """Get help about a specific command.
   """
   if len(args) == 0:
@@ -633,8 +630,6 @@ def help(args, options):
       print(doc)
       app.quit(0)
   print('unknown command: %s' % args[0], file=sys.stderr)
-
-
 
 
 def generate_usage():

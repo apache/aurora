@@ -215,8 +215,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
   def test_dynamic_hook_syntax_error(self):
     with patch("logging.warn") as log_patch:
       GlobalCommandHookRegistry.reset()
-      hook_locals = GlobalCommandHookRegistry.load_project_hooks(
-        "./src/test/python/apache/aurora/client/cli/hook_test_data/bad_syntax")
+      GlobalCommandHookRegistry.load_project_hooks(
+          "./src/test/python/apache/aurora/client/cli/hook_test_data/bad_syntax")
       log_patch.assert_called_with("Error compiling hooks file "
           "./src/test/python/apache/aurora/client/cli/hook_test_data/bad_syntax/AuroraHooks: "
           "invalid syntax (AuroraHooks, line 1)")
@@ -224,16 +224,15 @@ class TestClientCreateCommand(AuroraClientCommandTest):
   def test_dynamic_hook_exec_error(self):
     with patch("logging.warn") as log_patch:
       GlobalCommandHookRegistry.reset()
-      hook_locals = GlobalCommandHookRegistry.load_project_hooks(
-        "./src/test/python/apache/aurora/client/cli/hook_test_data/exec_error")
+      GlobalCommandHookRegistry.load_project_hooks(
+          "./src/test/python/apache/aurora/client/cli/hook_test_data/exec_error")
       log_patch.assert_called_with("Warning: error loading hooks file "
           "./src/test/python/apache/aurora/client/cli/hook_test_data/exec_error/AuroraHooks: "
           "integer division or modulo by zero")
 
   def assert_skip_allowed(self, context, skip_opt, user, noun, verb, args):
     """Checks that a hook would be allowed to be skipped in a command invocation"""
-    required_hooks = GlobalCommandHookRegistry.get_required_hooks(context, skip_opt, noun,
-        verb, user)
+    GlobalCommandHookRegistry.get_required_hooks(context, skip_opt, noun, verb, user)
 
   def assert_skip_forbidden(self, context, skip_opt, user, noun, verb, args):
     """Checks that a hook would NOT be allowed to be skipped in a command invocation"""
@@ -362,7 +361,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         }
       }
 
-      mock_query = self.create_mock_query()
       mock_context.add_expected_status_query_result(
         self.create_mock_status_query_result(ScheduleStatus.INIT))
       mock_context.add_expected_status_query_result(

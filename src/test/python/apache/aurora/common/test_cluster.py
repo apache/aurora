@@ -20,15 +20,15 @@ from apache.aurora.common.cluster import Cluster
 
 def test_simple():
   class AudubonTrait(Cluster.Trait):
-    master_role = String
-    slave_role  = Default(String, 'slave')
-    version     = Required(Integer)
+    master_role = String  # noqa
+    slave_role  = Default(String, 'slave')  # noqa
+    version     = Required(Integer)  # noqa
 
-  west = Cluster(name = 'west',
-                 master_role = 'west.master',
-                 slave_role = 'west.slave',
-                 version = 10)
-  east = Cluster(name = 'east', version = 11)
+  west = Cluster(name='west',
+                 master_role='west.master',
+                 slave_role='west.slave',
+                 version=10)
+  east = Cluster(name='east', version=11)
 
   assert east.name == 'east'
   with pytest.raises(AttributeError):
@@ -39,4 +39,4 @@ def test_simple():
 
   with pytest.raises(TypeError):
     # requires version at least
-    Cluster(name = 'east').with_traits(AudubonTrait)
+    Cluster(name='east').with_traits(AudubonTrait)

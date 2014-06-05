@@ -21,6 +21,6 @@ LogOptions.set_simple(True)
 
 
 def proxy_main():
-  main = runner_proxy_main
+  main = runner_proxy_main  # noqa
 
   app.main()

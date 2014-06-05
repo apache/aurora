@@ -14,6 +14,6 @@
 
 from code import interact
 
-from apache.thermos.config.schema import *
+from apache.thermos.config.schema import *  # noqa
 
 interact('Thermos Config REPL', local=locals())

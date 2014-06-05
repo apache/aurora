@@ -30,6 +30,7 @@ class UpdaterConfig(object):
   An instance is also expected to remain healthy for at least watch_secs. If these conditions are
   not satisfied, the instance is deemed unhealthy.
   """
+
   def __init__(self,
                batch_size,
                restart_threshold,
@@ -57,7 +58,6 @@ class FailureThreshold(object):
     self._max_per_instance_failures = max_per_instance_failures
     self._max_total_failures = max_total_failures
     self._failures_by_instance = collections.defaultdict(int)
-
 
   def update_failure_counts(self, failed_instances):
     """Update the failure counts metrics based upon a batch of failed instances.

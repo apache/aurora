@@ -147,23 +147,23 @@ def make_task(thermos_config, assigned_ports={}, **kw):
   return td
 
 
-BASE_MTI = MesosTaskInstance(instance = 0, role = getpass.getuser())
-BASE_TASK = Task(resources = Resources(cpu=1.0, ram=16*MB, disk=32*MB))
+BASE_MTI = MesosTaskInstance(instance=0, role=getpass.getuser())
+BASE_TASK = Task(resources=Resources(cpu=1.0, ram=16 * MB, disk=32 * MB))
 
 HELLO_WORLD_TASK_ID = 'hello_world-001'
 HELLO_WORLD = BASE_TASK(
-    name = 'hello_world',
-    processes = [Process(name = 'hello_world_{{thermos.task_id}}', cmdline = 'echo hello world')])
+    name='hello_world',
+    processes=[Process(name='hello_world_{{thermos.task_id}}', cmdline='echo hello world')])
 HELLO_WORLD_MTI = BASE_MTI(task=HELLO_WORLD)
 
-SLEEP60 = BASE_TASK(processes = [Process(name = 'sleep60', cmdline = 'sleep 60')])
-SLEEP2 = BASE_TASK(processes = [Process(name = 'sleep2', cmdline = 'sleep 2')])
+SLEEP60 = BASE_TASK(processes=[Process(name='sleep60', cmdline='sleep 60')])
+SLEEP2 = BASE_TASK(processes=[Process(name='sleep2', cmdline='sleep 2')])
 SLEEP60_MTI = BASE_MTI(task=SLEEP60)
 
 MESOS_JOB = MesosJob(
-  name = 'does_not_matter',
-  instances = 1,
-  role = getpass.getuser(),
+  name='does_not_matter',
+  instances=1,
+  role=getpass.getuser(),
 )
 
 
@@ -244,12 +244,15 @@ class SignalServer(ExceptionalThread):
     super(SignalServer, self).__init__()
     self.daemon = True
     self._stop = threading.Event()
+
   def run(self):
     while not self._stop.is_set():
       self._server.handle_request()
+
   def __enter__(self):
     self.start()
     return self._server.server_port
+
   def __exit__(self, exc_type, exc_val, traceback):
     self._stop.set()
 
@@ -350,7 +353,7 @@ class TestThermosExecutor(object):
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
 
-  def test_killTask(self):
+  def test_killTask(self):  # noqa
     proxy_driver = ProxyDriver()
 
     with temporary_dir() as checkpoint_root:
@@ -393,12 +396,13 @@ class TestThermosExecutor(object):
     with SignalServer(UnhealthyHandler) as port:
       with temporary_dir() as checkpoint_root:
         health_check_config = HealthCheckConfig(initial_interval_secs=0.1, interval_secs=0.1)
-        _, executor = make_executor(proxy_driver,
-                                    checkpoint_root,
-                                    MESOS_JOB(task=SLEEP60, health_check_config=health_check_config),
-                                    ports={'health': port},
-                                    fast_status=True,
-                                    status_providers=(HealthCheckerProvider(),))
+        _, executor = make_executor(
+            proxy_driver,
+            checkpoint_root,
+            MESOS_JOB(task=SLEEP60, health_check_config=health_check_config),
+            ports={'health': port},
+            fast_status=True,
+            status_providers=(HealthCheckerProvider(),))
         executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
@@ -468,7 +472,7 @@ class TestThermosExecutor(object):
 
       te._sandbox._init_start.set()
 
-  def test_killTask_during_runner_initialize(self):
+  def test_killTask_during_runner_initialize(self):  # noqa
     proxy_driver = ProxyDriver()
 
     task = make_task(HELLO_WORLD_MTI)
@@ -500,7 +504,7 @@ class TestThermosExecutor(object):
       assert len(updates) == 2
       assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
 
-  def test_launchTask_deserialization_fail(self):
+  def test_launchTask_deserialization_fail(self):  # noqa
     proxy_driver = ProxyDriver()
 
     role = getpass.getuser()

@@ -17,7 +17,6 @@ from __future__ import print_function
 import itertools
 import json
 import os
-import sys
 from collections import Mapping, namedtuple
 from contextlib import contextmanager
 
@@ -40,7 +39,7 @@ __all__ = (
 
 
 class NameTrait(Cluster.Trait):
-  name = Required(String)
+  name = Required(String)  # noqa
 
 
 Parser = namedtuple('Parser', 'loader exception')
@@ -125,7 +124,6 @@ class Clusters(Mapping):
     except KeyError:
       raise self.ClusterNotFound('Unknown cluster %s, valid clusters: %s' % (
           name, ', '.join(self._clusters.keys())))
-
 
 
 DEFAULT_SEARCH_PATHS = (

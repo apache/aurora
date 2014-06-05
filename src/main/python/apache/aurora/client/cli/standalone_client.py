@@ -11,11 +11,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import logging
 import sys
 
 from apache.aurora.client.cli import CommandLine
 from apache.aurora.client.cli.logsetup import setup_default_log_handlers
-import logging
 
 
 class AuroraCommandLine(CommandLine):
@@ -50,4 +50,3 @@ def proxy_main():
 
 if __name__ == '__main__':
   proxy_main()
-

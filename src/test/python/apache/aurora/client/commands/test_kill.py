@@ -13,17 +13,13 @@
 #
 
 import contextlib
-import unittest
 
 from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.commands.core import kill, killall
 from apache.aurora.client.commands.util import AuroraClientCommandTest
-from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
-from apache.aurora.common.cluster import Cluster
-from apache.aurora.common.clusters import Clusters
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -61,20 +57,6 @@ class TestClientKillCommand(AuroraClientCommandTest):
     return mock_api_factory
 
   @classmethod
-  def create_mock_status_query_result(cls, scheduleStatus):
-    mock_query_result = Mock(spec=Response)
-    mock_query_result.result = Mock(spec=Result)
-    mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    if scheduleStatus == ScheduleStatus.INIT:
-      # status query result for before job is launched.
-      mock_query_result.result.scheduleStatusResult.tasks = []
-    else:
-      mock_task_one = cls.create_mock_task('hello', 0, 1000, scheduleStatus)
-      mock_task_two = cls.create_mock_task('hello', 1, 1004, scheduleStatus)
-      mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]
-    return mock_query_result
-
-  @classmethod
   def get_kill_job_response(cls):
     return cls.create_simple_success_response()
 
@@ -82,17 +64,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
   def get_kill_job_error_response(cls):
     return cls.create_error_response()
 
-
   @classmethod
   def assert_kill_job_called(cls, mock_api):
     assert mock_api.kill_job.call_count == 1
-
-  @classmethod
-  def get_expected_task_query(cls, instances=None):
-    """Helper to create the query that will be a parameter to job kill."""
-    instance_ids = frozenset(instances) if instances is not None else None
-    return TaskQuery(taskIds=None, jobName=cls.TEST_JOB, environment=cls.TEST_ENV,
-                     instanceIds=instance_ids, owner=Identity(role=cls.TEST_ROLE, user=None))
 
   @classmethod
   def create_mock_task(cls, task_id, instance_id, initial_time, status):
@@ -144,13 +118,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-      mock_sleep,
-      mock_api_patch,
-      mock_scheduler_proxy_class,
-      mock_clusters,
-      options,
-      mock_get_job_config):
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)
+    ) as (mock_sleep, mock_api_patch, mock_scheduler_proxy_class, mock_clusters, options,
+        mock_get_job_config):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -408,17 +378,17 @@ class TestClientKillCommand(AuroraClientCommandTest):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_api.check_status.return_value = self.create_status_call_result()
     mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_call_result()
-    mock_api.kill_job.side_effect = [self.get_kill_job_error_response(), self.get_kill_job_response()]
+    mock_api.kill_job.side_effect = [
+        self.get_kill_job_error_response(), self.get_kill_job_response()]
     with contextlib.nested(
         patch('apache.aurora.client.factory.make_client', return_value=mock_api),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            mock_api_factory_patch,
-            mock_scheduler_proxy_class,
-            mock_clusters,
-            options, mock_get_job_config):
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)
+    ) as (mock_api_factory_patch, mock_scheduler_proxy_class, mock_clusters, options,
+        mock_get_job_config):
+
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()

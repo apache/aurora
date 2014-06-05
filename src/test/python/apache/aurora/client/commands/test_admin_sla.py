@@ -19,7 +19,7 @@ from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api import AuroraClientAPI
-from apache.aurora.client.api.sla import DomainUpTimeSlaVector
+from apache.aurora.client.api.sla import DomainUpTimeSlaVector, JobUpTimeDetails, JobUpTimeLimit
 from apache.aurora.client.base import DEFAULT_GROUPING
 from apache.aurora.client.commands.admin import sla_list_safe_domain, sla_probe_hosts
 from apache.aurora.client.commands.util import AuroraClientCommandTest
@@ -55,7 +55,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
     for i in range(num_hosts):
       host_name = 'h%s' % i
       job = AuroraJobKey.from_path('west/role/env/job%s' % i)
-      hosts[host_name].append(DomainUpTimeSlaVector.JobUpTimeLimit(job, percentage, duration))
+      hosts[host_name].append(JobUpTimeLimit(job, percentage, duration))
     return [hosts]
 
   @classmethod
@@ -214,9 +214,8 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
         sla_list_safe_domain(['west', '50', '100s'])
 
         job_key = AuroraJobKey.from_path('west/role/env/job1')
-        override = {job_key: DomainUpTimeSlaVector.JobUpTimeLimit(job_key, 30, 200)}
-        mock_vector.get_safe_hosts.assert_called_once_with(50.0, 100.0,
-            override, DEFAULT_GROUPING)
+        override = {job_key: JobUpTimeLimit(job_key, 30, 200)}
+        mock_vector.get_safe_hosts.assert_called_once_with(50.0, 100.0, override, DEFAULT_GROUPING)
         mock_print_results.assert_called_once_with(['h0', 'h1', 'h2'])
 
   def test_safe_domain_list_jobs(self):
@@ -247,8 +246,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
   def test_safe_domain_invalid_percentage(self):
     """Tests execution of the sla_list_safe_domain command with invalid percentage"""
     mock_options = self.setup_mock_options()
-    with patch('twitter.common.app.get_options', return_value=mock_options) as (_):
-
+    with patch('twitter.common.app.get_options', return_value=mock_options):
       try:
         sla_list_safe_domain(['west', '0', '100s'])
       except SystemExit:
@@ -262,7 +260,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
       fp.write('30 200s')
       fp.flush()
       mock_options = self.setup_mock_options(override=fp.name)
-      with patch('twitter.common.app.get_options', return_value=mock_options) as (_):
+      with patch('twitter.common.app.get_options', return_value=mock_options):
 
         try:
           sla_list_safe_domain(['west', '50', '100s'])
@@ -274,7 +272,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
   def test_safe_domain_hosts_error(self):
     """Tests execution of the sla_list_safe_domain command with both include file and list"""
     mock_options = self.setup_mock_options(include='file', include_list='list')
-    with patch('twitter.common.app.get_options', return_value=mock_options) as (_):
+    with patch('twitter.common.app.get_options', return_value=mock_options):
 
       try:
         sla_list_safe_domain(['west', '50', '100s'])
@@ -286,7 +284,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
   def test_safe_domain_grouping_error(self):
     """Tests execution of the sla_list_safe_domain command invalid grouping"""
     mock_options = self.setup_mock_options(grouping='foo')
-    with patch('twitter.common.app.get_options', return_value=mock_options) as (_):
+    with patch('twitter.common.app.get_options', return_value=mock_options):
 
       try:
         sla_list_safe_domain(['west', '50', '100s'])
@@ -319,7 +317,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
     for i in range(num_hosts):
       host_name = 'h%s' % i
       job = AuroraJobKey.from_path('west/role/env/job%s' % i)
-      hosts[host_name].append(DomainUpTimeSlaVector.JobUpTimeDetails(job, predicted, safe, safe_in))
+      hosts[host_name].append(JobUpTimeDetails(job, predicted, safe, safe_in))
     return [hosts]
 
   def test_probe_hosts_with_list(self):
@@ -385,7 +383,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
       fp.write('h0')
       fp.flush()
       mock_options = self.setup_mock_options(hosts='h0', filename=fp.name)
-      with patch('twitter.common.app.get_options', return_value=mock_options) as (_):
+      with patch('twitter.common.app.get_options', return_value=mock_options):
 
         try:
           sla_probe_hosts(['west', '50', '100s'])
@@ -397,7 +395,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
   def test_probe_grouping_error(self):
     """Tests execution of the sla_probe_hosts command with invalid grouping."""
     mock_options = self.setup_mock_options(hosts='h0', grouping='foo')
-    with patch('twitter.common.app.get_options', return_value=mock_options) as (_):
+    with patch('twitter.common.app.get_options', return_value=mock_options):
 
       try:
         sla_probe_hosts(['west', '50', '100s'])

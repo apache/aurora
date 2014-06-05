@@ -43,7 +43,7 @@ def test_extract_pexinfo():
 
 def test_init():
   self = ExecutorVars()
-  assert self._orphan == False
+  assert self._orphan is False
   samples = self.metrics.sample()
   assert samples['version'] == 'UNKNOWN'
   assert samples['orphan'] == 0

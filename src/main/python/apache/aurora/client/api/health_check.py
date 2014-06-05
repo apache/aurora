@@ -58,6 +58,7 @@ class StatusHealthCheck(HealthCheck):
     1. A task is in state RUNNING
     2. A task that satisfies (1) and is already known has the same task id.
   """
+
   def __init__(self):
     self._task_ids = {}
 
@@ -68,7 +69,10 @@ class StatusHealthCheck(HealthCheck):
 
     if status == ScheduleStatus.RUNNING:
       if instance_id in self._task_ids:
-        return Retriable.alive() if task_id == self._task_ids.get(instance_id) else NotRetriable.dead()
+        if task_id == self._task_ids.get(instance_id):
+          return Retriable.alive()
+        else:
+          return NotRetriable.dead()
       else:
         log.info('Detected RUNNING instance %s' % instance_id)
         self._task_ids[instance_id] = task_id

@@ -13,14 +13,11 @@
 #
 
 import contextlib
-import unittest
 
 from mock import Mock, patch
 
 from apache.aurora.client.commands.core import list_jobs
 from apache.aurora.client.commands.util import AuroraClientCommandTest
-from apache.aurora.common.cluster import Cluster
-from apache.aurora.common.clusters import Clusters
 
 from gen.apache.aurora.api.ttypes import GetJobsResult, JobKey
 

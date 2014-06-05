@@ -22,18 +22,9 @@ from apache.aurora.client.cli import EXIT_TIMEOUT
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.options import parse_instances
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
-from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.api.ttypes import (
-    AssignedTask,
-    Identity,
-    ScheduledTask,
-    ScheduleStatus,
-    ScheduleStatusResult,
-    TaskEvent,
-    TaskQuery
-)
+from gen.apache.aurora.api.ttypes import Identity, ScheduleStatus, ScheduleStatusResult, TaskQuery
 
 
 class TestInstancesParser(unittest.TestCase):
@@ -67,7 +58,6 @@ class TestClientKillCommand(AuroraClientCommandTest):
     return TaskQuery(taskIds=None, jobName=cls.TEST_JOB, environment=cls.TEST_ENV,
                      instanceIds=instance_ids, owner=Identity(role=cls.TEST_ROLE, user=None))
 
-
   def test_killall_job(self):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
@@ -87,7 +77,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'killall', '--no-batching', '--config=%s' % fp.name, 'west/bozo/test/hello'])
+        cmd.execute(['job', 'killall', '--no-batching', '--config=%s' % fp.name,
+            'west/bozo/test/hello'])
 
       # Now check that the right API calls got made.
       assert api.kill_job.call_count == 1
@@ -123,7 +114,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
       api.kill_job.assert_called_with(AuroraJobKey.from_path('west/bozo/test/hello'), None)
       self.assert_scheduler_called(api, self.get_expected_task_query(), 8)
 
-  def test_killall_job(self):
+  def test_killall_job_something_else(self):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
     mock_scheduler_proxy = Mock()
@@ -166,7 +157,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--no-batching', 'west/bozo/test/hello/0,2,4-6'])
+        cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--no-batching',
+            'west/bozo/test/hello/0,2,4-6'])
 
       # Now check that the right API calls got made.
       assert api.kill_job.call_count == 1
@@ -196,7 +188,6 @@ class TestClientKillCommand(AuroraClientCommandTest):
       # Now check that the right API calls got made.
       assert api.kill_job.call_count == 0
 
-
   def test_kill_job_with_invalid_instances_nonstrict(self):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
@@ -221,7 +212,6 @@ class TestClientKillCommand(AuroraClientCommandTest):
       instances = [0, 2, 4, 5, 6, 11, 12, 13]
       api.kill_job.assert_called_with(AuroraJobKey.from_path('west/bozo/test/hello'), instances)
       self.assert_scheduler_called(api, self.get_expected_task_query(instances), 2)
-
 
   def test_kill_job_with_instances_batched(self):
     """Test kill client-side API logic."""
@@ -292,7 +282,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'kill', '--max-total-failures=1', '--config=%s' % fp.name, 'west/bozo/test/hello/0,2,4-13'])
+        cmd.execute(['job', 'kill', '--max-total-failures=1', '--config=%s' % fp.name,
+            'west/bozo/test/hello/0,2,4-13'])
 
       # Now check that the right API calls got made. We should have aborted after the second batch.
       assert api.kill_job.call_count == 2
@@ -321,7 +312,6 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
       # Now check that the right API calls got made.
       assert api.kill_job.call_count == 0
-
 
   def test_kill_job_with_instances_deep_api(self):
     """Test kill client-side API logic."""

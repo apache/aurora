@@ -16,7 +16,6 @@ import grp
 import os
 import pwd
 import random
-import threading
 import time
 
 import mock
@@ -35,19 +34,21 @@ class TestProcess(Process):
   def execute(self):
     super(TestProcess, self).execute()
     os._exit(0)
+
   def finish(self):
     pass
 
 
 def wait_for_rc(checkpoint, timeout=5.0):
   start = time.time()
-  trr = ThriftRecordReader(open(checkpoint), RunnerCkpt)
-  while time.time() < start + timeout:
-    record = trr.read()
-    if record and record.process_status and record.process_status.return_code is not None:
-      return record.process_status.return_code
-    else:
-      time.sleep(0.1)
+  with open(checkpoint) as fp:
+    trr = ThriftRecordReader(fp, RunnerCkpt)
+    while time.time() < start + timeout:
+      record = trr.read()
+      if record and record.process_status and record.process_status.return_code is not None:
+        return record.process_status.return_code
+      else:
+        time.sleep(0.1)
 
 
 def get_other_nonroot_user():
@@ -94,7 +95,7 @@ def test_simple_process_other_user(*args):
 
     p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox, user=some_user.pw_name)
     p.start()
-    rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
+    wait_for_rc(taskpath.getpath('process_checkpoint'))
 
     # since we're not actually root, the best we can do is check the right things were attempted
     assert os.setgroups.calledwith([g.gr_gid for g in grp.getgrall() if some_user.pw_name in g])
@@ -108,7 +109,7 @@ def test_other_user_fails_nonroot():
     sandbox = setup_sandbox(td, taskpath)
 
     with pytest.raises(Process.PermissionError):
-      p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox,
+      TestProcess('process', 'echo hello world', 0, taskpath, sandbox,
             user=get_other_nonroot_user().pw_name)
 
 
@@ -119,7 +120,7 @@ def test_log_permissions():
 
     p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox)
     p.start()
-    rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
+    wait_for_rc(taskpath.getpath('process_checkpoint'))
 
     stdout = taskpath.with_filename('stdout').getpath('process_logdir')
     stderr = taskpath.with_filename('stderr').getpath('process_logdir')
@@ -142,7 +143,7 @@ def test_log_permissions_other_user(*mocks):
 
     p = TestProcess('process', 'echo hello world', 0, taskpath, sandbox, user=some_user.pw_name)
     p.start()
-    rc = wait_for_rc(taskpath.getpath('process_checkpoint'))
+    wait_for_rc(taskpath.getpath('process_checkpoint'))
 
     # since we're not actually root, the best we can do is check the right things were attempted
     stdout = taskpath.with_filename('stdout').getpath('process_logdir')

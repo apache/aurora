@@ -233,7 +233,7 @@ class AuroraExecutor(ExecutorBase, Observable):
     try:
       assigned_task = assigned_task_from_mesos_task(task)
       return assigned_task
-    except Exception as e:
+    except Exception:
       log.fatal('Could not deserialize AssignedTask')
       log.fatal(traceback.format_exc())
       return None

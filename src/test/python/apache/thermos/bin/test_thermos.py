@@ -12,4 +12,4 @@
 # limitations under the License.
 #
 
-from apache.thermos.bin import thermos
+from apache.thermos.bin import thermos  # noqa

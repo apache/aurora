@@ -80,7 +80,7 @@ app.add_option(
      callback=add_port_to('prebound_ports'),
      dest='prebound_ports',
      default={},
-     metavar = "NAME:PORT",
+     metavar="NAME:PORT",
      help="bind a numbered port PORT to name NAME")
 
 

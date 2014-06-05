@@ -110,7 +110,8 @@ STRUCT_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
         : %(type)s.buildNoCopy(wrapped.%(fn_name)s());'''
 
 
-IMMUTABLE_COLLECTION_DECLARATION = '''private final Immutable%(collection)s<%(params)s> %(field)s;'''
+IMMUTABLE_COLLECTION_DECLARATION = (
+    '''private final Immutable%(collection)s<%(params)s> %(field)s;''')
 IMMUTABLE_COLLECTION_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
         ? Immutable%(collection)s.<%(params)s>of()
         : Immutable%(collection)s.copyOf(wrapped.%(fn_name)s());'''
@@ -273,7 +274,7 @@ class GeneratedCode(object):
       'wrapped': self._wrapped_type,
       'imports': '\n\n'.join(import_groups),
       'accessors': '\n\n'.join(self._accessors),
-      'fields':  ('  ' + '\n  '.join(self._fields) + '\n') if self._fields else '',
+      'fields': ('  ' + '\n  '.join(self._fields) + '\n') if self._fields else '',
       'assignments': ('\n    ' + '\n    '.join(self._assignments)) if self._assignments else '',
     }, file=f)
 
@@ -344,7 +345,8 @@ def generate_java(struct):
 
   # Accessor for each field.
   for field in struct.fields:
-    if not (isinstance(field.ttype, StructType) and (field.ttype.kind == 'enum' or struct.kind == 'union')):
+    if not (isinstance(field.ttype, StructType) and (
+        field.ttype.kind == 'enum' or struct.kind == 'union')):
       code.add_accessor(IMMUTABLE_FIELD_TEMPLATE
                         % {'type': 'boolean',
                            'fn_name': field.isset_method()})

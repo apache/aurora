@@ -32,8 +32,7 @@ def test_shellify():
           "hi": [0],
         },
       ]
-    }
-  , prefix="TEST_"))
+    }, prefix="TEST_"))
 
   assert set(dump) == set([
     "TEST_NUM=123",

@@ -18,7 +18,7 @@ python_library(
   name = 'detector',
   sources = ['detector.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/common:path')
+    pants('src/main/python/apache/thermos/common:path'),
   ]
 )
 

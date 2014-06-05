@@ -19,9 +19,16 @@ from twitter.common.contextutil import temporary_dir, temporary_file
 
 from apache.aurora.client import config
 from apache.aurora.config import AuroraConfig
-from apache.aurora.config.schema.base import HealthCheckConfig, UpdateConfig
 from apache.aurora.config.loader import AuroraConfigLoader
-from apache.aurora.config.schema.base import Announcer, Job, MB, Resources, Task
+from apache.aurora.config.schema.base import (
+    Announcer,
+    HealthCheckConfig,
+    Job,
+    MB,
+    Resources,
+    Task,
+    UpdateConfig
+)
 
 from gen.apache.aurora.api.constants import DEFAULT_ENVIRONMENT
 
@@ -172,20 +179,22 @@ def test_update_config_passes_with_default_values():
 
   config._validate_update_config(AuroraConfig(base_job))
 
+
 def test_update_config_passes_with_min_requirement_values():
   base_job = Job(
     name='hello_world', role='john_doe', cluster='test-cluster',
-    update_config = UpdateConfig(watch_secs=26),
-    health_check_config = HealthCheckConfig(max_consecutive_failures=1),
+    update_config=UpdateConfig(watch_secs=26),
+    health_check_config=HealthCheckConfig(max_consecutive_failures=1),
     task=Task(name='main', processes=[],
               resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
 
   config._validate_update_config(AuroraConfig(base_job))
 
+
 def test_update_config_fails_insufficient_watch_secs_less_than_target():
   base_job = Job(
     name='hello_world', role='john_doe', cluster='test-cluster',
-    update_config = UpdateConfig(watch_secs=10),
+    update_config=UpdateConfig(watch_secs=10),
     task=Task(name='main', processes=[],
               resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
 
@@ -196,8 +205,8 @@ def test_update_config_fails_insufficient_watch_secs_less_than_target():
 def test_update_config_fails_insufficient_watch_secs_equal_to_target():
   base_job = Job(
     name='hello_world', role='john_doe', cluster='test-cluster',
-    update_config = UpdateConfig(watch_secs=25),
-    health_check_config = HealthCheckConfig(max_consecutive_failures=1),
+    update_config=UpdateConfig(watch_secs=25),
+    health_check_config=HealthCheckConfig(max_consecutive_failures=1),
     task=Task(name='main', processes=[],
               resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
 

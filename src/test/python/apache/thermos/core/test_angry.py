@@ -12,8 +12,6 @@
 # limitations under the License.
 #
 
-import random
-
 from apache.thermos.config.schema import Process, Task
 from apache.thermos.testing.runner import Runner
 
@@ -22,14 +20,14 @@ from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 def flaky_task():
   task = Task(
-    name = "failing_task",
-    max_failures = 2,
-    processes = [
-      Process(name = "a", max_failures=1, min_duration=1, cmdline="echo hello world"),
-      Process(name = "b", max_failures=2, min_duration=1, cmdline="exit 1"),
-      Process(name = "c", max_failures=1, min_duration=1, final=True, cmdline="echo hello world")
+    name="failing_task",
+    max_failures=2,
+    processes=[
+      Process(name="a", max_failures=1, min_duration=1, cmdline="echo hello world"),
+      Process(name="b", max_failures=2, min_duration=1, cmdline="exit 1"),
+      Process(name="c", max_failures=1, min_duration=1, final=True, cmdline="echo hello world")
     ],
-    constraints = [{'order': ['a', 'b']}]
+    constraints=[{'order': ['a', 'b']}]
   )
   return task.interpolate()[0]
 

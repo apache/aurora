@@ -16,17 +16,7 @@ import pytest
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.config import AuroraConfig, PortResolver
-from apache.aurora.config.schema.base import (
-    Announcer,
-    Empty,
-    Integer,
-    Job,
-    Process,
-    Resources,
-    Task
-)
-
-from gen.apache.aurora.api.ttypes import Identity
+from apache.aurora.config.schema.base import Announcer, Empty, Job, Process, Resources, Task
 
 resolve = PortResolver.resolve
 
@@ -56,7 +46,6 @@ def test_cycle():
     resolve(portmap)
 
 
-
 MESOS_CONFIG = """
 HELLO_WORLD = Job(
   name = 'hello_world',
@@ -71,6 +60,7 @@ HELLO_WORLD = Job(
 )
 jobs = [HELLO_WORLD]
 """
+
 
 LIMITED_MESOS_CONFIG = """
 HELLO_WORLD = Job(
@@ -96,33 +86,31 @@ jobs = [HELLO_WORLD]
 
 
 REIFIED_CONFIG = Job(
-  name = 'hello_world',
-  role = 'john_doe',
-  environment = 'staging42',
-  cluster = 'smf1-test',
-  task = Task(
-    name = 'main',
-    processes = [Process(name = 'hello_world', cmdline = 'echo {{mesos.instance}}')],
-    resources = Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576),
+  name='hello_world',
+  role='john_doe',
+  environment='staging42',
+  cluster='smf1-test',
+  task=Task(
+    name='main',
+    processes=[Process(name='hello_world', cmdline='echo {{mesos.instance}}')],
+    resources=Resources(cpu=0.1, ram=64 * 1048576, disk=64 * 1048576),
   )
 )
 
 REIFIED_LIMITED_CONFIG = Job(
-  name = 'hello_world',
-  role = 'john_doe',
-  environment = 'staging42',
-  cluster = 'smf1-test',
-  task = Task(
-    name = 'main',
-    processes = [Process(name = 'hello_world_fails_0', cmdline = 'echo hello world',
-                         max_failures = 0),
-                 Process(name = 'hello_world_fails_50', cmdline = 'echo hello world',
-                         max_failures = 50),
-                 Process(name = 'hello_world_fails_100', cmdline = 'echo hello world',
-                         max_failures = 100),
-                 Process(name = 'hello_world_fails_200', cmdline = 'echo hello world',
-                         max_failures = 200)],
-    resources = Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576),
+  name='hello_world',
+  role='john_doe',
+  environment='staging42',
+  cluster='smf1-test',
+  task=Task(
+    name='main',
+    processes=[
+        Process(name='hello_world_fails_0', cmdline='echo hello world', max_failures=0),
+        Process(name='hello_world_fails_50', cmdline='echo hello world', max_failures=50),
+        Process(name='hello_world_fails_100', cmdline='echo hello world', max_failures=100),
+        Process(name='hello_world_fails_200', cmdline='echo hello world', max_failures=200)
+    ],
+    resources=Resources(cpu=0.1, ram=64 * 1048576, disk=64 * 1048576),
   )
 )
 
@@ -165,27 +153,33 @@ def test_simple_config():
 
 
 def make_config(announce, *ports):
-  process = Process(name = 'hello',
-                    cmdline = ' '.join('{{thermos.ports[%s]}}' % port for port in ports))
+  process = Process(
+      name='hello',
+      cmdline=' '.join('{{thermos.ports[%s]}}' % port for port in ports))
   return AuroraConfig(Job(
-      name = 'hello_world', environment = 'staging42', role = 'john_doe', cluster = 'smf1-test',
-      announce = announce,
-      task = Task(name = 'main', processes = [process],
-                  resources =  Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576))))
+      name='hello_world',
+      environment='staging42',
+      role='john_doe',
+      cluster='smf1-test',
+      announce=announce,
+      task=Task(
+          name='main',
+          processes=[process],
+          resources=Resources(cpu=0.1, ram=64 * 1048576, disk=64 * 1048576))))
 
 
 def test_ports():
-  announce = Announcer(portmap = {'http': 80})
+  announce = Announcer(portmap={'http': 80})
   assert make_config(announce).ports() == set()
   assert make_config(announce, 'http').ports() == set()
   assert make_config(announce, 'http', 'thrift').ports() == set(['thrift'])
 
-  announce = Announcer(portmap = {'http': 'aurora'})
+  announce = Announcer(portmap={'http': 'aurora'})
   assert make_config(announce).ports() == set(['aurora'])
   assert make_config(announce, 'http').ports() == set(['aurora'])
   assert make_config(announce, 'http', 'thrift').ports() == set(['thrift', 'aurora'])
 
-  announce = Announcer(portmap = {'aurora': 'http'})
+  announce = Announcer(portmap={'aurora': 'http'})
   assert make_config(announce).ports() == set(['http'])
   assert make_config(announce, 'http').ports() == set(['http'])
   assert make_config(announce, 'http', 'thrift').ports() == set(['http', 'thrift'])
@@ -196,8 +190,8 @@ def test_ports():
 
 
 def test_static_port_aliasing():
-  announce = Announcer(primary_port = 'thrift',
-                       portmap = {'thrift': 8081, 'health': 8300, 'aurora': 'health'})
+  announce = Announcer(primary_port='thrift',
+                       portmap={'thrift': 8081, 'health': 8300, 'aurora': 'health'})
   assert make_config(announce).ports() == set()
   assert make_config(announce).job().taskConfig.requestedPorts == set()
   assert make_config(announce, 'thrift').ports() == set()

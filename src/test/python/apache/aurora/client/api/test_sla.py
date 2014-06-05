@@ -14,16 +14,15 @@
 
 import time
 import unittest
-
 from contextlib import contextmanager
+
 from mock import call, Mock, patch
 
-from apache.aurora.client.api.sla import DomainUpTimeSlaVector, JobUpTimeSlaVector, Sla, task_query
+from apache.aurora.client.api.sla import JobUpTimeLimit, Sla, task_query
 from apache.aurora.client.base import add_grouping, DEFAULT_GROUPING, remove_grouping
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 
-from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
 from gen.apache.aurora.api.constants import LIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -192,7 +191,6 @@ class SlaTest(unittest.TestCase):
     self.mock_get_tasks(self.create_tasks([100, 200, 300, 400, 500]))
     self.assert_count_result(100, 50)
 
-
   def test_uptime_empty(self):
     self.mock_get_tasks([])
     self.assert_uptime_result(0, 50)
@@ -216,7 +214,6 @@ class SlaTest(unittest.TestCase):
   def test_uptime_100(self):
     self.mock_get_tasks(self.create_tasks([100, 200, 300, 400]))
     self.assert_uptime_result(None, 100)
-
 
   def test_wait_time_empty(self):
     self.mock_get_tasks([])
@@ -245,7 +242,6 @@ class SlaTest(unittest.TestCase):
   def test_wait_time_with_total(self):
     self.mock_get_tasks(self.create_tasks([100, 200, 300, 400]))
     self.assert_wait_time_result(150, 80, 250)
-
 
   def test_domain_uptime_no_tasks(self):
     self.mock_get_tasks([])
@@ -289,11 +285,7 @@ class SlaTest(unittest.TestCase):
     ])
 
     job_override = {
-        self._job_key:
-        DomainUpTimeSlaVector.JobUpTimeLimit(
-            job=self._job_key,
-            percentage=50,
-            duration_secs=100)
+        self._job_key: JobUpTimeLimit(job=self._job_key, percentage=50, duration_secs=100)
     }
     self.assert_safe_domain_result('h1', 50, 400, in_limit=job_override)
 
@@ -336,7 +328,6 @@ class SlaTest(unittest.TestCase):
       vector = self._sla.get_domain_uptime_vector(self._cluster, self._min_count)
       assert 0 == len(vector.get_safe_hosts(50, 150, None, 'by_rack')), 'Length must be empty.'
       self.expect_task_status_call_cluster_scoped()
-
 
   def test_probe_hosts_no_hosts(self):
     self.mock_get_tasks([])
@@ -430,7 +421,6 @@ class SlaTest(unittest.TestCase):
       self.assert_probe_host_job_details(result, 'cl-r1-h02', 25.0, False, 100)
       self.assert_probe_host_job_details(result, 'cl-r2-h03', 25.0, False, 100)
       self.assert_probe_host_job_details(result, 'cl-r2-h04', 25.0, False, 100)
-
 
   def test_get_domain_uptime_vector_with_hosts(self):
     with patch('apache.aurora.client.api.sla.task_query', return_value=TaskQuery()) as (mock_query):

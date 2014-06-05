@@ -15,13 +15,12 @@
 import math
 import time
 from collections import defaultdict, namedtuple
-from copy import deepcopy
 
 from apache.aurora.client.base import DEFAULT_GROUPING, group_hosts, log_response
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.constants import LIVE_STATES
-from gen.apache.aurora.api.ttypes import Identity, Response, ResponseCode, ScheduleStatus, TaskQuery
+from gen.apache.aurora.api.ttypes import Identity, ResponseCode, ScheduleStatus, TaskQuery
 
 
 def job_key_from_scheduled(task, cluster):
@@ -99,7 +98,6 @@ class JobUpTimeSlaVector(object):
     else:
       return duration - sorted(self._uptime_map.values())[index]
 
-
   def get_task_up_count(self, duration, total_tasks=None):
     """Returns the percentage of job tasks that stayed up longer than duration.
 
@@ -130,9 +128,17 @@ class JobUpTimeSlaVector(object):
     for task in self._tasks:
       for event in task.taskEvents:
         if event.status == ScheduleStatus.RUNNING:
-          instance_map[task.assignedTask.instanceId] = math.floor(self._now - event.timestamp / 1000)
+          instance_map[task.assignedTask.instanceId] = math.floor(
+              self._now - event.timestamp / 1000)
           break
     return instance_map
+
+
+JobUpTimeLimit = namedtuple('JobUpTimeLimit', ['job', 'percentage', 'duration_secs'])
+
+
+JobUpTimeDetails = namedtuple('JobUpTimeDetails',
+    ['job', 'predicted_percentage', 'safe', 'safe_in_secs'])
 
 
 class DomainUpTimeSlaVector(object):
@@ -142,10 +148,6 @@ class DomainUpTimeSlaVector(object):
      Exposes an API for querying safe domain details.
   """
   DEFAULT_MIN_INSTANCE_COUNT = 2
-
-  JobUpTimeLimit = namedtuple('JobUpTimeLimit', ['job', 'percentage', 'duration_secs'])
-  JobUpTimeDetails = namedtuple('JobUpTimeDetails',
-      ['job', 'predicted_percentage', 'safe', 'safe_in_secs'])
 
   def __init__(self, cluster, tasks, min_instance_count=DEFAULT_MIN_INSTANCE_COUNT, hosts=None):
     self._cluster = cluster
@@ -188,7 +190,7 @@ class DomainUpTimeSlaVector(object):
           break
 
         for host in job_hosts:
-          safe_hosts[host].append(self.JobUpTimeLimit(job_key, filtered_percentage, job_duration))
+          safe_hosts[host].append(JobUpTimeLimit(job_key, filtered_percentage, job_duration))
 
       else:
         safe_groups.append(safe_hosts)
@@ -226,7 +228,7 @@ class DomainUpTimeSlaVector(object):
 
         for host in job_hosts:
           probed_hosts[host].append(
-              self.JobUpTimeDetails(job_key, filtered_percentage, safe, wait_to_sla))
+              JobUpTimeDetails(job_key, filtered_percentage, safe, wait_to_sla))
 
       if probed_hosts:
         probed_groups.append(probed_hosts)
@@ -247,7 +249,6 @@ class DomainUpTimeSlaVector(object):
     result = defaultdict(list)
     for host in group.keys():
       result[host].append(uptime_details)
-
 
   def _simulate_hosts_down(self, job_key, hosts, duration):
     unfiltered_tasks = self._tasks_by_job[job_key]

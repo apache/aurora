@@ -74,7 +74,6 @@ class Bridge(object):
       if self.default is not None:
         return self.default.execute(args)
 
-
   def execute(self, args):
     """Dispatch a command line to the appropriate CommandProcessor"""
     if len(args) == 1:

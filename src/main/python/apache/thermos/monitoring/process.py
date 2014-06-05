@@ -40,24 +40,25 @@ class ProcessSample(namedtuple('ProcessSample', 'rate user system rss vms nice s
     else:
       status = other.status
     return ProcessSample(
-      rate = self.rate + other.rate,
-      user = self.user + other.user,
-      system = self.system + other.system,
-      rss = self.rss + other.rss,
-      vms = self.vms + other.vms,
-      nice = nice,
-      status = status,
-      threads = self.threads + other.threads)
+        rate=self.rate + other.rate,
+        user=self.user + other.user,
+        system=self.system + other.system,
+        rss=self.rss + other.rss,
+        vms=self.vms + other.vms,
+        nice=nice,
+        status=status,
+        threads=self.threads + other.threads,
+    )
 
   def to_dict(self):
     return dict(
-      cpu     = self.rate,
-      ram     = self.rss,
-      user    = self.user,
-      system  = self.system,
-      rss     = self.rss,
-      vms     = self.vms,
-      nice    = self.nice,
-      status  = str(self.status),
-      threads = self.threads
+        cpu=self.rate,
+        ram=self.rss,
+        user=self.user,
+        system=self.system,
+        rss=self.rss,
+        vms=self.vms,
+        nice=self.nice,
+        status=str(self.status),
+        threads=self.threads,
     )

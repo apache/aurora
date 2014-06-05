@@ -13,6 +13,9 @@
 #
 
 """Helpers for composing Thermos workflows."""
+
+# checkstyle: noqa
+
 import itertools
 
 from pystachio import Empty, List
@@ -242,9 +245,11 @@ def SimpleTask(name, command):
   """A simple command-line Task with default resources"""
   return Tasks.simple(name, command)
 
+
 def SequentialTask(*args, **kw):
   """A Task whose processes are always sequential."""
   return Tasks.sequential(Task(*args, **kw))
+
 
 python_options = Options.python
 java_options = Options.java

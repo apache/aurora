@@ -16,10 +16,8 @@ import contextlib
 
 from mock import Mock, patch
 
-from apache.aurora.client.cli import EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
-from apache.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.client.cli.util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -108,7 +106,8 @@ class TestRunCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.cli.task.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.api.command_runner.InstanceDistributedCommandRunner.sandbox_args',
+        patch('apache.aurora.client.api.command_runner.'
+              'InstanceDistributedCommandRunner.sandbox_args',
             return_value=sandbox_args),
         patch('subprocess.Popen', return_value=self.create_mock_process())) as (
             mock_scheduler_proxy_class,
@@ -133,6 +132,7 @@ class TestRunCommand(AuroraClientCommandTest):
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'],
           stderr=-2, stdout=-1)
+
 
 class TestSshCommand(AuroraClientCommandTest):
   @classmethod

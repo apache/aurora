@@ -91,6 +91,8 @@ class FakeAuroraCommandContext(AuroraCommandContext):
 
 
 class AuroraClientCommandTest(unittest.TestCase):
+  FAKE_TIME = 42131
+
   @classmethod
   def create_blank_response(cls, code, msg):
     response = Mock(spec=Response)
@@ -162,9 +164,6 @@ class AuroraClientCommandTest(unittest.TestCase):
   def setup_get_tasks_status_calls(cls, scheduler):
     status_response = cls.create_status_call_result()
     scheduler.getTasksStatus.return_value = status_response
-
-
-  FAKE_TIME = 42131
 
   @classmethod
   def fake_time(cls, ignored):

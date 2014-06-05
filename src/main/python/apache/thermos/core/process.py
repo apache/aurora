@@ -20,7 +20,6 @@ commandline in a subprocess of its own.
 
 """
 
-import getpass
 import grp
 import os
 import pwd
@@ -41,6 +40,7 @@ from gen.apache.thermos.ttypes import ProcessState, ProcessStatus, RunnerCkpt
 
 class Platform(Interface):
   """Abstract representation of a platform encapsulating system-level functions"""
+
   @abstractmethod
   def clock(self):
     pass
@@ -94,7 +94,7 @@ class ProcessBase(object):
     self._stderr = None
     self._user = user
     if self._user:
-      user, current_user = self._getpwuid() # may raise self.UnknownUserError
+      user, current_user = self._getpwuid()  # may raise self.UnknownUserError
       if user != current_user and os.geteuid() != 0:
         raise self.PermissionError('Must be root to run processes as other users!')
     self._ckpt = None

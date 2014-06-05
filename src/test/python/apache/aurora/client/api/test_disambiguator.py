@@ -25,7 +25,7 @@ from apache.aurora.common.cluster import Cluster
 from gen.apache.aurora.api.constants import ResponseCode
 from gen.apache.aurora.api.ttypes import GetJobsResult, JobConfiguration, JobKey, Response, Result
 
-TEST_CLUSTER = Cluster(name = 'smf1')
+TEST_CLUSTER = Cluster(name='smf1')
 
 
 class LiveJobDisambiguatorTest(mox.MoxTestBase):
@@ -51,7 +51,7 @@ class LiveJobDisambiguatorTest(mox.MoxTestBase):
     self._api.get_jobs(self.ROLE).AndReturn(Response(
       responseCode=ResponseCode.OK,
       messageDEPRECATED='Mock OK',
-      result = Result(getJobsResult=GetJobsResult(
+      result=Result(getJobsResult=GetJobsResult(
         configs=set(JobConfiguration(key=JobKey(role=self.ROLE, environment=env, name=self.NAME))
         for env in envs)))))
 

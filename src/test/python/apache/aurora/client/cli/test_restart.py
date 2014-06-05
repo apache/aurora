@@ -22,14 +22,7 @@ from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
 
-from gen.apache.aurora.api.ttypes import (
-    AssignedTask,
-    JobKey,
-    PopulateJobResult,
-    ScheduledTask,
-    ScheduleStatusResult,
-    TaskConfig
-)
+from gen.apache.aurora.api.ttypes import JobKey, PopulateJobResult, TaskConfig
 
 
 class TestRestartCommand(AuroraClientCommandTest):
@@ -50,7 +43,6 @@ class TestRestartCommand(AuroraClientCommandTest):
     configs = [Mock(spec=TaskConfig) for i in range(20)]
     populate.result.populateJobResult.populated = set(configs)
     return populate
-
 
   @classmethod
   def setup_health_checks(cls, mock_api):
@@ -111,7 +103,6 @@ class TestRestartCommand(AuroraClientCommandTest):
         assert mock_scheduler_proxy.getTasksStatus.call_count == 0
         assert mock_scheduler_proxy.restartShards.call_count == 0
 
-
   def test_restart_failed_status(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
@@ -139,7 +130,6 @@ class TestRestartCommand(AuroraClientCommandTest):
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     # Make getTasksStatus return an error, which is what happens when a job is not found.
     mock_scheduler_proxy.getTasksStatus.return_value = self.create_error_response()
-    mock_logger = Mock()
     with contextlib.nested(
         patch('apache.aurora.client.cli.print_aurora_log'),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
@@ -152,7 +142,8 @@ class TestRestartCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello/1-3', fp.name])
+        result = cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello/1-3',
+            fp.name])
         # We need to check tat getTasksStatus was called, but that restartShards wasn't.
         # In older versions of the client, if shards were specified, but the job didn't
         # exist, the error wouldn't be detected unti0 restartShards was called, which generated

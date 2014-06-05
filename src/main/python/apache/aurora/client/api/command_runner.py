@@ -12,6 +12,8 @@
 # limitations under the License.
 #
 
+from __future__ import print_function
+
 import posixpath
 import subprocess
 from multiprocessing.pool import ThreadPool
@@ -29,8 +31,8 @@ from gen.apache.aurora.api.ttypes import Identity, ResponseCode, TaskQuery
 
 
 class CommandRunnerTrait(Cluster.Trait):
-  slave_root          = Required(String)
-  slave_run_directory = Required(String)
+  slave_root          = Required(String)  # noqa
+  slave_run_directory = Required(String)  # noqa
 
 
 class DistributedCommandRunner(object):
@@ -121,20 +123,25 @@ class DistributedCommandRunner(object):
   def process_arguments(self, command, **kw):
     for task in self.resolve():
       host = task.assignedTask.slaveHost
-      role = task.assignedTask.task.owner.role
       yield (host, self._ssh_user, self.substitute(command, task, self._cluster, **kw))
 
   def run(self, command, parallelism=1, **kw):
     threadpool = ThreadPool(processes=parallelism)
     for result in threadpool.imap_unordered(self.execute, self.process_arguments(command, **kw)):
-      print result
+      print(result)
+
 
 class InstanceDistributedCommandRunner(DistributedCommandRunner):
   """A distributed command runner that only runs on specified instances of a job."""
 
   @classmethod
   def query_from(cls, role, env, job, instances=None):
-    return TaskQuery(statuses=LIVE_STATES, owner=Identity(role), jobName=job, environment=env, instanceIds=instances)
+    return TaskQuery(
+        statuses=LIVE_STATES,
+        owner=Identity(role),
+        jobName=job,
+        environment=env,
+        instanceIds=instances)
 
   def __init__(self, cluster, role, env, job, ssh_user=None, instances=None):
     super(InstanceDistributedCommandRunner, self).__init__(cluster, role, env, [job], ssh_user)
@@ -148,6 +155,6 @@ class InstanceDistributedCommandRunner(DistributedCommandRunner):
       for task in resp.result.scheduleStatusResult.tasks:
         yield task
     else:
-      print_aurora_log(logging.ERROR,
-          "Error: could not retrieve task information for run command: %s" % resp.messageDEPRECATED)
+      # This should be fixed by AURORA-503.
+      log.error('could not retrieve task information for run command: %s' % resp.messageDEPRECATED)
       raise ValueError("Could not retrieve task information: %s" % resp.messageDEPRECATED)

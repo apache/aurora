@@ -12,8 +12,6 @@
 # limitations under the License.
 #
 
-import textwrap
-
 from pystachio import Ref
 from pystachio.matcher import Any, Matcher
 from twitter.common.contextutil import temporary_file

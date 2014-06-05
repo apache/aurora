@@ -41,6 +41,7 @@ from twitter.common.python.pex import PexInfo
 
 from .command_hooks import GlobalCommandHookRegistry
 from .logsetup import TRANSCRIPT
+from .options import CommandOption
 
 # Constants for standard return codes.
 EXIT_OK = 0
@@ -78,6 +79,7 @@ def print_aurora_log(sev, msg, *args, **kwargs):
   kwargs["extra"] = extra
   logger.log(sev, msg, *args, **kwargs)
 
+
 def get_client_version():
   try:
     pexpath = sys.argv[0]
@@ -90,12 +92,11 @@ def get_client_version():
 
 class Context(object):
   class Error(Exception): pass
-
   class ArgumentException(Error): pass
 
   class CommandError(Error):
     def __init__(self, code, msg):
-      super(Context.CommandError, self).__init__(msg)
+      super(Context.CommandError, self).__init__(msg)  # noqa:T800
       self.msg = msg
       self.code = code
       self.options = None
@@ -151,7 +152,7 @@ class ConfigurationPlugin(object):
 
   class Error(Exception):
     def __init__(self, msg, code=0):
-      super(ConfigurationPlugin.Error, self).__init__(msg)
+      super(ConfigurationPlugin.Error, self).__init__(msg)  # noqa:T800
       self.code = code
       self.msg = msg
 
@@ -295,7 +296,6 @@ class CommandLine(object):
     result.append("\nRun 'help noun' or 'help noun verb' for help about a specific command")
     return "\n".join(result)
 
-
   def register_nouns(self):
     """This method should overridden by applications to register the collection of nouns
     that they can manipulate.
@@ -309,7 +309,6 @@ class CommandLine(object):
     etc. You wouldn't want to clutter the help output with AWS commands for users
     that weren't using AWS. So you could have the command-line check the cluster.json
     file, and only register the AWS noun if there was an AWS cluster.
-
     """
 
   @property
@@ -320,7 +319,9 @@ class CommandLine(object):
 
   def _setup(self, args):
     GlobalCommandHookRegistry.setup(GLOBAL_HOOK_SKIP_RULES_URL)
-    nouns = self.registered_nouns
+    # Accessing registered_nouns has the side-effect of registering them, but since
+    # nouns is unused, we must disable checkstyle.
+    nouns = self.registered_nouns  # noqa
     for plugin in self.plugins:
       args = plugin.before_dispatch(args)
     return args
@@ -346,8 +347,8 @@ class CommandLine(object):
       for plugin in self.plugins:
         plugin.before_execution(context)
     except ConfigurationPlugin.Error as e:
-      print("Error in configuration plugin before execution: %s" % c.msg, file=sys.stderr)
-      return c.code
+      print("Error in configuration plugin before execution: %s" % e.msg, file=sys.stderr)
+      return e.code
     plugin_result = GlobalCommandHookRegistry.run_pre_hooks(context, context.options.noun,
         context.options.verb)
     if plugin_result != EXIT_OK:
@@ -383,8 +384,8 @@ class CommandLine(object):
       result = noun.execute(context)
       if result == EXIT_OK:
         print_aurora_log(logging.INFO, "Command terminated successfully")
-        GlobalCommandHookRegistry.run_post_hooks(context, context.options.noun, context.options.verb,
-            result)
+        GlobalCommandHookRegistry.run_post_hooks(context, context.options.noun,
+            context.options.verb, result)
       else:
         print_aurora_log(logging.INFO, "Command terminated with error code %s", result)
       self._run_post_plugins(context, result)

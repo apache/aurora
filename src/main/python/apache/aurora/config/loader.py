@@ -14,7 +14,6 @@
 
 import json
 import pkgutil
-import textwrap
 
 from pystachio.config import Config as PystachioConfig
 

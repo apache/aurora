@@ -12,9 +12,6 @@
 # limitations under the License.
 #
 
-import inspect
-import os
-import sys
 from abc import abstractmethod, abstractproperty
 
 from twitter.common.lang import Interface
@@ -63,10 +60,10 @@ class BindingHelper(Interface):
   (because a human reader wants to know the version of the package, not the meaningless
   HDFS URL.
   """
-  @staticmethod
-  def register(helper):
-    _BINDING_HELPERS.append(helper)
 
+  @classmethod
+  def register(cls, helper):
+    _BINDING_HELPERS.append(helper)
 
   def apply(self, config, env=None, binding_dict=None):
     for match in self.matcher.match(config.raw()):
@@ -88,6 +85,7 @@ class BindingHelper(Interface):
 
 class CachingBindingHelper(BindingHelper):
   """A binding helper implementation that caches binding results"""
+
   def __init__(self):
     self.cache = {}
 

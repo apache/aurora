@@ -17,7 +17,7 @@ import threading
 import time
 import traceback
 
-from pystachio import Boolean, Default, Integer, String
+from pystachio import Default, Integer, String
 from thrift.protocol import TJSONProtocol
 from thrift.transport import THttpClient, TTransport
 from twitter.common import log
@@ -33,19 +33,20 @@ from gen.apache.aurora.api.constants import CURRENT_API_VERSION
 
 
 class SchedulerClientTrait(Cluster.Trait):
-  zk                = String
-  zk_port           = Default(Integer, 2181)
-  scheduler_zk_path = String
-  scheduler_uri     = String
-  proxy_url         = String
-  auth_mechanism    = Default(String, 'UNAUTHENTICATED')
+  zk                = String  # noqa
+  zk_port           = Default(Integer, 2181)  # noqa
+  scheduler_zk_path = String  # noqa
+  scheduler_uri     = String  # noqa
+  proxy_url         = String  # noqa
+  auth_mechanism    = Default(String, 'UNAUTHENTICATED')  # noqa
 
 
 class SchedulerClient(object):
   THRIFT_RETRIES = 5
   RETRY_TIMEOUT = Amount(1, Time.SECONDS)
 
-  class CouldNotConnect(Exception): pass
+  class Error(Exception): pass
+  class CouldNotConnect(Error): pass
 
   # TODO(wickman) Refactor per MESOS-3005 into two separate classes with separate traits:
   #   ZookeeperClientTrait
@@ -81,23 +82,23 @@ class SchedulerClient(object):
   def _connect(self):
     return None
 
-  @staticmethod
-  def _connect_scheduler(host, port, clock=time):
+  @classmethod
+  def _connect_scheduler(cls, host, port, clock=time):
     transport = THttpClient.THttpClient('http://%s:%s/api' % (host, port))
     protocol = TJSONProtocol.TJSONProtocol(transport)
     schedulerClient = AuroraAdmin.Client(protocol)
-    for _ in range(SchedulerClient.THRIFT_RETRIES):
+    for _ in range(cls.THRIFT_RETRIES):
       try:
         transport.open()
         return schedulerClient
       except TTransport.TTransportException:
-        clock.sleep(SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
+        clock.sleep(cls.RETRY_TIMEOUT.as_(Time.SECONDS))
         continue
       except Exception as e:
         # Monkey-patched proxies, like socks, can generate a proxy error here.
         # without adding a dependency, we can't catch those in a more specific way.
-        raise SchedulerClient.CouldNotConnect('Connection to scheduler failed: %s' % e)
-    raise SchedulerClient.CouldNotConnect('Could not connect to %s:%s' % (host, port))
+        raise cls.CouldNotConnect('Connection to scheduler failed: %s' % e)
+    raise cls.CouldNotConnect('Could not connect to %s:%s' % (host, port))
 
 
 class ZookeeperSchedulerClient(SchedulerClient):

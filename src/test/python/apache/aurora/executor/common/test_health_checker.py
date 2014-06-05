@@ -24,6 +24,7 @@ from apache.aurora.executor.common.health_checker import HealthCheckerThread
 def thread_yield():
   time.sleep(0.1)
 
+
 class TestHealthChecker(unittest.TestCase):
   def setUp(self):
     self._clock = ThreadedClock()

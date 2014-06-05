@@ -15,7 +15,6 @@
 import unittest
 
 import mox
-import pytest
 
 from apache.aurora.client.api.health_check import (
     HealthCheck,

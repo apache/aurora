@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
 '''
-Organizes a java source file's import statements in a way that pleases Apache Aurora's checkstyle
-configuration. This expects exactly one argument: the name of the file to modify with preferred import
-ordering.
+Organizes a java source file's import statements in a way that pleases
+Apache Aurora's checkstyle configuration.  This expects exactly one
+argument: the name of the file to modify with preferred import ordering.
 '''
 
 from __future__ import print_function
@@ -25,6 +26,8 @@ import sys
 from collections import defaultdict
 
 IMPORT_RE = re.compile('import(?: static)? (.*);')
+
+
 def get_group(import_statement):
   matcher = IMPORT_RE.match(import_statement)
   assert matcher, 'Could not parse import statement: %s' % import_statement
@@ -42,6 +45,8 @@ def index_by_group(import_statements):
 
 IMPORT_CLASS_RE = re.compile(
     'import(?: static)? (?P<outer>[^A-Z]*[A-Z]\w+)(?:\.(?P<inners>[\w][^;]*))?')
+
+
 def get_all_group_lines(import_groups):
   if not import_groups:
     return []
@@ -75,64 +80,69 @@ def get_all_group_lines(import_groups):
     all_lines += get_group_lines(group)
   return all_lines
 
-
-if len(sys.argv) != 2:
-  print('usage: %s FILE' % sys.argv[0])
-  sys.exit(1)
-
 BEFORE_IMPORTS = 'before_imports'
 IMPORTS = 'imports'
 STATIC_IMPORTS = 'static_imports'
 AFTER_IMPORTS = 'after_imports'
 
-print('Organizing imports in %s' % sys.argv[1])
-lines_before_imports = []
-import_lines = []
-static_import_lines = []
-lines_after_imports = []
-with open(sys.argv[1], 'r') as f:
-  position = BEFORE_IMPORTS
-  for line in f:
-    line = line.rstrip()
-    if position == BEFORE_IMPORTS:
-      if line.startswith('import'):
-        position = IMPORTS
-      else:
-        lines_before_imports.append(line)
-    if position == IMPORTS:
-      if line.startswith('import static'):
-        position = STATIC_IMPORTS
-      elif line.startswith('import'):
-        import_lines.append(line)
-      elif line.strip():
-        position = AFTER_IMPORTS
-    if position == STATIC_IMPORTS:
-      if line.startswith('import static'):
-        static_import_lines.append(line)
-      elif line.strip():
-        position = AFTER_IMPORTS
-    if position == AFTER_IMPORTS:
-      lines_after_imports.append(line)
 
-import_groups = index_by_group(import_lines)
-static_import_groups = index_by_group(static_import_lines)
+def main(argv):
+  if len(argv) != 2:
+    print('usage: %s FILE' % argv[0])
+    sys.exit(1)
 
-def ensure_line_padding(lines):
-  if lines and lines[-1] != '':
-    lines.append('')
-  return lines
+  print('Organizing imports in %s' % argv[1])
+  lines_before_imports = []
+  import_lines = []
+  static_import_lines = []
+  lines_after_imports = []
+  with open(argv[1], 'r') as f:
+    position = BEFORE_IMPORTS
+    for line in f:
+      line = line.rstrip()
+      if position == BEFORE_IMPORTS:
+        if line.startswith('import'):
+          position = IMPORTS
+        else:
+          lines_before_imports.append(line)
+      if position == IMPORTS:
+        if line.startswith('import static'):
+          position = STATIC_IMPORTS
+        elif line.startswith('import'):
+          import_lines.append(line)
+        elif line.strip():
+          position = AFTER_IMPORTS
+      if position == STATIC_IMPORTS:
+        if line.startswith('import static'):
+          static_import_lines.append(line)
+        elif line.strip():
+          position = AFTER_IMPORTS
+      if position == AFTER_IMPORTS:
+        lines_after_imports.append(line)
 
-file_lines = lines_before_imports
-if import_groups:
-  ensure_line_padding(file_lines)
-  file_lines += get_all_group_lines(import_groups)
-if static_import_groups:
-  ensure_line_padding(file_lines)
-  file_lines += get_all_group_lines(static_import_groups)
-if lines_after_imports:
-  ensure_line_padding(file_lines)
-  file_lines += lines_after_imports
+  import_groups = index_by_group(import_lines)
+  static_import_groups = index_by_group(static_import_lines)
 
-with open(sys.argv[1], 'w') as f:
-  for line in file_lines:
-    print(line, file=f)
+  def ensure_line_padding(lines):
+    if lines and lines[-1] != '':
+      lines.append('')
+    return lines
+
+  file_lines = lines_before_imports
+  if import_groups:
+    ensure_line_padding(file_lines)
+    file_lines += get_all_group_lines(import_groups)
+  if static_import_groups:
+    ensure_line_padding(file_lines)
+    file_lines += get_all_group_lines(static_import_groups)
+  if lines_after_imports:
+    ensure_line_padding(file_lines)
+    file_lines += lines_after_imports
+
+  with open(argv[1], 'w') as f:
+    for line in file_lines:
+      print(line, file=f)
+
+
+if __name__ == '__main__':
+  main(sys.argv)

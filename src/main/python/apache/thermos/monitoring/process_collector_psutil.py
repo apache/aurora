@@ -43,11 +43,12 @@ def process_to_sample(process):
 
 class ProcessTreeCollector(object):
   """ Collect resource consumption statistics for a process and its children """
+
   def __init__(self, pid):
     """ Given a pid """
     self._pid = pid
     self._process = None  # psutil.Process
-    self._sampled_tree = {} # pid => ProcessSample
+    self._sampled_tree = {}  # pid => ProcessSample
     self._sample = ProcessSample.empty()
     self._stamp = None
     self._rate = 0.0

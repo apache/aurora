@@ -21,6 +21,7 @@ import sys
 TRANSCRIPT = logging.DEBUG + 1
 logging.addLevelName(TRANSCRIPT, "TRANSCRIPT")
 
+
 class PlainFormatter(logging.Formatter):
   """
     Format a log in a simple style:
@@ -31,8 +32,8 @@ class PlainFormatter(logging.Formatter):
   LEVEL_MAP = {
     logging.FATAL: "FATAL",
     logging.ERROR: "ERROR",
-    logging.WARN:  "WARN",
-    logging.INFO:  "info",
+    logging.WARN: "WARN",
+    logging.INFO: "info",
     TRANSCRIPT: "transcript",
     logging.DEBUG: "debug"
   }
@@ -46,8 +47,8 @@ class PlainFormatter(logging.Formatter):
     except TypeError:
       record_message = record.msg
     try:
-      level = PlainFormatter.LEVEL_MAP[record.levelno]
-    except:
+      level = self.LEVEL_MAP[record.levelno]
+    except Exception:
       level = "?????"
     record_message = "log(%s): %s" % (level, record_message)
     record.getMessage = lambda: record_message

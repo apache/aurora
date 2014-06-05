@@ -16,9 +16,6 @@ from __future__ import print_function
 
 import json
 import optparse
-import os
-import pipes
-import subprocess
 import sys
 
 from twitter.common import app, log
@@ -26,7 +23,7 @@ from twitter.common.quantity import Amount, Data, Time
 from twitter.common.quantity.parse_simple import parse_data, parse_time
 
 from apache.aurora.client.api import AuroraClientAPI
-from apache.aurora.client.api.sla import DomainUpTimeSlaVector
+from apache.aurora.client.api.sla import JobUpTimeLimit
 from apache.aurora.client.base import (
     check_and_log_response,
     die,
@@ -395,7 +392,7 @@ def sla_list_safe_domain(cluster, percentage, duration):
         if len(tokens) != 3:
           die('Invalid line in %s:%s' % (filename, line))
         job_key = AuroraJobKey.from_path(tokens[0])
-        result[job_key] = DomainUpTimeSlaVector.JobUpTimeLimit(
+        result[job_key] = JobUpTimeLimit(
             job=job_key,
             percentage=parse_sla_percentage(tokens[1]),
             duration_secs=parse_time(tokens[2]).as_(Time.SECONDS)
@@ -488,6 +485,7 @@ def sla_probe_hosts(cluster, percentage, duration):
 
   print_results(results)
 
+
 @app.command
 @app.command_option('--sh', default=False, action="store_true",
   help="Emit a shell script instead of JSON.")
@@ -506,5 +504,5 @@ def get_cluster_config(cluster):
   if not options.sh:
     json.dump(cluster, sys.stdout)
   else:
-    for line in shellify(cluster, options.export, prefix = "AURORA_CLUSTER_"):
+    for line in shellify(cluster, options.export, prefix="AURORA_CLUSTER_"):
       print(line)

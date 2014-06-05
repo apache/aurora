@@ -52,22 +52,22 @@ class TaskPath(object):
   class UnderspecifiedPath(Exception): pass
 
   DEFAULT_CHECKPOINT_ROOT = "/var/run/thermos"
-  KNOWN_KEYS = [ 'root', 'task_id', 'state', 'process', 'run', 'log_dir' ]
+  KNOWN_KEYS = ['root', 'task_id', 'state', 'process', 'run', 'log_dir']
   LEGACY_KNOWN_KEYS = KNOWN_KEYS[:-1]
 
   DIR_TEMPLATE = {
-            'task_path': ['%(root)s',       'tasks',   '%(state)s', '%(task_id)s'],
+      'task_path': ['%(root)s', 'tasks', '%(state)s', '%(task_id)s'],
       'checkpoint_path': ['%(root)s', 'checkpoints', '%(task_id)s'],
-    'runner_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'runner'],
-   'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'coordinator.%(process)s'],
+      'runner_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'runner'],
+      'process_checkpoint': ['%(root)s', 'checkpoints', '%(task_id)s', 'coordinator.%(process)s'],
       'process_logbase': ['%(log_dir)s'],
-       'process_logdir': ['%(log_dir)s', '%(process)s', '%(run)s']
+      'process_logdir': ['%(log_dir)s', '%(process)s', '%(run)s']
   }
 
   LEGACY_DIR_TEMPLATE = DIR_TEMPLATE.copy()
   LEGACY_DIR_TEMPLATE.update(
-      process_logbase = ['%(root)s', 'logs', '%(task_id)s'],
-      process_logdir  = ['%(root)s', 'logs', '%(task_id)s', '%(process)s', '%(run)s']
+      process_logbase=['%(root)s', 'logs', '%(task_id)s'],
+      process_logdir=['%(root)s', 'logs', '%(task_id)s', '%(process)s', '%(run)s']
   )
 
   def __init__(self, **kw):
@@ -85,7 +85,7 @@ class TaskPath(object):
 
   def given(self, **kw):
     """ Perform further interpolation of the templates given the kwargs """
-    eval_dict = dict(self._data) # copy
+    eval_dict = dict(self._data)
     eval_dict.update(kw)
     tp = TaskPath(**eval_dict)
     tp._filename = self._filename
@@ -107,9 +107,9 @@ class TaskPath(object):
     path = os.path.join(*path)
     interpolated_path = path % self._data
     try:
-      _ = interpolated_path % {}
+      interpolated_path % {}
     except KeyError:
-      raise TaskPath.UnderspecifiedPath(
+      raise self.UnderspecifiedPath(
         "Tried to interpolate path with insufficient variables: %s as %s" % (
         pathname, interpolated_path))
     return interpolated_path

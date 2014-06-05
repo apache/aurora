@@ -39,18 +39,22 @@ from gen.apache.aurora.api.ttypes import (
     TaskQuery
 )
 
+InstanceState = namedtuple('InstanceState', ['instance_id', 'is_updated'])
+
+
+OperationConfigs = namedtuple('OperationConfigs', ['from_config', 'to_config'])
+
+
+InstanceConfigs = namedtuple(
+    'InstanceConfigs',
+    ['remote_config_map', 'local_config_map', 'instances_to_process']
+)
+
 
 class Updater(object):
   """Update the instances of a job in batches."""
 
   class Error(Exception): pass
-
-  InstanceState = namedtuple('InstanceState', ['instance_id', 'is_updated'])
-  OperationConfigs = namedtuple('OperationConfigs', ['from_config', 'to_config'])
-  InstanceConfigs = namedtuple(
-      'InstanceConfigs',
-      ['remote_config_map', 'local_config_map', 'instances_to_process']
-  )
 
   def __init__(self,
                config,
@@ -116,19 +120,19 @@ class Updater(object):
         self._update_config.max_total_failures
     )
 
-    instance_operation = self.OperationConfigs(
+    instance_operation = OperationConfigs(
       from_config=instance_configs.remote_config_map,
       to_config=instance_configs.local_config_map
     )
 
     remaining_instances = [
-        self.InstanceState(instance_id, is_updated=False)
+        InstanceState(instance_id, is_updated=False)
         for instance_id in instance_configs.instances_to_process
     ]
 
     log.info('Starting job update.')
     while remaining_instances and not failure_threshold.is_failed_update():
-      batch_instances = remaining_instances[0 : self._update_config.batch_size]
+      batch_instances = remaining_instances[0:self._update_config.batch_size]
       remaining_instances = list(set(remaining_instances) - set(batch_instances))
       instances_to_restart = [s.instance_id for s in batch_instances if s.is_updated]
       instances_to_update = [s.instance_id for s in batch_instances if not s.is_updated]
@@ -152,7 +156,7 @@ class Updater(object):
                  (unretryable_instances, self._update_config.max_per_instance_failures))
       retryable_instances = list(set(failed_instances) - set(unretryable_instances))
       remaining_instances += [
-          self.InstanceState(instance_id, is_updated=True) for instance_id in retryable_instances
+          InstanceState(instance_id, is_updated=True) for instance_id in retryable_instances
       ]
       remaining_instances.sort(key=lambda tup: tup.instance_id)
 
@@ -177,14 +181,14 @@ class Updater(object):
       return
 
     log.info('Reverting update for %s' % instances_to_rollback)
-    instance_operation = self.OperationConfigs(
+    instance_operation = OperationConfigs(
         from_config=instance_configs.local_config_map,
         to_config=instance_configs.remote_config_map
     )
     instances_to_rollback.sort(reverse=True)
     failed_instances = []
     while instances_to_rollback:
-      batch_instances = instances_to_rollback[0 : self._update_config.batch_size]
+      batch_instances = instances_to_rollback[0:self._update_config.batch_size]
       instances_to_rollback = list(set(instances_to_rollback) - set(batch_instances))
       instances_to_rollback.sort(reverse=True)
       instances_to_watch = self._update_instances(batch_instances, instance_operation)
@@ -236,7 +240,8 @@ class Updater(object):
       if from_config and to_config:
         diff_output = self._diff_configs(from_config, to_config)
         if diff_output:
-          log.debug('Task configuration changed for instance [%s]:\n%s' % (instance_id, diff_output))
+          log.debug('Task configuration changed for instance [%s]:\n%s' % (
+              instance_id, diff_output))
           to_kill.append(instance_id)
           to_add.append(instance_id)
       elif from_config and not to_config:
@@ -318,7 +323,7 @@ class Updater(object):
 
     Returns Response.OK if quota check was successful.
     """
-    instance_operation = self.OperationConfigs(
+    instance_operation = OperationConfigs(
       from_config=instance_configs.remote_config_map,
       to_config=instance_configs.local_config_map
     )
@@ -379,7 +384,7 @@ class Updater(object):
     # Populate local config map
     local_config_map = dict.fromkeys(job_config_instances, local_task_config)
 
-    return self.InstanceConfigs(remote_config_map, local_config_map, instances_to_process)
+    return InstanceConfigs(remote_config_map, local_config_map, instances_to_process)
 
   def _get_existing_tasks(self):
     """Loads all existing tasks from the scheduler.

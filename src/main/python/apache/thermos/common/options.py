@@ -18,6 +18,7 @@ from pystachio import Ref
 class ParseError(Exception):
   pass
 
+
 def add_port_to(option_name):
   def add_port_callback(option, opt, value, parser):
     if not getattr(parser.values, option_name, None):
@@ -33,6 +34,7 @@ def add_port_to(option_name):
       raise ParseError('Port does not appear to be an integer: %s' % port)
     getattr(parser.values, option_name)[name] = port
   return add_port_callback
+
 
 def add_binding_to(option_name):
   def add_binding_callback(option, opt, value, parser):

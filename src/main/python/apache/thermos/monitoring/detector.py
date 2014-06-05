@@ -48,7 +48,7 @@ class TaskDetector(object):
     for path in paths:
       try:
         task_state, task_id = path_re.match(path).groups()
-      except:
+      except Exception:
         continue
       if state is None or task_state == state:
         yield (task_state, task_id)
@@ -69,7 +69,7 @@ class TaskDetector(object):
     for path in paths:
       try:
         process, run = path_re.match(path).groups()
-      except:
+      except Exception:
         continue
       yield process, int(run)
 
@@ -100,6 +100,6 @@ class TaskDetector(object):
     for path in matching_paths:
       try:
         process, = path_re.match(path).groups()
-      except:
+      except Exception:
         continue
       yield path

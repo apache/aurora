@@ -19,12 +19,10 @@ import logging
 import os
 import pprint
 import subprocess
-import sys
 import time
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 
-from pystachio.config import Config
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
 
@@ -403,8 +401,10 @@ class ListJobsCommand(Verb):
       context.print_out('%s/%s/%s/%s' % (j.cluster, j.role, j.env, j.name))
     return EXIT_OK
 
+
 class OpenCommand(Verb):
   # TODO(mchucarroll): this is awkward in the noun/verb framework: where does it actually belong?
+
   @property
   def name(self):
     return 'open'
@@ -424,7 +424,6 @@ class OpenCommand(Verb):
     while len(key_parts) < 4:
       key_parts.append(None)
     (cluster, role, env, name) = key_parts
-    api = context.get_api(cluster)
     context.open_scheduler_page(cluster, role, env, name)
     return EXIT_OK
 
@@ -438,11 +437,11 @@ class RestartCommand(Verb):
     return [BATCH_OPTION, BIND_OPTION, BROWSER_OPTION, FORCE_OPTION, HEALTHCHECK_OPTION,
         JSON_READ_OPTION, WATCH_OPTION,
         CommandOption('--max-per-instance-failures', type=int, default=0,
-             help='Maximum number of restarts per instance during restart. Increments total failure '
-                 'count when this limit is exceeded.'),
+             help='Maximum number of restarts per instance during restart. Increments total '
+                  'failure count when this limit is exceeded.'),
         CommandOption('--restart-threshold', type=int, default=60,
              help='Maximum number of seconds before a shard must move into the RUNNING state '
-                 'before considered a failure.'),
+                  'before considered a failure.'),
         MAX_TOTAL_FAILURES_OPTION,
         STRICT_OPTION,
         CommandOption('--rollback-on-failure', default=True, action='store_false',
@@ -467,7 +466,7 @@ Restarts are fully controlled client-side, so aborting halts the restart."""
     job = context.options.instance_spec.jobkey
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
-    if instances != None and context.options.strict:
+    if instances is not None and context.options.strict:
       context.verify_shards_option_validity(job, instances)
     api = context.get_api(job.cluster)
     config = (context.get_job_config(job, context.options.config_file)
@@ -628,7 +627,7 @@ to preview what changes will take effect.
     job = context.options.instance_spec.jobkey
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
-    if instances != None and context.options.strict:
+    if instances is not None and context.options.strict:
       context.verify_shards_option_validity(job, instances)
     config = context.get_job_config(job, context.options.config_file)
     api = context.get_api(config.cluster())

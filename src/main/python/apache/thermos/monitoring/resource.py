@@ -27,7 +27,6 @@ disk consumption and retaining a limited (FIFO) in-memory history of this data.
 
 """
 
-import platform
 import threading
 import time
 from abc import abstractmethod
@@ -42,7 +41,6 @@ from twitter.common.lang import Interface
 from twitter.common.quantity import Amount, Time
 
 from .disk import DiskCollector
-from .monitor import TaskMonitor
 from .process import ProcessSample
 from .process_collector_psutil import ProcessTreeCollector
 
@@ -81,6 +79,7 @@ class ResourceHistory(object):
   """Simple class to contain a RingBuffer (fixed-length FIFO) history of resource samples, with the
        mapping: timestamp => (number_of_procs, ProcessSample, disk_usage_in_bytes)
   """
+
   def __init__(self, maxlen, initialize=True):
     if not maxlen >= 1:
       raise ValueError("maxlen must be greater than 0")
@@ -117,7 +116,7 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
       history of previous sample results.
   """
 
-  MAX_HISTORY = 10000 # magic number
+  MAX_HISTORY = 10000  # magic number
 
   def __init__(self, task_monitor, sandbox,
                process_collector=ProcessTreeCollector, disk_collector=DiskCollector,
@@ -128,10 +127,10 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
       task_monitor: TaskMonitor object specifying the task whose resources should be monitored
       sandbox: Directory for which to monitor disk utilisation
     """
-    self._task_monitor = task_monitor # exposes PIDs, sandbox
+    self._task_monitor = task_monitor  # exposes PIDs, sandbox
     self._task_id = task_monitor._task_id
     log.debug('Initialising resource collection for task %s' % self._task_id)
-    self._process_collectors = dict() # ProcessStatus => ProcessTreeCollector
+    self._process_collectors = dict()  # ProcessStatus => ProcessTreeCollector
     # TODO(jon): sandbox is also available through task_monitor, but typically the first checkpoint
     # isn't written (and hence the header is not available) by the time we initialise here
     self._sandbox = sandbox
@@ -203,7 +202,7 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
           log.debug('Adding process "%s" (pid %s) to resource monitoring' %
                    (process.process, process.pid))
           self._process_collectors[process] = self._process_collector_factory(process.pid)
-        for process, collector in self._process_collectors.iteritems():
+        for process, collector in self._process_collectors.items():
           log.debug('Collecting sample for process "%s" (pid %s) and children' %
                    (process.process, process.pid))
           collector.sample()

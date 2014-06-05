@@ -30,14 +30,14 @@ from gen.apache.aurora.api.ttypes import CronCollisionPolicy, Identity, JobKey
 from gen.apache.aurora.test.constants import INVALID_IDENTIFIERS, VALID_IDENTIFIERS
 
 HELLO_WORLD = Job(
-  name = 'hello_world',
-  role = 'john_doe',
-  environment = 'staging66',
-  cluster = 'smf1-test',
-  task = Task(
-    name = 'main',
-    processes = [Process(name = 'hello_world', cmdline = 'echo {{mesos.instance}}')],
-    resources = Resources(cpu = 0.1, ram = 64 * 1048576, disk = 64 * 1048576),
+  name='hello_world',
+  role='john_doe',
+  environment='staging66',
+  cluster='smf1-test',
+  task=Task(
+    name='main',
+    processes=[Process(name='hello_world', cmdline='echo {{mesos.instance}}')],
+    resources=Resources(cpu=0.1, ram=64 * 1048576, disk=64 * 1048576),
   )
 )
 
@@ -51,14 +51,14 @@ def test_simple_config():
     environment=HELLO_WORLD.environment().get(),
     name=HELLO_WORLD.name().get())
   assert job.owner == Identity(role=HELLO_WORLD.role().get(), user=getpass.getuser())
-  assert job.cronSchedule == None
+  assert job.cronSchedule is None
   assert tti.jobName == 'hello_world'
-  assert tti.isService == False
+  assert tti.isService is False
   assert tti.numCpus == 0.1
   assert tti.ramMb == 64
   assert tti.diskMb == 64
   assert tti.requestedPorts == set()
-  assert tti.production == False
+  assert tti.production is False
   assert tti.priority == 0
   assert tti.maxTaskFailures == 1
   assert tti.constraints == set()
@@ -68,23 +68,23 @@ def test_simple_config():
 
 def test_config_with_options():
   hwc = HELLO_WORLD(
-    production = True,
-    priority = 200,
-    service = True,
-    cron_policy = 'RUN_OVERLAP',
-    constraints = {
-      'dedicated': 'your_mom',
+    production=True,
+    priority=200,
+    service=True,
+    cron_policy='RUN_OVERLAP',
+    constraints={
+      'dedicated': 'root',
       'cpu': 'x86_64'
     },
-    environment = 'prod'
+    environment='prod'
   )
   job = convert_pystachio_to_thrift(hwc)
   assert job.instanceCount == 1
   tti = job.taskConfig
 
-  assert tti.production == True
+  assert tti.production
   assert tti.priority == 200
-  assert tti.isService == True
+  assert tti.isService
   assert job.cronCollisionPolicy == CronCollisionPolicy.RUN_OVERLAP
   assert len(tti.constraints) == 2
   assert tti.environment == 'prod'
@@ -93,10 +93,10 @@ def test_config_with_options():
 
 def test_config_with_ports():
   hwc = HELLO_WORLD(
-    task = HELLO_WORLD.task()(
-      processes = [
-        Process(name = 'hello_world',
-                cmdline = 'echo {{thermos.ports[http]}} {{thermos.ports[admin]}}')
+    task=HELLO_WORLD.task()(
+      processes=[
+        Process(name='hello_world',
+                cmdline='echo {{thermos.ports[http]}} {{thermos.ports[admin]}}')
       ]
     )
   )
@@ -112,23 +112,23 @@ def test_config_with_bad_resources():
   convert_pystachio_to_thrift(HELLO_WORLD)
 
   good_resources = [
-    Resources(cpu = 1.0, ram = 1 * MB, disk = 1 * MB)
+    Resources(cpu=1.0, ram=1 * MB, disk=1 * MB)
   ]
 
   bad_resources = [
-    Resources(cpu = 0, ram = 1 * MB, disk = 1 * MB),
-    Resources(cpu = 1, ram = 0 * MB, disk = 1 * MB),
-    Resources(cpu = 1, ram = 1 * MB, disk = 0 * MB),
-    Resources(cpu = 1, ram = 1 * MB - 1, disk = 1 * MB),
-    Resources(cpu = 1, ram = 1 * MB, disk = 1 * MB - 1)
+    Resources(cpu=0, ram=1 * MB, disk=1 * MB),
+    Resources(cpu=1, ram=0 * MB, disk=1 * MB),
+    Resources(cpu=1, ram=1 * MB, disk=0 * MB),
+    Resources(cpu=1, ram=1 * MB - 1, disk=1 * MB),
+    Resources(cpu=1, ram=1 * MB, disk=1 * MB - 1)
   ]
 
   for resource in good_resources:
-    convert_pystachio_to_thrift(HELLO_WORLD(task = hwtask(resources = resource)))
+    convert_pystachio_to_thrift(HELLO_WORLD(task=hwtask(resources=resource)))
 
   for resource in bad_resources:
     with pytest.raises(ValueError):
-      convert_pystachio_to_thrift(HELLO_WORLD(task = hwtask(resources = resource)))
+      convert_pystachio_to_thrift(HELLO_WORLD(task=hwtask(resources=resource)))
 
 
 def test_config_with_task_links():
@@ -141,7 +141,7 @@ def test_config_with_task_links():
     'foo': 'http://%host%:%port:foo%',
     'bar': 'http://%host%:%port:bar%/%shard_id%'
   }
-  aurora_config = AuroraConfig(HELLO_WORLD(task_links = tl(unresolved_tl)))
+  aurora_config = AuroraConfig(HELLO_WORLD(task_links=tl(unresolved_tl)))
   assert aurora_config.task_links() == tl(resolved_tl)
   assert aurora_config.job().taskConfig.taskLinks == frozendict(resolved_tl)
 
@@ -154,12 +154,12 @@ def test_config_with_task_links():
 
 def test_unbound_references():
   def job_command(cmdline):
-    return AuroraConfig(HELLO_WORLD(task = SimpleTask('hello_world', cmdline))).raw()
+    return AuroraConfig(HELLO_WORLD(task=SimpleTask('hello_world', cmdline))).raw()
 
   # bindingless and bad => good bindings should work
   convert_pystachio_to_thrift(job_command('echo hello world'))
   convert_pystachio_to_thrift(job_command('echo {{mesos.user}}')
-      .bind(mesos = {'user': '{{mesos.role}}'}))
+      .bind(mesos={'user': '{{mesos.role}}'}))
 
   # unbound
   with pytest.raises(InvalidConfig):

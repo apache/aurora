@@ -49,8 +49,8 @@ class Planner(object):
       process_set -= given
     return dependencies
 
-  @staticmethod
-  def satisfiable(processes, dependencies):
+  @classmethod
+  def satisfiable(cls, processes, dependencies):
     """
       Given a set of processes and a dependency map, determine if this is a consistent
       schedule without cycles.
@@ -61,27 +61,27 @@ class Planner(object):
     scheduling = True
     while scheduling:
       scheduling = False
-      runnables = Planner.filter_runnable(processes, dependencies)
+      runnables = cls.filter_runnable(processes, dependencies)
       if runnables:
         scheduling = True
         processes -= runnables
-      dependencies = Planner.filter_dependencies(dependencies, given=runnables)
+      dependencies = cls.filter_dependencies(dependencies, given=runnables)
     return len(processes) == 0
 
   def __init__(self, processes, dependencies):
     self._processes = set(processes)
     self._dependencies = dict((process, set(dependencies.get(process, [])))
         for process in self._processes)
-    if not Planner.satisfiable(self._processes, self._dependencies):
-      raise Planner.InvalidSchedule("Cycles detected in the task schedule!")
+    if not self.satisfiable(self._processes, self._dependencies):
+      raise self.InvalidSchedule("Cycles detected in the task schedule!")
     self._running = set()
     self._finished = set()
     self._failed = set()
 
   @property
   def runnable(self):
-    return Planner.filter_runnable(self._processes - self._running - self._finished - self._failed,
-      Planner.filter_dependencies(self._dependencies, given=self._finished))
+    return self.filter_runnable(self._processes - self._running - self._finished - self._failed,
+      self.filter_dependencies(self._dependencies, given=self._finished))
 
   @property
   def processes(self):
@@ -129,6 +129,7 @@ class Planner(object):
 
 TaskAttributes = namedtuple('TaskAttributes', 'min_duration is_daemon max_failures is_ephemeral')
 
+
 class TaskPlanner(object):
   """
     A planner for the processes part of a Thermos task, taking into account ephemeral and daemon
@@ -155,12 +156,12 @@ class TaskPlanner(object):
                                       | failed |
                                       `--------'
   """
-  InvalidSchedule = Planner.InvalidSchedule
+  InvalidSchedule = Planner.InvalidSchedule  # noqa
   INFINITY = sys.float_info.max
   TOTAL_RUN_LIMIT = sys.maxsize
 
-  @staticmethod
-  def extract_dependencies(task, process_filter=None):
+  @classmethod
+  def extract_dependencies(cls, task, process_filter=None):
     """
       Construct a set of processes and the process dependencies from a Thermos Task.
     """
@@ -175,16 +176,16 @@ class TaskPlanner(object):
         process_name_set = set(process_names)
         # either all process_names must be in processes or none should be
         if process_name_set.issubset(processes) == process_name_set.isdisjoint(processes):
-          raise TaskPlanner.InvalidSchedule('Invalid process dependencies!')
+          raise cls.InvalidSchedule('Invalid process dependencies!')
         if not process_name_set.issubset(processes):
           continue
         for k in range(1, len(process_names)):
-          pnk, pnk1 = process_names[k], process_names[k-1]
+          pnk, pnk1 = process_names[k], process_names[k - 1]
           if process_map[pnk1].daemon().get():
-            raise TaskPlanner.InvalidSchedule(
+            raise cls.InvalidSchedule(
               'Process %s may not depend upon daemon process %s' % (pnk, pnk1))
           if not process_map[pnk].ephemeral().get() and process_map[pnk1].ephemeral().get():
-            raise TaskPlanner.InvalidSchedule(
+            raise cls.InvalidSchedule(
               'Non-ephemeral process %s may not depend upon ephemeral process %s' % (pnk, pnk1))
           dependencies[pnk].add(pnk1)
     return (processes, dependencies)
@@ -195,7 +196,7 @@ class TaskPlanner(object):
         'TaskPlanner must be given callable process filter.')
     self._planner = Planner(*self.extract_dependencies(task, self._filter))
     self._clock = clock
-    self._last_terminal = {} # process => timestamp of last terminal state
+    self._last_terminal = {}  # process => timestamp of last terminal state
     self._failures = defaultdict(int)
     self._successes = defaultdict(int)
     self._attributes = {}

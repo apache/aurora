@@ -29,24 +29,39 @@ from apache.aurora.common.cluster import Cluster
 import gen.apache.aurora.api.AuroraAdmin as AuroraAdmin
 import gen.apache.aurora.api.AuroraSchedulerManager as AuroraSchedulerManager
 from gen.apache.aurora.api.constants import CURRENT_API_VERSION, DEFAULT_ENVIRONMENT
-from gen.apache.aurora.api.ttypes import *
+from gen.apache.aurora.api.ttypes import (
+    Hosts,
+    JobConfiguration,
+    JobKey,
+    Lock,
+    LockValidation,
+    ResourceAggregate,
+    Response,
+    ResponseCode,
+    Result,
+    RewriteConfigsRequest,
+    ScheduleStatus,
+    SessionKey,
+    TaskQuery
+)
 
 ROLE = 'foorole'
 JOB_NAME = 'barjobname'
 JOB_KEY = JobKey(role=ROLE, environment=DEFAULT_ENVIRONMENT, name=JOB_NAME)
 
 
-def test_testCoverage():
+def test_coverage():
   """Make sure a new thrift RPC doesn't get added without minimal test coverage."""
   for name, klass in inspect.getmembers(AuroraAdmin) + inspect.getmembers(AuroraSchedulerManager):
     if name.endswith('_args'):
       rpc_name = name[:-len('_args')]
       assert hasattr(TestSchedulerProxyAdminInjection, 'test_%s' % rpc_name), (
-              'No test defined for RPC %s' % rpc_name)
+          'No test defined for RPC %s' % rpc_name)
 
 
 class TestSchedulerProxy(scheduler_client.SchedulerProxy):
   """In testing we shouldn't use the real SSHAgentAuthenticator."""
+
   def session_key(self):
     return self.create_session('SOME_USER')
 
@@ -70,7 +85,7 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.mock_scheduler_client.get_thrift_client().AndReturn(self.mock_thrift_client)
 
     version_resp = Response(responseCode=ResponseCode.OK)
-    version_resp.result = Result(getVersionResult = CURRENT_API_VERSION)
+    version_resp.result = Result(getVersionResult=CURRENT_API_VERSION)
 
     self.mock_thrift_client.getVersion().AndReturn(version_resp)
 
@@ -322,15 +337,15 @@ class TestZookeeperSchedulerClient(unittest.TestCase):
 
       return mock_zk, [ServiceInstance.unpack(service_json)]
 
-    class TestZookeeperSchedulerClient(scheduler_client.ZookeeperSchedulerClient):
+    class ZookeeperSchedulerClientTestImpl(scheduler_client.ZookeeperSchedulerClient):
       SERVERSET_TIMEOUT = Amount(10, Time.MILLISECONDS)
 
-    original_method = TestZookeeperSchedulerClient.get_scheduler_serverset
+    original_method = ZookeeperSchedulerClientTestImpl.get_scheduler_serverset
 
     try:
-      TestZookeeperSchedulerClient.get_scheduler_serverset = mock_get_serverset
+      ZookeeperSchedulerClientTestImpl.get_scheduler_serverset = mock_get_serverset
 
-      zk_scheduler_client = TestZookeeperSchedulerClient(Cluster(proxy_url=None))
+      zk_scheduler_client = ZookeeperSchedulerClientTestImpl(Cluster(proxy_url=None))
       self.mox.StubOutWithMock(zk_scheduler_client, '_connect_scheduler')
       mock_zk.stop()
       zk_scheduler_client._connect_scheduler(host, port)
@@ -339,7 +354,8 @@ class TestZookeeperSchedulerClient(unittest.TestCase):
 
       assert zk_scheduler_client.url == 'http://%s:%d' % (host, port)
     finally:
-      TestZookeeperSchedulerClient.get_scheduler_serverset = original_method
+      ZookeeperSchedulerClientTestImpl.get_scheduler_serverset = original_method
+
 
 class TestSchedulerClient(unittest.TestCase):
   @mock.patch('thrift.transport.THttpClient.THttpClient', spec=THttpClient.THttpClient)
@@ -348,4 +364,5 @@ class TestSchedulerClient(unittest.TestCase):
     mock_time = mock.Mock(spec=time)
     scheduler_client.SchedulerClient._connect_scheduler('scheduler.example.com', 1337, mock_time)
     assert MockTHttpClient.return_value.open.call_count is 2
-    mock_time.sleep.assert_called_once_with(scheduler_client.SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
+    mock_time.sleep.assert_called_once_with(
+        scheduler_client.SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))

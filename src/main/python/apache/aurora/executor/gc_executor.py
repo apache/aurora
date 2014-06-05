@@ -41,7 +41,7 @@ from apache.thermos.core.inspector import CheckpointInspector
 from apache.thermos.monitoring.detector import TaskDetector
 from apache.thermos.monitoring.garbage import TaskGarbageCollector
 
-from .common.sandbox import DirectorySandbox, SandboxInterface
+from .common.sandbox import DirectorySandbox
 from .executor_base import ExecutorBase
 from .executor_detector import ExecutorDetector
 
@@ -109,15 +109,17 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
     ExceptionalThread.__init__(self)
     self.daemon = True
     self._stop_event = threading.Event()
-    self._gc_task_queue = OrderedDict() # mapping of task_id => (TaskInfo, AdjustRetainedTasks), in
-                                        # the order in which they were received via a launchTask.
-    self._driver = None   # cache the ExecutorDriver provided by the slave, so we can use it
-                          # out of band from slave-initiated callbacks. This should be supplied by
-                          # ExecutorBase.registered() when the executor first registers with
-                          # the slave.
-    self._slave_id = None # cache the slave ID provided by the slave
+    # mapping of task_id => (TaskInfo, AdjustRetainedTasks), in the order in
+    # which they were received via a launchTask.
+    self._gc_task_queue = OrderedDict()
+    # cache the ExecutorDriver provided by the slave, so we can use it out
+    # of band from slave-initiated callbacks.  This should be supplied by
+    # ExecutorBase.registered() when the executor first registers with the
+    # slave.
+    self._driver = None
+    self._slave_id = None  # cache the slave ID provided by the slave
     self._task_id = None  # the task_id currently being executed by the ThermosGCExecutor, if any
-    self._start_time = None # the start time of a task currently being executed, if any
+    self._start_time = None  # the start time of a task currently being executed, if any
     self._detector = executor_detector()
     self._collector = task_garbage_collector(root=checkpoint_root)
     self._clock = clock
@@ -465,7 +467,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
         _, (task, retain_tasks, retain_start) = self._gc_task_queue.popitem(0)
         last_gc_run = retain_start
         self._run_gc(task, retain_tasks, retain_start)
-      except KeyError: # no enqueued GC tasks
+      except KeyError:  # no enqueued GC tasks
         pass
       if self._driver is not None:
         self.clean_orphans(self._driver)
@@ -475,7 +477,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
     if self._driver is not None:
       try:
         prev_task_id, _ = self._gc_task_queue.popitem(0)
-      except KeyError: # no enqueued GC tasks
+      except KeyError:  # no enqueued GC tasks
         pass
       else:
         self.send_update(self._driver, prev_task_id, mesos_pb.TASK_FINISHED,
@@ -509,7 +511,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
       return
     try:
       prev_task_id, _ = self._gc_task_queue.popitem(0)
-    except KeyError: # no enqueued GC tasks - reset counter
+    except KeyError:  # no enqueued GC tasks - reset counter
       self._dropped_tasks.write(0)
     else:
       self.log('=> Dropping previously queued GC with task_id %s' % prev_task_id)

@@ -34,13 +34,16 @@ After checking on the above, you may release the update lock on the job by
 invoking cancel_update.
 """
 
+
 def die(msg):
   log.fatal(msg)
   sys.exit(1)
 
+
 def log_response(resp):
   log.info('Response from scheduler: %s (message: %s)'
       % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.messageDEPRECATED))
+
 
 def check_and_log_response(resp):
   log_response(resp)
@@ -48,6 +51,12 @@ def check_and_log_response(resp):
     if resp.responseCode == ResponseCode.LOCK_ERROR:
       log.info(LOCKED_WARNING)
     sys.exit(1)
+
+
+def check_and_log_locked_response(resp):
+  if resp.responseCode == ResponseCode.LOCK_ERROR:
+    log.info(LOCKED_WARNING)
+
 
 def deprecation_warning(text):
   log.warning('')
@@ -59,9 +68,9 @@ def deprecation_warning(text):
   log.warning('')
 
 
-class requires(object):
-  @staticmethod
-  def wrap_function(fn, fnargs, comparator):
+class requires(object):  # noqa
+  @classmethod
+  def wrap_function(cls, fn, fnargs, comparator):
     @functools.wraps(fn)
     def wrapped_function(args):
       if not comparator(args, fnargs):
@@ -72,20 +81,20 @@ class requires(object):
       return fn(*args)
     return wrapped_function
 
-  @staticmethod
-  def exactly(*args):
+  @classmethod
+  def exactly(cls, *args):
     def wrap(fn):
-      return requires.wrap_function(fn, args, (lambda want, got: len(want) == len(got)))
+      return cls.wrap_function(fn, args, (lambda want, got: len(want) == len(got)))
     return wrap
 
-  @staticmethod
-  def at_least(*args):
+  @classmethod
+  def at_least(cls, *args):
     def wrap(fn):
-      return requires.wrap_function(fn, args, (lambda want, got: len(want) >= len(got)))
+      return cls.wrap_function(fn, args, (lambda want, got: len(want) >= len(got)))
     return wrap
 
-  @staticmethod
-  def nothing(fn):
+  @classmethod
+  def nothing(cls, fn):
     @functools.wraps(fn)
     def real_fn(line):
       return fn(*line)
@@ -109,16 +118,20 @@ HOSTS_OPTION = optparse.Option(
 def group_by_host(hostname):
   return hostname
 
+
 DEFAULT_GROUPING = 'by_host'
 GROUPING_FUNCTIONS = {
     'by_host': group_by_host,
 }
 
+
 def add_grouping(name, function):
   GROUPING_FUNCTIONS[name] = function
 
+
 def remove_grouping(name):
   GROUPING_FUNCTIONS.pop(name)
+
 
 def get_grouping_or_die(grouping_function):
   try:
@@ -126,6 +139,7 @@ def get_grouping_or_die(grouping_function):
   except KeyError:
     die('Unknown grouping function %s. Must be one of: %s'
         % (grouping_function, GROUPING_FUNCTIONS.keys()))
+
 
 def group_hosts(hostnames, grouping_function=DEFAULT_GROUPING):
   grouping_function = get_grouping_or_die(grouping_function)

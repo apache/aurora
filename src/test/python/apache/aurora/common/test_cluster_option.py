@@ -20,8 +20,8 @@ from apache.aurora.common.cluster_option import ClusterOption
 from apache.aurora.common.clusters import Clusters
 
 CLUSTER_LIST = Clusters((
-  Cluster(name = 'smf1'),
-  Cluster(name = 'smf1-test'),
+  Cluster(name='smf1'),
+  Cluster(name='smf1-test'),
 ))
 
 

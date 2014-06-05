@@ -14,7 +14,6 @@
 
 import contextlib
 import functools
-import unittest
 
 from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
@@ -25,9 +24,6 @@ from apache.aurora.client.api.quota_check import QuotaCheck
 from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.commands.core import update
 from apache.aurora.client.commands.util import AuroraClientCommandTest
-from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
-from apache.aurora.common.cluster import Cluster
-from apache.aurora.common.clusters import Clusters
 from apache.aurora.config import AuroraConfig
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES
@@ -204,7 +200,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
   @classmethod
   def setup_quota_check(cls):
     mock_quota_check = Mock(spec=QuotaCheck)
-    mock_quota_check.validate_quota_from_requested.return_value = cls.create_simple_success_response()
+    mock_quota_check.validate_quota_from_requested.return_value = (
+        cls.create_simple_success_response())
     return mock_quota_check
 
   @classmethod

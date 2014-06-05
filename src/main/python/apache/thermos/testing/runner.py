@@ -24,14 +24,13 @@ import tempfile
 import time
 
 from thrift.TSerialization import deserialize as thrift_deserialize
-from twitter.common import log
 from twitter.common.contextutil import environment_as, temporary_file
 
 from apache.thermos.common.ckpt import CheckpointDispatcher
 from apache.thermos.common.path import TaskPath
 from apache.thermos.config.loader import ThermosTaskWrapper
 
-from gen.apache.thermos.ttypes import RunnerCkpt, RunnerState, TaskState
+from gen.apache.thermos.ttypes import RunnerState
 
 
 class Runner(object):
@@ -98,11 +97,11 @@ with open('%(state_filename)s', 'w') as fp:
 
     self.state_filename = tempfile.mktemp()
     self.tempdir = tempfile.mkdtemp()
-    self.task_id = '%s-runner-base' % int(time.time()*1000000)
+    self.task_id = '%s-runner-base' % int(time.time() * 1000000)
     self.sandbox = os.path.join(self.tempdir, 'sandbox')
     self.portmap = portmap
     self.cleaned = False
-    self.pathspec = TaskPath(root = self.tempdir, task_id = self.task_id)
+    self.pathspec = TaskPath(root=self.tempdir, task_id=self.task_id)
     self.script_filename = None
     self.success_rate = success_rate
     self.random_seed = random_seed
@@ -150,7 +149,8 @@ with open('%(state_filename)s', 'w') as fp:
     rc = self.po.returncode
     if rc != 0:
       if os.path.exists(self.job_filename):
-        config = open(self.job_filename).read()
+        with open(self.job_filename) as fp:
+          config = fp.read()
       else:
         config = 'Nonexistent!'
       if 'THERMOS_DEBUG' in os.environ:
@@ -167,8 +167,9 @@ with open('%(state_filename)s', 'w') as fp:
 
     try:
       self.reconstructed_state = CheckpointDispatcher.from_file(
-        self.pathspec.getpath('runner_checkpoint'))
-    except:
+          self.pathspec.getpath('runner_checkpoint'))
+    except Exception as e:
+      print('Failed to replay checkpoint: %s' % e, file=sys.stderr)
       self.reconstructed_state = None
     self.initialized = True
     return rc
@@ -178,7 +179,8 @@ with open('%(state_filename)s', 'w') as fp:
       if hasattr(self, 'po'):
         try:
           self.po.kill()
-        except:
+        except Exception as e:
+          print('Failed to kill runner: %s' % e, file=sys.stderr)
           pass
       os.unlink(self.job_filename)
       os.unlink(self.script_filename)

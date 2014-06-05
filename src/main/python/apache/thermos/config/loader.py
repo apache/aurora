@@ -12,7 +12,6 @@
 # limitations under the License.
 #
 
-import copy
 import json
 import os
 import re
@@ -21,7 +20,6 @@ import textwrap
 from pystachio import Ref
 from pystachio.config import Config
 from twitter.common.dirutil import safe_open
-from twitter.common.lang import Compatibility
 
 from apache.thermos.common.planner import TaskPlanner
 from apache.thermos.config.schema import Task
@@ -30,8 +28,8 @@ from apache.thermos.config.schema import Task
 class PortExtractor(object):
   class InvalidPorts(Exception): pass
 
-  @staticmethod
-  def extract(obj):
+  @classmethod
+  def extract(cls, obj):
     port_scope = Ref.from_address('thermos.ports')
     _, uninterp = obj.interpolate()
     ports = []
@@ -39,7 +37,7 @@ class PortExtractor(object):
       subscope = port_scope.scoped_to(ref)
       if subscope is not None:
         if not subscope.is_index():
-          raise PortExtractor.InvalidPorts(
+          raise cls.InvalidPorts(
             'Bad port specification "%s" (should be of form "thermos.ports[name]"' % ref.address())
         ports.append(subscope.action().value)
     return ports
@@ -59,10 +57,10 @@ class ThermosProcessWrapper(object):
     except PortExtractor.InvalidPorts:
       raise self.InvalidProcess('Process has invalid ports scoping!')
 
-  @staticmethod
-  def assert_valid_process_name(name):
-    if not ThermosProcessWrapper.VALID_PROCESS_NAME_RE.match(name):
-      raise ThermosProcessWrapper.InvalidProcess('Invalid process name: %s' % name)
+  @classmethod
+  def assert_valid_process_name(cls, name):
+    if not cls.VALID_PROCESS_NAME_RE.match(name):
+      raise cls.InvalidProcess('Invalid process name: %s' % name)
 
 
 class ThermosTaskWrapper(object):
@@ -72,7 +70,7 @@ class ThermosTaskWrapper(object):
     if bindings:
       task = task.bind(*bindings)
     if not task.check().ok() and strict:
-      raise ThermosTaskWrapper.InvalidTask(task.check().message())
+      raise self.InvalidTask(task.check().message())
     self._task = task
 
   @property
@@ -98,13 +96,13 @@ class ThermosTaskWrapper(object):
     with safe_open(filename, 'w') as fp:
       json.dump(ti.get(), fp)
 
-  @staticmethod
-  def from_file(filename, **kw):
+  @classmethod
+  def from_file(cls, filename, **kw):
     try:
       with safe_open(filename) as fp:
         task = Task.json_load(fp)
-      return ThermosTaskWrapper(task, **kw)
-    except Exception as e:
+      return cls(task, **kw)
+    except Exception:
       return None
 
 
@@ -121,8 +119,8 @@ class ThermosTaskValidator(object):
   @classmethod
   def assert_valid_plan(cls, task):
     try:
-      TaskPlanner(task, process_filter=lambda proc: proc.final().get() == False)
-      TaskPlanner(task, process_filter=lambda proc: proc.final().get() == True)
+      TaskPlanner(task, process_filter=lambda proc: proc.final().get() is False)
+      TaskPlanner(task, process_filter=lambda proc: proc.final().get() is True)
     except TaskPlanner.InvalidSchedule as e:
       raise cls.InvalidTaskError('Task has invalid plan: %s' % e)
 

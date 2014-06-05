@@ -47,8 +47,8 @@ def generate_full_usage():
   return 'Available commands:\n\n' + '\n'.join(usage)
 
 
-@app.command
-def help(args):
+@app.command(name='help')
+def help_command(args):
   """usage: help [subcommand]
 
   Prints help for using the aurora client, or one of its specific subcommands.

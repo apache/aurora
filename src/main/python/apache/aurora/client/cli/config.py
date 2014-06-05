@@ -19,17 +19,9 @@ operate in on configuration files.
 
 from __future__ import print_function
 
-from apache.aurora.client.cli import (
-    EXIT_COMMAND_FAILURE,
-    EXIT_OK,
-    Noun,
-    Verb,
-)
+from apache.aurora.client.cli import EXIT_COMMAND_FAILURE, EXIT_OK, Noun, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
-from apache.aurora.client.cli.options import (
-    BIND_OPTION,
-    CONFIG_ARGUMENT,
-)
+from apache.aurora.client.cli.options import BIND_OPTION, CONFIG_ARGUMENT
 from apache.aurora.client.config import AuroraConfig
 from apache.aurora.config.loader import AuroraConfigLoader
 

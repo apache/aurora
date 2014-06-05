@@ -28,7 +28,7 @@ Currently, there are two threads available:
 import os
 import threading
 import time
-from Queue import Empty, Queue
+from Queue import Queue
 
 from twitter.common import log
 from twitter.common.dirutil import du, safe_bsize
@@ -47,6 +47,7 @@ from watchdog.observers import Observer as WatchdogObserver
 
 class DiskCollectorThread(ExceptionalThread):
   """ Thread to calculate aggregate disk usage under a given path using a simple algorithm """
+
   def __init__(self, path):
     self.path = path
     self.value = None
@@ -66,6 +67,7 @@ class DiskCollectorThread(ExceptionalThread):
 
 class DiskCollector(Lockable):
   """ Spawn a background thread to sample disk usage """
+
   def __init__(self, root):
     self._root = root
     self._thread = None
@@ -169,11 +171,12 @@ class InotifyDiskCollectorThread(ExceptionalThread, FileSystemEventHandler):
 
   @property
   def value(self):
-    return sum(self._files.itervalues())
+    return sum(self._files.values())
 
 
 class InotifyDiskCollector(object):
   """ Spawn a background thread to sample disk usage """
+
   def __init__(self, root):
     self._root = root
     self._thread = InotifyDiskCollectorThread(self._root)

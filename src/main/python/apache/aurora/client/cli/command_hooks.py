@@ -137,7 +137,6 @@ class GlobalCommandHookRegistry(object):
     except ValueError as e:
       logging.error("Client could not decode hook skip rules: %s" % e)
 
-
   @classmethod
   def load_hooks_file(cls, path):
     """Load a file containing hooks. If there are any errors compiling or executing the file,
@@ -177,7 +176,7 @@ class GlobalCommandHookRegistry(object):
       # it's an HG root if it contains a directory named ".hg"
       return any(os.path.isdir(os.path.join(dir, rootname)) for rootname in [".git", ".hg"])
 
-    filepath =  os.path.join(dir, cls.HOOKS_FILE_NAME)
+    filepath = os.path.join(dir, cls.HOOKS_FILE_NAME)
     if os.path.exists(filepath):
       return filepath
     elif is_repos_root(dir):
@@ -282,11 +281,12 @@ class GlobalCommandHookRegistry(object):
       context.print_err("Error executing command hook %s: %s; aborting" % hook.name, c.msg)
       return c.code
 
+
 class CommandHook(object):
   """A hook which contains code that should be run before certain commands."""
   class Error(Exception):
     def __init__(self, code, msg):
-      super(CommandHook.Error, self).__init__(msg)
+      super(CommandHook.Error, self).__init__(msg)  # noqa:T800
       self.code = code
       self.msg = msg
 

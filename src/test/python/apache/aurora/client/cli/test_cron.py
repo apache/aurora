@@ -15,7 +15,9 @@
 #
 
 import contextlib
+
 from mock import Mock, patch
+from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import EXIT_COMMAND_FAILURE, EXIT_INVALID_CONFIGURATION, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
@@ -23,9 +25,6 @@ from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCom
 from apache.aurora.config import AuroraConfig
 
 from gen.apache.aurora.api.ttypes import JobKey
-
-
-from twitter.common.contextutil import temporary_file
 
 
 class TestCronNoun(AuroraClientCommandTest):

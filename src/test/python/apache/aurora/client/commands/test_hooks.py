@@ -13,11 +13,8 @@
 #
 
 import contextlib
-import unittest
 
 from mock import Mock, patch
-from pystachio.config import Config
-from twitter.common import app
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.commands.core import create
@@ -28,9 +25,6 @@ from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
-    Response,
-    ResponseCode,
-    Result,
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
@@ -135,11 +129,10 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value = mock_scheduler_proxy),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('twitter.common.app.get_options', return_value=mock_options)):
 
-      mock_query = self.create_mock_query()
-      mock_scheduler_proxy.createJob.return_value=self.get_createjob_response()
+      mock_scheduler_proxy.createJob.return_value = self.get_createjob_response()
 
       mock_scheduler_proxy.getTasksStatus.side_effect = [
         self.create_mock_status_query_result(ScheduleStatus.INIT),
@@ -175,11 +168,10 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value = mock_scheduler_proxy),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('twitter.common.app.get_options', return_value=mock_options)):
 
-      mock_query = self.create_mock_query()
-      mock_scheduler_proxy.createJob.return_value=self.get_createjob_response()
+      mock_scheduler_proxy.createJob.return_value = self.get_createjob_response()
 
       mock_scheduler_proxy.getTasksStatus.side_effect = [
         self.create_mock_status_query_result(ScheduleStatus.INIT),
@@ -200,7 +192,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       assert mock_scheduler_proxy.createJob.call_count == 0
       assert len(hook.created_jobs) == 1
 
-
   def test_block_hooks(self):
     """Run a test of the "create" command against a mocked API;
     verifies that a required hook runs, even though the config doesn't mention it.
@@ -213,19 +204,16 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     GlobalHookRegistry.register_global_hook(hook)
     mock_options.disable_all_hooks_reason = "Because I said so."
 
-
     # create first calls get_job_config, which calls get_config. As long as we've got the options
     # set up correctly, this should work.
-
     # Next, create gets an API object via make_client. We need to replace that with a mock API.
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value = mock_scheduler_proxy),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('twitter.common.app.get_options', return_value=mock_options)):
 
-      mock_query = self.create_mock_query()
-      mock_scheduler_proxy.createJob.return_value=self.get_createjob_response()
+      mock_scheduler_proxy.createJob.return_value = self.get_createjob_response()
 
       mock_scheduler_proxy.getTasksStatus.side_effect = [
         self.create_mock_status_query_result(ScheduleStatus.INIT),

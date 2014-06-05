@@ -15,16 +15,14 @@
 from __future__ import print_function
 
 import logging
-import sys
 from collections import namedtuple
 from fnmatch import fnmatch
-
-from twitter.common import log
 
 from apache.aurora.client.base import synthesize_url
 from apache.aurora.client.cli import (
     Context,
     EXIT_API_ERROR,
+    EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER
 )

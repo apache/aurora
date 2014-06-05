@@ -12,7 +12,6 @@
 # limitations under the License.
 #
 
-import optparse
 import os
 import subprocess
 

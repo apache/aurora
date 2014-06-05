@@ -25,6 +25,7 @@ class StaticAssets(object):
   """
     Serve the /assets directory.
   """
+
   def __init__(self):
     self._assets = {}
     self._detect_assets()

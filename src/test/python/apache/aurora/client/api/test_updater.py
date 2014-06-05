@@ -38,7 +38,6 @@ from gen.apache.aurora.api.ttypes import (
     JobConfiguration,
     JobKey,
     LimitConstraint,
-    Lock,
     LockKey,
     LockValidation,
     Metadata,
@@ -62,6 +61,7 @@ if 'UPDATER_DEBUG' in environ:
   LogOptions.set_disk_log_level('NONE')
   LogOptions.set_stderr_log_level('DEBUG')
   log.init('test_updater')
+
 
 class FakeConfig(object):
   def __init__(self, role, name, env, update_config):
@@ -104,12 +104,12 @@ class FakeConfig(object):
 
 class UpdaterTest(TestCase):
   UPDATE_CONFIG = {
-    'batch_size':                 3,
-    'restart_threshold':          50,
-    'watch_secs':                 50,
-    'max_per_shard_failures':     0,
-    'max_total_failures':         0,
-    'rollback_on_failure':        True,
+    'batch_size': 3,
+    'restart_threshold': 50,
+    'watch_secs': 50,
+    'max_per_shard_failures': 0,
+    'max_total_failures': 0,
+    'rollback_on_failure': True,
   }
 
   def setUp(self):
@@ -458,7 +458,6 @@ class UpdaterTest(TestCase):
 
     self.update_and_expect_ok(instances=[2, 3, 4])
     self.verify_mocks()
-
 
   def test_patch_hole_with_instance_option(self):
     """Patching an instance ID gap created by a terminated update."""

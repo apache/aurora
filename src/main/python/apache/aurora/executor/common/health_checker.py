@@ -31,6 +31,7 @@ class HealthCheckerThread(StatusChecker, ExceptionalThread):
     respectively the health of the service and the reason for its failure (or None if the service is
     still healthy).
   """
+
   def __init__(self,
                health_checker,
                interval_secs=10,

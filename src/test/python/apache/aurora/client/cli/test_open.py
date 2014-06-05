@@ -12,11 +12,9 @@
 # limitations under the License.
 #
 
-import contextlib
+from mock import patch
 
-from mock import Mock, patch
-
-from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK
+from apache.aurora.client.cli import EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 

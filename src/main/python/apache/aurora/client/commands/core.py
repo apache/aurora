@@ -17,7 +17,6 @@
 
 from __future__ import print_function
 
-import collections
 import json
 import os
 import pprint
@@ -385,7 +384,7 @@ def list_jobs(cluster_and_role):
   # Take the cluster_and_role parameter, and split it into its two components.
   if cluster_and_role.count('/') != 1:
     die('list_jobs parameter must be in cluster/role format')
-  (cluster,role) = cluster_and_role.split('/')
+  cluster, role = cluster_and_role.split('/')
   api = make_client(cluster)
   resp = api.get_jobs(role)
   check_and_log_response(resp)
@@ -423,7 +422,6 @@ def kill(args, options):
   wait_kill_tasks(api.scheduler_proxy, job_key, options.shards)
 
 
-
 def kill_in_batches(api, job_key, instances_arg, batch_size, max_failures):
   """ Common behavior shared by kill and killAll for killing instances in
   a sequence of batches.
@@ -436,7 +434,6 @@ def kill_in_batches(api, job_key, instances_arg, batch_size, max_failures):
         batch.append(instances.pop())
       result.append(batch)
     return result
-
 
   resp = api.check_status(job_key)
   if resp.responseCode is not ResponseCode.OK:
@@ -463,7 +460,6 @@ def kill_in_batches(api, job_key, instances_arg, batch_size, max_failures):
     if tasks is None or len(tasks) == 0:
       log.error('No tasks to kill found for job %s' % job_key)
       return 1
-
 
 
 @app.command
@@ -589,7 +585,6 @@ def update(job_spec, config_file):
   def warn_if_dangerous_change(api, job_spec, config):
     # Get the current job status, so that we can check if there's anything
     # dangerous about this update.
-    job_key = AuroraJobKey(config.cluster(), config.role(), config.environment(), config.name())
     resp = api.query(api.build_query(config.role(), config.name(),
         statuses=ACTIVE_STATES, env=config.environment()))
     if resp.responseCode != ResponseCode.OK:

@@ -20,10 +20,13 @@ from apache.thermos.common.planner import Planner
 def details(planner):
   return planner.runnable, planner.running, planner.finished
 
-def _(*processes):
+
+def _(*processes):  # noqa
   return set(processes)
 
+
 empty = set()
+
 
 def test_planner_empty():
   p = Planner(set(), {})

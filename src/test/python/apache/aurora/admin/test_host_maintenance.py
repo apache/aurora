@@ -15,7 +15,6 @@
 import unittest
 
 import mock
-import pytest
 
 from apache.aurora.admin.host_maintenance import HostMaintenance
 from apache.aurora.client.base import add_grouping, remove_grouping

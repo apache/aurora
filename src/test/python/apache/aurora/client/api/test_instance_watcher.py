@@ -21,7 +21,19 @@ from apache.aurora.client.api.health_check import HealthCheck
 from apache.aurora.client.api.instance_watcher import InstanceWatcher
 
 from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
-from gen.apache.aurora.api.ttypes import *
+from gen.apache.aurora.api.ttypes import (
+    AssignedTask,
+    Identity,
+    JobKey,
+    Response,
+    ResponseCode,
+    Result,
+    ScheduledTask,
+    ScheduleStatus,
+    ScheduleStatusResult,
+    TaskConfig,
+    TaskQuery
+)
 
 
 class FakeClock(object):
@@ -82,7 +94,8 @@ class InstanceWatcherTest(unittest.TestCase):
     for x in range(int(num_calls)):
       self._scheduler.getTasksStatus(query).AndReturn(response)
 
-  def expect_io_error_in_get_statuses(self, instance_ids=WATCH_INSTANCES, num_calls=EXPECTED_CYCLES):
+  def expect_io_error_in_get_statuses(self, instance_ids=WATCH_INSTANCES,
+      num_calls=EXPECTED_CYCLES):
     tasks = [self.create_task(instance_id) for instance_id in instance_ids]
     response = Response(responseCode=ResponseCode.OK, messageDEPRECATED='test')
     response.result = Result()
@@ -91,7 +104,6 @@ class InstanceWatcherTest(unittest.TestCase):
     query = self.get_tasks_status_query(instance_ids)
     for x in range(int(num_calls)):
       self._scheduler.getTasksStatus(query).AndRaise(IOError('oops'))
-
 
   def mock_health_check(self, task, status, retry):
     self._health_check.health(task).InAnyOrder().AndReturn((status, retry))
@@ -103,7 +115,8 @@ class InstanceWatcherTest(unittest.TestCase):
   def assert_watch_result(self, expected_failed_instances, instances_to_watch=WATCH_INSTANCES):
     instances_returned = self._watcher.watch(instances_to_watch, self._health_check)
     assert set(expected_failed_instances) == instances_returned, (
-        'Expected instances (%s) : Returned instances (%s)' % (expected_failed_instances, instances_returned))
+        'Expected instances (%s) : Returned instances (%s)' % (
+            expected_failed_instances, instances_returned))
 
   def replay_mocks(self):
     mox.Replay(self._scheduler)
@@ -141,7 +154,6 @@ class InstanceWatcherTest(unittest.TestCase):
     self.replay_mocks()
     self.assert_watch_result([0, 1, 2])
     self.verify_mocks()
-
 
   def test_all_instance_failure(self):
     """All failed instance in a batch of instances"""

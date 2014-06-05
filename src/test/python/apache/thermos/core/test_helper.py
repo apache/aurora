@@ -82,7 +82,10 @@ def test_scan_process():
   with mock.patch(PSUTIL_PATH) as p_mock:
     class WrappedNoSuchProcess(psutil.NoSuchProcess):
       # psutil.NoSuchProcess exception requires an argument, but mock doesn't support that.
-      def __init__(self): pass
+
+      def __init__(self):
+        pass
+
     p_mock.side_effect = WrappedNoSuchProcess
     assert TRH.scan_process(
         make_runner_state(cpid=None), PROCESS_NAME) == (None, None, set())

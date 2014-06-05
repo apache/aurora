@@ -12,9 +12,7 @@
 # limitations under the License.
 #
 
-import atexit
 import os
-import sys
 import time
 from tempfile import mkstemp
 
@@ -47,7 +45,7 @@ def _run_collector_tests(collector, target, wait):
   wait()
   assert collector.value >= TEST_AMOUNT_1.as_(Data.BYTES)
 
-  f2 = make_file(TEST_AMOUNT_2, dir=target)
+  make_file(TEST_AMOUNT_2, dir=target)
   wait()
   assert collector.value >= TEST_AMOUNT_SUM.as_(Data.BYTES)
 

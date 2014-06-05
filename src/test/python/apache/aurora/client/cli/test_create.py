@@ -20,7 +20,6 @@ from twitter.common.contextutil import temporary_file
 from apache.aurora.client.cli import EXIT_COMMAND_FAILURE, EXIT_INVALID_CONFIGURATION
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
-from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.config import AuroraConfig
 
 from gen.apache.aurora.api.ttypes import (
@@ -163,7 +162,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       self.assert_create_job_called(api)
-
 
   def test_create_job_failed_invalid_config(self):
     """Run a test of the "create" command against a mocked-out API, with a configuration

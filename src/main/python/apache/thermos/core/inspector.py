@@ -40,7 +40,7 @@ class CheckpointInspector(object):
 
   @staticmethod
   def get_timestamp(process_record):
-    if process_record :
+    if process_record:
       for timestamp in ('fork_time', 'start_time', 'stop_time'):
         stamp = getattr(process_record, timestamp, None)
         if stamp:
@@ -52,7 +52,7 @@ class CheckpointInspector(object):
       Reconstructs the checkpoint stream and returns a CheckpointInspection.
     """
     dispatcher = CheckpointDispatcher()
-    state = RunnerState(processes = {})
+    state = RunnerState(processes={})
     muxer = ProcessMuxer(self._path.given(task_id=task_id))
 
     runner_processes = []

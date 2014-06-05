@@ -19,7 +19,6 @@ system. To do this, it relies heavily on the Thermos TaskObserver.
 
 """
 
-import os
 import socket
 
 from twitter.common import log
@@ -79,15 +78,15 @@ class BottleObserver(HttpServer, StaticAssets, TaskObserverFileBrowser, TaskObse
     state = self._observer.state(task_id)
 
     return dict(
-      task_id = task_id,
-      task = task,
-      statuses = self._observer.task_statuses(task_id),
-      user = task['user'],
-      ports = task['ports'],
-      processes = processes,
-      chroot = state.get('sandbox', ''),
-      launch_time = state.get('launch_time', 0),
-      hostname = state.get('hostname', 'localhost'),
+      task_id=task_id,
+      task=task,
+      statuses=self._observer.task_statuses(task_id),
+      user=task['user'],
+      ports=task['ports'],
+      processes=processes,
+      chroot=state.get('sandbox', ''),
+      launch_time=state.get('launch_time', 0),
+      hostname=state.get('hostname', 'localhost'),
     )
 
   def get_task(self, task_id):
@@ -102,9 +101,9 @@ class BottleObserver(HttpServer, StaticAssets, TaskObserverFileBrowser, TaskObse
     task = self.get_task(task_id)
     state = self._observer.state(task_id)
     return dict(
-      hostname = state.get('hostname', 'localhost'),
-      task_id = task_id,
-      task_struct = task['task_struct']
+      hostname=state.get('hostname', 'localhost'),
+      task_id=task_id,
+      task_struct=task['task_struct']
     )
 
   @HttpServer.route("/process/:task_id/:process_id")

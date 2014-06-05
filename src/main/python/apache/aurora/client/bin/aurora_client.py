@@ -16,7 +16,8 @@ from twitter.common import app
 from twitter.common.log.options import LogOptions
 
 from apache.aurora.client.base import generate_terse_usage
-from apache.aurora.client.commands import core, help, run, ssh
+from apache.aurora.client.commands import help as help_commands
+from apache.aurora.client.commands import core, run, ssh
 from apache.aurora.client.options import add_verbosity_options
 
 # These are are side-effecting imports in that they register commands via
@@ -25,7 +26,7 @@ from apache.aurora.client.options import add_verbosity_options
 # composition.
 
 app.register_commands_from(core, run, ssh)
-app.register_commands_from(help)
+app.register_commands_from(help_commands)
 add_verbosity_options()
 
 

@@ -57,6 +57,7 @@ class SandboxProvider(Interface):
 
 class DirectorySandbox(SandboxInterface):
   """ Basic sandbox implementation using a directory on the filesystem """
+
   def __init__(self, root, user=getpass.getuser()):
     self._root = root
     self._user = user

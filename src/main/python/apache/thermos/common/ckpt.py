@@ -22,8 +22,6 @@ Task state machines.
 
 """
 
-import os
-
 from twitter.common import log
 from twitter.common.recordio import RecordIO, ThriftRecordReader
 
@@ -41,6 +39,7 @@ class UniversalStateHandler(object):
     Generic interface for a handler to be called on any process/state transition, and at task
     initialization
   """
+
   def on_process_transition(self, state, process_update):
     pass
 
@@ -65,6 +64,7 @@ class ProcessStateHandler(object):
                     v          |    `---> [SUCCESS]
                  [LOST] <------'
   """
+
   def on_waiting(self, process_update):
     pass
 
@@ -301,7 +301,7 @@ class CheckpointDispatcher(object):
     if process_update is None:
       return False
     process = process_update.process
-    if process not in state.processes: # never seen before
+    if process not in state.processes:  # never seen before
       return True
     else:
       # if this sequence number is ahead of the current high water mark, it would

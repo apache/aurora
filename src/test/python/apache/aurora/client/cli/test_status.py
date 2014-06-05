@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import call, Mock, patch
+from mock import Mock, patch
 
 from apache.aurora.client.cli import EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine

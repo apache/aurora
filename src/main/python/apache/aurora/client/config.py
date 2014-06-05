@@ -19,17 +19,14 @@ from __future__ import print_function
 
 import functools
 import math
-import posixpath
 import re
 import sys
 
-from pystachio import Empty, Ref
-from twitter.common import app, log
+from pystachio import Empty
 
 from apache.aurora.client import binding_helper
 from apache.aurora.client.base import deprecation_warning, die
 from apache.aurora.config import AuroraConfig
-from apache.thermos.config.schema_helpers import Tasks
 
 from gen.apache.aurora.api.constants import DEFAULT_ENVIRONMENT
 
@@ -125,12 +122,14 @@ Based on your job size (%s) you should use max_total_failures >= %s.
 See http://go/auroraconfig for details.
 '''
 
+
 WATCH_SECS_INSUFFICIENT_ERROR_FORMAT = '''
 You have specified an insufficiently short watch period (%d seconds) in your update configuration.
 Your update will always succeed. In order for the updater to detect health check failures,
 UpdateConfig.watch_secs must be greater than %d seconds to account for an initial
 health check interval (%d seconds) plus %d consecutive failures at a check interval of %d seconds.
 '''
+
 
 def _validate_update_config(config):
   job_size = config.instances()
