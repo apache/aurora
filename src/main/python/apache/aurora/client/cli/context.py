@@ -86,11 +86,17 @@ class AuroraCommandContext(Context):
     self.open_page(synthesize_url(api.scheduler_proxy.scheduler_client().url,
         role, env, name))
 
-  def check_and_log_response(self, resp):
-    self.print_log(logging.INFO, 'Response from scheduler: %s (message: %s)'
-        % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.messageDEPRECATED))
+  def log_response(self, resp):
+    if resp.details is not None:
+      for m in resp.details:
+        self.print_log(logging.INFO, "Message from scheduler: %s" % m.message)
+
+  def check_and_log_response(self, resp, err_code=EXIT_API_ERROR, err_msg=None):
+    if err_msg is None:
+      err_msg = resp.messageDEPRECATED
+    self.log_response(resp)
     if resp.responseCode != ResponseCode.OK:
-      raise self.CommandError(EXIT_API_ERROR, resp.messageDEPRECATED)
+      raise self.CommandError(err_code, err_msg)
 
   @classmethod
   def parse_partial_jobkey(cls, key):
@@ -117,8 +123,7 @@ class AuroraCommandContext(Context):
     for cluster in clusters:
       api = self.get_api(cluster)
       resp = api.get_jobs(role)
-      if resp.responseCode is not ResponseCode.OK:
-        raise self.CommandError(EXIT_COMMAND_FAILURE, resp.messageDEPRECATED)
+      self.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE)
       result.extend([AuroraJobKey(cluster, job.key.role, job.key.environment, job.key.name)
           for job in resp.result.getJobsResult.configs])
     return result
@@ -156,8 +161,7 @@ class AuroraCommandContext(Context):
     """Returns a list of task instances running under the job."""
     api = self.get_api(key.cluster)
     resp = api.check_status(key)
-    if resp.responseCode is not ResponseCode.OK:
-      raise self.CommandError(EXIT_INVALID_PARAMETER, resp.messageDEPRECATED)
+    self.check_and_log_response(resp, err_code=EXIT_INVALID_PARAMETER)
     return resp.result.scheduleStatusResult.tasks or None
 
   def get_active_instances(self, key):

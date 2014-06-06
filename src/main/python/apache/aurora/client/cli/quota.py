@@ -76,6 +76,7 @@ class GetQuotaCmd(Verb):
     (cluster, role) = context.options.role
     api = context.get_api(cluster)
     resp = api.get_quota(role)
+    context.log_response(resp)
     if resp.responseCode == ResponseCode.ERROR:
       raise context.CommandError(EXIT_INVALID_PARAMETER, 'Role %s not found' % role)
     elif resp.responseCode == ResponseCode.INVALID_REQUEST:

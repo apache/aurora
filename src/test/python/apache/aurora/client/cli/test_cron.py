@@ -19,7 +19,12 @@ import contextlib
 from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.cli import EXIT_COMMAND_FAILURE, EXIT_INVALID_CONFIGURATION, EXIT_OK
+from apache.aurora.client.cli import (
+    EXIT_API_ERROR,
+    EXIT_COMMAND_FAILURE,
+    EXIT_INVALID_CONFIGURATION,
+    EXIT_OK
+)
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.config import AuroraConfig
@@ -58,7 +63,7 @@ class TestCronNoun(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         result = cmd.execute(['cron', 'schedule', 'west/bozo/test/hello', fp.name])
-        assert result == EXIT_COMMAND_FAILURE
+        assert result == EXIT_API_ERROR
 
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.

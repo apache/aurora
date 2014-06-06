@@ -69,7 +69,7 @@ def arg_type_jobkey(key):
 class CancelUpdateCommand(Verb):
   @property
   def name(self):
-    return 'cancel-update'
+    return "cancel-update"
 
   @property
   def help(self):
@@ -77,8 +77,8 @@ class CancelUpdateCommand(Verb):
 
   def get_options(self):
     return [JSON_READ_OPTION,
-        CommandOption('--config', type=str, default=None, dest='config_file',
-            help='Config file for the job, possibly containing hooks'),
+        CommandOption("--config", type=str, default=None, dest="config_file",
+            help="Config file for the job, possibly containing hooks"),
         JOBSPEC_ARGUMENT]
 
   def execute(self, context):
@@ -93,20 +93,20 @@ class CancelUpdateCommand(Verb):
 class CreateJobCommand(Verb):
   @property
   def name(self):
-    return 'create'
+    return "create"
 
   @property
   def help(self):
     return "Create a job using aurora"
 
-  CREATE_STATES = ('PENDING', 'RUNNING', 'FINISHED')
+  CREATE_STATES = ("PENDING", "RUNNING", "FINISHED")
 
   def get_options(self):
     return [BIND_OPTION, JSON_READ_OPTION,
-        CommandOption('--wait-until', choices=self.CREATE_STATES,
-            default='PENDING',
-            help=('Block the client until all the tasks have transitioned into the requested '
-                'state. Default: PENDING')),
+        CommandOption("--wait-until", choices=self.CREATE_STATES,
+            default="PENDING",
+            help=("Block the client until all the tasks have transitioned into the requested "
+                "state. Default: PENDING")),
         BROWSER_OPTION,
         JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
@@ -114,15 +114,16 @@ class CreateJobCommand(Verb):
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
     api = context.get_api(config.cluster())
     resp = api.create_job(config)
+    context.log_response(resp)
     if resp.responseCode == ResponseCode.INVALID_REQUEST:
-      raise context.CommandError(EXIT_INVALID_PARAMETER, 'Job not found')
+      raise context.CommandError(EXIT_INVALID_PARAMETER, "Job not found")
     elif resp.responseCode == ResponseCode.ERROR:
-      raise context.CommandError(EXIT_COMMAND_FAILURE, resp.messageDEPRECATED)
+      raise context.CommandError(EXIT_COMMAND_FAILURE, "Error reported by scheduler; see log for details")
     if context.options.open_browser:
       context.open_job_page(api, config)
-    if context.options.wait_until == 'RUNNING':
+    if context.options.wait_until == "RUNNING":
       JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.running_or_finished)
-    elif context.options.wait_until == 'FINISHED':
+    elif context.options.wait_until == "FINISHED":
       JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.terminal)
     return EXIT_OK
 
@@ -140,12 +141,12 @@ alternate diff program by setting the DIFF_VIEWER environment variable."""
 
   @property
   def name(self):
-    return 'diff'
+    return "diff"
 
   def get_options(self):
     return [BIND_OPTION, JSON_READ_OPTION,
-        CommandOption('--from', dest='rename_from', type=AuroraJobKey.from_path, default=None,
-            help='If specified, the job key to diff against.'),
+        CommandOption("--from", dest="rename_from", type=AuroraJobKey.from_path, default=None,
+            help="If specified, the job key to diff against."),
         JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
   def pretty_print_task(self, task):
@@ -156,11 +157,11 @@ alternate diff program by setting the DIFF_VIEWER environment variable."""
     return self.prettyprinter.pformat(vars(task))
 
   def pretty_print_tasks(self, tasks):
-    return ',\n'.join(self.pretty_print_task(t) for t in tasks)
+    return ",\n".join(self.pretty_print_task(t) for t in tasks)
 
   def dump_tasks(self, tasks, out_file):
     out_file.write(self.pretty_print_tasks(tasks))
-    out_file.write('\n')
+    out_file.write("\n")
     out_file.flush()
 
   def execute(self, context):
@@ -177,15 +178,14 @@ alternate diff program by setting the DIFF_VIEWER environment variable."""
       name = config.name()
     api = context.get_api(cluster)
     resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
-    if resp.responseCode != ResponseCode.OK:
-      raise context.CommandError(EXIT_INVALID_PARAMETER, 'Could not find job to diff against')
+    context.check_and_log_response(resp, err_code=EXIT_INVALID_PARAMETER,
+        err_msg="Could not find job to diff against")
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     resp = api.populate_job_config(config)
-    if resp.responseCode != ResponseCode.OK:
-      raise context.CommandError(EXIT_INVALID_CONFIGURATION,
-          'Error loading configuration: %s' % resp.messageDEPRECATED)
+    context.check_and_log_response(resp, err_code=EXIT_INVALID_CONFIGURATION,
+          err_msg="Error loading configuration; see log for details")
     local_tasks = resp.result.populateJobResult.populated
-    diff_program = os.environ.get('DIFF_VIEWER', 'diff')
+    diff_program = os.environ.get("DIFF_VIEWER", "diff")
     with NamedTemporaryFile() as local:
       self.dump_tasks(local_tasks, local)
       with NamedTemporaryFile() as remote:
@@ -194,7 +194,7 @@ alternate diff program by setting the DIFF_VIEWER environment variable."""
         # Unlike most commands, diff doesn't return zero on success; it returns
         # 1 when a successful diff is non-empty.
         if result not in (0, 1):
-          raise context.CommandError(EXIT_COMMAND_FAILURE, 'Error running diff command')
+          raise context.CommandError(EXIT_COMMAND_FAILURE, "Error running diff command")
         else:
           return EXIT_OK
 
@@ -208,14 +208,14 @@ the parsed configuration."""
 
   @property
   def name(self):
-    return 'inspect'
+    return "inspect"
 
   def get_options(self):
     return [BIND_OPTION, JSON_READ_OPTION,
-        CommandOption('--local', dest='local', default=False, action='store_true',
-            help='Inspect the configuration as would be created by the "spawn" command.'),
-        CommandOption('--raw', dest='raw', default=False, action='store_true',
-            help='Show the raw configuration.'),
+        CommandOption("--local", dest="local", default=False, action="store_true",
+            help='Inspect the configuration as would be created by the "job create" command.'),
+        CommandOption("--raw", dest="raw", default=False, action="store_true",
+            help="Show the raw configuration."),
         JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
   def execute(self, context):
@@ -226,45 +226,45 @@ the parsed configuration."""
 
     job = config.raw()
     job_thrift = config.job()
-    context.print_out('Job level information')
-    context.print_out('name:       %s' % job.name(), indent=2)
-    context.print_out('role:       %s' % job.role(), indent=2)
-    context.print_out('contact:    %s' % job.contact(), indent=2)
-    context.print_out('cluster:    %s' % job.cluster(), indent=2)
-    context.print_out('instances:  %s' % job.instances(), indent=2)
+    context.print_out("Job level information")
+    context.print_out("name:       %s" % job.name(), indent=2)
+    context.print_out("role:       %s" % job.role(), indent=2)
+    context.print_out("contact:    %s" % job.contact(), indent=2)
+    context.print_out("cluster:    %s" % job.cluster(), indent=2)
+    context.print_out("instances:  %s" % job.instances(), indent=2)
     if job.has_cron_schedule():
-      context.print_out('cron:', indent=2)
-      context.print_out('schedule: %s' % job.cron_schedule(), ident=4)
-      context.print_out('policy:   %s' % job.cron_collision_policy(), indent=4)
+      context.print_out("cron:", indent=2)
+      context.print_out("schedule: %s" % job.cron_schedule(), ident=4)
+      context.print_out("policy:   %s" % job.cron_collision_policy(), indent=4)
     if job.has_constraints():
-      context.print_out('constraints:', indent=2)
+      context.print_out("constraints:", indent=2)
       for constraint, value in job.constraints().get().items():
-        context.print_out('%s: %s' % (constraint, value), indent=4)
-    context.print_out('service:    %s' % job_thrift.taskConfig.isService, indent=2)
-    context.print_out('production: %s' % bool(job.production().get()), indent=2)
+        context.print_out("%s: %s" % (constraint, value), indent=4)
+    context.print_out("service:    %s" % job_thrift.taskConfig.isService, indent=2)
+    context.print_out("production: %s" % bool(job.production().get()), indent=2)
     context.print_out()
 
     task = job.task()
-    context.print_out('Task level information')
-    context.print_out('name: %s' % task.name(), indent=2)
+    context.print_out("Task level information")
+    context.print_out("name: %s" % task.name(), indent=2)
 
     if len(task.constraints().get()) > 0:
-      context.print_out('constraints:', indent=2)
+      context.print_out("constraints:", indent=2)
       for constraint in task.constraints():
-        context.print_out('%s' % (' < '.join(st.get() for st in constraint.order() or [])),
+        context.print_out("%s" % (" < ".join(st.get() for st in constraint.order() or [])),
             indent=2)
     context.print_out()
 
     processes = task.processes()
     for process in processes:
-      context.print_out('Process %s:' % process.name())
+      context.print_out("Process %s:" % process.name())
       if process.daemon().get():
-        context.print_out('daemon', indent=2)
+        context.print_out("daemon", indent=2)
       if process.ephemeral().get():
-        context.print_out('ephemeral', indent=2)
+        context.print_out("ephemeral", indent=2)
       if process.final().get():
-        context.print_out('final', indent=2)
-      context.print_out('cmdline:', indent=2)
+        context.print_out("final", indent=2)
+      context.print_out("cmdline:", indent=2)
       for line in process.cmdline().get().splitlines():
         context.print_out(line, indent=4)
       context.print_out()
@@ -274,8 +274,8 @@ the parsed configuration."""
 class AbstractKillCommand(Verb):
   def get_options(self):
     return [BROWSER_OPTION,
-        CommandOption('--config', type=str, default=None, dest='config',
-            help='Config file for the job, possibly containing hooks'),
+        CommandOption("--config", type=str, default=None, dest="config",
+            help="Config file for the job, possibly containing hooks"),
         BATCH_OPTION,
         MAX_TOTAL_FAILURES_OPTION,
         NO_BATCHING_OPTION]
@@ -283,7 +283,7 @@ class AbstractKillCommand(Verb):
   def wait_kill_tasks(self, context, scheduler, job_key, instances=None):
     monitor = JobMonitor(scheduler, job_key)
     if not monitor.wait_until(JobMonitor.terminal, instances=instances, with_timeout=True):
-      context.print_err('Tasks were not killed in time.')
+      context.print_err("Tasks were not killed in time.")
       return EXIT_TIMEOUT
     return EXIT_OK
 
@@ -292,7 +292,7 @@ class AbstractKillCommand(Verb):
     # query the job, to get the list of active instances.
     tasks = context.get_job_status(job)
     if tasks is None or len(tasks) == 0:
-      context.print_err('No tasks to kill found for job %s' % job)
+      context.print_err("No tasks to kill found for job %s" % job)
       return EXIT_INVALID_PARAMETER
     instance_ids = set(instance.assignedTask.instanceId for instance in tasks)
     # intersect that with the set of shards specified by the user.
@@ -305,24 +305,24 @@ class AbstractKillCommand(Verb):
       for i in range(min(context.options.batch_size, len(instances_to_kill))):
         batch.append(instances_to_kill.pop())
       resp = api.kill_job(job, batch)
+      context.log_response(resp)
       if resp.responseCode is not ResponseCode.OK or self.wait_kill_tasks(
           context, api.scheduler_proxy, job, batch) is not EXIT_OK:
-
         context.print_log(logging.INFO,
-            'Kill of shards %s failed with error %s' % (batch, resp.messageDEPRECATED))
+            "Kill of shards %s failed with error; see log for details" % batch)
         errors += 1
         if errors > context.options.max_total_failures:
           raise context.CommandError(EXIT_COMMAND_FAILURE,
-               'Exceeded maximum number of errors while killing instances')
+               "Exceeded maximum number of errors while killing instances")
     if errors > 0:
-      context.print_err('Warning: Errors occurred during batch kill')
+      context.print_err("Warning: Errors occurred during batch kill")
       raise context.CommandError(EXIT_COMMAND_FAILURE, "Errors occurred while killing instances")
 
 
 class KillCommand(AbstractKillCommand):
   @property
   def name(self):
-    return 'kill'
+    return "kill"
 
   @property
   def help(self):
@@ -336,8 +336,8 @@ class KillCommand(AbstractKillCommand):
     instances_arg = context.options.instance_spec.instance
     if instances_arg == ALL_INSTANCES:
       raise context.CommandError(EXIT_INVALID_PARAMETER,
-          'The instances list cannot be omitted in a kill command!; '
-          'use killall to kill all instances')
+          "The instances list cannot be omitted in a kill command!; "
+          "use killall to kill all instances")
     if context.options.strict:
       context.verify_shards_option_validity(job, instances_arg)
     api = context.get_api(job.cluster)
@@ -357,7 +357,7 @@ class KillCommand(AbstractKillCommand):
 class KillAllJobCommand(AbstractKillCommand):
   @property
   def name(self):
-    return 'killall'
+    return "killall"
 
   @property
   def help(self):
@@ -390,24 +390,22 @@ class ListJobsCommand(Verb):
 
   @property
   def name(self):
-    return 'list'
+    return "list"
 
   def get_options(self):
-    return [CommandOption('jobspec', type=arg_type_jobkey)]
+    return [CommandOption("jobspec", type=arg_type_jobkey)]
 
   def execute(self, context):
     jobs = context.get_jobs_matching_key(context.options.jobspec)
     for j in jobs:
-      context.print_out('%s/%s/%s/%s' % (j.cluster, j.role, j.env, j.name))
+      context.print_out("%s/%s/%s/%s" % (j.cluster, j.role, j.env, j.name))
     return EXIT_OK
 
 
 class OpenCommand(Verb):
-  # TODO(mchucarroll): this is awkward in the noun/verb framework: where does it actually belong?
-
   @property
   def name(self):
-    return 'open'
+    return "open"
 
   @property
   def help(self):
@@ -415,12 +413,12 @@ class OpenCommand(Verb):
 
   def get_options(self):
     return [
-      CommandOption('key', type=str, metavar='cluster[/role[/env[/job]]]',
-        help='A key for the cluster, role, env, or job whose scheduler page should be opened.')
+      CommandOption("key", type=str, metavar="cluster[/role[/env[/job]]]",
+        help="A key for the cluster, role, env, or job whose scheduler page should be opened.")
     ]
 
   def execute(self, context):
-    key_parts = context.options.key.split('/')
+    key_parts = context.options.key.split("/")
     while len(key_parts) < 4:
       key_parts.append(None)
     (cluster, role, env, name) = key_parts
@@ -431,7 +429,7 @@ class OpenCommand(Verb):
 class RestartCommand(Verb):
   @property
   def name(self):
-    return 'restart'
+    return "restart"
 
   def get_options(self):
     return [BATCH_OPTION, BIND_OPTION, BROWSER_OPTION, FORCE_OPTION, HEALTHCHECK_OPTION,
@@ -444,8 +442,8 @@ class RestartCommand(Verb):
                   'before considered a failure.'),
         MAX_TOTAL_FAILURES_OPTION,
         STRICT_OPTION,
-        CommandOption('--rollback-on-failure', default=True, action='store_false',
-            help='If false, prevent update from performing a rollback.'),
+        CommandOption("--rollback-on-failure", default=True, action="store_false",
+            help="If false, prevent update from performing a rollback."),
         INSTANCES_SPEC_ARGUMENT, CONFIG_ARGUMENT]
 
   @property
@@ -496,10 +494,10 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
 
   @property
   def name(self):
-    return 'status'
+    return "status"
 
   def get_options(self):
-    return [JSON_WRITE_OPTION, CommandOption('jobspec', type=arg_type_jobkey)]
+    return [JSON_WRITE_OPTION, CommandOption("jobspec", type=arg_type_jobkey)]
 
   def render_tasks_json(self, jobkey, active_tasks, inactive_tasks):
     """Render the tasks running for a job in machine-processable JSON format."""
@@ -511,9 +509,9 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
       return json.loads(serialize(scheduled_task,
           protocol_factory=TJSONProtocol.TSimpleJSONProtocolFactory()))
 
-    return {'job': str(jobkey),
-        'active': [render_task_json(task) for task in active_tasks],
-        'inactive': [render_task_json(task) for task in inactive_tasks]}
+    return {"job": str(jobkey),
+        "active": [render_task_json(task) for task in active_tasks],
+        "inactive": [render_task_json(task) for task in inactive_tasks]}
 
   def render_tasks_pretty(self, jobkey, active_tasks, inactive_tasks):
     """Render the tasks for a job in human-friendly format"""
@@ -522,22 +520,22 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
       task_info = assigned_task.task
       task_strings = []
       if task_info:
-        task_strings.append('''\tcpus: %s, ram: %s MB, disk: %s MB''' % (
+        task_strings.append("""\tcpus: %s, ram: %s MB, disk: %s MB""" % (
             task_info.numCpus, task_info.ramMb, task_info.diskMb))
       if assigned_task.assignedPorts:
-        task_strings.append('ports: %s' % assigned_task.assignedPorts)
+        task_strings.append("ports: %s" % assigned_task.assignedPorts)
         # TODO(mchucarroll): only add the max if taskInfo is filled in!
-        task_strings.append('failure count: %s (max %s)' % (scheduled_task.failureCount,
+        task_strings.append("failure count: %s (max %s)" % (scheduled_task.failureCount,
             task_info.maxTaskFailures))
-        task_strings.append('events:')
+        task_strings.append("events:")
       for event in scheduled_task.taskEvents:
-        task_strings.append('\t %s %s: %s' % (datetime.fromtimestamp(event.timestamp / 1000),
+        task_strings.append("\t %s %s: %s" % (datetime.fromtimestamp(event.timestamp / 1000),
             ScheduleStatus._VALUES_TO_NAMES[event.status], event.message))
-        task_strings.append('metadata:')
+        task_strings.append("metadata:")
         if assigned_task.task.metadata is not None:
           for md in assigned_task.task.metadata:
-            task_strings.append('\t%s: %s' % (md.key, md.value))
-      return '\n\t'.join(task_strings)
+            task_strings.append("\t%s: %s" % (md.key, md.value))
+      return "\n\t".join(task_strings)
 
     result = ["Active tasks (%s):\n" % len(active_tasks)]
     for t in active_tasks:
@@ -545,7 +543,7 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
     result.append("Inactive tasks (%s):\n" % len(inactive_tasks))
     for t in inactive_tasks:
       result.append(render_task_pretty(t))
-    return ''.join(result)
+    return "".join(result)
 
   def get_status_for_jobs(self, jobkeys, context):
     """Retrieve and render the status information for a collection of jobs"""
@@ -608,19 +606,18 @@ to preview what changes will take effect.
       # NOTE(mchucarroll): we assume here that updating a cron schedule and updating a
       # running job are different operations; in client v1, they were both done with update.
       raise context.CommandError(EXIT_COMMAND_FAILURE,
-          'Server could not find running job to update: %s' % resp.messageDEPRECATED)
+          "Server could not find running job to update: see log for details")
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     resp = api.populate_job_config(config)
-    if resp.responseCode != ResponseCode.OK:
-      raise context.CommandError(EXIT_COMMAND_FAILURE,
-          'Server could not populate job config for comparison: %s' % resp.messageDEPRECATED)
+    context.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE,
+        err_msg="Server could not populate job config for comparison; see log for details.")
     local_task_count = len(resp.result.populateJobResult.populated)
     remote_task_count = len(remote_tasks)
     if (local_task_count >= 4 * remote_task_count or
         local_task_count <= 4 * remote_task_count or
         local_task_count == 0):
-      context.print_out('Warning: this update is a large change. '
-          'Press ^C within 5 seconds to abort')
+      context.print_out("Warning: this update is a large change. "
+          "Press ^C within 5 seconds to abort")
       time.sleep(5)
 
   def execute(self, context):
@@ -635,15 +632,15 @@ to preview what changes will take effect.
       self.warn_if_dangerous_change(context, api, job, config)
     resp = api.update_job(config, context.options.healthcheck_interval_seconds,
         instances)
-    if resp.responseCode != ResponseCode.OK:
-      raise context.CommandError(EXIT_COMMAND_FAILURE, 'Update failed: %s' % resp.messageDEPRECATED)
+    context.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE,
+        err_msg="Update failed; see log for details.")
     return EXIT_OK
 
 
 class Job(Noun):
   @property
   def name(self):
-    return 'job'
+    return "job"
 
   @property
   def help(self):

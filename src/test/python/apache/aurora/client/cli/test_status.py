@@ -73,8 +73,7 @@ class TestJobStatus(AuroraClientCommandTest):
 
   @classmethod
   def create_getjobs_response(cls):
-    result = Mock()
-    result.responseCode = ResponseCode.OK
+    result = cls.create_simple_success_response()
     result.result = Mock()
     result.result.getJobsResult = Mock()
     mock_job_one = Mock()
@@ -137,6 +136,7 @@ class TestJobStatus(AuroraClientCommandTest):
     job, it should end up doing a query using getTasksStatus."""
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_scheduler_proxy.query.return_value = self.create_status_response()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response_null_metadata()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
@@ -148,6 +148,7 @@ class TestJobStatus(AuroraClientCommandTest):
   def test_successful_status_deep_null_metadata(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_scheduler_proxy.query.return_value = self.create_status_response_null_metadata()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response_null_metadata()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):

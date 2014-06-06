@@ -52,12 +52,9 @@ class Schedule(Verb):
     api = context.get_api(context.options.jobspec.cluster)
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
     resp = api.schedule_cron(config)
-    if resp.responseCode != ResponseCode.OK:
-      context.print_err("Error scheduling job %s: %s" % (context.options.jobspec,
-          resp.messageDEPRECATED))
-      return EXIT_COMMAND_FAILURE
-    else:
-      return EXIT_OK
+    context.check_and_log_response(resp,
+        err_msg=("Error scheduling job %s; see log for details" % context.options.jobspec))
+    return EXIT_OK
 
 
 class Deschedule(Verb):
@@ -75,12 +72,9 @@ class Deschedule(Verb):
   def execute(self, context):
     api = context.get_api(context.options.jobspec.cluster)
     resp = api.deschedule_cron(context.options.jobspec)
-    if resp.responseCode != ResponseCode.OK:
-      context.print_err("Error descheduling job %s: %s" % (context.options.jobspec,
-          resp.messageDEPRECATED))
-      return EXIT_COMMAND_FAILURE
-    else:
-      return EXIT_OK
+    context.check_and_log_response(resp,
+        err_msg=("Error descheduling job %s; see log for details" % context.options.jobspec))
+    return EXIT_OK
 
 
 class Start(Verb):
@@ -100,10 +94,8 @@ class Start(Verb):
     config = (context.get_job_config(context.options.jobspec, context.options.config)
         if context.options.config else None)
     resp = api.start_cronjob(context.options.jobspec, config=config)
-    if resp.responseCode != ResponseCode.OK:
-      context.print_err("Error starting cron job %s: %s" % (context.options.jobspec,
-          resp.messageDEPRECATED))
-      return EXIT_COMMAND_FAILURE
+    context.check_and_log_response(resp,
+        err_msg=("Error starting cron job %s; see log for details" % context.options.jobspec))
     if context.options.open_browser:
       context.open_job_page(api, context.options.job_spec)
     return EXIT_OK
@@ -126,8 +118,8 @@ class Show(Verb):
     jobkey = context.options.jobspec
     api = context.get_api(jobkey.cluster)
     resp = api.get_jobs(jobkey.role)
-    if resp.responseCode != ResponseCode.OK:
-      context.print_err("Error getting cron status for %s: %s" % (jobkey, resp.messageDEPRECATED))
+    context.check_and_log_response(resp, err_code=EXIT_INVALID_PARAMETER,
+        err_msg=("Error getting cron status for %s; see log for details" % jobkey))
     for job in resp.result.getJobsResult.configs:
       if job.key.environment == jobkey.env and job.key.name == jobkey.name:
         if job.cronSchedule is None or job.cronSchedule == "":

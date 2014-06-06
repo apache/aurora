@@ -68,8 +68,8 @@ class RunCommand(Verb):
     # TODO(mchucarroll): add options to specify which instances to run on (AURORA-198)
     (cluster_name, role, env, name), instances = context.options.instance_spec
     cluster = CLUSTERS[cluster_name]
-    dcr = InstanceDistributedCommandRunner(
-        cluster, role, env, name, context.options.ssh_user, instances)
+    dcr = InstanceDistributedCommandRunner(cluster, role, env, name, context.options.ssh_user,
+        instances)
     dcr.run(context.options.cmd, parallelism=context.options.num_threads,
         executor_sandbox=context.options.executor_sandbox)
 
@@ -104,9 +104,8 @@ class SshCommand(Verb):
 
     api = context.get_api(cluster)
     resp = api.query(api.build_query(role, name, set([int(instance)]), env=env))
-    if resp.responseCode != ResponseCode.OK:
-      raise context.CommandError('Unable to get information about instance: %s'
-          % resp.messageDEPRECATED)
+    context.check_and_log_response(resp,
+        err_msg=('Unable to get information about instance: %s' % resp.messageDEPRECATED))
     first_task = resp.result.scheduleStatusResult.tasks[0]
     remote_cmd = context.options.command or 'bash'
     command = DistributedCommandRunner.substitute(remote_cmd, first_task,

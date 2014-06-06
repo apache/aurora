@@ -71,6 +71,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       mock_api = mock_context.get_api('west')
+      mock_api.update_job.return_value = self.create_simple_success_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
