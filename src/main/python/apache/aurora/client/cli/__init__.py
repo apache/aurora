@@ -394,6 +394,9 @@ class CommandLine(object):
       print_aurora_log(logging.INFO, "Error executing command: %s", c.msg)
       self.print_err("Error executing command: %s" % c.msg)
       return c.code
+    except Exception as e:
+      print_aurora_log(logging.ERROR, "Internal error executing command: %s", e)
+      return EXIT_API_ERROR
 
 
 class Noun(AuroraCommand):

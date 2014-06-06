@@ -182,6 +182,7 @@ class SchedulerProxy(object):
   class TimeoutError(Error): pass
   class AuthenticationError(Error): pass
   class APIVersionError(Error): pass
+  class ThriftInternalError(Error): pass
 
   def __init__(self, cluster, verbose=False, session_key_factory=make_session_key):
     """A callable session_key_factory should be provided for authentication"""
@@ -267,6 +268,11 @@ class SchedulerProxy(object):
           log.warning('Connection error with scheduler: %s, reconnecting...' % e)
           self.invalidate()
           time.sleep(self.RPC_RETRY_INTERVAL.as_(Time.SECONDS))
+        except Exception as e:
+          # Take any error that occurs during the RPC call, and transform it
+          # into something clients can handle.
+          raise self.ThriftInternalError("Error during thrift call %s to %s: %s" %
+              (method_name, self.cluster.name, e))
       raise self.TimeoutError('Timed out attempting to issue %s to %s' % (
           method_name, self.cluster.name))
 

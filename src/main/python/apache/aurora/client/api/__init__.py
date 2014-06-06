@@ -33,6 +33,7 @@ class AuroraClientAPI(object):
   class Error(Exception): pass
   class TypeError(Error, TypeError): pass
   class ClusterMismatch(Error, ValueError): pass
+  class ThriftInternalError(Error): pass
 
   def __init__(self, cluster, verbose=False, session_key_factory=make_session_key):
     if not isinstance(cluster, Cluster):
@@ -109,7 +110,10 @@ class AuroraClientAPI(object):
                      environment=env)
 
   def query(self, query):
-    return self._scheduler_proxy.getTasksStatus(query)
+    try:
+      return self._scheduler_proxy.getTasksStatus(query)
+    except SchedulerProxy.ThriftInternalError as e:
+      raise self.ThriftInternalError(e.args[0])
 
   def update_job(self, config, health_check_interval_seconds=3, instances=None):
     """Run a job update for a given config, for the specified instances.  If

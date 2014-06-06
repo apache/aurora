@@ -15,6 +15,7 @@
 python_test_suite(
   name = 'all',
   dependencies = [
+    pants(':api'),
     pants(':bridge'),
     pants(':command_hooks'),
     pants(':cron'),
@@ -81,6 +82,20 @@ python_tests(
     pants('src/main/python/apache/aurora/client/cli:bridge'),
   ]
 )
+
+python_tests(
+  name = 'api',
+  sources = [ 'test_api_from_cli.py' ],
+  dependencies = [
+    pants(':util'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/client/cli'),
+    pants('src/main/python/apache/aurora/client/cli:client_lib'),
+    pants('src/test/python/apache/aurora/client/commands:util')
+  ]
+)
+
 
 python_tests(
   name = 'config',
