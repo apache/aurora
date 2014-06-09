@@ -244,7 +244,7 @@ class UpdaterTest(TestCase):
     self._quota_check.validate_quota_from_requested(
         self._job_key, prod, released, acquired).AndReturn(response)
 
-  def make_task_configs(self, count=1):
+  def make_task_configs(self, count=1, prod=True):
     return [TaskConfig(
         owner=Identity(role=self._job_key.role),
         environment=self._job_key.environment,
@@ -254,7 +254,7 @@ class UpdaterTest(TestCase):
         diskMb=self._num_disk,
         priority=0,
         maxTaskFailures=1,
-        production=True,
+        production=prod,
         taskLinks={'task': 'link'},
         contactEmail='foo@bar.com',
         executorConfig=ExecutorConfig(name='test', data='test data')
@@ -312,6 +312,43 @@ class UpdaterTest(TestCase):
     self.replay_mocks()
 
     self.update_and_expect_response(expected_code=ResponseCode.ERROR)
+    self.verify_mocks()
+
+  def test_non_to_prod_fails_quota_check(self):
+    """Update with shrinking with non->prod transition fails quota check."""
+    old_configs = self.make_task_configs(4, prod=False)
+    new_config = deepcopy(old_configs[0])
+    new_config.production = True
+    job_config = self.make_job_config(new_config, 2)
+    self._config.job_config = job_config
+    self.expect_start()
+    self.expect_get_tasks(old_configs)
+    self.expect_populate(job_config)
+    self.expect_quota_check(0, 2, response_code=ResponseCode.INVALID_REQUEST)
+    self.expect_finish()
+    self.replay_mocks()
+
+    self.update_and_expect_response(expected_code=ResponseCode.ERROR)
+    self.verify_mocks()
+
+  def test_prod_to_non_always_passes_quota_check(self):
+    """Update with growth with prod->non transition always passes."""
+    old_configs = self.make_task_configs(1, prod=True)
+    new_config = deepcopy(old_configs[0])
+    new_config.production = False
+    job_config = self.make_job_config(new_config, 3)
+    self._config.job_config = job_config
+    self.expect_start()
+    self.expect_get_tasks(old_configs)
+    self.expect_populate(job_config)
+    self.expect_quota_check(1, 0, prod=False)
+    self.expect_kill([0])
+    self.expect_add([0, 1, 2], new_config)
+    self.expect_watch_instances([0, 1, 2])
+    self.expect_finish()
+    self.replay_mocks()
+
+    self.update_and_expect_ok()
     self.verify_mocks()
 
   def test_shrink(self):

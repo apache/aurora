@@ -329,8 +329,13 @@ class Updater(object):
     )
 
     def _aggregate_quota(ops_list, config_map):
-      return sum(CapacityRequest.from_task(config_map[instance])
-                    for instance in ops_list) or CapacityRequest()
+      request = CapacityRequest()
+      for instance in ops_list:
+        task = config_map[instance]
+        if task.production:
+          request += CapacityRequest.from_task(task)
+
+      return request
 
     to_kill, to_add = self._create_kill_add_lists(
         instance_configs.instances_to_process,

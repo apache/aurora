@@ -70,8 +70,8 @@ class QuotaCheck(object):
     Arguments:
     job_key -- job key.
     production -- production flag.
-    released -- CapacityRequest to be released (in case of job update).
-    acquired -- CapacityRequest to be acquired.
+    released -- production CapacityRequest to be released (in case of job update).
+    acquired -- production CapacityRequest to be acquired.
 
     Returns: ResponseCode.OK if check is successful.
     """
