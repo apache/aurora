@@ -209,14 +209,14 @@ def increase_quota(cluster, role, cpu_str, ram_str, disk_str):
   log.info('Current quota for %s:\n\tCPU\t%s\n\tRAM\t%s MB\n\tDisk\t%s MB' %
            (role, quota.numCpus, quota.ramMb, quota.diskMb))
 
-  new_cpu = cpu + quota.numCpus
-  new_ram = ram + Amount(quota.ramMb, Data.MB)
-  new_disk = disk + Amount(quota.diskMb, Data.MB)
+  new_cpu = float(cpu + quota.numCpus)
+  new_ram = int((ram + Amount(quota.ramMb, Data.MB)).as_(Data.MB))
+  new_disk = int((disk + Amount(quota.diskMb, Data.MB)).as_(Data.MB))
 
   log.info('Attempting to update quota for %s to\n\tCPU\t%s\n\tRAM\t%s MB\n\tDisk\t%s MB' %
-           (role, new_cpu, new_ram.as_(Data.MB), new_disk.as_(Data.MB)))
+           (role, new_cpu, new_ram, new_disk))
 
-  resp = client.set_quota(role, new_cpu, new_ram.as_(Data.MB), new_disk.as_(Data.MB))
+  resp = client.set_quota(role, new_cpu, new_ram, new_disk)
   check_and_log_response(resp)
 
 
