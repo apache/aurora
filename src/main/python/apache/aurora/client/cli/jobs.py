@@ -64,7 +64,8 @@ from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleS
 
 def arg_type_jobkey(key):
   return AuroraCommandContext.parse_partial_jobkey(key)
-
+WILDCARD_JOBKEY_OPTION = CommandOption('jobspec', type=arg_type_jobkey,
+        help="A jobkey, optionally containing wildcards")
 
 class CancelUpdateCommand(Verb):
   @property
@@ -393,7 +394,7 @@ class ListJobsCommand(Verb):
     return "list"
 
   def get_options(self):
-    return [CommandOption("jobspec", type=arg_type_jobkey)]
+    return [WILDCARD_JOBKEY_OPTION]
 
   def execute(self, context):
     jobs = context.get_jobs_matching_key(context.options.jobspec)
@@ -497,7 +498,7 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
     return "status"
 
   def get_options(self):
-    return [JSON_WRITE_OPTION, CommandOption("jobspec", type=arg_type_jobkey)]
+    return [JSON_WRITE_OPTION, WILDCARD_JOBKEY_OPTION]
 
   def render_tasks_json(self, jobkey, active_tasks, inactive_tasks):
     """Render the tasks running for a job in machine-processable JSON format."""

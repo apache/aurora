@@ -451,7 +451,7 @@ class Noun(AuroraCommand):
     result = ['Usage for noun "%s":' % self.name]
     result += ["    %s %s" % (self.name, self.verbs[verb].usage) for verb in self.verbs]
     result += [self.help]
-    return "\n".join(result)
+    return "\n\n".join(result)
 
   def execute(self, context):
     if context.options.verb not in self.verbs:
@@ -485,7 +485,7 @@ class Verb(AuroraCommand):
   def composed_help(self):
     """Generate the composed help message shown when the user requests help about this verb"""
     result = ['Usage for verb "%s %s":' % (self.noun.name, self.name)]
-    result += ["  " + s for s in self.usage]
+    result += ["  " + self.usage]
     result += ["Options:"]
     for opt in self.get_options():
       result += ["  " + s for s in opt.render_help()]

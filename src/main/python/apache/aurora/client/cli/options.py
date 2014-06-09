@@ -34,10 +34,10 @@ class CommandOption(object):
         break
     else:
       raise ValueError('CommandOption had no valid name.')
-    self.args = args
-    self.kwargs = kwargs
-    self.type = kwargs.get('type')
-    self.help = kwargs.get('help', '')
+    self.args = args[:]
+    self.kwargs = kwargs.copy()
+    self.type = self.kwargs.get('type')
+    self.help = self.kwargs.get('help', '')
 
   def is_mandatory(self):
     return self.kwargs.get('required', not self.name.startswith('--'))
@@ -52,8 +52,10 @@ class CommandOption(object):
       displayname = self.type
     elif isinstance(self.type, Compatibility.integer):
       displayname = "int",
+    elif self.name.startswith('--'):
+      displayname = self.name[2:]
     else:
-      displayname = "value"
+      displayname = self.name
     return displayname
 
   def render_usage(self):
@@ -80,7 +82,7 @@ class CommandOption(object):
     elif self.type is None and "choices" in self.kwargs:
       result = "%s=%s" % (self.name, self.kwargs["choices"])
     else:
-      result = "%s=%s" % (self.name, self.get_displayname())
+      result = "%s" % (self.get_displayname())
     return [result, "\t" + self.help]
 
   def add_to_parser(self, parser):
