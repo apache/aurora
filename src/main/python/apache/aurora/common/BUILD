@@ -67,6 +67,15 @@ python_library(
 )
 
 python_library(
+  name = 'transport',
+  sources = ['transport.py'],
+  dependencies = [
+    pants('3rdparty/python:requests'),
+    pants('3rdparty/python:thrift'),
+  ],
+)
+
+python_library(
   name = 'common',
   dependencies = [
     pants(':aurora_job_key'),

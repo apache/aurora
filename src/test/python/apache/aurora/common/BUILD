@@ -21,6 +21,7 @@ python_test_suite(
     pants(':test_cluster_option'),
     pants(':test_http_signaler'),
     pants(':test_shellify'),
+    pants(':test_transport'),
   ]
 )
 
@@ -74,5 +75,15 @@ python_tests(
   sources = ['test_shellify.py'],
   dependencies = [
     pants('src/main/python/apache/aurora/common:shellify'),
+  ]
+)
+
+python_tests(
+  name = 'test_transport',
+  sources = ['test_transport.py'],
+  dependencies = [
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    pants('src/main/python/apache/aurora/common:transport'),
+    pants('3rdparty/python:mock'),
   ]
 )

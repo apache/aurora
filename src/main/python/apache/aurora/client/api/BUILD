@@ -82,6 +82,7 @@ python_library(
     pants('3rdparty/python:twitter.common.zookeeper'),
     pants('src/main/python/apache/aurora/common/auth'),
     pants('src/main/python/apache/aurora/common:cluster'),
+    pants('src/main/python/apache/aurora/common:transport'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )

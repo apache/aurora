@@ -27,9 +27,15 @@ from twitter.common.zookeeper.serverset import ServerSet
 
 from apache.aurora.common.auth import make_session_key, SessionKeyError
 from apache.aurora.common.cluster import Cluster
+from apache.aurora.common.transport import TRequestsTransport
 
 from gen.apache.aurora.api import AuroraAdmin
 from gen.apache.aurora.api.constants import CURRENT_API_VERSION
+
+try:
+  from urlparse import urljoin
+except ImportError:
+  from urllib.parse import urljoin
 
 
 class SchedulerClientTrait(Cluster.Trait):
@@ -59,12 +65,7 @@ class SchedulerClient(object):
     if cluster.zk:
       return ZookeeperSchedulerClient(cluster, port=cluster.zk_port, **kwargs)
     elif cluster.scheduler_uri:
-      try:
-        host, port = cluster.scheduler_uri.split(':', 2)
-        port = int(port)
-      except ValueError:
-        raise ValueError('Malformed Cluster scheduler_uri: %s' % cluster.scheduler_uri)
-      return DirectSchedulerClient(host, port)
+      return DirectSchedulerClient(cluster.scheduler_uri)
     else:
       raise ValueError('"cluster" does not specify zk or scheduler_uri')
 
@@ -83,8 +84,8 @@ class SchedulerClient(object):
     return None
 
   @classmethod
-  def _connect_scheduler(cls, host, port, clock=time):
-    transport = THttpClient.THttpClient('http://%s:%s/api' % (host, port))
+  def _connect_scheduler(cls, uri, clock=time):
+    transport = TRequestsTransport(uri)
     protocol = TJSONProtocol.TJSONProtocol(transport)
     schedulerClient = AuroraAdmin.Client(protocol)
     for _ in range(cls.THRIFT_RETRIES):
@@ -98,7 +99,7 @@ class SchedulerClient(object):
         # Monkey-patched proxies, like socks, can generate a proxy error here.
         # without adding a dependency, we can't catch those in a more specific way.
         raise cls.CouldNotConnect('Connection to scheduler failed: %s' % e)
-    raise cls.CouldNotConnect('Could not connect to %s:%s' % (host, port))
+    raise cls.CouldNotConnect('Could not connect to %s' % uri)
 
 
 class ZookeeperSchedulerClient(SchedulerClient):
@@ -118,9 +119,11 @@ class ZookeeperSchedulerClient(SchedulerClient):
     SchedulerClient.__init__(self, verbose=verbose)
     self._cluster = cluster
     self._zkport = port
-    self._http = None
+    self._endpoint = None
+    self._uri = None
 
-  def _connect(self):
+  def _resolve(self):
+    """Resolve the uri associated with this scheduler from zookeeper."""
     joined = threading.Event()
     def on_join(elements):
       joined.set()
@@ -131,34 +134,42 @@ class ZookeeperSchedulerClient(SchedulerClient):
     if len(serverset_endpoints) == 0:
       raise self.CouldNotConnect('No schedulers detected in %s!' % self._cluster.name)
     instance = serverset_endpoints[0]
-    self._http = instance.additional_endpoints.get('http')
+    if 'https' in instance.additional_endpoints:
+      endpoint = instance.additional_endpoints['https']
+      self._uri = 'https://%s:%s' % (endpoint.host, endpoint.port)
+    elif 'http' in instance.additional_endpoints:
+      endpoint = instance.additional_endpoints['http']
+      self._uri = 'http://%s:%s' % (endpoint.host, endpoint.port)
     zk.stop()
-    return self._connect_scheduler(self._http.host, self._http.port)
+
+  def _connect(self):
+    if self._uri is None:
+      self._resolve()
+    if self._uri is not None:
+      return self._connect_scheduler(urljoin(self._uri, 'api'))
 
   @property
   def url(self):
     proxy_url = self._cluster.proxy_url
     if proxy_url:
       return proxy_url
-    if self._http is None:
-      self._connect()
-    if self._http:
-      return 'http://%s:%s' % (self._http.host, self._http.port)
+    if self._uri is None:
+      self._resolve()
+    if self._uri:
+      return self._uri
 
 
 class DirectSchedulerClient(SchedulerClient):
-  def __init__(self, host, port):
+  def __init__(self, uri):
     SchedulerClient.__init__(self, verbose=True)
-    self._host = host
-    self._port = port
+    self._uri = uri
 
   def _connect(self):
-    return self._connect_scheduler(self._host, self._port)
+    return self._connect_scheduler(urljoin(self._uri, 'api'))
 
   @property
   def url(self):
-    # TODO(wickman) This is broken -- make this tunable in MESOS-3005
-    return 'http://%s:8081' % self._host
+    return self._uri
 
 
 class SchedulerProxy(object):
