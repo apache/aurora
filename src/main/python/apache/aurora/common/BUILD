@@ -84,6 +84,7 @@ python_library(
     pants(':clusters'),
     pants(':http_signaler'),
     pants(':shellify'),
+    pants(':transport'),
     pants('src/main/python/apache/aurora/common/auth'),
 
     # covering dependency on gen.*
