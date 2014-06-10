@@ -41,6 +41,9 @@ class CommandProcessor(object):
     """Get a list of the commands that this processor can handle."""
     pass
 
+  def show_help(self):
+    self.execute(["", "help"])
+
 
 class Bridge(object):
   """Given multiple command line programs, each represented by a "CommandProcessor" object,
@@ -64,7 +67,7 @@ class Bridge(object):
           [cp.name for cp in self.command_processors])
       for cp in self.command_processors:
         print("========== help for %s ==========" % cp.name)
-        cp.execute(args)
+        cp.show_help()
       return 0
     elif len(args) >= 3:
       discriminator = args[2]

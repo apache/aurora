@@ -46,6 +46,10 @@ class AuroraClientV1CommandProcessor(CommandProcessor):
   def name(self):
     return "Aurora Client v1"
 
+  def show_help(self):
+    print("Supported commands are: %s" % ", ".join(self.get_commands()))
+    print("\nRun '%s help _command_' for help on a specific command" % sys.argv[0])
+
   def get_commands(self):
     return ["cancel_update", "create", "diff", "get_quota", "inspect", "kill", "list_jobs",
         "open", "restart", "run", "ssh", "start_cron", "status", "update", "version"]
