@@ -17,6 +17,7 @@ import time
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
 
+from apache.aurora.admin.admin_util import format_sla_results, print_results
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.base import check_and_log_response, DEFAULT_GROUPING, group_hosts
 
@@ -37,6 +38,11 @@ class HostMaintenance(object):
   """
 
   START_MAINTENANCE_DELAY = Amount(30, Time.SECONDS)
+
+  SLA_MIN_JOB_INSTANCE_COUNT = 20
+  SLA_UPTIME_PERCENTAGE_LIMIT = 95
+  SLA_UPTIME_DURATION_LIMIT = Amount(30, Time.MINUTES)
+
 
   @classmethod
   def iter_batches(cls, hostnames, grouping_function=DEFAULT_GROUPING):
@@ -97,6 +103,46 @@ class HostMaintenance(object):
     for hostname in drained_hosts.hostNames:
       callback(hostname)
 
+  def _check_sla(self, hostnames, grouping_function, percentage=None, duration=None):
+    """Check if the provided list of hosts passes the job uptime SLA check.
+
+    This is an all-or-nothing check, meaning that all provided hosts must pass their job
+    SLA check for the maintenance to proceed.
+
+    :param hostnames: list of host names to check SLA for
+    :type hostnames: list of strings
+    :param grouping_function: grouping function to apply to the given hosts
+    :type grouping_function: function
+    :param percentage: SLA uptime percentage override
+    :type percentage: float
+    :param duration: SLA uptime duration override
+    :type duration: twitter.common.quantity.Amount
+    :rtype: True if all hosts pass SLA check, False otherwise.
+    """
+    sla_percentage = percentage or self.SLA_UPTIME_PERCENTAGE_LIMIT
+    sla_duration = duration or self.SLA_UPTIME_DURATION_LIMIT
+
+    vector = self._client.sla_get_safe_domain_vector(self.SLA_MIN_JOB_INSTANCE_COUNT, hostnames)
+    host_groups = vector.probe_hosts(
+      sla_percentage,
+      sla_duration.as_(Time.SECONDS),
+      grouping_function)
+
+    # Given that maintenance is performed 1 group at a time, any result longer than 1 group
+    # should be considered a batch failure.
+    if host_groups:
+      if len(host_groups) > 1:
+        log.error('Illegal multiple groups detected in SLA results. Skipping hosts:%s' % hostnames)
+        return False
+
+      results = format_sla_results(host_groups, unsafe_only=True)
+      if results:
+        print_results(results)
+        log.warning('Some hosts in a group did not pass SLA check. Skipping group:%s' % hostnames)
+        return False
+
+    return True
+
   def end_maintenance(self, hostnames):
     """Pull a list of hostnames out of maintenance mode.
 
@@ -117,7 +163,7 @@ class HostMaintenance(object):
     check_and_log_response(self._client.start_maintenance(Hosts(set(hostnames))))
 
   def perform_maintenance(self, hostnames, grouping_function=DEFAULT_GROUPING,
-                          callback=None):
+                          callback=None, percentage=None, duration=None):
     """Wrap a callback in between sending hosts into maintenance mode and back.
 
     Walk through the process of putting hosts into maintenance, draining them of tasks,
@@ -136,6 +182,10 @@ class HostMaintenance(object):
     self.start_maintenance(hostnames)
 
     for hosts in self.iter_batches(hostnames, grouping_function):
+      if not self._check_sla(list(hosts.hostNames), grouping_function, percentage, duration):
+        self._complete_maintenance(hosts)
+        continue
+
       self._drain_hosts(hosts)
       if callback:
         self._operate_on_hosts(hosts, callback)

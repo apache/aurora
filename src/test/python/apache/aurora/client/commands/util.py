@@ -13,10 +13,13 @@
 #
 
 import unittest
+from collections import defaultdict
 
 from mock import Mock
 
+from apache.aurora.client.api.sla import DomainUpTimeSlaVector, JobUpTimeDetails
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
 
@@ -126,3 +129,18 @@ jobs = [HELLO_WORLD]
   def get_invalid_config(cls, bad_clause):
     return cls.get_test_config(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB,
         bad_clause)
+
+  @classmethod
+  def create_mock_probe_hosts_vector(cls, result):
+    mock_vector = Mock(spec=DomainUpTimeSlaVector)
+    mock_vector.probe_hosts.return_value = result
+    return mock_vector
+
+  @classmethod
+  def create_probe_hosts(cls, num_hosts, predicted, safe, safe_in):
+    hosts = defaultdict(list)
+    for i in range(num_hosts):
+      host_name = 'h%s' % i
+      job = AuroraJobKey.from_path('west/role/env/job%s' % i)
+      hosts[host_name].append(JobUpTimeDetails(job, predicted, safe, safe_in))
+    return [hosts]

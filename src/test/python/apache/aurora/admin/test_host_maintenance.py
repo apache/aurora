@@ -144,12 +144,16 @@ class TestHostMaintenance(unittest.TestCase):
     spec=HostMaintenance._drain_hosts)
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance.start_maintenance",
     spec=HostMaintenance.start_maintenance)
-  def test_perform_maintenance(self, mock_start_maintenance, mock_drain_hosts,
-      mock_operate_on_hosts, mock_complete_maintenance):
+  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._check_sla",
+    spec=HostMaintenance._check_sla)
+  def test_perform_maintenance(self, mock_check_sla, mock_start_maintenance,
+      mock_drain_hosts, mock_operate_on_hosts, mock_complete_maintenance):
     mock_callback = mock.Mock()
+    mock_check_sla.return_value = True
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
     maintenance.perform_maintenance(TEST_HOSTNAMES, callback=mock_callback)
     mock_start_maintenance.assert_called_once_with(TEST_HOSTNAMES)
+    assert mock_check_sla.call_count == 3
     assert mock_drain_hosts.call_count == 3
     assert mock_drain_hosts.call_args_list == [
         mock.call(Hosts(set([hostname]))) for hostname in TEST_HOSTNAMES]
@@ -171,13 +175,13 @@ class TestHostMaintenance(unittest.TestCase):
         ]))
     ))
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
-    statuses = maintenance.check_status(TEST_HOSTNAMES)
+    result = maintenance.check_status(TEST_HOSTNAMES)
     mock_maintenance_status.assert_called_once_with(Hosts(set(TEST_HOSTNAMES)))
-    assert statuses == [
-        (TEST_HOSTNAMES[0], MaintenanceMode._VALUES_TO_NAMES[MaintenanceMode.DRAINING]),
-        (TEST_HOSTNAMES[1], MaintenanceMode._VALUES_TO_NAMES[MaintenanceMode.DRAINED]),
-        (TEST_HOSTNAMES[2], MaintenanceMode._VALUES_TO_NAMES[MaintenanceMode.NONE])
-    ]
+
+    assert len(result) == 3
+    assert (TEST_HOSTNAMES[0], MaintenanceMode._VALUES_TO_NAMES[MaintenanceMode.DRAINING]) in result
+    assert (TEST_HOSTNAMES[1], MaintenanceMode._VALUES_TO_NAMES[MaintenanceMode.DRAINED]) in result
+    assert (TEST_HOSTNAMES[2], MaintenanceMode._VALUES_TO_NAMES[MaintenanceMode.NONE]) in result
 
 
 def test_default_grouping():

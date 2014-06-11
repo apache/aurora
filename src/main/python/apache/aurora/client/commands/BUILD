@@ -29,6 +29,7 @@ python_library(
     pants('3rdparty/python:twitter.common.app'),
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.quantity'),
+    pants('src/main/python/apache/aurora/admin:util'),
     pants('src/main/python/apache/aurora/client/api'),
     pants('src/main/python/apache/aurora/client:base'),
     pants('src/main/python/apache/aurora/common:clusters'),

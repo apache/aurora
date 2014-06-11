@@ -45,6 +45,9 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     mock_options.cluster = self.TEST_CLUSTER
     mock_options.verbosity = False
     mock_options.disable_all_hooks = False
+    mock_options.percentage = None
+    mock_options.duration = None
+    mock_options.reason = None
     return mock_options
 
   def create_host_statuses(self, maintenance_mode):
@@ -88,10 +91,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options)) as (
-            mock_scheduler_proxy_class,
-            mock_clusters_maintenancepatch,
-            options):
+        patch('twitter.common.app.get_options', return_value=mock_options)):
       start_maintenance_hosts([self.TEST_CLUSTER])
 
       mock_scheduler_proxy.startMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
@@ -104,10 +104,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options)) as (
-            mock_scheduler_proxy_class,
-            mock_clusters_maintenancepatch,
-            options):
+        patch('twitter.common.app.get_options', return_value=mock_options)):
       end_maintenance_hosts([self.TEST_CLUSTER])
 
       mock_scheduler_proxy.endMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
@@ -128,14 +125,18 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     mock_scheduler_proxy.maintenanceStatus.side_effect = host_status_results
     mock_scheduler_proxy.startMaintenance.return_value = self.create_start_maintenance_result()
     mock_scheduler_proxy.drainHosts.return_value = self.create_start_maintenance_result()
+    mock_vector = self.create_mock_probe_hosts_vector(self.create_probe_hosts(1, 95, True, None))
 
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
+              return_value=mock_vector),
         patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (
             mock_sleep,
             mock_scheduler_proxy_class,
+            mock_vector_class,
             mock_clusters_maintenancepatch,
             options):
       perform_maintenance_hosts([self.TEST_CLUSTER])
@@ -147,6 +148,82 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
       assert mock_scheduler_proxy.drainHosts.call_count == 3
       assert mock_scheduler_proxy.endMaintenance.call_count == 3
 
+  def test_perform_maintenance_hosts_failed_default_sla(self):
+    mock_options = self.make_mock_options()
+    mock_options.post_drain_script = None
+    mock_options.grouping = 'by_host'
+
+    def host_status_results(hostnames):
+      if isinstance(hostnames, Hosts):
+        return self.create_drained_status_result(hostnames)
+      return self.create_maintenance_status_result()
+
+    mock_api, mock_scheduler_proxy = self.create_mock_api()
+    mock_scheduler_proxy.endMaintenance.return_value = self.create_end_maintenance_result()
+    mock_scheduler_proxy.maintenanceStatus.side_effect = host_status_results
+    mock_scheduler_proxy.startMaintenance.return_value = self.create_start_maintenance_result()
+    mock_scheduler_proxy.drainHosts.return_value = self.create_start_maintenance_result()
+    mock_vector = self.create_mock_probe_hosts_vector(self.create_probe_hosts(1, 95, False, None))
+
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
+              return_value=mock_vector),
+        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('twitter.common.app.get_options', return_value=mock_options)):
+      perform_maintenance_hosts([self.TEST_CLUSTER])
+
+      mock_scheduler_proxy.startMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
+      assert mock_scheduler_proxy.endMaintenance.call_count == len(self.HOSTNAMES)
+
+  def test_perform_maintenance_hosts_failed_custom_sla(self):
+    mock_options = self.make_mock_options()
+    mock_options.post_drain_script = None
+    mock_options.grouping = 'by_host'
+    mock_options.percentage = 50
+    mock_options.duration = '10m'
+    mock_options.reason = 'Test overrides'
+
+    def host_status_results(hostnames):
+      if isinstance(hostnames, Hosts):
+        return self.create_drained_status_result(hostnames)
+      return self.create_maintenance_status_result()
+
+    mock_api, mock_scheduler_proxy = self.create_mock_api()
+    mock_scheduler_proxy.endMaintenance.return_value = self.create_end_maintenance_result()
+    mock_scheduler_proxy.maintenanceStatus.side_effect = host_status_results
+    mock_scheduler_proxy.startMaintenance.return_value = self.create_start_maintenance_result()
+    mock_scheduler_proxy.drainHosts.return_value = self.create_start_maintenance_result()
+    mock_vector = self.create_mock_probe_hosts_vector(self.create_probe_hosts(1, 95, False, None))
+
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
+              return_value=mock_vector),
+        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('twitter.common.app.get_options', return_value=mock_options)):
+      perform_maintenance_hosts([self.TEST_CLUSTER])
+
+      mock_scheduler_proxy.startMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
+      assert mock_scheduler_proxy.endMaintenance.call_count == len(self.HOSTNAMES)
+
+  def test_perform_maintenance_hosts_reason_missing(self):
+    mock_options = self.make_mock_options()
+    mock_options.grouping = 'by_host'
+    mock_options.percentage = 50
+    mock_options.duration = '10m'
+
+    with contextlib.nested(
+        patch('twitter.common.app.get_options', return_value=mock_options)):
+      try:
+        perform_maintenance_hosts([self.TEST_CLUSTER])
+      except SystemExit:
+        pass
+      else:
+        assert 'Expected error is not raised.'
+
   def test_host_maintenance_status(self):
     mock_options = self.make_mock_options()
     mock_api, mock_scheduler_proxy = self.create_mock_api()
@@ -154,10 +231,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options)) as (
-            mock_scheduler_proxy_class,
-            mock_clusters_maintenancepatch,
-            options):
+        patch('twitter.common.app.get_options', return_value=mock_options)):
       host_maintenance_status([self.TEST_CLUSTER])
 
       mock_scheduler_proxy.maintenanceStatus.assert_called_with(Hosts(set(self.HOSTNAMES)))

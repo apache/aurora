@@ -22,17 +22,22 @@ from twitter.common import app, log
 from twitter.common.quantity import Amount, Data, Time
 from twitter.common.quantity.parse_simple import parse_data, parse_time
 
+from apache.aurora.admin.admin_util import (
+    FILENAME_OPTION,
+    format_sla_results,
+    HOSTS_OPTION,
+    parse_hostnames,
+    parse_hostnames_optional,
+    parse_sla_percentage,
+    print_results
+)
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.sla import JobUpTimeLimit
 from apache.aurora.client.base import (
     check_and_log_response,
     die,
-    FILENAME_OPTION,
     get_grouping_or_die,
     GROUPING_OPTION,
-    HOSTS_OPTION,
-    parse_hosts,
-    parse_hosts_optional,
     requires
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -52,18 +57,6 @@ MIN_SLA_INSTANCE_COUNT = optparse.Option(
     default=10,
     help='Min job instance count to consider for SLA purposes. Default 10.'
 )
-
-
-def print_results(results):
-  for line in results:
-    print(line)
-
-
-def parse_sla_percentage(percentage):
-  val = float(percentage)
-  if val <= 0 or val > 100:
-    die('Invalid percentage %s. Must be within (0, 100].' % percentage)
-  return val
 
 
 @app.command
@@ -407,8 +400,8 @@ def sla_list_safe_domain(cluster, percentage, duration):
   sla_percentage = parse_sla_percentage(percentage)
   sla_duration = parse_time(duration)
 
-  exclude_hosts = parse_hosts_optional(options.exclude_hosts, options.exclude_filename)
-  include_hosts = parse_hosts_optional(options.include_hosts, options.include_filename)
+  exclude_hosts = parse_hostnames_optional(options.exclude_hosts, options.exclude_filename)
+  include_hosts = parse_hostnames_optional(options.include_hosts, options.include_filename)
   override_jobs = parse_jobs_file(options.override_filename) if options.override_filename else {}
   get_grouping_or_die(options.grouping)
 
@@ -466,7 +459,7 @@ def sla_probe_hosts(cluster, percentage, duration):
 
   sla_percentage = parse_sla_percentage(percentage)
   sla_duration = parse_time(duration)
-  hosts = parse_hosts(options.filename, options.hosts)
+  hosts = parse_hostnames(options.filename, options.hosts)
   get_grouping_or_die(options.grouping)
 
   vector = AuroraClientAPI(
@@ -474,19 +467,7 @@ def sla_probe_hosts(cluster, percentage, duration):
       options.verbosity).sla_get_safe_domain_vector(options.min_instance_count, hosts)
   groups = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), options.grouping)
 
-  results = []
-  for group in groups:
-    for host, job_details in sorted(group.items()):
-      results.append('\n'.join(
-          ['%s\t%s\t%.2f\t%s\t%s' %
-              (host,
-               d.job.to_path(),
-               d.predicted_percentage,
-               d.safe,
-               'n/a' if d.safe_in_secs is None else d.safe_in_secs)
-              for d in sorted(job_details)]))
-
-  print_results(results)
+  print_results(format_sla_results(groups))
 
 
 @app.command

@@ -63,7 +63,8 @@ EXIT_UNKNOWN_ERROR = 20
 # invocation, and "user", which contains the username of the user who invoked
 # the client.
 
-logger = logging.getLogger("aurora_client")
+LOGGER_NAME = "aurora_client"
+logger = logging.getLogger(LOGGER_NAME)
 CLIENT_ID = uuid1()
 
 
@@ -77,6 +78,7 @@ def print_aurora_log(sev, msg, *args, **kwargs):
   extra = kwargs.get("extra", {})
   extra["clientid"] = CLIENT_ID
   extra["user"] = getpass.getuser()
+  extra["logger_name"] = LOGGER_NAME
   kwargs["extra"] = extra
   logger.log(sev, msg, *args, **kwargs)
 
