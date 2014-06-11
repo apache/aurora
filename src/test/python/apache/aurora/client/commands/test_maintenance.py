@@ -116,7 +116,6 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
   def test_perform_maintenance_hosts(self):
     mock_options = self.make_mock_options()
     mock_options.post_drain_script = None
-    mock_options.groups_per_batch = '1'
     mock_options.grouping = 'by_host'
 
     def host_status_results(hostnames):
@@ -144,9 +143,9 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
       mock_scheduler_proxy.startMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
       #TODO(jsmith): Consider not mocking out sleep and instead refactoring
       assert mock_sleep.call_count == 3
-      assert mock_scheduler_proxy.maintenanceStatus.call_count == 7
+      assert mock_scheduler_proxy.maintenanceStatus.call_count == 6
       assert mock_scheduler_proxy.drainHosts.call_count == 3
-      assert mock_scheduler_proxy.endMaintenance.call_count == 4
+      assert mock_scheduler_proxy.endMaintenance.call_count == 3
 
   def test_host_maintenance_status(self):
     mock_options = self.make_mock_options()

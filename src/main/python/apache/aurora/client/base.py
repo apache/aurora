@@ -142,6 +142,19 @@ def get_grouping_or_die(grouping_function):
 
 
 def group_hosts(hostnames, grouping_function=DEFAULT_GROUPING):
+  """Place a list of hosts into batches to be operated upon.
+
+  By default, the grouping function is 'by host' which means that maintenance will
+  operate on a single hostname at a time. By adding more grouping functions,
+  a site can setup a customized way of specifying groups, such as operating on a single
+  rack of hosts at a time.
+
+  :param hostnames: Hostnames to break into groups
+  :type hostnames: list of host names, must match the host names that slaves are registered with
+  :param grouping_function: Key within GROUPING_FUNCTIONS to partition hosts into desired batches
+  :type grouping_function: string
+  :rtype: dictionary of batches
+  """
   grouping_function = get_grouping_or_die(grouping_function)
   groups = defaultdict(set)
   for hostname in hostnames:
