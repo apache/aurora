@@ -17,7 +17,12 @@ import contextlib
 from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.cli import EXIT_COMMAND_FAILURE, EXIT_INVALID_CONFIGURATION
+from apache.aurora.client.cli import (
+    EXIT_COMMAND_FAILURE,
+    EXIT_INTERRUPTED,
+    EXIT_INVALID_CONFIGURATION,
+    EXIT_UNKNOWN_ERROR
+)
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.config import AuroraConfig
@@ -181,3 +186,38 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       api = mock_context.get_api('west')
       assert api.create_job.call_count == 0
       assert api.scheduler_proxy.getTasksStatus.call_count == 0
+
+  def test_interrupt(self):
+    mock_context = FakeAuroraCommandContext()
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context',
+            side_effect=KeyboardInterrupt())):
+      api = mock_context.get_api('west')
+      api.create_job.return_value = self.get_createjob_response()
+
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        result = cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
+            fp.name])
+        assert result == EXIT_INTERRUPTED
+        assert api.create_job.call_count == 0
+
+  def test_unknown_error(self):
+    mock_context = FakeAuroraCommandContext()
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context',
+            side_effect=Exception("Argh"))):
+      api = mock_context.get_api('west')
+      api.create_job.return_value = self.get_createjob_response()
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        result = cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
+            fp.name])
+        assert result == EXIT_UNKNOWN_ERROR
+        assert api.create_job.call_count == 0

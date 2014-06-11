@@ -45,6 +45,7 @@ from .options import CommandOption
 
 # Constants for standard return codes.
 EXIT_OK = 0
+EXIT_INTERRUPTED = 130
 EXIT_INVALID_CONFIGURATION = 3
 EXIT_COMMAND_FAILURE = 4
 EXIT_INVALID_COMMAND = 5
@@ -363,7 +364,7 @@ class CommandLine(object):
       except ConfigurationPlugin.Error as e:
         print_aurora_log(logging.INFO, "Error executing post-execution plugin: %s", e.msg)
 
-  def execute(self, args):
+  def _execute(self, args):
     """Execute a command.
     :param args: the command-line arguments for the command. This only includes arguments
         that should be parsed by the application; it does not include sys.argv[0].
@@ -397,6 +398,16 @@ class CommandLine(object):
     except Exception as e:
       print_aurora_log(logging.ERROR, "Internal error executing command: %s", e)
       return EXIT_API_ERROR
+
+  def execute(self, args):
+    try:
+      return self._execute(args)
+    except KeyboardInterrupt:
+      print_aurora_log(logging.ERROR, "Command interrupted by user")
+      return EXIT_INTERRUPTED
+    except Exception as e:
+      print_aurora_log(logging.ERROR, "Unknown error: %s" % e)
+      return EXIT_UNKNOWN_ERROR
 
 
 class Noun(AuroraCommand):
