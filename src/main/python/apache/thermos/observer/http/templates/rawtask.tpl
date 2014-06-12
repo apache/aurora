@@ -21,7 +21,7 @@
 <div class="container">
   <h3> task ${task_id} </h3>
   <div class="content" id="rawTask">
-    <pre>${print_task(task_struct)}</pre>
+    <pre>${print_task(task_struct) | h}</pre>
   </div>
 </div>
 </body>
