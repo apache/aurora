@@ -31,6 +31,12 @@ from gen.apache.aurora.api.ttypes import (
     TaskQuery
 )
 
+MOCK_LOG_CONTENTS = []
+
+
+def mock_log(level, msg):
+  MOCK_LOG_CONTENTS.append((level, msg))
+
 
 class TestRunCommand(AuroraClientCommandTest):
 
@@ -103,6 +109,7 @@ class TestRunCommand(AuroraClientCommandTest):
     mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
     sandbox_args = {'slave_root': '/slaveroot', 'slave_run_directory': 'slaverun'}
     with contextlib.nested(
+        patch('apache.aurora.client.cli.task.print_aurora_log', side_effect=mock_log),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.cli.task.CLUSTERS', new=self.TEST_CLUSTERS),
@@ -110,6 +117,7 @@ class TestRunCommand(AuroraClientCommandTest):
               'InstanceDistributedCommandRunner.sandbox_args',
             return_value=sandbox_args),
         patch('subprocess.Popen', return_value=self.create_mock_process())) as (
+            _,
             mock_scheduler_proxy_class,
             mock_clusters,
             mock_clusters_cli,
@@ -132,6 +140,8 @@ class TestRunCommand(AuroraClientCommandTest):
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'],
           stderr=-2, stdout=-1)
+      # Check that logging worked properly:
+      assert any("Running command" in entry[1] for entry in MOCK_LOG_CONTENTS)
 
 
 class TestSshCommand(AuroraClientCommandTest):

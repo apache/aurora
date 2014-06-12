@@ -12,6 +12,8 @@
 # limitations under the License.
 #
 
+from __future__ import print_function
+
 from twitter.common import log
 
 from apache.aurora.common.aurora_job_key import AuroraJobKey

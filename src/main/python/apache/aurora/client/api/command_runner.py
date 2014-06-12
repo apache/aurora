@@ -14,6 +14,7 @@
 
 from __future__ import print_function
 
+import logging
 import posixpath
 import subprocess
 from multiprocessing.pool import ThreadPool
@@ -36,13 +37,6 @@ class CommandRunnerTrait(Cluster.Trait):
 
 
 class DistributedCommandRunner(object):
-  @staticmethod
-  def execute(args):
-    hostname, role, command = args
-    ssh_command = ['ssh', '-n', '-q', '%s@%s' % (role, hostname), command]
-    po = subprocess.Popen(ssh_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.communicate()
-    return '\n'.join('%s:  %s' % (hostname, line) for line in output[0].splitlines())
 
   @classmethod
   def make_executor_path(cls, cluster, executor_name):
@@ -103,19 +97,29 @@ class DistributedCommandRunner(object):
   def query_from(cls, role, env, job):
     return TaskQuery(statuses=LIVE_STATES, owner=Identity(role), jobName=job, environment=env)
 
-  def __init__(self, cluster, role, env, jobs, ssh_user=None):
+  def __init__(self, cluster, role, env, jobs, ssh_user=None,
+      log_fn=log.error):
     self._cluster = cluster
     self._api = AuroraClientAPI(cluster=cluster)
     self._role = role
     self._env = env
     self._jobs = jobs
     self._ssh_user = ssh_user if ssh_user else self._role
+    self._log = log_fn
+
+  def execute(self, args):
+    hostname, role, command = args
+    ssh_command = ['ssh', '-n', '-q', '%s@%s' % (role, hostname), command]
+    self._log(logging.DEBUG, "Running command: %s" % ssh_command)
+    po = subprocess.Popen(ssh_command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output = po.communicate()
+    return '\n'.join('%s:  %s' % (hostname, line) for line in output[0].splitlines())
 
   def resolve(self):
     for job in self._jobs:
       resp = self._api.query(self.query_from(self._role, self._env, job))
       if resp.responseCode != ResponseCode.OK:
-        log.error('Failed to query job: %s' % job)
+        self._log(logging.ERROR, 'Failed to query job: %s' % job)
         continue
       for task in resp.result.scheduleStatusResult.tasks:
         yield task
@@ -143,8 +147,9 @@ class InstanceDistributedCommandRunner(DistributedCommandRunner):
         environment=env,
         instanceIds=instances)
 
-  def __init__(self, cluster, role, env, job, ssh_user=None, instances=None):
-    super(InstanceDistributedCommandRunner, self).__init__(cluster, role, env, [job], ssh_user)
+  def __init__(self, cluster, role, env, job, ssh_user=None, instances=None, log_fn=logging.log):
+    super(InstanceDistributedCommandRunner, self).__init__(cluster, role, env, [job], ssh_user,
+        log_fn)
     self._job = job
     self._ssh_user = ssh_user if ssh_user else self._role
     self.instances = instances
@@ -155,6 +160,6 @@ class InstanceDistributedCommandRunner(DistributedCommandRunner):
       for task in resp.result.scheduleStatusResult.tasks:
         yield task
     else:
-      # This should be fixed by AURORA-503.
-      log.error('could not retrieve task information for run command: %s' % resp.messageDEPRECATED)
+      self._log(logging.ERROR,
+          "Error: could not retrieve task information for run command: %s" % resp.messageDEPRECATED)
       raise ValueError("Could not retrieve task information: %s" % resp.messageDEPRECATED)

@@ -23,7 +23,16 @@ from apache.aurora.client.api.command_runner import (
     DistributedCommandRunner,
     InstanceDistributedCommandRunner
 )
-from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, Noun, Verb
+from apache.aurora.client.api.updater_util import UpdaterConfig
+from apache.aurora.client.cli import (
+    EXIT_COMMAND_FAILURE,
+    EXIT_INVALID_CONFIGURATION,
+    EXIT_INVALID_PARAMETER,
+    EXIT_OK,
+    Noun,
+    print_aurora_log,
+    Verb
+)
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
     CommandOption,
@@ -65,11 +74,10 @@ class RunCommand(Verb):
     ]
 
   def execute(self, context):
-    # TODO(mchucarroll): add options to specify which instances to run on (AURORA-198)
     (cluster_name, role, env, name), instances = context.options.instance_spec
     cluster = CLUSTERS[cluster_name]
-    dcr = InstanceDistributedCommandRunner(cluster, role, env, name, context.options.ssh_user,
-        instances)
+    dcr = InstanceDistributedCommandRunner(cluster, role, env, name,
+        context.options.ssh_user, instances, print_aurora_log)
     dcr.run(context.options.cmd, parallelism=context.options.num_threads,
         executor_sandbox=context.options.executor_sandbox)
 
