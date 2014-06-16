@@ -432,6 +432,10 @@ struct JobSummaryResult {
   1: set<JobSummary> summaries
 }
 
+struct GetLocksResult {
+  1: set<Lock> locks
+}
+
 // meta-data about the thrift server that is wrapped around every thrift response
 struct ServerInfo {
   1: string clusterName
@@ -454,6 +458,7 @@ union Result {
   16: AcquireLockResult acquireLockResult
   17: RoleSummaryResult roleSummaryResult
   18: JobSummaryResult jobSummaryResult
+  19: GetLocksResult getLocksResult
 }
 
 struct ResponseDetail {
@@ -497,6 +502,9 @@ service ReadOnlyScheduler {
   // Populates fields in a job configuration as though it were about to be run.
   // This can be used to diff a configuration running tasks.
   Response populateJobConfig(1: JobConfiguration description)
+
+  // Returns all stored context specific resource/operation locks.
+  Response getLocks()
 }
 
 // Due to assumptions in the client all authenticated RPCs must have a SessionKey as their

@@ -18,6 +18,7 @@ import java.util.Date;
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
+
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.Lock;
@@ -119,6 +120,16 @@ class LockManagerImpl implements LockManager {
             String.format("Invalid operation context: %s", formatLockKey(context)));
       }
     }
+  }
+
+  @Override
+  public Iterable<ILock> getLocks() {
+    return storage.weaklyConsistentRead(new Work.Quiet<Iterable<ILock>>() {
+      @Override
+      public Iterable<ILock> apply(StoreProvider storeProvider) {
+        return storeProvider.getLockStore().fetchLocks();
+      }
+    });
   }
 
   private static String formatLockKey(ILockKey lockKey) {

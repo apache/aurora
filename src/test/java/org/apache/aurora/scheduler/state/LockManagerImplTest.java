@@ -16,6 +16,8 @@ package org.apache.aurora.scheduler.state;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.Iterables;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -127,6 +129,12 @@ public class LockManagerImplTest extends EasyMockTest {
     ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
     ILockKey key = ILockKey.build(LockKey.job(jobKey.newBuilder()));
     lockManager.validateIfLocked(key, Optional.of(lock));
+  }
+
+  @Test
+  public void testGetLocks() throws Exception {
+    ILock lock = lockManager.acquireLock(LOCK_KEY, USER);
+    assertEquals(lock, Iterables.getOnlyElement(lockManager.getLocks()));
   }
 
   private void expectLockException(IJobKey key) {

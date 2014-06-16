@@ -235,6 +235,11 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
+  public Response getLocks() throws TException {
+    return delegate.getLocks();
+  }
+
+  @Override
   public Response addInstances(
       AddInstancesConfig config,
       Lock lock,

@@ -53,6 +53,7 @@ import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.DrainHostsResult;
 import org.apache.aurora.gen.EndMaintenanceResult;
 import org.apache.aurora.gen.GetJobsResult;
+import org.apache.aurora.gen.GetLocksResult;
 import org.apache.aurora.gen.GetQuotaResult;
 import org.apache.aurora.gen.Hosts;
 import org.apache.aurora.gen.InstanceConfigRewrite;
@@ -1065,6 +1066,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     } catch (LockException e) {
       return addMessage(response, LOCK_ERROR, e.getMessage());
     }
+  }
+
+  @Override
+  public Response getLocks() {
+    return okResponse(Result.getLocksResult(
+        new GetLocksResult().setLocks(ILock.toBuildersSet(lockManager.getLocks()))));
   }
 
   @VisibleForTesting

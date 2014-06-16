@@ -18,6 +18,7 @@ from apache.aurora.client.cli.bridge import Bridge, CommandProcessor
 from apache.aurora.client.cli.logsetup import setup_default_log_handlers
 from apache.aurora.client.cli.standalone_client import AuroraCommandLine
 
+
 # TODO(mchucarroll): the entire bridged executable mechanism here is
 # intended to be deprecated once clientv2 has proven to be stable
 # and adopted by most users. Once we reach that point, this should

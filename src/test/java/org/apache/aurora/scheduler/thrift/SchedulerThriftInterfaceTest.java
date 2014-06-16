@@ -1579,6 +1579,18 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testGetLocks() throws Exception {
+    expect(lockManager.getLocks()).andReturn(ImmutableSet.of(LOCK));
+
+    control.replay();
+
+    Response response = thrift.getLocks();
+    assertEquals(
+        LOCK.newBuilder(),
+        Iterables.getOnlyElement(response.getResult().getGetLocksResult().getLocks()));
+  }
+
+  @Test
   public void testGetQuota() throws Exception {
     QuotaInfo infoMock = createMock(QuotaInfo.class);
     expect(quotaManager.getQuotaInfo(ROLE)).andReturn(infoMock);

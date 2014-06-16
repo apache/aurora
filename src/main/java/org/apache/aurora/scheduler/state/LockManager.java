@@ -54,6 +54,13 @@ public interface LockManager {
   void validateIfLocked(ILockKey context, Optional<ILock> heldLock) throws LockException;
 
   /**
+   * Returns all available locks stored.
+   *
+   * @return Set of {@link ILock} instances.
+   */
+  Iterable<ILock> getLocks();
+
+  /**
    * Thrown when {@link ILock} related operation failed.
    */
   class LockException extends Exception {
