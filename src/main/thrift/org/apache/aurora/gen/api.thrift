@@ -137,7 +137,7 @@ struct Lock {
 // Defines the required lock validation level.
 enum LockValidation {
   CHECKED   = 0   // The lock must be valid in order to be released.
-  UNCHECKED = 1   // The lock will be released without validation (aka “force release”).
+  UNCHECKED = 1   // The lock will be released without validation (aka "force release").
 }
 
 // A unique identifier for the active task within a job.
