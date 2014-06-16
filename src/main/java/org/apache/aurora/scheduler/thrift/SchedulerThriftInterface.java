@@ -410,8 +410,15 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response getTasksStatus(TaskQuery query) {
     checkNotNull(query);
 
-    Set<IScheduledTask> tasks =
+    Iterable<IScheduledTask> tasks =
         Storage.Util.weaklyConsistentFetchTasks(storage, Query.arbitrary(query));
+
+    if (query.isSetOffset()) {
+      tasks = Iterables.skip(tasks, query.getOffset());
+    }
+    if (query.isSetLimit()) {
+      tasks = Iterables.limit(tasks, query.getLimit());
+    }
 
     return okResponse(Result.scheduleStatusResult(
             new ScheduleStatusResult().setTasks(IScheduledTask.toBuildersList(tasks))));

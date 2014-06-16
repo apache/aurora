@@ -17,14 +17,19 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Date;
+import java.util.List;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -76,6 +81,7 @@ import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
@@ -1237,6 +1243,65 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(allJobs, thrift.getJobs(null).getResult().getGetJobsResult().getConfigs());
   }
 
+  private TaskQuery setupPaginatedQuery(Iterable<IScheduledTask> tasks, int offset, int limit) {
+    TaskQuery query = new TaskQuery().setOffset(offset).setLimit(limit);
+    Builder builder = Query.arbitrary(query);
+    storageUtil.expectTaskFetch(builder, ImmutableSet.copyOf(tasks));
+    return query;
+  }
+
+  private static final Function<ScheduledTask, Integer> TO_INSTANCE_ID =
+      new Function<ScheduledTask, Integer>() {
+        @Nullable
+        @Override
+        public Integer apply(@Nullable ScheduledTask input) {
+          return input.getAssignedTask().getInstanceId();
+        }
+      };
+
+  @Test
+  public void testGetTasksStatusPagination() throws Exception {
+    Iterable<IScheduledTask> tasks = makeDefaultScheduledTasks(10);
+
+    TaskQuery page1Query = setupPaginatedQuery(tasks, 0, 4);
+    TaskQuery page2Query = setupPaginatedQuery(tasks, 4, 4);
+    TaskQuery page3Query = setupPaginatedQuery(tasks, 8, 4);
+
+    control.replay();
+
+    Response page1Response = assertOkResponse(thrift.getTasksStatus(page1Query));
+    Response page2Response = assertOkResponse(thrift.getTasksStatus(page2Query));
+    Response page3Response = assertOkResponse(thrift.getTasksStatus(page3Query));
+
+    Iterable<Integer> page1Ids = Lists.newArrayList(Iterables.transform(
+        page1Response.getResult().getScheduleStatusResult().getTasks(), TO_INSTANCE_ID));
+    Iterable<Integer> page2Ids = Lists.newArrayList(Iterables.transform(
+        page2Response.getResult().getScheduleStatusResult().getTasks(), TO_INSTANCE_ID));
+    Iterable<Integer> page3Ids = Lists.newArrayList(Iterables.transform(
+        page3Response.getResult().getScheduleStatusResult().getTasks(), TO_INSTANCE_ID));
+
+    assertEquals(Lists.newArrayList(0, 1, 2, 3), page1Ids);
+    assertEquals(Lists.newArrayList(4, 5, 6, 7), page2Ids);
+    assertEquals(Lists.newArrayList(8, 9), page3Ids);
+  }
+
+  @Test
+  public void testGetTasksStatus() throws Exception {
+    Builder query = Query.unscoped();
+
+    Iterable<IScheduledTask> tasks = makeDefaultScheduledTasks(10);
+
+    storageUtil.expectTaskFetch(query, ImmutableSet.copyOf(tasks));
+
+    control.replay();
+
+    ImmutableList<ScheduledTask> expected = IScheduledTask.toBuildersList(tasks);
+
+    Response response = assertOkResponse(thrift.getTasksStatus(new TaskQuery()));
+
+    assertEquals(expected, response.getResult().getScheduleStatusResult().getTasks());
+  }
+
   @Test
   public void testGetRoleSummary() throws Exception {
     final String BAZ_ROLE = "baz_role";
@@ -1539,6 +1604,18 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static JobConfiguration makeJob(TaskConfig task) {
     return makeJob(task, 1);
+  }
+
+  private static Iterable<IScheduledTask> makeDefaultScheduledTasks(int n) {
+    TaskConfig config = defaultTask(true);
+
+    List<IScheduledTask> tasks = Lists.newArrayList();
+    for (int i = 0; i < n; i++) {
+      tasks.add(IScheduledTask.build(new ScheduledTask()
+          .setAssignedTask(new AssignedTask().setTask(config).setInstanceId(i))));
+    }
+
+    return tasks;
   }
 
   private static JobConfiguration makeJob(TaskConfig task, int shardCount) {

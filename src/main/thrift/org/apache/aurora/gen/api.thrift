@@ -381,6 +381,8 @@ struct TaskQuery {
   7: set<i32> instanceIds
   10: set<string> slaveHosts
   11: set<JobKey> jobKeys
+  12: i32 offset
+  13: i32 limit
 }
 
 struct HostStatus {
