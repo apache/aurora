@@ -81,7 +81,7 @@ public interface TaskAssigner {
           offer.getSlaveId(),
           selectedPorts);
       LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
-          host, offer.getSlaveId(), Tasks.id(task)));
+          host, offer.getSlaveId().getValue(), Tasks.id(task)));
       return taskFactory.createFrom(assigned, offer.getSlaveId());
     }
 
