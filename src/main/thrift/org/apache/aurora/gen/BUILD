@@ -32,6 +32,9 @@ python_thrift_library(
 python_thrift_library(
   name = 'py-thrift-storage',
   sources = ['storage.thrift'],
+  dependencies = [
+    pants(':py-thrift'),
+  ],
 )
 
 python_library(

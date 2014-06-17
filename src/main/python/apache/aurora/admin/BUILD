@@ -14,7 +14,7 @@
 
 python_library(
   name = 'host_maintenance',
-  sources = 'host_maintenance.py',
+  sources = ['host_maintenance.py'],
   dependencies = [
     pants(':util'),
     pants('3rdparty/python:twitter.common.log'),
@@ -26,7 +26,7 @@ python_library(
 
 python_library(
   name = 'util',
-  sources = 'admin_util.py',
+  sources = ['admin_util.py'],
   dependencies = [
     pants('src/main/python/apache/aurora/client:base'),
   ]

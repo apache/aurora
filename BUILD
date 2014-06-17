@@ -12,11 +12,11 @@
 # limitations under the License.
 #
 
-source_root('src/main/python', Page, PythonBinary, PythonLibrary)
-source_root('src/main/thrift', Page, PythonLibrary, PythonThriftLibrary)
+source_root('src/main/python', page, python_binary, python_library)
+source_root('src/main/thrift', python_library, python_thrift_library)
 
 # TODO(wickman) get rid of PythonLibrary from src/test/python:
 #   src/test/python/apache/aurora/client/BUILD:python_library(
 #   src/test/python/apache/aurora/client/cli/BUILD:python_library(
 #   src/test/python/apache/aurora/client/commands/BUILD:python_library(
-source_root('src/test/python', Page, PythonTests, PythonTestSuite, PythonLibrary)
+source_root('src/test/python', python_tests, python_test_suite, python_library)
