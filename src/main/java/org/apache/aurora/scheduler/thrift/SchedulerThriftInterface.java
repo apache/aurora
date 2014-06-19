@@ -621,7 +621,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return addMessage(response, LOCK_ERROR, e.getMessage());
     }
 
-    return addMessage(response, OK, "Tasks killed.");
+    return okEmptyResponse();
   }
 
   @Override
