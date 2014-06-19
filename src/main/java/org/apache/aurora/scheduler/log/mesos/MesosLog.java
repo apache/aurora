@@ -341,8 +341,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       });
     }
 
-    @VisibleForTesting
-    interface Mutation<T> {
+    private interface Mutation<T> {
       T apply(WriterInterface writer) throws TimeoutException, Log.WriterFailedException;
     }
 
@@ -354,8 +353,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       throw new StreamAccessException(message, cause);
     }
 
-    @VisibleForTesting
-    synchronized <T> T mutate(OpStats stats, Mutation<T> mutation) {
+    private synchronized <T> T mutate(OpStats stats, Mutation<T> mutation) {
       if (writer == null) {
         throw new IllegalStateException("The log has encountered an error and cannot be used.");
       }
@@ -379,7 +377,8 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       return LogPosition.wrap(reader.ending());
     }
 
-    private static class LogPosition implements org.apache.aurora.scheduler.log.Log.Position {
+    @VisibleForTesting
+    static class LogPosition implements org.apache.aurora.scheduler.log.Log.Position {
       private final Log.Position underlying;
 
       LogPosition(Log.Position underlying) {
