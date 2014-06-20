@@ -17,14 +17,18 @@ import contextlib
 from mock import Mock, patch
 
 from apache.aurora.client.api import AuroraClientAPI
-from apache.aurora.client.commands.admin import increase_quota, query, set_quota
+from apache.aurora.client.commands.admin import get_locks, increase_quota, query, set_quota
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES, TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
+    GetLocksResult,
     GetQuotaResult,
     Identity,
+    JobKey,
+    Lock,
+    LockKey,
     ResourceAggregate,
     Response,
     ResponseCode,
@@ -185,3 +189,48 @@ class TestSetQuotaCommand(AuroraClientCommandTest):
       assert type(api.return_value.set_quota.call_args[0][1]) == type(float())
       assert type(api.return_value.set_quota.call_args[0][2]) == type(int())
       assert type(api.return_value.set_quota.call_args[0][3]) == type(int())
+
+
+class TestGetLocksCommand(AuroraClientCommandTest):
+
+  MESSAGE = 'test message'
+  USER = 'test user'
+  LOCKS = [Lock(
+    key=LockKey(job=JobKey('role', 'env', 'name')),
+    token='test token',
+    user=USER,
+    timestampMs='300',
+    message=MESSAGE)]
+
+  @classmethod
+  def setup_mock_options(cls):
+    mock_options = Mock(spec=['verbosity'])
+    mock_options.verbosity = 'verbose'
+    return mock_options
+
+  @classmethod
+  def create_response(cls, locks, response_code=None):
+    response_code = ResponseCode.OK if response_code is None else response_code
+    resp = Response(responseCode=response_code, messageDEPRECATED='test')
+    resp.result = Result(getLocksResult=GetLocksResult(locks=locks))
+    return resp
+
+  def test_get_locks(self):
+    """Tests successful execution of the get_locks command."""
+    mock_options = self.setup_mock_options()
+    with contextlib.nested(
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('apache.aurora.client.commands.admin.AuroraClientAPI',
+              new=Mock(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.commands.admin.print_results'),
+    ) as (_, api, _, mock_print_results):
+
+      api.return_value.get_locks.return_value = self.create_response(self.LOCKS)
+
+      get_locks([self.TEST_CLUSTER])
+
+      assert api.return_value.get_locks.call_count == 1
+      assert mock_print_results.call_count == 1
+      assert "'message': '%s'" % self.MESSAGE in mock_print_results.call_args[0][0][0]
+      assert "'user': '%s'" % self.USER in mock_print_results.call_args[0][0][0]

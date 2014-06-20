@@ -16,6 +16,7 @@ from __future__ import print_function
 
 import json
 import optparse
+import pprint
 import sys
 
 from twitter.common import app, log
@@ -319,7 +320,25 @@ def scheduler_snapshot(cluster):
   Request that the scheduler perform a storage snapshot and block until complete.
   """
   options = app.get_options()
-  check_and_log_response(AuroraClientAPI(CLUSTERS['cluster'], options.verbosity).snapshot())
+  check_and_log_response(AuroraClientAPI(CLUSTERS[cluster], options.verbosity).snapshot())
+
+
+@app.command
+@requires.exactly('cluster')
+def get_locks(cluster):
+  """usage: get_locks cluster
+
+  Prints all context/operation locks in the scheduler.
+  """
+  options = app.get_options()
+  resp = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).get_locks()
+  check_and_log_response(resp)
+
+  pp = pprint.PrettyPrinter(indent=2)
+  def pretty_print_lock(lock):
+    return pp.pformat(vars(lock))
+
+  print_results([',\n'.join(pretty_print_lock(t) for t in resp.result.getLocksResult.locks)])
 
 
 @app.command
