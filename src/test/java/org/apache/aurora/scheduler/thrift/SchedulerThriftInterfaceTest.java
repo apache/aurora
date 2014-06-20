@@ -1288,17 +1288,28 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testGetTasksStatus() throws Exception {
     Builder query = Query.unscoped();
-
     Iterable<IScheduledTask> tasks = makeDefaultScheduledTasks(10);
-
     storageUtil.expectTaskFetch(query, ImmutableSet.copyOf(tasks));
 
     control.replay();
 
     ImmutableList<ScheduledTask> expected = IScheduledTask.toBuildersList(tasks);
-
     Response response = assertOkResponse(thrift.getTasksStatus(new TaskQuery()));
+    assertEquals(expected, response.getResult().getScheduleStatusResult().getTasks());
+  }
 
+  @Test
+  public void testGetTasksWithoutConfigs() throws Exception {
+    Builder query = Query.unscoped();
+    storageUtil.expectTaskFetch(query, ImmutableSet.copyOf(makeDefaultScheduledTasks(10)));
+
+    control.replay();
+
+    ImmutableList<ScheduledTask> expected = IScheduledTask.toBuildersList(makeDefaultScheduledTasks(
+        10,
+        defaultTask(true).setExecutorConfig(null)));
+
+    Response response = assertOkResponse(thrift.getTasksWithoutConfigs(new TaskQuery()));
     assertEquals(expected, response.getResult().getScheduleStatusResult().getTasks());
   }
 
@@ -1619,8 +1630,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private static Iterable<IScheduledTask> makeDefaultScheduledTasks(int n) {
-    TaskConfig config = defaultTask(true);
+    return makeDefaultScheduledTasks(n, defaultTask(true));
+  }
 
+  private static Iterable<IScheduledTask> makeDefaultScheduledTasks(int n, TaskConfig config) {
     List<IScheduledTask> tasks = Lists.newArrayList();
     for (int i = 0; i < n; i++) {
       tasks.add(IScheduledTask.build(new ScheduledTask()

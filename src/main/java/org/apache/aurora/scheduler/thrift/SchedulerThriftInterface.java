@@ -79,6 +79,7 @@ import org.apache.aurora.gen.RoleSummary;
 import org.apache.aurora.gen.RoleSummaryResult;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduleStatusResult;
+import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.StartMaintenanceResult;
 import org.apache.aurora.gen.TaskConfig;
@@ -409,6 +410,26 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   // TODO(William Farner): Provide status information about cron jobs here.
   @Override
   public Response getTasksStatus(TaskQuery query) {
+    return okResponse(Result.scheduleStatusResult(
+        new ScheduleStatusResult().setTasks(getTasks(query))));
+  }
+
+  @Override
+  public Response getTasksWithoutConfigs(TaskQuery query) {
+    List<ScheduledTask> tasks = Lists.transform(
+        getTasks(query),
+        new Function<ScheduledTask, ScheduledTask>() {
+          @Override
+          public ScheduledTask apply(ScheduledTask task) {
+            task.assignedTask.task.executorConfig = null;
+            return task;
+          }
+        });
+
+    return okResponse(Result.scheduleStatusResult(new ScheduleStatusResult().setTasks(tasks)));
+  }
+
+  private List<ScheduledTask> getTasks(TaskQuery query) {
     checkNotNull(query);
 
     Iterable<IScheduledTask> tasks =
@@ -421,8 +442,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       tasks = Iterables.limit(tasks, query.getLimit());
     }
 
-    return okResponse(Result.scheduleStatusResult(
-            new ScheduleStatusResult().setTasks(IScheduledTask.toBuildersList(tasks))));
+    return IScheduledTask.toBuildersList(tasks);
   }
 
   @Override

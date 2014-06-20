@@ -487,6 +487,10 @@ service ReadOnlyScheduler {
   // Fetches the status of tasks.
   Response getTasksStatus(1: TaskQuery query)
 
+  // Same as getTaskStatus but without the TaskConfig.ExecutorConfig data set.
+  // This is an interim solution until we have a better way to query TaskConfigs (AURORA-541).
+  Response getTasksWithoutConfigs(1: TaskQuery query)
+
   // Fetches the status of jobs.
   // ownerRole is optional, in which case all jobs are returned.
   Response getJobs(1: string ownerRole)

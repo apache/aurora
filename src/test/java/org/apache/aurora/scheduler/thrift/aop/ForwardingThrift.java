@@ -167,6 +167,11 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
+  public Response getTasksWithoutConfigs(TaskQuery query) throws TException {
+    return delegate.getTasksStatus(query);
+  }
+
+  @Override
   public Response getJobs(String ownerRole) throws TException {
     return delegate.getJobs(ownerRole);
   }
