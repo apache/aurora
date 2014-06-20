@@ -312,9 +312,12 @@ class Sla(object):
     """
     tasks = self._get_tasks(task_query(hosts=hosts)) if hosts else None
     job_keys = set(job_key_from_scheduled(t, cluster) for t in tasks) if tasks else None
+
+    # Avoid full cluster pull if job_keys are missing for any reason but the hosts are specified.
+    job_tasks = [] if hosts and not job_keys else self._get_tasks(task_query(job_keys=job_keys))
     return DomainUpTimeSlaVector(
         cluster,
-        self._get_tasks(task_query(job_keys=job_keys)),
+        job_tasks,
         min_instance_count=min_instance_count,
         hosts=hosts)
 

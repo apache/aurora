@@ -122,6 +122,7 @@ class HostMaintenance(object):
     sla_percentage = percentage or self.SLA_UPTIME_PERCENTAGE_LIMIT
     sla_duration = duration or self.SLA_UPTIME_DURATION_LIMIT
 
+    log.info('Beginning SLA check for %s' % hostnames)
     vector = self._client.sla_get_safe_domain_vector(self.SLA_MIN_JOB_INSTANCE_COUNT, hostnames)
     host_groups = vector.probe_hosts(
       sla_percentage,
@@ -141,6 +142,7 @@ class HostMaintenance(object):
         log.warning('Some hosts in a group did not pass SLA check. Skipping group:%s' % hostnames)
         return False
 
+    log.info('All hosts passed SLA check.')
     return True
 
   def end_maintenance(self, hostnames):

@@ -443,6 +443,13 @@ class SlaTest(unittest.TestCase):
       self._sla.get_domain_uptime_vector(self._cluster, self._min_count, hosts)
       mock_query.assert_has_calls([call(hosts=hosts), call(job_keys=jobs)], any_order=False)
 
+  def test_get_domain_uptime_vector_with_hosts_no_job_tasks(self):
+    with patch('apache.aurora.client.api.sla.task_query', return_value=TaskQuery()) as (mock_query):
+      self.mock_get_tasks([])
+
+      self._sla.get_domain_uptime_vector(self._cluster, self._min_count, ['h1'])
+      mock_query.assert_called_once_with(hosts=['h1'])
+
   def test_task_query(self):
     jobs = set([
         AuroraJobKey(self._cluster.name, self._role, self._env, 'j1'),
