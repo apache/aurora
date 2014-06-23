@@ -14,8 +14,6 @@
 package org.apache.aurora.scheduler.app;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
@@ -88,7 +86,6 @@ import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
-import org.apache.aurora.scheduler.thrift.ThriftConfiguration;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Status;
@@ -172,21 +169,6 @@ public class SchedulerIT extends BaseZooKeeperTest {
       protected void configure() {
         bind(DriverFactory.class).toInstance(driverFactory);
         bind(Log.class).toInstance(log);
-        bind(ThriftConfiguration.class).toInstance(
-            new ThriftConfiguration() {
-              @Override
-              public Optional<? extends InputStream> getSslKeyStream() throws IOException {
-                return Optional.of(
-                    com.google.common.io.Resources.getResource(getClass(), "AuroraTestKeyStore")
-                        .openStream());
-              }
-
-              @Override
-              public int getServingPort() {
-                return 0;
-              }
-            }
-        );
         bind(ExecutorConfig.class).toInstance(new ExecutorConfig("/executor/thermos"));
         install(new BackupModule(backupDir, SnapshotStoreImpl.class));
       }

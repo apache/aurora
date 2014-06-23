@@ -47,7 +47,6 @@ Like Mesos, Aurora uses command-line flags for runtime configuration. As such th
     # Flags controlling the scheduler.
     AURORA_FLAGS=(
       -http_port=8081
-      -thrift_port=8082
       # Log configuration, etc.
     )
 
@@ -92,8 +91,8 @@ should be set to `2`, and in a cluster of 5 it should be set to `3`.
 
 Network considerations
 ----------------------
-The Aurora scheduler listens on 3 ports - a Thrift port for client RPCs, an admin web UI, and a
-libprocess (HTTP+Protobuf) port used to communicate with the Mesos master and for the log
+The Aurora scheduler listens on 2 ports - an HTTP port used for client RPCs and a web UI,
+and a libprocess (HTTP+Protobuf) port used to communicate with the Mesos master and for the log
 replication protocol. These can be left unconfigured (the scheduler publishes all selected ports
 to ZooKeeper) or explicitly set in the startup script as follows:
 
@@ -101,7 +100,6 @@ to ZooKeeper) or explicitly set in the startup script as follows:
     AURORA_FLAGS=(
       # ...
       -http_port=8081
-      -thrift_port=8082
       # ...
     )
     # ...

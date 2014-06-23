@@ -13,15 +13,10 @@
  */
 package org.apache.aurora.scheduler.app;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.logging.Logger;
 
-import javax.annotation.Nonnegative;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
@@ -68,7 +63,6 @@ import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.mem.MemStorage.Delegated;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
-import org.apache.aurora.scheduler.thrift.ThriftConfiguration;
 import org.apache.aurora.scheduler.thrift.ThriftModule;
 import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 
@@ -91,14 +85,6 @@ public class SchedulerMain extends AbstractApplication {
   @NotEmpty
   @CmdLine(name = "serverset_path", help = "ZooKeeper ServerSet path to register at.")
   private static final Arg<String> SERVERSET_PATH = Arg.create();
-
-  @CmdLine(name = "mesos_ssl_keyfile",
-      help = "JKS keyfile for operating the Mesos Thrift-over-SSL interface.")
-  private static final Arg<File> MESOS_SSL_KEY_FILE = Arg.create();
-
-  @Nonnegative
-  @CmdLine(name = "thrift_port", help = "Thrift server port.")
-  private static final Arg<Integer> THRIFT_PORT = Arg.create(0);
 
   @NotNull
   @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
@@ -193,21 +179,6 @@ public class SchedulerMain extends AbstractApplication {
     Module configModule = new AbstractModule() {
       @Override
       protected void configure() {
-        bind(ThriftConfiguration.class).toInstance(new ThriftConfiguration() {
-          @Override
-          public Optional<InputStream> getSslKeyStream() throws FileNotFoundException {
-            if (MESOS_SSL_KEY_FILE.hasAppliedValue()) {
-              return Optional.<InputStream>of(new FileInputStream(MESOS_SSL_KEY_FILE.get()));
-            } else {
-              return Optional.absent();
-            }
-          }
-
-          @Override
-          public int getServingPort() {
-            return THRIFT_PORT.get();
-          }
-        });
         bind(ExecutorConfig.class).toInstance(new ExecutorConfig(THERMOS_EXECUTOR_PATH.get()));
       }
     };

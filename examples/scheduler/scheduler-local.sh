@@ -36,7 +36,6 @@ AURORA_FLAGS=(
 
   # Ports to listen on.
   -http_port=8081
-  -thrift_port=8082
 
   -native_log_quorum_size=1
 

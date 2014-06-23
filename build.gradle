@@ -470,7 +470,6 @@ run {
     '-thermos_executor_path=/dev/null',
     '-gc_executor_path=/dev/null',
     '-http_port=8081',
-    '-thrift_port=8082',
     '-zk_in_proc=true',
     '-zk_endpoints=localhost:0',
     '-serverset_path=/twitter/service/mesos/local/scheduler',

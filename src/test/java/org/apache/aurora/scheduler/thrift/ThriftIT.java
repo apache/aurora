@@ -158,7 +158,6 @@ public class ThriftIT extends EasyMockTest {
             bind(Storage.class).toInstance(storageTestUtil.storage);
             bind(NonVolatileStorage.class).toInstance(storageTestUtil.storage);
             bindMock(StorageBackup.class);
-            bindMock(ThriftConfiguration.class);
             bind(QuotaManager.class).toInstance(quotaManager);
             bind(SessionValidator.class).toInstance(validator);
             bind(CapabilityValidator.class).toInstance(new CapabilityValidatorFake(validator));
