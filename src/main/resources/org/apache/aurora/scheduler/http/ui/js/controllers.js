@@ -296,10 +296,10 @@
       function buildGroupSummary($scope) {
         var colors = [
           'steelblue',
-          'indianred',
           'darkseagreen',
           'sandybrown',
-          'plum'
+          'plum',
+          'khaki'
         ];
 
         var total = _.reduce($scope.taskSummary, function (m, n) {
