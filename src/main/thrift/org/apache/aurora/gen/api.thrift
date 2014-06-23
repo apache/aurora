@@ -226,6 +226,16 @@ struct AddInstancesConfig {
   3: set<i32> instanceIds
 }
 
+struct ConfigGroup {
+  1: TaskConfig config
+  2: set<i32> instanceIds
+}
+
+struct ConfigSummary {
+  1: JobKey key
+  2: set<ConfigGroup> groups
+}
+
 struct PopulateJobResult {
   1: set<TaskConfig> populated
 }
@@ -432,8 +442,13 @@ struct JobSummaryResult {
   1: set<JobSummary> summaries
 }
 
+
 struct GetLocksResult {
   1: set<Lock> locks
+}
+
+struct ConfigSummaryResult {
+  1: ConfigSummary summary
 }
 
 // meta-data about the thrift server that is wrapped around every thrift response
@@ -459,6 +474,8 @@ union Result {
   17: RoleSummaryResult roleSummaryResult
   18: JobSummaryResult jobSummaryResult
   19: GetLocksResult getLocksResult
+  20: ConfigSummaryResult configSummaryResult
+
 }
 
 struct ResponseDetail {
@@ -490,6 +507,9 @@ service ReadOnlyScheduler {
   // Same as getTaskStatus but without the TaskConfig.ExecutorConfig data set.
   // This is an interim solution until we have a better way to query TaskConfigs (AURORA-541).
   Response getTasksWithoutConfigs(1: TaskQuery query)
+
+  // Fetches the configuration summary of active tasks for the specified job.
+  Response getConfigSummary(1: JobKey job)
 
   // Fetches the status of jobs.
   // ownerRole is optional, in which case all jobs are returned.

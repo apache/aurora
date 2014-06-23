@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.thrift;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -49,7 +50,10 @@ import org.apache.aurora.auth.SessionValidator.AuthFailedException;
 import org.apache.aurora.gen.AcquireLockResult;
 import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.ConfigGroup;
 import org.apache.aurora.gen.ConfigRewrite;
+import org.apache.aurora.gen.ConfigSummary;
+import org.apache.aurora.gen.ConfigSummaryResult;
 import org.apache.aurora.gen.DrainHostsResult;
 import org.apache.aurora.gen.EndMaintenanceResult;
 import org.apache.aurora.gen.GetJobsResult;
@@ -123,6 +127,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 import org.apache.aurora.scheduler.thrift.auth.Requires;
 import org.apache.commons.lang.StringUtils;
+import org.apache.thrift.TException;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -443,6 +448,37 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     return IScheduledTask.toBuildersList(tasks);
+  }
+
+  private static final Function<Entry<ITaskConfig, Collection<Integer>>, ConfigGroup>
+      CONFIG_TO_GROUP = new Function<Entry<ITaskConfig, Collection<Integer>>, ConfigGroup>() {
+
+    @Override
+    public ConfigGroup apply(Entry<ITaskConfig, Collection<Integer>> input) {
+      return new ConfigGroup(input.getKey().newBuilder(), ImmutableSet.copyOf(input.getValue()));
+    }
+  };
+
+  @Override
+  public Response getConfigSummary(JobKey job) throws TException {
+    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(job));
+
+    Set<IScheduledTask> activeTasks =
+        Storage.Util.weaklyConsistentFetchTasks(storage, Query.jobScoped(jobKey).active());
+
+    Iterable<IAssignedTask> assignedTasks =
+        Iterables.transform(activeTasks, Tasks.SCHEDULED_TO_ASSIGNED);
+    Map<Integer, ITaskConfig> tasksByInstance = Maps.transformValues(
+        Maps.uniqueIndex(assignedTasks, Tasks.ASSIGNED_TO_INSTANCE_ID),
+        Tasks.ASSIGNED_TO_INFO);
+    Multimap<ITaskConfig, Integer> instancesByDetails = Multimaps.invertFrom(
+        Multimaps.forMap(tasksByInstance),
+        HashMultimap.<ITaskConfig, Integer>create());
+    Iterable<ConfigGroup> groups = Iterables.transform(
+        instancesByDetails.asMap().entrySet(), CONFIG_TO_GROUP);
+
+    ConfigSummary summary = new ConfigSummary(job, ImmutableSet.copyOf(groups));
+    return okResponse(Result.configSummaryResult(new ConfigSummaryResult().setSummary(summary)));
   }
 
   @Override

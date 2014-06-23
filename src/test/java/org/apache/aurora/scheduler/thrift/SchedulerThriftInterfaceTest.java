@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -46,7 +47,10 @@ import org.apache.aurora.gen.APIVersion;
 import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.gen.ConfigGroup;
 import org.apache.aurora.gen.ConfigRewrite;
+import org.apache.aurora.gen.ConfigSummary;
+import org.apache.aurora.gen.ConfigSummaryResult;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.HostStatus;
@@ -1311,6 +1315,61 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Response response = assertOkResponse(thrift.getTasksWithoutConfigs(new TaskQuery()));
     assertEquals(expected, response.getResult().getScheduleStatusResult().getTasks());
+  }
+
+  @Test
+  public void testGetConfigSummary() throws Exception {
+    IJobKey key = JobKeys.from("test", "test", "test");
+
+    TaskConfig firstGroupTask = defaultTask(true);
+    TaskConfig secondGroupTask = defaultTask(true).setNumCpus(2);
+
+    IScheduledTask first1 = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(firstGroupTask).setInstanceId(0)));
+
+    IScheduledTask first2 = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(firstGroupTask).setInstanceId(1)));
+
+    IScheduledTask second = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask().setTask(secondGroupTask).setInstanceId(2)));
+
+    storageUtil.expectTaskFetch(Query.jobScoped(key).active(), first1, first2, second);
+
+    ConfigGroup group1 = new ConfigGroup()
+        .setConfig(firstGroupTask)
+        .setInstanceIds(Sets.newHashSet(0, 1));
+    ConfigGroup group2 = new ConfigGroup()
+        .setConfig(secondGroupTask)
+        .setInstanceIds(Sets.newHashSet(2));
+
+    ConfigSummary summary = new ConfigSummary()
+        .setKey(key.newBuilder())
+        .setGroups(Sets.newHashSet(group1, group2));
+
+    ConfigSummaryResult expected = new ConfigSummaryResult().setSummary(summary);
+
+    control.replay();
+
+    Response response = assertOkResponse(thrift.getConfigSummary(key.newBuilder()));
+    assertEquals(expected, response.getResult().getConfigSummaryResult());
+  }
+
+  @Test
+  public void testEmptyConfigSummary() throws Exception {
+    IJobKey key = JobKeys.from("test", "test", "test");
+
+    storageUtil.expectTaskFetch(Query.jobScoped(key).active(), ImmutableSet.<IScheduledTask>of());
+
+    ConfigSummary summary = new ConfigSummary()
+        .setKey(key.newBuilder())
+        .setGroups(Sets.<ConfigGroup>newHashSet());
+
+    ConfigSummaryResult expected = new ConfigSummaryResult().setSummary(summary);
+
+    control.replay();
+
+    Response response = assertOkResponse(thrift.getConfigSummary(key.newBuilder()));
+    assertEquals(expected, response.getResult().getConfigSummaryResult());
   }
 
   @Test
