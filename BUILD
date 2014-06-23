@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-source_root('src/main/python', page, python_binary, python_library)
+source_root('src/main/python', page, python_binary, python_library, resources)
 source_root('src/main/thrift', python_library, python_thrift_library)
 
 # TODO(wickman) get rid of PythonLibrary from src/test/python:
