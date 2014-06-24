@@ -32,13 +32,7 @@ hostname 192.168.33.7
 
 function build_all() {
   echo Copying aurora source code
-  rsync -urzvh /vagrant/ aurora \
-      --exclude './.gradle' \
-      --exclude './.pants.d' \
-      --exclude './dist/*' \
-      --exclude './build-support/*.venv' \
-      --exclude './build-support/thrift/thrift-*' \
-      --exclude '*.pyc'
+  rsync -urzvh /vagrant/ aurora --filter=':- .gitignore' --exclude=.git
 
   pushd aurora
     # fetch the mesos egg, needed to build python components
