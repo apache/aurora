@@ -17,6 +17,7 @@ import com.google.inject.AbstractModule;
 import com.twitter.common.inject.Bindings.KeyFactory;
 
 import org.apache.aurora.scheduler.storage.LockStore;
+import org.apache.aurora.scheduler.storage.QuotaStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -41,8 +42,13 @@ public class MigrationModule extends AbstractModule {
     this.toFactory = checkNotNull(to);
   }
 
+  private <T> void link(Class<T> clazz) {
+    bind(fromFactory.create(clazz)).to(toFactory.create(clazz));
+  }
+
   @Override
   protected void configure() {
-    bind(fromFactory.create(LockStore.Mutable.class)).to(toFactory.create(LockStore.Mutable.class));
+    link(LockStore.Mutable.class);
+    link(QuotaStore.Mutable.class);
   }
 }

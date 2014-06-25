@@ -85,7 +85,7 @@ public class MemStorage implements Storage {
       final TaskStore.Mutable taskStore,
       @Delegated final LockStore.Mutable lockStore,
       @Delegated final Storage delegated,
-      final QuotaStore.Mutable quotaStore,
+      @Delegated final QuotaStore.Mutable quotaStore,
       final AttributeStore.Mutable attributeStore) {
     this.delegatedStore = delegated;
     storeProvider = new MutableStoreProvider() {

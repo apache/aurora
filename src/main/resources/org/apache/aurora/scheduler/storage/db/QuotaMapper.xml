@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.apache.aurora.scheduler.storage.db.QuotaMapper">
+  <insert id="merge">
+    MERGE INTO quotas (
+      id,
+      role,
+      num_cpus,
+      ram_mb,
+      disk_mb
+    ) KEY(role) VALUES (
+      null,
+      #{role},
+      #{quota.numCpus},
+      #{quota.ramMb},
+      #{quota.diskMb}
+    )
+  </insert>
+
+  <select id="select" resultType="org.apache.aurora.gen.ResourceAggregate">
+    SELECT * FROM quotas
+    WHERE role = #{id}
+  </select>
+
+  <resultMap id="quotaResultMap" type="org.apache.aurora.gen.storage.SaveQuota">
+    <id column="id" />
+    <association property="quota" javaType="org.apache.aurora.gen.ResourceAggregate" />
+  </resultMap>
+
+  <select id="selectAll" resultMap="quotaResultMap">
+    SELECT * FROM quotas
+  </select>
+
+  <delete id="delete">
+    DELETE FROM quotas
+    WHERE role = #{id}
+  </delete>
+
+  <delete id="truncate">
+    DELETE FROM quotas
+  </delete>
+</mapper>

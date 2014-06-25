@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.storage.db;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
+import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.AbstractIdleService;
@@ -54,7 +55,11 @@ class DbStorage extends AbstractIdleService implements Storage {
   private final MutableStoreProvider storeProvider;
 
   @Inject
-  DbStorage(final SqlSessionFactory sessionFactory, final LockStore.Mutable lockStore) {
+  DbStorage(
+      final SqlSessionFactory sessionFactory,
+      final LockStore.Mutable lockStore,
+      final QuotaStore.Mutable quotaStore) {
+
     this.sessionFactory = Preconditions.checkNotNull(sessionFactory);
     storeProvider = new MutableStoreProvider() {
       @Override
@@ -84,7 +89,7 @@ class DbStorage extends AbstractIdleService implements Storage {
 
       @Override
       public QuotaStore.Mutable getQuotaStore() {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return quotaStore;
       }
 
       @Override
@@ -140,13 +145,16 @@ class DbStorage extends AbstractIdleService implements Storage {
   protected void startUp() throws IOException {
     Configuration configuration = sessionFactory.getConfiguration();
     String createStatementName = "create_tables";
+    configuration.setMapUnderscoreToCamelCase(true);
     configuration.addMappedStatement(new Builder(
         configuration,
         createStatementName,
         new StaticSqlSource(
             configuration,
             CharStreams.toString(
-                new InputStreamReader(DbStorage.class.getResourceAsStream("schema.sql"), "UTF-8"))),
+                new InputStreamReader(
+                    DbStorage.class.getResourceAsStream("schema.sql"),
+                    Charsets.UTF_8))),
         SqlCommandType.UPDATE)
         .build());
 

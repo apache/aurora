@@ -23,6 +23,7 @@ import com.google.inject.name.Names;
 import com.twitter.common.inject.Bindings;
 
 import org.apache.aurora.scheduler.storage.LockStore;
+import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.ibatis.session.AutoMappingBehavior;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -44,6 +45,7 @@ import static com.google.inject.name.Names.named;
  *     <li>Keys provided by the provided{@code keyFactory} for:
  *        <ul>
  *          <li>{@link org.apache.aurora.scheduler.storage.LockStore.Mutable}</li>
+ *          <li>{@link org.apache.aurora.scheduler.storage.QuotaStore.Mutable}</li>
  *        </ul>
  *     </li>
  *   </ul>
@@ -81,6 +83,7 @@ public class DbModule extends PrivateModule {
         bindTransactionFactoryType(JdbcTransactionFactory.class);
         addMapperClass(LockMapper.class);
         addMapperClass(JobKeyMapper.class);
+        addMapperClass(QuotaMapper.class);
         Properties props = new Properties();
         // We have no plans to take advantage of multiple DB environments. This is a required
         // property though, so we use an unnamed environment.
@@ -95,6 +98,7 @@ public class DbModule extends PrivateModule {
       }
     });
     bindStore(LockStore.Mutable.class, DbLockStore.class);
+    bindStore(QuotaStore.Mutable.class, DbQuotaStore.class);
 
     Key<Storage> storageKey = keyFactory.create(Storage.class);
     bind(storageKey).to(DbStorage.class);

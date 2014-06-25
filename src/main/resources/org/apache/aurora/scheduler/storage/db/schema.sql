@@ -19,3 +19,13 @@ CREATE TABLE locks(
 
   UNIQUE(job_key_id)
 );
+
+CREATE TABLE quotas(
+  id INT IDENTITY,
+  role VARCHAR NOT NULL,
+  num_cpus FLOAT NOT NULL,
+  ram_mb INT NOT NULL,
+  disk_mb INT NOT NULL,
+
+  UNIQUE(role)
+);
