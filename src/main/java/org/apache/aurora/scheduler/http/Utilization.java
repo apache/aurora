@@ -17,6 +17,7 @@ import java.io.StringWriter;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -30,7 +31,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Function;
-import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 import com.twitter.common.base.Closure;
@@ -103,7 +103,7 @@ public class Utilization {
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(title, link);
+      return Objects.hash(title, link);
     }
 
     @Override
@@ -113,7 +113,7 @@ public class Utilization {
       }
 
       Display other = (Display) o;
-      return Objects.equal(title, other.title) && Objects.equal(link, other.link);
+      return Objects.equals(title, other.title) && Objects.equals(link, other.link);
     }
   }
 
@@ -132,6 +132,23 @@ public class Utilization {
     @Nullable
     public String getLink() {
       return display.link;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof DisplayMetric)) {
+        return false;
+      }
+
+      DisplayMetric other = (DisplayMetric) o;
+
+      return super.equals(o)
+          && display.equals(other.display);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(super.hashCode(), display);
     }
   }
 
