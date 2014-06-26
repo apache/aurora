@@ -53,7 +53,7 @@ class ParameterizedType(Type):
   def param_names(self):
     def name(t):
       if isinstance(t, StructType):
-        return t.codegen_name
+        return t.name if t.kind == 'enum' else t.codegen_name
       elif isinstance(t, PrimitiveType):
         return t.boxed_name
       else:
