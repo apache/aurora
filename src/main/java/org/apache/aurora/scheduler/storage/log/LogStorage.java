@@ -56,6 +56,7 @@ import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.TaskStore;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -428,7 +429,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         break;
 
       case SAVE_HOST_ATTRIBUTES:
-        writeBehindAttributeStore.saveHostAttributes(op.getSaveHostAttributes().hostAttributes);
+        writeBehindAttributeStore.saveHostAttributes(
+            IHostAttributes.build(op.getSaveHostAttributes().hostAttributes));
         break;
 
       case SAVE_LOCK:

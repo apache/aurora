@@ -29,7 +29,6 @@ import com.google.common.collect.Ordering;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
-import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
@@ -39,6 +38,7 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
+import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -246,10 +246,10 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   }
 
   private boolean isDedicated(final String slaveHost) {
-    Iterable<Attribute> slaveAttributes =
-        storage.weaklyConsistentRead(new Quiet<Iterable<Attribute>>() {
+    Iterable<IAttribute> slaveAttributes =
+        storage.weaklyConsistentRead(new Quiet<Iterable<IAttribute>>() {
           @Override
-          public Iterable<Attribute> apply(final StoreProvider storeProvider) {
+          public Iterable<IAttribute> apply(final StoreProvider storeProvider) {
             return AttributeStore.Util.attributesOrNone(storeProvider, slaveHost);
           }
         });

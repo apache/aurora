@@ -25,7 +25,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 
-import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.RemoveJob;
@@ -49,6 +48,7 @@ import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.TaskStore;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -197,7 +197,7 @@ class WriteAheadStorage extends ForwardingStore implements
 
   @Timed("scheduler_save_host_attribute")
   @Override
-  public void saveHostAttributes(final HostAttributes attrs) {
+  public void saveHostAttributes(final IHostAttributes attrs) {
     checkNotNull(attrs);
 
     // Pass the updated attributes upstream, and then check if the stored value changes.
@@ -205,11 +205,11 @@ class WriteAheadStorage extends ForwardingStore implements
     // and they are merged together internally.
     // TODO(William Farner): Split out a separate method
     //                       saveAttributes(String host, Iterable<Attributes>) to simplify this.
-    Optional<HostAttributes> saved = getHostAttributes(attrs.getHost());
+    Optional<IHostAttributes> saved = getHostAttributes(attrs.getHost());
     attributeStore.saveHostAttributes(attrs);
-    Optional<HostAttributes> updated = getHostAttributes(attrs.getHost());
+    Optional<IHostAttributes> updated = getHostAttributes(attrs.getHost());
     if (!saved.equals(updated)) {
-      write(Op.saveHostAttributes(new SaveHostAttributes(updated.get())));
+      write(Op.saveHostAttributes(new SaveHostAttributes(updated.get().newBuilder())));
     }
   }
 
@@ -294,14 +294,12 @@ class WriteAheadStorage extends ForwardingStore implements
     checkNotNull(host);
     checkNotNull(mode);
 
-    Optional<HostAttributes> saved = getHostAttributes(host);
-    if (saved.isPresent()) {
-      HostAttributes attributes = saved.get().setMode(mode);
-      write(Op.saveHostAttributes(new SaveHostAttributes(attributes)));
-      attributeStore.saveHostAttributes(attributes);
-      return true;
+    boolean saved = attributeStore.setMaintenanceMode(host, mode);
+    if (saved) {
+      write(Op.saveHostAttributes(
+          new SaveHostAttributes(attributeStore.getHostAttributes(host).get().newBuilder())));
     }
-    return false;
+    return saved;
   }
 
   @Override

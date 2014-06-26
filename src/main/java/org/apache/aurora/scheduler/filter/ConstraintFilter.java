@@ -25,6 +25,7 @@ import com.google.common.collect.Iterables;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 
@@ -35,7 +36,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 class ConstraintFilter {
   private final AttributeAggregate cachedjobState;
-  private final Iterable<Attribute> hostAttributes;
+  private final Iterable<IAttribute> hostAttributes;
 
   /**
    * Creates a new constraint filer for a given job.
@@ -43,7 +44,7 @@ class ConstraintFilter {
    * @param cachedjobState Cached information about the job containing the task being matched.
    * @param hostAttributes The attributes of the host to test against.
    */
-  ConstraintFilter(AttributeAggregate cachedjobState, Iterable<Attribute> hostAttributes) {
+  ConstraintFilter(AttributeAggregate cachedjobState, Iterable<IAttribute> hostAttributes) {
     this.cachedjobState = checkNotNull(cachedjobState);
     this.hostAttributes = checkNotNull(hostAttributes);
   }
@@ -63,10 +64,10 @@ class ConstraintFilter {
     return new Veto("Host " + reason + " for maintenance", Veto.MAX_SCORE);
   }
 
-  private static final Function<Attribute, Set<String>> GET_VALUES =
-      new Function<Attribute, Set<String>>() {
+  private static final Function<IAttribute, Set<String>> GET_VALUES =
+      new Function<IAttribute, Set<String>>() {
         @Override
-        public Set<String> apply(Attribute attribute) {
+        public Set<String> apply(IAttribute attribute) {
           return attribute.getValues();
         }
       };
@@ -79,15 +80,16 @@ class ConstraintFilter {
    * @return A veto if the constraint is not satisfied based on the existing state of the job.
    */
   Optional<Veto> getVeto(IConstraint constraint) {
-    Iterable<Attribute> sameNameAttributes =
+    Iterable<IAttribute> sameNameAttributes =
         Iterables.filter(hostAttributes, new NameFilter(constraint.getName()));
-    Optional<Attribute> attribute;
+    Optional<IAttribute> attribute;
     if (Iterables.isEmpty(sameNameAttributes)) {
       attribute = Optional.absent();
     } else {
       Set<String> attributeValues = ImmutableSet.copyOf(
           Iterables.concat(Iterables.transform(sameNameAttributes, GET_VALUES)));
-      attribute = Optional.of(new Attribute(constraint.getName(), attributeValues));
+      attribute =
+          Optional.of(IAttribute.build(new Attribute(constraint.getName(), attributeValues)));
     }
 
     ITaskConstraint taskConstraint = constraint.getConstraint();
@@ -122,7 +124,7 @@ class ConstraintFilter {
   /**
    * A filter to find attributes matching a name.
    */
-  static class NameFilter implements Predicate<Attribute> {
+  static class NameFilter implements Predicate<IAttribute> {
     private final String attributeName;
 
     NameFilter(String attributeName) {
@@ -130,7 +132,7 @@ class ConstraintFilter {
     }
 
     @Override
-    public boolean apply(Attribute attribute) {
+    public boolean apply(IAttribute attribute) {
       return attributeName.equals(attribute.getName());
     }
   }

@@ -45,6 +45,7 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.easymock.EasyMock;
@@ -591,13 +592,13 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     return expect(maintenance.getMode(host)).andReturn(mode);
   }
 
-  private IExpectationSetters<Optional<HostAttributes>> expectGetHostAttributes(
+  private IExpectationSetters<Optional<IHostAttributes>> expectGetHostAttributes(
       String host,
       Attribute... attributes) {
 
-    HostAttributes hostAttributes = new HostAttributes()
+    IHostAttributes hostAttributes = IHostAttributes.build(new HostAttributes()
         .setHost(host)
-        .setAttributes(ImmutableSet.<Attribute>builder().add(attributes).build());
+        .setAttributes(ImmutableSet.<Attribute>builder().add(attributes).build()));
     return expect(attributeStore.getHostAttributes(host)).andReturn(Optional.of(hostAttributes));
   }
 

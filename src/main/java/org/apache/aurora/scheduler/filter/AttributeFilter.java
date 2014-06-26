@@ -18,7 +18,7 @@ import java.util.Set;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 
-import org.apache.aurora.gen.Attribute;
+import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
 
 /**
@@ -50,7 +50,8 @@ final class AttributeFilter {
    * @param attributeAggregate Cached state of the job being filtered.
    * @return {@code true} if the limit constraint is satisfied, {@code false} otherwise.
    */
-  static boolean matches(final Attribute attribute,
+  static boolean matches(
+      final IAttribute attribute,
       int limit,
       AttributeAggregate attributeAggregate) {
 

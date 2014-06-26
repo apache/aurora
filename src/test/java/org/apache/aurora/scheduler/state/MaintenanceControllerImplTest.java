@@ -36,6 +36,7 @@ import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.junit.Before;
@@ -99,7 +100,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     ScheduledTask task = makeTask(HOST_A, "taskA");
 
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
-    expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of(task));
+    expectFetchTasksByHost(HOST_A, ImmutableSet.of(task));
     expect(stateManager.changeState(
         Tasks.id(task),
         Optional.<ScheduleStatus>absent(),
@@ -107,8 +108,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
         MaintenanceControllerImpl.DRAINING_MESSAGE))
         .andReturn(true);
     expectMaintenanceModeChange(HOST_A, DRAINING);
-    expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
-        .andReturn(Optional.of(new HostAttributes().setHost(HOST_A).setMode(DRAINING)));
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.of(
+        IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING))));
     // TaskA is FINISHED and therefore no longer active
     expectFetchTasksByHost(HOST_A, ImmutableSet.<ScheduledTask>of());
     expectMaintenanceModeChange(HOST_A, DRAINED);
@@ -150,8 +151,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   public void testEndEarly() {
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
     expectMaintenanceModeChange(HOST_A, NONE);
-    expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
-        .andReturn(Optional.of(new HostAttributes().setHost(HOST_A).setMode(NONE)));
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.of(
+        IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(NONE))));
 
     control.replay();
 
@@ -168,10 +169,10 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   @Test
   public void testGetMode() {
-    expect(storageUtil.attributeStore.getHostAttributes(HOST_A))
-        .andReturn(Optional.of(new HostAttributes().setHost(HOST_A).setMode(DRAINING)));
+    expect(storageUtil.attributeStore.getHostAttributes(HOST_A)).andReturn(Optional.of(
+        IHostAttributes.build(new HostAttributes().setHost(HOST_A).setMode(DRAINING))));
     expect(storageUtil.attributeStore.getHostAttributes("unknown"))
-        .andReturn(Optional.<HostAttributes>absent());
+        .andReturn(Optional.<IHostAttributes>absent());
 
     control.replay();
 

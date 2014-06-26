@@ -27,6 +27,7 @@ import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
@@ -61,7 +62,7 @@ public class AttributeAggregateTest extends EasyMockTest {
   @Test(expected = IllegalStateException.class)
   public void testAttributesMissing() {
     expectGetTasks(task("1", "a"));
-    expect(attributeStore.getHostAttributes("a")).andReturn(Optional.<HostAttributes>absent());
+    expect(attributeStore.getHostAttributes("a")).andReturn(Optional.<IHostAttributes>absent());
 
     control.replay();
 
@@ -147,9 +148,9 @@ public class AttributeAggregateTest extends EasyMockTest {
 
   private IExpectationSetters<?> expectGetAttributes(String host, Attribute... attributes) {
     return expect(attributeStore.getHostAttributes(host)).andReturn(Optional.of(
-        new HostAttributes()
+        IHostAttributes.build(new HostAttributes()
             .setHost(host)
-            .setAttributes(ImmutableSet.<Attribute>builder().add(attributes).build())));
+            .setAttributes(ImmutableSet.<Attribute>builder().add(attributes).build()))));
   }
 
   private void assertAggregates(Map<Pair<String, String>, Long> expected) {

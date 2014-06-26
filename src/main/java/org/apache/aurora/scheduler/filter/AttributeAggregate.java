@@ -26,8 +26,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.AtomicLongMap;
 import com.twitter.common.collections.Pair;
 
-import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -63,10 +63,10 @@ public class AttributeAggregate {
     checkNotNull(activeTaskSupplier);
     checkNotNull(attributeStore);
 
-    final Function<IScheduledTask, Iterable<Attribute>> getHostAttributes =
-        new Function<IScheduledTask, Iterable<Attribute>>() {
+    final Function<IScheduledTask, Iterable<IAttribute>> getHostAttributes =
+        new Function<IScheduledTask, Iterable<IAttribute>>() {
           @Override
-          public Iterable<Attribute> apply(IScheduledTask task) {
+          public Iterable<IAttribute> apply(IScheduledTask task) {
             // Note: this assumes we have access to attributes for hosts where all active tasks
             // reside.
             String host = checkNotNull(task.getAssignedTask().getSlaveHost());
@@ -78,9 +78,9 @@ public class AttributeAggregate {
       @Override
       public Map<Pair<String, String>, Long> get() {
         AtomicLongMap<Pair<String, String>> counts = AtomicLongMap.create();
-        Iterable<Attribute> allAttributes =
+        Iterable<IAttribute> allAttributes =
             Iterables.concat(Iterables.transform(activeTaskSupplier.get(), getHostAttributes));
-        for (Attribute attribute : allAttributes) {
+        for (IAttribute attribute : allAttributes) {
           for (String value : attribute.getValues()) {
             counts.incrementAndGet(Pair.of(attribute.getName(), value));
           }

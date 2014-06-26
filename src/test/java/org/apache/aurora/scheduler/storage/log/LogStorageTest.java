@@ -70,6 +70,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -677,22 +678,23 @@ public class LogStorageTest extends EasyMockTest {
     final String host = "hostname";
     final Set<Attribute> attributes =
         ImmutableSet.of(new Attribute().setName("attr").setValues(ImmutableSet.of("value")));
-    final Optional<HostAttributes> hostAttributes = Optional.of(new HostAttributes()
-        .setHost(host)
-        .setAttributes(attributes));
+    final Optional<IHostAttributes> hostAttributes = Optional.of(
+        IHostAttributes.build(new HostAttributes()
+            .setHost(host)
+            .setAttributes(attributes)));
 
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWriteOperation();
         expect(storageUtil.attributeStore.getHostAttributes(host))
-            .andReturn(Optional.<HostAttributes>absent());
+            .andReturn(Optional.<IHostAttributes>absent());
 
         // Each logStorage save invokes get, save, get to the underlying attribute store.
         storageUtil.attributeStore.saveHostAttributes(hostAttributes.get());
         expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
         streamMatcher.expectTransaction(
-            Op.saveHostAttributes(new SaveHostAttributes(hostAttributes.get())))
+            Op.saveHostAttributes(new SaveHostAttributes(hostAttributes.get().newBuilder())))
             .andReturn(position);
         expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
 

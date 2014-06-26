@@ -26,7 +26,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
 
-import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -42,6 +41,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -157,7 +157,8 @@ public interface MaintenanceController {
           public void execute(MutableStoreProvider store) {
             // If the task _was_ associated with a draining host, and it was the last task on the
             // host.
-            Optional<HostAttributes> attributes = store.getAttributeStore().getHostAttributes(host);
+            Optional<IHostAttributes> attributes =
+                store.getAttributeStore().getHostAttributes(host);
             if (attributes.isPresent() && attributes.get().getMode() == DRAINING) {
               Query.Builder builder = Query.slaveScoped(host).active();
               if (store.getTaskStore().fetchTasks(builder).isEmpty()) {
@@ -193,18 +194,18 @@ public interface MaintenanceController {
       });
     }
 
-    private static final Function<HostAttributes, String> HOST_NAME =
-        new Function<HostAttributes, String>() {
+    private static final Function<IHostAttributes, String> HOST_NAME =
+        new Function<IHostAttributes, String>() {
           @Override
-          public String apply(HostAttributes attributes) {
+          public String apply(IHostAttributes attributes) {
             return attributes.getHost();
           }
         };
 
-    private static final Function<HostAttributes, HostStatus> ATTRS_TO_STATUS =
-        new Function<HostAttributes, HostStatus>() {
+    private static final Function<IHostAttributes, HostStatus> ATTRS_TO_STATUS =
+        new Function<IHostAttributes, HostStatus>() {
           @Override
-          public HostStatus apply(HostAttributes attributes) {
+          public HostStatus apply(IHostAttributes attributes) {
             return new HostStatus().setHost(attributes.getHost()).setMode(attributes.getMode());
           }
         };

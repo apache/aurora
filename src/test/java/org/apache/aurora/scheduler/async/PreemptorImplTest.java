@@ -52,6 +52,7 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
@@ -627,8 +628,9 @@ public class PreemptorImplTest extends EasyMockTest {
 
   // Sets up a normal host, no dedicated hosts and no maintenance.
   private void setUpHost(String host, String rack) {
-    HostAttributes hostAttrs = new HostAttributes().setHost(host).setSlaveId(host + "_id")
-        .setMode(NONE).setAttributes(ImmutableSet.of(rack(rack), host(host)));
+    IHostAttributes hostAttrs = IHostAttributes.build(
+        new HostAttributes().setHost(host).setSlaveId(host + "_id")
+            .setMode(NONE).setAttributes(ImmutableSet.of(rack(rack), host(host))));
 
     expect(this.storageUtil.attributeStore.getHostAttributes(host))
         .andReturn(Optional.of(hostAttrs)).anyTimes();

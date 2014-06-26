@@ -32,7 +32,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
 import com.twitter.common.stats.StatsProvider;
 
-import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
@@ -42,6 +41,7 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -82,19 +82,20 @@ class TaskVars implements EventSubscriber {
     return "tasks_lost_rack_" + rack;
   }
 
-  private static final Predicate<Attribute> IS_RACK = new Predicate<Attribute>() {
+  private static final Predicate<IAttribute> IS_RACK = new Predicate<IAttribute>() {
     @Override
-    public boolean apply(Attribute attr) {
+    public boolean apply(IAttribute attr) {
       return "rack".equals(attr.getName());
     }
   };
 
-  private static final Function<Attribute, String> ATTR_VALUE = new Function<Attribute, String>() {
-    @Override
-    public String apply(Attribute attr) {
-      return Iterables.getOnlyElement(attr.getValues());
-    }
-  };
+  private static final Function<IAttribute, String> ATTR_VALUE =
+      new Function<IAttribute, String>() {
+        @Override
+        public String apply(IAttribute attr) {
+          return Iterables.getOnlyElement(attr.getValues());
+        }
+      };
 
   private Counter getCounter(ScheduleStatus status) {
     return counters.getUnchecked(getVarName(status));
@@ -123,7 +124,7 @@ class TaskVars implements EventSubscriber {
       Optional<String> rack = storage.consistentRead(new Work.Quiet<Optional<String>>() {
         @Override
         public Optional<String> apply(StoreProvider storeProvider) {
-          Optional<Attribute> rack = FluentIterable
+          Optional<IAttribute> rack = FluentIterable
               .from(AttributeStore.Util.attributesOrNone(storeProvider, host))
               .firstMatch(IS_RACK);
           return rack.transform(ATTR_VALUE);

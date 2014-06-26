@@ -29,13 +29,13 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 
-import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
@@ -82,18 +82,18 @@ public class Maintenance {
         Tasks.SCHEDULED_TO_ID);
   }
 
-  private static final Function<HostAttributes, String> HOST_NAME =
-      new Function<HostAttributes, String>() {
+  private static final Function<IHostAttributes, String> HOST_NAME =
+      new Function<IHostAttributes, String>() {
         @Override
-        public String apply(HostAttributes attributes) {
+        public String apply(IHostAttributes attributes) {
           return attributes.getHost();
         }
       };
 
-  private static final Function<HostAttributes, MaintenanceMode> GET_MODE =
-      new Function<HostAttributes, MaintenanceMode>() {
+  private static final Function<IHostAttributes, MaintenanceMode> GET_MODE =
+      new Function<IHostAttributes, MaintenanceMode>() {
         @Override
-        public MaintenanceMode apply(HostAttributes attrs) {
+        public MaintenanceMode apply(IHostAttributes attrs) {
           return attrs.getMode();
         }
       };

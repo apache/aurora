@@ -18,10 +18,10 @@ import java.util.Set;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 
-import org.apache.aurora.gen.Attribute;
-import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
+import org.apache.aurora.scheduler.storage.entities.IAttribute;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 
 /**
  * Storage interface for host attributes.
@@ -33,14 +33,14 @@ public interface AttributeStore {
    * @param host host name.
    * @return attributes associated with {@code host}, if the host is known.
    */
-  Optional<HostAttributes> getHostAttributes(String host);
+  Optional<IHostAttributes> getHostAttributes(String host);
 
   /**
    * Fetches all attributes in the store.
    *
    * @return All host attributes.
    */
-  Set<HostAttributes> getHostAttributes();
+  Set<IHostAttributes> getHostAttributes();
 
   /**
    * Attributes are considered mostly ephemeral and extremely low risk when inconsistency
@@ -58,7 +58,7 @@ public interface AttributeStore {
      *
      * @param hostAttributes The attribute we are going to save.
      */
-    void saveHostAttributes(HostAttributes hostAttributes);
+    void saveHostAttributes(IHostAttributes hostAttributes);
 
     /**
      * Adjusts the maintenance mode for a host.
@@ -84,10 +84,10 @@ public interface AttributeStore {
      * @return Attributes associated with {@code host}, or an empty iterable if the host is
      *         unknown.
      */
-    public static Iterable<Attribute> attributesOrNone(StoreProvider store, String host) {
-      Optional<HostAttributes> attributes = store.getAttributeStore().getHostAttributes(host);
+    public static Iterable<IAttribute> attributesOrNone(StoreProvider store, String host) {
+      Optional<IHostAttributes> attributes = store.getAttributeStore().getHostAttributes(host);
       return attributes.isPresent()
-          ? attributes.get().getAttributes() : ImmutableList.<Attribute>of();
+          ? attributes.get().getAttributes() : ImmutableList.<IAttribute>of();
     }
   }
 }

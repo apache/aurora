@@ -33,6 +33,7 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.EasyMock;
@@ -199,10 +200,10 @@ public class TaskVarsTest extends EasyMockTest {
   }
 
   private IExpectationSetters<?> expectGetHostRack(String host, String rackToReturn) {
-    HostAttributes attributes = new HostAttributes()
+    IHostAttributes attributes = IHostAttributes.build(new HostAttributes()
         .setHost(host)
         .setAttributes(ImmutableSet.of(
-            new Attribute().setName("rack").setValues(ImmutableSet.of(rackToReturn))));
+            new Attribute().setName("rack").setValues(ImmutableSet.of(rackToReturn)))));
     return expect(storageUtil.attributeStore.getHostAttributes(host))
         .andReturn(Optional.of(attributes));
   }
@@ -238,7 +239,7 @@ public class TaskVarsTest extends EasyMockTest {
   public void testRackMissing() {
     expectStatusCountersInitialized();
     expect(storageUtil.attributeStore.getHostAttributes("a"))
-        .andReturn(Optional.<HostAttributes>absent());
+        .andReturn(Optional.<IHostAttributes>absent());
 
     control.replay();
     schedulerActivated();

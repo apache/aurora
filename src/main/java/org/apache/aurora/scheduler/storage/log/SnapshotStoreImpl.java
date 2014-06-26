@@ -39,6 +39,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Volatile;
 import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -59,7 +60,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   private static final SnapshotField ATTRIBUTE_FIELD = new SnapshotField() {
     @Override
     public void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
-      snapshot.setHostAttributes(storeProvider.getAttributeStore().getHostAttributes());
+      snapshot.setHostAttributes(
+          IHostAttributes.toBuildersSet(storeProvider.getAttributeStore().getHostAttributes()));
     }
 
     @Override
@@ -68,7 +70,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
       if (snapshot.isSetHostAttributes()) {
         for (HostAttributes attributes : snapshot.getHostAttributes()) {
-          store.getAttributeStore().saveHostAttributes(attributes);
+          store.getAttributeStore().saveHostAttributes(IHostAttributes.build(attributes));
         }
       }
     }

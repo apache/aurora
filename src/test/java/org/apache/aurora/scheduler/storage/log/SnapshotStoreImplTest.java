@@ -36,6 +36,7 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -69,8 +70,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     Set<QuotaConfiguration> quotas =
         ImmutableSet.of(
             new QuotaConfiguration("steve", ResourceAggregates.none().newBuilder()));
-    HostAttributes attribute = new HostAttributes("host",
-        ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))));
+    IHostAttributes attribute = IHostAttributes.build(new HostAttributes("host",
+        ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value")))));
     StoredJob job = new StoredJob(
         "jobManager",
         new JobConfiguration().setKey(new JobKey("owner", "env", "name")));
@@ -111,7 +112,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setTimestamp(NOW)
         .setTasks(IScheduledTask.toBuildersSet(tasks))
         .setQuotaConfigurations(quotas)
-        .setHostAttributes(ImmutableSet.of(attribute))
+        .setHostAttributes(ImmutableSet.of(attribute.newBuilder()))
         .setJobs(ImmutableSet.of(job))
         .setSchedulerMetadata(metadata)
         .setLocks(ILock.toBuildersSet(ImmutableSet.of(lock)));

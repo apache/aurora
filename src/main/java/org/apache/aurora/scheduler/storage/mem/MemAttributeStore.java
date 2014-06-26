@@ -24,12 +24,13 @@ import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.AttributeStore.Mutable;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 
 /**
  * An in-memory attribute store.
  */
 class MemAttributeStore implements Mutable {
-  private final ConcurrentMap<String, HostAttributes> hostAttributes = Maps.newConcurrentMap();
+  private final ConcurrentMap<String, IHostAttributes> hostAttributes = Maps.newConcurrentMap();
 
   @Override
   public void deleteHostAttributes() {
@@ -37,35 +38,40 @@ class MemAttributeStore implements Mutable {
   }
 
   @Override
-  public void saveHostAttributes(HostAttributes attributes) {
+  public void saveHostAttributes(IHostAttributes attributes) {
     hostAttributes.putIfAbsent(attributes.getHost(), attributes);
 
-    HostAttributes stored = hostAttributes.get(attributes.getHost());
+    IHostAttributes stored = hostAttributes.get(attributes.getHost());
+    HostAttributes updated = stored.newBuilder();
     if (!stored.isSetMode()) {
-      stored.setMode(attributes.isSetMode() ? attributes.getMode() : MaintenanceMode.NONE);
+      updated.setMode(attributes.isSetMode() ? attributes.getMode() : MaintenanceMode.NONE);
     }
-    stored.setAttributes(attributes.isSetAttributes()
-        ? attributes.getAttributes() : ImmutableSet.<Attribute>of());
+    updated.setAttributes(updated.isSetAttributes()
+        ? updated.getAttributes() : ImmutableSet.<Attribute>of());
+    hostAttributes.replace(attributes.getHost(), stored, IHostAttributes.build(updated));
   }
 
   @Override
   public boolean setMaintenanceMode(String host, MaintenanceMode mode) {
-    HostAttributes stored = hostAttributes.get(host);
+    IHostAttributes stored = hostAttributes.get(host);
     if (stored == null) {
       return false;
     } else {
-      stored.setMode(mode);
+      hostAttributes.replace(
+          host,
+          stored,
+          IHostAttributes.build(stored.newBuilder().setMode(mode)));
       return true;
     }
   }
 
   @Override
-  public Optional<HostAttributes> getHostAttributes(String host) {
+  public Optional<IHostAttributes> getHostAttributes(String host) {
     return Optional.fromNullable(hostAttributes.get(host));
   }
 
   @Override
-  public Set<HostAttributes> getHostAttributes() {
+  public Set<IHostAttributes> getHostAttributes() {
     return ImmutableSet.copyOf(hostAttributes.values());
   }
 }

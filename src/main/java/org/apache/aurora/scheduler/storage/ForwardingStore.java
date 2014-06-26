@@ -21,8 +21,8 @@ import javax.annotation.Nullable;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -124,12 +124,12 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Optional<HostAttributes> getHostAttributes(String host) {
+  public Optional<IHostAttributes> getHostAttributes(String host) {
     return attributeStore.getHostAttributes(host);
   }
 
   @Override
-  public Set<HostAttributes> getHostAttributes() {
+  public Set<IHostAttributes> getHostAttributes() {
     return attributeStore.getHostAttributes();
   }
 }

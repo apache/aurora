@@ -28,10 +28,10 @@ import com.google.common.collect.Ordering;
 import com.twitter.common.base.Closure;
 
 import org.antlr.stringtemplate.StringTemplate;
-import org.apache.aurora.gen.Attribute;
-import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IAttribute;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -61,19 +61,19 @@ public class Slaves extends JerseyTemplateServlet {
     this.storage = checkNotNull(storage);
   }
 
-  private Iterable<HostAttributes> getHostAttributes() {
-    return storage.weaklyConsistentRead(new Work.Quiet<Iterable<HostAttributes>>() {
+  private Iterable<IHostAttributes> getHostAttributes() {
+    return storage.weaklyConsistentRead(new Work.Quiet<Iterable<IHostAttributes>>() {
       @Override
-      public Iterable<HostAttributes> apply(StoreProvider storeProvider) {
+      public Iterable<IHostAttributes> apply(StoreProvider storeProvider) {
         return storeProvider.getAttributeStore().getHostAttributes();
       }
     });
   }
 
-  private static final Function<HostAttributes, Slave> TO_SLAVE =
-      new Function<HostAttributes, Slave>() {
+  private static final Function<IHostAttributes, Slave> TO_SLAVE =
+      new Function<IHostAttributes, Slave>() {
         @Override
-        public Slave apply(HostAttributes attributes) {
+        public Slave apply(IHostAttributes attributes) {
           return new Slave(attributes);
         }
       };
@@ -97,10 +97,10 @@ public class Slaves extends JerseyTemplateServlet {
     });
   }
 
-  private static final Ordering<Attribute> ATTR_ORDER = Ordering.natural().onResultOf(
-      new Function<Attribute, String>() {
+  private static final Ordering<IAttribute> ATTR_ORDER = Ordering.natural().onResultOf(
+      new Function<IAttribute, String>() {
         @Override
-        public String apply(Attribute attr) {
+        public String apply(IAttribute attr) {
           return attr .getName();
         }
       });
@@ -109,9 +109,9 @@ public class Slaves extends JerseyTemplateServlet {
    * Template object to represent a slave.
    */
   private static class Slave {
-    private final HostAttributes attributes;
+    private final IHostAttributes attributes;
 
-    Slave(HostAttributes attributes) {
+    Slave(IHostAttributes attributes) {
       this.attributes = attributes;
     }
 
@@ -127,10 +127,10 @@ public class Slaves extends JerseyTemplateServlet {
       return attributes.getMode();
     }
 
-    private static final Function<Attribute, String> ATTR_TO_STRING =
-        new Function<Attribute, String>() {
+    private static final Function<IAttribute, String> ATTR_TO_STRING =
+        new Function<IAttribute, String>() {
           @Override
-          public String apply(Attribute attr) {
+          public String apply(IAttribute attr) {
             return attr.getName() + "=[" + Joiner.on(",").join(attr.getValues()) + "]";
           }
         };
