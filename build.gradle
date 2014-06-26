@@ -33,7 +33,7 @@ buildscript {
   dependencies {
     classpath 'com.github.ben-manes:gradle-versions-plugin:0.4'
     classpath 'com.github.goldin.plugins.gradle:about:0.3.1'
-    classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.7.0'
+    classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.9.0'
     classpath 'com.eriwen:gradle-js-plugin:1.11.1'
   }
 }
