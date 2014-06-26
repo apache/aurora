@@ -117,7 +117,7 @@ IMMUTABLE_COLLECTION_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
         : Immutable%(collection)s.copyOf(wrapped.%(fn_name)s());'''
 
 
-# Tempalte string for assignment for a collection field containing a struct.
+# Template string for assignment for a collection field containing a struct.
 STRUCT_COLLECTION_FIELD_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
         ? Immutable%(collection)s.<%(params)s>of()
         : FluentIterable.from(wrapped.%(fn_name)s())
@@ -300,6 +300,17 @@ STRUCT_RE = '(?P<kind>enum|struct|union)\s+(?P<name>\w+)\s+{(?P<body>[^}]+)}'
 #     15: Map<String, TaskConfig> configs  # Configs mapped by name.
 FIELD_RE = '\s*\d+:\s+(?:(?:required|optional)\s+)?(%s)\s+(?P<name>\w+).*' % TYPE_PATTERN
 
+THRIFT_TYPES = {
+  'bool': PrimitiveType('boolean', 'Boolean'),
+  'i32': PrimitiveType('int', 'Integer'),
+  'i64': PrimitiveType('long', 'Long'),
+  'double': PrimitiveType('double', 'Double'),
+  'string': PrimitiveType('String', 'String'),
+  'list': Type('List'),
+  'set': Type('Set'),
+  'map': Type('Map'),
+  'binary': PrimitiveType('byte[]', 'byte[]'),
+}
 
 def parse_structs(thrift_defs):
   '''Read all thrift structures found in a file.
@@ -310,24 +321,36 @@ def parse_structs(thrift_defs):
   # Capture all namespace definitions.
   namespaces = dict(re.findall(NAMESPACE_RE, thrift_defs))
 
+  # Keep track of structs already seen, to identify referenced types.
+  structs = []
+
   def parse_field(field):
+    def make_type(name):
+      if name in ['list', 'map', 'set']:
+        return Type(name.title())
+      elif name in THRIFT_TYPES:
+        return THRIFT_TYPES[name]
+      else:
+        return [s for s in structs if s.name == name][0]
+
     type_name = field.group('type')
     type_params = field.group('params')
     if type_params:
-      params = [Type(p) for p in type_params.replace(' ', '').split(',')]
-      ttype = ParameterizedType(type_name, params)
+      params = [make_type(p) for p in type_params.replace(' ', '').split(',')]
+      ttype = ParameterizedType(type_name.title(), params)
     else:
-      ttype = Type(type_name)
+      ttype = make_type(type_name)
     return Field(ttype, field.group('name'))
 
   def parse_fields(field_str):
     return map(parse_field, re.finditer(FIELD_RE, field_str))
 
-  return [StructType(s.group('name'),
-                     namespaces['java'],
-                     s.group('kind'),
-                     parse_fields(s.group('body')))
-          for s in re.finditer(STRUCT_RE, thrift_defs, flags=re.MULTILINE)]
+  for s in re.finditer(STRUCT_RE, thrift_defs, flags=re.MULTILINE):
+    structs.append(StructType(s.group('name'),
+                              namespaces['java'],
+                              s.group('kind'),
+                              parse_fields(s.group('body'))))
+  return structs
 
 
 def generate_java(struct):
@@ -345,11 +368,9 @@ def generate_java(struct):
 
   # Accessor for each field.
   for field in struct.fields:
-    if not (isinstance(field.ttype, StructType) and (
-        field.ttype.kind == 'enum' or struct.kind == 'union')):
-      code.add_accessor(IMMUTABLE_FIELD_TEMPLATE
-                        % {'type': 'boolean',
-                           'fn_name': field.isset_method()})
+    code.add_accessor(IMMUTABLE_FIELD_TEMPLATE
+                      % {'type': 'boolean',
+                         'fn_name': field.isset_method()})
     if field.ttype.immutable:
       code.add_accessor(IMMUTABLE_FIELD_TEMPLATE % {'type': field.ttype.name,
                                                     'fn_name': field.accessor_method()})
@@ -357,7 +378,14 @@ def generate_java(struct):
       if isinstance(field.ttype, StructType):
         return_type = field.ttype.codegen_name
       elif isinstance(field.ttype, ParameterizedType):
-        return_type = '%s<%s>' % (field.ttype.name, field.ttype.param_names())
+        # Add imports for any referenced enum types. This is not necessary for other
+        # types since they are either primitives or struct types, which will be in
+        # the same package.
+        for param_type in field.ttype.params:
+          if isinstance(param_type, StructType) and param_type.kind == 'enum':
+            code.add_import(param_type.absolute_name())
+
+        return_type = 'Immutable%s<%s>' % (field.ttype.name, field.ttype.param_names())
       else:
         return_type = field.ttype.name
       code.add_accessor(FIELD_TEMPLATE % {'type': return_type,
@@ -389,7 +417,6 @@ def generate_java(struct):
       # Add necessary imports, supporting only List, Map, Set.
       assert field.ttype.name in ['List', 'Map', 'Set'], 'Unrecognized type %s' % field.ttype.name
       code.add_import('com.google.common.collect.Immutable%s' % field.ttype.name)
-      code.add_import('java.util.%s' % field.ttype.name)
 
       params = field.ttype.params
       if all([p.immutable for p in params]):
@@ -408,23 +435,7 @@ def generate_java(struct):
               'isset': field.isset_method(),
               'params': field.ttype.param_names()}
       code.add_assignment(IMMUTABLE_COLLECTION_DECLARATION % args, assignment % args)
-    elif not field.ttype.immutable:
-      assert False, 'Making type %s immutable is not supported.' % field.ttype.name
   return code
-
-
-THRIFT_ALIASES = {
-  'bool': 'boolean',
-  'i32': 'int',
-  'i64': 'long',
-  'double': 'double',
-  'string': 'String',
-  'list': 'List',
-  'set': 'Set',
-  'map': 'Map',
-  'binary': 'byte[]',
-}
-
 
 if __name__ == '__main__':
   parser = OptionParser()
@@ -438,63 +449,24 @@ if __name__ == '__main__':
     if options.verbose:
       print(value)
 
-  if len(args) != 3:
-    print('usage: %s thrift_file struct_name output_directory' % sys.argv[0])
+  if len(args) != 2:
+    print('usage: %s thrift_file output_directory' % sys.argv[0])
     sys.exit(1)
 
-  thrift_file, struct_name, output_directory = args
-  log('Searching for %s in %s' % (struct_name, thrift_file))
+  thrift_file, output_directory = args
   with open(thrift_file) as f:
     # Load all structs found in the thrift file.
     structs = parse_structs(f.read())
 
-    # The symbol table stores information about types we recognize.
-    # As new symbols are parsed, they are accumulated here.
-    # This is also seeded with JDK types.
-    # Note: byte[] is not immutable, but we'd rather accept it than copy.
-    primitives = dict((t, PrimitiveType(t, b)) for (t, b) in [('boolean', 'Boolean'),
-                                                             ('int', 'Integer'),
-                                                             ('long', 'Long'),
-                                                             ('double', 'Double')])
-    lang_symbols = dict((t, Type(t, 'java.lang', immutable=True)) for t in ['String', 'byte[]'])
-    util_symbols = dict((t, Type(t, 'java.util')) for t in ['List', 'Map', 'Set'])
-    symbol_table = dict(primitives.items() + lang_symbols.items() + util_symbols.items())
-
-    def load_dependencies(struct):
-      # Fill in type information for fields by searching for dependencies.
-      for field in struct.fields:
-        if isinstance(field.ttype, ParameterizedType):
-          field.ttype.name = find_symbol(field.ttype.name).name
-          field.ttype.params = [find_symbol(p.name) for p in field.ttype.params]
-        else:
-          field.ttype = find_symbol(field.ttype.name)
-
-    def find_symbol(name):
-      name = THRIFT_ALIASES.get(name, name)
-      if name in symbol_table:
-        return symbol_table[name]
-
-      symbol = next((s for s in structs if s.name == name), None)
-      assert symbol, 'Failed to find required struct %s' % name
-      load_dependencies(symbol)
-      symbol_table[name] = symbol
-      return symbol
-
-    find_symbol(struct_name)
-    log('Symbol table:')
-    for _, symbol in symbol_table.items():
-      log('    %s' % symbol)
-
-    for _, symbol in symbol_table.items():
-      if isinstance(symbol, StructType):
-        if symbol.kind == 'enum':
-          log('Skipping code generation for %s, since it is immutable' % symbol.name)
-        else:
-          package_dir = os.path.join(output_directory, PACKAGE_NAME.replace('.', os.path.sep))
-          if not os.path.isdir(package_dir):
-            os.makedirs(package_dir)
-          gen_file = os.path.join(package_dir, '%s.java' % symbol.codegen_name)
-          log('Generating %s' % gen_file)
-          with open(gen_file, 'w') as f:
-            code = generate_java(symbol)
-            code.dump(f)
+    package_dir = os.path.join(output_directory, PACKAGE_NAME.replace('.', os.path.sep))
+    if not os.path.isdir(package_dir):
+      os.makedirs(package_dir)
+    for struct in structs:
+      # Skip generation for enums, since they are immutable.
+      if struct.kind == 'enum':
+        continue
+      gen_file = os.path.join(package_dir, '%s.java' % struct.codegen_name)
+      log('Generating %s' % gen_file)
+      with open(gen_file, 'w') as f:
+        code = generate_java(struct)
+        code.dump(f)

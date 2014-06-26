@@ -401,22 +401,11 @@ task generateSources(dependsOn: ['bootstrapThrift', 'checkPython']) {
         args = ['--gen', 'java:hashcode', '--gen', 'js:jquery', '-o', outputDir, file]
       }
     }
-    // TODO(wfarner): Change codegen tool to generate for all structs in a thrift file.
-    def iStructs = ['JobConfiguration',
-                    'JobStats',
-                    'Lock',
-                    'ResourceAggregate',
-                    'ScheduledTask',
-                    'ServerInfo']
-    iStructs.each {
-      def structName = it
-      exec {
-        executable = project.py
-        args = ['src/main/python/apache/aurora/tools/java/thrift_wrapper_codegen.py',
-                'src/main/thrift/org/apache/aurora/gen/api.thrift',
-                structName,
-                generatedJavaDir]
-      }
+    exec {
+      executable = project.py
+      args = ['src/main/python/apache/aurora/tools/java/thrift_wrapper_codegen.py',
+              'src/main/thrift/org/apache/aurora/gen/api.thrift',
+              generatedJavaDir]
     }
   }
 }
