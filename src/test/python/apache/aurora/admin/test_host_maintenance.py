@@ -15,9 +15,11 @@
 import copy
 import time
 import unittest
+from contextlib import contextmanager
 
 import mock
 from twitter.common import log
+from twitter.common.contextutil import temporary_file
 from twitter.common.quantity import Time
 
 from apache.aurora.admin.host_maintenance import HostMaintenance
@@ -149,7 +151,7 @@ class TestHostMaintenance(unittest.TestCase):
   def test_perform_maintenance(self, mock_check_sla, mock_start_maintenance,
       mock_drain_hosts, mock_operate_on_hosts, mock_complete_maintenance):
     mock_callback = mock.Mock()
-    mock_check_sla.return_value = True
+    mock_check_sla.return_value = set()
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
     maintenance.perform_maintenance(TEST_HOSTNAMES, callback=mock_callback)
     mock_start_maintenance.assert_called_once_with(TEST_HOSTNAMES)
@@ -163,6 +165,47 @@ class TestHostMaintenance(unittest.TestCase):
     assert mock_complete_maintenance.call_count == 3
     assert mock_complete_maintenance.call_args_list == [
         mock.call(Hosts(set([hostname]))) for hostname in TEST_HOSTNAMES]
+
+  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._complete_maintenance",
+              spec=HostMaintenance._complete_maintenance)
+  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._operate_on_hosts",
+              spec=HostMaintenance._operate_on_hosts)
+  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._drain_hosts",
+              spec=HostMaintenance._drain_hosts)
+  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance.start_maintenance",
+              spec=HostMaintenance.start_maintenance)
+  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._check_sla",
+              spec=HostMaintenance._check_sla)
+  def test_perform_maintenance_partial_sla_failure(self, mock_check_sla, mock_start_maintenance,
+                               mock_drain_hosts, mock_operate_on_hosts, mock_complete_maintenance):
+    mock_callback = mock.Mock()
+    failed_host = 'us-west-001.example.com'
+    mock_check_sla.return_value = set([failed_host])
+    drained_hosts = set(TEST_HOSTNAMES) - set([failed_host])
+    maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
+
+    with temporary_file() as fp:
+      with group_by_rack():
+        maintenance.perform_maintenance(
+            TEST_HOSTNAMES,
+            callback=mock_callback,
+            grouping_function='by_rack',
+            output_file=fp.name)
+
+        with open(fp.name, 'r') as fpr:
+          content = fpr.read()
+          assert failed_host in content
+
+        mock_start_maintenance.assert_called_once_with(TEST_HOSTNAMES)
+        assert mock_check_sla.call_count == 1
+        assert mock_drain_hosts.call_count == 1
+        assert mock_drain_hosts.call_args_list == [mock.call(Hosts(drained_hosts))]
+        assert mock_operate_on_hosts.call_count == 1
+        assert mock_operate_on_hosts.call_args_list == [
+            mock.call(Hosts(drained_hosts), mock_callback)]
+        assert mock_complete_maintenance.call_count == 2
+        assert mock_complete_maintenance.call_args_list == [
+            mock.call(Hosts(set([failed_host]))), mock.call(Hosts(drained_hosts))]
 
   @mock.patch("apache.aurora.client.api.AuroraClientAPI.maintenance_status",
       spec=AuroraClientAPI.maintenance_status)
@@ -197,13 +240,18 @@ def test_default_grouping():
   assert batches[2] == Hosts(set(['xyz321.example.com']))
 
 
+@contextmanager
+def group_by_rack():
+  add_grouping('by_rack', rack_grouping)
+  yield
+  remove_grouping('by_rack')
+
+
 def rack_grouping(hostname):
   return hostname.split('-')[1]
 
 
 def test_rack_grouping():
-  add_grouping('by_rack', rack_grouping)
-
   example_host_list = [
     'west-aaa-001.example.com',
     'west-aaa-002.example.com',
@@ -212,7 +260,7 @@ def test_rack_grouping():
     'east-xyz-004.example.com',
   ]
 
-  try:
+  with group_by_rack():
     batches = list(HostMaintenance.iter_batches(example_host_list, 'by_rack'))
     assert batches[0] == Hosts(set([
         'west-aaa-001.example.com',
@@ -223,6 +271,3 @@ def test_rack_grouping():
         'east-xyz-003.example.com',
         'east-xyz-004.example.com',
     ]))
-
-  finally:
-    remove_grouping('by_rack')

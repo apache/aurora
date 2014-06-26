@@ -70,7 +70,10 @@ def end_maintenance_hosts(cluster):
          'See sla_probe_hosts and sla_list_safe_domain commands '
          'for more details on SLA.' % HostMaintenance.SLA_UPTIME_DURATION_LIMIT)
 @app.command_option('--override_reason', dest='reason', default=None,
-    help='Reason for overriding default SLA values.')
+    help='Reason for overriding default SLA values. Provide details including the '
+         'maintenance ticket number.')
+@app.command_option('--unsafe_hosts_file', dest='unsafe_hosts_filename', default=None,
+    help='Output file to write host names that did not pass SLA check.')
 @app.command_option(FILENAME_OPTION)
 @app.command_option(HOSTS_OPTION)
 @app.command_option(GROUPING_OPTION)
@@ -82,6 +85,7 @@ def perform_maintenance_hosts(cluster):
                                       [--override_percentage=percentage]
                                       [--override_duration=duration]
                                       [--override_reason=reason]
+                                      [--unsafe_hosts_file=unsafe_hosts_filename]
                                       cluster
 
   Asks the scheduler to remove any running tasks from the machine and remove it
@@ -100,7 +104,16 @@ def perform_maintenance_hosts(cluster):
   percentage = parse_sla_percentage(options.percentage) if options.percentage else None
   duration = parse_time(options.duration) if options.duration else None
   if options.reason:
-    log_admin_message(logging.WARNING, options.reason)
+    log_admin_message(
+        logging.WARNING,
+        'Default SLA values (percentage: %s, duration: %s) are overridden for the following '
+        'hosts: %s. New percentage: %s, duration: %s, override reason: %s' % (
+            HostMaintenance.SLA_UPTIME_PERCENTAGE_LIMIT,
+            HostMaintenance.SLA_UPTIME_DURATION_LIMIT,
+            drainable_hosts,
+            percentage,
+            duration,
+            options.reason))
 
   drained_callback = parse_script(options.post_drain_script)
 
@@ -109,7 +122,8 @@ def perform_maintenance_hosts(cluster):
       grouping_function=options.grouping,
       callback=drained_callback,
       percentage=percentage,
-      duration=duration)
+      duration=duration,
+      output_file=options.unsafe_hosts_filename)
 
 
 @app.command

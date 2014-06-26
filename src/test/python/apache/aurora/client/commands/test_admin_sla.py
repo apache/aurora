@@ -324,7 +324,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
     """Tests successful execution of the sla_probe_hosts command with host list."""
     hosts = ['h0', 'h1']
     mock_options = self.setup_mock_options(hosts=','.join(hosts))
-    mock_vector = self.create_mock_probe_hosts_vector(self.create_probe_hosts(2, 80, True, 0))
+    mock_vector = self.create_mock_probe_hosts_vector([self.create_probe_hosts(2, 80, True, 0)])
     with contextlib.nested(
         patch('apache.aurora.client.commands.admin.AuroraClientAPI',
             new=Mock(spec=AuroraClientAPI)),
@@ -350,7 +350,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
 
   def test_probe_hosts_with_file(self):
     """Tests successful execution of the sla_probe_hosts command with host filename."""
-    mock_vector = self.create_mock_probe_hosts_vector(self.create_probe_hosts(1, 80, False, None))
+    mock_vector = self.create_mock_probe_hosts_vector([self.create_probe_hosts(1, 80, False, None)])
     with temporary_file() as fp:
       fp.write('h0')
       fp.flush()

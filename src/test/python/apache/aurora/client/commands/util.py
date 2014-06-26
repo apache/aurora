@@ -131,16 +131,14 @@ jobs = [HELLO_WORLD]
         bad_clause)
 
   @classmethod
-  def create_mock_probe_hosts_vector(cls, result):
+  def create_mock_probe_hosts_vector(cls, side_effects):
     mock_vector = Mock(spec=DomainUpTimeSlaVector)
-    mock_vector.probe_hosts.return_value = result
+    mock_vector.probe_hosts.side_effect = side_effects
     return mock_vector
 
   @classmethod
-  def create_probe_hosts(cls, num_hosts, predicted, safe, safe_in):
+  def create_probe_hosts(cls, hostname, predicted, safe, safe_in):
     hosts = defaultdict(list)
-    for i in range(num_hosts):
-      host_name = 'h%s' % i
-      job = AuroraJobKey.from_path('west/role/env/job%s' % i)
-      hosts[host_name].append(JobUpTimeDetails(job, predicted, safe, safe_in))
+    job = AuroraJobKey.from_path('west/role/env/job-%s' % hostname)
+    hosts[hostname].append(JobUpTimeDetails(job, predicted, safe, safe_in))
     return [hosts]

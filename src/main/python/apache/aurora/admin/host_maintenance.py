@@ -117,12 +117,11 @@ class HostMaintenance(object):
     :type percentage: float
     :param duration: SLA uptime duration override
     :type duration: twitter.common.quantity.Amount
-    :rtype: True if all hosts pass SLA check, False otherwise.
+    :rtype: set of unsafe hosts
     """
     sla_percentage = percentage or self.SLA_UPTIME_PERCENTAGE_LIMIT
     sla_duration = duration or self.SLA_UPTIME_DURATION_LIMIT
 
-    log.info('Beginning SLA check for %s' % hostnames)
     vector = self._client.sla_get_safe_domain_vector(self.SLA_MIN_JOB_INSTANCE_COUNT, hostnames)
     host_groups = vector.probe_hosts(
       sla_percentage,
@@ -133,17 +132,15 @@ class HostMaintenance(object):
     # should be considered a batch failure.
     if host_groups:
       if len(host_groups) > 1:
-        log.error('Illegal multiple groups detected in SLA results. Skipping hosts:%s' % hostnames)
+        log.error('Illegal multiple groups detected in SLA results. Skipping hosts: %s' % hostnames)
         return False
 
-      results = format_sla_results(host_groups, unsafe_only=True)
+      results, unsafe_hostnames = format_sla_results(host_groups, unsafe_only=True)
       if results:
         print_results(results)
-        log.warning('Some hosts in a group did not pass SLA check. Skipping group:%s' % hostnames)
-        return False
+        return unsafe_hostnames
 
-    log.info('All hosts passed SLA check.')
-    return True
+    return unsafe_hostnames
 
   def end_maintenance(self, hostnames):
     """Pull a list of hostnames out of maintenance mode.
@@ -165,7 +162,7 @@ class HostMaintenance(object):
     check_and_log_response(self._client.start_maintenance(Hosts(set(hostnames))))
 
   def perform_maintenance(self, hostnames, grouping_function=DEFAULT_GROUPING,
-                          callback=None, percentage=None, duration=None):
+                          callback=None, percentage=None, duration=None, output_file=None):
     """Wrap a callback in between sending hosts into maintenance mode and back.
 
     Walk through the process of putting hosts into maintenance, draining them of tasks,
@@ -174,24 +171,57 @@ class HostMaintenance(object):
 
     :param hostnames: A list of hosts to operate upon
     :type hostnames: list of strings
-    :param groups_per_batch: Number of groups (by default, hosts) to operate on at once
-    :type groups_per_batch: int
     :param grouping_function: How to split up the hostname into groups
     :type grouping_function: function
     :param callback: Function to call once hosts are drained
     :type callback: function
+    :param percentage: SLA percentage to use
+    :type percentage: float
+    :param duration: SLA duration to use
+    :type duration: twitter.common.quantity.Time
+    :param output_file: file to write hosts that were not drained due to failed SLA check
+    :type output_file: string
     """
     self.start_maintenance(hostnames)
+    not_drained_hostnames = set()
 
     for hosts in self.iter_batches(hostnames, grouping_function):
-      if not self._check_sla(list(hosts.hostNames), grouping_function, percentage, duration):
-        self._complete_maintenance(hosts)
-        continue
+      log.info('Beginning SLA check for %s' % hosts.hostNames)
+      unsafe_hostnames = self._check_sla(
+          list(hosts.hostNames),
+          grouping_function,
+          percentage,
+          duration)
+
+      if unsafe_hostnames:
+        log.warning('Some hosts did not pass SLA check and will not be drained! '
+                    'Skipping hosts: %s' % unsafe_hostnames)
+        self._complete_maintenance(Hosts(unsafe_hostnames))
+        not_drained_hostnames |= unsafe_hostnames
+        drainable_hostnames = hosts.hostNames - unsafe_hostnames
+        if not drainable_hostnames:
+          continue
+        hosts = Hosts(drainable_hostnames)
+      else:
+        log.info('All hosts passed SLA check.')
 
       self._drain_hosts(hosts)
       if callback:
         self._operate_on_hosts(hosts, callback)
       self._complete_maintenance(hosts)
+
+    if not_drained_hostnames:
+      output = '\n'.join(list(not_drained_hostnames))
+      log.info('The following hosts did not pass SLA check and were not drained:')
+      print(output)
+      if output_file:
+        try:
+          with open(output_file, 'w') as fp:
+            fp.write(output)
+            fp.write('\n')
+          log.info('Written unsafe host names into: %s' % output_file)
+        except IOError as e:
+          log.error('Failed to write into the output file: %s' % e)
 
   def check_status(self, hostnames):
     """Query the scheduler to determine the maintenance status for a list of hostnames

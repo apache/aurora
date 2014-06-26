@@ -163,11 +163,12 @@ def format_sla_results(host_groups, unsafe_only=False):
   :type host_groups: list of (defaultdict(list))
   :param unsafe_only: If True, includes only SLA-"unsafe" hosts from the results
   :type unsafe_only: bool
-  :rtype: list of string
+  :rtype: a tuple of: list of output strings, set of hostnames included in output.
   """
   results = []
   include_unsafe_only = lambda d: not d.safe if unsafe_only else True
 
+  hostnames = set()
   for group in host_groups:
     for host, job_details in sorted(group.items()):
       host_details = '\n'.join(
@@ -180,4 +181,5 @@ def format_sla_results(host_groups, unsafe_only=False):
               for d in sorted(job_details) if include_unsafe_only(d)])
       if host_details:
         results.append(host_details)
-  return results
+        hostnames.add(host)
+  return results, hostnames

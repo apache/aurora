@@ -486,7 +486,8 @@ def sla_probe_hosts(cluster, percentage, duration):
       options.verbosity).sla_get_safe_domain_vector(options.min_instance_count, hosts)
   groups = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), options.grouping)
 
-  print_results(format_sla_results(groups))
+  output, _ = format_sla_results(groups)
+  print_results(output)
 
 
 @app.command
