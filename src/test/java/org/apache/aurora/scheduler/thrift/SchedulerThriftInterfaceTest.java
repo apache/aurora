@@ -430,12 +430,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     expectAuth(ROOT, true);
     scheduler.killTasks(query, USER);
-    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME));
-    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    storageUtil.expectTaskFetch(query);
 
     control.replay();
 
-    assertOkResponse(thrift.killTasks(query.get(), LOCK.newBuilder(), SESSION));
+    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -453,13 +452,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testKillNonExistentTasks() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
 
+    expectAuth(ROOT, true);
+
+    scheduler.killTasks(query, USER);
     storageUtil.expectTaskFetch(query);
 
     control.replay();
 
-    Response response = thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION);
-    assertOkResponse(response);
-    assertEquals("No tasks to kill.", response.getMessageDEPRECATED());
+    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
   }
 
   @Test

@@ -654,10 +654,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     Set<IScheduledTask> tasks = Storage.Util.consistentFetchTasks(storage, Query.arbitrary(query));
-    if (Iterables.isEmpty(tasks)) {
-      // Short-circuit the call if there are no tasks to kill.
-      return addMessage(response, OK, "No tasks to kill.");
-    }
 
     Optional<SessionContext> context = isAdmin(session);
     if (context.isPresent()) {
@@ -677,7 +673,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return addMessage(response, LOCK_ERROR, e.getMessage());
     }
 
-    return okEmptyResponse();
+    return response.setResponseCode(OK);
   }
 
   @Override
