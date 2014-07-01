@@ -17,6 +17,7 @@ import textwrap
 from mock import patch
 from twitter.common.contextutil import temporary_file
 
+from apache.aurora.client.cli import EXIT_COMMAND_FAILURE
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 
@@ -43,7 +44,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.write(self.get_invalid_config("blather=..."))
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['config', 'list', fp.name])
+        result = cmd.execute(['config', 'list', fp.name])
+        assert result == EXIT_COMMAND_FAILURE
         assert mock_context.out == []
         assert any(line.startswith("Error loading configuration file: invalid syntax") for line in
             mock_context.err)

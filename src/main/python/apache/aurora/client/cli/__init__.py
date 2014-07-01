@@ -102,7 +102,24 @@ class Context(object):
       super(Context.CommandError, self).__init__(msg)  # noqa:T800
       self.msg = msg
       self.code = code
-      self.options = None
+
+  REVEAL_ERRORS = False
+
+  def __init__(self):
+    self.options = None
+    self.logging_level = None
+
+  @classmethod
+  def reveal_errors(cls):
+    return cls.REVEAL_ERRORS
+
+  @classmethod
+  def enable_reveal_errors(cls):
+    cls.REVEAL_ERRORS = True
+
+  @classmethod
+  def disable_reveal_errors(cls):
+    cls.REVEAL_ERRORS = False
 
   @classmethod
   def exit(cls, code, msg):
@@ -409,6 +426,8 @@ class CommandLine(object):
       return EXIT_INTERRUPTED
     except Exception as e:
       print_aurora_log(logging.ERROR, "Unknown error: %s" % e)
+      if Context.reveal_errors():
+        raise
       return EXIT_UNKNOWN_ERROR
 
 

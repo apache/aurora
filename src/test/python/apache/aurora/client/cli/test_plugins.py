@@ -12,6 +12,8 @@
 # limitations under the License.
 #
 
+import logging
+
 from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
@@ -192,3 +194,38 @@ class TestPlugins(AuroraClientCommandTest):
       assert not any('list' in t for t in self.transcript)
       assert "Options:" in self.transcript
       assert any('bogosity' in t for t in self.transcript)
+
+  def test_verbose_logging_plugin_in_create_job(self):
+    """Run a test of the "create" command against a mocked-out API:
+    Verifies that the creation command sends the right API RPCs, and performs the correct
+    tests on the result."""
+
+    # We'll patch out create_context, which will give us a fake context
+    # object, and everything can be stubbed through that.
+    mock_context = FakeAuroraCommandContext(reveal=False)
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
+      # After making the client, create sets up a job monitor.
+      # The monitor uses TaskQuery to get the tasks. It's called at least twice:once before
+      # the job is created, and once after. So we need to set up mocks for the query results.
+      mock_query = self.create_mock_query()
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.INIT))
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+      api = mock_context.get_api('west')
+      api.create_job.return_value = self.get_createjob_response()
+
+      # This is the real test: invoke create as if it had been called by the command line.
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'create', '-v', '--wait-until=RUNNING',
+            'west/bozo/test/hello', fp.name])
+
+      # Now check that the right API calls got made.
+      # Check that create_job was called exactly once, with an AuroraConfig parameter.
+      self.assert_create_job_called(api)
+      self.assert_scheduler_called(api, mock_query, 1)
+      # Check that the plugin did its job.
+      assert mock_context.logging_level == logging.INFO

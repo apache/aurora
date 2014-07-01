@@ -206,7 +206,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         assert api.create_job.call_count == 0
 
   def test_unknown_error(self):
-    mock_context = FakeAuroraCommandContext()
+    mock_context = FakeAuroraCommandContext(reveal=False)
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.cli.jobs.Job.create_context',
