@@ -130,3 +130,41 @@ class TestLogging(AuroraClientCommandTest):
           r.getMessage()) for r in mock_log_handler.logs)
       assert mock_log_handler.logs[0].clientid == mock_log_handler.logs[1].clientid
       assert mock_log_handler.logs[0].user == mock_log_handler.logs[1].user
+
+  def test_configuration_logging(self):
+    """Sets up a log handler, registers it with the logger, and then verifies that calls
+    to the client logging methods correctly get captured in the logs.
+    """
+    mock_log_handler = MockHandler()
+    logger = logging.getLogger('aurora_client')
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(mock_log_handler)
+    mock_context = FakeAuroraCommandContext()
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.INIT))
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+      api = mock_context.get_api('west')
+      api.create_job.return_value = self.get_createjob_response()
+
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        with open(fp.name, "r") as rp:
+          lines = rp.readlines()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'create', 'west/bozo/test/hello',
+            fp.name])
+        # Check that the contents of the config file were logged, as expected.
+        expected_config_msg = "Config: %s" % lines
+        assert any(expected_config_msg == r.getMessage() for r in mock_log_handler.logs)
+
+      # Check that things were logged correctly:
+      # there should be at least two entries, with the clientid and username;
+      # and one entry should log the command being invoked.
+      assert any(("'job', 'create', 'west/bozo/test/hello'" in
+          r.getMessage()) for r in mock_log_handler.logs)
+
+      assert mock_log_handler.logs[0].clientid == mock_log_handler.logs[1].clientid
+      assert mock_log_handler.logs[0].user == mock_log_handler.logs[1].user

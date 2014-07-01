@@ -26,6 +26,7 @@ from apache.aurora.client.cli import (
     EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER
 )
+from apache.aurora.client.cli.logsetup import TRANSCRIPT
 from apache.aurora.client.config import get_config
 from apache.aurora.client.factory import make_client
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -60,6 +61,10 @@ class AuroraCommandContext(Context):
     """Loads a job configuration from a config file."""
     jobname = jobkey.name
     try:
+      # TODO(mchucarroll): pull request to pystachio, to make it possible to log the loaded
+      # file without double-reading.
+      with open(config_file, "r") as fp:
+        self.print_log(TRANSCRIPT, "Config: %s" % fp.readlines())
       return get_config(
         jobname,
         config_file,
