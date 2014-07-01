@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
+import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -113,15 +114,12 @@ class TaskVars implements EventSubscriber {
   public void taskChangedState(TaskStateChange stateChange) {
     IScheduledTask task = stateChange.getTask();
     Optional<ScheduleStatus> previousState = stateChange.getOldState();
-    if (stateChange.isTransition() && !previousState.equals(Optional.of(ScheduleStatus.INIT))) {
-      decrementCount(previousState.get());
-    }
-
-    incrementCount(task.getStatus());
-
-    if (stateChange.getNewState() == ScheduleStatus.LOST) {
-      final String host = stateChange.getTask().getAssignedTask().getSlaveHost();
-      Optional<String> rack = storage.consistentRead(new Work.Quiet<Optional<String>>() {
+    final String host = stateChange.getTask().getAssignedTask().getSlaveHost();
+    Optional<String> rack;
+    if (Strings.isNullOrEmpty(stateChange.getTask().getAssignedTask().getSlaveHost())) {
+      rack = Optional.absent();
+    } else {
+      rack = storage.consistentRead(new Work.Quiet<Optional<String>>() {
         @Override
         public Optional<String> apply(StoreProvider storeProvider) {
           Optional<IAttribute> rack = FluentIterable
@@ -130,7 +128,21 @@ class TaskVars implements EventSubscriber {
           return rack.transform(ATTR_VALUE);
         }
       });
+    }
 
+    // Always dummy-read the lost-tasks-per-rack stat. This ensures that there is at least a zero
+    // exported for all racks.
+    if (rack.isPresent()) {
+      counters.getUnchecked(rackStatName(rack.get()));
+    }
+
+    if (stateChange.isTransition() && !previousState.equals(Optional.of(ScheduleStatus.INIT))) {
+      decrementCount(previousState.get());
+    }
+
+    incrementCount(task.getStatus());
+
+    if (stateChange.getNewState() == ScheduleStatus.LOST) {
       if (rack.isPresent()) {
         counters.getUnchecked(rackStatName(rack.get())).increment();
       } else {

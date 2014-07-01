@@ -30,6 +30,7 @@ import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
@@ -49,6 +50,7 @@ import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.TaskVars.rackStatName;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -108,14 +110,18 @@ public class TaskVarsTest extends EasyMockTest {
   }
 
   private IScheduledTask makeTask(String job, ScheduleStatus status, String host) {
-    return IScheduledTask.build(new ScheduledTask()
+    ScheduledTask task = new ScheduledTask()
         .setStatus(status)
         .setAssignedTask(new AssignedTask()
             .setTaskId(TASK_ID)
-            .setSlaveHost(host)
             .setTask(new TaskConfig()
                 .setJobName(job)
-                .setOwner(new Identity(ROLE_A, ROLE_A + "-user")))));
+                .setOwner(new Identity(ROLE_A, ROLE_A + "-user"))));
+    if (Tasks.SLAVE_ASSIGNED_STATES.contains(status) || Tasks.isTerminated(status)) {
+      task.getAssignedTask().setSlaveHost(host);
+    }
+
+    return IScheduledTask.build(task);
   }
 
   private IScheduledTask makeTask(String job, ScheduleStatus status) {
@@ -161,21 +167,26 @@ public class TaskVarsTest extends EasyMockTest {
   public void testTaskLifeCycle() {
     expectStatusCountersInitialized();
 
+    IScheduledTask taskA = makeTask(JOB_A, INIT);
+    expectGetHostRack("hostA", "rackA").atLeastOnce();
+    expectStatExport(rackStatName("rackA"));
+
     control.replay();
     schedulerActivated();
 
-    IScheduledTask taskA = makeTask(JOB_A, INIT);
-    changeState(taskA, PENDING);
+    changeState(makeTask(JOB_A, INIT), PENDING);
     assertEquals(1, getValue(PENDING));
     changeState(IScheduledTask.build(taskA.newBuilder().setStatus(PENDING)), ASSIGNED);
     assertEquals(0, getValue(PENDING));
     assertEquals(1, getValue(ASSIGNED));
+    taskA = makeTask(JOB_A, ASSIGNED, "hostA");
     changeState(IScheduledTask.build(taskA.newBuilder().setStatus(ASSIGNED)), RUNNING);
     assertEquals(0, getValue(ASSIGNED));
     assertEquals(1, getValue(RUNNING));
     changeState(IScheduledTask.build(taskA.newBuilder().setStatus(RUNNING)), FINISHED);
     assertEquals(0, getValue(RUNNING));
     assertEquals(1, getValue(FINISHED));
+    assertEquals(0, getValue(rackStatName("rackA")));
     vars.tasksDeleted(new TasksDeleted(ImmutableSet.of(
         IScheduledTask.build(taskA.newBuilder().setStatus(FINISHED)))));
     assertAllZero();
@@ -184,19 +195,25 @@ public class TaskVarsTest extends EasyMockTest {
   @Test
   public void testLoadsFromStorage() {
     expectStatusCountersInitialized();
+    expectGetHostRack("hostA", "rackA").atLeastOnce();
+    expectGetHostRack("hostB", "rackB").atLeastOnce();
+    expectStatExport(rackStatName("rackA"));
+    expectStatExport(rackStatName("rackB"));
 
     control.replay();
     schedulerActivated(
         makeTask(JOB_A, PENDING),
-        makeTask(JOB_A, RUNNING),
-        makeTask(JOB_A, FINISHED),
+        makeTask(JOB_A, RUNNING, "hostA"),
+        makeTask(JOB_A, FINISHED, "hostA"),
         makeTask(JOB_B, PENDING),
-        makeTask(JOB_B, FAILED));
+        makeTask(JOB_B, FAILED, "hostB"));
 
     assertEquals(2, getValue(PENDING));
     assertEquals(1, getValue(RUNNING));
     assertEquals(1, getValue(FINISHED));
     assertEquals(1, getValue(FAILED));
+    assertEquals(0, getValue(rackStatName("rackA")));
+    assertEquals(0, getValue(rackStatName("rackB")));
   }
 
   private IExpectationSetters<?> expectGetHostRack(String host, String rackToReturn) {
@@ -215,8 +232,8 @@ public class TaskVarsTest extends EasyMockTest {
     expectGetHostRack("host2", "rackB").atLeastOnce();
     expectGetHostRack("host3", "rackB").atLeastOnce();
 
-    expectStatExport(TaskVars.rackStatName("rackA"));
-    expectStatExport(TaskVars.rackStatName("rackB"));
+    expectStatExport(rackStatName("rackA"));
+    expectStatExport(rackStatName("rackB"));
 
     control.replay();
     schedulerActivated();
@@ -231,8 +248,8 @@ public class TaskVarsTest extends EasyMockTest {
     changeState(c, LOST);
     changeState(d, LOST);
 
-    assertEquals(2, getValue(TaskVars.rackStatName("rackA")));
-    assertEquals(2, getValue(TaskVars.rackStatName("rackB")));
+    assertEquals(2, getValue(rackStatName("rackA")));
+    assertEquals(2, getValue(rackStatName("rackB")));
   }
 
   @Test
