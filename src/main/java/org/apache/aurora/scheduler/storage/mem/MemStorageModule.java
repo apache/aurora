@@ -26,7 +26,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.Volatile;
 import org.apache.aurora.scheduler.storage.TaskStore;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Binding module for an in-memory storage system.
@@ -50,7 +50,7 @@ public final class MemStorageModule extends PrivateModule {
   private final KeyFactory keyFactory;
 
   public MemStorageModule(KeyFactory keyFactory) {
-    this.keyFactory = checkNotNull(keyFactory);
+    this.keyFactory = requireNonNull(keyFactory);
   }
 
   private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {

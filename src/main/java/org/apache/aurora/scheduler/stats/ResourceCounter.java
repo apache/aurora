@@ -22,7 +22,6 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.cache.CacheBuilder;
@@ -49,7 +48,7 @@ public class ResourceCounter {
 
   @Inject
   ResourceCounter(Storage storage) {
-    this.storage = Preconditions.checkNotNull(storage);
+    this.storage = Objects.requireNonNull(storage);
   }
 
   private Iterable<ITaskConfig> getTasks(Query.Builder query) throws StorageException {

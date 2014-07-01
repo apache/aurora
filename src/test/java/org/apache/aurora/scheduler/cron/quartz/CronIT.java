@@ -19,7 +19,6 @@ import com.google.common.util.concurrent.Service;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-
 import com.google.inject.util.Modules;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.ExceptionalCommand;

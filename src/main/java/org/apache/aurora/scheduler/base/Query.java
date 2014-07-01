@@ -14,9 +14,9 @@
 package org.apache.aurora.scheduler.base;
 
 import java.util.EnumSet;
+import java.util.Objects;
 import java.util.Set;
 
-import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
@@ -29,7 +29,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A utility class to construct storage queries.
@@ -153,7 +153,7 @@ public final class Query {
     }
 
     Builder(final TaskQuery query) {
-      this.query = checkNotNull(query); // It is expected that the caller calls deepCopy.
+      this.query = requireNonNull(query); // It is expected that the caller calls deepCopy.
     }
 
     /**
@@ -172,17 +172,17 @@ public final class Query {
     public boolean equals(Object that) {
       return that != null
           && that instanceof Builder
-          && Objects.equal(query, ((Builder) that).query);
+          && Objects.equals(query, ((Builder) that).query);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(query);
+      return Objects.hash(query);
     }
 
     @Override
     public String toString() {
-      return Objects.toStringHelper(this)
+      return com.google.common.base.Objects.toStringHelper(this)
           .add("query", query)
           .toString();
     }
@@ -195,7 +195,7 @@ public final class Query {
      * @return A new Builder scoped to the given tasks.
      */
     public Builder byId(String taskId, String... taskIds) {
-      checkNotNull(taskId);
+      requireNonNull(taskId);
 
       return new Builder(
           query.deepCopy()
@@ -211,7 +211,7 @@ public final class Query {
      * @return A new Builder scoped to the given tasks.
      */
     public Builder byId(Iterable<String> taskIds) {
-      checkNotNull(taskIds);
+      requireNonNull(taskIds);
 
       return new Builder(
           query.deepCopy().setTaskIds(ImmutableSet.copyOf(taskIds)));
@@ -224,7 +224,7 @@ public final class Query {
      * @return A new Builder scoped to the given role.
      */
     public Builder byRole(String role) {
-      checkNotNull(role);
+      requireNonNull(role);
 
       return new Builder(
           query.deepCopy().setOwner(new Identity().setRole(role)));
@@ -239,8 +239,8 @@ public final class Query {
      * @return A new Builder scoped to the given environment.
      */
     public Builder byEnv(String role, String environment) {
-      checkNotNull(role);
-      checkNotNull(environment);
+      requireNonNull(role);
+      requireNonNull(environment);
 
       return new Builder(
           query.deepCopy()
@@ -274,7 +274,7 @@ public final class Query {
      * @return A new Builder scoped to the given slaves.
      */
     public Builder bySlave(String slaveHost, String... slaveHosts) {
-      checkNotNull(slaveHost);
+      requireNonNull(slaveHost);
 
       return bySlave(ImmutableSet.<String>builder().add(slaveHost).add(slaveHosts).build());
     }
@@ -288,7 +288,7 @@ public final class Query {
      * @return A new Builder scoped to the slaveHosts.
      */
     public Builder bySlave(Iterable<String> slaveHosts) {
-      checkNotNull(slaveHosts);
+      requireNonNull(slaveHosts);
 
       return new Builder(query.deepCopy().setSlaveHosts(ImmutableSet.copyOf(slaveHosts)));
     }
@@ -302,7 +302,7 @@ public final class Query {
      * @return A new Builder scoped to the given statuses.
      */
     public Builder byStatus(ScheduleStatus status, ScheduleStatus... statuses) {
-      checkNotNull(status);
+      requireNonNull(status);
 
       return new Builder(
           query.deepCopy().setStatuses(EnumSet.of(status, statuses)));
@@ -317,7 +317,7 @@ public final class Query {
      * @return A new Builder scoped to the given statuses.
      */
     public Builder byStatus(Iterable<ScheduleStatus> statuses) {
-      checkNotNull(statuses);
+      requireNonNull(statuses);
 
       return new Builder(
           query.deepCopy().setStatuses(EnumSet.copyOf(ImmutableSet.copyOf(statuses))));
@@ -357,7 +357,7 @@ public final class Query {
      */
     public Builder byInstances(IJobKey jobKey, Iterable<Integer> instanceIds) {
       JobKeys.assertValid(jobKey);
-      checkNotNull(instanceIds);
+      requireNonNull(instanceIds);
 
       return new Builder(
           query.deepCopy()
@@ -375,7 +375,7 @@ public final class Query {
      * @return A new Builder scoped to the job keys.
      */
     public Builder byJobKeys(Iterable<IJobKey> jobKeys) {
-      checkNotNull(jobKeys);
+      requireNonNull(jobKeys);
 
       return new Builder(query.deepCopy().setJobKeys(IJobKey.toBuildersSet(jobKeys)));
     }

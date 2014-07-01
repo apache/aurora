@@ -27,7 +27,7 @@ import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.ibatis.exceptions.PersistenceException;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  *  A relational database-backed lock store.
@@ -41,8 +41,8 @@ class DbLockStore implements LockStore.Mutable {
 
   @Inject
   DbLockStore(LockMapper mapper, LockKeyMapper lockKeyMapper) {
-    this.mapper = checkNotNull(mapper);
-    this.lockKeyMapper = checkNotNull(lockKeyMapper);
+    this.mapper = requireNonNull(mapper);
+    this.lockKeyMapper = requireNonNull(lockKeyMapper);
   }
 
   @Override

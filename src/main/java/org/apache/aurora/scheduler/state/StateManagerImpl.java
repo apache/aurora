@@ -64,7 +64,8 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.SlaveID;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
@@ -95,12 +96,12 @@ public class StateManagerImpl implements StateManager {
       EventSink eventSink,
       RescheduleCalculator rescheduleCalculator) {
 
-    this.storage = checkNotNull(storage);
-    this.clock = checkNotNull(clock);
-    this.driver = checkNotNull(driver);
-    this.taskIdGenerator = checkNotNull(taskIdGenerator);
-    this.eventSink = checkNotNull(eventSink);
-    this.rescheduleCalculator = checkNotNull(rescheduleCalculator);
+    this.storage = requireNonNull(storage);
+    this.clock = requireNonNull(clock);
+    this.driver = requireNonNull(driver);
+    this.taskIdGenerator = requireNonNull(taskIdGenerator);
+    this.eventSink = requireNonNull(eventSink);
+    this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
   }
 
   private IScheduledTask createTask(int instanceId, ITaskConfig template) {
@@ -115,7 +116,7 @@ public class StateManagerImpl implements StateManager {
 
   @Override
   public void insertPendingTasks(final Map<Integer, ITaskConfig> tasks) {
-    checkNotNull(tasks);
+    requireNonNull(tasks);
 
     // Done outside the write transaction to minimize the work done inside a transaction.
     final Set<IScheduledTask> scheduledTasks = FluentIterable.from(tasks.entrySet())
@@ -161,8 +162,8 @@ public class StateManagerImpl implements StateManager {
 
     checkNotBlank(taskId);
     checkNotBlank(slaveHost);
-    checkNotNull(slaveId);
-    checkNotNull(assignedPorts);
+    requireNonNull(slaveId);
+    requireNonNull(assignedPorts);
 
     return storage.write(new MutateWork.Quiet<IAssignedTask>() {
       @Override
@@ -203,7 +204,7 @@ public class StateManagerImpl implements StateManager {
       Set<String> portNames,
       Set<Integer> allocatedPorts) {
 
-    checkNotNull(portNames);
+    requireNonNull(portNames);
 
     // Expand ports.
     Map<String, Integer> ports = Maps.newHashMap();

@@ -22,7 +22,7 @@ import org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
 import org.apache.aurora.scheduler.stats.ResourceCounter.Metric;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Calculates and exports aggregate stats about resources consumed by active tasks.
@@ -35,8 +35,8 @@ class TaskStatCalculator implements Runnable {
 
   @Inject
   TaskStatCalculator(ResourceCounter resourceCounter, CachedCounters counters) {
-    this.resourceCounter = checkNotNull(resourceCounter);
-    this.counters = checkNotNull(counters);
+    this.resourceCounter = requireNonNull(resourceCounter);
+    this.counters = requireNonNull(counters);
   }
 
   private void update(String prefix, Metric metric) {

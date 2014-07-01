@@ -37,7 +37,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A recovery mechanism that works with {@link StorageBackup} to provide a two-step storage
@@ -119,12 +119,12 @@ public interface Recovery {
         DistributedSnapshotStore distributedStore,
         Command shutDownNow) {
 
-      this.backupDir = checkNotNull(backupDir);
-      this.tempStorageFactory = checkNotNull(tempStorageFactory);
+      this.backupDir = requireNonNull(backupDir);
+      this.tempStorageFactory = requireNonNull(tempStorageFactory);
       this.recovery = Atomics.newReference();
-      this.primaryStorage = checkNotNull(primaryStorage);
-      this.distributedStore = checkNotNull(distributedStore);
-      this.shutDownNow = checkNotNull(shutDownNow);
+      this.primaryStorage = requireNonNull(primaryStorage);
+      this.distributedStore = requireNonNull(distributedStore);
+      this.shutDownNow = requireNonNull(shutDownNow);
     }
 
     @Override

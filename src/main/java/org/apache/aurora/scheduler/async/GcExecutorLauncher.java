@@ -61,7 +61,7 @@ import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskStatus;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A task launcher that periodically initiates garbage collection on a host, re-using a single
@@ -128,12 +128,12 @@ public class GcExecutorLauncher implements TaskLauncher {
       Driver driver,
       Supplier<String> uuidGenerator) {
 
-    this.settings = checkNotNull(settings);
-    this.storage = checkNotNull(storage);
-    this.clock = checkNotNull(clock);
-    this.executor = checkNotNull(executor);
-    this.driver = checkNotNull(driver);
-    this.uuidGenerator = checkNotNull(uuidGenerator);
+    this.settings = requireNonNull(settings);
+    this.storage = requireNonNull(storage);
+    this.clock = requireNonNull(clock);
+    this.executor = requireNonNull(executor);
+    this.driver = requireNonNull(driver);
+    this.uuidGenerator = requireNonNull(uuidGenerator);
     this.pulses = CacheBuilder.newBuilder()
         .expireAfterWrite(settings.getMaxGcInterval(), TimeUnit.MILLISECONDS)
         .build();
@@ -234,8 +234,8 @@ public class GcExecutorLauncher implements TaskLauncher {
 
     @VisibleForTesting
     GcExecutorSettings(Amount<Long, Time> gcInterval, Optional<String> gcExecutorPath) {
-      this.gcInterval = checkNotNull(gcInterval);
-      this.gcExecutorPath = checkNotNull(gcExecutorPath);
+      this.gcInterval = requireNonNull(gcInterval);
+      this.gcExecutorPath = requireNonNull(gcExecutorPath);
     }
 
     @VisibleForTesting

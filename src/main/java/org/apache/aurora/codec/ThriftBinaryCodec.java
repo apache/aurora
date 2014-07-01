@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.codec;
 
-import javax.annotation.Nullable;
+import java.util.Objects;
 
-import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 
 import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;
@@ -69,8 +69,8 @@ public final class ThriftBinaryCodec {
   public static <T extends TBase<T, ?>> T decodeNonNull(Class<T> clazz, byte[] buffer)
       throws CodingException {
 
-    Preconditions.checkNotNull(clazz);
-    Preconditions.checkNotNull(buffer);
+    Objects.requireNonNull(clazz);
+    Objects.requireNonNull(buffer);
 
     try {
       T t = clazz.newInstance();
@@ -108,7 +108,7 @@ public final class ThriftBinaryCodec {
    * @throws CodingException If the object could not be encoded.
    */
   public static byte[] encodeNonNull(TBase<?, ?> tBase) throws CodingException {
-    Preconditions.checkNotNull(tBase);
+    Objects.requireNonNull(tBase);
 
     try {
       return new TSerializer(PROTOCOL_FACTORY).serialize(tBase);

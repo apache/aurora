@@ -14,13 +14,13 @@
 package org.apache.aurora.scheduler.local;
 
 import java.util.Collection;
+import java.util.Objects;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.twitter.common.application.Lifecycle;
 
 import org.apache.aurora.scheduler.DriverFactory;
@@ -49,8 +49,8 @@ class FakeDriverFactory implements DriverFactory {
 
   @Inject
   FakeDriverFactory(Provider<Scheduler> scheduler, Lifecycle lifecycle) {
-    this.scheduler = Preconditions.checkNotNull(scheduler);
-    this.lifecycle = Preconditions.checkNotNull(lifecycle);
+    this.scheduler = Objects.requireNonNull(scheduler);
+    this.lifecycle = Objects.requireNonNull(lifecycle);
   }
 
   @Override

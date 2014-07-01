@@ -23,7 +23,7 @@ import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Quota store backed by a relational database.
@@ -34,7 +34,7 @@ class DbQuotaStore implements QuotaStore.Mutable {
 
   @Inject
   DbQuotaStore(QuotaMapper mapper) {
-    this.mapper = checkNotNull(mapper);
+    this.mapper = requireNonNull(mapper);
   }
 
   @Override

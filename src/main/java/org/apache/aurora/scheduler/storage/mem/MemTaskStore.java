@@ -54,7 +54,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.commons.lang.StringUtils;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * An in-memory task store.
@@ -116,7 +116,7 @@ class MemTaskStore implements TaskStore.Mutable {
   @Timed("mem_storage_fetch_tasks")
   @Override
   public ImmutableSet<IScheduledTask> fetchTasks(Query.Builder query) {
-    checkNotNull(query);
+    requireNonNull(query);
 
     long start = System.nanoTime();
     ImmutableSet<IScheduledTask> result = matches(query).transform(TO_SCHEDULED).toSet();
@@ -141,7 +141,7 @@ class MemTaskStore implements TaskStore.Mutable {
   @Timed("mem_storage_save_tasks")
   @Override
   public void saveTasks(Set<IScheduledTask> newTasks) {
-    checkNotNull(newTasks);
+    requireNonNull(newTasks);
     Preconditions.checkState(Tasks.ids(newTasks).size() == newTasks.size(),
         "Proposed new tasks would create task ID collision.");
 
@@ -165,7 +165,7 @@ class MemTaskStore implements TaskStore.Mutable {
   @Timed("mem_storage_delete_tasks")
   @Override
   public void deleteTasks(Set<String> taskIds) {
-    checkNotNull(taskIds);
+    requireNonNull(taskIds);
 
     for (String id : taskIds) {
       Task removed = tasks.remove(id);
@@ -186,8 +186,8 @@ class MemTaskStore implements TaskStore.Mutable {
       Query.Builder query,
       Function<IScheduledTask, IScheduledTask> mutator) {
 
-    checkNotNull(query);
-    checkNotNull(mutator);
+    requireNonNull(query);
+    requireNonNull(mutator);
 
     ImmutableSet.Builder<IScheduledTask> mutated = ImmutableSet.builder();
     for (Task original : matches(query).toList()) {
@@ -212,7 +212,7 @@ class MemTaskStore implements TaskStore.Mutable {
   @Override
   public boolean unsafeModifyInPlace(String taskId, ITaskConfig taskConfiguration) {
     MorePreconditions.checkNotBlank(taskId);
-    checkNotNull(taskConfiguration);
+    requireNonNull(taskConfiguration);
 
     Task stored = tasks.get(taskId);
     if (stored == null) {

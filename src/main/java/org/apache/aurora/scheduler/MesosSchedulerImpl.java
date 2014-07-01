@@ -50,7 +50,7 @@ import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Location for communication with mesos.
@@ -93,11 +93,11 @@ class MesosSchedulerImpl implements Scheduler {
       List<TaskLauncher> taskLaunchers,
       EventSink eventSink) {
 
-    this.storage = checkNotNull(storage);
-    this.stateManager = checkNotNull(stateManager);
-    this.lifecycle = checkNotNull(lifecycle);
-    this.taskLaunchers = checkNotNull(taskLaunchers);
-    this.eventSink = checkNotNull(eventSink);
+    this.storage = requireNonNull(storage);
+    this.stateManager = requireNonNull(stateManager);
+    this.lifecycle = requireNonNull(lifecycle);
+    this.taskLaunchers = requireNonNull(taskLaunchers);
+    this.eventSink = requireNonNull(eventSink);
   }
 
   @Override

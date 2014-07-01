@@ -25,7 +25,6 @@ import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
-
 import org.apache.aurora.scheduler.cron.ExpectedPrediction;
 import org.junit.Before;
 import org.junit.Test;

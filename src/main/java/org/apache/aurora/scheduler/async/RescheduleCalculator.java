@@ -39,7 +39,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.DRAINING;
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
@@ -122,16 +122,16 @@ public interface RescheduleCalculator {
           Amount<Long, Time> flappingTaskThreashold,
           Amount<Integer, Time> maxStartupRescheduleDelay) {
 
-        this.flappingTaskBackoff = checkNotNull(flappingTaskBackoff);
-        this.flappingTaskThreashold = checkNotNull(flappingTaskThreashold);
-        this.maxStartupRescheduleDelay = checkNotNull(maxStartupRescheduleDelay);
+        this.flappingTaskBackoff = requireNonNull(flappingTaskBackoff);
+        this.flappingTaskThreashold = requireNonNull(flappingTaskThreashold);
+        this.maxStartupRescheduleDelay = requireNonNull(maxStartupRescheduleDelay);
       }
     }
 
     @Inject
     RescheduleCalculatorImpl(Storage storage, RescheduleCalculatorSettings settings) {
-      this.storage = checkNotNull(storage);
-      this.settings = checkNotNull(settings);
+      this.storage = requireNonNull(storage);
+      this.settings = requireNonNull(settings);
     }
 
     @Override

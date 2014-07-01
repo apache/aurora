@@ -31,7 +31,7 @@ import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.thrift.TException;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A forwarding scheduler controller to make it easy to override specific behavior in an
@@ -42,7 +42,7 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   private final AuroraAdmin.Iface delegate;
 
   ForwardingThrift(AuroraAdmin.Iface delegate) {
-    this.delegate = checkNotNull(delegate);
+    this.delegate = requireNonNull(delegate);
   }
 
   @Override

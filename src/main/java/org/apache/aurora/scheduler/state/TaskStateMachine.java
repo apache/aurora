@@ -40,7 +40,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.state.SideEffect.Action;
 import static org.apache.aurora.scheduler.state.SideEffect.Action.DELETE;
@@ -158,7 +158,7 @@ class TaskStateMachine {
 
   private TaskStateMachine(final String name, final Optional<IScheduledTask> task) {
     MorePreconditions.checkNotBlank(name);
-    checkNotNull(task);
+    requireNonNull(task);
 
     final TaskState initialState = task.transform(SCHEDULED_TO_TASK_STATE).or(DELETED);
     if (task.isPresent()) {
@@ -538,7 +538,7 @@ class TaskStateMachine {
    * @return {@code true} if the state change was allowed, {@code false} otherwise.
    */
   public synchronized TransitionResult updateState(final Optional<ScheduleStatus> status) {
-    checkNotNull(status);
+    requireNonNull(status);
     Preconditions.checkState(sideEffects.isEmpty());
 
     /**

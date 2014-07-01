@@ -34,7 +34,8 @@ import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.scheduler.storage.Storage.StoreProvider;
@@ -58,7 +59,7 @@ public class Slaves extends JerseyTemplateServlet {
   public Slaves(IServerInfo serverInfo, Storage storage) {
     super("slaves");
     this.clusterName = checkNotBlank(serverInfo.getClusterName());
-    this.storage = checkNotNull(storage);
+    this.storage = requireNonNull(storage);
   }
 
   private Iterable<IHostAttributes> getHostAttributes() {

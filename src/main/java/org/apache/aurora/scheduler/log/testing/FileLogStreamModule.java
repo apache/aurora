@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.log.testing;
 
 import java.io.File;
+import java.util.Objects;
 
 import javax.inject.Singleton;
 
-import com.google.common.base.Preconditions;
 import com.google.inject.PrivateModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -37,7 +37,7 @@ public class FileLogStreamModule extends PrivateModule {
 
   @Override
   protected void configure() {
-    Preconditions.checkNotNull(LOG_PATH.get());
+    Objects.requireNonNull(LOG_PATH.get());
     bind(File.class).toInstance(LOG_PATH.get());
     bind(Log.class).to(FileLog.class);
     bind(FileLog.class).in(Singleton.class);

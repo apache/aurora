@@ -16,12 +16,12 @@ package org.apache.aurora.scheduler.cron;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
-import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Splitter;
 import com.google.common.collect.BiMap;
@@ -34,8 +34,9 @@ import com.google.common.collect.Range;
 import com.google.common.collect.RangeSet;
 import com.google.common.collect.TreeRangeSet;
 
+import static java.util.Objects.requireNonNull;
+
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A pattern that describes one or more cron 5-tuples (minute, hour, dayOfMonth, month, dayOfWeek).
@@ -278,16 +279,16 @@ public final class CrontabEntry {
       return false;
     }
     CrontabEntry that = (CrontabEntry) o;
-    return Objects.equal(getMinute(), that.getMinute())
-        && Objects.equal(getHour(), that.getHour())
-        && Objects.equal(getDayOfMonth(), that.getDayOfMonth())
-        && Objects.equal(getMonth(), that.getMonth())
-        && Objects.equal(getDayOfWeek(), that.getDayOfWeek());
+    return Objects.equals(getMinute(), that.getMinute())
+        && Objects.equals(getHour(), that.getHour())
+        && Objects.equals(getDayOfMonth(), that.getDayOfMonth())
+        && Objects.equals(getMonth(), that.getMonth())
+        && Objects.equals(getDayOfWeek(), that.getDayOfWeek());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(getMinute(), getHour(), getDayOfWeek(), getMonth(), getDayOfMonth());
+    return Objects.hash(getMinute(), getHour(), getDayOfWeek(), getMonth(), getDayOfMonth());
   }
 
   private static class Parser {
@@ -349,11 +350,11 @@ public final class CrontabEntry {
       Matcher matcher = CRONTAB_ENTRY.matcher(schedule);
       checkArgument(matcher.matches(), "Invalid cron schedule " + schedule);
 
-      rawMinute = checkNotNull(matcher.group("minute"));
-      rawHour = checkNotNull(matcher.group("hour"));
-      rawDayOfMonth = checkNotNull(matcher.group("dayOfMonth"));
-      rawMonth = checkNotNull(matcher.group("month"));
-      rawDayOfWeek = checkNotNull(matcher.group("dayOfWeek"));
+      rawMinute = requireNonNull(matcher.group("minute"));
+      rawHour = requireNonNull(matcher.group("hour"));
+      rawDayOfMonth = requireNonNull(matcher.group("dayOfMonth"));
+      rawMonth = requireNonNull(matcher.group("month"));
+      rawDayOfWeek = requireNonNull(matcher.group("dayOfWeek"));
     }
 
     CrontabEntry get() throws IllegalArgumentException {

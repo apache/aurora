@@ -29,7 +29,7 @@ import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Filter that determines whether a task's constraints are satisfied.
@@ -45,8 +45,8 @@ class ConstraintFilter {
    * @param hostAttributes The attributes of the host to test against.
    */
   ConstraintFilter(AttributeAggregate cachedjobState, Iterable<IAttribute> hostAttributes) {
-    this.cachedjobState = checkNotNull(cachedjobState);
-    this.hostAttributes = checkNotNull(hostAttributes);
+    this.cachedjobState = requireNonNull(cachedjobState);
+    this.hostAttributes = requireNonNull(hostAttributes);
   }
 
   @VisibleForTesting

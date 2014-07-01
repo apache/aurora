@@ -36,7 +36,7 @@ import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.TriggerBuilder;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Utilities for converting Aurora datatypes to Quartz datatypes.
@@ -108,8 +108,8 @@ final class Quartz {
   }
 
   static JobDetail jobDetail(IJobKey jobKey, Class<? extends Job> jobClass) {
-    checkNotNull(jobKey);
-    checkNotNull(jobClass);
+    requireNonNull(jobKey);
+    requireNonNull(jobClass);
 
     return JobBuilder.newJob(jobClass)
         .withIdentity(jobKey(jobKey))

@@ -34,7 +34,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Manager for startup and teardown of Quartz scheduler.
@@ -56,9 +56,9 @@ class CronLifecycle extends AbstractIdleService implements PubsubEvent.EventSubs
       ShutdownRegistry shutdownRegistry,
       CronJobManagerImpl cronJobManager) {
 
-    this.scheduler = checkNotNull(scheduler);
-    this.shutdownRegistry = checkNotNull(shutdownRegistry);
-    this.cronJobManager = checkNotNull(cronJobManager);
+    this.scheduler = requireNonNull(scheduler);
+    this.shutdownRegistry = requireNonNull(shutdownRegistry);
+    this.cronJobManager = requireNonNull(cronJobManager);
   }
 
   /**

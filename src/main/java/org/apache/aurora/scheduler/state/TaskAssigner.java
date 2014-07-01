@@ -32,7 +32,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskInfo;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Responsible for matching a task against an offer.
@@ -66,9 +66,9 @@ public interface TaskAssigner {
         SchedulingFilter filter,
         MesosTaskFactory taskFactory) {
 
-      this.stateManager = checkNotNull(stateManager);
-      this.filter = checkNotNull(filter);
-      this.taskFactory = checkNotNull(taskFactory);
+      this.stateManager = requireNonNull(stateManager);
+      this.filter = requireNonNull(filter);
+      this.taskFactory = requireNonNull(taskFactory);
     }
 
     private TaskInfo assign(Offer offer, IScheduledTask task) {

@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Utility class for facilitating async scheduling.
@@ -47,7 +47,7 @@ public final class AsyncUtil {
       String nameFormat,
       final Logger logger) {
 
-    checkNotNull(nameFormat);
+    requireNonNull(nameFormat);
 
     return new ScheduledThreadPoolExecutor(
         poolSize,

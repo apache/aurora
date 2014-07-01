@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.Map;
+import java.util.Objects;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -25,7 +26,6 @@ import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
@@ -45,7 +45,7 @@ public class Quotas {
 
   @Inject
   Quotas(Storage storage) {
-    this.storage = Preconditions.checkNotNull(storage);
+    this.storage = Objects.requireNonNull(storage);
   }
 
   /**

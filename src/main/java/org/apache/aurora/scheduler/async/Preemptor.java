@@ -58,8 +58,7 @@ import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.PREEMPTING;
@@ -150,12 +149,12 @@ public interface Preemptor {
         @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
         Clock clock) {
 
-      this.storage = checkNotNull(storage);
-      this.stateManager = checkNotNull(stateManager);
-      this.offerQueue = checkNotNull(offerQueue);
-      this.schedulingFilter = checkNotNull(schedulingFilter);
-      this.preemptionCandidacyDelay = checkNotNull(preemptionCandidacyDelay);
-      this.clock = checkNotNull(clock);
+      this.storage = requireNonNull(storage);
+      this.stateManager = requireNonNull(stateManager);
+      this.offerQueue = requireNonNull(offerQueue);
+      this.schedulingFilter = requireNonNull(schedulingFilter);
+      this.preemptionCandidacyDelay = requireNonNull(preemptionCandidacyDelay);
+      this.clock = requireNonNull(clock);
     }
 
     private List<IAssignedTask> fetch(Query.Builder query, Predicate<IScheduledTask> filter) {

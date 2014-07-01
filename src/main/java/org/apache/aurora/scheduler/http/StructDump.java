@@ -40,7 +40,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.thrift.TBase;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Servlet that prints out the raw configuration for a specified struct.
@@ -54,8 +54,8 @@ public class StructDump extends JerseyTemplateServlet {
   @Inject
   public StructDump(Storage storage, CronJobManager cronJobManager) {
     super("structdump");
-    this.storage = checkNotNull(storage);
-    this.cronJobManager = checkNotNull(cronJobManager);
+    this.storage = requireNonNull(storage);
+    this.cronJobManager = requireNonNull(cronJobManager);
   }
 
   private static final String USAGE =

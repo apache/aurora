@@ -43,7 +43,7 @@ import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.impl.matchers.GroupMatcher;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * NOTE: The source of truth for whether a cron job exists or not is always the JobStore. If state
@@ -60,9 +60,9 @@ class CronJobManagerImpl implements CronJobManager {
 
   @Inject
   CronJobManagerImpl(Storage storage, Scheduler scheduler, TimeZone timeZone) {
-    this.storage = checkNotNull(storage);
-    this.scheduler = checkNotNull(scheduler);
-    this.timeZone = checkNotNull(timeZone);
+    this.storage = requireNonNull(storage);
+    this.scheduler = requireNonNull(scheduler);
+    this.timeZone = requireNonNull(timeZone);
   }
 
   @Override
@@ -72,7 +72,7 @@ class CronJobManagerImpl implements CronJobManager {
 
   @Override
   public void startJobNow(final IJobKey jobKey) throws CronException {
-    checkNotNull(jobKey);
+    requireNonNull(jobKey);
 
     storage.weaklyConsistentRead(new Work<Void, CronException>() {
       @Override
@@ -104,7 +104,7 @@ class CronJobManagerImpl implements CronJobManager {
 
   @Override
   public void updateJob(final SanitizedCronJob config) throws CronException {
-    checkNotNull(config);
+    requireNonNull(config);
     checkNoRunOverlap(config);
 
     final IJobKey jobKey = config.getSanitizedConfig().getJobConfig().getKey();
@@ -123,7 +123,7 @@ class CronJobManagerImpl implements CronJobManager {
 
   @Override
   public void createJob(final SanitizedCronJob cronJob) throws CronException {
-    checkNotNull(cronJob);
+    requireNonNull(cronJob);
     checkNoRunOverlap(cronJob);
 
     final IJobKey jobKey = cronJob.getSanitizedConfig().getJobConfig().getKey();
@@ -192,7 +192,7 @@ class CronJobManagerImpl implements CronJobManager {
 
   @Override
   public boolean hasJob(final IJobKey jobKey) {
-    checkNotNull(jobKey);
+    requireNonNull(jobKey);
 
     return storage.consistentRead(new Work.Quiet<Boolean>() {
       @Override
@@ -204,7 +204,7 @@ class CronJobManagerImpl implements CronJobManager {
 
   @Override
   public boolean deleteJob(final IJobKey jobKey) {
-    checkNotNull(jobKey);
+    requireNonNull(jobKey);
 
     return storage.write(new MutateWork.Quiet<Boolean>() {
       @Override

@@ -49,8 +49,7 @@ import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A backup routine that layers over a snapshot store and periodically writes snapshots to
@@ -78,9 +77,9 @@ public interface StorageBackup {
       private final Amount<Long, Time> interval;
 
       BackupConfig(File dir, int maxBackups, Amount<Long, Time> interval) {
-        this.dir = checkNotNull(dir);
+        this.dir = requireNonNull(dir);
         this.maxBackups = maxBackups;
-        this.interval = checkNotNull(interval);
+        this.interval = requireNonNull(interval);
       }
 
       @VisibleForTesting
@@ -120,9 +119,9 @@ public interface StorageBackup {
         Clock clock,
         BackupConfig config) {
 
-      this.delegate = checkNotNull(delegate);
-      this.clock = checkNotNull(clock);
-      this.config = checkNotNull(config);
+      this.delegate = requireNonNull(delegate);
+      this.clock = requireNonNull(clock);
+      this.config = requireNonNull(config);
       backupDateFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm", Locale.ENGLISH);
       backupIntervalMs = config.interval.as(Time.MILLISECONDS);
       lastBackupMs = clock.nowMillis();

@@ -19,7 +19,7 @@ import com.twitter.common.inject.Bindings.KeyFactory;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Temporary module to wire the two partial storage implementations together as we
@@ -38,8 +38,8 @@ public class MigrationModule extends AbstractModule {
   private final KeyFactory fromFactory;
 
   public MigrationModule(KeyFactory from, KeyFactory to) {
-    this.fromFactory = checkNotNull(from);
-    this.toFactory = checkNotNull(to);
+    this.fromFactory = requireNonNull(from);
+    this.toFactory = requireNonNull(to);
   }
 
   private <T> void link(Class<T> clazz) {

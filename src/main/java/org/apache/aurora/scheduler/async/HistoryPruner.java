@@ -39,7 +39,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -89,11 +89,11 @@ public class HistoryPruner implements EventSubscriber {
       final HistoryPrunnerSettings settings,
       final Storage storage) {
 
-    this.executor = checkNotNull(executor);
-    this.stateManager = checkNotNull(stateManager);
-    this.clock = checkNotNull(clock);
-    this.settings = checkNotNull(settings);
-    this.storage = checkNotNull(storage);
+    this.executor = requireNonNull(executor);
+    this.stateManager = requireNonNull(stateManager);
+    this.clock = requireNonNull(clock);
+    this.settings = requireNonNull(settings);
+    this.storage = requireNonNull(storage);
   }
 
   @VisibleForTesting

@@ -19,12 +19,12 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
-
 import com.twitter.common.base.Supplier;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffHelper;
@@ -43,13 +43,13 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-
 import org.quartz.DisallowConcurrentExecution;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
+
 import static com.google.common.base.Preconditions.checkState;
 
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
@@ -87,10 +87,10 @@ class AuroraCronJob implements Job {
       StateManager stateManager,
       CronJobManager cronJobManager) {
 
-    this.storage = checkNotNull(storage);
-    this.stateManager = checkNotNull(stateManager);
-    this.cronJobManager = checkNotNull(cronJobManager);
-    this.delayedStartBackoff = checkNotNull(config.getDelayedStartBackoff());
+    this.storage = requireNonNull(storage);
+    this.stateManager = requireNonNull(stateManager);
+    this.cronJobManager = requireNonNull(cronJobManager);
+    this.delayedStartBackoff = requireNonNull(config.getDelayedStartBackoff());
   }
 
   private static final class DeferredLaunch {
@@ -219,7 +219,7 @@ class AuroraCronJob implements Job {
     private final BackoffHelper delayedStartBackoff;
 
     Config(BackoffHelper delayedStartBackoff) {
-      this.delayedStartBackoff = checkNotNull(delayedStartBackoff);
+      this.delayedStartBackoff = requireNonNull(delayedStartBackoff);
     }
 
     public BackoffHelper getDelayedStartBackoff() {

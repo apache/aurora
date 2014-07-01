@@ -59,7 +59,8 @@ import org.apache.aurora.scheduler.storage.StorageBackfill;
 import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
+
 import static com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 
 /**
@@ -148,8 +149,8 @@ public class SchedulerLifecycle implements EventSubscriber {
     private final ScheduledExecutorService executorService;
 
     DefaultDelayedActions(LeadingOptions leadingOptions, ScheduledExecutorService executorService) {
-      this.leadingOptions = checkNotNull(leadingOptions);
-      this.executorService = checkNotNull(executorService);
+      this.leadingOptions = requireNonNull(leadingOptions);
+      this.executorService = requireNonNull(executorService);
     }
 
     @Override
@@ -200,14 +201,14 @@ public class SchedulerLifecycle implements EventSubscriber {
       final EventSink eventSink,
       final ShutdownRegistry shutdownRegistry) {
 
-    checkNotNull(driverFactory);
-    checkNotNull(storage);
-    checkNotNull(lifecycle);
-    checkNotNull(driver);
-    checkNotNull(delayedActions);
-    checkNotNull(clock);
-    checkNotNull(eventSink);
-    checkNotNull(shutdownRegistry);
+    requireNonNull(driverFactory);
+    requireNonNull(storage);
+    requireNonNull(lifecycle);
+    requireNonNull(driver);
+    requireNonNull(delayedActions);
+    requireNonNull(clock);
+    requireNonNull(eventSink);
+    requireNonNull(shutdownRegistry);
 
     Stats.export(new StatImpl<Integer>("framework_registered") {
       @Override
@@ -490,8 +491,8 @@ public class SchedulerLifecycle implements EventSubscriber {
           leadingTimeLimit.getValue() >= 0,
           "Leading time limit must be positive.");
 
-      this.registrationDelayLimit = checkNotNull(registrationDelayLimit);
-      this.leadingTimeLimit = checkNotNull(leadingTimeLimit);
+      this.registrationDelayLimit = requireNonNull(registrationDelayLimit);
+      this.leadingTimeLimit = requireNonNull(leadingTimeLimit);
     }
   }
 

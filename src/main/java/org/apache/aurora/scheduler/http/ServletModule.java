@@ -14,11 +14,11 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.Map;
+import java.util.Objects;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
 import com.google.common.net.MediaType;
@@ -257,7 +257,7 @@ public class ServletModule extends AbstractModule {
 
     @Inject
     RedirectMonitor(LeaderRedirect redirector) {
-      this.redirector = Preconditions.checkNotNull(redirector);
+      this.redirector = Objects.requireNonNull(redirector);
     }
 
     @Override

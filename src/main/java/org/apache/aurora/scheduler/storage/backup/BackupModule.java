@@ -39,7 +39,7 @@ import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImp
 import org.apache.aurora.scheduler.storage.backup.StorageBackup.StorageBackupImpl.BackupConfig;
 import org.apache.aurora.scheduler.storage.backup.TemporaryStorage.TemporaryStorageFactory;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A module that will periodically save full storage backups to local disk and makes those backups
@@ -81,8 +81,8 @@ public class BackupModule extends PrivateModule {
    */
   @VisibleForTesting
   public BackupModule(File backupDir, Class<? extends SnapshotStore<Snapshot>> snapshotStore) {
-    this.unvalidatedBackupDir = checkNotNull(backupDir);
-    this.snapshotStore = checkNotNull(snapshotStore);
+    this.unvalidatedBackupDir = requireNonNull(backupDir);
+    this.snapshotStore = requireNonNull(snapshotStore);
   }
 
   @Override
@@ -109,7 +109,7 @@ public class BackupModule extends PrivateModule {
     private final Lifecycle lifecycle;
 
     @Inject LifecycleHook(Lifecycle lifecycle) {
-      this.lifecycle = checkNotNull(lifecycle);
+      this.lifecycle = requireNonNull(lifecycle);
     }
 
     @Override

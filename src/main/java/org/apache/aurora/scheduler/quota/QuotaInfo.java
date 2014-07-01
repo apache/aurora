@@ -15,7 +15,7 @@ package org.apache.aurora.scheduler.quota;
 
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Wraps allocated quota and consumption details.
@@ -30,9 +30,9 @@ public class QuotaInfo {
       IResourceAggregate prodConsumption,
       IResourceAggregate nonProdConsumption) {
 
-    this.quota = checkNotNull(quota);
-    this.prodConsumption = checkNotNull(prodConsumption);
-    this.nonProdConsumption = checkNotNull(nonProdConsumption);
+    this.quota = requireNonNull(quota);
+    this.prodConsumption = requireNonNull(prodConsumption);
+    this.nonProdConsumption = requireNonNull(nonProdConsumption);
   }
 
   /**

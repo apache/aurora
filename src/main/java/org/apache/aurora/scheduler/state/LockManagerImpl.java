@@ -18,7 +18,6 @@ import java.util.Date;
 import javax.inject.Inject;
 
 import com.google.common.base.Optional;
-
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.Lock;
@@ -33,7 +32,7 @@ import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Implements lock-related primitives required to provide mutual exclusion guarantees
@@ -46,9 +45,9 @@ class LockManagerImpl implements LockManager {
 
   @Inject
   LockManagerImpl(Storage storage, Clock clock, UUIDGenerator tokenGenerator) {
-    this.storage = checkNotNull(storage);
-    this.clock = checkNotNull(clock);
-    this.tokenGenerator = checkNotNull(tokenGenerator);
+    this.storage = requireNonNull(storage);
+    this.clock = requireNonNull(clock);
+    this.tokenGenerator = requireNonNull(tokenGenerator);
   }
 
   @Override

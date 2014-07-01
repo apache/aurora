@@ -13,12 +13,12 @@
  */
 package org.apache.aurora.scheduler.metadata;
 
+import java.util.Objects;
 import java.util.Set;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Ticker;
 import com.google.common.cache.CacheBuilder;
@@ -120,7 +120,7 @@ public class NearestFit implements EventSubscriber {
    */
   @Subscribe
   public synchronized void vetoed(Vetoed vetoEvent) {
-    Preconditions.checkNotNull(vetoEvent);
+    Objects.requireNonNull(vetoEvent);
     fitByTask.getUnchecked(vetoEvent.getTaskId()).maybeUpdate(vetoEvent.getVetoes());
   }
 

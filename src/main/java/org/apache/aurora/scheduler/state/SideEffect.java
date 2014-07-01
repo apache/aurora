@@ -13,7 +13,8 @@
  */
 package org.apache.aurora.scheduler.state;
 
-import com.google.common.base.Objects;
+import java.util.Objects;
+
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 
@@ -52,13 +53,13 @@ class SideEffect {
     }
 
     SideEffect other = (SideEffect) o;
-    return Objects.equal(action, other.action)
-        && Objects.equal(nextState, other.nextState);
+    return Objects.equals(action, other.action)
+        && Objects.equals(nextState, other.nextState);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(action, nextState);
+    return Objects.hash(action, nextState);
   }
 
   @Override

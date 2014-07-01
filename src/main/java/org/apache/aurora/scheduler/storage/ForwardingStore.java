@@ -30,7 +30,7 @@ import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A store that forwards all its operations to underlying storage systems.  Useful for decorating
@@ -69,12 +69,12 @@ public class ForwardingStore implements
       QuotaStore quotaStore,
       AttributeStore attributeStore) {
 
-    this.schedulerStore = checkNotNull(schedulerStore);
-    this.jobStore = checkNotNull(jobStore);
-    this.taskStore = checkNotNull(taskStore);
-    this.lockStore = checkNotNull(lockStore);
-    this.quotaStore = checkNotNull(quotaStore);
-    this.attributeStore = checkNotNull(attributeStore);
+    this.schedulerStore = requireNonNull(schedulerStore);
+    this.jobStore = requireNonNull(jobStore);
+    this.taskStore = requireNonNull(taskStore);
+    this.lockStore = requireNonNull(lockStore);
+    this.quotaStore = requireNonNull(quotaStore);
+    this.attributeStore = requireNonNull(attributeStore);
   }
 
   @Override

@@ -18,12 +18,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Iterator;
+import java.util.Objects;
 
 import javax.inject.Inject;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
@@ -53,7 +53,7 @@ class FileLog implements Log {
 
   @Inject
   FileLog(File logFile) {
-    this.logFile = Preconditions.checkNotNull(logFile);
+    this.logFile = Objects.requireNonNull(logFile);
   }
 
   @Override

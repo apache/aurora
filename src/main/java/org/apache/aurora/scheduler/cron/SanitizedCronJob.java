@@ -24,7 +24,7 @@ import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.commons.lang.StringUtils;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Used by functions that expect field validation before being called.
@@ -105,7 +105,7 @@ public final class SanitizedCronJob {
   }
 
   private static boolean hasCronSchedule(IJobConfiguration job) {
-    checkNotNull(job);
+    requireNonNull(job);
     return !StringUtils.isEmpty(job.getCronSchedule());
   }
 

@@ -24,7 +24,7 @@ import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.quartz.CronExpression;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 class CronPredictorImpl implements CronPredictor {
   private final Clock clock;
@@ -32,8 +32,8 @@ class CronPredictorImpl implements CronPredictor {
 
   @Inject
   CronPredictorImpl(Clock clock, TimeZone timeZone) {
-    this.clock = checkNotNull(clock);
-    this.timeZone = checkNotNull(timeZone);
+    this.clock = requireNonNull(clock);
+    this.timeZone = requireNonNull(timeZone);
   }
 
   @Override

@@ -13,10 +13,10 @@
  */
 package org.apache.aurora.scheduler.filter;
 
+import java.util.Objects;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Objects;
 
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -80,19 +80,19 @@ public interface SchedulingFilter {
       }
 
       Veto other = (Veto) o;
-      return Objects.equal(reason, other.reason)
-          && score == other.score
-          && valueMismatch == other.valueMismatch;
+      return Objects.equals(reason, other.reason)
+          && Objects.equals(score, other.score)
+          && Objects.equals(valueMismatch, other.valueMismatch);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(reason, score, valueMismatch);
+      return Objects.hash(reason, score, valueMismatch);
     }
 
     @Override
     public String toString() {
-      return Objects.toStringHelper(this)
+      return com.google.common.base.Objects.toStringHelper(this)
           .add("reason", reason)
           .add("score", score)
           .add("valueMismatch", valueMismatch)

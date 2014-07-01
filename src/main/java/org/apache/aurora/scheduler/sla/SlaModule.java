@@ -26,7 +26,6 @@ import com.google.common.eventbus.Subscribe;
 import com.google.inject.AbstractModule;
 import com.google.inject.BindingAnnotation;
 import com.google.inject.Singleton;
-
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -45,8 +44,7 @@ import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Binding module for the sla processor.
@@ -101,9 +99,9 @@ public class SlaModule extends AbstractModule {
         MetricCalculator calculator,
         MetricCalculatorSettings settings) {
 
-      this.executor = checkNotNull(executor);
-      this.calculator = checkNotNull(calculator);
-      this.settings = checkNotNull(settings);
+      this.executor = requireNonNull(executor);
+      this.calculator = requireNonNull(calculator);
+      this.settings = requireNonNull(settings);
     }
 
     @Subscribe

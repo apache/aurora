@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.thrift.auth;
 
 import java.util.Map;
+import java.util.Objects;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -50,7 +51,7 @@ public class ThriftAuthModule extends AbstractModule {
 
   @VisibleForTesting
   public ThriftAuthModule(Map<Capability, String> capabilities) {
-    this.capabilities = Preconditions.checkNotNull(capabilities);
+    this.capabilities = Objects.requireNonNull(capabilities);
   }
 
   @Override

@@ -57,7 +57,7 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.storage.log.LogStorage.TransactionManager;
 
@@ -107,13 +107,13 @@ class WriteAheadStorage extends ForwardingStore implements
 
     super(schedulerStore, jobStore, taskStore, lockStore, quotaStore, attributeStore);
 
-    this.transactionManager = checkNotNull(transactionManager);
-    this.schedulerStore = checkNotNull(schedulerStore);
-    this.jobStore = checkNotNull(jobStore);
-    this.taskStore = checkNotNull(taskStore);
-    this.lockStore = checkNotNull(lockStore);
-    this.quotaStore = checkNotNull(quotaStore);
-    this.attributeStore = checkNotNull(attributeStore);
+    this.transactionManager = requireNonNull(transactionManager);
+    this.schedulerStore = requireNonNull(schedulerStore);
+    this.jobStore = requireNonNull(jobStore);
+    this.taskStore = requireNonNull(taskStore);
+    this.lockStore = requireNonNull(lockStore);
+    this.quotaStore = requireNonNull(quotaStore);
+    this.attributeStore = requireNonNull(attributeStore);
   }
 
   private void write(Op op) {
@@ -126,7 +126,7 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_log_save_framework_id")
   @Override
   public void saveFrameworkId(final String frameworkId) {
-    checkNotNull(frameworkId);
+    requireNonNull(frameworkId);
 
     write(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)));
     schedulerStore.saveFrameworkId(frameworkId);
@@ -135,8 +135,8 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_log_unsafe_modify_in_place")
   @Override
   public boolean unsafeModifyInPlace(final String taskId, final ITaskConfig taskConfiguration) {
-    checkNotNull(taskId);
-    checkNotNull(taskConfiguration);
+    requireNonNull(taskId);
+    requireNonNull(taskConfiguration);
 
     boolean mutated = taskStore.unsafeModifyInPlace(taskId, taskConfiguration);
     if (mutated) {
@@ -148,7 +148,7 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_log_tasks_remove")
   @Override
   public void deleteTasks(final Set<String> taskIds) {
-    checkNotNull(taskIds);
+    requireNonNull(taskIds);
 
     write(Op.removeTasks(new RemoveTasks(taskIds)));
     taskStore.deleteTasks(taskIds);
@@ -157,7 +157,7 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_log_tasks_save")
   @Override
   public void saveTasks(final Set<IScheduledTask> newTasks) {
-    checkNotNull(newTasks);
+    requireNonNull(newTasks);
 
     write(Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(newTasks))));
     taskStore.saveTasks(newTasks);
@@ -169,8 +169,8 @@ class WriteAheadStorage extends ForwardingStore implements
       final Query.Builder query,
       final Function<IScheduledTask, IScheduledTask> mutator) {
 
-    checkNotNull(query);
-    checkNotNull(mutator);
+    requireNonNull(query);
+    requireNonNull(mutator);
 
     ImmutableSet<IScheduledTask> mutated = taskStore.mutateTasks(query, mutator);
 
@@ -188,8 +188,8 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_log_quota_save")
   @Override
   public void saveQuota(final String role, final IResourceAggregate quota) {
-    checkNotNull(role);
-    checkNotNull(quota);
+    requireNonNull(role);
+    requireNonNull(quota);
 
     write(Op.saveQuota(new SaveQuota(role, quota.newBuilder())));
     quotaStore.saveQuota(role, quota);
@@ -198,7 +198,7 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_save_host_attribute")
   @Override
   public void saveHostAttributes(final IHostAttributes attrs) {
-    checkNotNull(attrs);
+    requireNonNull(attrs);
 
     // Pass the updated attributes upstream, and then check if the stored value changes.
     // We do this since different parts of the system write partial HostAttributes objects
@@ -216,7 +216,7 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_log_job_remove")
   @Override
   public void removeJob(final IJobKey jobKey) {
-    checkNotNull(jobKey);
+    requireNonNull(jobKey);
 
     write(Op.removeJob(new RemoveJob().setJobKey(jobKey.newBuilder())));
     jobStore.removeJob(jobKey);
@@ -225,8 +225,8 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_log_job_save")
   @Override
   public void saveAcceptedJob(final String managerId, final IJobConfiguration jobConfig) {
-    checkNotNull(managerId);
-    checkNotNull(jobConfig);
+    requireNonNull(managerId);
+    requireNonNull(jobConfig);
 
     write(Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())));
     jobStore.saveAcceptedJob(managerId, jobConfig);
@@ -235,7 +235,7 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_log_quota_remove")
   @Override
   public void removeQuota(final String role) {
-    checkNotNull(role);
+    requireNonNull(role);
 
     write(Op.removeQuota(new RemoveQuota(role)));
     quotaStore.removeQuota(role);
@@ -244,7 +244,7 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_lock_save")
   @Override
   public void saveLock(final ILock lock) {
-    checkNotNull(lock);
+    requireNonNull(lock);
 
     write(Op.saveLock(new SaveLock(lock.newBuilder())));
     lockStore.saveLock(lock);
@@ -253,7 +253,7 @@ class WriteAheadStorage extends ForwardingStore implements
   @Timed("scheduler_lock_remove")
   @Override
   public void removeLock(final ILockKey lockKey) {
-    checkNotNull(lockKey);
+    requireNonNull(lockKey);
 
     write(Op.removeLock(new RemoveLock(lockKey.newBuilder())));
     lockStore.removeLock(lockKey);
@@ -291,8 +291,8 @@ class WriteAheadStorage extends ForwardingStore implements
 
   @Override
   public boolean setMaintenanceMode(final String host, final MaintenanceMode mode) {
-    checkNotNull(host);
-    checkNotNull(mode);
+    requireNonNull(host);
+    requireNonNull(mode);
 
     boolean saved = attributeStore.setMaintenanceMode(host, mode);
     if (saved) {

@@ -45,7 +45,7 @@ import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 
@@ -195,8 +195,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
   @Inject
   public SnapshotStoreImpl(Clock clock, @Volatile Storage storage) {
-    this.clock = checkNotNull(clock);
-    this.storage = checkNotNull(storage);
+    this.clock = requireNonNull(clock);
+    this.storage = requireNonNull(storage);
   }
 
   @Timed("snapshot_create")
@@ -222,7 +222,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   @Timed("snapshot_apply")
   @Override
   public void applySnapshot(final Snapshot snapshot) {
-    checkNotNull(snapshot);
+    requireNonNull(snapshot);
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override

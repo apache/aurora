@@ -13,12 +13,12 @@
  */
 package org.apache.aurora.scheduler.configuration;
 
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -174,16 +174,16 @@ public final class ConfigurationManager {
         && identifier.length() <= MAX_IDENTIFIER_LENGTH;
   }
 
-  private static void checkNotNull(Object value, String error) throws TaskDescriptionException {
+  private static void requireNonNull(Object value, String error) throws TaskDescriptionException {
     if (value == null) {
       throw new TaskDescriptionException(error);
     }
   }
 
   private static void assertOwnerValidity(IIdentity jobOwner) throws TaskDescriptionException {
-    checkNotNull(jobOwner, "No job owner specified!");
-    checkNotNull(jobOwner.getRole(), "No job role specified!");
-    checkNotNull(jobOwner.getUser(), "No job user specified!");
+    requireNonNull(jobOwner, "No job owner specified!");
+    requireNonNull(jobOwner.getRole(), "No job role specified!");
+    requireNonNull(jobOwner.getUser(), "No job user specified!");
 
     if (!isGoodIdentifier(jobOwner.getRole())) {
       throw new TaskDescriptionException(
@@ -225,7 +225,7 @@ public final class ConfigurationManager {
   public static IJobConfiguration validateAndPopulate(IJobConfiguration job)
       throws TaskDescriptionException {
 
-    Preconditions.checkNotNull(job);
+    Objects.requireNonNull(job);
 
     if (!job.isSetTaskConfig()) {
       throw new TaskDescriptionException("Job configuration must have taskConfig set.");

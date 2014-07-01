@@ -13,8 +13,8 @@
  */
 package org.apache.aurora.scheduler.state;
 
-import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
+
 import com.google.common.collect.ImmutableSet;
 
 /**
@@ -34,7 +34,7 @@ public class TransitionResult {
    */
   public TransitionResult(boolean success, ImmutableSet<SideEffect> sideEffects) {
     this.success = success;
-    this.sideEffects = Preconditions.checkNotNull(sideEffects);
+    this.sideEffects = Objects.requireNonNull(sideEffects);
   }
 
   public boolean isSuccess() {
@@ -52,18 +52,18 @@ public class TransitionResult {
     }
 
     TransitionResult other = (TransitionResult) o;
-    return success == other.success
-        && Objects.equal(sideEffects, other.sideEffects);
+    return Objects.equals(success, other.success)
+        && Objects.equals(sideEffects, other.sideEffects);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(success, sideEffects);
+    return Objects.hash(success, sideEffects);
   }
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(this)
+    return com.google.common.base.Objects.toStringHelper(this)
         .add("success", success)
         .add("sideEffects", sideEffects)
         .toString();

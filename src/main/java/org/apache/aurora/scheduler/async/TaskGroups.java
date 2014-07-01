@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.async;
 
+import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -21,7 +22,6 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -46,9 +46,8 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 
@@ -76,8 +75,8 @@ public class TaskGroups implements EventSubscriber {
     private final RateLimiter rateLimiter;
 
     TaskGroupsSettings(BackoffStrategy taskGroupBackoff, RateLimiter rateLimiter) {
-      this.taskGroupBackoff = checkNotNull(taskGroupBackoff);
-      this.rateLimiter = checkNotNull(rateLimiter);
+      this.taskGroupBackoff = requireNonNull(taskGroupBackoff);
+      this.rateLimiter = requireNonNull(rateLimiter);
     }
   }
 
@@ -104,11 +103,11 @@ public class TaskGroups implements EventSubscriber {
       final TaskScheduler taskScheduler,
       final RescheduleCalculator rescheduleCalculator) {
 
-    this.executor = checkNotNull(executor);
-    checkNotNull(rateLimiter);
-    checkNotNull(taskScheduler);
-    this.backoff = checkNotNull(backoff);
-    this.rescheduleCalculator = checkNotNull(rescheduleCalculator);
+    this.executor = requireNonNull(executor);
+    requireNonNull(rateLimiter);
+    requireNonNull(taskScheduler);
+    this.backoff = requireNonNull(backoff);
+    this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
 
     this.taskScheduler = new TaskScheduler() {
       @Override
@@ -226,7 +225,7 @@ public class TaskGroups implements EventSubscriber {
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(canonicalTask);
+      return Objects.hash(canonicalTask);
     }
 
     @Override
@@ -235,7 +234,7 @@ public class TaskGroups implements EventSubscriber {
         return false;
       }
       GroupKey other = (GroupKey) o;
-      return Objects.equal(canonicalTask, other.canonicalTask);
+      return Objects.equals(canonicalTask, other.canonicalTask);
     }
 
     @Override

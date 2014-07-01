@@ -22,7 +22,8 @@ import org.quartz.SchedulerException;
 import org.quartz.spi.JobFactory;
 import org.quartz.spi.TriggerFiredBundle;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
+
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -33,7 +34,7 @@ class AuroraCronJobFactory implements JobFactory {
 
   @Inject
   AuroraCronJobFactory(Provider<AuroraCronJob> auroraCronJobProvider) {
-    this.auroraCronJobProvider = checkNotNull(auroraCronJobProvider);
+    this.auroraCronJobProvider = requireNonNull(auroraCronJobProvider);
   }
 
   @Override

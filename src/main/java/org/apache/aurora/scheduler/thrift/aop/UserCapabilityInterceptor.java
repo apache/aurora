@@ -16,13 +16,13 @@ package org.apache.aurora.scheduler.thrift.aop;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -59,7 +59,7 @@ class UserCapabilityInterceptor implements MethodInterceptor {
 
   @Override
   public Object invoke(MethodInvocation invocation) throws Throwable {
-    Preconditions.checkNotNull(capabilityValidator, "Session validator has not yet been set.");
+    Objects.requireNonNull(capabilityValidator, "Session validator has not yet been set.");
 
     // Ensure ROOT is always permitted.
     ImmutableList.Builder<Capability> whitelistBuilder =

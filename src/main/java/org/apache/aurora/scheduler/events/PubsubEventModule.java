@@ -33,7 +33,7 @@ import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelega
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Binding module for plumbing event notifications.
@@ -81,8 +81,8 @@ public final class PubsubEventModule extends AbstractModule {
 
     @Inject
     RegisterSubscribers(EventBus eventBus, Set<EventSubscriber> subscribers) {
-      this.eventBus = checkNotNull(eventBus);
-      this.subscribers = checkNotNull(subscribers);
+      this.eventBus = requireNonNull(eventBus);
+      this.subscribers = requireNonNull(subscribers);
     }
 
     @Override

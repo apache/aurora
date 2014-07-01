@@ -42,7 +42,8 @@ import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
@@ -108,7 +109,7 @@ public interface MesosTaskFactory {
 
     @Override
     public TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException {
-      checkNotNull(task);
+      requireNonNull(task);
       byte[] taskInBytes;
       try {
         taskInBytes = ThriftBinaryCodec.encode(task.newBuilder());

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.http;
 
 import java.io.IOException;
+import java.util.Objects;
 
 import javax.inject.Inject;
 import javax.servlet.FilterChain;
@@ -22,7 +23,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.twitter.common.net.http.filters.AbstractHttpFilter;
 
 /**
@@ -34,7 +34,7 @@ public class LeaderRedirectFilter extends AbstractHttpFilter {
 
   @Inject
   LeaderRedirectFilter(LeaderRedirect redirector) {
-    this.redirector = Preconditions.checkNotNull(redirector);
+    this.redirector = Objects.requireNonNull(redirector);
   }
 
   @Override

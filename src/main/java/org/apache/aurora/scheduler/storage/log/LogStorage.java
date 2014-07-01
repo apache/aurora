@@ -67,7 +67,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager;
 import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A storage implementation that ensures committed transactions are written to a log.
@@ -155,8 +155,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
     @Override
     public void doEvery(Amount<Long, Time> interval, Runnable action) {
-      checkNotNull(interval);
-      checkNotNull(action);
+      requireNonNull(interval);
+      requireNonNull(action);
 
       long delay = interval.getValue();
       TimeUnit timeUnit = interval.getUnit().getTimeUnit();
@@ -254,22 +254,22 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
              QuotaStore.Mutable quotaStore,
              AttributeStore.Mutable attributeStore) {
 
-    this.logManager = checkNotNull(logManager);
-    this.schedulingService = checkNotNull(schedulingService);
-    this.snapshotStore = checkNotNull(snapshotStore);
-    this.snapshotInterval = checkNotNull(snapshotInterval);
+    this.logManager = requireNonNull(logManager);
+    this.schedulingService = requireNonNull(schedulingService);
+    this.snapshotStore = requireNonNull(snapshotStore);
+    this.snapshotInterval = requireNonNull(snapshotInterval);
 
     // Log storage has two distinct operating modes: pre- and post-recovery.  When recovering,
     // we write directly to the writeBehind stores since we are replaying what's already persisted.
     // After that, all writes must succeed in the distributed log before they may be considered
     // successful.
-    this.writeBehindStorage = checkNotNull(delegateStorage);
-    this.writeBehindSchedulerStore = checkNotNull(schedulerStore);
-    this.writeBehindJobStore = checkNotNull(jobStore);
-    this.writeBehindTaskStore = checkNotNull(taskStore);
-    this.writeBehindLockStore = checkNotNull(lockStore);
-    this.writeBehindQuotaStore = checkNotNull(quotaStore);
-    this.writeBehindAttributeStore = checkNotNull(attributeStore);
+    this.writeBehindStorage = requireNonNull(delegateStorage);
+    this.writeBehindSchedulerStore = requireNonNull(schedulerStore);
+    this.writeBehindJobStore = requireNonNull(jobStore);
+    this.writeBehindTaskStore = requireNonNull(taskStore);
+    this.writeBehindLockStore = requireNonNull(lockStore);
+    this.writeBehindQuotaStore = requireNonNull(quotaStore);
+    this.writeBehindAttributeStore = requireNonNull(attributeStore);
     TransactionManager transactionManager = new TransactionManager() {
       @Override
       public boolean hasActiveTransaction() {

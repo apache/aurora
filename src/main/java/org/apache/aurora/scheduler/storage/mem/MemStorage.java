@@ -43,7 +43,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A storage implementation comprised of individual in-memory store implementations.
@@ -154,7 +154,7 @@ public class MemStorage implements Storage {
       SlidingStats stats,
       AtomicLong lockWaitStat) throws StorageException, E {
 
-    checkNotNull(work);
+    requireNonNull(work);
 
     // Perform the work, and only record stats for top-level transactions.  This prevents
     // over-counting when nested transactions are performed.

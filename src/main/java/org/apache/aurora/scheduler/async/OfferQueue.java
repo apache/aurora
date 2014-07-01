@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.async;
 
 import java.util.Comparator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,9 +26,7 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.base.Function;
-import com.google.common.base.Objects;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
@@ -188,7 +187,7 @@ public interface OfferQueue extends EventSubscriber {
     }
 
     private boolean removeFromHostOffers(final OfferID offerId) {
-      Preconditions.checkNotNull(offerId);
+      Objects.requireNonNull(offerId);
 
       // The small risk of inconsistency is acceptable here - if we have an accept/remove race
       // on an offer, the master will mark the task as LOST and it will be retried.
@@ -248,12 +247,12 @@ public interface OfferQueue extends EventSubscriber {
           return false;
         }
         HostOffer other = (HostOffer) o;
-        return Objects.equal(offer, other.offer) && mode == other.mode;
+        return Objects.equals(offer, other.offer) && mode == other.mode;
       }
 
       @Override
       public int hashCode() {
-        return Objects.hashCode(offer, mode);
+        return Objects.hash(offer, mode);
       }
     }
 

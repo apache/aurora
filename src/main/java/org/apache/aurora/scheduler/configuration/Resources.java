@@ -15,11 +15,11 @@ package org.apache.aurora.scheduler.configuration;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ContiguousSet;
@@ -36,7 +36,6 @@ import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Value.Range;
@@ -44,7 +43,7 @@ import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.Protos.Value.Scalar;
 import org.apache.mesos.Protos.Value.Type;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A container for multiple resource vectors.
@@ -82,8 +81,8 @@ public class Resources {
    */
   public Resources(double numCpus, Amount<Long, Data> ram, Amount<Long, Data> disk, int numPorts) {
     this.numCpus = numCpus;
-    this.ram = checkNotNull(ram);
-    this.disk = checkNotNull(disk);
+    this.ram = requireNonNull(ram);
+    this.disk = requireNonNull(disk);
     this.numPorts = numPorts;
   }
 
@@ -137,17 +136,15 @@ public class Resources {
     }
 
     Resources other = (Resources) o;
-    return new EqualsBuilder()
-        .append(numCpus, other.numCpus)
-        .append(ram, other.ram)
-        .append(disk, other.disk)
-        .append(numPorts, other.numPorts)
-        .isEquals();
+    return Objects.equals(numCpus, other.numCpus)
+        && Objects.equals(ram, other.ram)
+        && Objects.equals(disk, other.disk)
+        && Objects.equals(numPorts, other.numPorts);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(numCpus, ram, disk, numPorts);
+    return Objects.hash(numCpus, ram, disk, numPorts);
   }
 
   /**
@@ -157,7 +154,7 @@ public class Resources {
    * @return The resources required by the task.
    */
   public static Resources from(ITaskConfig task) {
-    checkNotNull(task);
+    requireNonNull(task);
     return new Resources(
         task.getNumCpus(),
         Amount.of(task.getRamMb(), Data.MB),
@@ -172,7 +169,7 @@ public class Resources {
    * @return The canonical resources.
    */
   public static Resources from(List<Resource> resources) {
-    checkNotNull(resources);
+    requireNonNull(resources);
     return new Resources(
         getScalarValue(resources, CPUS),
         Amount.of((long) getScalarValue(resources, RAM_MB), Data.MB),
@@ -188,7 +185,7 @@ public class Resources {
    * @return The resources available in the offer.
    */
   public static Resources from(Offer offer) {
-    checkNotNull(offer);
+    requireNonNull(offer);
     return new Resources(
         getScalarValue(offer, CPUS),
         Amount.of((long) getScalarValue(offer, RAM_MB), Data.MB),
@@ -379,7 +376,7 @@ public class Resources {
   public static Set<Integer> getPorts(Offer offer, int numPorts)
       throws InsufficientResourcesException {
 
-    checkNotNull(offer);
+    requireNonNull(offer);
 
     if (numPorts == 0) {
       return ImmutableSet.of();

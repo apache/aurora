@@ -32,7 +32,8 @@ import org.h2.Driver;
 import org.mybatis.guice.MyBatisModule;
 import org.mybatis.guice.datasource.builtin.PooledDataSourceProvider;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
+
 import static com.google.inject.name.Names.named;
 
 /**
@@ -56,7 +57,7 @@ public class DbModule extends PrivateModule {
   private final Bindings.KeyFactory keyFactory;
 
   public DbModule(Bindings.KeyFactory keyFactory) {
-    this.keyFactory = checkNotNull(keyFactory);
+    this.keyFactory = requireNonNull(keyFactory);
   }
 
   private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {

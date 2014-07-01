@@ -18,7 +18,7 @@ import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Calculates and formats detailed quota comparison result.
@@ -64,8 +64,8 @@ public class QuotaCheckResult {
   }
 
   private QuotaCheckResult(Result result, Optional<String> details) {
-    this.result = checkNotNull(result);
-    this.details = checkNotNull(details);
+    this.result = requireNonNull(result);
+    this.details = requireNonNull(details);
   }
 
   /**

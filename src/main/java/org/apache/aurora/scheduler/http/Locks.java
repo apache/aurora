@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.http;
 
+import java.util.Objects;
+
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -21,7 +23,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 
 import org.apache.aurora.gen.LockKey;
@@ -40,7 +41,7 @@ public class Locks {
 
   @Inject
   Locks(LockManager lockManager) {
-    this.lockManager = Preconditions.checkNotNull(lockManager);
+    this.lockManager = Objects.requireNonNull(lockManager);
   }
 
   /**

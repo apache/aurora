@@ -26,7 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A stat computer that aggregates the number of 'slots' available at different pre-determined
@@ -49,9 +49,9 @@ class SlotSizeCounter implements Runnable {
       MachineResourceProvider machineResourceProvider,
       CachedCounters cachedCounters) {
 
-    this.slotSizes = checkNotNull(slotSizes);
-    this.machineResourceProvider = checkNotNull(machineResourceProvider);
-    this.cachedCounters = checkNotNull(cachedCounters);
+    this.slotSizes = requireNonNull(slotSizes);
+    this.machineResourceProvider = requireNonNull(machineResourceProvider);
+    this.cachedCounters = requireNonNull(cachedCounters);
   }
 
   static class MachineResource {
@@ -59,7 +59,7 @@ class SlotSizeCounter implements Runnable {
     private final boolean dedicated;
 
     public MachineResource(IResourceAggregate size, boolean dedicated) {
-      this.size = checkNotNull(size);
+      this.size = requireNonNull(size);
       this.dedicated = dedicated;
     }
 

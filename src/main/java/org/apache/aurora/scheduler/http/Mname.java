@@ -45,9 +45,9 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static javax.ws.rs.core.Response.Status.NOT_FOUND;
+import static java.util.Objects.requireNonNull;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 
@@ -67,7 +67,7 @@ public class Mname {
 
   @Inject
   public Mname(Storage storage) {
-    this.storage = checkNotNull(storage);
+    this.storage = requireNonNull(storage);
   }
 
   @GET

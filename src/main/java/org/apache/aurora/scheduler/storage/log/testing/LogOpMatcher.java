@@ -13,7 +13,8 @@
  */
 package org.apache.aurora.scheduler.storage.log.testing;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
+
 import com.google.common.collect.ImmutableList;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;
@@ -70,7 +71,7 @@ public class LogOpMatcher implements IArgumentMatcher {
     private final Stream stream;
 
     StreamMatcher(Stream stream) {
-      this.stream = Preconditions.checkNotNull(stream);
+      this.stream = Objects.requireNonNull(stream);
     }
 
     /**

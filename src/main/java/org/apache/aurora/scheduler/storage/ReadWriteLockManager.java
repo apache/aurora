@@ -17,7 +17,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.base.Preconditions;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A lock manager that wraps a ReadWriteLock and detects ill-fated attempts to upgrade
@@ -88,7 +88,7 @@ public class ReadWriteLockManager {
    *         secured the lock and has yet to release it.
    */
   public boolean lock(LockType type) {
-    checkNotNull(type);
+    requireNonNull(type);
 
     if (LockType.READ == type) {
       managedLock.readLock().lock();
@@ -108,7 +108,7 @@ public class ReadWriteLockManager {
    * @param type Type of lock to release.
    */
   public void unlock(LockType type) {
-    checkNotNull(type);
+    requireNonNull(type);
 
     if (LockType.READ == type) {
       managedLock.readLock().unlock();

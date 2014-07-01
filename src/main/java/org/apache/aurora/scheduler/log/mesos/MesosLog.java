@@ -51,8 +51,7 @@ import org.apache.mesos.Log;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A {@code Log} implementation backed by a true distributed log in mesos core.
@@ -118,17 +117,17 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
       @NoopEntry byte[] noopEntry,
       Lifecycle lifecycle) {
 
-    this.logFactory = checkNotNull(logFactory);
+    this.logFactory = requireNonNull(logFactory);
 
-    this.readerFactory = checkNotNull(readerFactory);
-    this.readTimeout = checkNotNull(readTimeout);
+    this.readerFactory = requireNonNull(readerFactory);
+    this.readTimeout = requireNonNull(readTimeout);
 
-    this.writerFactory = checkNotNull(writerFactory);
-    this.writeTimeout = checkNotNull(writeTimeout);
+    this.writerFactory = requireNonNull(writerFactory);
+    this.writeTimeout = requireNonNull(writeTimeout);
 
-    this.noopEntry = checkNotNull(noopEntry);
+    this.noopEntry = requireNonNull(noopEntry);
 
-    this.lifecycle = checkNotNull(lifecycle);
+    this.lifecycle = requireNonNull(lifecycle);
   }
 
   @Override
@@ -302,7 +301,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
             throw new NoSuchElementException();
           }
 
-          Entry result = checkNotNull(entry);
+          Entry result = requireNonNull(entry);
           entry = null;
           return result;
         }
@@ -311,7 +310,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
 
     @Override
     public LogPosition append(final byte[] contents) throws StreamAccessException {
-      checkNotNull(contents);
+      requireNonNull(contents);
 
       Log.Position position = mutate(appendStats, new Mutation<Log.Position>() {
         @Override

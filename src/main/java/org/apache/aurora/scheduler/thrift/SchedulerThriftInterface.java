@@ -129,7 +129,8 @@ import org.apache.aurora.scheduler.thrift.auth.Requires;
 import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TException;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.auth.SessionValidator.SessionContext;
@@ -211,16 +212,16 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       CronPredictor cronPredictor,
       QuotaManager quotaManager) {
 
-    this.storage = checkNotNull(storage);
-    this.schedulerCore = checkNotNull(schedulerCore);
-    this.lockManager = checkNotNull(lockManager);
-    this.sessionValidator = checkNotNull(sessionValidator);
-    this.backup = checkNotNull(backup);
-    this.recovery = checkNotNull(recovery);
-    this.maintenance = checkNotNull(maintenance);
-    this.cronJobManager = checkNotNull(cronJobManager);
-    this.cronPredictor = checkNotNull(cronPredictor);
-    this.quotaManager = checkNotNull(quotaManager);
+    this.storage = requireNonNull(storage);
+    this.schedulerCore = requireNonNull(schedulerCore);
+    this.lockManager = requireNonNull(lockManager);
+    this.sessionValidator = requireNonNull(sessionValidator);
+    this.backup = requireNonNull(backup);
+    this.recovery = requireNonNull(recovery);
+    this.maintenance = requireNonNull(maintenance);
+    this.cronJobManager = requireNonNull(cronJobManager);
+    this.cronPredictor = requireNonNull(cronPredictor);
+    this.quotaManager = requireNonNull(quotaManager);
   }
 
   @Override
@@ -231,7 +232,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     IJobConfiguration job = IJobConfiguration.build(mutableJob);
     IJobKey jobKey = JobKeys.assertValid(job.getKey());
-    checkNotNull(session);
+    requireNonNull(session);
 
     Response response = Util.emptyResponse();
 
@@ -266,7 +267,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     IJobConfiguration job = IJobConfiguration.build(mutableJob);
     IJobKey jobKey = JobKeys.assertValid(job.getKey());
-    checkNotNull(session);
+    requireNonNull(session);
 
     Response response = Util.emptyResponse();
 
@@ -346,10 +347,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       @Nullable Lock mutableLock,
       SessionKey session) {
 
-    checkNotNull(mutableConfig);
+    requireNonNull(mutableConfig);
     IJobConfiguration job = IJobConfiguration.build(mutableConfig);
     IJobKey jobKey = JobKeys.assertValid(job.getKey());
-    checkNotNull(session);
+    requireNonNull(session);
 
     Response response = Util.emptyResponse();
     try {
@@ -374,7 +375,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response populateJobConfig(JobConfiguration description) {
-    checkNotNull(description);
+    requireNonNull(description);
 
     Response response = Util.emptyResponse();
     try {
@@ -394,7 +395,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response startCronJob(JobKey mutableJobKey, SessionKey session) {
-    checkNotNull(session);
+    requireNonNull(session);
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
 
     Response response = Util.emptyResponse();
@@ -435,7 +436,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   private List<ScheduledTask> getTasks(TaskQuery query) {
-    checkNotNull(query);
+    requireNonNull(query);
 
     Iterable<IScheduledTask> tasks =
         Storage.Util.weaklyConsistentFetchTasks(storage, Query.arbitrary(query));
@@ -641,8 +642,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response killTasks(final TaskQuery query, Lock mutablelock, SessionKey session) {
-    checkNotNull(query);
-    checkNotNull(session);
+    requireNonNull(query);
+    requireNonNull(session);
 
     Response response = Util.emptyResponse();
 
@@ -685,7 +686,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
     checkNotBlank(shardIds);
-    checkNotNull(session);
+    requireNonNull(session);
 
     Response response = Util.emptyResponse();
     SessionContext context;
@@ -730,8 +731,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       SessionKey session) {
 
     checkNotBlank(ownerRole);
-    checkNotNull(resourceAggregate);
-    checkNotNull(session);
+    requireNonNull(resourceAggregate);
+    requireNonNull(session);
 
     Response response = Util.emptyResponse();
     try {
@@ -775,8 +776,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @Override
   public Response forceTaskState(String taskId, ScheduleStatus status, SessionKey session) {
     checkNotBlank(taskId);
-    checkNotNull(status);
-    checkNotNull(session);
+    requireNonNull(status);
+    requireNonNull(session);
 
     Response response = Util.emptyResponse();
     SessionContext context;
@@ -1034,8 +1035,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       @Nullable Lock mutableLock,
       SessionKey session) {
 
-    checkNotNull(config);
-    checkNotNull(session);
+    requireNonNull(config);
+    requireNonNull(session);
     checkNotBlank(config.getInstanceIds());
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(config.getKey()));
 
@@ -1075,8 +1076,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response acquireLock(LockKey mutableLockKey, SessionKey session) {
-    checkNotNull(mutableLockKey);
-    checkNotNull(session);
+    requireNonNull(mutableLockKey);
+    requireNonNull(session);
 
     ILockKey lockKey = ILockKey.build(mutableLockKey);
     Response response = Util.emptyResponse();
@@ -1100,9 +1101,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response releaseLock(Lock mutableLock, LockValidation validation, SessionKey session) {
-    checkNotNull(mutableLock);
-    checkNotNull(validation);
-    checkNotNull(session);
+    requireNonNull(mutableLock);
+    requireNonNull(validation);
+    requireNonNull(session);
 
     Response response = Util.emptyResponse();
     ILock lock = ILock.build(mutableLock);

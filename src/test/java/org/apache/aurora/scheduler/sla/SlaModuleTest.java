@@ -48,7 +48,6 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.easymock.EasyMock.expect;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 

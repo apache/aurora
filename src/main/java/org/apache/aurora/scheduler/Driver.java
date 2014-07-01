@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
@@ -111,7 +112,7 @@ public interface Driver {
     private synchronized SchedulerDriver get(State expected) {
       // TODO(William Farner): Formalize the failure case here by throwing a checked exception.
       stateMachine.checkState(expected);
-      return Preconditions.checkNotNull(driverRef.get());
+      return Objects.requireNonNull(driverRef.get());
     }
 
     @Override
@@ -126,7 +127,7 @@ public interface Driver {
 
     @Override
     public void initialize(SchedulerDriver driver) {
-      Preconditions.checkNotNull(driver);
+      Objects.requireNonNull(driver);
       stateMachine.checkState(State.INIT);
       Preconditions.checkState(driverRef.compareAndSet(null, driver));
       stateMachine.transition(State.RUNNING);

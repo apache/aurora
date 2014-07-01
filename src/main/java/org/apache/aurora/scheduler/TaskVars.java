@@ -44,7 +44,7 @@ import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A container that tracks and exports stat counters for tasks.
@@ -58,8 +58,8 @@ class TaskVars implements EventSubscriber {
 
   @Inject
   TaskVars(Storage storage, final StatsProvider statProvider) {
-    this.storage = checkNotNull(storage);
-    checkNotNull(statProvider);
+    this.storage = requireNonNull(storage);
+    requireNonNull(statProvider);
     counters = CacheBuilder.newBuilder().build(new CacheLoader<String, Counter>() {
       @Override
       public Counter load(String statName) {

@@ -31,7 +31,7 @@ import org.quartz.CronTrigger;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.cron.quartz.Quartz.jobKey;
 
@@ -42,12 +42,12 @@ class CronSchedulerImpl implements CronScheduler {
 
   @Inject
   CronSchedulerImpl(Scheduler scheduler) {
-    this.scheduler = checkNotNull(scheduler);
+    this.scheduler = requireNonNull(scheduler);
   }
 
   @Override
   public Optional<CrontabEntry> getSchedule(IJobKey jobKey) throws IllegalStateException {
-    checkNotNull(jobKey);
+    requireNonNull(jobKey);
 
     try {
       return Optional.of(Iterables.getOnlyElement(

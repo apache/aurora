@@ -34,7 +34,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Observes task transitions and identifies tasks that are 'stuck' in a transient state.  Stuck
@@ -69,8 +69,8 @@ class TaskTimeout implements EventSubscriber {
       Amount<Long, Time> timeout,
       StatsProvider statsProvider) {
 
-    this.executor = checkNotNull(executor);
-    this.stateManager = checkNotNull(stateManager);
+    this.executor = requireNonNull(executor);
+    this.stateManager = requireNonNull(stateManager);
     this.timeoutMillis = timeout.as(Time.MILLISECONDS);
     this.timedOutTasks = statsProvider.makeCounter(TIMED_OUT_TASKS_COUNTER);
   }

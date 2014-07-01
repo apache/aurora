@@ -31,7 +31,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
@@ -60,7 +59,7 @@ public class Utilization {
   @Inject
   Utilization(ResourceCounter counter, IServerInfo serverInfo) {
     templateHelper = new StringTemplateHelper(getClass(), "utilization", true);
-    this.counter = Preconditions.checkNotNull(counter);
+    this.counter = Objects.requireNonNull(counter);
     this.clusterName = MorePreconditions.checkNotBlank(serverInfo.getClusterName());
   }
 

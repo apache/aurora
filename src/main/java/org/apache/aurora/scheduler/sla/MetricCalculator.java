@@ -30,7 +30,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Range;
-
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
@@ -43,7 +42,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.AGGREGATE_PLATFORM_UPTIME;
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.JOB_UPTIME_50;
@@ -131,11 +130,11 @@ class MetricCalculator implements Runnable {
       MetricCalculatorSettings settings,
       final StatsProvider statsProvider) {
 
-    this.storage = checkNotNull(storage);
-    this.clock = checkNotNull(clock);
-    this.settings = checkNotNull(settings);
+    this.storage = requireNonNull(storage);
+    this.clock = requireNonNull(clock);
+    this.settings = requireNonNull(settings);
 
-    checkNotNull(statsProvider);
+    requireNonNull(statsProvider);
     this.metricCache = CacheBuilder.newBuilder().build(
         new CacheLoader<String, Counter>() {
           public Counter load(String key) {

@@ -29,7 +29,7 @@ import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
 
@@ -81,7 +81,7 @@ public interface QuotaManager {
 
     @Inject
     QuotaManagerImpl(Storage storage) {
-      this.storage = checkNotNull(storage);
+      this.storage = requireNonNull(storage);
     }
 
     @Override

@@ -31,7 +31,7 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskStatus;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A task launcher that matches resource offers against user tasks.
@@ -51,13 +51,13 @@ class UserTaskLauncher implements TaskLauncher {
 
   @Inject
   UserTaskLauncher(OfferQueue offerQueue, StateManager stateManager) {
-    this.offerQueue = checkNotNull(offerQueue);
-    this.stateManager = checkNotNull(stateManager);
+    this.offerQueue = requireNonNull(offerQueue);
+    this.stateManager = requireNonNull(stateManager);
   }
 
   @Override
   public boolean willUse(Offer offer) {
-    checkNotNull(offer);
+    requireNonNull(offer);
 
     offerQueue.addOffer(offer);
     return true;

@@ -31,8 +31,7 @@ import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A decorating scheduling filter that sends an event when a scheduling assignment is vetoed.
@@ -54,8 +53,8 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
       @NotifyDelegate SchedulingFilter delegate,
       EventSink eventSink) {
 
-    this.delegate = checkNotNull(delegate);
-    this.eventSink = checkNotNull(eventSink);
+    this.delegate = requireNonNull(delegate);
+    this.eventSink = requireNonNull(eventSink);
   }
 
   @Override

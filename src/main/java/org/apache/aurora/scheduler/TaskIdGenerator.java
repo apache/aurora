@@ -13,11 +13,11 @@
  */
 package org.apache.aurora.scheduler;
 
+import java.util.Objects;
 import java.util.UUID;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Preconditions;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -42,7 +42,7 @@ public interface TaskIdGenerator {
 
     @Inject
     TaskIdGeneratorImpl(Clock clock) {
-      this.clock = Preconditions.checkNotNull(clock);
+      this.clock = Objects.requireNonNull(clock);
     }
 
     @Override

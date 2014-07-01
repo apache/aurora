@@ -42,7 +42,7 @@ import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
@@ -77,8 +77,8 @@ public class SchedulingFilterImpl implements SchedulingFilter {
    */
   @Inject
   public SchedulingFilterImpl(Storage storage, MaintenanceController maintenance) {
-    this.storage = checkNotNull(storage);
-    this.maintenance = checkNotNull(maintenance);
+    this.storage = requireNonNull(storage);
+    this.maintenance = requireNonNull(maintenance);
   }
 
   /**

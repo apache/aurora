@@ -17,7 +17,7 @@ import com.google.inject.Inject;
 
 import org.apache.aurora.gen.LockKey;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Mapper for LockKeys. Not a MyBatis mapper, this just encapsulates the logic for writing
@@ -36,12 +36,12 @@ public class LockKeyMapper {
 
   @Inject
   public LockKeyMapper(JobKeyMapper jobKeyMapper) {
-    this.jobKeyMapper = checkNotNull(jobKeyMapper);
+    this.jobKeyMapper = requireNonNull(jobKeyMapper);
   }
 
   public void insert(LockKey key) {
     if (key.isSetJob()) {
-      jobKeyMapper.insert(checkNotNull(key.getJob()));
+      jobKeyMapper.insert(requireNonNull(key.getJob()));
     } else {
       throw new IllegalArgumentException("Unsupported lock type on LockKey.");
     }

@@ -30,7 +30,7 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A temporary view of a job's state. Once constructed, instances of this class should be discarded
@@ -60,8 +60,8 @@ public class AttributeAggregate {
       final Supplier<ImmutableSet<IScheduledTask>> activeTaskSupplier,
       final AttributeStore attributeStore) {
 
-    checkNotNull(activeTaskSupplier);
-    checkNotNull(attributeStore);
+    requireNonNull(activeTaskSupplier);
+    requireNonNull(attributeStore);
 
     final Function<IScheduledTask, Iterable<IAttribute>> getHostAttributes =
         new Function<IScheduledTask, Iterable<IAttribute>>() {
@@ -69,7 +69,7 @@ public class AttributeAggregate {
           public Iterable<IAttribute> apply(IScheduledTask task) {
             // Note: this assumes we have access to attributes for hosts where all active tasks
             // reside.
-            String host = checkNotNull(task.getAssignedTask().getSlaveHost());
+            String host = requireNonNull(task.getAssignedTask().getSlaveHost());
             return attributeStore.getHostAttributes(host).get().getAttributes();
           }
         };

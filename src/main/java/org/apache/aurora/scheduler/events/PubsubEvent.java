@@ -13,9 +13,9 @@
  */
 package org.apache.aurora.scheduler.events;
 
+import java.util.Objects;
 import java.util.Set;
 
-import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.HostStatus;
@@ -24,7 +24,7 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Event notifications related to tasks.
@@ -44,7 +44,7 @@ public interface PubsubEvent {
     private final Set<IScheduledTask> tasks;
 
     public TasksDeleted(Set<IScheduledTask> tasks) {
-      this.tasks = checkNotNull(tasks);
+      this.tasks = requireNonNull(tasks);
     }
 
     public Set<IScheduledTask> getTasks() {
@@ -58,17 +58,17 @@ public interface PubsubEvent {
       }
 
       TasksDeleted other = (TasksDeleted) o;
-      return Objects.equal(tasks, other.tasks);
+      return Objects.equals(tasks, other.tasks);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(tasks);
+      return Objects.hash(tasks);
     }
 
     @Override
     public String toString() {
-      return Objects.toStringHelper(this)
+      return com.google.common.base.Objects.toStringHelper(this)
           .add("tasks", Tasks.ids(tasks))
           .toString();
     }
@@ -84,8 +84,8 @@ public interface PubsubEvent {
     private final Optional<ScheduleStatus> oldState;
 
     private TaskStateChange(IScheduledTask task, Optional<ScheduleStatus> oldState) {
-      this.task = checkNotNull(task);
-      this.oldState = checkNotNull(oldState);
+      this.task = requireNonNull(task);
+      this.oldState = requireNonNull(oldState);
     }
 
     /**
@@ -136,18 +136,18 @@ public interface PubsubEvent {
       }
 
       TaskStateChange other = (TaskStateChange) o;
-      return Objects.equal(task, other.task)
-          && Objects.equal(oldState, other.oldState);
+      return Objects.equals(task, other.task)
+          && Objects.equals(oldState, other.oldState);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(task, oldState);
+      return Objects.hash(task, oldState);
     }
 
     @Override
     public String toString() {
-      return Objects.toStringHelper(this)
+      return com.google.common.base.Objects.toStringHelper(this)
           .add("task", Tasks.id(task))
           .add("oldState", getOldState())
           .add("newState", getNewState())
@@ -162,7 +162,7 @@ public interface PubsubEvent {
     private final HostStatus status;
 
     public HostMaintenanceStateChange(HostStatus status) {
-      this.status = checkNotNull(status);
+      this.status = requireNonNull(status);
     }
 
     public HostStatus getStatus() {
@@ -176,12 +176,12 @@ public interface PubsubEvent {
       }
 
       HostMaintenanceStateChange other = (HostMaintenanceStateChange) o;
-      return Objects.equal(status, other.status);
+      return Objects.equals(status, other.status);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(status);
+      return Objects.hash(status);
     }
   }
 
@@ -193,8 +193,8 @@ public interface PubsubEvent {
     private final Set<Veto> vetoes;
 
     public Vetoed(String taskId, Set<Veto> vetoes) {
-      this.taskId = checkNotNull(taskId);
-      this.vetoes = checkNotNull(vetoes);
+      this.taskId = requireNonNull(taskId);
+      this.vetoes = requireNonNull(vetoes);
     }
 
     public String getTaskId() {
@@ -212,13 +212,13 @@ public interface PubsubEvent {
       }
 
       Vetoed other = (Vetoed) o;
-      return Objects.equal(taskId, other.taskId)
-          && Objects.equal(vetoes, other.vetoes);
+      return Objects.equals(taskId, other.taskId)
+          && Objects.equals(vetoes, other.vetoes);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(taskId, vetoes);
+      return Objects.hash(taskId, vetoes);
     }
   }
 

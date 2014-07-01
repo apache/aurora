@@ -43,7 +43,7 @@ import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
@@ -111,9 +111,9 @@ public interface MaintenanceController {
         StateManager stateManager,
         EventSink eventSink) {
 
-      this.storage = checkNotNull(storage);
-      this.stateManager = checkNotNull(stateManager);
-      this.eventSink = checkNotNull(eventSink);
+      this.storage = requireNonNull(storage);
+      this.stateManager = requireNonNull(stateManager);
+      this.eventSink = requireNonNull(eventSink);
     }
 
     private Set<HostStatus> watchDrainingTasks(MutableStoreProvider store, Set<String> hosts) {

@@ -50,7 +50,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
@@ -96,11 +96,11 @@ class SchedulerCoreImpl implements SchedulerCore {
       TaskIdGenerator taskIdGenerator,
       QuotaManager quotaManager) {
 
-    this.storage = checkNotNull(storage);
+    this.storage = requireNonNull(storage);
     this.cronJobManager = cronJobManager;
-    this.stateManager = checkNotNull(stateManager);
-    this.taskIdGenerator = checkNotNull(taskIdGenerator);
-    this.quotaManager = checkNotNull(quotaManager);
+    this.stateManager = requireNonNull(stateManager);
+    this.taskIdGenerator = requireNonNull(taskIdGenerator);
+    this.quotaManager = requireNonNull(quotaManager);
   }
 
   private boolean hasActiveJob(IJobConfiguration job) {
@@ -208,8 +208,8 @@ class SchedulerCoreImpl implements SchedulerCore {
       final ScheduleStatus status,
       Optional<String> message) {
 
-    checkNotNull(taskId);
-    checkNotNull(status);
+    requireNonNull(taskId);
+    requireNonNull(status);
 
     stateManager.changeState(taskId, Optional.<ScheduleStatus>absent(), status, message);
   }
@@ -217,7 +217,7 @@ class SchedulerCoreImpl implements SchedulerCore {
   @Override
   public synchronized void killTasks(Query.Builder query, final String user) {
 
-    checkNotNull(query);
+    requireNonNull(query);
     LOG.info("Killing tasks matching " + query);
 
     if (Query.isSingleJobScoped(query)) {

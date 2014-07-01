@@ -15,9 +15,9 @@ package org.apache.aurora.scheduler.storage.db;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Objects;
 
 import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
@@ -60,7 +60,7 @@ class DbStorage extends AbstractIdleService implements Storage {
       final LockStore.Mutable lockStore,
       final QuotaStore.Mutable quotaStore) {
 
-    this.sessionFactory = Preconditions.checkNotNull(sessionFactory);
+    this.sessionFactory = Objects.requireNonNull(sessionFactory);
     storeProvider = new MutableStoreProvider() {
       @Override
       public SchedulerStore.Mutable getSchedulerStore() {

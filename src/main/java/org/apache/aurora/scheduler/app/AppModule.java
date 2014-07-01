@@ -58,7 +58,8 @@ import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.mesos.Scheduler;
 import org.apache.zookeeper.data.ACL;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
+
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
@@ -83,7 +84,7 @@ class AppModule extends AbstractModule {
     this.clusterName = checkNotBlank(clusterName);
     this.serverSetPath = checkNotBlank(serverSetPath);
     this.statsUrlPrefix = statsUrlPrefix;
-    this.zkClientConfig = checkNotNull(zkClientConfig);
+    this.zkClientConfig = requireNonNull(zkClientConfig);
   }
 
   @Override

@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.http;
 
 import java.net.InetSocketAddress;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
 
@@ -22,7 +23,6 @@ import javax.servlet.http.HttpServletRequest;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
@@ -54,8 +54,8 @@ public class LeaderRedirect {
 
   @Inject
   LeaderRedirect(LocalServiceRegistry serviceRegistry, DynamicHostSet<ServiceInstance> schedulers) {
-    this.serviceRegistry = Preconditions.checkNotNull(serviceRegistry);
-    this.schedulers = Preconditions.checkNotNull(schedulers);
+    this.serviceRegistry = Objects.requireNonNull(serviceRegistry);
+    this.schedulers = Objects.requireNonNull(schedulers);
   }
 
   /**

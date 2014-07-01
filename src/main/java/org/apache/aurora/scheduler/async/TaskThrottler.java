@@ -28,7 +28,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
@@ -55,10 +55,10 @@ class TaskThrottler implements EventSubscriber {
       ScheduledExecutorService executor,
       StateManager stateManager) {
 
-    this.rescheduleCalculator = checkNotNull(rescheduleCalculator);
-    this.clock = checkNotNull(clock);
-    this.executor = checkNotNull(executor);
-    this.stateManager = checkNotNull(stateManager);
+    this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
+    this.clock = requireNonNull(clock);
+    this.executor = requireNonNull(executor);
+    this.stateManager = requireNonNull(stateManager);
   }
 
   @Subscribe

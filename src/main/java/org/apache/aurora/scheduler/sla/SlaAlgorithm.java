@@ -16,10 +16,10 @@ package org.apache.aurora.scheduler.sla;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Objects;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
@@ -39,7 +39,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Defines an SLA algorithm to be applied to a {@link IScheduledTask}
@@ -250,7 +250,7 @@ interface SlaAlgorithm {
       private final int id;
 
       InstanceId(IJobKey jobKey, int instanceId) {
-        this.jobKey = checkNotNull(jobKey);
+        this.jobKey = requireNonNull(jobKey);
         this.id = instanceId;
       }
 
@@ -261,12 +261,13 @@ interface SlaAlgorithm {
         }
 
         InstanceId other = (InstanceId) o;
-        return Objects.equal(jobKey, other.jobKey) && Objects.equal(id, other.id);
+        return Objects.equals(jobKey, other.jobKey)
+            && Objects.equals(id, other.id);
       }
 
       @Override
       public int hashCode() {
-        return Objects.hashCode(jobKey, id);
+        return Objects.hash(jobKey, id);
       }
     }
 

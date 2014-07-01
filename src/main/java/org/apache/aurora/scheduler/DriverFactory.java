@@ -18,6 +18,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -107,7 +108,7 @@ public interface DriverFactory extends Function<String, SchedulerDriver> {
 
     @Inject
     DriverFactoryImpl(Provider<Scheduler> scheduler) {
-      this.scheduler = Preconditions.checkNotNull(scheduler);
+      this.scheduler = Objects.requireNonNull(scheduler);
     }
 
     @VisibleForTesting

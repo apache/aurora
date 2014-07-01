@@ -66,7 +66,7 @@ import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.log.Log.Stream.InvalidPositionException;
 import org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Manages opening, reading from and writing to a {@link Log}.
@@ -101,8 +101,8 @@ public final class LogManager {
       @MaxEntrySize Amount<Integer, Data> maxEntrySize,
       @SnapshotSetting boolean deflateSnapshots) {
 
-    this.log = checkNotNull(log);
-    this.maxEntrySize = checkNotNull(maxEntrySize);
+    this.log = requireNonNull(log);
+    this.maxEntrySize = requireNonNull(maxEntrySize);
     this.deflateSnapshots = deflateSnapshots;
   }
 
@@ -154,7 +154,7 @@ public final class LogManager {
     private final EntrySerializer entrySerializer;
 
     StreamManager(Stream stream, boolean deflateSnapshots, Amount<Integer, Data> maxEntrySize) {
-      this.stream = checkNotNull(stream);
+      this.stream = requireNonNull(stream);
       this.deflateSnapshots = deflateSnapshots;
       digest = createDigest();
       entrySerializer = new EntrySerializer(digest, maxEntrySize);
@@ -320,7 +320,7 @@ public final class LogManager {
       private final int maxEntrySizeBytes;
 
       EntrySerializer(MessageDigest digest, Amount<Integer, Data> maxEntrySize) {
-        this.digest = checkNotNull(digest);
+        this.digest = requireNonNull(digest);
         maxEntrySizeBytes = maxEntrySize.as(Data.BYTES);
       }
 

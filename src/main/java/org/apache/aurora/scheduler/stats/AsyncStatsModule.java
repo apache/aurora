@@ -48,8 +48,7 @@ import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Module to configure export of cluster-wide resource allocation and consumption statistics.
@@ -97,9 +96,9 @@ public class AsyncStatsModule extends AbstractModule {
         TaskStatCalculator taskStats,
         SlotSizeCounter slotCounter) {
 
-      this.executor = checkNotNull(executor);
-      this.taskStats = checkNotNull(taskStats);
-      this.slotCounter = checkNotNull(slotCounter);
+      this.executor = requireNonNull(executor);
+      this.taskStats = requireNonNull(taskStats);
+      this.slotCounter = requireNonNull(slotCounter);
     }
 
     @Override
@@ -129,7 +128,7 @@ public class AsyncStatsModule extends AbstractModule {
 
     @Inject
     OfferAdapter(OfferQueue offerQueue) {
-      this.offerQueue = checkNotNull(offerQueue);
+      this.offerQueue = requireNonNull(offerQueue);
     }
 
     @Override

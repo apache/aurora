@@ -14,10 +14,10 @@
 package org.apache.aurora.scheduler.state;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import com.google.common.base.Function;
-import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -444,7 +444,7 @@ public class TaskStateMachineTest {
 
     @Override
     public int hashCode() {
-      return Objects.hashCode(taskPresent, from, to);
+      return Objects.hash(taskPresent, from, to);
     }
 
     @Override
@@ -461,7 +461,7 @@ public class TaskStateMachineTest {
 
     @Override
     public String toString() {
-      return Objects.toStringHelper(this)
+      return com.google.common.base.Objects.toStringHelper(this)
           .add("taskPresent", taskPresent)
           .add("from", from)
           .add("to", to)

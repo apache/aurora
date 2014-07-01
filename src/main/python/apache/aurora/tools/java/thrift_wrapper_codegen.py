@@ -153,7 +153,7 @@ public final class %(name)s {
   private int cachedHashCode = 0;
 %(fields)s
   private %(name)s(%(wrapped)s wrapped) {
-    this.wrapped = Preconditions.checkNotNull(wrapped);%(assignments)s
+    this.wrapped = Objects.requireNonNull(wrapped);%(assignments)s
   }
 
   static %(name)s buildNoCopy(%(wrapped)s wrapped) {
@@ -355,7 +355,7 @@ def parse_structs(thrift_defs):
 
 def generate_java(struct):
   code = GeneratedCode(struct.codegen_name, struct.name)
-  code.add_import('com.google.common.base.Preconditions')
+  code.add_import('java.util.Objects')
   code.add_import('com.google.common.base.Function')
   code.add_import('com.google.common.collect.ImmutableList')
   code.add_import('com.google.common.collect.ImmutableSet')

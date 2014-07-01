@@ -62,8 +62,7 @@ import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
@@ -118,11 +117,11 @@ interface TaskScheduler extends EventSubscriber {
         @ReservationDuration Amount<Long, Time> reservationDuration,
         final Clock clock) {
 
-      this.storage = checkNotNull(storage);
-      this.stateManager = checkNotNull(stateManager);
-      this.assigner = checkNotNull(assigner);
-      this.offerQueue = checkNotNull(offerQueue);
-      this.preemptor = checkNotNull(preemptor);
+      this.storage = requireNonNull(storage);
+      this.stateManager = requireNonNull(stateManager);
+      this.assigner = requireNonNull(assigner);
+      this.offerQueue = requireNonNull(offerQueue);
+      this.preemptor = requireNonNull(preemptor);
       this.reservations = new Reservations(reservationDuration, clock);
     }
 
@@ -243,8 +242,8 @@ interface TaskScheduler extends EventSubscriber {
       private final Cache<SlaveID, String> reservations;
 
       Reservations(final Amount<Long, Time> duration, final Clock clock) {
-        checkNotNull(duration);
-        checkNotNull(clock);
+        requireNonNull(duration);
+        requireNonNull(clock);
         this.reservations = CacheBuilder.newBuilder()
             .expireAfterWrite(duration.as(Time.MINUTES), TimeUnit.MINUTES)
             .ticker(new Ticker() {

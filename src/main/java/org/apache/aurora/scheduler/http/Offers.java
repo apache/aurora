@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.Map;
+import java.util.Objects;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -23,7 +24,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 
@@ -44,7 +44,7 @@ public class Offers {
 
   @Inject
   Offers(OfferQueue offerQueue) {
-    this.offerQueue = Preconditions.checkNotNull(offerQueue);
+    this.offerQueue = Objects.requireNonNull(offerQueue);
   }
 
   /**

@@ -34,7 +34,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A non-volatile storage wrapper that enforces method call ordering.
@@ -69,8 +69,8 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
 
   @Inject
   CallOrderEnforcingStorage(@EnforceOrderOn NonVolatileStorage wrapped, EventSink eventSink) {
-    this.wrapped = checkNotNull(wrapped);
-    this.eventSink = checkNotNull(eventSink);
+    this.wrapped = requireNonNull(wrapped);
+    this.eventSink = requireNonNull(eventSink);
   }
 
   private void checkInState(State state) throws StorageException {

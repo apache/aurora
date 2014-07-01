@@ -30,7 +30,7 @@ import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * An in-memory job store.
@@ -47,8 +47,8 @@ class MemJobStore implements JobStore.Mutable {
 
   @Override
   public void saveAcceptedJob(String managerId, IJobConfiguration jobConfig) {
-    checkNotNull(managerId);
-    checkNotNull(jobConfig);
+    requireNonNull(managerId);
+    requireNonNull(jobConfig);
 
     IJobKey key = JobKeys.assertValid(jobConfig.getKey());
     managers.getUnchecked(managerId).jobs.put(key, jobConfig);
@@ -56,7 +56,7 @@ class MemJobStore implements JobStore.Mutable {
 
   @Override
   public void removeJob(IJobKey jobKey) {
-    checkNotNull(jobKey);
+    requireNonNull(jobKey);
 
     for (Manager manager : managers.asMap().values()) {
       manager.jobs.remove(jobKey);
@@ -70,7 +70,7 @@ class MemJobStore implements JobStore.Mutable {
 
   @Override
   public Iterable<IJobConfiguration> fetchJobs(String managerId) {
-    checkNotNull(managerId);
+    requireNonNull(managerId);
 
     @Nullable Manager manager = managers.getIfPresent(managerId);
     if (manager == null) {
@@ -84,8 +84,8 @@ class MemJobStore implements JobStore.Mutable {
 
   @Override
   public Optional<IJobConfiguration> fetchJob(String managerId, IJobKey jobKey) {
-    checkNotNull(managerId);
-    checkNotNull(jobKey);
+    requireNonNull(managerId);
+    requireNonNull(jobKey);
 
     Optional<Manager> manager = Optional.fromNullable(managers.getIfPresent(managerId));
     if (manager.isPresent()) {
