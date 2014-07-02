@@ -45,11 +45,11 @@ class TaskObserverJSONBindings(object):
     task_ids = HttpServer.Request.GET.get('task_id', [])
     if task_ids:
       task_ids = urllib.unquote(task_ids).split(',')
-    return self._observer.task(task_ids)
+    return self._observer.tasks(task_ids)
 
   @HttpServer.route("/j/task/:task_id")
   def handle_task(self, task_id):
-    return self._observer.task([task_id])
+    return self._observer.tasks([task_id])
 
   @HttpServer.route("/j/process/:task_id")
   @HttpServer.route("/j/process/:task_id/:process")

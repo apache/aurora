@@ -364,6 +364,26 @@ class TaskObserver(ExceptionalThread, Lockable):
       for st in state.statuses]
 
   @Lockable.sync
+  def tasks(self, task_ids):
+    """
+      Return information about an iterable of tasks [task_id1, task_id2, ...]
+      in the following form.
+
+      {
+        task_id1 : self._task(task_id1),
+        task_id2 : self._task(task_id2),
+        ...
+      }
+    """
+    res = {}
+    for task_id in task_ids:
+      d = self._task(task_id)
+      task_struct = d.pop('task_struct')
+      d['task'] = task_struct.get()
+      res[task_id] = d
+    return res
+
+  @Lockable.sync
   def _task(self, task_id):
     """
       Return composite information about a particular task task_id, given the below
