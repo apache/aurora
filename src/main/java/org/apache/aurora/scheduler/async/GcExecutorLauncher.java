@@ -36,6 +36,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.Random;
 
@@ -52,6 +53,7 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Offer;
@@ -87,6 +89,8 @@ public class GcExecutorLauncher implements TaskLauncher {
 
   @VisibleForTesting
   static final String SYSTEM_TASK_PREFIX = "system-gc-";
+  @VisibleForTesting
+  static final String LOST_TASKS_STAT_NAME = "gc_executor_tasks_lost";
   private static final String EXECUTOR_NAME = "aurora.gc";
 
   private final GcExecutorSettings settings;
@@ -96,6 +100,7 @@ public class GcExecutorLauncher implements TaskLauncher {
   private final Driver driver;
   private final Supplier<String> uuidGenerator;
   private final Cache<String, Long> pulses;
+  private final AtomicLong lostTasks;
 
   @Inject
   GcExecutorLauncher(
@@ -103,7 +108,8 @@ public class GcExecutorLauncher implements TaskLauncher {
       Storage storage,
       Clock clock,
       Executor executor,
-      Driver driver) {
+      Driver driver,
+      StatsProvider statsProvider) {
 
     this(
         settings,
@@ -111,6 +117,7 @@ public class GcExecutorLauncher implements TaskLauncher {
         clock,
         executor,
         driver,
+        statsProvider,
         new Supplier<String>() {
           @Override
           public String get() {
@@ -126,6 +133,7 @@ public class GcExecutorLauncher implements TaskLauncher {
       Clock clock,
       Executor executor,
       Driver driver,
+      StatsProvider statsProvider,
       Supplier<String> uuidGenerator) {
 
     this.settings = requireNonNull(settings);
@@ -137,12 +145,15 @@ public class GcExecutorLauncher implements TaskLauncher {
     this.pulses = CacheBuilder.newBuilder()
         .expireAfterWrite(settings.getMaxGcInterval(), TimeUnit.MILLISECONDS)
         .build();
+    this.lostTasks = statsProvider.makeCounter(LOST_TASKS_STAT_NAME);
   }
 
   @VisibleForTesting
-  TaskInfo makeGcTask(
+  static TaskInfo makeGcTask(
       String sourceName,
       SlaveID slaveId,
+      String gcExecutorPath,
+      String uuid,
       AdjustRetainedTasks message) {
 
     ExecutorInfo.Builder executorInfo = ExecutorInfo.newBuilder()
@@ -150,7 +161,7 @@ public class GcExecutorLauncher implements TaskLauncher {
         .setName(EXECUTOR_NAME)
         .setSource(sourceName)
         .addAllResources(GC_EXECUTOR_TASK_RESOURCES.toResourceList())
-        .setCommand(CommandUtil.create(settings.getGcExecutorPath().get()));
+        .setCommand(CommandUtil.create(gcExecutorPath));
 
     byte[] data;
     try {
@@ -161,7 +172,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     }
 
     return TaskInfo.newBuilder().setName("system-gc")
-        .setTaskId(TaskID.newBuilder().setValue(SYSTEM_TASK_PREFIX + uuidGenerator.get()))
+        .setTaskId(TaskID.newBuilder().setValue(SYSTEM_TASK_PREFIX + uuid))
         .setSlaveId(slaveId)
         .setData(ByteString.copyFrom(data))
         .setExecutor(executorInfo)
@@ -177,7 +188,12 @@ public class GcExecutorLauncher implements TaskLauncher {
         Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS),
         Predicates.not(Predicates.equalTo(ScheduleStatus.SANDBOX_DELETED)));
     tasksCreated.incrementAndGet();
-    return makeGcTask(hostName, slaveId, new AdjustRetainedTasks().setRetainedTasks(tasks));
+    return makeGcTask(
+        hostName,
+        slaveId,
+        settings.getGcExecutorPath().get(),
+        uuidGenerator.get(),
+        new AdjustRetainedTasks().setRetainedTasks(tasks));
   }
 
   private boolean sufficientResources(Offer offer) {
@@ -212,6 +228,9 @@ public class GcExecutorLauncher implements TaskLauncher {
   public boolean statusUpdate(TaskStatus status) {
     if (status.getTaskId().getValue().startsWith(SYSTEM_TASK_PREFIX)) {
       LOG.info("Received status update for GC task: " + Protobufs.toString(status));
+      if (status.getState() == Protos.TaskState.TASK_LOST) {
+        lostTasks.incrementAndGet();
+      }
       return true;
     } else {
       return false;

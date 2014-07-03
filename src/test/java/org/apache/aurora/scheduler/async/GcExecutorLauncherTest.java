@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.async;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Suppliers;
@@ -23,6 +24,7 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -54,7 +56,10 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
+import static org.apache.aurora.scheduler.async.GcExecutorLauncher.LOST_TASKS_STAT_NAME;
 import static org.apache.aurora.scheduler.async.GcExecutorLauncher.SYSTEM_TASK_PREFIX;
+import static org.easymock.EasyMock.expect;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -71,6 +76,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
       .build();
 
   private static final String JOB_A = "jobA";
+  private static final String TASK_UUID = "gc";
 
   private static final GcExecutorSettings SETTINGS =
       new GcExecutorSettings(Amount.of(1L, Time.HOURS), Optional.of("nonempty"));
@@ -80,7 +86,9 @@ public class GcExecutorLauncherTest extends EasyMockTest {
   private FakeClock clock;
   private StorageTestUtil storageUtil;
   private Driver driver;
+  private StatsProvider statsProvider;
   private GcExecutorLauncher gcExecutorLauncher;
+  private AtomicLong lostTasks;
 
   @Before
   public void setUp() {
@@ -88,13 +96,21 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     clock = new FakeClock();
     storageUtil.expectOperations();
     driver = createMock(Driver.class);
+    statsProvider = createMock(StatsProvider.class);
+    lostTasks = new AtomicLong();
+  }
+
+  private void replayAndConstruct() {
+    expect(statsProvider.makeCounter(LOST_TASKS_STAT_NAME)).andReturn(lostTasks);
+    control.replay();
     gcExecutorLauncher = new GcExecutorLauncher(
         SETTINGS,
         storageUtil.storage,
         clock,
         MoreExecutors.sameThreadExecutor(),
         driver,
-        Suppliers.ofInstance("gc"));
+        statsProvider,
+        Suppliers.ofInstance(TASK_UUID));
   }
 
   @Test
@@ -111,7 +127,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     expectGetTasksByHost(HOST, a);
     expectAdjustRetainedTasks(a);
 
-    control.replay();
+    replayAndConstruct();
 
     // First call - no items in the cache, no tasks collected.
     assertTrue(gcExecutorLauncher.willUse(OFFER));
@@ -127,7 +143,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
   @Test
   public void testNoAcceptingSmallOffers() {
-    control.replay();
+    replayAndConstruct();
 
     Iterable<Resource> resources =
         Resources.subtract(
@@ -150,16 +166,21 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
   @Test
   public void testStatusUpdate() {
-    control.replay();
+    replayAndConstruct();
 
     assertTrue(gcExecutorLauncher.statusUpdate(makeStatus(SYSTEM_TASK_PREFIX)));
     assertTrue(gcExecutorLauncher.statusUpdate(makeStatus(SYSTEM_TASK_PREFIX + "1")));
     assertFalse(gcExecutorLauncher.statusUpdate(makeStatus("1" + SYSTEM_TASK_PREFIX)));
     assertFalse(gcExecutorLauncher.statusUpdate(makeStatus("asdf")));
+    assertEquals(0, lostTasks.get());
+    assertTrue(gcExecutorLauncher.statusUpdate(
+        makeStatus(SYSTEM_TASK_PREFIX).toBuilder().setState(TaskState.TASK_LOST).build()));
+    assertEquals(1, lostTasks.get());
   }
 
   @Test
   public void testGcExecutorDisabled() {
+    expect(statsProvider.makeCounter(LOST_TASKS_STAT_NAME)).andReturn(lostTasks);
     control.replay();
 
     gcExecutorLauncher = new GcExecutorLauncher(
@@ -168,6 +189,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
         clock,
         MoreExecutors.sameThreadExecutor(),
         driver,
+        statsProvider,
         Suppliers.ofInstance("gc"));
     assertFalse(gcExecutorLauncher.willUse(OFFER));
   }
@@ -180,7 +202,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     expectGetTasksByHost(HOST, a, b);
     expectAdjustRetainedTasks(a);
 
-    control.replay();
+    replayAndConstruct();
 
     // First call - no items in the cache, no tasks collected.
     assertTrue(gcExecutorLauncher.willUse(OFFER));
@@ -190,7 +212,8 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     Map<String, ScheduleStatus> statuses =
         Maps.transformValues(Tasks.mapById(ImmutableSet.copyOf(tasks)), Tasks.GET_STATUS);
     AdjustRetainedTasks message = new AdjustRetainedTasks().setRetainedTasks(statuses);
-    TaskInfo task = gcExecutorLauncher.makeGcTask(HOST, OFFER.getSlaveId(), message);
+    TaskInfo task = GcExecutorLauncher.makeGcTask(
+        HOST, OFFER.getSlaveId(), SETTINGS.getGcExecutorPath().get(), TASK_UUID, message);
     driver.launchTask(OFFER.getId(), task);
   }
 
