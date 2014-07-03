@@ -13,13 +13,13 @@
  */
 package org.apache.aurora.scheduler.cron.quartz;
 
+import java.util.Properties;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 import javax.inject.Singleton;
 
-import com.google.common.base.Throwables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.twitter.common.args.Arg;
@@ -34,9 +34,14 @@ import org.apache.aurora.scheduler.cron.CronScheduler;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
-import org.quartz.impl.DirectSchedulerFactory;
-import org.quartz.simpl.RAMJobStore;
+import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.simpl.SimpleThreadPool;
+
+import static org.quartz.impl.StdSchedulerFactory.PROP_SCHED_INSTANCE_ID;
+import static org.quartz.impl.StdSchedulerFactory.PROP_SCHED_MAKE_SCHEDULER_THREAD_DAEMON;
+import static org.quartz.impl.StdSchedulerFactory.PROP_SCHED_NAME;
+import static org.quartz.impl.StdSchedulerFactory.PROP_THREAD_POOL_CLASS;
+import static org.quartz.impl.StdSchedulerFactory.PROP_THREAD_POOL_PREFIX;
 
 /**
  * Provides a {@link CronJobManager} with a Quartz backend. While Quartz itself supports
@@ -101,28 +106,22 @@ public class CronModule extends AbstractModule {
     return timeZone;
   }
 
-  /*
-   * NOTE: Quartz implements DirectSchedulerFactory as a mutable global singleton in a static
-   * variable. While the Scheduler instances it produces are independent we synchronize here to
-   * avoid an initialization race across injectors. In practice this only shows up during testing;
-   * production Aurora instances will only have one object graph at a time.
-   */
   @Provides
   @Singleton
-  static synchronized Scheduler provideScheduler(AuroraCronJobFactory jobFactory) {
-    SimpleThreadPool threadPool = new SimpleThreadPool(NUM_THREADS.get(), Thread.NORM_PRIORITY);
-    threadPool.setMakeThreadsDaemons(true);
+  static Scheduler provideScheduler(AuroraCronJobFactory jobFactory) throws SchedulerException {
+    // There are several ways to create a quartz Scheduler instance.  This path was chosen as the
+    // simplest to create a Scheduler that uses a *daemon* QuartzSchedulerThread instance.
+    Properties props = new Properties();
+    String name = "aurora-cron-" + ID_GENERATOR.incrementAndGet();
+    props.setProperty(PROP_SCHED_NAME, name);
+    props.setProperty(PROP_SCHED_INSTANCE_ID, name);
+    props.setProperty(PROP_THREAD_POOL_CLASS, SimpleThreadPool.class.getCanonicalName());
+    props.setProperty(PROP_THREAD_POOL_PREFIX + ".threadCount", NUM_THREADS.get().toString());
+    props.setProperty(PROP_THREAD_POOL_PREFIX + ".makeThreadsDaemons", Boolean.TRUE.toString());
 
-    DirectSchedulerFactory schedulerFactory = DirectSchedulerFactory.getInstance();
-    String schedulerName = "aurora-cron-" + ID_GENERATOR.incrementAndGet();
-    try {
-      schedulerFactory.createScheduler(schedulerName, schedulerName, threadPool, new RAMJobStore());
-      Scheduler scheduler = schedulerFactory.getScheduler(schedulerName);
-      scheduler.setJobFactory(jobFactory);
-      return scheduler;
-    } catch (SchedulerException e) {
-      LOG.severe("Error initializing Quartz cron scheduler: " + e);
-      throw Throwables.propagate(e);
-    }
+    props.setProperty(PROP_SCHED_MAKE_SCHEDULER_THREAD_DAEMON, Boolean.TRUE.toString());
+    Scheduler scheduler = new StdSchedulerFactory(props).getScheduler();
+    scheduler.setJobFactory(jobFactory);
+    return scheduler;
   }
 }
