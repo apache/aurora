@@ -99,7 +99,7 @@ public class DbLockStoreTest {
 
   @Before
   public void setUp() throws IOException {
-    Injector injector = Guice.createInjector(new DbModule(Bindings.KeyFactory.PLAIN));
+    Injector injector = Guice.createInjector(DbModule.testModule(Bindings.KeyFactory.PLAIN));
     storage = injector.getInstance(DbStorage.class);
     storage.prepare();
   }

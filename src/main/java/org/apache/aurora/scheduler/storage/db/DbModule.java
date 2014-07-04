@@ -17,6 +17,7 @@ import java.util.Properties;
 
 import javax.inject.Singleton;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.name.Names;
@@ -55,9 +56,28 @@ import static com.google.inject.name.Names.named;
 public class DbModule extends PrivateModule {
 
   private final Bindings.KeyFactory keyFactory;
+  private final String jdbcUrl;
+
+  private DbModule(Bindings.KeyFactory keyFactory, String jdbcUrl) {
+    this.keyFactory = requireNonNull(keyFactory);
+    this.jdbcUrl = requireNonNull(jdbcUrl);
+  }
 
   public DbModule(Bindings.KeyFactory keyFactory) {
-    this.keyFactory = requireNonNull(keyFactory);
+    this(keyFactory, "jdbc:h2:mem:aurora;DB_CLOSE_DELAY=-1");
+  }
+
+  /**
+   * Creates a module that will prepare a private in-memory database.
+   *
+   * @param keyFactory Key factory to scope bindings.
+   * @return A new database module for testing.
+   */
+  @VisibleForTesting
+  public static DbModule testModule(Bindings.KeyFactory keyFactory) {
+    // This creates a private in-memory database.  New connections will have a _new_ database,
+    // and closing the database will expunge its data.
+    return new DbModule(keyFactory, "jdbc:h2:mem:");
   }
 
   private <T> void bindStore(Class<T> binding, Class<? extends T> impl) {
@@ -78,7 +98,7 @@ public class DbModule extends PrivateModule {
         // But the in-memory URL is invalid as far as H2 is concerned, so we had to inline
         // some of the constants here and bind it manually.
         bindConstant().annotatedWith(named("JDBC.driver")).to(Driver.class.getName());
-        bind(Key.get(String.class, named("JDBC.url"))).toInstance("jdbc:h2:mem:");
+        bind(Key.get(String.class, named("JDBC.url"))).toInstance(jdbcUrl);
 
         bindDataSourceProviderType(PooledDataSourceProvider.class);
         bindTransactionFactoryType(JdbcTransactionFactory.class);

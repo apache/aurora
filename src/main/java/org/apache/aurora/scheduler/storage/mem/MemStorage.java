@@ -139,7 +139,7 @@ public class MemStorage implements Storage {
   @VisibleForTesting
   public static Storage newEmptyStorage() {
     Injector injector = Guice.createInjector(
-        new DbModule(Bindings.annotatedKeyFactory(Delegated.class)),
+        DbModule.testModule(Bindings.annotatedKeyFactory(Delegated.class)),
         new MemStorageModule(Bindings.annotatedKeyFactory(Volatile.class)));
 
     Storage storage = injector.getInstance(Key.get(Storage.class, Volatile.class));
