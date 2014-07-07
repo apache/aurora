@@ -20,7 +20,6 @@ set -e
 set -o nounset
 
 aurora_git_url='https://git-wip-us.apache.org/repos/asf/incubator-aurora.git'
-aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=incubator-aurora.git'
 aurora_svn_dist_url='https://dist.apache.org/repos/dist/release/incubator/aurora'
 aurora_svn_dev_dist_url='https://dist.apache.org/repos/dist/dev/incubator/aurora'
 
@@ -99,17 +98,10 @@ if [[ "$base_dir" != "$PWD" ]]; then
 fi
 
 # Make sure that this is not on a snapshot release
-tagged_version=$(cat .auroraversion | tr '[a-z]' '[A-Z]')
-current_version=$tagged_version
-if [[ $current_version =~ .*-SNAPSHOT ]]; then
+current_version=$(cat .auroraversion | tr '[a-z]' '[A-Z]')
+if ! [[ $current_version =~ .*-SNAPSHOT ]]; then
   echo "ERROR: .auroraversion can not be a 'SNAPSHOT', it is ${current_version}"
   exit 1
-else
-  major=`echo $current_version | cut -d. -f1`
-  minor=`echo $current_version | cut -d. -f2`
-  patch=`echo $current_version | cut -d. -f3 | cut -d- -f1`
-
-  current_version="${major}.${minor}.${patch}"
 fi
 
 # Make sure the tag does not exist
@@ -123,49 +115,38 @@ if [[ $publish == 0 ]]; then
   echo "Performing dry-run"
 fi
 
-# Create a branch for the release and update the .auroraversion and tag it
-echo "Creating release branch and tag for ${current_version}"
-git checkout -b $current_version
-echo $current_version_tag > .auroraversion
-git add .auroraversion
-git commit -m "Updating .auroraversion to ${current_version}."
-
-git tag -s "${current_version}" -m "aurora-${current_version} release." $current_version
-
 if [[ $publish == 1 ]]; then
+  echo "Creating release tag ${current_version}."
+  # Create release branch and tag and push them to the origin
+  git checkout -b $current_version
   git push origin $current_version
+  git tag -s "${current_version}" -m "aurora-${current_version} release." $current_version
   git push origin --tags
 fi
 
-dist_name="apache-aurora-${current_version}-incubating"
+dist_name="aurora-${current_version}"
 
 dist_dir=${base_dir}/dist
-release_dir=${dist_dir}/${current_version}
-mkdir -p $release_dir
-cd $dist_dir
+rc_dir=${dist_dir}/rc
+mkdir -p ${rc_dir}
+cd ${dist_dir}
+
+# Checkout the release candidate
+svn co ${aurora_svn_dev_dist_url}/${current_version} ${rc_dir}
 
 if [[ $publish == 1 ]]; then
   echo "Publishing the release"
-  # Make and checkout the release dist directory
+  # Make the release dist directory and check it out
   svn mkdir ${aurora_svn_dist_url}/${current_version} -m "aurora-${current_version} release"
-  svn co --depth=empty ${aurora_svn_dist_url}/${current_version} ${release_dir}
-fi
+  svn co --depth=empty ${aurora_svn_dist_url}/${current_version} ${current_version}
+else
+  mkdir ${current_version}
+else
 
-# Now that the .auroraversion has been updated to the release version build the release source dist from it
-cd $base_dir
-git archive --prefix=${dist_name}/ -o ${release_dir}/${dist_name}.tar.gz HEAD
-
-cd ${release_dir}
-# Sign the tarball.
-echo "Signing the distribution"
-gpg --armor --output ${release_dir}/${dist_name}.tar.gz.asc --detach-sig ${release_dir}/${dist_name}.tar.gz
-
-# Create the checksums
-echo "Creating checksums"
-# md5
-gpg --print-md MD5 ${dist_name}.tar.gz > ${dist_name}.tar.gz.md5
-# sha
-shasum ${dist_name}.tar.gz > ${dist_name}.tar.gz.sha
+# Remove the release candidate -rc# from the release package names
+cd ${rc_dir}
+for f in *; do cp "$f" "${dist_dir}/{current_version}/${f/-rc[[:digit:]]/}"; done
+cd ${dist_dir}/{current_version}
 
 if [[ $publish == 1 ]]; then
   # Commit the release
@@ -210,10 +191,10 @@ There were no 0 or -1 votes. Thank you to all who helped make this release.
 Aurora ${current_version} includes the following:
 ---
 The CHANGELOG for the release is available at:
-${aurora_git_web_url};a=blob_plain;f=CHANGELOG;hb=${current_version}
+${aurora_git_url};a=blob_plain;f=CHANGELOG;hb=${current_version}
 
 The tag used to create the release with is ${current_version}:
-${aurora_git_web_url};a=commit;h=${current_version}
+${aurora_git_url};a=commit;h=${current_version}
 
 The release is available at:
 ${aurora_svn_dist_url}/${current_version}/${dist_name}.tar.gz
@@ -222,7 +203,7 @@ The MD5 checksum of the release can be found at:
 ${aurora_svn_dist_url}/${current_version}/${dist_name}.tar.gz.md5
 
 The signature of the release can be found at:
-${aurora_svn_dist_url}/${current_version}/${dist_name}.tar.gz.asc
+${aurora_svn_dist_url}/${current_version}/${dist_name}.asc
 
 The GPG key used to sign the release are available at:
 ${aurora_svn_dist_url}/KEYS

@@ -107,11 +107,7 @@ jira_base_url = "https://issues.apache.org/jira"
 jira_search_url = "/rest/api/2/search"
 jira_url = jira_base_url + jira_search_url
 
-jql="project=AURORA " \
-    "AND fixVersion='#{version}' " \
-    "AND status in (Resolved,Closed) " \
-    "AND resolution in (Fixed, Done) " \
-    "ORDER BY issuetype DESC"
+jql="project=AURORA AND fixVersion='#{version}' AND status in (Resolved,Closed) ORDER BY issuetype"
 
 # Fetch all the issues available for the given jql query
 results = get_all_jira_issues_for_query(jira_url, jql)

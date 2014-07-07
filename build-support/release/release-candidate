@@ -28,7 +28,6 @@ set -o nounset
 
 rc_tag_version=0
 aurora_git_url='https://git-wip-us.apache.org/repos/asf/incubator-aurora.git'
-aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=incubator-aurora.git'
 aurora_svn_dist_url='https://dist.apache.org/repos/dist/dev/incubator/aurora'
 
 function print_help_and_exit {
@@ -39,9 +38,9 @@ Usage: $0 [-h] [-l p|m|M] [-r #] [-p | publish]
 
   -h   Print this help message and exit
   -l   Increment level, must be one of:
-         p, patch (default)
-         m, minor
-         M, major
+       p, patch (default)
+  		 m, minor
+  		 M, major
   -r   Release candidate number (default: 0)
   -p   Publish the release candidate (default: dry-run, does not publish anything)
 EOF
@@ -99,7 +98,7 @@ elif [[ "`git rev-parse --abbrev-ref HEAD`" != "master" ]]; then
 fi
 
 if [[ "$base_dir" != "$PWD" ]]; then
-  echo "Warning: This script must be run from the root of the repository ${base_dir}"
+  echo "Warrning: This script must be run from the root of the repository ${base_dir}"
   cd $base_dir
 fi
 
@@ -122,7 +121,8 @@ else
   elif [[ $increment_level == "major" ]]; then
     new_master_version="$((major + 1)).0.0"
   else
-    new_master_version=$current_version
+    echo "Unknown release increment ${increment_level}"
+    exit 1
   fi
 
   new_snapshot_version="${new_master_version}-SNAPSHOT"
@@ -199,9 +199,7 @@ gpg --armor --output ${dist_dir}/${dist_name}.tar.gz.asc --detach-sig ${dist_dir
 
 # Create the checksums
 echo "Creating checksums"
-# md5
 gpg --print-md MD5 ${dist_name}.tar.gz > ${dist_name}.tar.gz.md5
-# sha
 shasum ${dist_name}.tar.gz > ${dist_name}.tar.gz.sha
 
 # Publish release candidate to svn and commit and push the new git branch
@@ -239,10 +237,10 @@ Apache Aurora ${current_version} release.
 Aurora ${current_version_tag} includes the following:
 ---
 The CHANGELOG for the release is available at:
-${aurora_git_web_url};a=blob_plain;f=CHANGELOG;hb=${current_version_tag}
+${aurora_git_url};a=blob_plain;f=CHANGELOG;hb=${current_version_tag}
 
 The branch used to create the release with is ${current_version_tag}:
-${aurora_git_web_url};a=tree;hb=${current_version_tag}
+${aurora_git_url};a=commit;hb=${current_version_tag}
 
 The release candidate is available at:
 ${aurora_svn_dist_url}/${current_version_tag}/${dist_name}.tar.gz

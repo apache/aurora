@@ -1,0 +1,9 @@
+/gradlew export-ignore
+/gradle export-ignore
+/src/resources export-ignore
+
+*.pyc export-ignore
+*.zip export-ignore
+*.gzip export-ignore
+*.tar export-ignore
+*.tar.gz export-ignore
