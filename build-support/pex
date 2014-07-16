@@ -15,7 +15,7 @@
 # Wrapper script for self-bootstrapping pex.
 set -e
 
-TWITTER_COMMON_PYTHON_VERSION=0.5.6
+TWITTER_COMMON_PYTHON_VERSION=0.5.9
 
 if which python2.7 >/dev/null; then
   PY=`which python2.7`

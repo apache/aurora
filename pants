@@ -18,20 +18,15 @@ set -o nounset
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 
 PANTS_VERSION=0.0.17
-PANTS_GIT_SHA=dccd515fb684421f4122df6ff425bfd07359606f
-if ! [[ -e "$HERE/build-support/pants-$PANTS_VERSION.pex" ]]; then
+if ! [[ -e "$HERE/build-support/pantsbuild.pants-$PANTS_VERSION.pex" ]]; then
   echo "Building pants.pex @ $PANTS_VERSION"
-  #TODO(yasumoto): We need to migrate to a published version of pants once
-  # pantsbuild does a release.
   "$HERE/build-support/pex" \
     -v \
     --requirement "pantsbuild.pants==$PANTS_VERSION" \
     --entry-point pants.bin.pants_exe:main \
-    --repo "https://yasumoto.github.io/cheeseshop/pantsbuild/pants/$PANTS_GIT_SHA/index.html" \
-    --no-wheel \
-    -p "$HERE/build-support/pants-$PANTS_VERSION.pex.tmp"
-  mv "$HERE/build-support/pants-$PANTS_VERSION.pex.tmp" "$HERE/build-support/pants-$PANTS_VERSION.pex"  # 2PC
-  echo "Built pants-$PANTS_VERSION.pex"
+    -p "$HERE/build-support/pantsbuild.pants-$PANTS_VERSION.pex.tmp"
+  mv "$HERE/build-support/pantsbuild.pants-$PANTS_VERSION.pex.tmp" "$HERE/build-support/pantsbuild.pants-$PANTS_VERSION.pex"  # 2PC
+  echo "Built pantsbuild.pants-$PANTS_VERSION.pex"
 fi
 
-exec "$HERE/build-support/pants-$PANTS_VERSION.pex" "$@"
+exec "$HERE/build-support/pantsbuild.pants-$PANTS_VERSION.pex" "$@"
