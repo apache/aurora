@@ -21,7 +21,6 @@ python_test_suite(
     pants(':cron'),
     pants(':help'),
     pants(':job'),
-    pants(':json_diff'),
     pants(':config'),
     pants(':logging'),
     pants(':plugins'),
@@ -29,12 +28,6 @@ python_test_suite(
     pants(':sla'),
     pants(':task'),
   ]
-)
-
-python_tests(
-  name='json_diff',
-  sources = [ 'test_json_diff.py' ],
-  dependencies = [ pants('src/main/python/apache/aurora/client/cli:client_lib') ]
 )
 
 python_library(
