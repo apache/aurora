@@ -23,9 +23,11 @@ import com.google.inject.PrivateModule;
 import com.google.inject.name.Names;
 import com.twitter.common.inject.Bindings;
 
+import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.db.typehandlers.TypeHandlers;
 import org.apache.ibatis.session.AutoMappingBehavior;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
@@ -102,6 +104,8 @@ public class DbModule extends PrivateModule {
 
         bindDataSourceProviderType(PooledDataSourceProvider.class);
         bindTransactionFactoryType(JdbcTransactionFactory.class);
+        addMapperClass(AttributeMapper.class);
+        addMapperClass(EnumValueMapper.class);
         addMapperClass(LockMapper.class);
         addMapperClass(JobKeyMapper.class);
         addMapperClass(QuotaMapper.class);
@@ -115,9 +119,12 @@ public class DbModule extends PrivateModule {
         // http://mybatis.github.io/mybatis-3/configuration.html#settings
         autoMappingBehavior(AutoMappingBehavior.FULL);
 
+        addTypeHandlersClasses(TypeHandlers.getAll());
+
         // TODO(davmclau): ensure that mybatis logging is configured correctly.
       }
     });
+    bindStore(AttributeStore.Mutable.class, DbAttributeStore.class);
     bindStore(LockStore.Mutable.class, DbLockStore.class);
     bindStore(QuotaStore.Mutable.class, DbQuotaStore.class);
 

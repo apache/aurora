@@ -15,13 +15,13 @@ package org.apache.aurora.scheduler.storage.db;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Objects;
 
 import com.google.common.base.Charsets;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
 
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.LockStore;
@@ -31,12 +31,15 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.ibatis.builder.StaticSqlSource;
 import org.apache.ibatis.exceptions.PersistenceException;
+import org.apache.ibatis.logging.jdk14.Jdk14LoggingImpl;
 import org.apache.ibatis.mapping.MappedStatement.Builder;
 import org.apache.ibatis.mapping.SqlCommandType;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.guice.transactional.Transactional;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * A storage implementation backed by a relational database.
@@ -53,14 +56,21 @@ class DbStorage extends AbstractIdleService implements Storage {
 
   private final SqlSessionFactory sessionFactory;
   private final MutableStoreProvider storeProvider;
+  private final EnumValueMapper enumValueMapper;
 
   @Inject
   DbStorage(
-      final SqlSessionFactory sessionFactory,
+      SqlSessionFactory sessionFactory,
+      EnumValueMapper enumValueMapper,
+      final AttributeStore.Mutable attributeStore,
       final LockStore.Mutable lockStore,
       final QuotaStore.Mutable quotaStore) {
 
-    this.sessionFactory = Objects.requireNonNull(sessionFactory);
+    this.sessionFactory = requireNonNull(sessionFactory);
+    this.enumValueMapper = requireNonNull(enumValueMapper);
+    requireNonNull(attributeStore);
+    requireNonNull(lockStore);
+    requireNonNull(quotaStore);
     storeProvider = new MutableStoreProvider() {
       @Override
       public SchedulerStore.Mutable getSchedulerStore() {
@@ -94,7 +104,7 @@ class DbStorage extends AbstractIdleService implements Storage {
 
       @Override
       public AttributeStore.Mutable getAttributeStore() {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return attributeStore;
       }
     };
   }
@@ -158,8 +168,14 @@ class DbStorage extends AbstractIdleService implements Storage {
         SqlCommandType.UPDATE)
         .build());
 
+    configuration.setLogImpl(Jdk14LoggingImpl.class);
+
     try (SqlSession session = sessionFactory.openSession()) {
       session.update(createStatementName);
+    }
+
+    for (MaintenanceMode mode : MaintenanceMode.values()) {
+      enumValueMapper.addEnumValue("maintenance_modes", mode.getValue(), mode.name());
     }
   }
 

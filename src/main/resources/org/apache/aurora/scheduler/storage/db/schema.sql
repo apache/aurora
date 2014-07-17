@@ -43,3 +43,30 @@ CREATE TABLE quotas(
 
   UNIQUE(role)
 );
+
+CREATE TABLE maintenance_modes(
+  id INT PRIMARY KEY,
+  name VARCHAR NOT NULL,
+
+  UNIQUE(name)
+);
+
+CREATE TABLE host_attributes(
+  id INT IDENTITY,
+  host VARCHAR NOT NULL,
+  mode TINYINT NOT NULL REFERENCES maintenance_modes(id),
+  slave_id VARCHAR NOT NULL,
+
+  UNIQUE(host),
+  UNIQUE(slave_id),
+);
+
+CREATE TABLE host_attribute_values(
+  id INT IDENTITY,
+  host_attribute_id INT NOT NULL REFERENCES host_attributes(id)
+  ON DELETE CASCADE,
+  name VARCHAR NOT NULL,
+  value VARCHAR NOT NULL,
+
+  UNIQUE(host_attribute_id, name, value)
+);

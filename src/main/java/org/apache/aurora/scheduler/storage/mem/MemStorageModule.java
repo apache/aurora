@@ -19,7 +19,6 @@ import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.twitter.common.inject.Bindings.KeyFactory;
 
-import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -74,6 +73,5 @@ public final class MemStorageModule extends PrivateModule {
     bindStore(SchedulerStore.Mutable.class, MemSchedulerStore.class);
     bindStore(JobStore.Mutable.class, MemJobStore.class);
     bindStore(TaskStore.Mutable.class, MemTaskStore.class);
-    bindStore(AttributeStore.Mutable.class, MemAttributeStore.class);
   }
 }
