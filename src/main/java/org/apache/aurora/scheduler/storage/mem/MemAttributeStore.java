@@ -39,16 +39,28 @@ class MemAttributeStore implements Mutable {
 
   @Override
   public void saveHostAttributes(IHostAttributes attributes) {
-    hostAttributes.putIfAbsent(attributes.getHost(), attributes);
+    hostAttributes.put(
+        attributes.getHost(),
+        merge(attributes, Optional.fromNullable(hostAttributes.get(attributes.getHost()))));
+  }
 
-    IHostAttributes stored = hostAttributes.get(attributes.getHost());
-    HostAttributes updated = stored.newBuilder();
-    if (!stored.isSetMode()) {
-      updated.setMode(attributes.isSetMode() ? attributes.getMode() : MaintenanceMode.NONE);
+  private IHostAttributes merge(IHostAttributes newAttributes, Optional<IHostAttributes> previous) {
+    HostAttributes attributes = newAttributes.newBuilder();
+    if (!attributes.isSetMode()) {
+      // If the newly-saved value does not explicitly set the mode, use the previous value
+      // or the default.
+      MaintenanceMode mode;
+      if (previous.isPresent() && previous.get().isSetMode()) {
+        mode = previous.get().getMode();
+      } else {
+        mode = MaintenanceMode.NONE;
+      }
+      attributes.setMode(mode);
     }
-    updated.setAttributes(updated.isSetAttributes()
-        ? updated.getAttributes() : ImmutableSet.<Attribute>of());
-    hostAttributes.replace(attributes.getHost(), stored, IHostAttributes.build(updated));
+    if (!attributes.isSetAttributes()) {
+      attributes.setAttributes(ImmutableSet.<Attribute>of());
+    }
+    return IHostAttributes.build(attributes);
   }
 
   @Override
