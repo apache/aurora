@@ -208,12 +208,12 @@ class TestDiffCommand(AuroraClientCommandTest):
         {"name": "serv", "metadata": [Metadata(key="a", value="1"),
             Metadata(key="b", value="2"), Metadata(key="instance", value="2")]}]
 
-    two = [{"name": "serv", "metadata": [Metadata(key="b", value="2"),
-        Metadata(key="a", value="1"), Metadata(key="instance", value="0")]},
-        {"name": "serv", "metadata": [Metadata(key="instance", value="1"),
-        Metadata(key="a", value="3"), Metadata(key="b", value="2")]},
+    two = [{"name": "serv", "metadata": [Metadata(key="a", value="1"),
+        Metadata(key="b", value="2"), Metadata(key="instance", value="0")]},
+        {"name": "serv", "metadata": [Metadata(key="a", value="3"),
+         Metadata(key="b", value="2"), Metadata(key="instance", value="1")]},
         {"name": "serv", "metadata": [Metadata(key="a", value="1"),
-        Metadata(key="instance", value="2"), Metadata(key="b", value="2")]}]
+         Metadata(key="b", value="2"), Metadata(key="instance", value="2")]}]
 
     result = self._test_successful_diff_generic(one, two)
     assert result == EXIT_OK
