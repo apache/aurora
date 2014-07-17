@@ -207,7 +207,7 @@ if [[ $publish == 1 ]]; then
   echo "Publishing release candidate to ${aurora_svn_dist_url}/${current_version_tag}"
   svn mkdir ${aurora_svn_dist_url}/${current_version_tag} -m "aurora-${current_version} release candidate ${rc_tag_version}"
   svn co --depth=empty ${aurora_svn_dist_url}/${current_version_tag} ${dist_dir}
-  svn add aurora-*
+  svn add ${dist_name}*
   svn ci -m "aurora-${current_version} release candidate ${rc_tag_version}"
 
   echo "Pushing new branch ${current_version_tag} to origin"
