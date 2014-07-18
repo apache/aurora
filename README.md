@@ -36,6 +36,12 @@ environment
 
 		./build-support/jenkins/build.sh
 
+* In addition, there is an end-to-end test that runs a suite of aurora commands
+using a virtual cluster. To run the end-to-end tests:
+
+    $ bash src/test/sh/org/apache/aurora/e2e/test_end_to_end.sh
+
+
 ### Compiling the source packages
 To compile the source packages into binary distributions
 
