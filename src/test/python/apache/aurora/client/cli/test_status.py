@@ -97,7 +97,7 @@ class TestJobStatus(AuroraClientCommandTest):
     return resp
 
   @classmethod
-  def create_status_response_null_metadata(cls):
+  def create_status_null_metadata(cls):
     resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_no_metadata())
@@ -124,7 +124,7 @@ class TestJobStatus(AuroraClientCommandTest):
 
     mock_context = FakeAuroraCommandContext()
     mock_api = mock_context.get_api('west')
-    mock_api.check_status.return_value = self.create_status_response_null_metadata()
+    mock_api.check_status.return_value = self.create_status_null_metadata()
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       cmd = AuroraCommandLine()
@@ -133,33 +133,33 @@ class TestJobStatus(AuroraClientCommandTest):
 
   def test_successful_status_deep(self):
     """Test the status command more deeply: in a request with a fully specified
-    job, it should end up doing a query using getTasksStatus."""
+    job, it should end up doing a query using getTasksWithoutConfigs."""
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_scheduler_proxy.query.return_value = self.create_status_response()
-    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response_null_metadata()
+    mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_null_metadata()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='bozo')))
 
   def test_successful_status_deep_null_metadata(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_scheduler_proxy.query.return_value = self.create_status_response_null_metadata()
-    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response_null_metadata()
+    mock_scheduler_proxy.query.return_value = self.create_status_null_metadata()
+    mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_null_metadata()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='bozo')))
 
   def test_status_wildcard(self):
     """Test status using a wildcard. It should first call api.get_jobs, and then do a
-    getTasksStatus on each job."""
+    getTasksWithoutConfigs on each job."""
     mock_context = FakeAuroraCommandContext()
     mock_api = mock_context.get_api('west')
     mock_api.check_status.return_value = self.create_status_response()
@@ -186,7 +186,8 @@ class TestJobStatus(AuroraClientCommandTest):
 
   def test_status_wildcard_two(self):
     """Test status using a wildcard. It should first call api.get_jobs, and then do a
-    getTasksStatus on each job. This time, use a pattern that doesn't match all of the jobs."""
+    getTasksWithoutConfigs on each job. This time, use a pattern that doesn't match
+    all of the jobs."""
     mock_context = FakeAuroraCommandContext()
     mock_api = mock_context.get_api('west')
     mock_api.check_status.return_value = self.create_status_response()

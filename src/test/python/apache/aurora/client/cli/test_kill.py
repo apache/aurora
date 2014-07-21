@@ -49,8 +49,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
   @classmethod
   def assert_scheduler_called(cls, mock_api, mock_query, num_queries):
-    assert mock_api.scheduler_proxy.getTasksStatus.call_count == num_queries
-    mock_api.scheduler_proxy.getTasksStatus.assert_called_with(mock_query)
+    assert mock_api.scheduler_proxy.getTasksWithoutConfigs.call_count == num_queries
+    mock_api.scheduler_proxy.getTasksWithoutConfigs.assert_called_with(mock_query)
 
   @classmethod
   def get_expected_task_query(cls, instances=None):
@@ -68,7 +68,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
 
       api = mock_context.get_api('west')
-      mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_call_result()
+      mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_call_result()
       api.kill_job.return_value = self.get_kill_job_response()
       mock_scheduler_proxy.killTasks.return_value = self.get_kill_job_response()
       mock_context.add_expected_status_query_result(self.create_status_call_result(
@@ -95,7 +95,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
 
       api = mock_context.get_api('west')
-      mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_call_result()
+      mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_call_result()
       api.kill_job.return_value = self.get_kill_job_response()
       mock_scheduler_proxy.killTasks.return_value = self.get_kill_job_response()
       for _ in range(8):
@@ -287,7 +287,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
       # Now check that the right API calls got made. We should have aborted after the second batch.
       assert api.kill_job.call_count == 2
-      assert api.scheduler_proxy.getTasksStatus.call_count == 0
+      assert api.scheduler_proxy.getTasksWithoutConfigs.call_count == 0
 
   def test_kill_job_with_empty_instances_batched(self):
     """Test kill client-side API logic."""
@@ -297,7 +297,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
-      # set up an empty instance list in the getTasksStatus response
+      # set up an empty instance list in the getTasksWithoutConfigs response
       status_response = self.create_simple_success_response()
       schedule_status = Mock(spec=ScheduleStatusResult)
       status_response.result.scheduleStatusResult = schedule_status

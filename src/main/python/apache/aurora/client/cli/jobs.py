@@ -601,7 +601,7 @@ to preview what changes will take effect.
   def warn_if_dangerous_change(self, context, api, job_spec, config):
     # Get the current job status, so that we can check if there's anything
     # dangerous about this update.
-    resp = api.query(api.build_query(config.role(), config.name(),
+    resp = api.query_no_configs(api.build_query(config.role(), config.name(),
         statuses=ACTIVE_STATES, env=config.environment()))
     if resp.responseCode != ResponseCode.OK:
       # NOTE(mchucarroll): we assume here that updating a cron schedule and updating a

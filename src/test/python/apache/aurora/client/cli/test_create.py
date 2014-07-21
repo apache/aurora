@@ -83,8 +83,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
   @classmethod
   def assert_scheduler_called(cls, mock_api, mock_query, num_queries):
-    assert mock_api.scheduler_proxy.getTasksStatus.call_count == num_queries
-    mock_api.scheduler_proxy.getTasksStatus.assert_called_with(mock_query)
+    assert mock_api.scheduler_proxy.getTasksWithoutConfigs.call_count == num_queries
+    mock_api.scheduler_proxy.getTasksWithoutConfigs.assert_called_with(mock_query)
 
   def test_simple_successful_create_job(self):
     """Run a test of the "create" command against a mocked-out API:
@@ -185,7 +185,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Check that create_job was not called.
       api = mock_context.get_api('west')
       assert api.create_job.call_count == 0
-      assert api.scheduler_proxy.getTasksStatus.call_count == 0
+      assert api.scheduler_proxy.test_simple_successful_create_job.call_count == 0
 
   def test_interrupt(self):
     mock_context = FakeAuroraCommandContext()

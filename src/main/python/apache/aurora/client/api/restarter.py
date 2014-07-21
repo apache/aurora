@@ -45,7 +45,7 @@ class Restarter(object):
     # Verify that this operates on a valid job.
     query = self._job_key.to_thrift_query()
     query.statuses = ACTIVE_STATES
-    status = self._scheduler.getTasksStatus(query)
+    status = self._scheduler.getTasksWithoutConfigs(query)
     if status.responseCode != ResponseCode.OK:
       return status
 

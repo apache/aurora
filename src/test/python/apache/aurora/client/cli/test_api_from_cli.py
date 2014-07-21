@@ -113,7 +113,7 @@ class TestApiFromCLI(AuroraClientCommandTest):
 
   def test_successful_status_deep(self):
     """Test the status command more deeply: in a request with a fully specified
-    job, it should end up doing a query using getTasksStatus."""
+    job, it should end up doing a query using getTasksWithoutConfigs."""
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_scheduler_proxy.query.return_value = self.create_status_response()
     with contextlib.nested(
@@ -121,14 +121,14 @@ class TestApiFromCLI(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='bozo')))
 
   def test_status_api_failure(self):
     # Following should use spec=SchedulerClient, but due to introspection for the RPC calls,
     # the necessary methods aren't in that spec.
     mock_scheduler_client = Mock()
-    mock_scheduler_client.getTasksStatus.side_effect = IOError("Uh-Oh")
+    mock_scheduler_client.getTasksWithoutConfigs.side_effect = IOError("Uh-Oh")
     with contextlib.nested(
         patch('apache.aurora.client.api.scheduler_client.SchedulerClient.get',
             return_value=mock_scheduler_client),
@@ -136,8 +136,8 @@ class TestApiFromCLI(AuroraClientCommandTest):
 
       cmd = AuroraCommandLine()
       # This should create a scheduler client, set everything up, and then issue a
-      # getTasksStatus call against the mock_scheduler_client. That should raise an
+      # getTasksWithoutConfigs call against the mock_scheduler_client. That should raise an
       # exception, which results in the command failing with an error code.
       result = cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       assert result == EXIT_API_ERROR
-      mock_scheduler_client.getTasksStatus.assert_call_count == 1
+      mock_scheduler_client.getTasksWithoutConfigs.assert_call_count == 1

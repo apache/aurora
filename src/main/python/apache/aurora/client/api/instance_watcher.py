@@ -131,7 +131,7 @@ class InstanceWatcher(object):
 
     query.instanceIds = instance_ids
     try:
-      resp = self._scheduler.getTasksStatus(query)
+      resp = self._scheduler.getTasksWithoutConfigs(query)
     except IOError as e:
       log.error('IO Exception during scheduler call: %s' % e)
       return []

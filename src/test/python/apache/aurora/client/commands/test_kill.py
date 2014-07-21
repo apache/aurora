@@ -90,8 +90,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
   @classmethod
   def assert_scheduler_called(cls, mock_api, mock_query, num_queries):
-    assert mock_api.scheduler_proxy.getTasksStatus.call_count == num_queries
-    mock_api.scheduler_proxy.getTasksStatus.assert_called_with(mock_query)
+    assert mock_api.scheduler_proxy.getTasksWithoutConfigs.call_count == num_queries
+    mock_api.scheduler_proxy.getTasksWithoutConfigs.assert_called_with(mock_query)
 
   def test_kill_job_tasks_not_killed_in_time(self):
     """Test kill timed out waiting in job monitor."""
@@ -111,16 +111,14 @@ class TestClientKillCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.KILLING),
         self.create_mock_status_query_result(ScheduleStatus.KILLING),
     ]
-    mock_scheduler_proxy.getTasksStatus.side_effect = mock_query_results
+    mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = mock_query_results
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.factory.make_client', return_value=mock_api),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)
-    ) as (mock_sleep, mock_api_patch, mock_scheduler_proxy_class, mock_clusters, options,
-        mock_get_job_config):
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -142,11 +140,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.commands.core.make_client_factory',
             return_value=mock_api_factory),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            mock_make_client_factory,
-            options, mock_get_job_config):
-      mock_api = mock_api_factory.return_value
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
 
+      mock_api = mock_api_factory.return_value
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -170,17 +166,13 @@ class TestClientKillCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.KILLING),
         self.create_mock_status_query_result(ScheduleStatus.KILLED),
     ]
-    mock_scheduler_proxy.getTasksStatus.side_effect = mock_query_results
+    mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = mock_query_results
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.commands.core.make_client',
             return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            sleep,
-            mock_make_client,
-            options,
-            mock_get_job_config):
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -234,9 +226,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
             return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config),
-        patch('apache.aurora.client.commands.core.JobMonitor')) as (
-            mock_make_client,
-            options, mock_get_job_config, mock_monitor):
+        patch('apache.aurora.client.commands.core.JobMonitor')):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -269,20 +259,14 @@ class TestClientKillCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.KILLING),
         self.create_mock_status_query_result(ScheduleStatus.KILLED),
     ]
-    mock_scheduler_proxy.getTasksStatus.side_effect = mock_query_results
+    mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = mock_query_results
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.factory.make_client', return_value=mock_api),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            mock_sleep,
-            mock_api_patch,
-            mock_scheduler_proxy_class,
-            mock_clusters,
-            options,
-            mock_get_job_config):
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -309,19 +293,15 @@ class TestClientKillCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.KILLING),
         self.create_mock_status_query_result(ScheduleStatus.KILLED),
     ]
-    mock_scheduler_proxy.getTasksStatus.side_effect = mock_query_results
+    mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = mock_query_results
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.factory.make_client', return_value=mock_api),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            mock_sleep,
-            mock_api_factory_patch,
-            mock_scheduler_proxy_class,
-            mock_clusters,
-            options, mock_get_job_config):
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
+
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -343,7 +323,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_config.raw.return_value.enable_hooks.return_value.get.return_value = False
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_api.check_status.return_value = self.create_status_call_result()
-    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_call_result()
+    mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_call_result()
     mock_scheduler_proxy.killTasks.return_value = self.get_kill_job_response()
     with contextlib.nested(
         patch('apache.aurora.client.factory.make_client', return_value=mock_api),
@@ -351,12 +331,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config),
-        patch('apache.aurora.client.commands.core.JobMonitor')) as (
-            mock_api_factory_patch,
-            mock_scheduler_proxy_class,
-            mock_clusters,
-            options, mock_get_job_config,
-            mock_monitor):
+        patch('apache.aurora.client.commands.core.JobMonitor')):
+
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -377,7 +353,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_config.raw.return_value.enable_hooks.return_value.get.return_value = False
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_api.check_status.return_value = self.create_status_call_result()
-    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_call_result()
+    mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_call_result()
     mock_api.kill_job.side_effect = [
         self.get_kill_job_error_response(), self.get_kill_job_response()]
     with contextlib.nested(
@@ -385,9 +361,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)
-    ) as (mock_api_factory_patch, mock_scheduler_proxy_class, mock_clusters, options,
-        mock_get_job_config):
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())

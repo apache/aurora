@@ -44,7 +44,7 @@ class JobMonitor(object):
 
   def iter_query(self, query):
     try:
-      res = self._scheduler.getTasksStatus(query)
+      res = self._scheduler.getTasksWithoutConfigs(query)
     except TTransport.TTransportException as e:
       log.error('Failed to query tasks from scheduler: %s' % e)
       return

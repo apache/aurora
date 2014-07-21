@@ -88,7 +88,7 @@ class FakeAuroraCommandContext(AuroraCommandContext):
   def add_expected_status_query_result(self, expected_result):
     self.task_status.append(expected_result)
     # each call adds an expected query result, in order.
-    self.fake_api.scheduler_proxy.getTasksStatus.side_effect = self.task_status
+    self.fake_api.scheduler_proxy.getTasksWithoutConfigs.side_effect = self.task_status
     self.fake_api.check_status.side_effect = self.task_status
 
 
@@ -168,7 +168,7 @@ class AuroraClientCommandTest(unittest.TestCase):
   @classmethod
   def setup_get_tasks_status_calls(cls, scheduler):
     status_response = cls.create_status_call_result()
-    scheduler.getTasksStatus.return_value = status_response
+    scheduler.getTasksWithoutConfigs.return_value = status_response
 
   @classmethod
   def fake_time(cls, ignored):

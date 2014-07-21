@@ -86,7 +86,7 @@ class TestListJobs(AuroraClientCommandTest):
     return resp
 
   @classmethod
-  def create_status_response_null_metadata(cls):
+  def create_status_null_metadata(cls):
     resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_no_metadata())
@@ -101,19 +101,16 @@ class TestListJobs(AuroraClientCommandTest):
     # Calls api.check_status, which calls scheduler_proxy.getJobs
     mock_options = self.setup_mock_options()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
+    mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_response()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options)) as (
-            mock_scheduler_proxy_class,
-            mock_clusters,
-            options):
-      status(['west/mchucarroll/test/hello'], mock_options)
+        patch('twitter.common.app.get_options', return_value=mock_options)):
 
-      # The status command sends a getTasksStatus query to the scheduler,
+      status(['west/mchucarroll/test/hello'], mock_options)
+      # The status command sends a getTasksWithoutConfigs query to the scheduler,
       # and then prints the result.
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll')))
 
   def test_unsuccessful_status(self):
@@ -121,17 +118,14 @@ class TestListJobs(AuroraClientCommandTest):
     # Calls api.check_status, which calls scheduler_proxy.getJobs
     mock_options = self.setup_mock_options()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_scheduler_proxy.getTasksStatus.return_value = self.create_failed_status_response()
+    mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_failed_status_response()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options)) as (
-            mock_scheduler_proxy_class,
-            mock_clusters,
-            options):
-      self.assertRaises(SystemExit, status, ['west/mchucarroll/test/hello'], mock_options)
+        patch('twitter.common.app.get_options', return_value=mock_options)):
 
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+      self.assertRaises(SystemExit, status, ['west/mchucarroll/test/hello'], mock_options)
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll')))
 
   def test_successful_status_nometadata(self):
@@ -139,13 +133,12 @@ class TestListJobs(AuroraClientCommandTest):
     # Calls api.check_status, which calls scheduler_proxy.getJobs
     mock_options = self.setup_mock_options()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response_null_metadata()
+    mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_null_metadata()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options)
-    ) as (mock_scheduler_proxy_class, mock_clusters, options):
-      status(['west/mchucarroll/test/hello'], mock_options)
+        patch('twitter.common.app.get_options', return_value=mock_options)):
 
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
+      status(['west/mchucarroll/test/hello'], mock_options)
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='mchucarroll')))

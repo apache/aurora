@@ -101,7 +101,7 @@ class AuroraClientAPI(object):
     self._assert_valid_job_key(job_key)
 
     log.info("Checking status of %s" % job_key)
-    return self.query(job_key.to_thrift_query())
+    return self.query_no_configs(job_key.to_thrift_query())
 
   @classmethod
   def build_query(cls, role, job, instances=None, statuses=LIVE_STATES, env=None):
@@ -114,6 +114,13 @@ class AuroraClientAPI(object):
   def query(self, query):
     try:
       return self._scheduler_proxy.getTasksStatus(query)
+    except SchedulerProxy.ThriftInternalError as e:
+      raise self.ThriftInternalError(e.args[0])
+
+  def query_no_configs(self, query):
+    """Returns all matching tasks without TaskConfig.executorConfig set."""
+    try:
+      return self._scheduler_proxy.getTasksWithoutConfigs(query)
     except SchedulerProxy.ThriftInternalError as e:
       raise self.ThriftInternalError(e.args[0])
 

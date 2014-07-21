@@ -143,8 +143,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
   @classmethod
   def assert_scheduler_called(cls, mock_api, mock_query, num_queries):
-    assert mock_api.scheduler_proxy.getTasksStatus.call_count == num_queries
-    mock_api.scheduler_proxy.getTasksStatus.assert_called_with(mock_query)
+    assert mock_api.scheduler_proxy.getTasksWithoutConfigs.call_count == num_queries
+    mock_api.scheduler_proxy.getTasksWithoutConfigs.assert_called_with(mock_query)
 
   def test_create_job_with_successful_hook(self):
     GlobalCommandHookRegistry.reset()

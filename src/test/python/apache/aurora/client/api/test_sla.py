@@ -58,7 +58,7 @@ class SlaTest(unittest.TestCase):
     response_code = ResponseCode.OK if response_code is None else response_code
     resp = Response(responseCode=response_code, messageDEPRECATED='test')
     resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
-    self._scheduler.getTasksStatus.return_value = resp
+    self._scheduler.getTasksWithoutConfigs.return_value = resp
 
   def create_task(self, duration, id, host=None, name=None, prod=None):
     return ScheduledTask(
@@ -162,7 +162,7 @@ class SlaTest(unittest.TestCase):
     )
 
   def expect_task_status_call_job_scoped(self):
-    self._scheduler.getTasksStatus.assert_called_once_with(
+    self._scheduler.getTasksWithoutConfigs.assert_called_once_with(
         TaskQuery(
             owner=Identity(role=self._role),
             environment=self._env,
@@ -171,7 +171,7 @@ class SlaTest(unittest.TestCase):
     )
 
   def expect_task_status_call_cluster_scoped(self):
-    self._scheduler.getTasksStatus.assert_called_with(TaskQuery(statuses=LIVE_STATES))
+    self._scheduler.getTasksWithoutConfigs.assert_called_with(TaskQuery(statuses=LIVE_STATES))
 
   @contextmanager
   def group_by_rack(self):

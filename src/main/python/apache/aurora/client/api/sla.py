@@ -322,7 +322,7 @@ class Sla(object):
         hosts=hosts)
 
   def _get_tasks(self, task_query):
-    resp = self._scheduler.getTasksStatus(task_query)
+    resp = self._scheduler.getTasksWithoutConfigs(task_query)
     log_response(resp)
     if resp.responseCode != ResponseCode.OK:
       return []

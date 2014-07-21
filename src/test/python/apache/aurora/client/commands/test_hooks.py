@@ -108,8 +108,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
   @classmethod
   def assert_scheduler_called(cls, mock_api, mock_query, num_queries):
     # scheduler.scheduler() is called once, as a part of the handle_open call.
-    assert mock_api.scheduler_proxy.getTasksStatus.call_count == num_queries
-    mock_api.scheduler_proxy.getTasksStatus.assert_called_with(mock_query)
+    assert mock_api.scheduler_proxy.getTasksWithoutConfigs.call_count == num_queries
+    mock_api.scheduler_proxy.getTasksWithoutConfigs.assert_called_with(mock_query)
 
   def test_create_job_hook_called(self):
     """Run a test of the "create" command against a mocked API;
@@ -134,7 +134,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
       mock_scheduler_proxy.createJob.return_value = self.get_createjob_response()
 
-      mock_scheduler_proxy.getTasksStatus.side_effect = [
+      mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = [
         self.create_mock_status_query_result(ScheduleStatus.INIT),
         self.create_mock_status_query_result(ScheduleStatus.RUNNING)
       ]
@@ -173,7 +173,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
       mock_scheduler_proxy.createJob.return_value = self.get_createjob_response()
 
-      mock_scheduler_proxy.getTasksStatus.side_effect = [
+      mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = [
         self.create_mock_status_query_result(ScheduleStatus.INIT),
         self.create_mock_status_query_result(ScheduleStatus.RUNNING)
       ]
@@ -215,7 +215,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
       mock_scheduler_proxy.createJob.return_value = self.get_createjob_response()
 
-      mock_scheduler_proxy.getTasksStatus.side_effect = [
+      mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = [
         self.create_mock_status_query_result(ScheduleStatus.INIT),
         self.create_mock_status_query_result(ScheduleStatus.RUNNING)
       ]

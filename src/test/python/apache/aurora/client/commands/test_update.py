@@ -74,10 +74,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)
-    ) as (make_client,
-          options,
-          test_clusters):
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+
       mock_api.update_job.return_value = self.create_simple_success_response()
 
       with temporary_file() as fp:
@@ -98,10 +96,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)
-    ) as (make_client,
-          options,
-          test_clusters):
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+
       with temporary_file() as fp:
         fp.write(self.get_invalid_config('invalid_field=False,'))
         fp.flush()
@@ -145,7 +141,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     populate.result.populateJobResult = Mock(spec=PopulateJobResult)
     api.populateJobConfig.return_value = populate
     configs = []
-    for i in range(20):
+    for _ in range(20):
       task_config = TaskConfig(numCpus=1.0, ramMb=1, diskMb=1)
       configs.append(task_config)
     populate.result.populateJobResult.populated = set(configs)
@@ -171,6 +167,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
   def setup_get_tasks_status_calls(cls, scheduler_proxy):
     status_response = cls.create_simple_success_response()
     scheduler_proxy.getTasksStatus.return_value = status_response
+    scheduler_proxy.getTasksWithoutConfigs.return_value = status_response
     schedule_status = Mock(spec=ScheduleStatusResult)
     status_response.result.scheduleStatusResult = schedule_status
     task_config = TaskConfig(numCpus=1.0, ramMb=10, diskMb=1)
@@ -274,18 +271,27 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
   @classmethod
   def assert_correct_status_calls(cls, api):
-    # getTasksStatus gets called a lot of times. The exact number isn't fixed; it loops
+    # getTasksWithoutConfigs gets called a lot of times. The exact number isn't fixed; it loops
     # over the health checks until all of them pass for a configured period of time.
-    # The minumum number of calls is 5: once before the tasks are restarted, and then
-    # once for each batch of restarts (Since the batch size is set to 5, and the
-    # total number of jobs is 20, that's 4 batches.)
-    assert api.getTasksStatus.call_count >= 5
-    # In the first getStatus call, it uses an expansive query; in the rest, it only queries for
-    # status RUNNING.
-    status_calls = api.getTasksStatus.call_args_list
-    assert status_calls[0][0][0] == TaskQuery(taskIds=None, jobName='hello', environment='test',
+    # The minumum number of calls is 4: once for each batch of restarts (Since the batch size
+    # is set to 5, and the total number of jobs is 20, that's 4 batches.)
+    assert api.getTasksWithoutConfigs.call_count >= 4
+
+    status_calls = api.getTasksWithoutConfigs.call_args_list
+    for status_call in status_calls:
+      status_call[0][0] == TaskQuery(
+          taskIds=None,
+          jobName='hello',
+          environment='test',
+          owner=Identity(role='mchucarroll', user=None),
+          statuses=set([ScheduleStatus.RUNNING]))
+
+    # getTasksStatus is called only once to build an generate update instructions
+    assert api.getTasksStatus.call_count == 1
+
+    api.getTasksStatus.assert_called_once_with(TaskQuery(
+        taskIds=None,
+        jobName='hello',
+        environment='test',
         owner=Identity(role=u'mchucarroll', user=None),
-        statuses=ACTIVE_STATES)
-    for status_call in status_calls[1:]:
-      status_call[0][0] == TaskQuery(taskIds=None, jobName='hello', environment='test',
-          owner=Identity(role='mchucarroll', user=None), statuses=set([ScheduleStatus.RUNNING]))
+        statuses=ACTIVE_STATES))

@@ -101,7 +101,7 @@ class TestRestarter(MoxTestBase):
     response.result = Result()
     response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
 
-    self.mock_scheduler.getTasksStatus(IgnoreArg()).AndReturn(response)
+    self.mock_scheduler.getTasksWithoutConfigs(IgnoreArg()).AndReturn(response)
 
   def test_restart_all_instances(self):
     self.mock_status_active_tasks([0, 1, 3, 4, 5])
@@ -113,7 +113,7 @@ class TestRestarter(MoxTestBase):
 
   def mock_status_no_active_task(self):
     response = Response(responseCode=ResponseCode.INVALID_REQUEST, messageDEPRECATED='test')
-    self.mock_scheduler.getTasksStatus(IgnoreArg()).AndReturn(response)
+    self.mock_scheduler.getTasksWithoutConfigs(IgnoreArg()).AndReturn(response)
 
   def test_restart_no_instance_active(self):
     self.mock_status_no_active_task()

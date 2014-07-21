@@ -59,7 +59,7 @@ class JobMonitorTest(unittest.TestCase):
     response_code = ResponseCode.OK if response_code is None else response_code
     resp = Response(responseCode=response_code, messageDEPRECATED='test')
     resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
-    self._scheduler.getTasksStatus.return_value = resp
+    self._scheduler.getTasksWithoutConfigs.return_value = resp
 
   def expect_task_status(self, once=False, instances=None):
     query = TaskQuery(
@@ -70,9 +70,9 @@ class JobMonitorTest(unittest.TestCase):
       query.instanceIds = frozenset([int(s) for s in instances])
 
     if once:
-      self._scheduler.getTasksStatus.assert_called_once_with(query)
+      self._scheduler.getTasksWithoutConfigs.assert_called_once_with(query)
     else:
-      self._scheduler.getTasksStatus.assert_called_with(query)
+      self._scheduler.getTasksWithoutConfigs.assert_called_with(query)
 
   def test_wait_until_state(self):
     self.mock_get_tasks([
