@@ -410,6 +410,11 @@ struct Hosts {
   1: set<string> hostNames
 }
 
+struct PendingReason {
+  1: string taskId
+  2: string reason
+}
+
 struct ListBackupsResult {
   1: set<string> backups
 }
@@ -451,6 +456,10 @@ struct ConfigSummaryResult {
   1: ConfigSummary summary
 }
 
+struct GetPendingReasonResult {
+  1: set<PendingReason> reasons
+}
+
 // meta-data about the thrift server that is wrapped around every thrift response
 struct ServerInfo {
   1: string clusterName
@@ -475,6 +484,7 @@ union Result {
   18: JobSummaryResult jobSummaryResult
   19: GetLocksResult getLocksResult
   20: ConfigSummaryResult configSummaryResult
+  21: GetPendingReasonResult getPendingReasonResult
 
 }
 
@@ -507,6 +517,9 @@ service ReadOnlyScheduler {
   // Same as getTaskStatus but without the TaskConfig.ExecutorConfig data set.
   // This is an interim solution until we have a better way to query TaskConfigs (AURORA-541).
   Response getTasksWithoutConfigs(1: TaskQuery query)
+
+  // Returns user-friendly reasons (if available) for tasks retained in PENDING state.
+  Response getPendingReason(1: TaskQuery query)
 
   // Fetches the configuration summary of active tasks for the specified job.
   Response getConfigSummary(1: JobKey job)

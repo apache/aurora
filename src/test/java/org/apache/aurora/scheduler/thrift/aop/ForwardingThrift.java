@@ -257,4 +257,9 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
 
     return delegate.addInstances(config, lock, session);
   }
+
+  @Override
+  public Response getPendingReason(TaskQuery query) throws TException {
+    return delegate.getPendingReason(query);
+  }
 }

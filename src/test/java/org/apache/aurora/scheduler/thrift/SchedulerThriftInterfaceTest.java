@@ -67,6 +67,7 @@ import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.PendingReason;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
@@ -94,6 +95,8 @@ import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.metadata.NearestFit;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
@@ -182,6 +185,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private CronJobManager cronJobManager;
   private CronPredictor cronPredictor;
   private QuotaManager quotaManager;
+  private NearestFit nearestFit;
 
   @Before
   public void setUp() throws Exception {
@@ -198,6 +202,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     cronJobManager = createMock(CronJobManager.class);
     cronPredictor = createMock(CronPredictor.class);
     quotaManager = createMock(QuotaManager.class);
+    nearestFit = createMock(NearestFit.class);
 
     // Use guice and install AuthModule to apply AOP-style auth layer.
     Module testModule = new AbstractModule() {
@@ -216,6 +221,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
         bind(IServerInfo.class).toInstance(IServerInfo.build(SERVER_INFO));
         bind(CronPredictor.class).toInstance(cronPredictor);
+        bind(NearestFit.class).toInstance(nearestFit);
       }
     };
     Injector injector = Guice.createInjector(testModule, new AopModule());
@@ -1318,6 +1324,52 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testGetPendingReason() throws Exception {
+    Builder query = Query.unscoped().byJob(JOB_KEY);
+    Builder filterQuery = Query.unscoped().byJob(JOB_KEY).byStatus(ScheduleStatus.PENDING);
+    String taskId = "task_id_test";
+    ImmutableSet<Veto> result = ImmutableSet.of(
+        Veto.constraintMismatch("first"),
+        Veto.constraintMismatch("second"));
+
+    IScheduledTask pendingTask = IScheduledTask.build(new ScheduledTask()
+        .setAssignedTask(new AssignedTask()
+            .setTask(defaultTask(true))
+            .setTaskId(taskId))
+        .setStatus(ScheduleStatus.PENDING));
+
+    storageUtil.expectTaskFetch(filterQuery, pendingTask);
+    expect(nearestFit.getNearestFit(taskId)).andReturn(result);
+
+    control.replay();
+
+    Set<PendingReason> expected = ImmutableSet.of(new PendingReason()
+        .setTaskId(taskId)
+        .setReason("first,second"));
+
+    Response response = assertOkResponse(thrift.getPendingReason(query.get()));
+    assertEquals(expected, response.getResult().getGetPendingReasonResult().getReasons());
+  }
+
+  @Test
+  public void testGetPendingReasonFailsStatusSet() throws Exception {
+    Builder query = Query.unscoped().byStatus(ScheduleStatus.ASSIGNED);
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.getPendingReason(query.get()));
+  }
+
+  @Test
+  public void testGetPendingReasonFailsSlavesSet() throws Exception {
+    Builder query = Query.unscoped().bySlave("host1");
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.getPendingReason(query.get()));
+  }
+
+  @Test
   public void testGetConfigSummary() throws Exception {
     IJobKey key = JobKeys.from("test", "test", "test");
 
@@ -1746,7 +1798,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static TaskConfig defaultTask(boolean production) {
     return new TaskConfig()
-        .setOwner(new Identity("role", "user"))
+        .setOwner(new Identity(ROLE, USER))
         .setEnvironment(DEFAULT_ENVIRONMENT)
         .setJobName(JOB_NAME)
         .setContactEmail("testing@twitter.com")

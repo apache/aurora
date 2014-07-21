@@ -27,6 +27,7 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -58,6 +59,7 @@ import org.apache.aurora.gen.DrainHostsResult;
 import org.apache.aurora.gen.EndMaintenanceResult;
 import org.apache.aurora.gen.GetJobsResult;
 import org.apache.aurora.gen.GetLocksResult;
+import org.apache.aurora.gen.GetPendingReasonResult;
 import org.apache.aurora.gen.GetQuotaResult;
 import org.apache.aurora.gen.Hosts;
 import org.apache.aurora.gen.InstanceConfigRewrite;
@@ -73,6 +75,7 @@ import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.LockKey._Fields;
 import org.apache.aurora.gen.LockValidation;
 import org.apache.aurora.gen.MaintenanceStatusResult;
+import org.apache.aurora.gen.PendingReason;
 import org.apache.aurora.gen.PopulateJobResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.ResourceAggregate;
@@ -101,6 +104,8 @@ import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.metadata.NearestFit;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
@@ -173,6 +178,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final CronJobManager cronJobManager;
   private final CronPredictor cronPredictor;
   private final QuotaManager quotaManager;
+  private final NearestFit nearestFit;
 
   @Inject
   SchedulerThriftInterface(
@@ -185,7 +191,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       CronJobManager cronJobManager,
       CronPredictor cronPredictor,
       MaintenanceController maintenance,
-      QuotaManager quotaManager) {
+      QuotaManager quotaManager,
+      NearestFit nearestFit) {
 
     this(storage,
         schedulerCore,
@@ -196,7 +203,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         maintenance,
         cronJobManager,
         cronPredictor,
-        quotaManager);
+        quotaManager,
+        nearestFit);
   }
 
   @VisibleForTesting
@@ -210,7 +218,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       MaintenanceController maintenance,
       CronJobManager cronJobManager,
       CronPredictor cronPredictor,
-      QuotaManager quotaManager) {
+      QuotaManager quotaManager,
+      NearestFit nearestFit) {
 
     this.storage = requireNonNull(storage);
     this.schedulerCore = requireNonNull(schedulerCore);
@@ -222,6 +231,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.cronJobManager = requireNonNull(cronJobManager);
     this.cronPredictor = requireNonNull(cronPredictor);
     this.quotaManager = requireNonNull(quotaManager);
+    this.nearestFit = requireNonNull(nearestFit);
   }
 
   @Override
@@ -459,6 +469,46 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return new ConfigGroup(input.getKey().newBuilder(), ImmutableSet.copyOf(input.getValue()));
     }
   };
+
+  @Override
+  public Response getPendingReason(TaskQuery query) throws TException {
+    requireNonNull(query);
+
+    Response response = Util.emptyResponse();
+    if (query.isSetSlaveHosts() || query.isSetStatuses()) {
+      return addMessage(
+          response,
+          INVALID_REQUEST,
+          "Statuses or slaveHosts are not supported in " + query.toString());
+    }
+
+    // Only PENDING tasks should be considered.
+    query.setStatuses(ImmutableSet.of(ScheduleStatus.PENDING));
+
+    Set<PendingReason> reasons = FluentIterable.from(getTasks(query))
+        .transform(new Function<ScheduledTask, PendingReason>() {
+          @Override
+          public PendingReason apply(ScheduledTask scheduledTask) {
+            String taskId = scheduledTask.getAssignedTask().getTaskId();
+            String reason = Joiner.on(',').join(Iterables.transform(
+                nearestFit.getNearestFit(taskId),
+                new Function<Veto, String>() {
+                  @Override
+                  public String apply(Veto veto) {
+                    return veto.getReason();
+                  }
+                }));
+
+            return new PendingReason()
+                .setTaskId(taskId)
+                .setReason(reason);
+          }
+        }).toSet();
+
+    return response
+        .setResponseCode(OK)
+        .setResult(Result.getPendingReasonResult(new GetPendingReasonResult(reasons)));
+  }
 
   @Override
   public Response getConfigSummary(JobKey job) throws TException {
