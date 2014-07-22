@@ -24,13 +24,12 @@ import javax.servlet.http.HttpServletResponseWrapper;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.twitter.common.net.http.filters.AbstractHttpFilter;
 import com.twitter.common.stats.SlidingStats;
 
 /**
  * An HTTP filter that exports counts and timing for requests based on response code.
  */
-public class HttpStatsFilter extends AbstractHttpFilter {
+public class HttpStatsFilter extends AbstractFilter {
 
   private final LoadingCache<Integer, SlidingStats> counters = CacheBuilder.newBuilder()
       .build(new CacheLoader<Integer, SlidingStats>() {

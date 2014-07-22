@@ -23,12 +23,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.google.common.base.Optional;
-import com.twitter.common.net.http.filters.AbstractHttpFilter;
 
 /**
  * An HTTP filter that will redirect the request to the leading scheduler.
  */
-public class LeaderRedirectFilter extends AbstractHttpFilter {
+public class LeaderRedirectFilter extends AbstractFilter {
 
   private final LeaderRedirect redirector;
 

@@ -139,7 +139,7 @@ jar {
 }
 
 dependencies {
-  def jerseyRev = '1.17.1'
+  def jerseyRev = '1.18.1'
   def log4jRev = '1.2.17'
   def slf4jRev = '1.6.1'
   def junitRev = '4.11'
@@ -197,7 +197,6 @@ dependencies {
   compile 'com.twitter.common:io:0.0.53'
   compile 'com.twitter.common:jdk-logging:0.0.44'
   compile 'com.twitter.common:logging:0.0.61'
-  compile 'com.twitter.common:net-http-filters:0.0.6'
   compile 'com.twitter.common:net-util:0.0.80'
   compile 'com.twitter.common:quantity:0.0.71'
   compile 'com.twitter.common:stats:0.0.91'

@@ -1545,6 +1545,7 @@ public class Foo {  //Should be final
     </rule>
 
 
+<!-- Empty methods in abstract classes can save implementers from boilerplate.
     <rule name="EmptyMethodInAbstractClassShouldBeAbstract"
    		language="java"
           since="4.1"
@@ -1593,6 +1594,7 @@ public abstract class ShouldBeAbstract {
 	     	]]>
     	</example>
     </rule>
+-->
 
     <rule name="SingularField"
           since="3.1"

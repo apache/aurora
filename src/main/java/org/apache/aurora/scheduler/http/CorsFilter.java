@@ -26,13 +26,12 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.HttpHeaders;
 import com.twitter.common.base.MorePreconditions;
-import com.twitter.common.net.http.filters.AbstractHttpFilter;
 
 /*
  * A filter that adds CORS headers to HTTP responses. This filter enables CORS support for a single
  * domain.
  */
-public class CorsFilter extends AbstractHttpFilter {
+public class CorsFilter extends AbstractFilter {
 
   @VisibleForTesting
   static final String ALLOWED_METHODS = Joiner.on(",")
