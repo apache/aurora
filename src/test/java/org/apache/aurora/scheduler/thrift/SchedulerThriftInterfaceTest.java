@@ -103,6 +103,7 @@ import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.SchedulerCore;
+import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
@@ -138,6 +139,7 @@ import static org.apache.aurora.gen.ResponseCode.WARNING;
 import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.killedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
@@ -159,6 +161,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final ILock LOCK = ILock.build(new Lock().setKey(LOCK_KEY.newBuilder()));
   private static final JobConfiguration CRON_JOB = makeJob().setCronSchedule("* * * * *");
   private static final Lock DEFAULT_LOCK = null;
+  private static final String TASK_ID = "task_id";
 
   private static final IResourceAggregate QUOTA =
       IResourceAggregate.build(new ResourceAggregate(10.0, 1024, 2048));
@@ -186,6 +189,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private CronPredictor cronPredictor;
   private QuotaManager quotaManager;
   private NearestFit nearestFit;
+  private StateManager stateManager;
 
   @Before
   public void setUp() throws Exception {
@@ -203,6 +207,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     cronPredictor = createMock(CronPredictor.class);
     quotaManager = createMock(QuotaManager.class);
     nearestFit = createMock(NearestFit.class);
+    stateManager = createMock(StateManager.class);
 
     // Use guice and install AuthModule to apply AOP-style auth layer.
     Module testModule = new AbstractModule() {
@@ -222,6 +227,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(IServerInfo.class).toInstance(IServerInfo.build(SERVER_INFO));
         bind(CronPredictor.class).toInstance(cronPredictor);
         bind(NearestFit.class).toInstance(nearestFit);
+        bind(StateManager.class).toInstance(stateManager);
       }
     };
     Injector injector = Guice.createInjector(testModule, new AopModule());
@@ -377,23 +383,36 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertResponse(AUTH_FAILED, thrift.createJob(makeJob(), DEFAULT_LOCK, SESSION));
   }
 
-  private static IScheduledTask buildScheduledTask(String jobName) {
+  private IScheduledTask buildScheduledTask() {
+    return buildScheduledTask(JOB_NAME, TASK_ID);
+  }
+
+  private static IScheduledTask buildScheduledTask(String jobName, String taskId) {
     return IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
+            .setTaskId(taskId)
             .setTask(new TaskConfig()
                 .setOwner(ROLE_IDENTITY)
                 .setEnvironment(DEFAULT_ENVIRONMENT)
                 .setJobName(jobName))));
   }
 
+  private void expectTransitionsToKilling() {
+    expect(stateManager.changeState(
+        TASK_ID,
+        Optional.<ScheduleStatus>absent(),
+        ScheduleStatus.KILLING,
+        killedByMessage(USER))).andReturn(true);
+  }
+
   @Test
-  public void testKillTasksImmediate() throws Exception {
+  public void testUserKillTasks() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
     expectAuth(ROOT, false);
     expectAuth(ROLE, true);
-    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME));
-    scheduler.killTasks(query, USER);
+    storageUtil.expectTaskFetch(query, buildScheduledTask());
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    expectTransitionsToKilling();
 
     control.replay();
 
@@ -401,14 +420,53 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testAdminKillTasks() throws Exception {
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
+    expectAuth(ROOT, true);
+    storageUtil.expectTaskFetch(query, buildScheduledTask());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expectTransitionsToKilling();
+
+    control.replay();
+
+    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testKillQueryActive() throws Exception {
+    Query.Builder query = Query.unscoped().byJob(JOB_KEY);
+    expectAuth(ROOT, true);
+    storageUtil.expectTaskFetch(query.active(), buildScheduledTask());
+    expect(cronJobManager.deleteJob(JOB_KEY)).andReturn(false);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expectTransitionsToKilling();
+
+    control.replay();
+
+    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testKillCronJob() throws Exception {
+    Query.Builder query = Query.jobScoped(JOB_KEY);
+    expectAuth(ROOT, true);
+    storageUtil.expectTaskFetch(query.active());
+    expect(cronJobManager.deleteJob(JOB_KEY)).andReturn(true);
+
+    control.replay();
+
+    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
   public void testKillTasksLockCheckFailed() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-    IScheduledTask task2 = buildScheduledTask("job_bar");
+    IScheduledTask task2 = buildScheduledTask("job_bar", TASK_ID);
     ILockKey key2 = ILockKey.build(LockKey.job(
         JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, "job_bar").newBuilder()));
     expectAuth(ROOT, false);
     expectAuth(ROLE, true);
-    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME), task2);
+    storageUtil.expectTaskFetch(query, buildScheduledTask(), task2);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     lockManager.validateIfLocked(key2, Optional.of(LOCK));
     expectLastCall().andThrow(new LockException("Failed lock check."));
@@ -423,7 +481,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
     expectAuth(ROOT, false);
     expectAuth(ROLE, false);
-    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME));
+    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME, TASK_ID));
 
     control.replay();
 
@@ -431,20 +489,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testAdminKillTasks() throws Exception {
-    Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-
-    expectAuth(ROOT, true);
-    scheduler.killTasks(query, USER);
-    storageUtil.expectTaskFetch(query);
-
-    control.replay();
-
-    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
-  }
-
-  @Test
-  public void testKillTasksInvalidJobname() throws Exception {
+  public void testKillTasksInvalidJobName() throws Exception {
     TaskQuery query = new TaskQuery()
         .setOwner(ROLE_IDENTITY)
         .setJobName("");
@@ -457,11 +502,26 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testKillNonExistentTasks() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
-
     expectAuth(ROOT, true);
-
-    scheduler.killTasks(query, USER);
     storageUtil.expectTaskFetch(query);
+
+    control.replay();
+
+    Response response = thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION);
+    assertOkResponse(response);
+    assertMessageMatches(response, SchedulerThriftInterface.NO_TASKS_TO_KILL_MESSAGE);
+  }
+
+  @Test
+  public void testKillAuthenticatesQueryRole() throws Exception {
+    expectAuth(ROOT, false);
+    expectAuth(ImmutableSet.of("foo", ROLE), true);
+
+    Query.Builder query = Query.roleScoped("foo").active();
+
+    storageUtil.expectTaskFetch(query, buildScheduledTask());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expectTransitionsToKilling();
 
     control.replay();
 
@@ -1499,22 +1559,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertResponse(AUTH_FAILED, thrift.snapshot(SESSION));
     assertOkResponse(thrift.snapshot(SESSION));
     assertResponse(ERROR, thrift.snapshot(SESSION));
-  }
-
-  @Test
-  public void testKillAuthenticatesQueryRole() throws Exception {
-    expectAuth(ROOT, false);
-    expectAuth(ImmutableSet.of("foo", ROLE), true);
-
-    Query.Builder query = Query.roleScoped("foo");
-
-    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME));
-    scheduler.killTasks(query, USER);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
-
-    control.replay();
-
-    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
   }
 
   @Test

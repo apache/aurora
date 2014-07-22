@@ -31,6 +31,7 @@ import org.junit.Test;
 import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.apache.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
 import static org.apache.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
+import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.isGoodIdentifier;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -71,10 +72,14 @@ public class ConfigurationManagerTest {
                       new Constraint()
                           .setName("host")
                           .setConstraint(TaskConstraint.limit(new LimitConstraint()
-                              .setLimit(1))))))
-      .setOwner(new Identity()
-          .setRole("owner-role")
-          .setUser("owner-user"));
+                              .setLimit(1))),
+                      new Constraint()
+                          .setName(DEDICATED_ATTRIBUTE)
+                          .setConstraint(TaskConstraint.value(new ValueConstraint(
+                              false, ImmutableSet.of("foo"))))))
+              .setOwner(new Identity()
+                  .setRole("owner-role")
+                  .setUser("owner-user")));
 
   @Test
   public void testIsGoodIdentifier() {

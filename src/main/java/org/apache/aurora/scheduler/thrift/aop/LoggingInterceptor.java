@@ -87,7 +87,7 @@ class LoggingInterceptor implements MethodInterceptor {
       return invocation.proceed();
     } catch (RuntimeException e) {
       LOG.log(Level.WARNING, "Uncaught exception while handling " + message, e);
-      return Util.addMessage(Util.emptyResponse(), ResponseCode.ERROR, e.getMessage());
+      return Util.addMessage(Util.emptyResponse(), ResponseCode.ERROR, e);
     }
   }
 }

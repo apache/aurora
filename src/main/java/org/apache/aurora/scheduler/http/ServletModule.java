@@ -39,10 +39,6 @@ import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 import com.twitter.thrift.ServiceInstance;
 
-import org.apache.aurora.scheduler.cron.CronJobManager;
-import org.apache.aurora.scheduler.quota.QuotaManager;
-import org.apache.aurora.scheduler.state.SchedulerCore;
-import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.mortbay.servlet.GzipFilter;
 
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;
@@ -69,11 +65,6 @@ public class ServletModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    requireBinding(SchedulerCore.class);
-    requireBinding(CronJobManager.class);
-    requireBinding(IServerInfo.class);
-    requireBinding(QuotaManager.class);
-
     // Register /api end point
     Registration.registerServlet(binder(), "/api", SchedulerAPIServlet.class, true);
 

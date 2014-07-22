@@ -19,7 +19,6 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
@@ -68,14 +67,6 @@ public interface SchedulerCore {
    * @param message Additional information about the state transition.
    */
   void setTaskStatus(String taskId, ScheduleStatus status, Optional<String> message);
-
-  /**
-   * Kills a specific set of tasks.
-   *
-   * @param query Builder for a query to identify tasks
-   * @param user Name of the user performing the kill.
-   */
-  void killTasks(Query.Builder query, String user);
 
   /**
    * Initiates a restart of shards within an active job.

@@ -57,6 +57,7 @@ import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.INIT;
+import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
@@ -200,6 +201,24 @@ public class StateManagerImplTest extends EasyMockTest {
     insertTask(task, 0);
     assertEquals(true, changeState(taskId, KILLING));
     assertEquals(false, changeState(taskId, KILLING));
+  }
+
+  @Test
+  public void testKillRunningTask() {
+    ITaskConfig task = makeTask(JIM, MY_JOB);
+    String taskId = "a";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING, KILLED);
+    driver.killTask(EasyMock.<String>anyObject());
+
+    control.replay();
+
+    insertTask(task, 0);
+    assignTask(taskId, HOST_A);
+    assertEquals(true, changeState(taskId, RUNNING));
+    assertEquals(true, changeState(taskId, KILLING));
+    assertEquals(true, changeState(taskId, KILLED));
+    assertEquals(false, changeState(taskId, KILLED));
   }
 
   @Test
@@ -394,6 +413,59 @@ public class StateManagerImplTest extends EasyMockTest {
     stateManager.deleteTasks(ImmutableSet.of(taskId));
   }
 
+  @Test
+  public void testPortResource() throws Exception {
+    Set<String> requestedPorts = ImmutableSet.of("one", "two", "three");
+    ITaskConfig task = ITaskConfig.build(makeTask(JIM, MY_JOB).newBuilder()
+        .setRequestedPorts(requestedPorts));
+
+    String taskId = "a";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED);
+
+    control.replay();
+
+    insertTask(task, 0);
+    assignTask(taskId, HOST_A, ImmutableSet.of(80, 81, 82));
+
+    IScheduledTask actual = Iterables.getOnlyElement(
+        Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId)));
+
+    assertEquals(
+        requestedPorts,
+        actual.getAssignedTask().getTask().getRequestedPorts());
+  }
+
+  @Test
+  public void testPortResourceResetAfterReschedule() throws Exception {
+    Set<String> requestedPorts = ImmutableSet.of("one");
+    ITaskConfig task = ITaskConfig.build(makeTask(JIM, MY_JOB).newBuilder()
+        .setRequestedPorts(requestedPorts));
+
+    String taskId = "a";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, LOST);
+
+    String newTaskId = "b";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(newTaskId);
+    expectStateTransitions(newTaskId, INIT, PENDING, ASSIGNED);
+    noFlappingPenalty();
+
+    control.replay();
+
+    insertTask(task, 0);
+    assignTask(taskId, HOST_A, ImmutableSet.of(80));
+    changeState(taskId, RUNNING);
+    changeState(taskId, LOST);
+
+    assignTask(newTaskId, HOST_A, ImmutableSet.of(86));
+
+    IScheduledTask actual = Iterables.getOnlyElement(
+        Storage.Util.consistentFetchTasks(storage, Query.taskScoped(newTaskId)));
+
+    assertEquals(ImmutableMap.of("one", 86), actual.getAssignedTask().getAssignedPorts());
+  }
+
   private void expectStateTransitions(
       String taskId,
       ScheduleStatus initial,
@@ -437,7 +509,10 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   private void assignTask(String taskId, String host) {
-    stateManager.assignTask(taskId, host, SlaveID.newBuilder().setValue(host).build(),
-        ImmutableSet.<Integer>of());
+    assignTask(taskId, host, ImmutableSet.<Integer>of());
+  }
+
+  private void assignTask(String taskId, String host, Set<Integer> ports) {
+    stateManager.assignTask(taskId, host, SlaveID.newBuilder().setValue(host).build(), ports);
   }
 }

@@ -23,7 +23,6 @@ import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.twitter.common.args.Arg;
@@ -52,9 +51,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
-import static org.apache.aurora.scheduler.base.Tasks.ACTIVE_STATES;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 
 /**
@@ -212,42 +209,6 @@ class SchedulerCoreImpl implements SchedulerCore {
     requireNonNull(status);
 
     stateManager.changeState(taskId, Optional.<ScheduleStatus>absent(), status, message);
-  }
-
-  @Override
-  public synchronized void killTasks(Query.Builder query, final String user) {
-
-    requireNonNull(query);
-    LOG.info("Killing tasks matching " + query);
-
-    if (Query.isSingleJobScoped(query)) {
-      // If this looks like a query for all tasks in a job, instruct the cron scheduler to delete
-      // it.
-      // TODO(maxim): Should be trivial to support killing multiple jobs instead.
-      // TODO(mchucarroll): deprecate cron as a part of create/kill job.  (AURORA-454)
-      IJobKey jobKey = Iterables.getOnlyElement(JobKeys.from(query).get());
-      LOG.warning("Deprecated behavior: descheduling job " + jobKey
-          + " with cron via killTasks. (See AURORA-454)");
-      cronJobManager.deleteJob(jobKey);
-    }
-
-    // Unless statuses were specifically supplied, only attempt to kill active tasks.
-    final Query.Builder taskQuery = query.get().isSetStatuses()
-        ? query.byStatus(ACTIVE_STATES)
-        : query;
-
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        for (String taskId : Tasks.ids(storeProvider.getTaskStore().fetchTasks(taskQuery))) {
-          stateManager.changeState(
-              taskId,
-              Optional.<ScheduleStatus>absent(),
-              KILLING,
-              Optional.of("Killed by " + user));
-        }
-      }
-    });
   }
 
   @Override
