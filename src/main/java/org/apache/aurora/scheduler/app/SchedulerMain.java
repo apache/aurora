@@ -20,6 +20,7 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
@@ -53,7 +54,6 @@ import org.apache.aurora.scheduler.DriverFactory.DriverFactoryImpl;
 import org.apache.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
-import org.apache.aurora.scheduler.local.IsolatedSchedulerModule;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.db.DbModule;
@@ -72,10 +72,6 @@ import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 public class SchedulerMain extends AbstractApplication {
 
   private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
-
-  @CmdLine(name = "testing_isolated_scheduler",
-      help = "If true, run in a testing mode with the scheduler isolated from other components.")
-  private static final Arg<Boolean> ISOLATED_SCHEDULER = Arg.create(false);
 
   @NotNull
   @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
@@ -116,14 +112,6 @@ public class SchedulerMain extends AbstractApplication {
   @Inject private Lifecycle appLifecycle;
   @Inject private Optional<RootLogConfig.Configuration> glogConfig;
 
-  private static Iterable<? extends Module> getSystemModules() {
-    return ImmutableList.of(
-        new LogModule(),
-        new HttpModule(),
-        new StatsModule()
-    );
-  }
-
   private static Iterable<? extends Module> getExtraModules() {
     Builder<Module> modules = ImmutableList.builder();
     modules.add(Modules.wrapInPrivateModule(AUTH_MODULE.get(), AUTH_MODULE_CLASSES));
@@ -135,6 +123,7 @@ public class SchedulerMain extends AbstractApplication {
     return modules.build();
   }
 
+  @VisibleForTesting
   static Iterable<? extends Module> getModules(
       String clusterName,
       String serverSetPath,
@@ -142,7 +131,9 @@ public class SchedulerMain extends AbstractApplication {
       String statsURLPrefix) {
 
     return ImmutableList.<Module>builder()
-        .addAll(getSystemModules())
+        .add(new LogModule())
+        .add(new HttpModule())
+        .add(new StatsModule())
         .add(new AppModule(clusterName, serverSetPath, zkClientConfig, statsURLPrefix))
         .addAll(getExtraModules())
         .add(new LogStorageModule())
@@ -160,21 +151,16 @@ public class SchedulerMain extends AbstractApplication {
 
   @Override
   public Iterable<? extends Module> getModules() {
-    Module additional;
     final ClientConfig zkClientConfig = FlaggedClientConfig.create();
-    if (ISOLATED_SCHEDULER.get()) {
-      additional = new IsolatedSchedulerModule();
-    } else {
       // TODO(Kevin Sweeney): Push these bindings down into a "production" module.
-      additional = new AbstractModule() {
-        @Override
-        protected void configure() {
-          bind(DriverFactory.class).to(DriverFactoryImpl.class);
-          bind(DriverFactoryImpl.class).in(Singleton.class);
-          install(new MesosLogStreamModule(zkClientConfig));
-        }
-      };
-    }
+    Module additional = new AbstractModule() {
+      @Override
+      protected void configure() {
+        bind(DriverFactory.class).to(DriverFactoryImpl.class);
+        bind(DriverFactoryImpl.class).in(Singleton.class);
+        install(new MesosLogStreamModule(zkClientConfig));
+      }
+    };
 
     Module configModule = new AbstractModule() {
       @Override

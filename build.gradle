@@ -452,29 +452,6 @@ idea {
 applicationName = 'aurora-scheduler'
 mainClassName = 'org.apache.aurora.scheduler.app.SchedulerMain'
 
-// Run a local scheduler with a local log file and fake jobs
-run {
-  classpath += sourceSets.generated.output
-  args = [
-    '-thermos_executor_path=/dev/null',
-    '-gc_executor_path=/dev/null',
-    '-http_port=8081',
-    '-zk_in_proc=true',
-    '-zk_endpoints=localhost:0',
-    '-serverset_path=/twitter/service/mesos/local/scheduler',
-    '-mesos_master_address=local',
-    '-cluster_name=local',
-    '-log_dir=/tmp',
-    '-backup_dir=/tmp',
-    '-logtostderr',
-    '-vlog=INFO',
-    '-testing_isolated_scheduler=true',
-    '-testing_log_file_path=/tmp/testing_log_file',
-    '-viz_job_url_prefix=http://fake_viz_domain.com/stats?',
-    '-enable_cors_support'
-  ]
-}
-
 tasks.withType(nl.javadude.gradle.plugins.license.License).each { licenseTask ->
   licenseTask.setSource files("$projectDir/src/main/java", "$projectDir/src/test/java")
 }
