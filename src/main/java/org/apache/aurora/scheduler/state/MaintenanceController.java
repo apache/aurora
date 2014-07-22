@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.state;
 
 import java.util.Set;
+import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
@@ -101,6 +102,7 @@ public interface MaintenanceController {
   Set<HostStatus> endMaintenance(Set<String> hosts);
 
   class MaintenanceControllerImpl implements MaintenanceController, EventSubscriber {
+    private static final Logger LOG = Logger.getLogger(MaintenanceControllerImpl.class.getName());
     private final Storage storage;
     private final StateManager stateManager;
     private final EventSink eventSink;
@@ -117,6 +119,7 @@ public interface MaintenanceController {
     }
 
     private Set<HostStatus> watchDrainingTasks(MutableStoreProvider store, Set<String> hosts) {
+      LOG.info("Hosts to drain: " + hosts);
       Set<String> emptyHosts = Sets.newHashSet();
       for (String host : hosts) {
         // If there are no tasks on the host, immediately transition to DRAINED.
@@ -125,8 +128,10 @@ public interface MaintenanceController {
             .transform(Tasks.SCHEDULED_TO_ID)
             .toSet();
         if (activeTasks.isEmpty()) {
+          LOG.info("No tasks to drain for host: " + host);
           emptyHosts.add(host);
         } else {
+          LOG.info(String.format("Draining tasks: %s on host: %s", activeTasks, host));
           for (String taskId : activeTasks) {
             stateManager.changeState(
                 taskId,

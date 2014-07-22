@@ -128,12 +128,13 @@ class HostMaintenance(object):
       sla_duration.as_(Time.SECONDS),
       grouping_function)
 
+    unsafe_hostnames = set()
     # Given that maintenance is performed 1 group at a time, any result longer than 1 group
     # should be considered a batch failure.
     if host_groups:
       if len(host_groups) > 1:
         log.error('Illegal multiple groups detected in SLA results. Skipping hosts: %s' % hostnames)
-        return False
+        return set(hostnames)
 
       results, unsafe_hostnames = format_sla_results(host_groups, unsafe_only=True)
       if results:

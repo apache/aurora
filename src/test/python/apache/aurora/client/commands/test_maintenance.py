@@ -229,6 +229,91 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
         mock_scheduler_proxy.startMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
         assert mock_scheduler_proxy.endMaintenance.call_count == len(self.HOSTNAMES)
 
+  def test_perform_maintenance_hosts_no_prod_tasks(self):
+    mock_options = self.make_mock_options()
+    mock_options.post_drain_script = None
+    mock_options.grouping = 'by_host'
+
+    def host_status_results(hostnames):
+      if isinstance(hostnames, Hosts):
+        return self.create_drained_status_result(hostnames)
+      return self.create_maintenance_status_result()
+
+    mock_api, mock_scheduler_proxy = self.create_mock_api()
+    mock_scheduler_proxy.endMaintenance.return_value = self.create_end_maintenance_result()
+    mock_scheduler_proxy.maintenanceStatus.side_effect = host_status_results
+    mock_scheduler_proxy.startMaintenance.return_value = self.create_start_maintenance_result()
+    mock_scheduler_proxy.drainHosts.return_value = self.create_start_maintenance_result()
+
+    def create_empty_sla_results():
+      mock_vector = Mock()
+      mock_vector.probe_hosts.return_value = []
+      return mock_vector
+
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
+              return_value=create_empty_sla_results()),
+        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('twitter.common.app.get_options', return_value=mock_options)) as (
+            mock_sleep,
+            mock_scheduler_proxy_class,
+            mock_vector_class,
+            mock_clusters_maintenancepatch,
+            options):
+
+      perform_maintenance_hosts([self.TEST_CLUSTER])
+
+      mock_scheduler_proxy.startMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
+      assert mock_sleep.call_count == 3
+      assert mock_scheduler_proxy.maintenanceStatus.call_count == 6
+      assert mock_scheduler_proxy.drainHosts.call_count == 3
+      assert mock_scheduler_proxy.endMaintenance.call_count == 3
+
+  def test_perform_maintenance_hosts_multiple_sla_groups_failure(self):
+    mock_options = self.make_mock_options()
+    mock_options.post_drain_script = None
+    mock_options.grouping = 'by_host'
+    mock_options.unsafe_hosts_filename = None
+
+    def host_status_results(hostnames):
+      if isinstance(hostnames, Hosts):
+        return self.create_drained_status_result(hostnames)
+      return self.create_maintenance_status_result()
+
+    mock_api, mock_scheduler_proxy = self.create_mock_api()
+    mock_scheduler_proxy.endMaintenance.return_value = self.create_end_maintenance_result()
+    mock_scheduler_proxy.maintenanceStatus.side_effect = host_status_results
+    mock_scheduler_proxy.startMaintenance.return_value = self.create_start_maintenance_result()
+    mock_scheduler_proxy.drainHosts.return_value = self.create_start_maintenance_result()
+
+    def create_multiple_sla_results():
+      mock_vector = Mock()
+      mock_vector.probe_hosts.return_value = self.HOSTNAMES
+      return mock_vector
+
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
+              return_value=create_multiple_sla_results()),
+        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('twitter.common.app.get_options', return_value=mock_options)) as (
+            mock_sleep,
+            mock_scheduler_proxy_class,
+            mock_vector_class,
+            mock_clusters_maintenancepatch,
+            options):
+
+      perform_maintenance_hosts([self.TEST_CLUSTER])
+
+      mock_scheduler_proxy.startMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
+      assert mock_sleep.call_count == 0
+      assert mock_scheduler_proxy.maintenanceStatus.call_count == 3
+      assert mock_scheduler_proxy.drainHosts.call_count == 0
+      assert mock_scheduler_proxy.endMaintenance.call_count == 3
+
   def test_perform_maintenance_hosts_reason_missing(self):
     mock_options = self.make_mock_options()
     mock_options.grouping = 'by_host'
