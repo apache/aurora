@@ -1,17 +1,19 @@
 Aurora User Guide
 -----------------
 
-- [Overview](#overview)
-- [Job Lifecycle](#job-lifecycle)
-  - [Life Of A Task](#life-of-a-task)
-  - [PENDING to RUNNING states](#pending-to-running-states)
-  - [Task Updates](#task-updates)
-  - [Giving Priority to Production Tasks: PREEMPTING](#giving-priority-to-production-tasks-preempting)
-  - [Natural Termination: FINISHED, FAILED](#natural-termination-finished-failed)
-  - [Forceful Termination: KILLING, RESTARTING](#forceful-termination-killing-restarting)
-- [Configuration](#configuration)
-- [Creating Jobs](#creating-jobs)
-- [Interacting With Jobs](#interacting-with-jobs)
+- [Overview](#user-content-overview)
+- [Job Lifecycle](#user-content-job-lifecycle)
+	- [Life Of A Task](#user-content-life-of-a-task)
+	- [PENDING to RUNNING states](#user-content-pending-to-running-states)
+	- [Task Updates](#user-content-task-updates)
+	- [HTTP Health Checking and Graceful Shutdown](#user-content-http-health-checking-and-graceful-shutdown)
+		- [Tearing a task down](#user-content-tearing-a-task-down)
+	- [Giving Priority to Production Tasks: PREEMPTING](#user-content-giving-priority-to-production-tasks-preempting)
+	- [Natural Termination: FINISHED, FAILED](#user-content-natural-termination-finished-failed)
+	- [Forceful Termination: KILLING, RESTARTING](#user-content-forceful-termination-killing-restarting)
+- [Configuration](#user-content-configuration)
+- [Creating Jobs](#user-content-creating-jobs)
+- [Interacting With Jobs](#user-content-interacting-with-jobs)
 
 Overview
 --------
@@ -107,9 +109,6 @@ When Aurora reads a configuration file and finds a `Job` definition, it:
 4.  The scheduler puts the `Task`s into `PENDING` state, starting each
     `Task`'s life cycle.
 
-**Note**: It is not currently possible to create an Aurora job from
-within an Aurora job.
-
 ### Life Of A Task
 
 ![Life of a task](images/lifeofatask.png)
@@ -185,6 +184,50 @@ update sequence, but in reverse order. New instance configs are swapped
 with old instance configs and batch updates proceed backwards
 from the point where the update failed. E.g.; (0,1,2) (3,4,5) (6,7,
 8-FAIL) results in a rollback in order (8,7,6) (5,4,3) (2,1,0).
+
+### HTTP Health Checking and Graceful Shutdown
+
+The Executor implements a protocol for rudimentary control of a task via HTTP.  Tasks subscribe for
+this protocol by declaring a port named `health`.  Take for example this configuration snippet:
+
+    nginx = Process(
+      name = 'nginx',
+      cmdline = './run_nginx.sh -port {{thermos.ports[http]}}')
+
+When this Process is included in a job, the job will be allocated a port, and the command line
+will be replaced with something like:
+
+    ./run_nginx.sh -port 42816
+
+Where 42816 happens to be the allocated. port.  Typically, the Executor monitors Processes within
+a task only by liveness of the forked process.  However, when a `health` port was allocated, it will
+also send periodic HTTP health checks.  A task requesting a `health` port must handle the following
+requests:
+
+| HTTP request            | Description                             |
+| ------------            | -----------                             |
+| `GET /health`           | Inquires whether the task is healthy.   |
+| `POST /quitquitquit`    | Task should initiate graceful shutdown. |
+| `POST /abortabortabort` | Final warning task is being killed.     |
+
+Please see the
+[configuration reference](configuration-reference.md#user-content-healthcheckconfig-objects) for
+configuration options for this feature.
+
+#### Tearing a task down
+
+The Executor follows an escalation sequence when killing a running task:
+
+  1. If `health` port is not present, skip to (5)
+  2. POST /quitquitquit
+  3. wait 5 seconds
+  4. POST /abortabortabort
+  5. Send SIGTERM (`kill`)
+  6. Send SIGKILL (`kill -9`)
+
+If the Executor notices that all Processes in a Task have aborted during this sequence, it will
+not proceed with subsequent steps.  Note that graceful shutdown is best-effort, and due to the many
+inevitable realities of distributed systems, it may not be performed.
 
 ### Giving Priority to Production Tasks: PREEMPTING
 
