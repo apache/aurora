@@ -12,8 +12,9 @@
 # limitations under the License.
 #
 
+from optparse import OptionParser
+
 import pytest
-from twitter.common import options
 
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.cluster_option import ClusterOption
@@ -43,18 +44,37 @@ def test_constructors():
     ClusterOption('--cluster', clusters=CLUSTER_LIST, cluster_provider=cluster_provider)
 
 
-def test_parsable(capsys):
-  parser = options.parser().options((
-    ClusterOption('--source_cluster', '-s', clusters=CLUSTER_LIST),
-    ClusterOption('--dest_cluster', clusters=CLUSTER_LIST),
-    ClusterOption('--cluster', cluster_provider=cluster_provider)))
+class MockOptionParser(OptionParser):
+  class Error(Exception): pass
 
-  values, _ = parser.parse(['--source_cluster=smf1-test', '--cluster=smf1-test'])
+  def error(self, msg):
+    # per optparse documentation:
+    # Print a usage message incorporating 'msg' to stderr and exit.
+    # If you override this in a subclass, it should not return -- it
+    # should either exit or raise an exception.
+    raise self.Error(msg)
+
+
+def make_parser():
+  parser = MockOptionParser()
+  parser.add_option(ClusterOption('--source_cluster', '-s', clusters=CLUSTER_LIST))
+  parser.add_option(ClusterOption('--dest_cluster', clusters=CLUSTER_LIST))
+  parser.add_option(ClusterOption('--cluster', cluster_provider=cluster_provider))
+  return parser
+
+
+def test_parsable():
+  parser = make_parser()
+  values, _ = parser.parse_args(['--source_cluster=smf1-test', '--cluster=smf1-test'])
   assert isinstance(values.source_cluster, Cluster)
   assert isinstance(values.cluster, Cluster)
 
-  with pytest.raises(SystemExit):
-    parser.parse(['--source_cluster=borg'])
 
-  out, err = capsys.readouterr()
-  assert 'error: borg is not a valid cluster for the --source_cluster option.' in err
+def test_not_parsable():
+  parser = make_parser()
+  try:
+    parser.parse_args(['--source_cluster=borg'])
+  except MockOptionParser.Error as e:
+    assert 'borg is not a valid cluster for the --source_cluster option.' in e.args[0]
+  else:
+    assert False, 'Expected OptionParser to raise on invalid cluster list.'

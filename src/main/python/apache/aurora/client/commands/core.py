@@ -64,6 +64,7 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME, CURRENT_API_VERSION
 from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
 
+
 class CoreCommandHook(object):
   """Limited version of the command hooks framework ported to clientv1 commands.
   Core command hooks can only be created by invoking "CoreCommandHook.register_hook"
