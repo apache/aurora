@@ -17,7 +17,7 @@ import contextlib
 from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.commands.core import kill, killall
+from apache.aurora.client.commands.core import CoreCommandHook, kill, killall
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
@@ -185,6 +185,97 @@ class TestClientKillCommand(AuroraClientCommandTest):
         AuroraJobKey(cluster=self.TEST_CLUSTER, role=self.TEST_ROLE, env=self.TEST_ENV,
             name=self.TEST_JOB), None, config=mock_config)
       self.assert_scheduler_called(mock_api, self.get_expected_task_query(), 3)
+
+  def test_happy_hook(self):
+    """Test that hooks that return 0 don't block command execution"""
+
+    class HappyHook(CoreCommandHook):
+      @property
+      def name(self):
+        return "I'm so happy"
+
+      def execute(self, cmd, options, *args, **kwargs):
+        return 0
+
+    CoreCommandHook.register_hook(HappyHook())
+
+
+    mock_options = self.setup_mock_options()
+    mock_config = Mock()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_api.kill_job.return_value = self.get_kill_job_response()
+    mock_scheduler_proxy.killTasks.return_value = self.get_kill_job_response()
+    mock_query_results = [
+        self.create_mock_status_query_result(ScheduleStatus.RUNNING),
+        self.create_mock_status_query_result(ScheduleStatus.KILLING),
+        self.create_mock_status_query_result(ScheduleStatus.KILLED),
+    ]
+    mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = mock_query_results
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.commands.core.make_client',
+            return_value=mock_api),
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
+            sleep,
+            mock_make_client,
+            options,
+            mock_get_job_config):
+
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        killall(['west/mchucarroll/test/hello', fp.name], mock_options)
+
+      # Now check that the right API calls got made.
+      self.assert_kill_job_called(mock_api)
+      mock_api.kill_job.assert_called_with(
+        AuroraJobKey(cluster=self.TEST_CLUSTER, role=self.TEST_ROLE, env=self.TEST_ENV,
+            name=self.TEST_JOB), None, config=mock_config)
+      self.assert_scheduler_called(mock_api, self.get_expected_task_query(), 3)
+      CoreCommandHook.clear_hooks()
+
+
+
+  def test_hook_aborts_kill(self):
+    """Test that a command hook that returns non-zero does block command execution."""
+    class FailingKillHook(CoreCommandHook):
+      @property
+      def name(self):
+        return "failure"
+
+      def execute(self, cmd, options, *args, **kwargs):
+        if cmd == "killall":
+          assert args[0] == 'west/mchucarroll/test/hello'
+          return 1
+        else:
+          return 0
+
+    CoreCommandHook.register_hook(FailingKillHook())
+
+    mock_options = self.setup_mock_options()
+    mock_config = Mock()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.commands.core.make_client',
+            return_value=mock_api),
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
+            sleep,
+            mock_make_client,
+            options,
+            mock_get_job_config):
+
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        self.assertRaises(SystemExit, killall, ['west/mchucarroll/test/hello', fp.name], mock_options)
+
+      CoreCommandHook.clear_hooks()
+      mock_api.kill_job.call_count == 0
+
+
 
   def create_status_call_result(cls):
     """Set up the mock status call that will be used to get a task list for

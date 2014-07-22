@@ -64,6 +64,50 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME, CURRENT_API_VERSION
 from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
 
+class CoreCommandHook(object):
+  """Limited version of the command hooks framework ported to clientv1 commands.
+  Core command hooks can only be created by invoking "CoreCommandHook.register_hook"
+  in a module compiled into the aurora client executable.
+  Core command hooks are currently only supported for the following commands:
+     create, kill, killall, restart, start_cron, update, cancel_update
+  """
+
+  def execute(self, cmd, options, *args, **kwargs):
+    """
+    :param cmd: the command being invoked
+    :param options: the options object created by processing command line options
+    :param args: all other positional arguments taken by the command.
+    :param kwargs: all other keyword argumetns taken by the command.
+
+    This is invoked by each core client command before the command is executed, *after* options
+    are parsed. If this returns non-zero, the command execution will be aborted and the return
+    code of this method will be used as the exit code. To make a hook work with a specific
+    command, hook implementors should check the "cmd" parameter.
+    """
+    pass
+
+  ALL_HOOKS = []
+
+  @property
+  def name(self):
+    pass
+
+  @classmethod
+  def register_hook(cls, hook):
+    cls.ALL_HOOKS.append(hook)
+
+  @classmethod
+  def clear_hooks(cls):
+    cls.ALL_HOOKS = []
+
+  @classmethod
+  def run_hooks(cls, cmd, options, *args, **kwargs):
+    for hook in cls.ALL_HOOKS:
+      result = hook.execute(cmd, options, *args, **kwargs)
+      if result != 0:
+        print("Command execution aborted by hook %s" % hook.name)
+        exit(result)
+
 
 def get_job_config(job_spec, config_file, options):
   try:
@@ -143,6 +187,7 @@ def create(job_spec, config_file):
   Creates a job based on a configuration file.
   """
   options = app.get_options()
+  CoreCommandHook.run_hooks("create", options, job_spec, config_file)
   maybe_disable_hooks(options)
   try:
     config = get_job_config(job_spec, config_file, options)
@@ -174,6 +219,7 @@ def diff(job_spec, config_file):
   By default the diff will be displayed using 'diff', though you may choose an alternate
   diff program by specifying the DIFF_VIEWER environment variable."""
   options = app.get_options()
+
   config = get_job_config(job_spec, config_file, options)
   if options.rename_from:
     cluster, role, env, name = options.rename_from
@@ -333,6 +379,7 @@ def start_cron(args, options):
   Invokes a cron job immediately, out of its normal cron cycle.
   This does not affect the cron cycle in any way.
   """
+  CoreCommandHook.run_hooks("start_cron", options, *args)
   maybe_disable_hooks(options)
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())
@@ -405,6 +452,7 @@ def kill(args, options):
   Kills a group of tasks in a running job, blocking until all specified tasks have terminated.
 
   """
+  CoreCommandHook.run_hooks("kill", options, *args)
   maybe_disable_hooks(options)
   if options.shards is None:
     print('Shards option is required for kill; use killall to kill all shards', file=sys.stderr)
@@ -472,6 +520,7 @@ def killall(args, options):
   """usage: killall cluster/role/env/job
   Kills all tasks in a running job, blocking until all specified tasks have been terminated.
   """
+  CoreCommandHook.run_hooks("killall", options, *args)
   maybe_disable_hooks(options)
   job_key = AuroraJobKey.from_path(args[0])
   config_file = args[1] if len(args) > 1 else None  # the config for hooks
@@ -601,6 +650,7 @@ def update(job_spec, config_file):
       time.sleep(5)
 
   options = app.get_options()
+  CoreCommandHook.run_hooks("update", options, job_spec, config_file)
   maybe_disable_hooks(options)
   config = get_job_config(job_spec, config_file, options)
   api = make_client(config.cluster())
@@ -663,6 +713,7 @@ def restart(args, options):
 
   Restarts are fully controlled client-side, so aborting halts the restart.
   """
+  CoreCommandHook.run_hooks("restart", options, *args)
   if options.max_total_failures < 0:
     print("max_total_failures option must be >0, but you specified %s" % options.max_total_failures,
       file=sys.stderr)
@@ -693,6 +744,7 @@ def cancel_update(args, options):
   or if another user is actively updating the job.  This command should only
   be used when the user is confident that they are not conflicting with another user.
   """
+  CoreCommandHook.run_hooks("cancel_update", options, *args)
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
