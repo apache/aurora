@@ -100,7 +100,7 @@ public class ServletModule extends AbstractModule {
         bind(HttpStatsFilter.class).in(Singleton.class);
         filter("/scheduler*").through(HttpStatsFilter.class);
         bind(LeaderRedirectFilter.class).in(Singleton.class);
-        filter("/scheduler").through(LeaderRedirectFilter.class);
+        filterRegex("/scheduler(?:/.*)?").through(LeaderRedirectFilter.class);
 
         // Add CORS support for all /api end points.
         if (ENABLE_CORS_SUPPORT.get()) {

@@ -70,11 +70,11 @@ public class TaskGroups implements EventSubscriber {
   private final BackoffStrategy backoff;
   private final RescheduleCalculator rescheduleCalculator;
 
-  static class TaskGroupsSettings {
+  public static class TaskGroupsSettings {
     private final BackoffStrategy taskGroupBackoff;
     private final RateLimiter rateLimiter;
 
-    TaskGroupsSettings(BackoffStrategy taskGroupBackoff, RateLimiter rateLimiter) {
+    public TaskGroupsSettings(BackoffStrategy taskGroupBackoff, RateLimiter rateLimiter) {
       this.taskGroupBackoff = requireNonNull(taskGroupBackoff);
       this.rateLimiter = requireNonNull(rateLimiter);
     }

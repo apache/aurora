@@ -70,7 +70,7 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 /**
  * Enables scheduling and preemption of tasks.
  */
-interface TaskScheduler extends EventSubscriber {
+public interface TaskScheduler extends EventSubscriber {
 
   /**
    * Attempts to schedule a task, possibly performing irreversible actions.
