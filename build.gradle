@@ -495,15 +495,6 @@ jacocoTestReport {
   }
 }
 
-// Output jacoco details needed by the jacoco jenkins plugin.
-test {
-  jacoco {
-    append = false
-    destinationFile = file("$buildDir/reports/jacoco/jacoco.exec")
-    classDumpFile = file("$buildDir/reports/jacoco/classes")
-  }
-}
-
 test.finalizedBy jacocoTestReport
 
 task FlagSchemaChanges(type: Test) << {
