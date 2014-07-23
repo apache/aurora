@@ -75,11 +75,11 @@ class FailureThreshold(object):
 
     return exceeded_failure_count_instances
 
-  def is_failed_update(self):
+  def is_failed_update(self, log_errors=True):
     total_failed_instances = self._exceeded_instance_fail_count()
     is_failed = total_failed_instances > self._max_total_failures
 
-    if is_failed:
+    if is_failed and log_errors:
       log.error('%s failed instances observed, maximum allowed is %s' % (total_failed_instances,
           self._max_total_failures))
       for instance, failure_count in self._failures_by_instance.items():

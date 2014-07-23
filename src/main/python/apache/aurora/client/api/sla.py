@@ -16,7 +16,9 @@ import math
 import time
 from collections import defaultdict, namedtuple
 
-from apache.aurora.client.base import DEFAULT_GROUPING, group_hosts, log_response
+from twitter.common import log
+
+from apache.aurora.client.base import DEFAULT_GROUPING, format_response, group_hosts
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.constants import LIVE_STATES
@@ -323,7 +325,7 @@ class Sla(object):
 
   def _get_tasks(self, task_query):
     resp = self._scheduler.getTasksWithoutConfigs(task_query)
-    log_response(resp)
+    log.info(format_response(resp))
     if resp.responseCode != ResponseCode.OK:
       return []
     return resp.result.scheduleStatusResult.tasks

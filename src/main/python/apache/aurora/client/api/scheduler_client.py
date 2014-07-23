@@ -204,6 +204,8 @@ class SchedulerProxy(object):
     self._session_key_factory = session_key_factory
     self._client = self._scheduler_client = None
     self.verbose = verbose
+    self._lock = threading.RLock()
+    self._terminating = threading.Event()
 
   def with_scheduler(method):
     """Decorator magic to make sure a connection is made to the scheduler"""
@@ -215,6 +217,11 @@ class SchedulerProxy(object):
 
   def invalidate(self):
     self._client = self._scheduler_client = None
+
+  def terminate(self):
+    """Requests immediate termination of any retry attempts and invalidates client."""
+    self._terminating.set()
+    self.invalidate()
 
   @with_scheduler
   def client(self):
@@ -268,24 +275,30 @@ class SchedulerProxy(object):
 
     @functools.wraps(method)
     def method_wrapper(*args):
-      start = time.time()
-      while (time.time() - start) < self.RPC_MAXIMUM_WAIT.as_(Time.SECONDS):
-        auth_args = () if method_name in self.UNAUTHENTICATED_RPCS else (self.session_key(),)
-        try:
-          method = getattr(self.client(), method_name)
-          if not callable(method):
-            return method
-          return method(*(args + auth_args))
-        except (TTransport.TTransportException, self.TimeoutError) as e:
-          log.warning('Connection error with scheduler: %s, reconnecting...' % e)
-          self.invalidate()
-          time.sleep(self.RPC_RETRY_INTERVAL.as_(Time.SECONDS))
-        except Exception as e:
-          # Take any error that occurs during the RPC call, and transform it
-          # into something clients can handle.
-          raise self.ThriftInternalError("Error during thrift call %s to %s: %s" %
-              (method_name, self.cluster.name, e))
-      raise self.TimeoutError('Timed out attempting to issue %s to %s' % (
-          method_name, self.cluster.name))
+      with self._lock:
+        start = time.time()
+        while not self._terminating.is_set() and (
+            time.time() - start) < self.RPC_MAXIMUM_WAIT.as_(Time.SECONDS):
+
+          auth_args = () if method_name in self.UNAUTHENTICATED_RPCS else (self.session_key(),)
+          try:
+            method = getattr(self.client(), method_name)
+            if not callable(method):
+              return method
+            return method(*(args + auth_args))
+          except (TTransport.TTransportException, self.TimeoutError) as e:
+            if not self._terminating:
+              log.warning('Connection error with scheduler: %s, reconnecting...' % e)
+              self.invalidate()
+              self._terminating.wait(self.RPC_RETRY_INTERVAL.as_(Time.SECONDS))
+          except Exception as e:
+            # Take any error that occurs during the RPC call, and transform it
+            # into something clients can handle.
+            if not self._terminating:
+              raise self.ThriftInternalError("Error during thrift call %s to %s: %s" %
+                                            (method_name, self.cluster.name, e))
+        if not self._terminating:
+          raise self.TimeoutError('Timed out attempting to issue %s to %s' % (
+              method_name, self.cluster.name))
 
     return method_wrapper

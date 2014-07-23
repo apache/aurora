@@ -12,6 +12,8 @@
 # limitations under the License.
 #
 
+from threading import Event, RLock
+
 from apache.aurora.client.api.scheduler_client import SchedulerProxy
 
 
@@ -20,9 +22,14 @@ class FakeSchedulerProxy(SchedulerProxy):
     self._cluster = cluster
     self._scheduler = scheduler
     self._session_key = session_key
+    self._lock = RLock()
+    self._terminating = Event()
 
   def client(self):
     return self._scheduler
 
   def session_key(self):
     return self._session_key
+
+  def terminate(self):
+    return self._terminating.set()

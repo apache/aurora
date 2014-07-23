@@ -22,6 +22,7 @@ from pytest import raises
 from apache.aurora.client.api.instance_watcher import InstanceWatcher
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck
+from apache.aurora.client.api.scheduler_mux import SchedulerMux
 from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -38,6 +39,7 @@ from gen.apache.aurora.api.ttypes import (
     JobConfiguration,
     JobKey,
     LimitConstraint,
+    Lock,
     LockKey,
     LockValidation,
     Metadata,
@@ -102,15 +104,32 @@ class FakeConfig(object):
     return self.job_config.instanceCount
 
 
+class FakeSchedulerMux(object):
+  def __init__(self):
+    self._raise_error = False
+
+  def enqueue_and_wait(self, command, data, timeout=None):
+    command([data])
+    if self._raise_error:
+      raise SchedulerMux.Error("expected")
+
+  def terminate(self):
+    pass
+
+  def raise_error(self):
+    self._raise_error = True
+
+
 class UpdaterTest(TestCase):
   UPDATE_CONFIG = {
-    'batch_size': 3,
+    'batch_size': 1,
     'restart_threshold': 50,
     'watch_secs': 50,
     'max_per_shard_failures': 0,
     'max_total_failures': 0,
     'rollback_on_failure': True,
   }
+
 
   def setUp(self):
     self._role = 'mesos'
@@ -121,6 +140,7 @@ class UpdaterTest(TestCase):
     self._lock = 'test_lock'
     self._instance_watcher = MockObject(InstanceWatcher)
     self._job_monitor = MockObject(JobMonitor)
+    self._scheduler_mux = FakeSchedulerMux()
     self._scheduler = MockObject(scheduler_client)
     self._scheduler_proxy = FakeSchedulerProxy('test-cluster', self._scheduler, self._session_key)
     self._quota_check = MockObject(QuotaCheck)
@@ -149,10 +169,17 @@ class UpdaterTest(TestCase):
         self._scheduler_proxy,
         self._instance_watcher,
         self._quota_check,
-        self._job_monitor)
+        self._job_monitor,
+        self._scheduler_mux)
+
+  def expect_terminate(self):
+    self._job_monitor.terminate()
+    self._instance_watcher.terminate()
 
   def expect_watch_instances(self, instance_ids, failed_instances=[]):
-    self._instance_watcher.watch(instance_ids).AndReturn(set(failed_instances))
+    for i in instance_ids:
+      failed = [i] if i in failed_instances else []
+      self._instance_watcher.watch(instance_ids).AndReturn(set(failed))
 
   def expect_populate(self, job_config, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
@@ -182,38 +209,60 @@ class UpdaterTest(TestCase):
     self._scheduler.replaceCronTemplate(job_config, self._lock, self._session_key).AndReturn(resp)
 
   def expect_restart(self, instance_ids, response_code=None):
-    response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, messageDEPRECATED='test')
-    self._scheduler.restartShards(
-        self._job_key,
-        instance_ids,
-        self._lock,
-        self._session_key).AndReturn(response)
+    for i in instance_ids:
+      response_code = ResponseCode.OK if response_code is None else response_code
+      response = Response(responseCode=response_code, messageDEPRECATED='test')
+      self._scheduler.restartShards(
+          self._job_key,
+          [i],
+          self._lock,
+          self._session_key).AndReturn(response)
 
-  def expect_kill(self, instance_ids, response_code=None, monitor_result=True):
-    response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, messageDEPRECATED='test')
-    query = TaskQuery(
-        owner=Identity(role=self._job_key.role),
-        environment=self._job_key.environment,
-        jobName=self._job_key.name,
-        statuses=ACTIVE_STATES,
-        instanceIds=frozenset([int(s) for s in instance_ids]))
-    self._scheduler.killTasks(query, self._lock, self._session_key).AndReturn(response)
-    if response_code != ResponseCode.OK:
+  def expect_kill(self, instance_ids, response_code=None, monitor_result=True, skip_monitor=False):
+    for i in instance_ids:
+      response_code = ResponseCode.OK if response_code is None else response_code
+      response = Response(responseCode=response_code, messageDEPRECATED='test')
+      query = TaskQuery(
+          owner=Identity(role=self._job_key.role),
+          environment=self._job_key.environment,
+          jobName=self._job_key.name,
+          statuses=ACTIVE_STATES,
+          instanceIds=frozenset([int(i)]))
+      self._scheduler.killTasks(query, self._lock, self._session_key).AndReturn(response)
+
+    self.expect_job_monitor(response_code, instance_ids, monitor_result, skip_monitor)
+
+  def expect_job_monitor(self, response_code, instance_ids, monitor_result=True, skip=False):
+    if skip or response_code != ResponseCode.OK:
       return
 
     self._job_monitor.wait_until(JobMonitor.terminal, instance_ids, with_timeout=True).AndReturn(
-        monitor_result)
+      monitor_result)
 
   def expect_add(self, instance_ids, task_config, response_code=None):
-    response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, messageDEPRECATED='test')
-    add_config = AddInstancesConfig(
-        key=self._job_key,
-        taskConfig=task_config,
-        instanceIds=frozenset([int(s) for s in instance_ids]))
-    self._scheduler.addInstances(add_config, self._lock, self._session_key).AndReturn(response)
+    for i in instance_ids:
+      response_code = ResponseCode.OK if response_code is None else response_code
+      response = Response(responseCode=response_code, messageDEPRECATED='test')
+      add_config = AddInstancesConfig(
+          key=self._job_key,
+          taskConfig=task_config,
+          instanceIds=frozenset([int(i)]))
+      self._scheduler.addInstances(add_config, self._lock, self._session_key).AndReturn(response)
+
+  def expect_update_instances(self, instance_ids, task_config):
+    for i in instance_ids:
+      self.expect_kill([i])
+      self.expect_add([i], task_config)
+      self.expect_watch_instances([i])
+
+  def expect_add_instances(self, instance_ids, task_config):
+    for i in instance_ids:
+      self.expect_add([i], task_config)
+      self.expect_watch_instances([i])
+
+  def expect_kill_instances(self, instance_ids):
+    for i in instance_ids:
+      self.expect_kill([i])
 
   def expect_start(self, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
@@ -288,10 +337,7 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(0, 4)
-    self.expect_add([3, 4, 5], new_config)
-    self.expect_watch_instances([3, 4, 5])
-    self.expect_add([6], new_config)
-    self.expect_watch_instances([6])
+    self.expect_add_instances([3, 4, 5, 6], new_config)
     self.expect_finish()
     self.replay_mocks()
 
@@ -343,8 +389,7 @@ class UpdaterTest(TestCase):
     self.expect_populate(job_config)
     self.expect_quota_check(1, 0, prod=False)
     self.expect_kill([0])
-    self.expect_add([0, 1, 2], new_config)
-    self.expect_watch_instances([0, 1, 2])
+    self.expect_add_instances([0, 1, 2], new_config)
     self.expect_finish()
     self.replay_mocks()
 
@@ -361,9 +406,7 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(7, 0)
-    self.expect_kill([3, 4, 5])
-    self.expect_kill([6, 7, 8])
-    self.expect_kill([9])
+    self.expect_kill_instances([3, 4, 5, 6, 7, 8, 9])
     self.expect_finish()
     self.replay_mocks()
 
@@ -381,13 +424,8 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(3, 7)
-    self.expect_kill([0, 1, 2])
-    self.expect_add([0, 1, 2], new_config)
-    self.expect_watch_instances([0, 1, 2])
-    self.expect_add([3, 4, 5], new_config)
-    self.expect_watch_instances([3, 4, 5])
-    self.expect_add([6], new_config)
-    self.expect_watch_instances([6])
+    self.expect_update_instances([0, 1, 2], new_config)
+    self.expect_add_instances([3, 4, 5, 6], new_config)
     self.expect_finish()
     self.replay_mocks()
 
@@ -405,12 +443,8 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(10, 1)
-    self.expect_kill([0, 1, 2])
-    self.expect_add([0], new_config)
-    self.expect_watch_instances([0])
-    self.expect_kill([3, 4, 5])
-    self.expect_kill([6, 7, 8])
-    self.expect_kill([9])
+    self.expect_update_instances([0], new_config)
+    self.expect_kill_instances([1, 2, 3, 4, 5, 6, 7, 8, 9])
     self.expect_finish()
     self.replay_mocks()
 
@@ -428,12 +462,7 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(5, 5)
-    self.expect_kill([0, 1, 2])
-    self.expect_add([0, 1, 2], new_config)
-    self.expect_watch_instances([0, 1, 2])
-    self.expect_kill([3, 4])
-    self.expect_add([3, 4], new_config)
-    self.expect_watch_instances([3, 4])
+    self.expect_update_instances([0, 1, 2, 3, 4], new_config)
     self.expect_finish()
     self.replay_mocks()
 
@@ -450,8 +479,7 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(0, 2)
-    self.expect_add([3, 4], new_config)
-    self.expect_watch_instances([3, 4])
+    self.expect_add_instances([3, 4], new_config)
     self.expect_finish()
     self.replay_mocks()
 
@@ -468,8 +496,7 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(6, 0)
-    self.expect_kill([4, 5, 6])
-    self.expect_kill([7, 8, 9])
+    self.expect_kill_instances([4, 5, 6, 7, 8, 9])
     self.expect_finish()
     self.replay_mocks()
 
@@ -487,14 +514,13 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(3, 3)
-    self.expect_kill([2, 3, 4])
-    self.expect_add([2, 3, 4], new_config)
-    self.expect_watch_instances([2, 3, 4])
+    self.expect_update_instances([2, 3, 4], new_config)
     self.expect_finish()
     self.replay_mocks()
 
     self.update_and_expect_ok(instances=[2, 3, 4])
     self.verify_mocks()
+
 
   def test_patch_hole_with_instance_option(self):
     """Patching an instance ID gap created by a terminated update."""
@@ -506,8 +532,7 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs, [2, 3])
     self.expect_populate(job_config)
     self.expect_quota_check(0, 2)
-    self.expect_add([2, 3], new_config)
-    self.expect_watch_instances([2, 3])
+    self.expect_add_instances([2, 3], new_config)
     self.expect_finish()
     self.replay_mocks()
 
@@ -533,7 +558,7 @@ class UpdaterTest(TestCase):
   def test_update_rollback(self):
     """Update process failures exceed total allowable count and update is rolled back."""
     update_config = self.UPDATE_CONFIG.copy()
-    update_config.update(max_total_failures=2, max_per_shard_failures=1)
+    update_config.update(max_per_shard_failures=1)
     self.init_updater(update_config)
 
     old_configs = self.make_task_configs(10)
@@ -545,55 +570,13 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(10, 10)
-    self.expect_kill([0, 1, 2])
-    self.expect_add([0, 1, 2], new_config)
-    self.expect_watch_instances([0, 1, 2], failed_instances=[0, 1, 2])
-    self.expect_restart([0, 1, 2])
-    self.expect_watch_instances([0, 1, 2], failed_instances=[0, 1, 2])
-    self.expect_kill([2, 1, 0])
-    self.expect_add([2, 1, 0], old_configs[0])
-    self.expect_watch_instances([2, 1, 0])
-    self.expect_finish()
-    self.replay_mocks()
-
-    self.update_and_expect_response(ResponseCode.ERROR)
-    self.verify_mocks()
-
-  def test_update_rollback_sorted(self):
-    """Rolling back with a batch of 1 should still be correctly sorted in reverse"""
-    update_config = self.UPDATE_CONFIG.copy()
-    update_config.update(max_total_failures=0, max_per_shard_failures=1, batch_size=1)
-    self.init_updater(update_config)
-
-    old_configs = self.make_task_configs(5)
-    new_config = deepcopy(old_configs[0])
-    new_config.priority = 5
-    job_config = self.make_job_config(new_config, 5)
-    self._config.job_config = job_config
-    self.expect_start()
-    self.expect_get_tasks(old_configs)
-    self.expect_populate(job_config)
-    self.expect_quota_check(5, 5)
-    self.expect_kill([0])
-    self.expect_add([0], new_config)
-    self.expect_watch_instances([0])
-    self.expect_kill([1])
-    self.expect_add([1], new_config)
-    self.expect_watch_instances([1])
+    self.expect_update_instances([0, 1], new_config)
     self.expect_kill([2])
     self.expect_add([2], new_config)
     self.expect_watch_instances([2], failed_instances=[2])
     self.expect_restart([2])
     self.expect_watch_instances([2], failed_instances=[2])
-    self.expect_kill([2])
-    self.expect_add([2], old_configs[0])
-    self.expect_watch_instances([2])
-    self.expect_kill([1])
-    self.expect_add([1], old_configs[0])
-    self.expect_watch_instances([1])
-    self.expect_kill([0])
-    self.expect_add([0], old_configs[0])
-    self.expect_watch_instances([0])
+    self.expect_update_instances([2, 1, 0], old_configs[0])
     self.expect_finish()
     self.replay_mocks()
 
@@ -615,14 +598,13 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(6, 6)
-    self.expect_kill([0, 1, 2])
-    self.expect_add([0, 1, 2], new_config)
-    self.expect_watch_instances([0, 1, 2], failed_instances=[0, 1, 2])
-    self.expect_restart([0, 1, 2])
-    self.expect_watch_instances([0, 1, 2])
-    self.expect_kill([3, 4, 5])
-    self.expect_add([3, 4, 5], new_config)
-    self.expect_watch_instances([3, 4, 5])
+    self.expect_update_instances([0, 1], new_config)
+    self.expect_kill([2])
+    self.expect_add([2], new_config)
+    self.expect_watch_instances([2], failed_instances=[2])
+    self.expect_restart([2])
+    self.expect_watch_instances([2])
+    self.expect_update_instances([3, 4, 5], new_config)
     self.expect_finish()
     self.replay_mocks()
 
@@ -695,7 +677,9 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(5, 5)
-    self.expect_kill([0, 1, 2], response_code=ResponseCode.INVALID_REQUEST)
+    self._scheduler_mux.raise_error()
+    self.expect_kill([0], skip_monitor=True)
+    self.expect_terminate()
     self.replay_mocks()
 
     self.update_and_expect_response(ResponseCode.ERROR)
@@ -712,7 +696,8 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(5, 5)
-    self.expect_kill([0, 1, 2], monitor_result=False)
+    self.expect_kill([0], monitor_result=False)
+    self.expect_terminate()
     self.replay_mocks()
 
     self.update_and_expect_response(ResponseCode.ERROR)
@@ -763,50 +748,15 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(10, 10)
-    self.expect_kill([0, 1, 2])
-    self.expect_add([0, 1, 2], new_config)
-    self.expect_watch_instances([0, 1, 2], failed_instances=[0])
-    self.expect_restart([0])
-    self.expect_kill([3, 4])
-    self.expect_add([3, 4], new_config)
-    self.expect_watch_instances([0, 3, 4], failed_instances=[0])
-    self.expect_restart([0])
-    self.expect_kill([5, 6])
-    self.expect_add([5, 6], new_config)
-    self.expect_watch_instances([0, 5, 6], failed_instances=[0])
-    self.expect_kill([7, 8, 9])
-    self.expect_add([7, 8, 9], new_config)
-    self.expect_watch_instances([7, 8, 9])
-    self.expect_finish()
-    self.replay_mocks()
-
-    self.update_and_expect_ok()
-    self.verify_mocks()
-
-  def test_failed_unretryable_do_not_cause_rollback(self):
-    """Update process still succeeds if failed instances in last batch are within allowed limit."""
-    update_config = self.UPDATE_CONFIG.copy()
-    update_config.update(max_total_failures=1, max_per_shard_failures=2)
-    self.init_updater(update_config)
-
-    old_configs = self.make_task_configs(5)
-    new_config = deepcopy(old_configs[0])
-    new_config.priority = 5
-    job_config = self.make_job_config(new_config, 5)
-    self._config.job_config = job_config
-    self.expect_start()
-    self.expect_get_tasks(old_configs)
-    self.expect_populate(job_config)
-    self.expect_quota_check(5, 5)
-    self.expect_kill([0, 1, 2])
-    self.expect_add([0, 1, 2], new_config)
-    self.expect_watch_instances([0, 1, 2], failed_instances=[0])
-    self.expect_restart([0])
-    self.expect_kill([3, 4])
-    self.expect_add([3, 4], new_config)
-    self.expect_watch_instances([0, 3, 4], failed_instances=[0])
-    self.expect_restart([0])
-    self.expect_watch_instances([0], failed_instances=[0])
+    self.expect_update_instances([0, 1], new_config)
+    self.expect_kill([2])
+    self.expect_add([2], new_config)
+    self.expect_watch_instances([2], failed_instances=[2])
+    self.expect_restart([2])
+    self.expect_watch_instances([2], failed_instances=[2])
+    self.expect_restart([2])
+    self.expect_watch_instances([2], failed_instances=[2])
+    self.expect_update_instances([3, 4, 5, 6, 7, 8, 9], new_config)
     self.expect_finish()
     self.replay_mocks()
 
@@ -839,7 +789,7 @@ class UpdaterTest(TestCase):
   def test_update_no_rollback(self):
     """Update process failures exceed total allowable count and update is not rolled back."""
     update_config = self.UPDATE_CONFIG.copy()
-    update_config.update(max_total_failures=2, max_per_shard_failures=1, rollback_on_failure=False)
+    update_config.update(max_total_failures=1, max_per_shard_failures=1, rollback_on_failure=False)
     self.init_updater(update_config)
 
     old_configs = self.make_task_configs(10)
@@ -851,11 +801,16 @@ class UpdaterTest(TestCase):
     self.expect_get_tasks(old_configs)
     self.expect_populate(job_config)
     self.expect_quota_check(10, 10)
-    self.expect_kill([0, 1, 2])
-    self.expect_add([0, 1, 2], new_config)
-    self.expect_watch_instances([0, 1, 2], failed_instances=[0, 1, 2])
-    self.expect_restart([0, 1, 2])
-    self.expect_watch_instances([0, 1, 2], failed_instances=[0, 1, 2])
+    self.expect_kill([0])
+    self.expect_add([0], new_config)
+    self.expect_watch_instances([0], failed_instances=[0])
+    self.expect_restart([0])
+    self.expect_watch_instances([0], failed_instances=[0])
+    self.expect_kill([1])
+    self.expect_add([1], new_config)
+    self.expect_watch_instances([1], failed_instances=[1])
+    self.expect_restart([1])
+    self.expect_watch_instances([1], failed_instances=[1])
     self.expect_finish()
     self.replay_mocks()
 

@@ -21,6 +21,7 @@ from twitter.common.contextutil import temporary_file
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import QuotaCheck
+from apache.aurora.client.api.scheduler_mux import SchedulerMux
 from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.commands.core import update
 from apache.aurora.client.commands.util import AuroraClientCommandTest
@@ -45,6 +46,12 @@ from gen.apache.aurora.api.ttypes import (
 
 
 class TestUpdateCommand(AuroraClientCommandTest):
+  class FakeSchedulerMux(SchedulerMux):
+    def enqueue_and_wait(self, command, data, aggregator=None, timeout=None):
+      return command([data])
+
+    def terminate(self):
+      pass
 
   @classmethod
   def setup_mock_options(cls):
@@ -215,6 +222,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     mock_health_check = self.setup_health_checks(mock_api)
     mock_quota_check = self.setup_quota_check()
     mock_job_monitor = self.setup_job_monitor()
+    fake_mux = self.FakeSchedulerMux()
 
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
@@ -224,11 +232,12 @@ class TestUpdateCommand(AuroraClientCommandTest):
             return_value=mock_health_check),
         patch('apache.aurora.client.api.updater.QuotaCheck', return_value=mock_quota_check),
         patch('apache.aurora.client.api.updater.JobMonitor', return_value=mock_job_monitor),
+        patch('apache.aurora.client.api.updater.SchedulerMux', return_value=fake_mux),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('time.sleep', return_value=None)
+        patch('threading._Event.wait')
 
     ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
-          mock_quota_check_patch, mock_job_monitor_patch, time_patch, sleep_patch):
+          mock_quota_check_patch, mock_job_monitor_patch, fake_mux, time_patch, sleep_patch):
       self.setup_mock_scheduler_for_simple_update(mock_api)
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -252,19 +261,19 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
   @classmethod
   def assert_correct_addinstance_calls(cls, api):
-    assert api.addInstances.call_count == 4
+    assert api.addInstances.call_count == 20
     last_addinst = api.addInstances.call_args
     assert isinstance(last_addinst[0][0], AddInstancesConfig)
-    assert last_addinst[0][0].instanceIds == frozenset([15, 16, 17, 18, 19])
+    assert last_addinst[0][0].instanceIds == frozenset([19])
     assert last_addinst[0][0].key == JobKey(environment='test', role='mchucarroll', name='hello')
 
   @classmethod
   def assert_correct_killtask_calls(cls, api):
-    assert api.killTasks.call_count == 4
+    assert api.killTasks.call_count == 20
     # Check the last call's parameters.
     api.killTasks.assert_called_with(
         TaskQuery(taskIds=None, jobName='hello', environment='test',
-            instanceIds=frozenset([16, 17, 18, 19, 15]),
+            instanceIds=frozenset([19]),
             owner=Identity(role=u'mchucarroll', user=None),
            statuses=ACTIVE_STATES),
         'foo')
@@ -273,25 +282,26 @@ class TestUpdateCommand(AuroraClientCommandTest):
   def assert_correct_status_calls(cls, api):
     # getTasksWithoutConfigs gets called a lot of times. The exact number isn't fixed; it loops
     # over the health checks until all of them pass for a configured period of time.
-    # The minumum number of calls is 4: once for each batch of restarts (Since the batch size
-    # is set to 5, and the total number of jobs is 20, that's 4 batches.)
+    # The minumum number of calls is 20: once before the tasks are restarted, and then
+    # once for each batch of restarts (Since the batch size is set to 1, and the
+    # total number of tasks is 20, that's 20 batches.)
     assert api.getTasksWithoutConfigs.call_count >= 4
 
     status_calls = api.getTasksWithoutConfigs.call_args_list
     for status_call in status_calls:
       status_call[0][0] == TaskQuery(
-          taskIds=None,
-          jobName='hello',
-          environment='test',
-          owner=Identity(role='mchucarroll', user=None),
-          statuses=set([ScheduleStatus.RUNNING]))
+        taskIds=None,
+        jobName='hello',
+        environment='test',
+        owner=Identity(role='mchucarroll', user=None),
+        statuses=set([ScheduleStatus.RUNNING]))
 
     # getTasksStatus is called only once to build an generate update instructions
     assert api.getTasksStatus.call_count == 1
 
     api.getTasksStatus.assert_called_once_with(TaskQuery(
-        taskIds=None,
-        jobName='hello',
-        environment='test',
-        owner=Identity(role=u'mchucarroll', user=None),
-        statuses=ACTIVE_STATES))
+      taskIds=None,
+      jobName='hello',
+      environment='test',
+      owner=Identity(role=u'mchucarroll', user=None),
+      statuses=ACTIVE_STATES))

@@ -185,7 +185,7 @@ HELLO_WORLD = Job(
   instances = 20,
   %(inner)s
   update_config = UpdateConfig(
-    batch_size = 5,
+    batch_size = 1,
     restart_threshold = 60,
     watch_secs = 45,
     max_per_shard_failures = 2,

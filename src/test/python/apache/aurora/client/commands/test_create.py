@@ -143,7 +143,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (sleep, make_client,
         options):
@@ -200,7 +200,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (sleep, make_client,
         options):

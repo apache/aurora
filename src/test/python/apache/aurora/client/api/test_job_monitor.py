@@ -32,9 +32,18 @@ from gen.apache.aurora.api.ttypes import (
 )
 
 
-class FakeClock(object):
-  def sleep(self, seconds):
+class FakeEvent(object):
+  def __init__(self):
+    self._is_set = False
+
+  def wait(self, seconds):
     pass
+
+  def is_set(self):
+    return self._is_set
+
+  def set(self):
+    self._is_set = True
 
 
 class JobMonitorTest(unittest.TestCase):
@@ -42,7 +51,7 @@ class JobMonitorTest(unittest.TestCase):
   def setUp(self):
     self._scheduler = Mock()
     self._job_key = AuroraJobKey('cl', 'johndoe', 'test', 'test_job')
-    self._clock = FakeClock()
+    self._event = FakeEvent()
 
   def create_task(self, status, id):
     return ScheduledTask(
@@ -108,6 +117,11 @@ class JobMonitorTest(unittest.TestCase):
         self.create_task(ScheduleStatus.RUNNING, '3'),
     ])
 
-    monitor = JobMonitor(self._scheduler, self._job_key, clock=self._clock)
+    monitor = JobMonitor(self._scheduler, self._job_key, terminating_event=self._event)
     assert not monitor.wait_until(monitor.terminal, with_timeout=True)
     self.expect_task_status()
+
+  def test_terminated_exits_immediately(self):
+    self._event.set()
+    monitor = JobMonitor(self._scheduler, self._job_key, terminating_event=self._event)
+    assert monitor.wait_until(monitor.terminal)

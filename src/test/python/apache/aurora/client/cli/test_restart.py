@@ -61,7 +61,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('time.sleep', return_value=None)
+        patch('threading._Event.wait')
     ):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -91,7 +91,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('time.sleep', return_value=None)
+        patch('threading._Event.wait')
     ):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -114,7 +114,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('time.sleep', return_value=None)):
+        patch('threading._Event.wait')):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -137,7 +137,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('time.sleep', return_value=None)) as (mock_log, _, _, _, _, _):
+        patch('threading._Event.wait')) as (mock_log, _, _, _, _, _):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -168,7 +168,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('time.sleep', return_value=None)):
+        patch('threading._Event.wait')):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()

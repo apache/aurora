@@ -95,7 +95,9 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     # object, and everything can be stubbed through that.
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('time.sleep'),
+        # TODO(maxim): Patching threading.Event with all possible namespace/patch/mock
+        #              combinations did not produce the desired effect. Investigate why (AURORA-510)
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       # After making the client, create sets up a job monitor.
       # The monitor uses TaskQuery to get the tasks. It's called at least twice:once before
@@ -127,7 +129,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     """
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
       mock_query = self.create_mock_query()
       for result in [ScheduleStatus.PENDING, ScheduleStatus.PENDING, ScheduleStatus.RUNNING]:

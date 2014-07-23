@@ -63,7 +63,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_context = FakeAuroraCommandContext()
     mock_scheduler_proxy = Mock()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
 
@@ -90,7 +90,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_context = FakeAuroraCommandContext()
     mock_scheduler_proxy = Mock()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
 
@@ -119,7 +119,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_context = FakeAuroraCommandContext()
     mock_scheduler_proxy = Mock()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
 
@@ -145,7 +145,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
@@ -170,7 +170,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
@@ -192,7 +192,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
@@ -217,7 +217,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
@@ -244,7 +244,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
@@ -293,7 +293,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
@@ -317,7 +317,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     """Test kill client-side API logic."""
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       mock_scheduler_proxy.killTasks.return_value = self.get_kill_job_response()

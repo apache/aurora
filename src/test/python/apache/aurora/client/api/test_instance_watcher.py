@@ -47,6 +47,21 @@ class FakeClock(object):
     self._now_seconds += seconds
 
 
+class FakeEvent(object):
+  def __init__(self, clock):
+    self._clock = clock
+    self._is_set = False
+
+  def wait(self, seconds):
+    self._clock.sleep(seconds)
+
+  def is_set(self):
+    return self._is_set
+
+  def set(self):
+    self._is_set = True
+
+
 def find_expected_cycles(period, sleep_secs):
   return ceil(period / sleep_secs) + 1
 
@@ -61,6 +76,7 @@ class InstanceWatcherTest(unittest.TestCase):
     self._env = 'test'
     self._name = 'jimbob'
     self._clock = FakeClock()
+    self._event = FakeEvent(self._clock)
     self._scheduler = mox.MockObject(scheduler_client)
     job_key = JobKey(name=self._name, environment=self._env, role=self._role)
     self._health_check = mox.MockObject(HealthCheck)
@@ -69,7 +85,8 @@ class InstanceWatcherTest(unittest.TestCase):
                                  self.RESTART_THRESHOLD,
                                  self.WATCH_SECS,
                                  health_check_interval_seconds=3,
-                                 clock=self._clock)
+                                 clock=self._clock,
+                                 terminating_event=self._event)
 
   def get_tasks_status_query(self, instance_ids):
     query = TaskQuery()
@@ -211,4 +228,12 @@ class InstanceWatcherTest(unittest.TestCase):
     self.expect_health_check(2, False, num_calls=1)
     self.replay_mocks()
     self.assert_watch_result([2])
+    self.verify_mocks()
+
+  def test_terminated_exits_immediately(self):
+    """Terminated instance watched should bail out immediately."""
+    self.replay_mocks()
+    self._watcher.terminate()
+    result = self._watcher.watch([], self._health_check)
+    assert result is None, ('Expected instances None : Returned instances (%s)' % result)
     self.verify_mocks()

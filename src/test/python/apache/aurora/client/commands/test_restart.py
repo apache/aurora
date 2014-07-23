@@ -113,7 +113,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('time.sleep', return_value=None)
+        patch('threading._Event.wait')
     ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
         time_patch, sleep_patch):
 
@@ -146,7 +146,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('time.sleep', return_value=None)
+        patch('threading._Event.wait')
     ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
         time_patch, sleep_patch):
 
@@ -175,7 +175,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('time.sleep', return_value=None)
+        patch('threading._Event.wait')
     ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
         time_patch, sleep_patch):
 
@@ -201,7 +201,7 @@ class TestRestartCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('time.sleep', return_value=None)
+        patch('threading._Event.wait')
     ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
         time_patch, sleep_patch):
 

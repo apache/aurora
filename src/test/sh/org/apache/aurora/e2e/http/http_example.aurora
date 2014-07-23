@@ -25,7 +25,7 @@ stage_server = Process(
 
 test_task = Task(
   name = 'http_example',
-  resources = Resources(cpu=1.0, ram=64*MB, disk=64*MB),
+  resources = Resources(cpu=0.5, ram=32*MB, disk=64*MB),
   processes = [stage_server, run_server],
   constraints = order(stage_server, run_server))
 
@@ -37,7 +37,7 @@ job = Job(
   role = getpass.getuser(),
   environment = 'test',
   contact = '{{role}}@localhost',
-  # Since there is only one slave in devcluster allow both instances to run there.
+  # Since there is only one slave in devcluster allow all instances to run there.
   constraints = {
     'host': 'limit:2',
   },

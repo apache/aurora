@@ -113,7 +113,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     ]
     mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = mock_query_results
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.factory.make_client', return_value=mock_api),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
@@ -212,7 +212,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     ]
     mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = mock_query_results
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.commands.core.make_client',
             return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options),
@@ -352,7 +352,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     ]
     mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = mock_query_results
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.factory.make_client', return_value=mock_api),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
@@ -386,7 +386,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     ]
     mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = mock_query_results
     with contextlib.nested(
-        patch('time.sleep'),
+        patch('threading._Event.wait'),
         patch('apache.aurora.client.factory.make_client', return_value=mock_api),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),

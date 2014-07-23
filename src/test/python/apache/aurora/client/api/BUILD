@@ -22,6 +22,7 @@ python_test_suite(name = 'all',
     pants(':updater'),
     pants(':quota_check'),
     pants(':sla'),
+    pants(':mux')
   ],
 )
 
@@ -90,6 +91,22 @@ python_tests(name = 'sla',
   dependencies = [
     pants('3rdparty/python:mock'),
     pants('src/main/python/apache/aurora/client/api:sla'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ]
+)
+
+python_tests(name = 'mux',
+  sources = ['test_scheduler_mux.py'],
+  dependencies = [
+    pants('src/main/python/apache/aurora/client/api:scheduler_mux'),
+  ]
+)
+
+python_tests(name = 'task_util',
+  sources = ['test_task_util.py'],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('src/main/python/apache/aurora/client/api:task_util'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )

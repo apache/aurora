@@ -55,6 +55,7 @@ python_library(
   name = 'job_monitor',
   sources = ['job_monitor.py'],
   dependencies = [
+    pants(':task_util'),
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.quantity'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
@@ -88,10 +89,43 @@ python_library(
 )
 
 python_library(
+  name = 'error_handling_thread',
+  sources = ['error_handling_thread.py'],
+  dependencies = [
+    pants('3rdparty/python:twitter.common.decorators'),
+    pants('3rdparty/python:twitter.common.quantity'),
+    pants('3rdparty/python:twitter.common.log'),
+  ]
+)
+
+python_library(
+  name = 'scheduler_mux',
+  sources = ['scheduler_mux.py'],
+  dependencies = [
+    pants(':error_handling_thread'),
+    pants('3rdparty/python:twitter.common.quantity'),
+    pants('3rdparty/python:twitter.common.log'),
+  ]
+)
+
+python_library(
+  name = 'task_util',
+  sources = ['task_util.py'],
+  dependencies = [
+    pants(':scheduler_mux'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('src/main/python/apache/aurora/client:base'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ]
+)
+
+python_library(
   name = 'instance_watcher',
   sources = ['instance_watcher.py', 'health_check.py'],
   dependencies = [
     pants(':scheduler_client'),
+    pants(':scheduler_mux'),
+    pants(':task_util'),
     pants('3rdparty/python:twitter.common.lang'),
     pants('3rdparty/python:twitter.common.log'),
     pants('src/main/python/apache/aurora/common:http_signaler'),

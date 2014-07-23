@@ -45,7 +45,7 @@ test_http_example() {
   # to allow automatic logins to the slaves. "aurora run" therefore tries to prompt the user for
   # a password, finds that it's not running in a TTY, and aborts.
   runlen=$(vagrant ssh -c "aurora run $jobkey 'pwd'" | wc -l)
-  test $runlen -eq 2
+  test $runlen -eq 4
 
   vagrant ssh -c "aurora get_quota --cluster=$_cluster $_role"
   vagrant ssh -c "aurora killall  $jobkey"

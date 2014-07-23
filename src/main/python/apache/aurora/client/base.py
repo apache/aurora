@@ -40,13 +40,13 @@ def die(msg):
   sys.exit(1)
 
 
-def log_response(resp):
-  log.info('Response from scheduler: %s (message: %s)'
-      % (ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.messageDEPRECATED))
+def format_response(resp):
+  return 'Response from scheduler: %s (message: %s)' % (
+    ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.messageDEPRECATED)
 
 
 def check_and_log_response(resp):
-  log_response(resp)
+  log.info(format_response(resp))
   if resp.responseCode != ResponseCode.OK:
     if resp.responseCode == ResponseCode.LOCK_ERROR:
       log.info(LOCKED_WARNING)

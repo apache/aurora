@@ -12,11 +12,13 @@
 # limitations under the License.
 #
 
-import time
+from threading import Event
 
 from thrift.transport import TTransport
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
+
+from .task_util import StatusMuxHelper
 
 from gen.apache.aurora.api.constants import LIVE_STATES, TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import Identity, TaskQuery
@@ -34,28 +36,24 @@ class JobMonitor(object):
   def terminal(cls, status):
     return status in TERMINAL_STATES
 
-  def __init__(self, scheduler, job_key, clock=time,
-               min_poll_interval=MIN_POLL_INTERVAL, max_poll_interval=MAX_POLL_INTERVAL):
+  def __init__(self, scheduler, job_key, terminating_event=None,
+               min_poll_interval=MIN_POLL_INTERVAL, max_poll_interval=MAX_POLL_INTERVAL,
+               scheduler_mux=None):
     self._scheduler = scheduler
     self._job_key = job_key
-    self._clock = clock
     self._min_poll_interval = min_poll_interval
     self._max_poll_interval = max_poll_interval
+    self._terminating = terminating_event or Event()
+    self._status_helper = StatusMuxHelper(self._scheduler, self.create_query, scheduler_mux)
 
-  def iter_query(self, query):
-    try:
-      res = self._scheduler.getTasksWithoutConfigs(query)
-    except TTransport.TTransportException as e:
-      log.error('Failed to query tasks from scheduler: %s' % e)
-      return
-    if res is None or res.result is None:
-      return
-    for task in res.result.scheduleStatusResult.tasks:
+  def iter_tasks(self, instances):
+    tasks = self._status_helper.get_tasks(instances)
+    for task in tasks:
       yield task
 
-  def states(self, query):
+  def states(self, instance_ids):
     states = {}
-    for task in self.iter_query(query):
+    for task in self.iter_tasks(instance_ids):
       status, instance_id = task.status, task.assignedTask.instanceId
       first_timestamp = task.taskEvents[0].timestamp
       if instance_id not in states or first_timestamp > states[instance_id][0]:
@@ -81,11 +79,17 @@ class JobMonitor(object):
     Returns: True if predicate is met or False if timeout has expired.
     """
     poll_interval = self._min_poll_interval
-    while not all(predicate(state) for state in self.states(self.create_query(instances)).values()):
+    while not self._terminating.is_set() and not all(predicate(state) for state
+        in self.states(instances).values()):
+
       if with_timeout and poll_interval >= self._max_poll_interval:
         return False
 
-      self._clock.sleep(poll_interval.as_(Time.SECONDS))
+      self._terminating.wait(poll_interval.as_(Time.SECONDS))
       poll_interval = min(self._max_poll_interval, 2 * poll_interval)
 
     return True
+
+  def terminate(self):
+    """Requests immediate termination of the wait cycle."""
+    self._terminating.set()
