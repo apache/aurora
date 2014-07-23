@@ -14,6 +14,13 @@
 
 -- schema for h2 engine.
 
+CREATE TABLE framework_id(
+  id INT PRIMARY KEY,
+  framework_id VARCHAR NOT NULL,
+
+  UNIQUE(framework_id)
+);
+
 CREATE TABLE job_keys(
   id INT IDENTITY,
   role VARCHAR NOT NULL,

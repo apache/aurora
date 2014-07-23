@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 
+import com.google.common.base.Optional;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
@@ -104,7 +105,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   private void expectLoadStorage() {
     storageUtil.storage.start(EasyMock.<Quiet>anyObject());
     storageUtil.expectOperations();
-    expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(FRAMEWORK_ID);
+    expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(FRAMEWORK_ID));
   }
 
   private void expectInitializeDriver() {

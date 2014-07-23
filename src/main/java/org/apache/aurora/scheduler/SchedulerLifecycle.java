@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -251,17 +252,17 @@ public class SchedulerLifecycle implements EventSubscriber {
           }
         });
 
-        @Nullable final String frameworkId = storage.consistentRead(
-            new Work.Quiet<String>() {
+        final Optional<String> frameworkId = storage.consistentRead(
+            new Work.Quiet<Optional<String>>() {
               @Override
-              public String apply(StoreProvider storeProvider) {
+              public Optional<String> apply(StoreProvider storeProvider) {
                 return storeProvider.getSchedulerStore().fetchFrameworkId();
               }
             });
 
         // Save the prepared driver locally, but don't expose it until the registered callback is
         // received.
-        driverRef.set(driverFactory.apply(frameworkId));
+        driverRef.set(driverFactory.apply(frameworkId.orNull()));
 
         delayedActions.onRegistrationTimeout(
             new Runnable() {

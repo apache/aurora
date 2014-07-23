@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage;
 
-import javax.annotation.Nullable;
+import com.google.common.base.Optional;
 
 /**
  * Stores data specific to the scheduler itself.
@@ -25,7 +25,7 @@ public interface SchedulerStore {
    *
    * @return the last saved framework id
    */
-  @Nullable String fetchFrameworkId();
+  Optional<String> fetchFrameworkId();
 
   interface Mutable extends SchedulerStore {
     /**

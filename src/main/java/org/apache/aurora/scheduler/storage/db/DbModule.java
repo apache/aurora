@@ -26,6 +26,7 @@ import com.twitter.common.inject.Bindings;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
+import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.db.typehandlers.TypeHandlers;
 import org.apache.ibatis.session.AutoMappingBehavior;
@@ -48,8 +49,9 @@ import static com.google.inject.name.Names.named;
  *     <li>{@link org.apache.ibatis.session.SqlSessionFactory}</li>
  *     <li>Keys provided by the provided{@code keyFactory} for:
  *        <ul>
- *          <li>{@link org.apache.aurora.scheduler.storage.LockStore.Mutable}</li>
- *          <li>{@link org.apache.aurora.scheduler.storage.QuotaStore.Mutable}</li>
+ *          <li>{@link LockStore.Mutable}</li>
+ *          <li>{@link QuotaStore.Mutable}</li>
+ *          <li>{@link SchedulerStore.Mutable}</li>
  *        </ul>
  *     </li>
  *   </ul>
@@ -109,6 +111,7 @@ public class DbModule extends PrivateModule {
         addMapperClass(LockMapper.class);
         addMapperClass(JobKeyMapper.class);
         addMapperClass(QuotaMapper.class);
+        addMapperClass(FrameworkIdMapper.class);
         Properties props = new Properties();
         // We have no plans to take advantage of multiple DB environments. This is a required
         // property though, so we use an unnamed environment.
@@ -127,6 +130,7 @@ public class DbModule extends PrivateModule {
     bindStore(AttributeStore.Mutable.class, DbAttributeStore.class);
     bindStore(LockStore.Mutable.class, DbLockStore.class);
     bindStore(QuotaStore.Mutable.class, DbQuotaStore.class);
+    bindStore(SchedulerStore.Mutable.class, DbSchedulerStore.class);
 
     Key<Storage> storageKey = keyFactory.create(Storage.class);
     bind(storageKey).to(DbStorage.class);

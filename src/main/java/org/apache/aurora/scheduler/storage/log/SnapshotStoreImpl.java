@@ -127,7 +127,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
           snapshot.setSchedulerMetadata(
                 new SchedulerMetadata()
-                  .setFrameworkId(store.getSchedulerStore().fetchFrameworkId())
+                  .setFrameworkId(store.getSchedulerStore().fetchFrameworkId().orNull())
                   .setRevision(props.getProperty(BuildInfo.Key.GIT_REVISION.value))
                   .setTag(props.getProperty(BuildInfo.Key.GIT_TAG.value))
                   .setTimestamp(props.getProperty(BuildInfo.Key.TIMESTAMP.value))
@@ -138,7 +138,8 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
         @Override
         public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
-          if (snapshot.isSetSchedulerMetadata()) {
+          if (snapshot.isSetSchedulerMetadata()
+              && snapshot.getSchedulerMetadata().isSetFrameworkId()) {
             // No delete necessary here since this is a single value.
 
             store.getSchedulerStore()

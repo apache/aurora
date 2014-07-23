@@ -30,7 +30,7 @@ import org.apache.ibatis.exceptions.PersistenceException;
 import static java.util.Objects.requireNonNull;
 
 /**
- *  A relational database-backed lock store.
+ * A relational database-backed lock store.
  */
 class DbLockStore implements LockStore.Mutable {
 

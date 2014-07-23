@@ -16,8 +16,6 @@ package org.apache.aurora.scheduler.storage;
 import java.util.Map;
 import java.util.Set;
 
-import javax.annotation.Nullable;
-
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
@@ -78,8 +76,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  @Nullable
-  public String fetchFrameworkId() {
+  public Optional<String> fetchFrameworkId() {
     return schedulerStore.fetchFrameworkId();
   }
 

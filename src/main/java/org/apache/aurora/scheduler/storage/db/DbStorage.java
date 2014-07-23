@@ -62,19 +62,21 @@ class DbStorage extends AbstractIdleService implements Storage {
   DbStorage(
       SqlSessionFactory sessionFactory,
       EnumValueMapper enumValueMapper,
+      final SchedulerStore.Mutable schedulerStore,
       final AttributeStore.Mutable attributeStore,
       final LockStore.Mutable lockStore,
       final QuotaStore.Mutable quotaStore) {
 
     this.sessionFactory = requireNonNull(sessionFactory);
     this.enumValueMapper = requireNonNull(enumValueMapper);
+    requireNonNull(schedulerStore);
     requireNonNull(attributeStore);
     requireNonNull(lockStore);
     requireNonNull(quotaStore);
     storeProvider = new MutableStoreProvider() {
       @Override
       public SchedulerStore.Mutable getSchedulerStore() {
-        throw new UnsupportedOperationException("Not yet implemented.");
+        return schedulerStore;
       }
 
       @Override

@@ -80,7 +80,7 @@ public class MemStorage implements Storage {
 
   @Inject
   MemStorage(
-      final SchedulerStore.Mutable schedulerStore,
+      @Delegated final SchedulerStore.Mutable schedulerStore,
       final JobStore.Mutable jobStore,
       final TaskStore.Mutable taskStore,
       @Delegated final LockStore.Mutable lockStore,

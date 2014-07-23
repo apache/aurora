@@ -11,30 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.mem;
-
-import java.util.concurrent.atomic.AtomicReference;
+package org.apache.aurora.scheduler.storage.db;
 
 import javax.annotation.Nullable;
 
-import com.google.common.util.concurrent.Atomics;
-
-import org.apache.aurora.scheduler.storage.SchedulerStore;
-
 /**
- * An in-memory scheduler store.
+ * MyBatis mapper class for FrameworkIdMapper.xml.
  */
-class MemSchedulerStore implements SchedulerStore.Mutable {
-  private final AtomicReference<String> frameworkId = Atomics.newReference();
-
-  @Override
-  public void saveFrameworkId(String newFrameworkId) {
-    frameworkId.set(newFrameworkId);
-  }
-
+interface FrameworkIdMapper {
   @Nullable
-  @Override
-  public String fetchFrameworkId() {
-    return frameworkId.get();
-  }
+  String select();
+
+  void insert(String id);
 }

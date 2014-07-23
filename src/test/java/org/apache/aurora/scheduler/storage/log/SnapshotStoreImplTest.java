@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.storage.log;
 
 import java.util.Set;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -93,7 +94,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of("jobManager"));
     expect(storageUtil.jobStore.fetchJobs("jobManager"))
         .andReturn(ImmutableSet.of(IJobConfiguration.build(job.getJobConfiguration())));
-    expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(frameworkId);
+    expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(frameworkId));
     expect(storageUtil.lockStore.fetchLocks()).andReturn(ImmutableSet.of(lock));
 
     expectDataWipe();
