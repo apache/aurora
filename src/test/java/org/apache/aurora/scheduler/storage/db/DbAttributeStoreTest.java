@@ -137,6 +137,14 @@ public class DbAttributeStoreTest {
         read(HOST_A));
   }
 
+  @Test
+  public void testSlaveIdChanges() {
+    insert(HOST_A_ATTRS);
+    IHostAttributes updated = IHostAttributes.build(HOST_A_ATTRS.newBuilder().setSlaveId(SLAVE_B));
+    insert(updated);
+    assertEquals(Optional.of(updated), read(HOST_A));
+  }
+
   private void insert(final IHostAttributes attributes) {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override

@@ -33,7 +33,7 @@
   <delete id="deleteAttributesAndValues">
     <!-- This assumes the schema enables cascading deletes in the values table. -->
     DELETE FROM host_attributes
-    WHERE slave_id = #{id}
+    WHERE host = #{id}
   </delete>
 
   <resultMap id="hostAttributeResultMap" type="org.apache.aurora.gen.HostAttributes">

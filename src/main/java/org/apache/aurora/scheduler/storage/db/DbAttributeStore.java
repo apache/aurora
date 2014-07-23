@@ -82,7 +82,7 @@ class DbAttributeStore implements AttributeStore.Mutable {
           "Host attributes contains empty values: " + hostAttributes);
     }
 
-    mapper.deleteAttributesAndValues(hostAttributes.getSlaveId());
+    mapper.deleteAttributesAndValues(hostAttributes.getHost());
     mapper.insert(hostAttributes);
     if (!hostAttributes.getAttributes().isEmpty()) {
       mapper.insertAttributeValues(hostAttributes);
