@@ -34,7 +34,8 @@ from gen.apache.aurora.api.ttypes import (
     MaintenanceStatusResult,
     Response,
     ResponseCode,
-    Result
+    Result,
+    StartMaintenanceResult
 )
 
 DEFAULT_CLUSTER = Cluster(
@@ -133,7 +134,8 @@ class TestHostMaintenance(unittest.TestCase):
   @mock.patch("apache.aurora.client.api.AuroraClientAPI.start_maintenance",
       spec=AuroraClientAPI.start_maintenance)
   def test_start_maintenance(self, mock_api):
-    mock_api.return_value = Response(responseCode=ResponseCode.OK)
+    mock_api.return_value = Response(responseCode=ResponseCode.OK,
+        result=Result(startMaintenanceResult=StartMaintenanceResult(statuses=set([HostStatus()]))))
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
     maintenance.start_maintenance(TEST_HOSTNAMES)
     mock_api.assert_called_once_with(Hosts(set(TEST_HOSTNAMES)))
@@ -152,6 +154,7 @@ class TestHostMaintenance(unittest.TestCase):
       mock_drain_hosts, mock_operate_on_hosts, mock_complete_maintenance):
     mock_callback = mock.Mock()
     mock_check_sla.return_value = set()
+    mock_start_maintenance.return_value = TEST_HOSTNAMES
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
     maintenance.perform_maintenance(TEST_HOSTNAMES, callback=mock_callback)
     mock_start_maintenance.assert_called_once_with(TEST_HOSTNAMES)
@@ -181,6 +184,7 @@ class TestHostMaintenance(unittest.TestCase):
     mock_callback = mock.Mock()
     failed_host = 'us-west-001.example.com'
     mock_check_sla.return_value = set([failed_host])
+    mock_start_maintenance.return_value = TEST_HOSTNAMES
     drained_hosts = set(TEST_HOSTNAMES) - set([failed_host])
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
 

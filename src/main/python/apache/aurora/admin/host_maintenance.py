@@ -159,8 +159,15 @@ class HostMaintenance(object):
 
     :param hostnames: List of hosts to set for initial maintenance
     :type hostnames: list of strings
+    :rtype: list of hostnames with the maintenance mode set
     """
-    check_and_log_response(self._client.start_maintenance(Hosts(set(hostnames))))
+    resp = self._client.start_maintenance(Hosts(set(hostnames)))
+    check_and_log_response(resp)
+    result = [host_status.host for host_status in resp.result.startMaintenanceResult.statuses]
+    if len(result) != len(hostnames):
+      log.warning('Skipping maintenance for unknown hosts: %s' % (set(hostnames) - set(result)))
+
+    return result
 
   def perform_maintenance(self, hostnames, grouping_function=DEFAULT_GROUPING,
                           callback=None, percentage=None, duration=None, output_file=None):
@@ -170,7 +177,7 @@ class HostMaintenance(object):
     performing an action on them once drained, then removing them from maintenance mode
     so tasks can schedule.
 
-    :param hostnames: A list of hosts to operate upon
+    :param hostnames: A list of hostnames to operate upon
     :type hostnames: list of strings
     :param grouping_function: How to split up the hostname into groups
     :type grouping_function: function
@@ -183,7 +190,7 @@ class HostMaintenance(object):
     :param output_file: file to write hosts that were not drained due to failed SLA check
     :type output_file: string
     """
-    self.start_maintenance(hostnames)
+    hostnames = self.start_maintenance(hostnames)
     not_drained_hostnames = set()
 
     for hosts in self.iter_batches(hostnames, grouping_function):
