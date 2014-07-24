@@ -19,7 +19,7 @@
 set -e
 set -o nounset
 
-aurora_git_url='https://git-wip-us.apache.org/repos/asf/incubator-aurora.git'
+aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=incubator-aurora.git'
 aurora_svn_dist_url='https://dist.apache.org/repos/dist/release/incubator/aurora'
 aurora_svn_dev_dist_url='https://dist.apache.org/repos/dist/dev/incubator/aurora'
 
@@ -191,10 +191,10 @@ There were no 0 or -1 votes. Thank you to all who helped make this release.
 Aurora ${current_version} includes the following:
 ---
 The CHANGELOG for the release is available at:
-${aurora_git_url};a=blob_plain;f=CHANGELOG;hb=${current_version}
+${aurora_git_web_url}&f=CHANGELOG&hb=${current_version}
 
 The tag used to create the release with is ${current_version}:
-${aurora_git_url};a=commit;h=${current_version}
+${aurora_git_web_url}&hb=${current_version}
 
 The release is available at:
 ${aurora_svn_dist_url}/${current_version}/${dist_name}.tar.gz

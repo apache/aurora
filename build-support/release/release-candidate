@@ -27,7 +27,7 @@ set -o errexit
 set -o nounset
 
 rc_tag_version=0
-aurora_git_url='https://git-wip-us.apache.org/repos/asf/incubator-aurora.git'
+aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=incubator-aurora.git'
 aurora_svn_dist_url='https://dist.apache.org/repos/dist/dev/incubator/aurora'
 
 function print_help_and_exit {
@@ -237,10 +237,11 @@ Apache Aurora ${current_version} release.
 Aurora ${current_version_tag} includes the following:
 ---
 The CHANGELOG for the release is available at:
-${aurora_git_url};a=blob_plain;f=CHANGELOG;hb=${current_version_tag}
+${aurora_git_web_url}&f=CHANGELOG&hb=${current_version_tag}
 
-The branch used to create the release with is ${current_version_tag}:
-${aurora_git_url};a=commit;hb=${current_version_tag}
+The branch used to create the release candidate is:
+${aurora_git_web_url}&hb=${current_version_tag}
+
 
 The release candidate is available at:
 ${aurora_svn_dist_url}/${current_version_tag}/${dist_name}.tar.gz
