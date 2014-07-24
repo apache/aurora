@@ -65,9 +65,9 @@ class AuroraClientAPI(object):
     log.debug('Lock %s' % lock)
     return self._scheduler_proxy.scheduleCronJob(config.job(), lock)
 
-  def deschedule_cron(self, jobkey):
+  def deschedule_cron(self, jobkey, lock=None):
     log.info("Removing cron schedule for job %s" % jobkey)
-    return self._scheduler_proxy.descheduleCronJob(jobkey.to_thrift())
+    return self._scheduler_proxy.descheduleCronJob(jobkey.to_thrift(), lock)
 
   def populate_job_config(self, config):
     return self._scheduler_proxy.populateJobConfig(config.job())

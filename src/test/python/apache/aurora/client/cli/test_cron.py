@@ -113,7 +113,7 @@ class TestCronNoun(AuroraClientCommandTest):
       assert result == EXIT_OK
       assert mock_scheduler_proxy.descheduleCronJob.call_count == 1
       mock_scheduler_proxy.descheduleCronJob.assert_called_with(JobKey(environment='test',
-          role='bozo', name='hello'))
+          role='bozo', name='hello'), None)
 
   def test_start_cron(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
