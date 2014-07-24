@@ -219,7 +219,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
           "./src/test/python/apache/aurora/client/cli/hook_test_data/bad_syntax")
       log_patch.assert_called_with("Error compiling hooks file "
           "./src/test/python/apache/aurora/client/cli/hook_test_data/bad_syntax/AuroraHooks: "
-          "invalid syntax (AuroraHooks, line 1)")
+          "invalid syntax (AuroraHooks, line 15)")
 
   def test_dynamic_hook_exec_error(self):
     with patch("logging.warn") as log_patch:
