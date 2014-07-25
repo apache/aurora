@@ -200,18 +200,6 @@ class SchedulerCoreImpl implements SchedulerCore {
   }
 
   @Override
-  public synchronized void setTaskStatus(
-      String taskId,
-      final ScheduleStatus status,
-      Optional<String> message) {
-
-    requireNonNull(taskId);
-    requireNonNull(status);
-
-    stateManager.changeState(taskId, Optional.<ScheduleStatus>absent(), status, message);
-  }
-
-  @Override
   public void restartShards(
       IJobKey jobKey,
       final Set<Integer> shards,

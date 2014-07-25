@@ -874,17 +874,20 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(status);
     requireNonNull(session);
 
-    Response response = Util.emptyResponse();
     SessionContext context;
     try {
       // TODO(Sathya): Remove this after AOP-style session validation passes in a SessionContext.
       context = sessionValidator.checkAuthorized(session, Capability.ROOT, AuditCheck.REQUIRED);
     } catch (AuthFailedException e) {
-      addMessage(response, AUTH_FAILED, e);
-      return response;
+      return addMessage(emptyResponse(), AUTH_FAILED, e);
     }
 
-    schedulerCore.setTaskStatus(taskId, status, transitionMessage(context.getIdentity()));
+    stateManager.changeState(
+        taskId,
+        Optional.<ScheduleStatus>absent(),
+        status,
+        transitionMessage(context.getIdentity()));
+
     return okEmptyResponse();
   }
 
