@@ -140,6 +140,7 @@ import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.killedByMessage;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.restartedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
@@ -662,16 +663,35 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testRestartShards() throws Exception {
-    Set<Integer> shards = ImmutableSet.of(1, 6);
+    Set<Integer> shards = ImmutableSet.of(0);
 
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
-    scheduler.restartShards(JOB_KEY, shards, USER);
+    storageUtil.expectTaskFetch(
+        Query.instanceScoped(JOB_KEY, shards).active(),
+        buildScheduledTask());
+
+    expect(stateManager.changeState(
+        TASK_ID,
+        Optional.<ScheduleStatus>absent(),
+        ScheduleStatus.RESTARTING,
+        restartedByMessage(USER))).andReturn(true);
 
     control.replay();
 
     assertOkResponse(
         thrift.restartShards(JOB_KEY.newBuilder(), shards, LOCK.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testRestartShardsAuthFailure() throws Exception {
+    expectAuth(ROLE, false);
+
+    control.replay();
+
+    assertResponse(
+        AUTH_FAILED,
+        thrift.restartShards(JOB_KEY.newBuilder(), ImmutableSet.of(0), DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -690,20 +710,18 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testRestartShardsFails() throws Exception {
+  public void testRestartShardsNotFoundTasksFailure() throws Exception {
     Set<Integer> shards = ImmutableSet.of(1, 6);
 
-    String message = "Injected.";
     expectAuth(ROLE, true);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
-    scheduler.restartShards(JOB_KEY, shards, USER);
-    expectLastCall().andThrow(new ScheduleException(message));
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    storageUtil.expectTaskFetch(Query.instanceScoped(JOB_KEY, shards).active());
 
     control.replay();
 
-    Response resp = thrift.restartShards(JOB_KEY.newBuilder(), shards, DEFAULT_LOCK, SESSION);
-    assertResponse(INVALID_REQUEST, resp);
-    assertMessageMatches(resp, message);
+    assertResponse(
+        INVALID_REQUEST,
+        thrift.restartShards(JOB_KEY.newBuilder(), shards, LOCK.newBuilder(), SESSION));
   }
 
   @Test

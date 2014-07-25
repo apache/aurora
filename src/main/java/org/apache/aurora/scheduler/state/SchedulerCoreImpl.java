@@ -20,7 +20,6 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -29,7 +28,6 @@ import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.Positive;
 
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
@@ -51,7 +49,6 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 
 /**
@@ -195,40 +192,6 @@ class SchedulerCoreImpl implements SchedulerCore {
         }
 
         stateManager.insertPendingTasks(Maps.asMap(instanceIds, Functions.constant(config)));
-      }
-    });
-  }
-
-  @Override
-  public void restartShards(
-      IJobKey jobKey,
-      final Set<Integer> shards,
-      final String requestingUser) throws ScheduleException {
-
-    if (!JobKeys.isValid(jobKey)) {
-      throw new ScheduleException("Invalid job key: " + jobKey);
-    }
-
-    if (shards.isEmpty()) {
-      throw new ScheduleException("At least one shard must be specified.");
-    }
-
-    final Query.Builder query = Query.instanceScoped(jobKey, shards).active();
-    storage.write(new MutateWork.NoResult<ScheduleException>() {
-      @Override
-      protected void execute(MutableStoreProvider storeProvider) throws ScheduleException {
-        Set<IScheduledTask> matchingTasks = storeProvider.getTaskStore().fetchTasks(query);
-        if (matchingTasks.size() != shards.size()) {
-          throw new ScheduleException("Not all requested shards are active.");
-        }
-        LOG.info("Restarting shards matching " + query);
-        for (String taskId : Tasks.ids(matchingTasks)) {
-          stateManager.changeState(
-              taskId,
-              Optional.<ScheduleStatus>absent(),
-              RESTARTING,
-              Optional.of("Restarted by " + requestingUser));
-        }
       }
     });
   }

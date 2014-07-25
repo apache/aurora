@@ -78,7 +78,6 @@ import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
-import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
@@ -497,47 +496,6 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     control.replay();
     assertTrue(Query.isSingleJobScoped(Query.jobScoped(KEY_A)));
     assertFalse(Query.isSingleJobScoped(Query.jobScoped(KEY_A).byId("xyz")));
-  }
-
-  @Test
-  public void testRestartShards() throws Exception {
-    expectKillTask(2);
-    expectTaskNotThrottled().times(2);
-
-    control.replay();
-    buildScheduler();
-
-    scheduler.createJob(makeJob(KEY_A, productionTask().setIsService(true), 6));
-    changeStatus(Query.jobScoped(KEY_A), ASSIGNED, RUNNING);
-    scheduler.restartShards(KEY_A, ImmutableSet.of(1, 5), OWNER_A.user);
-    assertEquals(4, getTasks(Query.unscoped().byStatus(RUNNING)).size());
-    assertEquals(2, getTasks(Query.unscoped().byStatus(RESTARTING)).size());
-    changeStatus(Query.unscoped().byStatus(RESTARTING), FINISHED);
-    assertEquals(2, getTasks(Query.unscoped().byStatus(PENDING)).size());
-  }
-
-  @Test(expected = ScheduleException.class)
-  public void testRestartNonexistentShard() throws Exception {
-    expectTaskNotThrottled();
-    expectNoCronJob(KEY_A);
-
-    control.replay();
-    buildScheduler();
-
-    scheduler.createJob(makeJob(KEY_A, productionTask().setIsService(true), 1));
-    changeStatus(Query.jobScoped(KEY_A), ASSIGNED, FINISHED);
-    scheduler.restartShards(KEY_A, ImmutableSet.of(5), OWNER_A.user);
-  }
-
-  @Test
-  public void testRestartPendingShard() throws Exception {
-    expect(cronJobManager.hasJob(KEY_A)).andReturn(false);
-
-    control.replay();
-    buildScheduler();
-
-    scheduler.createJob(makeJob(KEY_A, productionTask().setIsService(true), 1));
-    scheduler.restartShards(KEY_A, ImmutableSet.of(0), OWNER_A.user);
   }
 
   @Test
