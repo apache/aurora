@@ -11,7 +11,7 @@ Submitting a Patch for Review
 -----------------------------
 Post a review with `rbt`, fill out the fields in your browser and hit Publish.
 
-    ./rbt post -o -g
+    ./rbt post -o
 
 Updating an Existing Review
 ---------------------------

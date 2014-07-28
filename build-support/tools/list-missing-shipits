@@ -97,8 +97,8 @@ class Reviewboard(object):
     if self._url is not None:
       base_cmd += ['--server=%s' % self._url]
     return json.loads(subprocess.Popen(
-      base_cmd + [resource, '--'] + ['--%s=%s' % (k, v) for k, v in params.items()],
-      stdout=subprocess.PIPE).communicate()[0])
+        base_cmd + [resource] + ['--%s=%s' % (k, v) for k, v in params.items()],
+        stdout=subprocess.PIPE).communicate()[0])
 
   def get_server_url(self):
     return self._get('info')['info']['site']['url']
