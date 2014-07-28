@@ -360,6 +360,8 @@ tasks.checkstyleMain.dependsOn(jsHint)
  * contain the path to the thrift executable when finished
  */
 task bootstrapThrift {
+  logging.captureStandardOutput LogLevel.INFO
+
   project.ext.set('thrift', '')
 
   try {

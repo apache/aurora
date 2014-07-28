@@ -20,7 +20,7 @@ THRIFT = ./thrift-$(THRIFT_VERSION)/compiler/cpp/thrift
 all: $(THRIFT)
 
 $(THRIFT):
-	curl $(THRIFT_URL) | tar zxv
+	curl -s $(THRIFT_URL) | tar zxv
 	(cd $(THRIFT_DISTNAME) && ./configure --without-tests --without-php --without-php_extension \
 		--without-ruby --without-haskell --without-d --without-go --without-perl --without-python \
 		--without-erlang --without-java --without-c_glib)
