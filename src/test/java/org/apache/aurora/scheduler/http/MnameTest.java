@@ -14,23 +14,144 @@
 package org.apache.aurora.scheduler.http;
 
 import java.util.Map;
+import java.util.Set;
+
+import javax.ws.rs.HttpMethod;
+import javax.ws.rs.core.HttpHeaders;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.ClientResponse.Status;
 
 import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.gen.ScheduledTask;
+import org.apache.aurora.scheduler.base.JobKeys;
+import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class MnameTest {
+public class MnameTest extends ServletModuleTest {
+
+  private static final String SLAVE_HOST = "fakehost";
+  private static final int PORT = 50000;
+  private static final String APP_URI = "http://" + SLAVE_HOST + ":" + PORT + "/";
+
+  private static final IScheduledTask TASK = IScheduledTask.build(
+      new ScheduledTask()
+          .setStatus(ScheduleStatus.RUNNING)
+          .setAssignedTask(
+              new AssignedTask()
+                  .setSlaveHost("fakehost")
+                  .setAssignedPorts(ImmutableMap.of("http", 50000))));
+  private static final Query.Builder TASK_QUERY =
+      Query.instanceScoped(JobKeys.from("myrole", "test", "myjob"), 1).active();
+
+  @Test
+  public void testGetUsage() {
+    replayAndStart();
+
+    ClientResponse response = getRequestBuilder("/mname")
+        .get(ClientResponse.class);
+    assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testHttpMethods() {
+    storage.expectOperations();
+
+    Set<String> methods =
+        ImmutableSet.of(HttpMethod.GET, HttpMethod.PUT, HttpMethod.POST, HttpMethod.DELETE);
+    storage.expectTaskFetch(TASK_QUERY, TASK).times(methods.size());
+
+    replayAndStart();
+
+    for (String method : methods) {
+      ClientResponse response = getRequestBuilder("/mname/myrole/test/myjob/1")
+          .method(method, ClientResponse.class);
+      assertEquals(Status.TEMPORARY_REDIRECT.getStatusCode(), response.getStatus());
+      assertEquals(APP_URI, response.getHeaders().getFirst(HttpHeaders.LOCATION));
+    }
+  }
+
+  @Test
+  public void testForwardPathAndQuery() {
+    storage.expectOperations();
+
+    Set<String> methods =
+        ImmutableSet.of(HttpMethod.GET, HttpMethod.PUT, HttpMethod.POST, HttpMethod.DELETE);
+    storage.expectTaskFetch(TASK_QUERY, TASK).times(methods.size());
+
+    replayAndStart();
+
+    String pathAndQuery = "path?query=2";
+
+    for (String method : methods) {
+      ClientResponse response = getRequestBuilder("/mname/myrole/test/myjob/1/" + pathAndQuery)
+          .method(method, ClientResponse.class);
+      assertEquals(Status.TEMPORARY_REDIRECT.getStatusCode(), response.getStatus());
+      assertEquals(APP_URI + pathAndQuery, response.getHeaders().getFirst(HttpHeaders.LOCATION));
+    }
+  }
+
+  @Test
+  public void testInstanceAbsent() {
+    storage.expectOperations();
+
+    storage.expectTaskFetch(TASK_QUERY);
+
+    replayAndStart();
+
+    ClientResponse response = getRequestBuilder("/mname/myrole/test/myjob/1")
+        .get(ClientResponse.class);
+    assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testInstanceNotRunning() {
+    storage.expectOperations();
+
+    IScheduledTask pending =
+        IScheduledTask.build(TASK.newBuilder().setStatus(ScheduleStatus.PENDING));
+
+    storage.expectTaskFetch(TASK_QUERY, pending);
+
+    replayAndStart();
+
+    ClientResponse response = getRequestBuilder("/mname/myrole/test/myjob/1")
+        .get(ClientResponse.class);
+    assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testInstanceNoHttp() {
+    storage.expectOperations();
+
+    ScheduledTask builder = TASK.newBuilder();
+    builder.getAssignedTask().setAssignedPorts(ImmutableMap.of("telnet", 80));
+    IScheduledTask noHttp = IScheduledTask.build(builder);
+
+    storage.expectTaskFetch(TASK_QUERY, noHttp);
+
+    replayAndStart();
+
+    ClientResponse response = getRequestBuilder("/mname/myrole/test/myjob/1")
+        .get(ClientResponse.class);
+    assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+  }
 
   @Test
   public void testRedirectPort() {
-    assertEquals(Optional.absent(), getRedirectPort(null));
-    assertEquals(Optional.absent(), getRedirectPort(ImmutableMap.<String, Integer>of()));
-    assertEquals(Optional.absent(), getRedirectPort(ImmutableMap.of("thrift", 5)));
+    replayAndStart();
+
+    assertEquals(Optional.<Integer>absent(), getRedirectPort(null));
+    assertEquals(Optional.<Integer>absent(), getRedirectPort(ImmutableMap.<String, Integer>of()));
+    assertEquals(Optional.<Integer>absent(), getRedirectPort(ImmutableMap.of("thrift", 5)));
     assertEquals(Optional.of(5), getRedirectPort(ImmutableMap.of("health", 5, "http", 6)));
     assertEquals(Optional.of(6), getRedirectPort(ImmutableMap.of("http", 6)));
     assertEquals(Optional.of(7), getRedirectPort(ImmutableMap.of("HTTP", 7)));

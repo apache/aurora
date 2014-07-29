@@ -25,9 +25,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriBuilder;
@@ -71,7 +69,6 @@ public class Mname {
   }
 
   @GET
-  @Produces(MediaType.TEXT_HTML)
   public Response getUsage() {
     return Response
         .status(Status.BAD_REQUEST)
@@ -81,7 +78,6 @@ public class Mname {
 
   @GET
   @Path("/{role}/{env}/{job}/{instance}/{forward:.+}")
-  @Produces(MediaType.TEXT_HTML)
   public Response getWithForwardRequest(
       @PathParam("role") String role,
       @PathParam("env") String env,
@@ -95,7 +91,6 @@ public class Mname {
 
   @PUT
   @Path("/{role}/{env}/{job}/{instance}/{forward:.+}")
-  @Produces(MediaType.TEXT_HTML)
   public Response putWithForwardRequest(
       @PathParam("role") String role,
       @PathParam("env") String env,
@@ -109,7 +104,6 @@ public class Mname {
 
   @POST
   @Path("/{role}/{env}/{job}/{instance}/{forward:.+}")
-  @Produces(MediaType.TEXT_HTML)
   public Response postWithForwardRequest(
       @PathParam("role") String role,
       @PathParam("env") String env,
@@ -123,7 +117,6 @@ public class Mname {
 
   @DELETE
   @Path("/{role}/{env}/{job}/{instance}/{forward:.+}")
-  @Produces(MediaType.TEXT_HTML)
   public Response deleteWithForwardRequest(
       @PathParam("role") String role,
       @PathParam("env") String env,
@@ -137,7 +130,6 @@ public class Mname {
 
   @GET
   @Path("/{role}/{env}/{job}/{instance}")
-  @Produces(MediaType.TEXT_HTML)
   public Response get(
       @PathParam("role") String role,
       @PathParam("env") String env,
@@ -150,7 +142,6 @@ public class Mname {
 
   @PUT
   @Path("/{role}/{env}/{job}/{instance}")
-  @Produces(MediaType.TEXT_HTML)
   public Response put(
       @PathParam("role") String role,
       @PathParam("env") String env,
@@ -163,7 +154,6 @@ public class Mname {
 
   @POST
   @Path("/{role}/{env}/{job}/{instance}")
-  @Produces(MediaType.TEXT_HTML)
   public Response post(
       @PathParam("role") String role,
       @PathParam("env") String env,
@@ -176,7 +166,6 @@ public class Mname {
 
   @DELETE
   @Path("/{role}/{env}/{job}/{instance}")
-  @Produces(MediaType.TEXT_HTML)
   public Response delete(
       @PathParam("role") String role,
       @PathParam("env") String env,
