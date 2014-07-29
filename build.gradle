@@ -204,16 +204,16 @@ dependencies {
   compile 'com.twitter.common:net-util:0.0.80'
   compile 'com.twitter.common:quantity:0.0.71'
   compile 'com.twitter.common:stats:0.0.91'
-  compile 'com.twitter.common:testing-easymock:0.0.4'
   compile 'com.twitter.common:thrift:0.0.68'
   compile 'com.twitter.common:util-executor-service-shutdown:0.0.49'
-  compile 'com.twitter.common:util-system-mocks:0.0.72'
   compile 'com.twitter.common:util-templating:0.0.25'
   compile 'com.twitter.common:util-testing:0.0.10'
   compile 'com.twitter.common:util:0.0.94'
-  compile 'com.twitter.common:zookeeper-testing:0.0.45'
 
   testCompile "com.sun.jersey:jersey-client:${jerseyRev}"
+  testCompile 'com.twitter.common:testing-easymock:0.0.4'
+  testCompile 'com.twitter.common:util-system-mocks:0.0.72'
+  testCompile 'com.twitter.common:zookeeper-testing:0.0.45'
   testCompile "junit:junit:${junitRev}"
 
   generatedCompile gsonDep
