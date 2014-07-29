@@ -18,14 +18,14 @@
   auroraUI.directive('roleLink', function () {
     return {
       restrict: 'C',
-      template: '<a ng-href="/scheduler/{{formatedValue}}">{{formatedValue}}</a>'
+      template: '<a ng-href="/scheduler/{{formattedValue}}">{{formattedValue}}</a>'
     };
   });
 
   auroraUI.directive('roleEnvLink', function () {
     return {
       restrict: 'C',
-      template: '<a ng-href="/scheduler/{{dataRow.role}}/{{formatedValue}}">{{formatedValue}}</a>'
+      template: '<a ng-href="/scheduler/{{dataRow.role}}/{{formattedValue}}">{{formattedValue}}</a>'
     };
   });
 
@@ -33,8 +33,8 @@
     return {
       restrict: 'C',
       template:
-        '<a ng-href="/scheduler/{{dataRow.role}}/{{dataRow.environment}}/{{formatedValue}}">' +
-        '{{formatedValue}}</a>'
+        '<a ng-href="/scheduler/{{dataRow.role}}/{{dataRow.environment}}/{{formattedValue}}">' +
+        '{{formattedValue}}</a>'
     };
   });
 
@@ -63,10 +63,10 @@
     return {
       restrict: 'E',
       replace: true,
-      link: function (scope, element, attrs, ctrl) {
-        element.on('click', function (e) {
+      link: function (scope) {
+        scope.toggleShowDetails = function () {
           scope.showDetails = !scope.showDetails;
-        });
+        };
       }
     };
   });
@@ -74,8 +74,8 @@
   auroraUI.directive('taskLink', function () {
     return {
       restrict: 'C',
-      template: '<a class="col-md-8" ng-href="/structdump/task/{{formatedValue}}" target="_self">' +
-        '{{formatedValue}}</a>'
+      template: '<a class="col-md-8" ng-href="/structdump/task/{{formattedValue}}" ' +
+        'target="_self">{{formattedValue}}</a>'
     };
   });
 

@@ -13,12 +13,16 @@
     limitations under the License.
   -->
   <div>
-    <span title='{{formatedValue | scheduleStatusTooltip}}'>
-      <span ng-if='!showDetails'><i class='glyphicon glyphicon-plus'></i></span>
-      <span ng-if='showDetails'><i class='glyphicon glyphicon-minus'></i></span>
+    <span title='{{formattedValue | scheduleStatusTooltip}}'>
+      <span ng-if='!showDetails'>
+        <i class='glyphicon glyphicon-plus' ng-click="toggleShowDetails()"></i>
+      </span>
+      <span ng-if='showDetails'>
+        <i class='glyphicon glyphicon-minus' ng-click="toggleShowDetails()"></i>
+      </span>
       <span>
         {{dataRow.latestActivity | toElapsedTime}} ago -
-        <span class='schedulingStatus'>{{formatedValue}}</span>
+        <span class='schedulingStatus'>{{formattedValue}}</span>
         <span ng-if='dataRow.statusMessage'>: {{dataRow.statusMessage}}</span>
       </span>
     </span>

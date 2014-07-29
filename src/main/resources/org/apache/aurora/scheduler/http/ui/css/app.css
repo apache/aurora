@@ -21,6 +21,10 @@
   border-bottom: darkgray 1px solid;
 }
 
+a {
+  cursor: pointer
+}
+
 .logo {
   width: 200px;
 }
