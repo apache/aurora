@@ -173,6 +173,23 @@ def maybe_disable_hooks(options):
     log.info('Client hooks disabled; reason given by user: %s' % options.disable_all_hooks_reason)
 
 
+def really_create(job_spec, config_file, options):
+  try:
+    config = get_job_config(job_spec, config_file, options)
+  except ValueError as v:
+    print("Error: %s" % v)
+    sys.exit(1)
+  api = make_client(config.cluster())
+  resp = api.create_job(config)
+  check_and_log_response(resp)
+  handle_open(api.scheduler_proxy.scheduler_client().url, config.role(), config.environment(),
+      config.name())
+  if options.wait_until == 'RUNNING':
+    JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.running_or_finished)
+  elif options.wait_until == 'FINISHED':
+    JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.terminal)
+
+
 @app.command
 @app.command_option(ENVIRONMENT_BIND_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
@@ -190,20 +207,8 @@ def create(job_spec, config_file):
   options = app.get_options()
   CoreCommandHook.run_hooks("create", options, job_spec, config_file)
   maybe_disable_hooks(options)
-  try:
-    config = get_job_config(job_spec, config_file, options)
-  except ValueError as v:
-    print("Error: %s" % v)
-    sys.exit(1)
-  api = make_client(config.cluster())
-  resp = api.create_job(config)
-  check_and_log_response(resp)
-  handle_open(api.scheduler_proxy.scheduler_client().url, config.role(), config.environment(),
-      config.name())
-  if options.wait_until == 'RUNNING':
-    JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.running_or_finished)
-  elif options.wait_until == 'FINISHED':
-    JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.terminal)
+  return really_create(job_spec, config_file, options)
+
 
 
 @app.command
@@ -370,6 +375,15 @@ def inspect(job_spec, config_file):
     print()
 
 
+def really_start_cron(args, options):
+  api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
+      args, options, make_client_factory())
+  config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
+  resp = api.start_cronjob(job_key, config=config)
+  check_and_log_response(resp)
+  handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
+
+
 @app.command
 @app.command_option(CLUSTER_INVOKE_OPTION)
 @app.command_option(OPEN_BROWSER_OPTION)
@@ -382,12 +396,7 @@ def start_cron(args, options):
   """
   CoreCommandHook.run_hooks("start_cron", options, *args)
   maybe_disable_hooks(options)
-  api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
-      args, options, make_client_factory())
-  config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
-  resp = api.start_cronjob(job_key, config=config)
-  check_and_log_response(resp)
-  handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
+  return really_start_cron(args, options)
 
 
 @app.command
@@ -455,6 +464,10 @@ def kill(args, options):
   """
   CoreCommandHook.run_hooks("kill", options, *args)
   maybe_disable_hooks(options)
+  return really_kill(args, options)
+
+
+def really_kill(args, options):
   if options.shards is None:
     print('Shards option is required for kill; use killall to kill all shards', file=sys.stderr)
     exit(1)
@@ -511,17 +524,10 @@ def kill_in_batches(api, job_key, instances_arg, batch_size, max_failures):
       return 1
 
 
-@app.command
-@app.command_option(CLUSTER_INVOKE_OPTION)
-@app.command_option(OPEN_BROWSER_OPTION)
-@app.command_option(DISABLE_HOOKS_OPTION)
-@app.command_option(BATCH_OPTION)
-@app.command_option(MAX_FAILURES_OPTION)
-def killall(args, options):
-  """usage: killall cluster/role/env/job
-  Kills all tasks in a running job, blocking until all specified tasks have been terminated.
+def really_killall(args, options):
+  """Helper for testing purposes: make it easier to mock out the actual kill process,
+  while testing hooks in the command dispatch process.
   """
-  CoreCommandHook.run_hooks("killall", options, *args)
   maybe_disable_hooks(options)
   job_key = AuroraJobKey.from_path(args[0])
   config_file = args[1] if len(args) > 1 else None  # the config for hooks
@@ -534,6 +540,20 @@ def killall(args, options):
     check_and_log_response(resp)
   handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
   wait_kill_tasks(api.scheduler_proxy, job_key)
+
+
+@app.command
+@app.command_option(CLUSTER_INVOKE_OPTION)
+@app.command_option(OPEN_BROWSER_OPTION)
+@app.command_option(DISABLE_HOOKS_OPTION)
+@app.command_option(BATCH_OPTION)
+@app.command_option(MAX_FAILURES_OPTION)
+def killall(args, options):
+  """usage: killall cluster/role/env/job
+  Kills all tasks in a running job, blocking until all specified tasks have been terminated.
+  """
+  CoreCommandHook.run_hooks("killall", options, *args)
+  really_killall(args, options)
 
 
 @app.command
@@ -600,6 +620,34 @@ def status(args, options):
     log.info('No tasks found.')
 
 
+def really_update(job_spec, config_file, options):
+  def warn_if_dangerous_change(api, job_spec, config):
+    # Get the current job status, so that we can check if there's anything
+    # dangerous about this update.
+    resp = api.query_no_configs(api.build_query(config.role(), config.name(),
+        statuses=ACTIVE_STATES, env=config.environment()))
+    if resp.responseCode != ResponseCode.OK:
+      die('Could not get job status from server for comparison: %s' % resp.messageDEPRECATED)
+    remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
+    resp = api.populate_job_config(config)
+    if resp.responseCode != ResponseCode.OK:
+      die('Server could not populate job config for comparison: %s' % resp.messageDEPRECATED)
+    local_task_count = len(resp.result.populateJobResult.populated)
+    remote_task_count = len(remote_tasks)
+    if (local_task_count >= 4 * remote_task_count or local_task_count <= 4 * remote_task_count
+        or local_task_count == 0):
+      print('Warning: this update is a large change. Press ^c within 5 seconds to abort')
+      time.sleep(5)
+
+  maybe_disable_hooks(options)
+  config = get_job_config(job_spec, config_file, options)
+  api = make_client(config.cluster())
+  if not options.force:
+    warn_if_dangerous_change(api, job_spec, config)
+  resp = api.update_job(config, options.health_check_interval_seconds, options.shards)
+  check_and_log_response(resp)
+
+
 @app.command
 @app.command_option(SHARDS_OPTION)
 @app.command_option(ENVIRONMENT_BIND_OPTION)
@@ -632,33 +680,30 @@ def update(job_spec, config_file):
   You may want to consider using the 'diff' subcommand before updating,
   to preview what changes will take effect.
   """
-  def warn_if_dangerous_change(api, job_spec, config):
-    # Get the current job status, so that we can check if there's anything
-    # dangerous about this update.
-    resp = api.query_no_configs(api.build_query(config.role(), config.name(),
-        statuses=ACTIVE_STATES, env=config.environment()))
-    if resp.responseCode != ResponseCode.OK:
-      die('Could not get job status from server for comparison: %s' % resp.messageDEPRECATED)
-    remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
-    resp = api.populate_job_config(config)
-    if resp.responseCode != ResponseCode.OK:
-      die('Server could not populate job config for comparison: %s' % resp.messageDEPRECATED)
-    local_task_count = len(resp.result.populateJobResult.populated)
-    remote_task_count = len(remote_tasks)
-    if (local_task_count >= 4 * remote_task_count or local_task_count <= 4 * remote_task_count
-        or local_task_count == 0):
-      print('Warning: this update is a large change. Press ^c within 5 seconds to abort')
-      time.sleep(5)
-
   options = app.get_options()
   CoreCommandHook.run_hooks("update", options, job_spec, config_file)
+  return really_update(job_spec, config_file, options)
+
+
+def really_restart(args, options):
+  if options.max_total_failures < 0:
+    print("max_total_failures option must be >0, but you specified %s" % options.max_total_failures,
+      file=sys.stderr)
+    exit(1)
   maybe_disable_hooks(options)
-  config = get_job_config(job_spec, config_file, options)
-  api = make_client(config.cluster())
-  if not options.force:
-    warn_if_dangerous_change(api, job_spec, config)
-  resp = api.update_job(config, options.health_check_interval_seconds, options.shards)
+  api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
+      args, options, make_client_factory())
+  config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
+  updater_config = UpdaterConfig(
+      options.batch_size,
+      options.restart_threshold,
+      options.watch_secs,
+      options.max_per_shard_failures,
+      options.max_total_failures)
+  resp = api.restart(job_key, options.shards, updater_config,
+      options.health_check_interval_seconds, config=config)
   check_and_log_response(resp)
+  handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
 
 
 @app.command
@@ -715,24 +760,15 @@ def restart(args, options):
   Restarts are fully controlled client-side, so aborting halts the restart.
   """
   CoreCommandHook.run_hooks("restart", options, *args)
-  if options.max_total_failures < 0:
-    print("max_total_failures option must be >0, but you specified %s" % options.max_total_failures,
-      file=sys.stderr)
-    exit(1)
-  maybe_disable_hooks(options)
+  return really_restart(args, options)
+
+
+def really_cancel_update(args, options):
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
-  updater_config = UpdaterConfig(
-      options.batch_size,
-      options.restart_threshold,
-      options.watch_secs,
-      options.max_per_shard_failures,
-      options.max_total_failures)
-  resp = api.restart(job_key, options.shards, updater_config,
-      options.health_check_interval_seconds, config=config)
+  resp = api.cancel_update(job_key, config=config)
   check_and_log_response(resp)
-  handle_open(api.scheduler_proxy.scheduler_client().url, job_key.role, job_key.env, job_key.name)
 
 
 @app.command
@@ -746,11 +782,7 @@ def cancel_update(args, options):
   be used when the user is confident that they are not conflicting with another user.
   """
   CoreCommandHook.run_hooks("cancel_update", options, *args)
-  api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
-      args, options, make_client_factory())
-  config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
-  resp = api.cancel_update(job_key, config=config)
-  check_and_log_response(resp)
+  return really_cancel_update(args, options)
 
 
 @app.command
