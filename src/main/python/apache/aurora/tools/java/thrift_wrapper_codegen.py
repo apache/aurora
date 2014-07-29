@@ -64,22 +64,33 @@ class ParameterizedType(Type):
 class StructType(Type):
   '''A thrift-defined type, which composes other types as fields.'''
 
-  def __init__(self, name, package, kind, fields):
+  def __init__(self, name, package, kind, fields, doc):
     Type.__init__(self, name, package, kind == 'enum')
     self.codegen_name = 'I%s' % name
     self.kind = kind
     self.fields = fields
+    self.doc = doc
 
   def __str__(self):
     return '%s %s { %s }' % (self.kind, self.name, ', '.join(map(str, self.fields)))
 
+class EnumType(StructType):
+  '''A thrift-defined value enumeration.'''
+
+  def __init__(self, name, package, values, doc):
+    StructType.__init__(self, name, package, 'enum', [], doc)
+    self.values = values
+
+  def __str__(self):
+    return '%s (%s)' % (self.name, ', '.join(self.values))
 
 class Field(object):
   '''A field within a thrift structure.'''
 
-  def __init__(self, ttype, name):
+  def __init__(self, ttype, name, doc):
     self.ttype = ttype
     self.name = name
+    self.doc = doc
 
   def accessor_method(self):
     return '%s%s' % (
@@ -126,20 +137,9 @@ STRUCT_COLLECTION_FIELD_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
 
 PACKAGE_NAME = 'org.apache.aurora.scheduler.storage.entities'
 
-CLASS_TEMPLATE = '''/*
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-package %(package)s;
+
+
+CLASS_TEMPLATE = '''package %(package)s;
 
 %(imports)s
 
@@ -283,6 +283,11 @@ class GeneratedCode(object):
 #    namespace java org.apache.aurora.gen
 NAMESPACE_RE = 'namespace\s+(?P<lang>\w+)\s+(?P<namespace>[^\s]+)'
 
+DOC_RE = '(\/\*+(?P<doc>[^\/]+)\*\/\s*)?'
+
+# Matches a complete struct definition, capturing the type and body.
+STRUCT_RE = DOC_RE + '(?P<kind>enum|struct|union)\s+(?P<name>\w+)\s+{(?P<body>[^}]+)}'
+
 # A possibly-parameterized type name, e.g.:
 #    int
 #    TaskConfig
@@ -290,15 +295,148 @@ NAMESPACE_RE = 'namespace\s+(?P<lang>\w+)\s+(?P<namespace>[^\s]+)'
 #    Map<String, TaskConfig>
 TYPE_PATTERN = '(?P<type>\w+)(?:<(?P<params>[^>]+)>)?'
 
-
-# Matches a complete struct definnition, capturing the type and body.
-STRUCT_RE = '(?P<kind>enum|struct|union)\s+(?P<name>\w+)\s+{(?P<body>[^}]+)}'
-
-
 # A field definition within a struct, e.g.:
 #     1: string name
 #     15: Map<String, TaskConfig> configs  # Configs mapped by name.
-FIELD_RE = '\s*\d+:\s+(?:(?:required|optional)\s+)?(%s)\s+(?P<name>\w+).*' % TYPE_PATTERN
+FIELD_RE = DOC_RE + '\s*\d+:\s+(?:(?:required|optional)\s+)?(%s)\s+(?P<name>\w+).*' % TYPE_PATTERN
+
+# An enum value definition, e.g.:
+#    INVALID_REQUEST = 0,
+ENUM_VALUE_RE = DOC_RE + '\s*(?P<name>\w+)\s*=\s*\d+,?'
+
+
+class Service(object):
+  def __init__(self, name, parent, methods):
+    self.name = name
+    self.parent = parent
+    self.methods = methods
+
+  def __str__(self):
+    return ''.join([self.name, self.parent or '', '  ' + '\n  '.join(map(str, self.methods))])
+
+class Method(object):
+  def __init__(self, name, parameters, return_type, doc):
+    self.name = name
+    self.parameters = parameters
+    self.return_type = return_type
+    self.doc = doc
+
+  def __str__(self):
+    return '%s(%s)' % (self.name, ', '.join(map(str, self.parameters)))
+
+class Parameter(object):
+  def __init__(self, name, type_name):
+    self.name = name
+    self.type_name = type_name
+
+  def __str__(self):
+    return '%s %s' % (self.type_name, self.name)
+
+class GenericParameter(Parameter):
+  def __init__(self, name, type_name, parameters):
+    Parameter.__init__(self, name, type_name)
+    self.parameters = parameters
+
+GET_SUPER_METHODS = '.putAll(%(super)sMetadata.METHODS)'
+
+PARAM_METADATA_TEMPLATE = '.put("%(name)s", %(type)s.class)'
+
+GENERIC_PARAM_METADATA_TEMPLATE = (
+    '.put("%(name)s", new TypeToken<%(type)s<%(params)s>>() {}.getType())')
+
+METHOD_METADATA_TEMPLATE = '''.put(
+              "%(name)s",
+              ImmutableMap.<String, Type>builder()%(params)s
+                  .build())'''
+
+SERVICE_METADATA_TEMPLATE = '''package %(package)s;
+
+import java.lang.reflect.Type;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.gson.reflect.TypeToken;
+
+import org.apache.aurora.gen.*;
+
+public final class %(name)sMetadata {
+  public static final Map<String, Map<String, Type>> METHODS =
+      ImmutableMap.<String, Map<String, Type>>builder()
+          %(methods)s
+          .build();
+
+  private %(name)sMetadata() {
+    // Utility class
+  }
+}
+'''
+
+HTML_TEMPLATE = '''<html>
+  <head>
+    <title>Aurora Beta API Help</title>
+  </head>
+  <body>
+    %s
+  </body>
+</html>
+'''
+
+
+METHOD_ENTRY = '<li><a href="method/%(name)s.html">%(name)s</a></li>'
+
+
+SERVICE_DOC_PAGE_TEMPLATE = HTML_TEMPLATE % '''<h2>Available Methods</h2>
+    <ul>
+      %(methods)s
+    </ul>'''
+
+TYPE_LINK = '<a href="../type/%(name)s.html">%(name)s</a>'
+
+PARAM_ENTRY = '<li>%(type)s <code>%(name)s</code>: %(doc)s</li>'
+
+PARAMETERS_LIST = '''<ul>
+  %(params)s
+  </ul>'''
+
+METHOD_DOC_PAGE_TEMPLATE = HTML_TEMPLATE % '''<h2>POST /apibeta/%(method)s</h2>
+    <a href="../index.html">home</a>
+    <h4>Description</h4>
+    %(doc)s
+    <h4>Return Type</h4>
+    %(return)s
+    <h4>Parameters</h4>
+    %(parameters)s
+'''
+
+TYPE_DOC_PAGE_TEMPLATE = HTML_TEMPLATE % '''<h2>object %(name)s</h2>
+    <a href="../index.html">home</a>
+    <h4>Description</h4>
+    %(doc)s
+    <h4>Fields</h4>
+    <ul>
+    %(fields)s
+    </ul>
+'''
+
+ENUM_DOC_PAGE_TEMPLATE = HTML_TEMPLATE % '''<h2>enum %(name)s</h2>
+    <a href="../index.html">home</a>
+    <h4>Description</h4>
+    %(doc)s
+    <h4>Values</h4>
+    <ul>
+    %(values)s
+    </ul>
+'''
+
+ENUM_VALUE_ENTRY = '<li><code>%(value)s</code>: %(doc)s</li>'
+
+SERVICE_RE = 'service (?P<name>\w+)\s+(extends\s+(?P<super>\w+)\s+)?{(?P<body>[^}]+)}'
+
+METHOD_RE = DOC_RE + '\s*(?P<return>\w+)\s+(?P<name>\w+)\((?P<params>[^\)]*)\)'
+
+PARAM_RE = '\d+\:\s+%s\s+(?P<name>\w+)' % TYPE_PATTERN
 
 THRIFT_TYPES = {
   'bool': PrimitiveType('boolean', 'Boolean'),
@@ -340,17 +478,55 @@ def parse_structs(thrift_defs):
       ttype = ParameterizedType(type_name.title(), params)
     else:
       ttype = make_type(type_name)
-    return Field(ttype, field.group('name'))
+    return Field(ttype, field.group('name'), field.group('doc'))
 
   def parse_fields(field_str):
     return map(parse_field, re.finditer(FIELD_RE, field_str))
 
+  def parse_values(enum_str):
+    return [(m.group('name'), m.group('doc')) for m in re.finditer(ENUM_VALUE_RE, enum_str)]
+
   for s in re.finditer(STRUCT_RE, thrift_defs, flags=re.MULTILINE):
-    structs.append(StructType(s.group('name'),
-                              namespaces['java'],
-                              s.group('kind'),
-                              parse_fields(s.group('body'))))
+    if s.group('kind') == 'enum':
+      struct = EnumType(s.group('name'),
+                        namespaces['java'],
+                        parse_values(s.group('body')),
+                        s.group('doc'))
+    else:
+      struct = StructType(s.group('name'),
+                          namespaces['java'],
+                          s.group('kind'),
+                          parse_fields(s.group('body')),
+                          s.group('doc'))
+    structs.append(struct)
+
   return structs
+
+def parse_services(service_defs):
+  services = []
+
+  for s in re.finditer(SERVICE_RE, service_defs, flags=re.MULTILINE):
+    methods = []
+    for method in re.finditer(METHOD_RE, s.group('body'), flags=re.MULTILINE):
+      params = []
+      for param in re.finditer(PARAM_RE, method.group('params'), flags=re.MULTILINE):
+        if param.group('params'):
+          params.append(GenericParameter(
+              param.group('name'),
+              param.group('type'),
+              param.group('params').replace(' ', '').split(',')))
+        else:
+          params.append(Parameter(param.group('name'), param.group('type')))
+      methods.append(Method(method.group('name'),
+                            params,
+                            method.group('return'),
+                            method.group('doc')))
+    services.append(Service(s.group('name'), s.group('super'), methods))
+  return services
+
+def trim_doc_text(doc):
+  # Remove multiline comment text from doc strings
+  return re.sub('^\s*\*\s*', '', doc, flags=re.MULTILINE) if doc else None
 
 
 def generate_java(struct):
@@ -449,16 +625,17 @@ if __name__ == '__main__':
     if options.verbose:
       print(value)
 
-  if len(args) != 2:
-    print('usage: %s thrift_file output_directory' % sys.argv[0])
+  if len(args) != 3:
+    print('usage: %s thrift_file code_output_dir resource_output_dir' % sys.argv[0])
     sys.exit(1)
 
-  thrift_file, output_directory = args
+  thrift_file, code_output_dir, resource_output_dir = args
   with open(thrift_file) as f:
     # Load all structs found in the thrift file.
-    structs = parse_structs(f.read())
+    file_contents = f.read()
+    structs = parse_structs(file_contents)
 
-    package_dir = os.path.join(output_directory, PACKAGE_NAME.replace('.', os.path.sep))
+    package_dir = os.path.join(code_output_dir, PACKAGE_NAME.replace('.', os.path.sep))
     if not os.path.isdir(package_dir):
       os.makedirs(package_dir)
     for struct in structs:
@@ -470,3 +647,136 @@ if __name__ == '__main__':
       with open(gen_file, 'w') as f:
         code = generate_java(struct)
         code.dump(f)
+
+    services = parse_services(file_contents)
+    resource_dir = os.path.join(resource_output_dir, PACKAGE_NAME.replace('.', os.path.sep))
+    if not os.path.isdir(resource_dir):
+      os.makedirs(resource_dir)
+
+    methods_dir = os.path.join(resource_dir, 'method')
+    if not os.path.isdir(methods_dir):
+      os.makedirs(methods_dir)
+    types_dir = os.path.join(resource_dir, 'type')
+    if not os.path.isdir(types_dir):
+      os.makedirs(types_dir)
+
+    def get_service(name):
+      return [s for s in services if s.name == name][0]
+
+    service = get_service('AuroraAdmin')
+
+    all_methods = [] + service.methods
+    cur_service = service
+    while cur_service.parent:
+      cur_service = get_service(cur_service.parent)
+      all_methods += cur_service.methods
+
+    api_help_page = os.path.join(resource_dir, 'index.html')
+    log('Generating service help file %s' % api_help_page)
+    with open(api_help_page, 'w') as f:
+      method_entries = '\n  '.join([METHOD_ENTRY % {'name': m.name} for m in all_methods])
+      print(SERVICE_DOC_PAGE_TEMPLATE % {'methods': method_entries}, file=f)
+
+    def get_type_name(name):
+      if name in THRIFT_TYPES:
+        thrift_type = THRIFT_TYPES[name]
+        if isinstance(thrift_type, PrimitiveType):
+          return thrift_type.boxed_name
+        else:
+          return name
+      return name
+
+    def ttype_text(ttype):
+      if isinstance(ttype, PrimitiveType):
+        return ttype.name
+      elif isinstance(ttype, ParameterizedType):
+        return '%s&lt;%s&gt;' % (ttype.name, ', '.join(map(ttype_text, ttype.params)))
+      else:
+        return TYPE_LINK % {'name': ttype.name}
+
+    for struct in structs:
+      type_help_page = os.path.join(types_dir, '%s.html' % struct.name)
+      log('Generating type help file %s' % type_help_page)
+      with open(type_help_page, 'w') as f:
+        def make_field_help(field):
+          return PARAM_ENTRY % {'type': ttype_text(field.ttype),
+                                'name': field.name,
+                                'doc': trim_doc_text(field.doc)}
+
+        def value_entries(values):
+          return '\n      '.join([ENUM_VALUE_ENTRY % {'value': v[0],
+                                                      'doc': trim_doc_text(v[1])} for v in values])
+
+        if struct.kind == 'enum':
+          print(ENUM_DOC_PAGE_TEMPLATE % {'name': struct.name,
+                                          'values': value_entries(struct.values),
+                                          'doc': trim_doc_text(struct.doc)}, file=f)
+        else:
+          fields_text = '\n  '.join(make_field_help(f) for f in struct.fields)
+          print(TYPE_DOC_PAGE_TEMPLATE % {'name': struct.name,
+                                          'fields': fields_text,
+                                          'doc': trim_doc_text(struct.doc)}, file=f)
+
+    def type_text(type_name):
+      type_text = type_name
+      if type_name in THRIFT_TYPES:
+        thrift_type = THRIFT_TYPES[type_name]
+        if isinstance(thrift_type, PrimitiveType):
+          type_text = thrift_type.boxed_name
+      else:
+        type_text = TYPE_LINK % {'name': type_name}
+      return type_text
+
+    for method in all_methods:
+      method_help_page = os.path.join(methods_dir, '%s.html' % method.name)
+      log('Generating method help file %s' % method_help_page)
+      with open(method_help_page, 'w') as f:
+        def make_param_help(parameter):
+          return PARAM_ENTRY % {'type': type_text(parameter.type_name),
+                                'name': parameter.name,
+                                'doc': None}
+
+        def make_params_help(parameters):
+          if parameters:
+            return PARAMETERS_LIST % {'params': '\n  '.join([make_param_help(p) for p in parameters])}
+          else:
+            return 'This method has no parameters.'
+
+        print(METHOD_DOC_PAGE_TEMPLATE % {'method': method.name,
+                                          'parameters': make_params_help(method.parameters),
+                                          'return': type_text(method.return_type),
+                                          'doc': trim_doc_text(method.doc)},
+              file=f)
+
+    def add_param(param):
+      if param.type_name in THRIFT_TYPES:
+        thrift_type = THRIFT_TYPES[param.type_name]
+        if not isinstance(thrift_type, PrimitiveType):
+          return GENERIC_PARAM_METADATA_TEMPLATE % {
+            'name': param.name,
+            'type': thrift_type.name,
+            'params': ', '.join(map(get_type_name, param.parameters))
+          }
+      return PARAM_METADATA_TEMPLATE % {
+        'name': param.name,
+        'type': get_type_name(param.type_name)
+      }
+
+    def add_method(method):
+      spacing = '\n                  '
+      return METHOD_METADATA_TEMPLATE % {
+        'name': method.name,
+        'params': (spacing if method.parameters else '') + spacing.join(map(add_param, method.parameters))
+      }
+
+    method_metadata = '\n          '.join(map(add_method, all_methods))
+
+    service_metadata = SERVICE_METADATA_TEMPLATE % {
+            'package': PACKAGE_NAME,
+            'methods': method_metadata,
+            'name': service.name
+          }
+    gen_file = os.path.join(package_dir, '%sMetadata.java' % service.name)
+    log('Generating service metadata file %s' % gen_file)
+    with open(gen_file, 'w') as f:
+      print(service_metadata, file=f)

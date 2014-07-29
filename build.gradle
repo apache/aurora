@@ -42,6 +42,7 @@ buildDir = 'dist'
 def generatedDir = "$buildDir/generated-src"
 def generatedJavaDir = "$generatedDir/gen-java"
 def generatedJSDir = "$generatedDir/gen-js"
+def generatedResourceDir = "$generatedDir/resources"
 
 def thriftVersion = '0.9.1'
 
@@ -116,6 +117,7 @@ sourceSets {
     resources {
       srcDir '3rdparty/javascript'
       srcDir generatedJSDir
+      srcDir generatedResourceDir
     }
   }
   test {
@@ -144,11 +146,13 @@ dependencies {
   def slf4jRev = '1.6.1'
   def junitRev = '4.11'
 
+  def gsonDep = 'com.google.code.gson:gson:2.2.4'
   def guavaDep = 'com.google.guava:guava:16.0'
   def thriftLib = "org.apache.thrift:libthrift:${thriftVersion}"
 
   compile 'aopalliance:aopalliance:1.0'
   compile 'com.google.code.findbugs:jsr305:2.0.1'
+  compile gsonDep
   compile guavaDep
   compile 'com.google.inject:guice:3.0'
   compile 'com.google.protobuf:protobuf-java:2.5.0'
@@ -212,6 +216,7 @@ dependencies {
   testCompile "com.sun.jersey:jersey-client:${jerseyRev}"
   testCompile "junit:junit:${junitRev}"
 
+  generatedCompile gsonDep
   generatedCompile guavaDep
   generatedCompile thriftLib
 
@@ -224,6 +229,7 @@ dependencies {
 
       def forceDepVersions = [
         // Force versions based on the dependencies we use from above
+        'com.google.code.gson:gson': '2.2.4',
         'org.slf4j:slf4j-api' : slf4jRev,
         'log4j:log4j' : log4jRev,
         'org.apache.thrift:libthrift' : thriftVersion,
@@ -391,13 +397,15 @@ task bootstrapThrift {
 }
 
 task generateSources(dependsOn: ['bootstrapThrift', 'checkPython']) {
-  ext.inputFiles = fileTree(dir: 'src/main/thrift').matching { include '**/*.thrift' }
+  def codeGenerator = 'src/main/python/apache/aurora/tools/java/thrift_wrapper_codegen.py';
+  def thriftFiles = fileTree(dir: 'src/main/thrift').matching { include '**/*.thrift' }
+  ext.inputFiles = thriftFiles + files(codeGenerator)
   ext.outputDir = file(generatedDir)
   inputs.file inputFiles
   outputs.dir outputDir
   doLast {
     outputDir.exists() || outputDir.mkdirs()
-    inputFiles.each { File file ->
+    thriftFiles.each { File file ->
       exec {
         executable = project.thrift
         args = ['--gen', 'java:hashcode', '--gen', 'js:jquery', '-o', outputDir, file]
@@ -405,9 +413,10 @@ task generateSources(dependsOn: ['bootstrapThrift', 'checkPython']) {
     }
     exec {
       executable = project.py
-      args = ['src/main/python/apache/aurora/tools/java/thrift_wrapper_codegen.py',
+      args = [codeGenerator,
               'src/main/thrift/org/apache/aurora/gen/api.thrift',
-              generatedJavaDir]
+              generatedJavaDir,
+              generatedResourceDir]
     }
   }
 }
@@ -426,7 +435,7 @@ ideaProject.dependsOn generateSources
 
 idea {
   module {
-    def codegenDirs = [file(generatedJavaDir), file(generatedJSDir)]
+    def codegenDirs = [file(generatedJavaDir)]
 
     // These directories must exist, else the plugin omits them from the
     // generated project. Since this is executed during the configuration

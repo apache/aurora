@@ -39,6 +39,7 @@ import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 import com.twitter.thrift.ServiceInstance;
 
+import org.apache.aurora.scheduler.http.api.ApiBeta;
 import org.mortbay.servlet.GzipFilter;
 
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;
@@ -71,6 +72,8 @@ public class ServletModule extends AbstractModule {
     // NOTE: GzipFilter is applied only to /api instead of globally because the Jersey-managed
     // servlets have a conflicting filter applied to them.
     Registration.registerServletFilter(binder(), GzipFilter.class, "/api/*");
+    // TODO(wfarner): Add a unit test to validate gzip behavior.
+    Registration.registerServletFilter(binder(), GzipFilter.class, "/apibeta");
 
     // Bindings required for the leader redirector.
     requireBinding(LocalServiceRegistry.class);
@@ -99,6 +102,7 @@ public class ServletModule extends AbstractModule {
           filter("/api*").through(CorsFilter.class);
         }
 
+        registerJerseyEndpoint("/apibeta", ApiBeta.class);
         registerJerseyEndpoint("/cron", Cron.class);
         registerJerseyEndpoint("/locks", Locks.class);
         registerJerseyEndpoint("/maintenance", Maintenance.class);

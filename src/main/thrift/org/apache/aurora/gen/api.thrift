@@ -17,13 +17,18 @@ namespace py gen.apache.aurora.api
 
 // Thrift interface definition for the aurora scheduler.
 
+/*
+ * TODO(wfarner): It would be nice if we could put some HTML tags here, regex doesn't handle it though.
+ * The result of an API operation.  A result may only be specified when this is OK.
+ */
 enum ResponseCode {
   INVALID_REQUEST = 0,
   OK              = 1,
   ERROR           = 2,
   WARNING         = 3,
   AUTH_FAILED     = 4,
-  LOCK_ERROR      = 5  // Raised when a Lock-protected operation failed due to lock validation.
+  /** Raised when a Lock-protected operation failed due to lock validation. */
+  LOCK_ERROR      = 5
 }
 
 const i32 THRIFT_API_VERSION = 3
@@ -44,18 +49,25 @@ struct Identity {
 }
 
 struct SessionKey {
-  4: optional string mechanism  // The name of the authentication mechanism, which
-                                // instructs the server how to interpret the data field.
-  5: optional binary data       // A blob of data that the server may use for authentication.
+  /**
+   * The name of the authentication mechanism, which instructs the server how to interpret the data
+   * field.
+   */
+  4: optional string mechanism
+  /** A blob of data that the server may use for authentication. */
+  5: optional binary data
 }
 
 struct ResourceAggregate {
-  1: double numCpus  // Number of CPU cores allotted.
-  2: i64 ramMb       // Megabytes of RAM allotted.
-  3: i64 diskMb      // Megabytes of disk space allotted.
+  /** Number of CPU cores allotted. */
+  1: double numCpus
+  /** Megabytes of RAM allotted. */
+  2: i64 ramMb
+  /** Megabytes of disk space allotted. */
+  3: i64 diskMb
 }
 
-// A single host attribute.
+/** A single host attribute. */
 struct Attribute {
   1: string name
   2: set<string> values
@@ -68,7 +80,7 @@ enum MaintenanceMode {
   DRAINED   = 4
 }
 
-// The attributes assigned to a host.
+/** The attributes assigned to a host. */
 struct HostAttributes {
   1: string          host
   2: set<Attribute>  attributes
@@ -76,27 +88,33 @@ struct HostAttributes {
   4: optional string slaveId
 }
 
-// A constraint that specifies an explicit set of values, at least one of which must be present
-// on a host for a task to be scheduled there.
+/**
+ * A constraint that specifies an explicit set of values, at least one of which must be present
+ * on a host for a task to be scheduled there.
+ */
 struct ValueConstraint {
-  1: bool negated       // If true, treat this as a 'not' - to avoid specific values.
+  /** If true, treat this as a 'not' - to avoid specific values. */
+  1: bool negated
   2: set<string> values
 }
 
-// A constraint the specifies the maximum number of active tasks on a host with a matching
-// attribute that may be scheduled simultaneously.
+/**
+ * A constraint the specifies the maximum number of active tasks on a host with a matching
+ * attribute that may be scheduled simultaneously.
+ */
 struct LimitConstraint {
   1: i32 limit
 }
 
-// Types of constraints that may be applied to a task.
+/** Types of constraints that may be applied to a task. */
 union TaskConstraint {
   1: ValueConstraint value
   2: LimitConstraint limit
 }
 
-// A constraint that defines whether a task may be scheduled on a host.
+/** A constraint that defines whether a task may be scheduled on a host. */
 struct Constraint {
+  /** Mesos slave attribute that the constraint is matched against. */
   1: string name
   2: TaskConstraint constraint
 }
@@ -107,119 +125,159 @@ struct Package {
   3: i32 version
 }
 
-// Arbitrary key-value metadata to be included into TaskConfig.
+/** Arbitrary key-value metadata to be included into TaskConfig. */
 struct Metadata {
   1: string key
   2: string value
 }
 
-// A unique identifier for a Job.
+/** A unique identifier for a Job. */
 struct JobKey {
-  1: string role        // Mesos role (Unix service account), for example "mesos"
-  2: string environment // Environment, for example "devel"
-  3: string name        // Name, for example "labrat"
+  /** User role (Unix service account), for example "mesos" */
+  1: string role
+  /** Environment, for example "devel" */
+  2: string environment
+  /** Name, for example "labrat" */
+  3: string name
 }
 
-// A unique lock key.
+/** A unique lock key. */
 union LockKey {
   1: JobKey job
 }
 
-// A generic lock struct to facilitate context specific resource/operation serialization.
+/** A generic lock struct to facilitate context specific resource/operation serialization. */
 struct Lock {
-  1: LockKey key                // ID of the lock - unique per storage
-  2: string token               // UUID - facilitating soft lock authorization
-  3: string user                // Lock owner
-  4: i64 timestampMs            // Lock creation timestamp in milliseconds
-  5: optional string message    // Optional message to record with the lock
+  /** ID of the lock - unique per storage */
+  1: LockKey key
+  /** UUID - facilitating soft lock authorization */
+  2: string token
+  /** Lock creator */
+  3: string user
+  /** Lock creation timestamp in milliseconds */
+  4: i64 timestampMs
+  /** Optional message to record with the lock */
+  5: optional string message
 }
 
-// Defines the required lock validation level.
+/** Defines the required lock validation level. */
 enum LockValidation {
-  CHECKED   = 0   // The lock must be valid in order to be released.
-  UNCHECKED = 1   // The lock will be released without validation (aka "force release").
+  /** The lock must be valid in order to be released. */
+  CHECKED   = 0
+  /** The lock will be released without validation (aka "force release"). */
+  UNCHECKED = 1
 }
 
-// A unique identifier for the active task within a job.
+/** A unique identifier for the active task within a job. */
 struct InstanceKey {
-  1: JobKey jobKey   // Key identifying the job.
-  2: i32 instanceId  // Unique instance ID for the active task in a job.
+  /** Key identifying the job. */
+  1: JobKey jobKey
+  /** Unique instance ID for the active task in a job. */
+  2: i32 instanceId
 }
 
 struct ExecutorConfig {
-  1: string name    // Name identifying the Executor.
-  2: string data    // Executor configuration data.
+  /** Name identifying the Executor. */
+  1: string name
+  /** Executor configuration data. */
+  2: string data
 }
 
-// Description of the tasks contained within a job.
+/** Description of the tasks contained within a job. */
 struct TaskConfig {
-                                             // TODO(William Farner): Store a JobKey instead.
- 17: Identity owner                          // contains the role component of JobKey
- 26: string environment                      // contains the environment component of JobKey
-  3: string jobName                          // contains the name component of JobKey
+ // TODO(William Farner): Store a JobKey instead.
+ /** contains the role component of JobKey */
+ 17: Identity owner
+ /** contains the environment component of JobKey */
+ 26: string environment
+ /** contains the name component of JobKey */
+  3: string jobName
   7: bool isService
   8: double numCpus
   9: i64 ramMb
  10: i64 diskMb
  11: i32 priority
  13: i32 maxTaskFailures
- 18: optional bool production                // Whether this is a production task, which can preempt
-                                             // non-production tasks.
+ /** Whether this is a production task, which can preempt. */
+ 18: optional bool production
+
  20: set<Constraint> constraints
- 21: set<string> requestedPorts              // a list of named ports this task requests
- 22: optional map<string, string> taskLinks  // Custom links to include when displaying this task
-                                             // on the scheduler dashboard.  Keys are anchor text,
-                                             // values are URLs.
-                                             // Wildcards are supported for dynamic link
-                                             // crafting based on host, ports, instance, etc.
+ /** a list of named ports this task requests */
+ 21: set<string> requestedPorts
+
+ /**
+  * Custom links to include when displaying this task on the scheduler dashboard. Keys are anchor
+  * text, values are URLs. Wildcards are supported for dynamic link crafting based on host, ports,
+  * instance, etc.
+  */
+ 22: optional map<string, string> taskLinks
  23: optional string contactEmail
- 25: optional ExecutorConfig executorConfig  // Executor configuration
- 27: optional set<Metadata> metadata         // Used to display additional details in the UI.
+ /** Executor configuration */
+ 25: optional ExecutorConfig executorConfig
+ /** Used to display additional details in the UI. */
+ 27: optional set<Metadata> metadata
 }
 
-// Defines the policy for launching a new cron job when one is already running.
+/** Defines the policy for launching a new cron job when one is already running. */
 enum CronCollisionPolicy {
-  KILL_EXISTING = 0,  // Kills the existing job with the colliding name, and runs the new cron job.
-  CANCEL_NEW    = 1,  // Cancels execution of the new job, leaving the running job in tact.
-  RUN_OVERLAP   = 2   // DEPRECATED. For existing jobs, treated the same as CANCEL_NEW. createJob
-                      // will reject jobs with this policy.
+  /** Kills the existing job with the colliding name, and runs the new cron job. */
+  KILL_EXISTING = 0,
+  /** Cancels execution of the new job, leaving the running job in tact. */
+  CANCEL_NEW    = 1,
+  /**
+   * DEPRECATED. For existing jobs, treated the same as CANCEL_NEW.
+   * createJob will reject jobs with this policy.
+   */
+  RUN_OVERLAP   = 2
 }
 
-// Description of an aurora job.
-// A list of task descriptions must be specified, which may be
-// heterogeneous.  One task will be scheduled for each task description.
-// The tuple (name, environment, owner.role) must be unique.
+/**
+ * Description of an Aurora job. One task will be scheduled for each instance within the job.
+ */
 struct JobConfiguration {
-  9: JobKey key                               // Key for this job. If not specified
-                                              // name, owner.role, and a reasonable default
-                                              // environment are used to construct it server-side.
-                                              // TODO(William Farner): Deprecate Identity and
-                                              // use JobKey instead (MESOS-4006).
-  7: Identity owner                           // Owner of this job.
-  4: string cronSchedule                      // If present, the job will be handled as a cron job
-                                              // with this crontab-syntax schedule.
-  5: CronCollisionPolicy cronCollisionPolicy  // Collision policy to use when handling overlapping
-                                              // cron runs.  Default is KILL_EXISTING.
-  6: TaskConfig taskConfig                    // Task configuration for this job.
-  8: i32 instanceCount                        // The number of instances in the job.  Generated
-                                              // instance IDs for tasks will be in the range
-                                              // [0, instances).
+  /**
+   * Key for this job. If not specified name, owner.role, and a reasonable default environment are
+   * used to construct it server-side.
+   */
+  9: JobKey key
+  // TODO(William Farner): Deprecate Identity and
+  // use JobKey instead (MESOS-4006).
+  /** Owner of this job. */
+  7: Identity owner
+  /**
+   * If present, the job will be handled as a cron job with this crontab-syntax schedule.
+   */
+  4: string cronSchedule
+  /** Collision policy to use when handling overlapping cron runs.  Default is KILL_EXISTING. */
+  5: CronCollisionPolicy cronCollisionPolicy
+  /** Task configuration for this job. */
+  6: TaskConfig taskConfig
+  /**
+   * The number of instances in the job. Generated instance IDs for tasks will be in the range
+   * [0, instances).
+   */
+  8: i32 instanceCount
 }
 
 struct JobStats {
- 1: i32 activeTaskCount    // Number of tasks in active state for this job.
- 2: i32 finishedTaskCount  // Number of tasks in finished state for this job.
- 3: i32 failedTaskCount    // Number of failed tasks for this job.
- 4: i32 pendingTaskCount   // Number of tasks in pending state for this job.
+  /** Number of tasks in active state for this job. */
+  1: i32 activeTaskCount
+  /** Number of tasks in finished state for this job. */
+  2: i32 finishedTaskCount
+  /** Number of failed tasks for this job. */
+  3: i32 failedTaskCount
+  /** Number of tasks in pending state for this job. */
+  4: i32 pendingTaskCount
 }
 
 struct JobSummary {
   1: JobConfiguration job
   2: JobStats stats
-  3: optional i64 nextCronRunMs  // Timestamp of next cron run in ms since epoch, for a cron job
+  /** Timestamp of next cron run in ms since epoch, for a cron job */
+  3: optional i64 nextCronRunMs
 }
 
-// A request to add the following instances to an existing job. Used by addInstances.
+/** A request to add the following instances to an existing job. Used by addInstances. */
 struct AddInstancesConfig {
   1: JobKey key
   2: TaskConfig taskConfig
@@ -241,49 +299,54 @@ struct PopulateJobResult {
 }
 
 struct GetQuotaResult {
-  1: ResourceAggregate quota                       // Total allocated resource quota.
-  2: optional ResourceAggregate prodConsumption    // Resources consumed by production jobs.
-  3: optional ResourceAggregate nonProdConsumption // Resources consumed by non-production jobs.
+  /** Total allocated resource quota. */
+  1: ResourceAggregate quota
+  /** Resources consumed by production jobs. */
+  2: optional ResourceAggregate prodConsumption
+  /** Resources consumed by non-production jobs. */
+  3: optional ResourceAggregate nonProdConsumption
 }
 
-// Wraps return results for the acquireLock API.
+/** Wraps return results for the acquireLock API. */
 struct AcquireLockResult {
-  1: Lock lock			// Acquired Lock instance.
+  /** Acquired Lock instance. */
+  1: Lock lock
 }
 
-// States that a task may be in.
+/** States that a task may be in. */
 enum ScheduleStatus {
   // TODO(maxim): This state does not add much value. Consider dropping it completely.
-  // Initial state for a task.  A task will remain in this state until it has been persisted.
+  /* Initial state for a task.  A task will remain in this state until it has been persisted. */
   INIT             = 11,
-  // The task will be rescheduled, but is being throttled for restarting too frequently.
+  /** The task will be rescheduled, but is being throttled for restarting too frequently. */
   THROTTLED        = 16,
-  // Task is awaiting assignment to a slave.
+  /** Task is awaiting assignment to a slave. */
   PENDING          = 0,
-  // Task has been assigned to a slave.
+  /** Task has been assigned to a slave. */
   ASSIGNED         = 9,
-  // Slave has acknowledged receipt of task and is bootstrapping the task.
+  /** Slave has acknowledged receipt of task and is bootstrapping the task. */
   STARTING         = 1,
-  // The task is running on the slave.
+  /** The task is running on the slave. */
   RUNNING          = 2,
-  // The task terminated with an exit code of zero.
+  /** The task terminated with an exit code of zero. */
   FINISHED         = 3,
-  // The task is being preempted by another task.
+  /** The task is being preempted by another task. */
   PREEMPTING       = 13,
-  // The task is being restarted in response to a user request.
+  /** The task is being restarted in response to a user request. */
   RESTARTING       = 12,
-  // The task is being restarted in response to a host maintenance request.
+  /** The task is being restarted in response to a host maintenance request. */
   DRAINING         = 17,
-  // The task terminated with a non-zero exit code.
+  /** The task terminated with a non-zero exit code. */
   FAILED           = 4,
-  // Execution of the task was terminated by the system.
+  /** Execution of the task was terminated by the system. */
   KILLED           = 5,
-  // The task is being forcibly killed.
+  /** The task is being forcibly killed. */
   KILLING          = 6,
-  // A fault in the task environment has caused the system to believe the task no longer exists.
-  // This can happen, for example, when a slave process disappears.
+  /** A fault in the task environment has caused the system to believe the task no longer exists.
+   * This can happen, for example, when a slave process disappears.
+   */
   LOST             = 7,
-  // The task sandbox has been deleted by the executor.
+  /** The task sandbox has been deleted by the executor. */
   SANDBOX_DELETED  = 10
 }
 
@@ -332,44 +395,65 @@ const string GOOD_IDENTIFIER_PATTERN_JVM = GOOD_IDENTIFIER_PATTERN
 // Python: Use with re.compile
 const string GOOD_IDENTIFIER_PATTERN_PYTHON = GOOD_IDENTIFIER_PATTERN
 
-// Event marking a state transition within a task's lifecycle.
+/** Event marking a state transition within a task's lifecycle. */
 struct TaskEvent {
-  // Epoch timestamp in milliseconds.
+  /** Epoch timestamp in milliseconds. */
   1: i64 timestamp
-  // New status of the task.
+  /** New status of the task. */
   2: ScheduleStatus status
-  // Audit message that explains why a transition occurred.
+  /** Audit message that explains why a transition occurred. */
   3: optional string message
-  // Hostname of the scheduler machine that performed the event.
+  /** Hostname of the scheduler machine that performed the event. */
   4: optional string scheduler
 }
 
-// A task assignment that is provided to a slave.
+/** A task assignment that is provided to an executor. */
 struct AssignedTask {
-  1: string taskId                   // The mesos task ID for this task.  Guaranteed to be globally
-                                     // unique.
-  2: string slaveId                  // The mesos slave ID that this task has been assigned to.
-                                     // This will not be populated for a PENDING task.
-  3: string slaveHost                // The name of the machine that this task has been assigned to.
-                                     // This will not be populated for a PENDING task.
-  4: TaskConfig task                 // Information about how to run this task.
-  5: map<string, i32> assignedPorts  // Ports reserved on the machine while this task is running.
-  6: i32 instanceId                  // The instance ID assigned to this task.
-                                     // Instance IDs must be unique and contiguous within a
-                                     // job, and will be in the range [0, N-1] (inclusive)
-                                     // for a job that has N instances.
+  /** The mesos task ID for this task.  Guaranteed to be globally unique */
+  1: string taskId
+
+  /**
+   * The mesos slave ID that this task has been assigned to.
+   * This will not be populated for a PENDING task.
+   */
+  2: string slaveId
+
+  /**
+   * The name of the machine that this task has been assigned to.
+   * This will not be populated for a PENDING task.
+   */
+  3: string slaveHost
+
+  /** Information about how to run this task. */
+  4: TaskConfig task
+  /** Ports reserved on the machine while this task is running. */
+  5: map<string, i32> assignedPorts
+
+  /**
+   * The instance ID assigned to this task. Instance IDs must be unique and contiguous within a
+   * job, and will be in the range [0, N-1] (inclusive) for a job that has N instances.
+   */
+  6: i32 instanceId
 }
 
-// A task that has been scheduled.
+/** A task that has been scheduled. */
 struct ScheduledTask {
-  1: AssignedTask assignedTask   // The task that was scheduled.
-  2: ScheduleStatus status       // The current status of this task.
-  3: i32 failureCount            // The number of failures that this task has accumulated over the
-                                 // multi-generational history of this task.
-  4: list<TaskEvent> taskEvents  // State change history for this task.
-  5: string ancestorId           // The task ID of the previous generation of this task.  When a
-                                 // task is automatically rescheduled, a copy of the task is created
-                                 // and ancestor ID of the previous task's task ID.
+  /** The task that was scheduled. */
+  1: AssignedTask assignedTask
+  /** The current status of this task. */
+  2: ScheduleStatus status
+  /**
+   * The number of failures that this task has accumulated over the multi-generational history of
+   * this task.
+   */
+  3: i32 failureCount
+  /** State change history for this task. */
+  4: list<TaskEvent> taskEvents
+  /**
+   * The task ID of the previous generation of this task.  When a task is automatically rescheduled,
+   * a copy of the task is created and ancestor ID of the previous task's task ID.
+   */
+  5: string ancestorId
 }
 
 struct ScheduleStatusResult {
@@ -380,8 +464,10 @@ struct GetJobsResult {
   1: set<JobConfiguration> configs
 }
 
-// Contains a set of restrictions on matching tasks where all restrictions must be met (terms are
-// AND'ed together).
+/**
+ * Contains a set of restrictions on matching tasks where all restrictions must be met
+ * (terms are AND'ed together).
+ */
 struct TaskQuery {
   8: Identity owner               // TODO(wfarner): Deprecate Identity
   9: string environment
@@ -460,11 +546,12 @@ struct GetPendingReasonResult {
   1: set<PendingReason> reasons
 }
 
-// meta-data about the thrift server that is wrapped around every thrift response
+/** Information about the scheduler. */
 struct ServerInfo {
   1: string clusterName
   2: i32 thriftAPIVersion
-  3: string statsUrlPrefix  // A url prefix for job container stats.
+  /** A url prefix for job container stats. */
+  3: string statsUrlPrefix
 }
 
 union Result {
@@ -485,7 +572,6 @@ union Result {
   19: GetLocksResult getLocksResult
   20: ConfigSummaryResult configSummaryResult
   21: GetPendingReasonResult getPendingReasonResult
-
 }
 
 struct ResponseDetail {
@@ -499,48 +585,61 @@ struct Response {
   // TODO(wfarner): Remove version field in 0.7.0. (AURORA-467)
   4: APIVersion DEPRECATEDversion
   5: ServerInfo serverInfo
+  /** Payload from the invoked RPC. */
   3: optional Result result
+  /**
+   * Messages from the server relevant to the request, such as warnings or use of deprecated
+   * features.
+   */
   6: list<ResponseDetail> details
 }
 
 // A service that provides all the read only calls to the Aurora scheduler.
 service ReadOnlyScheduler {
-  // Returns a summary of the jobs grouped by role.
+  /** Returns a summary of the jobs grouped by role. */
   Response getRoleSummary()
 
-  // Returns a summary of jobs, optionally only those owned by a specific role.
+  /** Returns a summary of jobs, optionally only those owned by a specific role. */
   Response getJobSummary(1: string role)
 
-  // Fetches the status of tasks.
+  /** Fetches the status of tasks. */
   Response getTasksStatus(1: TaskQuery query)
 
-  // Same as getTaskStatus but without the TaskConfig.ExecutorConfig data set.
-  // This is an interim solution until we have a better way to query TaskConfigs (AURORA-541).
+  /**
+   * Same as getTaskStatus but without the TaskConfig.ExecutorConfig data set.
+   * This is an interim solution until we have a better way to query TaskConfigs (AURORA-541).
+   */
   Response getTasksWithoutConfigs(1: TaskQuery query)
 
-  // Returns user-friendly reasons (if available) for tasks retained in PENDING state.
+  /** Returns user-friendly reasons (if available) for tasks retained in PENDING state. */
   Response getPendingReason(1: TaskQuery query)
 
-  // Fetches the configuration summary of active tasks for the specified job.
+  /** Fetches the configuration summary of active tasks for the specified job. */
   Response getConfigSummary(1: JobKey job)
 
-  // Fetches the status of jobs.
-  // ownerRole is optional, in which case all jobs are returned.
+  /**
+   * Fetches the status of jobs.
+   * ownerRole is optional, in which case all jobs are returned.
+   */
   Response getJobs(1: string ownerRole)
 
-  // Fetches the quota allocated for a user.
+  /** Fetches the quota allocated for a user. */
   Response getQuota(1: string ownerRole)
 
   // TODO(Suman Karumuri): Delete this API once it is no longer used.
-  // NOTE: This API is deprecated.
-  // Returns the current version of the API implementation
+  /**
+   * Returns the current version of the API implementation
+   * NOTE: This method is deprecated.
+   */
   Response getVersion()
 
-  // Populates fields in a job configuration as though it were about to be run.
-  // This can be used to diff a configuration running tasks.
+  /**
+   * Populates fields in a job configuration as though it were about to be run.
+   * This can be used to diff a configuration running tasks.
+   */
   Response populateJobConfig(1: JobConfiguration description)
 
-  // Returns all stored context specific resource/operation locks.
+  /** Returns all stored context specific resource/operation locks. */
   Response getLocks()
 }
 
@@ -548,57 +647,76 @@ service ReadOnlyScheduler {
 // last argument. Note that the order in this file is what matters, and message numbers should still
 // never be reused.
 service AuroraSchedulerManager extends ReadOnlyScheduler {
-  // Creates a new job.  The request will be denied if a job with the provided
-  // name already exists in the cluster.
+  /**
+   * Creates a new job.  The request will be denied if a job with the provided name already exists
+   * in the cluster.
+   */
   Response createJob(1: JobConfiguration description, 3: Lock lock, 2: SessionKey session)
 
-  // Enters a job into the cron schedule, without actually starting the job.
-  // If the job is already present in the schedule, this will update the schedule
-  // entry with the new configuration.
+  /**
+   * Enters a job into the cron schedule, without actually starting the job.
+   * If the job is already present in the schedule, this will update the schedule entry with the new
+   * configuration.
+   */
   Response scheduleCronJob(1: JobConfiguration description, 3: Lock lock, 2: SessionKey session)
 
-  // Removes a job from the cron schedule. The request will be denied if the
-  // job was not previously scheduled with scheduleCronJob.
+  /**
+   * Removes a job from the cron schedule. The request will be denied if the job was not previously
+   * scheduled with scheduleCronJob.
+   */
   Response descheduleCronJob(4: JobKey job, 3: Lock lock, 2: SessionKey session)
 
-  // Starts a cron job immediately.  The request will be denied if the specified job does not
-  // exist for the role account, or the job is not a cron job.
+  /**
+   * Starts a cron job immediately.  The request will be denied if the specified job does not
+   * exist for the role account, or the job is not a cron job.
+   */
   Response startCronJob(4: JobKey job, 3: SessionKey session)
 
-  // Restarts a batch of shards.
+  /** Restarts a batch of shards. */
   Response restartShards(5: JobKey job, 3: set<i32> shardIds, 6: Lock lock 4: SessionKey session)
 
-  // Initiates a kill on tasks.
+  /** Initiates a kill on tasks. */
   Response killTasks(1: TaskQuery query, 3: Lock lock, 2: SessionKey session)
 
-  // Adds new instances specified by the AddInstancesConfig.
-  // A job represented by the JobKey must be protected by Lock.
+  /**
+   * Adds new instances specified by the AddInstancesConfig. A job represented by the JobKey must be
+   * protected by Lock.
+   */
   Response addInstances(
       1: AddInstancesConfig config,
       2: Lock lock,
       3: SessionKey session)
 
-  // Creates and saves a new Lock instance guarding against multiple
-  // mutating operations within the context defined by LockKey.
+  /**
+   * Creates and saves a new Lock instance guarding against multiple mutating operations within the
+   * context defined by LockKey.
+   */
   Response acquireLock(1: LockKey lockKey, 2: SessionKey session)
 
-  // Releases the lock acquired earlier in acquireLock call.
+  /** Releases the lock acquired earlier in acquireLock call. */
   Response releaseLock(1: Lock lock, 2: LockValidation validation, 3: SessionKey session)
 
-  // Replaces the template (configuration) for the existing cron job.
-  // The cron job template (configuration) must exist for the call to succeed.
+  /**
+   * Replaces the template (configuration) for the existing cron job.
+   * The cron job template (configuration) must exist for the call to succeed.
+   */
   Response replaceCronTemplate(1: JobConfiguration config, 2: Lock lock, 3: SessionKey session)
 }
 
 struct InstanceConfigRewrite {
-  1: InstanceKey instanceKey   // Key for the task to rewrite.
-  2: TaskConfig oldTask        // The original configuration.
-  3: TaskConfig rewrittenTask  // The rewritten configuration.
+  /** Key for the task to rewrite. */
+  1: InstanceKey instanceKey
+  /** The original configuration. */
+  2: TaskConfig oldTask
+  /** The rewritten configuration. */
+  3: TaskConfig rewrittenTask
 }
 
 struct JobConfigRewrite {
-  1: JobConfiguration oldJob        // The original job configuration.
-  2: JobConfiguration rewrittenJob  // The rewritten job configuration.
+  /** The original job configuration. */
+  1: JobConfiguration oldJob
+  /** The rewritten job configuration. */
+  2: JobConfiguration rewrittenJob
 }
 
 union ConfigRewrite {
@@ -613,57 +731,61 @@ struct RewriteConfigsRequest {
 // It would be great to compose these services rather than extend, but that won't be possible until
 // https://issues.apache.org/jira/browse/THRIFT-66 is resolved.
 service AuroraAdmin extends AuroraSchedulerManager {
-  // Assign quota to a user.  This will overwrite any pre-existing quota for the user.
+  /** Assign quota to a user.  This will overwrite any pre-existing quota for the user. */
   Response setQuota(1: string ownerRole, 2: ResourceAggregate quota, 3: SessionKey session)
 
-  // Forces a task into a specific state.  This does not guarantee the task will enter the given
-  // state, as the task must still transition within the bounds of the state machine.  However,
-  // it attempts to enter that state via the state machine.
+  /**
+   * Forces a task into a specific state.  This does not guarantee the task will enter the given
+   * state, as the task must still transition within the bounds of the state machine.  However,
+   * it attempts to enter that state via the state machine.
+   */
   Response forceTaskState(
       1: string taskId,
       2: ScheduleStatus status,
       3: SessionKey session)
 
-  // Immediately writes a storage snapshot to disk.
+  /** Immediately writes a storage snapshot to disk. */
   Response performBackup(1: SessionKey session)
 
-  // Lists backups that are available for recovery.
+  /** Lists backups that are available for recovery. */
   Response listBackups(1: SessionKey session)
 
-  // Loads a backup to an in-memory storage.  This must precede all other recovery operations.
+  /** Loads a backup to an in-memory storage.  This must precede all other recovery operations. */
   Response stageRecovery(1: string backupId, 2: SessionKey session)
 
-  // Queries for tasks in a staged recovery.
+  /** Queries for tasks in a staged recovery. */
   Response queryRecovery(1: TaskQuery query, 2: SessionKey session)
 
-  // Deletes tasks from a staged recovery.
+  /** Deletes tasks from a staged recovery. */
   Response deleteRecoveryTasks(1: TaskQuery query, 2: SessionKey session)
 
-  // Commits a staged recovery, completely replacing the previous storage state.
+  /** Commits a staged recovery, completely replacing the previous storage state. */
   Response commitRecovery(1: SessionKey session)
 
-  // Unloads (aborts) a staged recovery.
+  /** Unloads (aborts) a staged recovery. */
   Response unloadRecovery(1: SessionKey session)
 
-  // Put the given hosts into maintenance mode.
+  /** Put the given hosts into maintenance mode. */
   Response startMaintenance(1: Hosts hosts, 2: SessionKey session)
 
-  // Ask scheduler to begin moving tasks scheduled on given hosts.
+  /** Ask scheduler to begin moving tasks scheduled on given hosts. */
   Response drainHosts(1: Hosts hosts, 2: SessionKey session)
 
-  // Retrieve the current maintenance states for a group of hosts.
+  /** Retrieve the current maintenance states for a group of hosts. */
   Response maintenanceStatus(1: Hosts hosts, 2: SessionKey session)
 
-  // Set the given hosts back into serving mode.
+  /** Set the given hosts back into serving mode. */
   Response endMaintenance(1: Hosts hosts, 2: SessionKey session)
 
-  // Start a storage snapshot and block until it completes.
+  /** Start a storage snapshot and block until it completes. */
   Response snapshot(1: SessionKey session)
 
-  // Forcibly rewrites the stored definition of user configurations.  This is intended to be used
-  // in a controlled setting, primarily to migrate pieces of configurations that are opaque to the
-  // scheduler (e.g. executorConfig).
-  // The scheduler may do some validation of the rewritten configurations, but it is important
-  // that the caller take care to provide valid input and alter only necessary fields.
+  /**
+   * Forcibly rewrites the stored definition of user configurations.  This is intended to be used
+   * in a controlled setting, primarily to migrate pieces of configurations that are opaque to the
+   * scheduler (e.g. executorConfig).
+   * The scheduler may do some validation of the rewritten configurations, but it is important
+   * that the caller take care to provide valid input and alter only necessary fields.
+   */
   Response rewriteConfigs(1: RewriteConfigsRequest request, 2: SessionKey session)
 }
