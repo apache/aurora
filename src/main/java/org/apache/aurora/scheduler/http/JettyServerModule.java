@@ -15,41 +15,76 @@ package org.apache.aurora.scheduler.http;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.logging.Logger;
 
+import javax.annotation.Nonnegative;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import javax.servlet.http.HttpServlet;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Resources;
 import com.google.common.net.MediaType;
 import com.google.inject.AbstractModule;
-import com.google.inject.Key;
+import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
+import com.google.inject.name.Names;
 import com.google.inject.servlet.GuiceFilter;
 import com.sun.jersey.api.container.filter.GZIPContentEncodingFilter;
 import com.sun.jersey.guice.JerseyServletModule;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
+import com.twitter.common.application.http.DefaultQuitHandler;
+import com.twitter.common.application.http.GraphViewer;
+import com.twitter.common.application.http.HttpAssetConfig;
+import com.twitter.common.application.http.HttpFilterConfig;
+import com.twitter.common.application.http.HttpServletConfig;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
-import com.twitter.common.net.pool.DynamicHostSet;
+import com.twitter.common.base.ExceptionalSupplier;
+import com.twitter.common.base.MoreSuppliers;
+import com.twitter.common.net.http.HttpServerDispatch;
+import com.twitter.common.net.http.RequestLogger;
+import com.twitter.common.net.http.handlers.AbortHandler;
+import com.twitter.common.net.http.handlers.ContentionPrinter;
+import com.twitter.common.net.http.handlers.HealthHandler;
+import com.twitter.common.net.http.handlers.LogConfig;
+import com.twitter.common.net.http.handlers.QuitHandler;
+import com.twitter.common.net.http.handlers.StringTemplateServlet;
+import com.twitter.common.net.http.handlers.ThreadStackPrinter;
+import com.twitter.common.net.http.handlers.TimeSeriesDataSource;
+import com.twitter.common.net.http.handlers.VarsHandler;
+import com.twitter.common.net.http.handlers.VarsJsonHandler;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
-import com.twitter.thrift.ServiceInstance;
 
 import org.apache.aurora.scheduler.http.api.ApiBeta;
+import org.mortbay.jetty.RequestLog;
 import org.mortbay.servlet.GzipFilter;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_RESPONSE_FILTERS;
 import static com.sun.jersey.api.json.JSONConfiguration.FEATURE_POJO_MAPPING;
+import static com.twitter.common.application.modules.LocalServiceRegistry.LocalService;
 
 /**
  * Binding module for scheduler HTTP servlets.
+ * <p>
+ * TODO(wfarner): Continue improvements here by simplifying serving of static assets.  Jetty's
+ * DefaultServlet can take over this responsibility.
  */
-public class ServletModule extends AbstractModule {
+public class JettyServerModule extends AbstractModule {
+
+  private static final Logger LOG = Logger.getLogger(JettyServerModule.class.getName());
+
+  @Nonnegative
+  @CmdLine(name = "http_port",
+      help = "The port to start an HTTP server on.  Default value will choose a random port.")
+  protected static final Arg<Integer> HTTP_PORT = Arg.create(0);
 
   @CmdLine(name = "enable_cors_support", help = "Enable CORS support for thrift end points.")
   private static final Arg<Boolean> ENABLE_CORS_SUPPORT = Arg.create(false);
@@ -66,19 +101,51 @@ public class ServletModule extends AbstractModule {
 
   @Override
   protected void configure() {
+    bind(Runnable.class)
+        .annotatedWith(Names.named(AbortHandler.ABORT_HANDLER_KEY))
+        .to(AbortCallback.class);
+    bind(AbortCallback.class).in(Singleton.class);
+    bind(Runnable.class).annotatedWith(Names.named(QuitHandler.QUIT_HANDLER_KEY))
+        .to(DefaultQuitHandler.class);
+    bind(DefaultQuitHandler.class).in(Singleton.class);
+    bind(new TypeLiteral<ExceptionalSupplier<Boolean, ?>>() { })
+        .annotatedWith(Names.named(HealthHandler.HEALTH_CHECKER_KEY))
+        .toInstance(MoreSuppliers.ofInstance(true));
+
+    bindConstant().annotatedWith(StringTemplateServlet.CacheTemplates.class).to(true);
+
+    bind(HttpServerDispatch.class).in(Singleton.class);
+    bind(RequestLog.class).to(RequestLogger.class);
+    Registration.registerServlet(binder(), "/abortabortabort", AbortHandler.class, true);
+    Registration.registerServlet(binder(), "/contention", ContentionPrinter.class, false);
+    Registration.registerServlet(binder(), "/graphdata", TimeSeriesDataSource.class, true);
+    Registration.registerServlet(binder(), "/health", HealthHandler.class, true);
+    Registration.registerServlet(binder(), "/healthz", HealthHandler.class, true);
+    Registration.registerServlet(binder(), "/logconfig", LogConfig.class, false);
+    Registration.registerServlet(binder(), "/quitquitquit", QuitHandler.class, true);
+    Registration.registerServlet(binder(), "/threads", ThreadStackPrinter.class, false);
+    Registration.registerServlet(binder(), "/vars", VarsHandler.class, false);
+    Registration.registerServlet(binder(), "/vars.json", VarsJsonHandler.class, false);
+
+    GraphViewer.registerResources(binder());
+
+    LifecycleModule.bindServiceRunner(binder(), HttpServerLauncher.class);
+
+    // Ensure at least an empty filter set is bound.
+    Registration.getFilterBinder(binder());
+
+    // Ensure at least an empty set of additional links is bound.
+    Registration.getEndpointBinder(binder());
+
     // Register /api end point
     Registration.registerServlet(binder(), "/api", SchedulerAPIServlet.class, true);
 
     // NOTE: GzipFilter is applied only to /api instead of globally because the Jersey-managed
     // servlets have a conflicting filter applied to them.
     Registration.registerServletFilter(binder(), GzipFilter.class, "/api/*");
-    // TODO(wfarner): Add a unit test to validate gzip behavior.
-    Registration.registerServletFilter(binder(), GzipFilter.class, "/apibeta");
-
-    // Bindings required for the leader redirector.
-    requireBinding(LocalServiceRegistry.class);
-    requireBinding(Key.get(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }));
+    Registration.registerServletFilter(binder(), GzipFilter.class, "/apibetabeta/*");
     Registration.registerServletFilter(binder(), GuiceFilter.class, "/*");
+
     install(new JerseyServletModule() {
       private void registerJerseyEndpoint(String indexPath, Class<?>... servlets) {
         filter(indexPath + "*").through(LeaderRedirectFilter.class);
@@ -209,7 +276,7 @@ public class ServletModule extends AbstractModule {
       Registration.registerHttpAsset(
           binder(),
           registerLocation,
-          ServletModule.class,
+          JettyServerModule.class,
           resourceLocation,
           mediaType,
           true);
@@ -258,6 +325,66 @@ public class ServletModule extends AbstractModule {
     @Override
     public void execute() throws MonitorException {
       redirector.monitor();
+    }
+  }
+
+  // TODO(wfarner): Use guava's Service to enforce the lifecycle of this.
+  public static final class HttpServerLauncher implements LifecycleModule.ServiceRunner {
+    private final HttpServerDispatch httpServer;
+    private final Set<HttpServletConfig> httpServlets;
+    private final Set<HttpAssetConfig> httpAssets;
+    private final Set<HttpFilterConfig> httpFilters;
+    private final Set<String> additionalIndexLinks;
+    private final Injector injector;
+
+    @Inject
+    HttpServerLauncher(
+        HttpServerDispatch httpServer,
+        Set<HttpServletConfig> httpServlets,
+        Set<HttpAssetConfig> httpAssets,
+        Set<HttpFilterConfig> httpFilters,
+        @Registration.IndexLink Set<String> additionalIndexLinks,
+        Injector injector) {
+
+      this.httpServer = checkNotNull(httpServer);
+      this.httpServlets = checkNotNull(httpServlets);
+      this.httpAssets = checkNotNull(httpAssets);
+      this.httpFilters = checkNotNull(httpFilters);
+      this.additionalIndexLinks = checkNotNull(additionalIndexLinks);
+      this.injector = checkNotNull(injector);
+    }
+
+    @Override
+    public LocalService launch() {
+      if (!httpServer.listen(HTTP_PORT.get())) {
+        throw new IllegalStateException("Failed to start HTTP server, all servlets disabled.");
+      }
+
+      for (HttpServletConfig config : httpServlets) {
+        HttpServlet handler = injector.getInstance(config.handlerClass);
+        httpServer.registerHandler(config.path, handler, config.params, config.silent);
+      }
+
+      for (HttpAssetConfig config : httpAssets) {
+        httpServer.registerHandler(config.path, config.handler, null, config.silent);
+      }
+
+      for (HttpFilterConfig filter : httpFilters) {
+        httpServer.registerFilter(filter.filterClass, filter.pathSpec, filter.dispatch);
+      }
+
+      for (String indexLink : additionalIndexLinks) {
+        httpServer.registerIndexLink(indexLink);
+      }
+
+      Command shutdown = new Command() {
+        @Override public void execute() {
+          LOG.info("Shutting down embedded http server");
+          httpServer.stop();
+        }
+      };
+
+      return LocalService.auxiliaryService("http", httpServer.getPort(), shutdown);
     }
   }
 }

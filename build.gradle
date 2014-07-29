@@ -176,8 +176,6 @@ dependencies {
   compile "org.slf4j:slf4j-api:${slf4jRev}"
   compile "org.slf4j:slf4j-jdk14:${slf4jRev}"
   compile 'com.twitter.common.logging:log4j:0.0.7'
-  compile 'com.twitter.common.webassets:bootstrap:0.0.4'
-  compile 'com.twitter.common.webassets:jquery:0.0.4'
   compile 'com.twitter.common.zookeeper.guice:client-flagged:0.0.5'
   compile 'com.twitter.common.zookeeper.guice:client:0.0.5'
   compile 'com.twitter.common.zookeeper:candidate:0.0.64'
@@ -187,7 +185,6 @@ dependencies {
   compile 'com.twitter.common.zookeeper:singleton-service:0.0.85'
   compile 'com.twitter.common:application-http:0.0.59'
   compile 'com.twitter.common:application-module-applauncher:0.0.51'
-  compile 'com.twitter.common:application-module-http:0.0.62'
   compile 'com.twitter.common:application-module-lifecycle:0.0.48'
   compile 'com.twitter.common:application-module-log:0.0.56'
   compile 'com.twitter.common:application-module-stats:0.0.44'
@@ -201,6 +198,7 @@ dependencies {
   compile 'com.twitter.common:io:0.0.53'
   compile 'com.twitter.common:jdk-logging:0.0.44'
   compile 'com.twitter.common:logging:0.0.61'
+  compile 'com.twitter.common:net-http-handlers-time-series:0.0.51'
   compile 'com.twitter.common:net-util:0.0.80'
   compile 'com.twitter.common:quantity:0.0.71'
   compile 'com.twitter.common:stats:0.0.91'

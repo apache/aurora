@@ -29,7 +29,6 @@ import com.google.inject.Module;
 import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.AppLauncher;
 import com.twitter.common.application.Lifecycle;
-import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsModule;
@@ -132,7 +131,6 @@ public class SchedulerMain extends AbstractApplication {
 
     return ImmutableList.<Module>builder()
         .add(new LogModule())
-        .add(new HttpModule())
         .add(new StatsModule())
         .add(new AppModule(clusterName, serverSetPath, zkClientConfig, statsURLPrefix))
         .addAll(getExtraModules())

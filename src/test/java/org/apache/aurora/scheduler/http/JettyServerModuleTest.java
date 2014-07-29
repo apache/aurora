@@ -31,7 +31,6 @@ import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.api.json.JSONConfiguration;
 import com.twitter.common.application.ShutdownRegistry.ShutdownRegistryImpl;
 import com.twitter.common.application.StartupRegistry;
-import com.twitter.common.application.modules.HttpModule;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.application.modules.LogModule;
@@ -70,7 +69,7 @@ import static org.junit.Assert.assertNotNull;
  * HTTP server for each test case.
  *
  */
-public abstract class ServletModuleTest extends EasyMockTest {
+public abstract class JettyServerModuleTest extends EasyMockTest {
 
   private Injector injector;
   protected StorageTestUtil storage;
@@ -79,16 +78,16 @@ public abstract class ServletModuleTest extends EasyMockTest {
   protected AuroraAdmin.Iface thrift;
 
   @Before
-  public final void setUpServletModuleTest() throws Exception {
+  public void setUp() throws Exception {
     storage = new StorageTestUtil(this);
     final DynamicHostSet<ServiceInstance> schedulers =
-        createMock(new Clazz<DynamicHostSet<ServiceInstance>>() { });
+        createMock(new Clazz<DynamicHostSet<ServiceInstance>>() {
+        });
 
     injector = Guice.createInjector(
-        new ServletModule(),
+        new JettyServerModule(),
         new LogModule(),
         new StatsModule(),
-        new HttpModule(),
         new LifecycleModule(),
         new AbstractModule() {
           <T> T bindMock(Class<T> clazz) {

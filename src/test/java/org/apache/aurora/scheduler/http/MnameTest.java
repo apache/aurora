@@ -36,7 +36,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class MnameTest extends ServletModuleTest {
+public class MnameTest extends JettyServerModuleTest {
 
   private static final String SLAVE_HOST = "fakehost";
   private static final int PORT = 50000;

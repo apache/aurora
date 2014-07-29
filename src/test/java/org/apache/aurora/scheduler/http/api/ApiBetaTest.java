@@ -50,7 +50,7 @@ import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskQuery;
-import org.apache.aurora.scheduler.http.ServletModuleTest;
+import org.apache.aurora.scheduler.http.JettyServerModuleTest;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Test;
@@ -61,7 +61,7 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
-public class ApiBetaTest extends ServletModuleTest {
+public class ApiBetaTest extends JettyServerModuleTest {
 
   private static final ITaskConfig TASK_CONFIG = ITaskConfig.build(
       new TaskConfig()
