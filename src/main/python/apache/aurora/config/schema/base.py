@@ -57,6 +57,7 @@ class UpdateConfig(Struct):
   max_per_shard_failures      = Default(Integer, 0)
   max_total_failures          = Default(Integer, 0)
   rollback_on_failure         = Default(Boolean, True)
+  wait_for_batch_completion   = Default(Boolean, False)
 
 
 class HealthCheckConfig(Struct):

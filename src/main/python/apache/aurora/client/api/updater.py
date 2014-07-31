@@ -17,6 +17,7 @@ import signal
 from collections import namedtuple
 from difflib import unified_diff
 from threading import Lock as threading_lock
+from threading import Event
 
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
@@ -94,6 +95,8 @@ class Updater(object):
       raise self.Error(str(e))
     self._lock = None
     self._thread_lock = threading_lock()
+    self._batch_wait_event = Event()
+    self._batch_completion_queue = Queue()
     self.failure_threshold = FailureThreshold(
         self._update_config.max_per_instance_failures,
         self._update_config.max_total_failures
@@ -201,11 +204,55 @@ class Updater(object):
 
       for thread in threads:
         thread.join_and_raise()
-    except Exception:
+    except Exception as e:
+      log.debug('Caught unhandled exception: %s' % e)
       self._terminate()
       raise
 
     return instance_queue
+
+  def _try_reset_batch_wait_event(self, instance_id, instance_queue):
+    """Resets batch_wait_event in case the current batch is filled up.
+
+    This is a helper method that separates thread locked logic. Called from
+    _wait_for_batch_completion_if_needed() when a given instance update completes.
+    Resumes worker threads if all batch instances are updated.
+
+    Arguments:
+    instance_id -- Instance ID being processed.
+    instance_queue -- Instance update work queue.
+    """
+    with self._thread_lock:
+      log.debug("Instance ID %s: Completion queue size %s" %
+                (instance_id, self._batch_completion_queue.qsize()))
+      log.debug("Instance ID %s: Instance queue size %s" %
+                (instance_id, instance_queue.qsize()))
+      self._batch_completion_queue.put(instance_id)
+      filled_up = self._batch_completion_queue.qsize() % self._update_config.batch_size == 0
+      all_done = instance_queue.qsize() == 0
+      if filled_up or all_done:
+        # Required batch size of completed instances has filled up -> unlock waiting threads.
+        log.debug('Instance %s completes the batch wait.' % instance_id)
+        self._batch_wait_event.set()
+        self._batch_wait_event.clear()
+        return True
+
+    return False
+
+  def _wait_for_batch_completion_if_needed(self, instance_id, instance_queue):
+    """Waits for batch completion if wait_for_batch_completion flag is set.
+
+    Arguments:
+    instance_id -- Instance ID.
+    instance_queue -- Instance update work queue.
+    """
+    if not self._update_config.wait_for_batch_completion:
+      return
+
+    if not self._try_reset_batch_wait_event(instance_id, instance_queue):
+      # The current batch has not filled up -> block the work thread.
+      log.debug('Instance %s is done. Waiting for batch to complete.' % instance_id)
+      self._batch_wait_event.wait()
 
   def _terminate(self):
     """Attempts to terminate all outstanding activities."""
@@ -216,6 +263,7 @@ class Updater(object):
       self._job_monitor.terminate()
       self._scheduler_mux.terminate()
       self._watcher.terminate()
+      self._batch_wait_event.set()
 
   def _update_instance(self, instance_queue):
     """Works through the instance_queue and performs instance updates (one at a time).
@@ -242,6 +290,8 @@ class Updater(object):
         if instances_to_watch:
           failed_instances = self._watcher.watch(instances_to_watch)
           restart = self._is_restart_needed(failed_instances)
+
+      self._wait_for_batch_completion_if_needed(instance_data.instance_id, instance_queue)
 
   def _revert_instance(self, instance_queue):
     """Works through the instance_queue and performs instance rollbacks (one at a time).

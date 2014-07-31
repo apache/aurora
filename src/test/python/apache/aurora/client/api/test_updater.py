@@ -128,6 +128,7 @@ class UpdaterTest(TestCase):
     'max_per_shard_failures': 0,
     'max_total_failures': 0,
     'rollback_on_failure': True,
+    'wait_for_batch_completion': False,
   }
 
 
@@ -179,7 +180,7 @@ class UpdaterTest(TestCase):
   def expect_watch_instances(self, instance_ids, failed_instances=[]):
     for i in instance_ids:
       failed = [i] if i in failed_instances else []
-      self._instance_watcher.watch(instance_ids).AndReturn(set(failed))
+      self._instance_watcher.watch(instance_ids).InAnyOrder().AndReturn(set(failed))
 
   def expect_populate(self, job_config, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
@@ -228,7 +229,10 @@ class UpdaterTest(TestCase):
           jobName=self._job_key.name,
           statuses=ACTIVE_STATES,
           instanceIds=frozenset([int(i)]))
-      self._scheduler.killTasks(query, self._lock, self._session_key).AndReturn(response)
+      self._scheduler.killTasks(
+          query,
+          self._lock,
+          self._session_key).InAnyOrder().AndReturn(response)
 
     self.expect_job_monitor(response_code, instance_ids, monitor_result, skip_monitor)
 
@@ -236,8 +240,10 @@ class UpdaterTest(TestCase):
     if skip or response_code != ResponseCode.OK:
       return
 
-    self._job_monitor.wait_until(JobMonitor.terminal, instance_ids, with_timeout=True).AndReturn(
-      monitor_result)
+    self._job_monitor.wait_until(
+        JobMonitor.terminal,
+        instance_ids,
+        with_timeout=True).InAnyOrder().AndReturn(monitor_result)
 
   def expect_add(self, instance_ids, task_config, response_code=None):
     for i in instance_ids:
@@ -247,7 +253,10 @@ class UpdaterTest(TestCase):
           key=self._job_key,
           taskConfig=task_config,
           instanceIds=frozenset([int(i)]))
-      self._scheduler.addInstances(add_config, self._lock, self._session_key).AndReturn(response)
+      self._scheduler.addInstances(
+          add_config,
+          self._lock,
+          self._session_key).InAnyOrder().AndReturn(response)
 
   def expect_update_instances(self, instance_ids, task_config):
     for i in instance_ids:
@@ -815,4 +824,48 @@ class UpdaterTest(TestCase):
     self.replay_mocks()
 
     self.update_and_expect_response(ResponseCode.ERROR)
+    self.verify_mocks()
+
+  def test_update_instances_wait_for_batch_completion_filled_batch(self):
+    """Update existing instances with wait_for_batch_completion flag set."""
+    update_config = self.UPDATE_CONFIG.copy()
+    update_config.update(wait_for_batch_completion=True, batch_size=2)
+    self.init_updater(update_config)
+
+    old_configs = self.make_task_configs(6)
+    new_config = deepcopy(old_configs[0])
+    new_config.priority = 5
+    job_config = self.make_job_config(new_config, 6)
+    self._config.job_config = job_config
+    self.expect_start()
+    self.expect_get_tasks(old_configs)
+    self.expect_populate(job_config)
+    self.expect_quota_check(6, 6)
+    self.expect_update_instances([0, 1, 2, 3, 4, 5], new_config)
+    self.expect_finish()
+    self.replay_mocks()
+
+    self.update_and_expect_ok()
+    self.verify_mocks()
+
+  def test_update_instances_wait_for_batch_completion_partially_filled_batch(self):
+    """Update existing instances with wait_for_batch_completion flag set."""
+    update_config = self.UPDATE_CONFIG.copy()
+    update_config.update(wait_for_batch_completion=True, batch_size=3)
+    self.init_updater(update_config)
+
+    old_configs = self.make_task_configs(5)
+    new_config = deepcopy(old_configs[0])
+    new_config.priority = 5
+    job_config = self.make_job_config(new_config, 5)
+    self._config.job_config = job_config
+    self.expect_start()
+    self.expect_get_tasks(old_configs)
+    self.expect_populate(job_config)
+    self.expect_quota_check(5, 5)
+    self.expect_update_instances([0, 1, 2, 3, 4], new_config)
+    self.expect_finish()
+    self.replay_mocks()
+
+    self.update_and_expect_ok()
     self.verify_mocks()
