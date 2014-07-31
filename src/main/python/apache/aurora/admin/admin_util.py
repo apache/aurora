@@ -137,11 +137,14 @@ def parse_script(filename):
   :type filename: string
   :rtype: function
   """
+  def callback(host):
+    subprocess.Popen([cmd, host]).wait()
+
   if filename:
     if not os.path.exists(filename):
       die("No such file: %s" % filename)
     cmd = os.path.abspath(filename)
-    return lambda host: subprocess.Popen([cmd, host])
+    return callback
   else:
     return None
 

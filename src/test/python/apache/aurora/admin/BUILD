@@ -15,6 +15,7 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':host_maintenance'),
+    pants(':admin_util'),
   ],
 )
 
@@ -30,3 +31,13 @@ python_tests(name = 'host_maintenance',
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ],
 )
+
+python_tests(name = 'admin_util',
+  sources = ['test_admin_util.py'],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/admin:util'),
+  ],
+)
+
