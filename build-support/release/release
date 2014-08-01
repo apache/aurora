@@ -76,7 +76,7 @@ To configure one, find your code signing key's ID with
 
 Then configure it as the signing key for this repository with
 
-   git config user.signingkey YOUR_KEY_ID
+   git config --global user.signingkey YOUR_KEY_ID
 EOF
   exit 1
 fi
@@ -99,13 +99,22 @@ fi
 
 # Make sure that this is not on a snapshot release
 current_version=$(cat .auroraversion | tr '[a-z]' '[A-Z]')
-if ! [[ $current_version =~ .*-SNAPSHOT ]]; then
+if [[ $current_version =~ .*-SNAPSHOT ]]; then
   echo "ERROR: .auroraversion can not be a 'SNAPSHOT', it is ${current_version}"
   exit 1
+else
+  major=`echo $current_version | cut -d. -f1`
+  minor=`echo $current_version | cut -d. -f2`
+  patch=`echo $current_version | cut -d. -f3 | cut -d- -f1`
+
+  current_version="${major}.${minor}.${patch}"
 fi
 
+previous_version_tag="${current_version}-rc${rc_tag_version}"
+current_version_tag="${current_version}-incubating"
+
 # Make sure the tag does not exist
-if git rev-parse --tags=$current_version >/dev/null 2>&1; then
+if [[ $(git ls-remote --exit-code --tags origin refs/tags/${current_version} >/dev/null 2>&1) == 0 ]]; then
   echo "ERROR: ${current_version} tag exists."
   exit 1
 fi
@@ -115,54 +124,67 @@ if [[ $publish == 0 ]]; then
   echo "Performing dry-run"
 fi
 
+dist_name="apache-aurora-${current_version_tag}"
+
 if [[ $publish == 1 ]]; then
-  echo "Creating release tag ${current_version}."
   # Create release branch and tag and push them to the origin
-  git checkout -b $current_version
-  git push origin $current_version
-  git tag -s "${current_version}" -m "aurora-${current_version} release." $current_version
+  echo "Creating ${current_version_tag} branch"
+  git checkout -b ${current_version_tag}
+
+  # Increment the version and create a branch
+  echo ${current_version_tag} > .auroraversion
+  git add .auroraversion
+  git commit -m "Updating .auroraversion to release version ${current_version_tag}."
+  git push origin $current_version_tag
+  git tag -s "${current_version_tag}" -m "Apache Aurora ${current_version_tag} release" ${current_version_tag}
   git push origin --tags
 fi
 
-dist_name="aurora-${current_version}"
-
 dist_dir=${base_dir}/dist
 rc_dir=${dist_dir}/rc
+release_dir=${dist_dir}/${current_version}
 mkdir -p ${rc_dir}
 cd ${dist_dir}
 
 # Checkout the release candidate
-svn co ${aurora_svn_dev_dist_url}/${current_version} ${rc_dir}
+svn co ${aurora_svn_dev_dist_url}/${previous_version_tag} ${rc_dir} >/dev/null 2>&1
 
 if [[ $publish == 1 ]]; then
   echo "Publishing the release"
   # Make the release dist directory and check it out
   svn mkdir ${aurora_svn_dist_url}/${current_version} -m "aurora-${current_version} release"
-  svn co --depth=empty ${aurora_svn_dist_url}/${current_version} ${current_version}
+  svn co --depth=empty ${aurora_svn_dist_url}/${current_version} ${release_dir}
 else
-  mkdir ${current_version}
-else
+  mkdir ${release_dir}
+fi
 
-# Remove the release candidate -rc# from the release package names
-cd ${rc_dir}
-for f in *; do cp "$f" "${dist_dir}/{current_version}/${f/-rc[[:digit:]]/}"; done
-cd ${dist_dir}/{current_version}
+cd ${release_dir}
+
+# Rename the .auroraversion from -RC[:digit:] to release current_version_tag and repackage the release
+tar -xzf ${rc_dir}/apache-aurora-*.tar.gz
+mv apache-aurora-* ${dist_name}
+echo ${current_version_tag} > ${dist_name}/.auroraversion
+tar -czf ${dist_name}.tar.gz ${dist_name}
+rm -rf ${dist_name}
+
+# Sign the tarball.
+echo "Signing the distribution"
+gpg --armor --output ${dist_name}.tar.gz.asc --detach-sig ${dist_name}.tar.gz
+
+# Create the checksums
+echo "Creating checksums"
+gpg --print-md MD5 ${dist_name}.tar.gz > ${dist_name}.tar.gz.md5
+shasum ${dist_name}.tar.gz > ${dist_name}.tar.gz.sha
 
 if [[ $publish == 1 ]]; then
   # Commit the release
-  svn add aurora-*
+  svn add ${dist_name}*
   svn ci -m "aurora-${current_version} release"
-
-  # Finally delete all release candidate branches
-  for ref in $(git for-each-ref --format='%(refname:short)' 'refs/heads/${current_version}-rc*') do
-    git branch -D ${ref}
-    git push origin --delete ${ref}
-    svn rm ${aurora_svn_dev_dist_url}/${ref}
-  done
 fi
 
 cd ${base_dir}
 
+echo
 echo "Done creating the release. The following draft email has been created"
 echo "to send to the dev@aurora.incubator.apache.org mailing list."
 echo
@@ -170,7 +192,7 @@ echo
 # Create the email template for the release to be sent to the mailing lists.
 MESSAGE=$(cat <<__EOF__
 To: dev@aurora.incubator.apache.org
-Subject: [RESULT][VOTE] Release Apache Aurora ${current_version} (incubating) RC#{rc_tag_version}
+Subject: [RESULT][VOTE] Release Apache Aurora ${current_version} (incubating) RC${rc_tag_version}
 
 All,
 The vote to accept Apache Aurora ${current_version} RC#{rc_tag_version}
