@@ -294,6 +294,12 @@
       $scope.activeTasks = getTasksForJob($scope.role, $scope.environment, $scope.job);
 
       function buildGroupSummary($scope) {
+        var response = auroraClient.getConfigSummary($scope.role, $scope.environment, $scope.job);
+        if (response.error) {
+          $scope.error = 'Error fetching configuration summary: ' + response.error;
+          return [];
+        }
+
         var colors = [
           'steelblue',
           'darkseagreen',
@@ -302,30 +308,30 @@
           'khaki'
         ];
 
-        var total = _.reduce($scope.taskSummary, function (m, n) {
-          return m + ((n.range.end - n.range.start) + 1);
+        var total = _.reduce(response.groups, function (m, n) {
+          return m + n.instanceIds.length;
         }, 0);
 
-        $scope.groupSummary = $scope.taskSummary.map(function (summary, i) {
-          var count = (summary.range.end - summary.range.start) + 1;
+        $scope.groupSummary = response.groups.map(function (group, i) {
+          var count = group.instanceIds.length;
           var percentage = (count / total) * 100;
 
-          var label = (summary.range.start === summary.range.end) ?
-            summary.range.start :
-            summary.range.start + '-' + summary.range.end;
+          var ranges = taskUtil.toRanges(group.instanceIds).map(function (r) {
+            return (r.start === r.end) ? r.start : r.start + '-' + r.end;
+          });
 
           return {
-            label: label,
+            label: ranges.join(', '),
             value: count,
             percentage: percentage,
-            summary: summary,
+            summary: { schedulingDetail: taskUtil.configToDetails(group.config)},
             color: colors[i % colors.length]
           };
         });
       }
 
       function getTasksForJob(role, environment, job) {
-        var response = auroraClient.getTasks(role, environment, job);
+        var response = auroraClient.getTasksWithoutConfigs(role, environment, job);
 
         if (response.error) {
           $scope.error = 'Error fetching tasks: ' + response.error;
@@ -334,7 +340,6 @@
 
         $scope.jobDashboardUrl = getJobDashboardUrl(response.statsUrlPrefix);
 
-        $scope.taskSummary = taskUtil.summarizeActiveTaskConfigs(response.tasks);
         buildGroupSummary($scope);
 
         var tasks = _.map(response.tasks, function (task) {

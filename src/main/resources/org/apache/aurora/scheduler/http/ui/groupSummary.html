@@ -28,7 +28,7 @@
     </li>
   </ul>
   <a ng-click="showAllGroups()" ng-if="visibleGroups.length < groups.length">
-    show <span ng-if="groups.length > 1">all</span><span ng-if="groups.length === 1">config</span>
+    show <span ng-if="groups.length > 1">all configs</span><span ng-if="groups.length === 1">config</span>
   </a>
   <span ng-if="visibleGroups.length < groups.length && visibleGroups.length > 0"> | </span>
   <a ng-if="visibleGroups.length > 0" ng-click="hideAllGroups()">

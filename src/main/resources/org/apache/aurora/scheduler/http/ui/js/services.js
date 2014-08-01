@@ -13,8 +13,18 @@
  */
 (function () {
   /* global auroraUI:false, Identity:false, TaskQuery:false, ReadOnlySchedulerClient:false,
-            ACTIVE_STATES:false, CronCollisionPolicy: false */
+            ACTIVE_STATES:false, CronCollisionPolicy: false, JobKey: false */
   'use strict';
+
+  function makeJobTaskQuery(role, environment, jobName) {
+    var id = new Identity();
+    id.role = role;
+    var taskQuery = new TaskQuery();
+    taskQuery.owner = id;
+    taskQuery.environment = environment;
+    taskQuery.jobName = jobName;
+    return taskQuery;
+  }
 
   auroraUI.factory(
     'auroraClient',
@@ -56,6 +66,27 @@
             var result = auroraClient.processResponse(response);
             result.tasks = response.result !== null ?
               response.result.scheduleStatusResult.tasks : [];
+            return result;
+          },
+
+          getTasksWithoutConfigs: function (role, environment, jobName) {
+            var query = makeJobTaskQuery(role, environment, jobName);
+            var response = auroraClient.getSchedulerClient().getTasksWithoutConfigs(query);
+            var result = auroraClient.processResponse(response);
+            result.tasks = response.result !== null ?
+              response.result.scheduleStatusResult.tasks : [];
+            return result;
+          },
+
+          getConfigSummary: function (role, environment, jobName) {
+            var key = new JobKey();
+            key.role = role;
+            key.environment = environment;
+            key.name = jobName;
+            var response = auroraClient.getSchedulerClient().getConfigSummary(key);
+            var result = auroraClient.processResponse(response);
+            result.groups = response.result !== null ?
+              response.result.configSummaryResult.summary.groups : [];
             return result;
           },
 
