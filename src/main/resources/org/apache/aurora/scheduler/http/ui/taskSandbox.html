@@ -1,4 +1,4 @@
- <div>
+<div>
   <!--
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -13,14 +13,14 @@
     limitations under the License.
   -->
   <span ng-if='dataRow.sandboxExists'>
-    <a ng-href='http://{{formattedValue}}:1338/task/{{dataRow.taskId}}'>
-      {{formattedValue}}
+    <a ng-href='http://{{formatedValue}}:1338/task/{{dataRow.taskId}}'>
+      {{formatedValue}}
     </a>
   </span>
 
   <span ng-if='!dataRow.sandboxExists'>
     <abbr title='This sandbox link is disabled because the sandbox disk space has been reclaimed.'>
-      {{formattedValue}}
+      {{formatedValue}}
     </abbr>
   </span>
 </div>
