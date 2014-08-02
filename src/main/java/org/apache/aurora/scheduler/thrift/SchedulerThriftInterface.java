@@ -91,6 +91,8 @@ import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.StartMaintenanceResult;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.gen.UpdateQuery;
+import org.apache.aurora.gen.UpdateRequest;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Jobs;
 import org.apache.aurora.scheduler.base.Query;
@@ -1242,6 +1244,36 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response getLocks() {
     return okResponse(Result.getLocksResult(
         new GetLocksResult().setLocks(ILock.toBuildersSet(lockManager.getLocks()))));
+  }
+
+  @Override
+  public Response startUpdate(UpdateRequest request, Lock lock, SessionKey session) {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
+  public Response pauseUpdate(String updateId, Lock lock, SessionKey session) {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
+  public Response resumeUpdate(String updateId, Lock lock, SessionKey session) {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
+  public Response abortUpdate(String updateId, Lock lock, SessionKey session) {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
+  public Response getUpdates(UpdateQuery updateQuery) throws TException {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
+  public Response getUpdateDetails(String updateId) {
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @VisibleForTesting

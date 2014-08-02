@@ -29,6 +29,8 @@ import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.gen.UpdateQuery;
+import org.apache.aurora.gen.UpdateRequest;
 import org.apache.thrift.TException;
 
 import static java.util.Objects.requireNonNull;
@@ -261,5 +263,37 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   @Override
   public Response getPendingReason(TaskQuery query) throws TException {
     return delegate.getPendingReason(query);
+  }
+
+  @Override
+  public Response startUpdate(UpdateRequest request, Lock lock, SessionKey session)
+      throws TException {
+
+    return delegate.startUpdate(request, lock, session);
+  }
+
+  @Override
+  public Response pauseUpdate(String updateId, Lock lock, SessionKey session) throws TException {
+    return delegate.pauseUpdate(updateId, lock, session);
+  }
+
+  @Override
+  public Response resumeUpdate(String updateId, Lock lock, SessionKey session) throws TException {
+    return delegate.resumeUpdate(updateId, lock, session);
+  }
+
+  @Override
+  public Response abortUpdate(String updateId, Lock lock, SessionKey session) throws TException {
+    return delegate.abortUpdate(updateId, lock, session);
+  }
+
+  @Override
+  public Response getUpdates(UpdateQuery updateQuery) throws TException {
+    return delegate.getUpdates(updateQuery);
+  }
+
+  @Override
+  public Response getUpdateDetails(String updateId) throws TException {
+    return delegate.getUpdateDetails(updateId);
   }
 }

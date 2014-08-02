@@ -284,9 +284,15 @@ struct AddInstancesConfig {
   3: set<i32> instanceIds
 }
 
+/** Closed range of integers. */
+struct Range {
+  1: i32 first
+  2: i32 last
+}
+
 struct ConfigGroup {
   1: TaskConfig config
-  2: set<i32> instanceIds
+  2: set<i32> instanceIds   // TODO(maxim): change it to use list<Range> instead.
 }
 
 struct ConfigSummary {
@@ -501,6 +507,185 @@ struct PendingReason {
   2: string reason
 }
 
+/** States that a job update may be in. */
+enum UpdateStatus {
+  /** Update is created but not yet started. */
+  INIT = 0,
+
+  /** Update is in progress. */
+  ROLLING_FORWARD = 1,
+
+  /** Update has failed and is being rolled back. */
+  ROLLING_BACK = 2,
+
+  /** Update has been paused while in progress. */
+  ROLL_FORWARD_PAUSED = 3,
+
+  /** Update has been paused during rollback. */
+  ROLL_BACK_PAUSED = 4,
+
+  /** Update has completed successfully. */
+  ROLLED_FORWARD = 5,
+
+  /** Update has failed and rolled back. */
+  ROLLED_BACK = 6,
+
+  /** Update was aborted. */
+  ABORTED = 7,
+
+  /** Unknown error during update. */
+  ERROR = 8
+}
+
+/** Update actions that can be applied to job instances. */
+enum UpdateAction {
+  // TODO(maxim): Define when instance update part is completed.
+}
+
+/** Job update thresholds and limits. */
+struct UpdateSettings {
+  /** Max number of instances being updated at any given moment. */
+  1: i32 updateGroupSize
+
+  /** Max number of instance failures to tolerate before marking instance as FAILED. */
+  2: i32 maxPerInstanceFailures
+
+  /** Max number of FAILED instances to tolerate before terminating the forward roll. */
+  3: i32 maxFailedInstances
+
+  /** Max time to wait until an instance reaches RUNNING state. */
+  4: i32 maxWaitToInstanceRunningMs
+
+  /** Min time to watch to watch a RUNNING instance. */
+  5: i32 minWaitInInstanceRunningMs
+
+  /** If True, disables failed update rollback. */
+  6: bool doNotRollbackOnFailure
+
+  /** A set of instance IDs to act on. */
+  7: set<i32> updateOnlyTheseInstances
+}
+
+/** Event marking a state transition in job update lifecycle. */
+struct UpdateEvent {
+  /** Update status. */
+  1: UpdateStatus status
+
+  /** Epoch timestamp in milliseconds. */
+  2: i64 timestampMs
+}
+
+/** Event marking a state transition in job instance update lifecycle. */
+struct InstanceUpdateEvent {
+  /** Job instance ID. */
+  1: i32 instanceId
+
+  /** Epoch timestamp in milliseconds. */
+  2: i64 timestampMs
+
+  /** Update action taken on the instance. */
+  3: UpdateAction action
+}
+
+/** Maps instance IDs to TaskConfigs it. */
+struct InstanceTaskConfig {
+  /** A TaskConfig associated with instances. */
+  1: TaskConfig task
+
+  /** Instances associated with the TaskConfig. */
+  2: list<Range> instances
+}
+
+/** Job update state. */
+struct Update {
+  /** Update ID. */
+  1: string updateId
+
+  /** Job key. */
+  2: JobKey jobKey
+
+  /** User initiated an update. */
+  3: string user
+
+  /** Current status of the update. */
+  4: UpdateStatus status
+
+  /** Creation timestamp in milliseconds. */
+  5: i64 createdTimestampMs
+
+  /** Last modified timestamp in milliseconds. */
+  6: i64 lastModifiedTimestampMs
+}
+
+/** Update configuration and setting details. */
+struct UpdateConfiguration {
+  /** Update ID. */
+  1: string updateId
+
+  /** Actual InstanceId -> TaskConfig mapping when the update was requested. */
+  2: set<InstanceTaskConfig> oldTaskConfigs
+
+  /** Desired InstanceId -> TaskConfig mapping when the update completes. */
+  3: set<InstanceTaskConfig> newTaskConfigs
+
+  /** Update specific settings. */
+  4: UpdateSettings settings
+}
+
+/** Full job update info including all lifecycle events. */
+struct UpdateDetails {
+  /** Current job update state. */
+  1: Update summary
+
+  /** Update configuration and setting details. */
+  2: UpdateConfiguration details
+
+  /** History for this update. */
+  3: list<UpdateEvent> updateEvents
+
+  /** History for the individual instances updated. */
+  4: list<InstanceUpdateEvent> instanceEvents
+}
+
+/** A request to update the following instances of the existing job. Used by startUpdate. */
+struct UpdateRequest {
+  /** Job key. */
+  1: JobKey jobKey
+
+  /** Desired TaskConfig for the job. */
+  2: TaskConfig taskConfig
+
+  /** Desired job instance count. */
+  3: i32 instanceCount
+
+  /** Update settings and limits. */
+  4: UpdateSettings settings
+}
+
+/**
+ * Contains a set of restrictions on matching job updates where all restrictions must be met
+ * (terms are AND'ed together).
+ */
+struct UpdateQuery {
+  /** Update ID. */
+  1: string updateId
+
+  /** Job role. */
+  2: string role
+
+  /** Job key. */
+  3: JobKey jobKey
+
+  /** Set of update statuses. */
+  4: set<UpdateStatus> updateStatus
+
+  /** Offset to serve data from. Used by pagination. */
+  5: i32 offset
+
+  /** Number or records to serve. Used by pagination. */
+  6: i32 limit
+}
+
 struct ListBackupsResult {
   1: set<string> backups
 }
@@ -546,6 +731,21 @@ struct GetPendingReasonResult {
   1: set<PendingReason> reasons
 }
 
+/** Result of the startUpdate call. */
+struct StartUpdateResult {
+  1: string updateId
+}
+
+/** Result of the getUpdates call. */
+struct GetUpdatesResult {
+  1: set<Update> updates
+}
+
+/** Result of the getUpdateDetails call. */
+struct GetUpdateDetailsResult {
+  1: UpdateDetails details
+}
+
 /** Information about the scheduler. */
 struct ServerInfo {
   1: string clusterName
@@ -572,6 +772,9 @@ union Result {
   19: GetLocksResult getLocksResult
   20: ConfigSummaryResult configSummaryResult
   21: GetPendingReasonResult getPendingReasonResult
+  22: StartUpdateResult startUpdateResult
+  23: GetUpdatesResult getUpdatesResult
+  24: GetUpdateDetailsResult getUpdateDetailsResult
 }
 
 struct ResponseDetail {
@@ -641,6 +844,12 @@ service ReadOnlyScheduler {
 
   /** Returns all stored context specific resource/operation locks. */
   Response getLocks()
+
+  /** Gets job updates. Not implemented yet. */
+  Response getUpdates(1: UpdateQuery updateQuery)
+
+  /** Gets job update details. Not implemented yet. */
+  Response getUpdateDetails(1: string updateId)
 }
 
 // Due to assumptions in the client all authenticated RPCs must have a SessionKey as their
@@ -701,6 +910,21 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
    * The cron job template (configuration) must exist for the call to succeed.
    */
   Response replaceCronTemplate(1: JobConfiguration config, 2: Lock lock, 3: SessionKey session)
+
+  /** Starts update of the existing service job. Not implemented yet. */
+  Response startUpdate(
+      1: UpdateRequest request,
+      2: Lock lock,
+      3: SessionKey session)
+
+  /** Pauses the update progress. Can be resumed by resumeUpdate call. Not implemented yet. */
+  Response pauseUpdate(1: string updateId, 2: Lock lock, 3: SessionKey session)
+
+  /** Resumes progress of a previously paused update. Not implemented yet. */
+  Response resumeUpdate(1: string updateId, 2: Lock lock, 3: SessionKey session)
+
+  /** Permanently aborts the update. Does not remove the update history. Not implemented yet. */
+  Response abortUpdate(1: string updateId, 2: Lock lock, 3: SessionKey session)
 }
 
 struct InstanceConfigRewrite {
