@@ -300,6 +300,7 @@ public class SchedulerLifecycle implements EventSubscriber {
           public void run() {
             // Blocks until driver exits.
             driverRef.get().join();
+            LOG.info("Driver exited, terminating lifecycle.");
             stateMachine.transition(State.DEAD);
           }
         });
@@ -421,6 +422,7 @@ public class SchedulerLifecycle implements EventSubscriber {
         try {
           closure.execute(transition);
         } catch (RuntimeException e) {
+          LOG.log(Level.SEVERE, "Caught unchecked exception: " + e, e);
           stateMachine.transition(State.DEAD);
           throw e;
         }
