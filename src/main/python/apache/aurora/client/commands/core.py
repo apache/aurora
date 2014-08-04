@@ -172,6 +172,10 @@ def maybe_disable_hooks(options):
     GlobalHookRegistry.disable_hooks()
     log.info('Client hooks disabled; reason given by user: %s' % options.disable_all_hooks_reason)
 
+def v1_deprecation_warning(old, new):
+  print("WARNING: %s is an aurora clientv1 command which will be deprecated soon" % old)
+  print("To run this command using clientv2, use 'aurora %s'" % " ".join(new))
+
 
 def really_create(job_spec, config_file, options):
   try:
@@ -207,6 +211,17 @@ def create(job_spec, config_file):
   options = app.get_options()
   CoreCommandHook.run_hooks("create", options, job_spec, config_file)
   maybe_disable_hooks(options)
+  newcmd = ["job create"]
+  newcmd.append(job_spec)
+  newcmd.append(config_file)
+  if options.open_browser:
+    newcmd.append('--open-browser')
+  if options.json:
+    newcmd.append('--read-json')
+  if options.wait_until != "PENDING":
+    newcmd.append('--wait-until=%s' % options.wait_until)
+
+  v1_deprecation_warning("create", newcmd)
   return really_create(job_spec, config_file, options)
 
 
@@ -225,6 +240,12 @@ def diff(job_spec, config_file):
   By default the diff will be displayed using 'diff', though you may choose an alternate
   diff program by specifying the DIFF_VIEWER environment variable."""
   options = app.get_options()
+
+  newcmd = ["job", "diff", job_spec, config_file]
+  if options.json:
+    newcmd.append("--read-json")
+
+  v1_deprecation_warning("diff", newcmd)
 
   config = get_job_config(job_spec, config_file, options)
   if options.rename_from:
@@ -285,6 +306,7 @@ def do_open(args, _):
   if len(args) == 0:
     print('Open command requires a jobkey parameter.')
     exit(1)
+  v1_deprecation_warning("open", ["job", "open"])
   args = args[0].split("/")
   if len(args) > 0:
     cluster_name = args[0]
@@ -325,6 +347,11 @@ def inspect(job_spec, config_file):
   the parsed configuration.
   """
   options = app.get_options()
+  newcmd = ["job", "inspect", job_spec, config_file]
+  if options.json:
+    newcmd.append("--read-json")
+  v1_deprecation_warning("inspect", newcmd)
+
   config = get_job_config(job_spec, config_file, options)
   if options.raw:
     print('Parsed job config: %s' % config.job())
@@ -394,6 +421,10 @@ def start_cron(args, options):
   Invokes a cron job immediately, out of its normal cron cycle.
   This does not affect the cron cycle in any way.
   """
+  newcmd = ["cron", "start"]
+  if options.disable_all_hooks_reason is not None:
+    newcmd.append("--disable-all-hooks-reason=%s" % options.disable_all_hooks_reason)
+  v1_deprecation_warning("start_cron", newcmd)
   CoreCommandHook.run_hooks("start_cron", options, *args)
   maybe_disable_hooks(options)
   return really_start_cron(args, options)
@@ -434,6 +465,8 @@ def list_jobs(cluster_and_role):
     print('\tcron policy:   %s' % job.cronCollisionPolicy)
 
   options = app.get_options()
+  v1_deprecation_warning("list_jobs", ["job", "list", cluster_and_role])
+
   if options.show_cron_schedule and options.pretty:
     print_fn = show_job_pretty
   else:
@@ -473,7 +506,20 @@ def really_kill(args, options):
     exit(1)
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())
-  options = app.get_options()
+  instance_key = str(job_key)
+  if options.shards is not None:
+    instance_key = "%s/%s" % (instance_key, ",".join(map(str, options.shards)))
+  new_cmd = ["job", "kill", instance_key]
+  if config_file is not None:
+    new_cmd.append("--config=%s" % config_file)
+  if options.open_browser:
+    new_cmd.append("--open-browser")
+  if options.batch_size is not None:
+    new_cmd.append("--batch-size=%s" % options.batch_size)
+  if options.max_total_failures is not None:
+    new_cmd.append("--max-total-failures=%s" % options.max_total_failures)
+  v1_deprecation_warning("kill", new_cmd)
+
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
   if options.batch_size is not None:
     kill_in_batches(api, job_key, options.shards, options.batch_size, options.max_failures_option)
@@ -531,6 +577,17 @@ def really_killall(args, options):
   maybe_disable_hooks(options)
   job_key = AuroraJobKey.from_path(args[0])
   config_file = args[1] if len(args) > 1 else None  # the config for hooks
+  new_cmd = ["job", "killall", args[0]]
+  if config_file is not None:
+    new_cmd.append("--config=%s" % config_file)
+  if options.open_browser:
+    new_cmd.append("--open-browser")
+  if options.batch_size is not None:
+    new_cmd.append("--batch-size=%s" % options.batch_size)
+  if options.max_total_failures is not None:
+    new_cmd.append("--max-total-failures=%s" % options.max_total_failures)
+  v1_deprecation_warning("killall", new_cmd)
+
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
   api = make_client(job_key.cluster)
   if options.batch_size is not None:
@@ -605,6 +662,7 @@ def status(args, options):
 
   api, job_key, _ = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())
+  v1_deprecation_warning("status", ["job", "status", args[0]])
   resp = api.check_status(job_key)
   check_and_log_response(resp)
 
@@ -682,6 +740,17 @@ def update(job_spec, config_file):
   """
   options = app.get_options()
   CoreCommandHook.run_hooks("update", options, job_spec, config_file)
+  new_cmd = ["job", "update"]
+  instance_spec = job_spec
+  if options.shards is not None:
+    instance_spec = "%s/%s" % (job_spec, ",".join(map(str, options.shards)))
+  new_cmd.append(instance_spec)
+  new_cmd.append(config_file)
+  if options.json:
+    new_cmd.append("--read-json")
+  if options.health_check_interval_seconds is not None:
+    new_cmd.append("--health-check-interval-seconds=%s" % options.health_check_interval_seconds)
+  v1_deprecation_warning("update", new_cmd)
   return really_update(job_spec, config_file, options)
 
 
@@ -766,6 +835,24 @@ def restart(args, options):
 def really_cancel_update(args, options):
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())
+  new_cmd = ["job", "restart"]
+  instance_key = args[0]
+  if options.shards is not None:
+    instance_key += "/" + ",".join(map(str, option.shards))
+  new_cmd.append(instance_key)
+  if config_file is not None:
+    new_cmd.append("--config=%s" % config_file)
+  if options.batch_size != 1:
+    new_cmd.append("--batch-size=%s" % options.batch_size)
+  if options.max_per_shard_failures != 0:
+    new_cmd.append("--max-per-shard-failures=%s" % options.max_per_shard_failures)
+  if options.max_total_failures != 0:
+    new_cmd.append("--max-total-failures=%s" % options.max_total_failures)
+  if options.restart_threshold != 60:
+    new_cmd.append("--restart-threshold=%s" % options.restart)
+  if options.watch_secs != 30:
+    new_cmd.append("--watch-secs=%s" % options.watch_secs)
+  v1_deprecation_warning("update", new_cmd)
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
   resp = api.cancel_update(job_key, config=config)
   check_and_log_response(resp)
@@ -782,6 +869,7 @@ def cancel_update(args, options):
   be used when the user is confident that they are not conflicting with another user.
   """
   CoreCommandHook.run_hooks("cancel_update", options, *args)
+  v1_deprecation_warning("cancel_update", ["job", "cancel_update"] + args)
   return really_cancel_update(args, options)
 
 
@@ -794,6 +882,7 @@ def get_quota(role):
   Prints the production quota that has been allocated to a user.
   """
   options = app.get_options()
+  v1_deprecation_warning("get_quota", ["quota", "get", "%s/%s" % (options.cluster, role)])
   resp = make_client(options.cluster).get_quota(role)
   quota_result = resp.result.getQuotaResult
   print_quota(quota_result.quota, 'Total allocated quota', role)
