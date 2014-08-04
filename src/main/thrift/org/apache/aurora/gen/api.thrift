@@ -559,8 +559,8 @@ struct UpdateSettings {
   /** Min time to watch to watch a RUNNING instance. */
   5: i32 minWaitInInstanceRunningMs
 
-  /** If True, disables failed update rollback. */
-  6: bool doNotRollbackOnFailure
+  /** If true, enables failed update rollback. */
+  6: bool rollbackOnFailure
 
   /** A set of instance IDs to act on. */
   7: set<i32> updateOnlyTheseInstances
@@ -843,7 +843,7 @@ service ReadOnlyScheduler {
   Response populateJobConfig(1: JobConfiguration description)
 
   /** Returns all stored context specific resource/operation locks. */
-    Response getLocks()
+  Response getLocks()
 
   /** Gets job updates. Not implemented yet. */
   Response getUpdates(1: UpdateQuery updateQuery)

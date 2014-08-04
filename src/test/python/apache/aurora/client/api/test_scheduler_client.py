@@ -45,8 +45,8 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatus,
     SessionKey,
     TaskQuery,
-    UpdateRequest,
-    UpdateQuery
+    UpdateQuery,
+    UpdateRequest
 )
 
 ROLE = 'foorole'

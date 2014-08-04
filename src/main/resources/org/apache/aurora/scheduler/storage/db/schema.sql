@@ -13,6 +13,7 @@
  */
 
 -- schema for h2 engine.
+/* TODO(maxim): Consider using TIMESTAMP instead of BIGINT for all "timestamp" fields below. */
 
 CREATE TABLE framework_id(
   id INT PRIMARY KEY,
@@ -76,4 +77,60 @@ CREATE TABLE host_attribute_values(
   value VARCHAR NOT NULL,
 
   UNIQUE(host_attribute_id, name, value)
+);
+
+CREATE TABLE job_instance_update_actions(
+  id INT PRIMARY KEY,
+  name VARCHAR NOT NULL,
+
+  UNIQUE(name)
+);
+
+CREATE TABLE job_update_statuses(
+  id INT PRIMARY KEY,
+  name VARCHAR NOT NULL,
+
+  UNIQUE(name)
+);
+
+CREATE TABLE job_updates(
+  id INT IDENTITY,
+  job_key_id INT NOT NULL REFERENCES job_keys(id),
+  update_id VARCHAR NOT NULL,
+  user_name VARCHAR NOT NULL,
+  status INT NOT NULL REFERENCES job_update_statuses(id),
+  inserted_timestamp_ms BIGINT NOT NULL,
+  modified_timestamp_ms BIGINT NOT NULL,
+  update_group_size INT NOT NULL,
+  max_per_instance_failures INT NOT NULL,
+  max_failed_instances INT NOT NULL,
+  max_wait_to_instance_running_ms INT NOT NULL,
+  min_wait_in_instance_running_ms INT NOT NULL,
+  rollback_on_failure BOOLEAN NOT NULL,
+  update_only_these_instances ARRAY,
+
+  UNIQUE(update_id)
+);
+
+CREATE TABLE job_update_configs(
+  id INT IDENTITY,
+  update_id INT NOT NULL REFERENCES job_updates(id),
+  task_config VARCHAR NOT NULL,
+  instances ARRAY NOT NULL,
+  is_new BOOLEAN NOT NULL
+);
+
+CREATE TABLE job_update_events(
+  id BIGINT IDENTITY,
+  update_id INT NOT NULL REFERENCES job_updates(id),
+  update_status INT NOT NULL REFERENCES job_update_statuses(id),
+  timestamp_ms BIGINT NOT NULL
+);
+
+CREATE TABLE job_instance_update_events(
+  id BIGINT IDENTITY,
+  update_id INT NOT NULL REFERENCES job_updates(id),
+  update_action INT NOT NULL REFERENCES job_instance_update_actions(id),
+  instance_id INT NOT NULL,
+  timestamp_ms BIGINT NOT NULL
 );
