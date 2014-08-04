@@ -44,7 +44,9 @@ from gen.apache.aurora.api.ttypes import (
     RewriteConfigsRequest,
     ScheduleStatus,
     SessionKey,
-    TaskQuery
+    TaskQuery,
+    UpdateRequest,
+    UpdateQuery
 )
 
 ROLE = 'foorole'
@@ -201,7 +203,7 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.make_scheduler_proxy().setQuota(ROLE, ResourceAggregate())
 
   def test_forceTaskState(self):
-    self.mock_thrift_client.forceTaskState(IgnoreArg(), IgnoreArg(), IsA(SessionKey))
+    self.mock_thrift_client.forceTaskState('taskid', IgnoreArg(), IsA(SessionKey))
     self.mox.ReplayAll()
     self.make_scheduler_proxy().forceTaskState('taskid', ScheduleStatus.LOST)
 
@@ -249,6 +251,36 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mock_thrift_client.rewriteConfigs(IsA(RewriteConfigsRequest), IsA(SessionKey))
     self.mox.ReplayAll()
     self.make_scheduler_proxy().rewriteConfigs(RewriteConfigsRequest())
+
+  def test_getUpdates(self):
+    self.mock_thrift_client.getUpdates(IsA(UpdateQuery))
+    self.mox.ReplayAll()
+    self.make_scheduler_proxy().getUpdates(UpdateQuery())
+
+  def test_getUpdateDetails(self):
+    self.mock_thrift_client.getUpdateDetails('update_id')
+    self.mox.ReplayAll()
+    self.make_scheduler_proxy().getUpdateDetails('update_id')
+
+  def test_startUpdate(self):
+    self.mock_thrift_client.startUpdate(IsA(UpdateRequest), IsA(Lock), IsA(SessionKey))
+    self.mox.ReplayAll()
+    self.make_scheduler_proxy().startUpdate(UpdateRequest(), Lock())
+
+  def test_pauseUpdate(self):
+    self.mock_thrift_client.pauseUpdate('update_id', IsA(Lock), IsA(SessionKey))
+    self.mox.ReplayAll()
+    self.make_scheduler_proxy().pauseUpdate('update_id', Lock())
+
+  def test_resumeUpdate(self):
+    self.mock_thrift_client.resumeUpdate('update_id', IsA(Lock), IsA(SessionKey))
+    self.mox.ReplayAll()
+    self.make_scheduler_proxy().resumeUpdate('update_id', Lock())
+
+  def test_abortUpdate(self):
+    self.mock_thrift_client.abortUpdate('update_id', IsA(Lock), IsA(SessionKey))
+    self.mox.ReplayAll()
+    self.make_scheduler_proxy().abortUpdate('update_id', Lock())
 
 
 @pytest.mark.parametrize('scheme', ('http', 'https'))

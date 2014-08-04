@@ -843,7 +843,7 @@ service ReadOnlyScheduler {
   Response populateJobConfig(1: JobConfiguration description)
 
   /** Returns all stored context specific resource/operation locks. */
-  Response getLocks()
+    Response getLocks()
 
   /** Gets job updates. Not implemented yet. */
   Response getUpdates(1: UpdateQuery updateQuery)

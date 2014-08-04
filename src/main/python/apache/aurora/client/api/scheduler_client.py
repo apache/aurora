@@ -29,7 +29,7 @@ from apache.aurora.common.auth import make_session_key, SessionKeyError
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.transport import TRequestsTransport
 
-from gen.apache.aurora.api import AuroraAdmin
+from gen.apache.aurora.api import AuroraAdmin, ReadOnlyScheduler
 from gen.apache.aurora.api.constants import CURRENT_API_VERSION
 
 try:
@@ -181,14 +181,6 @@ class SchedulerProxy(object):
   CONNECT_MAXIMUM_WAIT = Amount(1, Time.MINUTES)
   RPC_RETRY_INTERVAL = Amount(5, Time.SECONDS)
   RPC_MAXIMUM_WAIT = Amount(10, Time.MINUTES)
-  UNAUTHENTICATED_RPCS = frozenset([
-    'populateJobConfig',
-    'getTasksStatus',
-    'getTasksWithoutConfigs',
-    'getJobs',
-    'getQuota',
-    'getVersion',
-  ])
 
   class Error(Exception): pass
   class TimeoutError(Error): pass
@@ -277,10 +269,13 @@ class SchedulerProxy(object):
     def method_wrapper(*args):
       with self._lock:
         start = time.time()
+        # TODO(wfarner): The while loop causes failed unit tests to spin for the retry
+        # period (currently 10 minutes).  Figure out a better approach.
         while not self._terminating.is_set() and (
             time.time() - start) < self.RPC_MAXIMUM_WAIT.as_(Time.SECONDS):
 
-          auth_args = () if method_name in self.UNAUTHENTICATED_RPCS else (self.session_key(),)
+          # Only automatically append a SessionKey if this is not part of the read-only API.
+          auth_args = () if hasattr(ReadOnlyScheduler.Iface, method_name) else (self.session_key(),)
           try:
             method = getattr(self.client(), method_name)
             if not callable(method):
