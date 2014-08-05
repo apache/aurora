@@ -63,12 +63,22 @@ struct RemoveQuota {
   1: string role
 }
 
+struct SaveHostAttributes {
+  1: api.HostAttributes hostAttributes
+}
+
 struct SaveJobUpdate {
   1: api.JobUpdate jobUpdate
 }
 
-struct SaveHostAttributes {
-  1: api.HostAttributes hostAttributes
+struct SaveJobUpdateEvent {
+  1: api.JobUpdateEvent event
+  2: string updateId
+}
+
+struct SaveJobInstanceUpdateEvent {
+  1: api.JobInstanceUpdateEvent event
+  2: string updateId
 }
 
 union Op {
@@ -84,6 +94,8 @@ union Op {
   12: SaveLock saveLock
   13: RemoveLock removeLock
   14: SaveJobUpdate saveJobUpdate
+  15: SaveJobUpdateEvent saveJobUpdateEvent
+  16: SaveJobInstanceUpdateEvent saveJobInstanceUpdateEvent
 }
 
 // The current schema version ID.  This should be incremented each time the

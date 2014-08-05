@@ -540,6 +540,7 @@ enum JobUpdateStatus {
 /** Job update actions that can be applied to job instances. */
 enum JobUpdateAction {
   // TODO(maxim): Define when instance update part is completed.
+  ADD_INSTANCE = 1
 }
 
 /** Job update thresholds and limits. */

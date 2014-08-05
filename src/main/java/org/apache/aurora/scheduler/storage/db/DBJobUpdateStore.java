@@ -14,7 +14,9 @@
 package org.apache.aurora.scheduler.storage.db;
 
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
+import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 
 /**
  * A relational database-backed job update store.
@@ -22,6 +24,16 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   @Override
   public void saveJobUpdate(IJobUpdate update) {
+    // TODO(maxim): implement DB mapping logic.
+  }
+
+  @Override
+  public void saveJobUpdateEvent(IJobUpdateEvent event, String updateId) {
+    // TODO(maxim): implement DB mapping logic.
+  }
+
+  @Override
+  public void saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent event, String updateId) {
     // TODO(maxim): implement DB mapping logic.
   }
 }

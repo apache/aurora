@@ -13,7 +13,9 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 
 /**
  * Stores all job updates and defines methods for saving, updating and fetching job updates.
@@ -25,10 +27,26 @@ public interface JobUpdateStore {
   interface Mutable extends JobUpdateStore {
 
     /**
-     * Saves a new job {@code update}.
+     * Saves a new job update.
      *
      * @param update Update to save.
      */
     void saveJobUpdate(IJobUpdate update);
+
+    /**
+     * Saves a new job update event.
+     *
+     * @param event Job update event to save.
+     * @param updateId Job update ID.
+     */
+    void saveJobUpdateEvent(IJobUpdateEvent event, String updateId);
+
+    /**
+     * Saves a new job instance update event.
+     *
+     * @param event Job instance update event.
+     * @param updateId Job update ID.
+     */
+    void saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent event, String updateId);
   }
 }

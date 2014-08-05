@@ -23,6 +23,8 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+
+import com.twitter.common.base.MorePreconditions;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 
 import org.apache.aurora.gen.MaintenanceMode;
@@ -35,7 +37,9 @@ import org.apache.aurora.gen.storage.RewriteTask;
 import org.apache.aurora.gen.storage.SaveAcceptedJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
+import org.apache.aurora.gen.storage.SaveJobInstanceUpdateEvent;
 import org.apache.aurora.gen.storage.SaveJobUpdate;
+import org.apache.aurora.gen.storage.SaveJobUpdateEvent;
 import org.apache.aurora.gen.storage.SaveLock;
 import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.SaveTasks;
@@ -52,8 +56,10 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -280,6 +286,26 @@ class WriteAheadStorage extends ForwardingStore implements
 
     write(Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder())));
     jobUpdateStore.saveJobUpdate(update);
+  }
+
+  @Override
+  public void saveJobUpdateEvent(IJobUpdateEvent event, String updateId) {
+    requireNonNull(event);
+    MorePreconditions.checkNotBlank(updateId);
+
+    write(Op.saveJobUpdateEvent(new SaveJobUpdateEvent(event.newBuilder(), updateId)));
+    jobUpdateStore.saveJobUpdateEvent(event, updateId);
+  }
+
+  @Override
+  public void saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent event, String updateId) {
+    requireNonNull(event);
+    MorePreconditions.checkNotBlank(updateId);
+
+    write(Op.saveJobInstanceUpdateEvent(new SaveJobInstanceUpdateEvent(
+        event.newBuilder(),
+        updateId)));
+    jobUpdateStore.saveJobInstanceUpdateEvent(event, updateId);
   }
 
   @Override

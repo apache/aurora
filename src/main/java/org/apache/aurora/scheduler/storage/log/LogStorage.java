@@ -59,8 +59,10 @@ import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -179,7 +181,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   private final LockStore.Mutable writeBehindLockStore;
   private final QuotaStore.Mutable writeBehindQuotaStore;
   private final AttributeStore.Mutable writeBehindAttributeStore;
-  private final JobUpdateStore.Mutable writeBehindUpdateStore;
+  private final JobUpdateStore.Mutable writeBehindJobUpdateStore;
 
   private StreamManager streamManager;
   private final WriteAheadStorage writeAheadStorage;
@@ -230,7 +232,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
              @WriteBehind LockStore.Mutable lockStore,
              @WriteBehind QuotaStore.Mutable quotaStore,
              @WriteBehind AttributeStore.Mutable attributeStore,
-             @WriteBehind JobUpdateStore.Mutable updateStore) {
+             @WriteBehind JobUpdateStore.Mutable jobUpdateStore) {
 
     this(logManager,
         new ScheduledExecutorSchedulingService(shutdownRegistry, shutdownGracePeriod),
@@ -243,7 +245,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         lockStore,
         quotaStore,
         attributeStore,
-        updateStore);
+        jobUpdateStore);
   }
 
   @VisibleForTesting
@@ -258,7 +260,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
              LockStore.Mutable lockStore,
              QuotaStore.Mutable quotaStore,
              AttributeStore.Mutable attributeStore,
-             JobUpdateStore.Mutable updateStore) {
+             JobUpdateStore.Mutable jobUpdateStore) {
 
     this.logManager = requireNonNull(logManager);
     this.schedulingService = requireNonNull(schedulingService);
@@ -276,7 +278,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     this.writeBehindLockStore = requireNonNull(lockStore);
     this.writeBehindQuotaStore = requireNonNull(quotaStore);
     this.writeBehindAttributeStore = requireNonNull(attributeStore);
-    this.writeBehindUpdateStore = requireNonNull(updateStore);
+    this.writeBehindJobUpdateStore = requireNonNull(jobUpdateStore);
     TransactionManager transactionManager = new TransactionManager() {
       @Override
       public boolean hasActiveTransaction() {
@@ -296,7 +298,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         lockStore,
         quotaStore,
         attributeStore,
-        updateStore);
+        jobUpdateStore);
   }
 
   @Override
@@ -450,8 +452,20 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         break;
 
       case SAVE_JOB_UPDATE:
-        writeBehindUpdateStore.saveJobUpdate(
+        writeBehindJobUpdateStore.saveJobUpdate(
             IJobUpdate.build(op.getSaveJobUpdate().getJobUpdate()));
+        break;
+
+      case SAVE_JOB_UPDATE_EVENT:
+        writeBehindJobUpdateStore.saveJobUpdateEvent(
+            IJobUpdateEvent.build(op.getSaveJobUpdateEvent().getEvent()),
+            op.getSaveJobUpdateEvent().getUpdateId());
+        break;
+
+      case SAVE_JOB_INSTANCE_UPDATE_EVENT:
+        writeBehindJobUpdateStore.saveJobInstanceUpdateEvent(
+            IJobInstanceUpdateEvent.build(op.getSaveJobInstanceUpdateEvent().getEvent()),
+            op.getSaveJobInstanceUpdateEvent().getUpdateId());
         break;
 
       default:
