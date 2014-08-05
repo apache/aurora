@@ -26,6 +26,7 @@ from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
 from apache.aurora.executor.aurora_executor import AuroraExecutor
+from apache.aurora.executor.common.announcer import DefaultAnnouncerCheckerProvider
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
 from apache.aurora.executor.common.health_checker import HealthCheckerProvider
 from apache.aurora.executor.thermos_task_runner import DefaultThermosTaskRunnerProvider
@@ -34,6 +35,32 @@ app.configure(debug=True)
 LogOptions.set_simple(True)
 LogOptions.set_disk_log_level('DEBUG')
 LogOptions.set_log_dir('.')
+
+
+app.add_option(
+    '--announcer-enable',
+    dest='announcer_enable',
+    action='store_true',
+    default=False,
+    help='Enable the ServerSet announcer for this executor.  Jobs must still activate using '
+         'the Announcer configuration.')
+
+
+app.add_option(
+    '--announcer-ensemble',
+    dest='announcer_ensemble',
+    type=str,
+    default=None,
+    help='The ensemble to which the Announcer should register ServerSets.')
+
+
+app.add_option(
+    '--announcer-serverset-path',
+    dest='announcer_serverset_path',
+    type=str,
+    default='/aurora',
+    help='The root of the tree into which ServerSets should be announced.  The paths will '
+         'be of the form $ROOT/$ROLE/$ENVIRONMENT/$JOBNAME.')
 
 
 # TODO(wickman) Consider just having the OSS version require pip installed
@@ -52,16 +79,25 @@ def dump_runner_pex():
 
 
 def proxy_main():
-  def main():
+  def main(args, options):
     thermos_runner_provider = DefaultThermosTaskRunnerProvider(
         dump_runner_pex(),
         artifact_dir=os.path.realpath('.'),
     )
 
+    # status providers:
+    status_providers = [HealthCheckerProvider()]
+
+    if options.announcer_enable:
+      if options.announcer_ensemble is None:
+        app.error('Must specify --announcer-ensemble if the announcer is enabled.')
+      status_providers.append(DefaultAnnouncerCheckerProvider(
+          options.announcer_ensemble, options.announcer_serverset_path))
+
     # Create executor stub
     thermos_executor = AuroraExecutor(
         runner_provider=thermos_runner_provider,
-        status_providers=(HealthCheckerProvider(),),
+        status_providers=status_providers,
     )
 
     # Create driver stub

@@ -46,7 +46,9 @@ from gen.apache.aurora.api.ttypes import (
     RewriteConfigsRequest,
     ScheduleStatus,
     SessionKey,
-    TaskQuery
+    TaskQuery,
+    UpdateQuery,
+    UpdateRequest
 )
 
 ROLE = 'foorole'

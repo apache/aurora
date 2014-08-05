@@ -44,6 +44,21 @@ python_library(
 )
 
 python_library(
+  name = 'announcer',
+  sources = ['announcer.py'],
+  dependencies = [
+    pants('3rdparty/python:twitter.common.concurrent'),
+    pants('3rdparty/python:twitter.common.exceptions'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('3rdparty/python:twitter.common.metrics'),
+    pants('3rdparty/python:twitter.common.quantity'),
+    pants('3rdparty/python:twitter.common.zookeeper'),
+    pants(':status_checker'),
+    pants(':task_info'),
+  ]
+)
+
+python_library(
   name = 'executor_timeout',
   sources = ['executor_timeout.py'],
   dependencies = [

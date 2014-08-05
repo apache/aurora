@@ -28,6 +28,7 @@ Aurora + Thermos Configuration Reference
     - [Services](#services)
     - [UpdateConfig Objects](#updateconfig-objects)
     - [HealthCheckConfig Objects](#healthcheckconfig-objects)
+    - [Announcer Objects](#announcer-objects)
 - [Specifying Scheduling Constraints](#specifying-scheduling-constraints)
 - [Template Namespaces](#template-namespaces)
     - [mesos Namespace](#mesos-namespace)
@@ -355,6 +356,42 @@ Parameters for controlling a task's health checks via HTTP.
 | ```interval_secs```            | Integer   | Interval on which to check the task's health via HTTP. (Default: 10)
 | ```timeout_secs```             | Integer   | HTTP request timeout. (Default: 1)
 | ```max_consecutive_failures``` | Integer   | Maximum number of consecutive failures that tolerated before considering a task unhealthy (Default: 0)
+
+### Announcer Objects
+
+If the `announce` field in the Job configuration is set, each task will be
+registered in the ServerSet `/aurora/role/environment/jobname` in the
+zookeeper ensemble configured by the executor.  If no Announcer object is specified,
+no announcement will take place.  For more information about ServerSets, see the [User Guide](user-guide.md).
+
+| object                         | type      | description
+| -------                        | :-------: | --------
+| ```primary_port```             | String    | Which named port to register as the primary endpoint in the ServerSet (Default: `http`)
+| ```portmap```                  | dict      | A mapping of additional endpoints to announced in the ServerSet (Default: `{ 'aurora': '{{primary_port}}' }`)
+
+### Port aliasing with the Announcer `portmap`
+
+The primary endpoint registered in the ServerSet is the one allocated to the port
+specified by the `primary_port` in the `Announcer` object, by default
+the `http` port.  This port can be referenced from anywhere within a configuration
+as `{{thermos.ports[http]}}`.
+
+Without the port map, each named port would be allocated a unique port number.
+The `portmap` allows two different named ports to be aliased together.  The default
+`portmap` aliases the `aurora` port (i.e. `{{thermos.ports[aurora]}}`) to
+the `http` port.  Even though the two ports can be referenced independently,
+only one port is allocated by Mesos.  Any port referenced in a `Process` object
+but which is not in the portmap will be allocated dynamically by Mesos and announced as well.
+
+It is possible to use the portmap to alias names to static port numbers, e.g.
+`{'http': 80, 'https': 443, 'aurora': 'http'}`.  In this case, referencing
+`{{thermos.ports[aurora]}}` would look up `{{thermos.ports[http]}}` then
+find a static port 80.  No port would be requested of or allocated by Mesos.
+
+Static ports should be used cautiously as Aurora does nothing to prevent two
+tasks with the same static port allocations from being co-scheduled.
+External constraints such as slave attributes should be used to enforce such
+guarantees should they be needed.
 
 Specifying Scheduling Constraints
 =================================

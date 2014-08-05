@@ -16,12 +16,12 @@ python_binary(
   name = 'thermos_executor',
   source = 'thermos_executor_main.py',
   entry_point = 'apache.aurora.executor.bin.thermos_executor_main:proxy_main',
-  ignore_errors = True,
   always_write_cache = True,
   dependencies = [
     pants('3rdparty/python:twitter.common.app'),
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.metrics'),
+    pants('src/main/python/apache/aurora/executor/common:announcer'),
     pants('src/main/python/apache/aurora/executor/common:executor_timeout'),
     pants('src/main/python/apache/aurora/executor/common:health_checker'),
     pants('src/main/python/apache/aurora/executor/common:sandbox'),
@@ -36,7 +36,6 @@ python_binary(
   name = 'gc_executor',
   source = 'gc_executor_main.py',
   entry_point = 'apache.aurora.executor.bin.gc_executor_main:proxy_main',
-  ignore_errors = True,
   always_write_cache = True,
   dependencies = [
     pants('3rdparty/python:twitter.common.app'),

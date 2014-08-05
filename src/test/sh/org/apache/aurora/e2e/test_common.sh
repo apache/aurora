@@ -41,3 +41,26 @@ collect_result() {
     exit $RETCODE
   ) >&4 # Send to the stderr we had at startup.
 }
+
+validate_serverset() {
+  # default python return code
+  local retcode=0
+
+  # launch aurora client in interpreter mode to get access to the kazoo client
+  vagrant ssh -c \
+      "env SERVERSET="$1" PEX_INTERPRETER=1 aurora /vagrant/src/test/sh/org/apache/aurora/e2e/validate_serverset.py" \
+      || retcode=$?
+
+  if [[ $retcode = 1 ]]; then
+    echo "Validated announced job."
+    return 0
+  elif [[ $retcode = 2 ]]; then
+    echo "Job failed to announce in serverset."
+  elif [[ $retcode = 3 ]]; then
+    echo "Job failed to re-announce when expired."
+  else
+    echo "Unknown failure in test script."
+  fi
+
+  return 1
+}

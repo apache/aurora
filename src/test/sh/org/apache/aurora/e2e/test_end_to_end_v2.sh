@@ -45,6 +45,9 @@ test_http_example() {
   echo '== Updating test job'
   vagrant ssh -c "aurora2 job update $jobkey $_updated_config"
 
+  echo '== Validating announce'
+  validate_serverset "/aurora/$_role/$_env/$_job"
+
   # TODO(mchucarroll): Get "run" working: the vagrant configuration currently doesn't set up ssh
   # to allow automatic logins to the slaves. "aurora run" therefore tries to prompt the user for
   # a password, finds that it's not running in a TTY, and aborts.

@@ -46,6 +46,7 @@ job = Job(
   constraints = {
     'host': 'limit:4',
   },
+  announce = Announcer(),
 )
 
 jobs = [ job ]

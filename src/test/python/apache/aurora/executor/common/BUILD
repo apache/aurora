@@ -15,11 +15,23 @@
 python_test_suite(
   name = 'all',
   dependencies = [
+    pants(':announcer'),
     pants(':directory_sandbox'),
     pants(':health_checker'),
     pants(':status_checker'),
     pants(':task_info'),
   ]
+)
+
+python_tests(
+  name = 'announcer',
+  sources = ['test_announcer.py'],
+  dependencies = [
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.quantity'),
+    pants('3rdparty/python:twitter.common.testing'),
+    pants('src/main/python/apache/aurora/executor/common:announcer'),
+  ],
 )
 
 python_tests(
