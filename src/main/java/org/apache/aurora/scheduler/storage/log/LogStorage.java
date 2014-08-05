@@ -463,8 +463,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         break;
 
       case SAVE_JOB_INSTANCE_UPDATE_EVENT:
-        writeBehindJobUpdateStore.saveJobInstanceUpdateEvent(
-            IJobInstanceUpdateEvent.build(op.getSaveJobInstanceUpdateEvent().getEvent()),
+        writeBehindJobUpdateStore.saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent.build(
+            op.getSaveJobInstanceUpdateEvent().getEvent()),
             op.getSaveJobInstanceUpdateEvent().getUpdateId());
         break;
 

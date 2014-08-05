@@ -19,10 +19,13 @@ import java.util.Set;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -49,6 +52,7 @@ public class ForwardingStore implements
   private final LockStore lockStore;
   private final QuotaStore quotaStore;
   private final AttributeStore attributeStore;
+  private final JobUpdateStore jobUpdateStore;
 
   /**
    * Creates a new forwarding store that delegates to the providing default stores.
@@ -76,7 +80,7 @@ public class ForwardingStore implements
     this.lockStore = requireNonNull(lockStore);
     this.quotaStore = requireNonNull(quotaStore);
     this.attributeStore = requireNonNull(attributeStore);
-    requireNonNull(jobUpdateStore);
+    this.jobUpdateStore = requireNonNull(jobUpdateStore);
   }
 
   @Override
@@ -132,5 +136,20 @@ public class ForwardingStore implements
   @Override
   public Set<IHostAttributes> getHostAttributes() {
     return attributeStore.getHostAttributes();
+  }
+
+  @Override
+  public ImmutableSet<IJobUpdateSummary> fetchJobUpdateSummaries(JobUpdateQuery query) {
+    return jobUpdateStore.fetchJobUpdateSummaries(query);
+  }
+
+  @Override
+  public Optional<IJobUpdateDetails> fetchJobUpdateDetails(String updateId) {
+    return jobUpdateStore.fetchJobUpdateDetails(updateId);
+  }
+
+  @Override
+  public ImmutableSet<IJobUpdateDetails> fetchAllJobUpdateDetails() {
+    return jobUpdateStore.fetchAllJobUpdateDetails();
   }
 }

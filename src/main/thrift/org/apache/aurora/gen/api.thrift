@@ -645,6 +645,17 @@ struct JobUpdate {
   3: JobUpdateConfiguration configuration
 }
 
+struct JobUpdateDetails {
+  /** Update definition. */
+  1: JobUpdate update
+
+  /** History for this update. */
+  2: list<JobUpdateEvent> updateEvents
+
+  /** History for the individual instances updated. */
+  3: list<JobInstanceUpdateEvent> instanceEvents
+}
+
 /** A request to update the following instances of the existing job. Used by startUpdate. */
 struct JobUpdateRequest {
   /** Job key. */
@@ -740,14 +751,7 @@ struct GetJobUpdateSummariesResult {
 
 /** Result of the getJobUpdateDetails call. */
 struct GetJobUpdateDetailsResult {
-  /** Update definition. */
-  1: JobUpdate update
-
-  /** History for this update. */
-  2: list<JobUpdateEvent> updateEvents
-
-  /** History for the individual instances updated. */
-  3: list<JobInstanceUpdateEvent> instanceEvents
+  1: JobUpdateDetails details
 }
 
 /** Information about the scheduler. */

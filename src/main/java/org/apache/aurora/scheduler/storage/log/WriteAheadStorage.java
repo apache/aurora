@@ -339,6 +339,12 @@ class WriteAheadStorage extends ForwardingStore implements
   }
 
   @Override
+  public void deleteAllUpdatesAndEvents() {
+    throw new UnsupportedOperationException(
+        "Unsupported since casual storage users should never be doing this.");
+  }
+
+  @Override
   public boolean setMaintenanceMode(final String host, final MaintenanceMode mode) {
     requireNonNull(host);
     requireNonNull(mode);
@@ -387,7 +393,7 @@ class WriteAheadStorage extends ForwardingStore implements
   }
 
   @Override
-  public JobUpdateStore.Mutable getUpdateStore() {
+  public JobUpdateStore.Mutable getJobUpdateStore() {
     return this;
   }
 }

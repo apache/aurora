@@ -128,7 +128,7 @@ public class MemStorage implements Storage {
       }
 
       @Override
-      public JobUpdateStore.Mutable getUpdateStore() {
+      public JobUpdateStore.Mutable getJobUpdateStore() {
         return updateStore;
       }
     };

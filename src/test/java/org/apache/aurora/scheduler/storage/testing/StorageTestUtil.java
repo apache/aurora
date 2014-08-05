@@ -117,6 +117,7 @@ public class StorageTestUtil {
     expect(storeProvider.getJobStore()).andReturn(jobStore).anyTimes();
     expect(storeProvider.getLockStore()).andReturn(lockStore).anyTimes();
     expect(storeProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
+    expect(storeProvider.getJobUpdateStore()).andReturn(updateStore).anyTimes();
     expect(mutableStoreProvider.getTaskStore()).andReturn(taskStore).anyTimes();
     expect(mutableStoreProvider.getUnsafeTaskStore()).andReturn(taskStore).anyTimes();
     expect(mutableStoreProvider.getQuotaStore()).andReturn(quotaStore).anyTimes();
@@ -124,6 +125,7 @@ public class StorageTestUtil {
     expect(mutableStoreProvider.getJobStore()).andReturn(jobStore).anyTimes();
     expect(mutableStoreProvider.getLockStore()).andReturn(lockStore).anyTimes();
     expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
+    expect(mutableStoreProvider.getJobUpdateStore()).andReturn(updateStore).anyTimes();
     expectConsistentRead().anyTimes();
     expectWeaklyConsistentRead().anyTimes();
     expectWriteOperation().anyTimes();

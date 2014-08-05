@@ -16,15 +16,23 @@ package org.apache.aurora.scheduler.storage.log;
 import java.util.Set;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
+
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobUpdate;
+import org.apache.aurora.gen.JobUpdateDetails;
+import org.apache.aurora.gen.JobUpdateEvent;
+import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -39,6 +47,7 @@ import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -85,6 +94,11 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     SchedulerMetadata metadata = new SchedulerMetadata()
         .setFrameworkId(frameworkId)
         .setVersion(CURRENT_API_VERSION);
+    final String updateId = "updateId";
+    IJobUpdateDetails updateDetails = IJobUpdateDetails.build(new JobUpdateDetails()
+        .setUpdate(new JobUpdate().setUpdateId(updateId))
+        .setUpdateEvents(ImmutableList.of(new JobUpdateEvent().setStatus(JobUpdateStatus.INIT)))
+        .setInstanceEvents(ImmutableList.of(new JobInstanceUpdateEvent().setTimestampMs(123L))));
 
     storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);
@@ -96,6 +110,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .andReturn(ImmutableSet.of(IJobConfiguration.build(job.getJobConfiguration())));
     expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(frameworkId));
     expect(storageUtil.lockStore.fetchLocks()).andReturn(ImmutableSet.of(lock));
+    expect(storageUtil.updateStore.fetchAllJobUpdateDetails())
+        .andReturn(ImmutableSet.of(updateDetails));
 
     expectDataWipe();
     storageUtil.taskStore.saveTasks(tasks);
@@ -106,6 +122,13 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         IJobConfiguration.build(job.getJobConfiguration()));
     storageUtil.schedulerStore.saveFrameworkId(frameworkId);
     storageUtil.lockStore.saveLock(lock);
+    storageUtil.updateStore.saveJobUpdate(updateDetails.getUpdate());
+    storageUtil.updateStore.saveJobUpdateEvent(
+        Iterables.getOnlyElement(updateDetails.getUpdateEvents()),
+        updateId);
+    storageUtil.updateStore.saveJobInstanceUpdateEvent(
+        Iterables.getOnlyElement(updateDetails.getInstanceEvents()),
+        updateId);
 
     control.replay();
 
@@ -116,7 +139,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setHostAttributes(ImmutableSet.of(attribute.newBuilder()))
         .setJobs(ImmutableSet.of(job))
         .setSchedulerMetadata(metadata)
-        .setLocks(ILock.toBuildersSet(ImmutableSet.of(lock)));
+        .setLocks(ImmutableSet.of(lock.newBuilder()))
+        .setJobUpdateDetails(ImmutableSet.of(updateDetails.newBuilder()));
 
     assertEquals(expected, snapshotStore.createSnapshot());
 
@@ -129,5 +153,6 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     storageUtil.attributeStore.deleteHostAttributes();
     storageUtil.jobStore.deleteJobs();
     storageUtil.lockStore.deleteLocks();
+    storageUtil.updateStore.deleteAllUpdatesAndEvents();
   }
 }

@@ -21,17 +21,22 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.collect.ImmutableSet;
+
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.util.BuildInfo;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.JobInstanceUpdateEvent;
+import org.apache.aurora.gen.JobUpdateDetails;
+import org.apache.aurora.gen.JobUpdateEvent;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.StoredJob;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -41,6 +46,10 @@ import org.apache.aurora.scheduler.storage.Storage.Volatile;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -57,27 +66,25 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
   private static final Logger LOG = Logger.getLogger(SnapshotStoreImpl.class.getName());
 
-  private static final SnapshotField ATTRIBUTE_FIELD = new SnapshotField() {
-    @Override
-    public void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
-      snapshot.setHostAttributes(
-          IHostAttributes.toBuildersSet(storeProvider.getAttributeStore().getHostAttributes()));
-    }
-
-    @Override
-    public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
-      store.getAttributeStore().deleteHostAttributes();
-
-      if (snapshot.isSetHostAttributes()) {
-        for (HostAttributes attributes : snapshot.getHostAttributes()) {
-          store.getAttributeStore().saveHostAttributes(IHostAttributes.build(attributes));
-        }
-      }
-    }
-  };
-
   private static final Iterable<SnapshotField> SNAPSHOT_FIELDS = Arrays.asList(
-      ATTRIBUTE_FIELD,
+      new SnapshotField() {
+        @Override
+        public void saveToSnapshot(StoreProvider storeProvider, Snapshot snapshot) {
+          snapshot.setHostAttributes(
+              IHostAttributes.toBuildersSet(storeProvider.getAttributeStore().getHostAttributes()));
+        }
+
+        @Override
+        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          store.getAttributeStore().deleteHostAttributes();
+
+          if (snapshot.isSetHostAttributes()) {
+            for (HostAttributes attributes : snapshot.getHostAttributes()) {
+              store.getAttributeStore().saveHostAttributes(IHostAttributes.build(attributes));
+            }
+          }
+        }
+      },
       new SnapshotField() {
         @Override
         public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
@@ -185,6 +192,36 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
           if (snapshot.isSetLocks()) {
             for (Lock lock : snapshot.getLocks()) {
               store.getLockStore().saveLock(ILock.build(lock));
+            }
+          }
+        }
+      },
+      new SnapshotField() {
+        @Override
+        public void saveToSnapshot(StoreProvider store, Snapshot snapshot) {
+          snapshot.setJobUpdateDetails(IJobUpdateDetails.toBuildersSet(
+              store.getJobUpdateStore().fetchAllJobUpdateDetails()));
+        }
+
+        @Override
+        public void restoreFromSnapshot(MutableStoreProvider store, Snapshot snapshot) {
+          JobUpdateStore.Mutable updateStore = store.getJobUpdateStore();
+          updateStore.deleteAllUpdatesAndEvents();
+
+          if (snapshot.isSetJobUpdateDetails()) {
+            for (JobUpdateDetails details : snapshot.getJobUpdateDetails()) {
+              updateStore.saveJobUpdate(IJobUpdate.build(details.getUpdate()));
+
+              for (JobUpdateEvent updateEvent : details.getUpdateEvents()) {
+                updateStore.saveJobUpdateEvent(
+                    IJobUpdateEvent.build(updateEvent),
+                    details.getUpdate().getUpdateId());
+              }
+              for (JobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
+                updateStore.saveJobInstanceUpdateEvent(
+                    IJobInstanceUpdateEvent.build(instanceEvent),
+                    details.getUpdate().getUpdateId());
+              }
             }
           }
         }

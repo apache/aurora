@@ -13,16 +13,43 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableSet;
+
+import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 
 /**
  * Stores all job updates and defines methods for saving, updating and fetching job updates.
  */
 public interface JobUpdateStore {
 
-  // TODO(maxim): define get and update event APIs.
+  /**
+   * Fetches a read-only view of job update summaries.
+   *
+   * @param query Query to identify job update summaries with.
+   * @return A read-only view of job update summaries.
+   */
+  ImmutableSet<IJobUpdateSummary> fetchJobUpdateSummaries(JobUpdateQuery query);
+
+  /**
+   * Fetches a read-only view of job update details.
+   *
+   * @param updateId Update ID to fetch details for.
+   * @return A read-only view of job update details.
+   */
+  Optional<IJobUpdateDetails> fetchJobUpdateDetails(String updateId);
+
+  /**
+   * Fetches a read-only view of all job update details available in the store.
+   *
+   * @return A read-only view of all job update details.
+   */
+  ImmutableSet<IJobUpdateDetails> fetchAllJobUpdateDetails();
 
   interface Mutable extends JobUpdateStore {
 
@@ -48,5 +75,10 @@ public interface JobUpdateStore {
      * @param updateId Job update ID.
      */
     void saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent event, String updateId);
+
+    /**
+     * Deletes all updates and update events from the store.
+     */
+    void deleteAllUpdatesAndEvents();
   }
 }

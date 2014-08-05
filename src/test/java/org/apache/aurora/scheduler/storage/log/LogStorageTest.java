@@ -760,7 +760,7 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getUpdateStore().saveJobUpdate(update);
+        storeProvider.getJobUpdateStore().saveJobUpdate(update);
       }
     }.run();
   }
@@ -783,7 +783,7 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getUpdateStore().saveJobUpdateEvent(event, UPDATE_ID);
+        storeProvider.getJobUpdateStore().saveJobUpdateEvent(event, UPDATE_ID);
       }
     }.run();
   }
@@ -806,7 +806,7 @@ public class LogStorageTest extends EasyMockTest {
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getUpdateStore().saveJobInstanceUpdateEvent(event, UPDATE_ID);
+        storeProvider.getJobUpdateStore().saveJobInstanceUpdateEvent(event, UPDATE_ID);
       }
     }.run();
   }

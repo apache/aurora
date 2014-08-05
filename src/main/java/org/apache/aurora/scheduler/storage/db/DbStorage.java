@@ -111,7 +111,7 @@ class DbStorage extends AbstractIdleService implements Storage {
       }
 
       @Override
-      public JobUpdateStore.Mutable getUpdateStore() {
+      public JobUpdateStore.Mutable getJobUpdateStore() {
         throw new UnsupportedOperationException("Not implemented.");
       }
     };
