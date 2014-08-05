@@ -23,6 +23,14 @@ from apache.aurora.client.options import EXECUTOR_SANDBOX_OPTION, SSH_USER_OPTIO
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 
+# duplicate of same function in core.py; since this is a temporary deprecation warning,
+# we don't want to add new source files or inter-source dependencies. Duplicating this
+# two-line function is the lesser evil.
+def v1_deprecation_warning(old, new):
+  print("WARNING: %s is an aurora clientv1 command which will be deprecated soon" % old)
+  print("To run this command using clientv2, use 'aurora %s'" % " ".join(new))
+
+
 @app.command
 @app.command_option(EXECUTOR_SANDBOX_OPTION)
 @app.command_option(SSH_USER_OPTION)
@@ -47,6 +55,18 @@ def ssh(args, options):
     shard = int(args.pop(0))
   except ValueError:
     die('Shard must be an integer')
+
+  newcmd = ["task", "ssh", "%s/%s" % (job_path, shard)]
+  if len(options.tunnels) > 0:
+    newcmd.append("--tunnels=%s" % options.tunnels)
+  if options.ssh_user is not None:
+    newcmd.append("--ssh-user=%s" % options.ssh_user)
+  if options.executor_sandbox:
+    newcmd.append("--executor-sandbox")
+  if len(args) > 0:
+    newcmd.append("--command=\"%s\"" % " ".join(args))
+  v1_deprecation_warning("ssh", newcmd)
+
   api = make_client(cluster_name)
   resp = api.query(api.build_query(role, name, set([int(shard)]), env=env))
   check_and_log_response(resp)
@@ -57,6 +77,7 @@ def ssh(args, options):
       api.cluster, executor_sandbox=options.executor_sandbox)
 
   ssh_command = ['ssh', '-t']
+
 
   role = first_task.assignedTask.task.owner.role
   slave_host = first_task.assignedTask.slaveHost

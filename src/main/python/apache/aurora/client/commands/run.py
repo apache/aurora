@@ -21,6 +21,14 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 
 
+# duplicate of same function in core.py; since this is a temporary deprecation warning,
+# we don't want to add new source files or inter-source dependencies. Duplicating this
+# two-line function is the lesser evil.
+def v1_deprecation_warning(old, new):
+  print("WARNING: %s is an aurora clientv1 command which will be deprecated soon" % old)
+  print("To run this command using clientv2, use 'aurora %s'" % " ".join(new))
+
+
 @app.command
 @app.command_option('-t', '--threads', type=int, default=1, dest='num_threads',
     help='The number of threads to use.')
@@ -41,6 +49,17 @@ def run(args, options):
   if not args:
     die('job path is required')
   job_path = args.pop(0)
+  new_cmd = ["task", "run" ]
+  instances_spec = job_path
+  if options.num_threads != 1:
+    new_cmd.append("--threads=%s" % options.num_threads)
+  if options.ssh_user is not None:
+    new_cmd.append("--ssh-user=%s" % options.ssh_user)
+  if options.executor_sandbox:
+    new_cmd.append("--executor-sandbox")
+  new_cmd.append("\"%s\"" % " ".join(args))
+  v1_deprecation_warning("ssh", new_cmd)
+
   try:
     cluster_name, role, env, name = AuroraJobKey.from_path(job_path)
   except AuroraJobKey.Error as e:
