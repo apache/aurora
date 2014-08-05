@@ -20,6 +20,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -53,6 +54,7 @@ public class StorageTestUtil {
   public final JobStore.Mutable jobStore;
   public final LockStore.Mutable lockStore;
   public final SchedulerStore.Mutable schedulerStore;
+  public final JobUpdateStore.Mutable updateStore;
   public final NonVolatileStorage storage;
 
   /**
@@ -69,6 +71,7 @@ public class StorageTestUtil {
     this.jobStore = easyMock.createMock(JobStore.Mutable.class);
     this.lockStore = easyMock.createMock(LockStore.Mutable.class);
     this.schedulerStore = easyMock.createMock(SchedulerStore.Mutable.class);
+    this.updateStore = easyMock.createMock(JobUpdateStore.Mutable.class);
     this.storage = easyMock.createMock(NonVolatileStorage.class);
   }
 

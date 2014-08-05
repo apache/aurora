@@ -17,6 +17,7 @@ import com.google.inject.AbstractModule;
 import com.twitter.common.inject.Bindings.KeyFactory;
 
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -54,5 +55,6 @@ public class MigrationModule extends AbstractModule {
     link(LockStore.Mutable.class);
     link(QuotaStore.Mutable.class);
     link(SchedulerStore.Mutable.class);
+    link(JobUpdateStore.Mutable.class);
   }
 }

@@ -34,6 +34,7 @@ import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.ReadWriteLockManager;
@@ -86,7 +87,9 @@ public class MemStorage implements Storage {
       @Delegated final LockStore.Mutable lockStore,
       @Delegated final Storage delegated,
       @Delegated final QuotaStore.Mutable quotaStore,
-      @Delegated final AttributeStore.Mutable attributeStore) {
+      @Delegated final AttributeStore.Mutable attributeStore,
+      @Delegated final JobUpdateStore.Mutable updateStore) {
+
     this.delegatedStore = delegated;
     storeProvider = new MutableStoreProvider() {
       @Override
@@ -122,6 +125,11 @@ public class MemStorage implements Storage {
       @Override
       public AttributeStore.Mutable getAttributeStore() {
         return attributeStore;
+      }
+
+      @Override
+      public JobUpdateStore.Mutable getUpdateStore() {
+        return updateStore;
       }
     };
 

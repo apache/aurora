@@ -35,6 +35,8 @@ from gen.apache.aurora.api.ttypes import (
     Hosts,
     JobConfiguration,
     JobKey,
+    JobUpdateQuery,
+    JobUpdateRequest,
     Lock,
     LockValidation,
     ResourceAggregate,
@@ -44,9 +46,7 @@ from gen.apache.aurora.api.ttypes import (
     RewriteConfigsRequest,
     ScheduleStatus,
     SessionKey,
-    TaskQuery,
-    UpdateQuery,
-    UpdateRequest
+    TaskQuery
 )
 
 ROLE = 'foorole'
@@ -252,35 +252,35 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.mox.ReplayAll()
     self.make_scheduler_proxy().rewriteConfigs(RewriteConfigsRequest())
 
-  def test_getUpdates(self):
-    self.mock_thrift_client.getUpdates(IsA(UpdateQuery))
+  def test_getJobUpdateSummaries(self):
+    self.mock_thrift_client.getJobUpdateSummaries(IsA(JobUpdateQuery))
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().getUpdates(UpdateQuery())
+    self.make_scheduler_proxy().getJobUpdateSummaries(JobUpdateQuery())
 
-  def test_getUpdateDetails(self):
-    self.mock_thrift_client.getUpdateDetails('update_id')
+  def test_getJobUpdateDetails(self):
+    self.mock_thrift_client.getJobUpdateDetails('update_id')
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().getUpdateDetails('update_id')
+    self.make_scheduler_proxy().getJobUpdateDetails('update_id')
 
-  def test_startUpdate(self):
-    self.mock_thrift_client.startUpdate(IsA(UpdateRequest), IsA(Lock), IsA(SessionKey))
+  def test_startJobUpdate(self):
+    self.mock_thrift_client.startJobUpdate(IsA(JobUpdateRequest), IsA(Lock), IsA(SessionKey))
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().startUpdate(UpdateRequest(), Lock())
+    self.make_scheduler_proxy().startJobUpdate(JobUpdateRequest(), Lock())
 
-  def test_pauseUpdate(self):
-    self.mock_thrift_client.pauseUpdate('update_id', IsA(Lock), IsA(SessionKey))
+  def test_pauseJobUpdate(self):
+    self.mock_thrift_client.pauseJobUpdate('update_id', IsA(Lock), IsA(SessionKey))
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().pauseUpdate('update_id', Lock())
+    self.make_scheduler_proxy().pauseJobUpdate('update_id', Lock())
 
-  def test_resumeUpdate(self):
-    self.mock_thrift_client.resumeUpdate('update_id', IsA(Lock), IsA(SessionKey))
+  def test_resumeJobUpdate(self):
+    self.mock_thrift_client.resumeJobUpdate('update_id', IsA(Lock), IsA(SessionKey))
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().resumeUpdate('update_id', Lock())
+    self.make_scheduler_proxy().resumeJobUpdate('update_id', Lock())
 
-  def test_abortUpdate(self):
-    self.mock_thrift_client.abortUpdate('update_id', IsA(Lock), IsA(SessionKey))
+  def test_abortJobUpdate(self):
+    self.mock_thrift_client.abortJobUpdate('update_id', IsA(Lock), IsA(SessionKey))
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().abortUpdate('update_id', Lock())
+    self.make_scheduler_proxy().abortJobUpdate('update_id', Lock())
 
 
 @pytest.mark.parametrize('scheme', ('http', 'https'))

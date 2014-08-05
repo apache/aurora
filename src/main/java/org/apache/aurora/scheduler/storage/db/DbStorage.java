@@ -24,6 +24,7 @@ import com.google.inject.Inject;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -107,6 +108,11 @@ class DbStorage extends AbstractIdleService implements Storage {
       @Override
       public AttributeStore.Mutable getAttributeStore() {
         return attributeStore;
+      }
+
+      @Override
+      public JobUpdateStore.Mutable getUpdateStore() {
+        throw new UnsupportedOperationException("Not implemented.");
       }
     };
   }

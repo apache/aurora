@@ -35,6 +35,7 @@ import org.apache.aurora.gen.storage.RewriteTask;
 import org.apache.aurora.gen.storage.SaveAcceptedJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
+import org.apache.aurora.gen.storage.SaveJobUpdate;
 import org.apache.aurora.gen.storage.SaveLock;
 import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.SaveTasks;
@@ -43,6 +44,7 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.ForwardingStore;
 import org.apache.aurora.scheduler.storage.JobStore;
+import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -51,6 +53,7 @@ import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -73,7 +76,8 @@ class WriteAheadStorage extends ForwardingStore implements
     TaskStore.Mutable,
     LockStore.Mutable,
     QuotaStore.Mutable,
-    AttributeStore.Mutable {
+    AttributeStore.Mutable,
+    JobUpdateStore.Mutable {
 
   private static final Logger LOG = Logger.getLogger(WriteAheadStorage.class.getName());
 
@@ -84,6 +88,7 @@ class WriteAheadStorage extends ForwardingStore implements
   private final LockStore.Mutable lockStore;
   private final QuotaStore.Mutable quotaStore;
   private final AttributeStore.Mutable attributeStore;
+  private final JobUpdateStore.Mutable jobUpdateStore;
 
   /**
    * Creates a new write-ahead storage that delegates to the providing default stores.
@@ -95,6 +100,7 @@ class WriteAheadStorage extends ForwardingStore implements
    * @param lockStore      Delegate.
    * @param quotaStore     Delegate.
    * @param attributeStore Delegate.
+   * @param jobUpdateStore Delegate.
    */
   WriteAheadStorage(
       TransactionManager transactionManager,
@@ -103,9 +109,17 @@ class WriteAheadStorage extends ForwardingStore implements
       TaskStore.Mutable taskStore,
       LockStore.Mutable lockStore,
       QuotaStore.Mutable quotaStore,
-      AttributeStore.Mutable attributeStore) {
+      AttributeStore.Mutable attributeStore,
+      JobUpdateStore.Mutable jobUpdateStore) {
 
-    super(schedulerStore, jobStore, taskStore, lockStore, quotaStore, attributeStore);
+    super(
+        schedulerStore,
+        jobStore,
+        taskStore,
+        lockStore,
+        quotaStore,
+        attributeStore,
+        jobUpdateStore);
 
     this.transactionManager = requireNonNull(transactionManager);
     this.schedulerStore = requireNonNull(schedulerStore);
@@ -114,6 +128,7 @@ class WriteAheadStorage extends ForwardingStore implements
     this.lockStore = requireNonNull(lockStore);
     this.quotaStore = requireNonNull(quotaStore);
     this.attributeStore = requireNonNull(attributeStore);
+    this.jobUpdateStore = requireNonNull(jobUpdateStore);
   }
 
   private void write(Op op) {
@@ -260,6 +275,14 @@ class WriteAheadStorage extends ForwardingStore implements
   }
 
   @Override
+  public void saveJobUpdate(IJobUpdate update) {
+    requireNonNull(update);
+
+    write(Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder())));
+    jobUpdateStore.saveJobUpdate(update);
+  }
+
+  @Override
   public void deleteAllTasks() {
     throw new UnsupportedOperationException(
         "Unsupported since casual storage users should never be doing this.");
@@ -334,6 +357,11 @@ class WriteAheadStorage extends ForwardingStore implements
 
   @Override
   public TaskStore getTaskStore() {
+    return this;
+  }
+
+  @Override
+  public JobUpdateStore.Mutable getUpdateStore() {
     return this;
   }
 }

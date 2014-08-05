@@ -24,6 +24,7 @@ import com.google.inject.name.Names;
 import com.twitter.common.inject.Bindings;
 
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
@@ -131,6 +132,7 @@ public class DbModule extends PrivateModule {
     bindStore(LockStore.Mutable.class, DbLockStore.class);
     bindStore(QuotaStore.Mutable.class, DbQuotaStore.class);
     bindStore(SchedulerStore.Mutable.class, DbSchedulerStore.class);
+    bindStore(JobUpdateStore.Mutable.class, DBJobUpdateStore.class);
 
     Key<Storage> storageKey = keyFactory.create(Storage.class);
     bind(storageKey).to(DbStorage.class);

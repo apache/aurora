@@ -33,10 +33,16 @@ import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobConfiguration;
-import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobUpdate;
+import org.apache.aurora.gen.JobUpdateConfiguration;
+import org.apache.aurora.gen.JobUpdateSettings;
+import org.apache.aurora.gen.JobUpdateStatus;
+import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
@@ -51,6 +57,7 @@ import org.apache.aurora.gen.storage.RewriteTask;
 import org.apache.aurora.gen.storage.SaveAcceptedJob;
 import org.apache.aurora.gen.storage.SaveFrameworkId;
 import org.apache.aurora.gen.storage.SaveHostAttributes;
+import org.apache.aurora.gen.storage.SaveJobUpdate;
 import org.apache.aurora.gen.storage.SaveLock;
 import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.SaveTasks;
@@ -73,6 +80,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -98,6 +106,7 @@ import static org.junit.Assert.assertTrue;
 public class LogStorageTest extends EasyMockTest {
 
   private static final Amount<Long, Time> SNAPSHOT_INTERVAL = Amount.of(1L, Time.MINUTES);
+  private static final IJobKey JOB_KEY = JobKeys.from("role", "env", "name");
   private static final long NOW = 42L;
 
   private LogStorage logStorage;
@@ -130,7 +139,8 @@ public class LogStorageTest extends EasyMockTest {
             storageUtil.taskStore,
             storageUtil.lockStore,
             storageUtil.quotaStore,
-            storageUtil.attributeStore);
+            storageUtil.attributeStore,
+            storageUtil.updateStore);
 
     stream = createMock(Stream.class);
     streamMatcher = LogOpMatcher.matcherFor(stream);
@@ -344,7 +354,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveAcceptedJob() throws Exception {
     final IJobConfiguration jobConfig =
-        IJobConfiguration.build(new JobConfiguration().setKey(new JobKey("owner", "env", "jake")));
+        IJobConfiguration.build(new JobConfiguration().setKey(JOB_KEY.newBuilder()));
     final String managerId = "CRON";
     new MutationFixture() {
       @Override
@@ -365,20 +375,19 @@ public class LogStorageTest extends EasyMockTest {
 
   @Test
   public void testRemoveJob() throws Exception {
-    final IJobKey jobKey = JobKeys.from("role", "env", "name");
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWriteOperation();
-        storageUtil.jobStore.removeJob(jobKey);
+        storageUtil.jobStore.removeJob(JOB_KEY);
         streamMatcher.expectTransaction(
-            Op.removeJob(new RemoveJob().setJobKey(jobKey.newBuilder())))
+            Op.removeJob(new RemoveJob().setJobKey(JOB_KEY.newBuilder())))
             .andReturn(position);
       }
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getJobStore().removeJob(jobKey);
+        storeProvider.getJobStore().removeJob(JOB_KEY);
       }
     }.run();
   }
@@ -633,7 +642,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveLock() throws Exception {
     final ILock lock = ILock.build(new Lock()
-        .setKey(LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()))
+        .setKey(LockKey.job(JOB_KEY.newBuilder()))
         .setToken("testLockId")
         .setUser("testUser")
         .setTimestampMs(12345L));
@@ -656,7 +665,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testRemoveLock() throws Exception {
     final ILockKey lockKey =
-        ILockKey.build(LockKey.job(JobKeys.from("testRole", "testEnv", "testJob").newBuilder()));
+        ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
@@ -711,6 +720,40 @@ public class LogStorageTest extends EasyMockTest {
         assertEquals(hostAttributes, store.getHostAttributes(host));
         store.saveHostAttributes(hostAttributes.get());
         assertEquals(hostAttributes, store.getHostAttributes(host));
+      }
+    }.run();
+  }
+
+  @Test
+  public void testSaveUpdate() throws Exception {
+    final String updateId = "testUpdateId";
+    final IJobUpdate update = IJobUpdate.build(new JobUpdate()
+        .setUpdateId(updateId)
+        .setSummary(new JobUpdateSummary()
+            .setJobKey(JOB_KEY.newBuilder())
+            .setStatus(JobUpdateStatus.ROLLED_FORWARD)
+            .setUser("user"))
+        .setConfiguration(new JobUpdateConfiguration()
+            .setNewTaskConfigs(ImmutableSet.of(new InstanceTaskConfig()
+                .setTask(new TaskConfig())
+                .setInstances(ImmutableList.of(new Range(0, 3)))))
+            .setOldTaskConfigs(ImmutableSet.of(new InstanceTaskConfig()
+                .setTask(new TaskConfig())
+                .setInstances(ImmutableList.of(new Range(0, 3)))))
+            .setSettings(new JobUpdateSettings())));
+
+    new MutationFixture() {
+      @Override
+      protected void setupExpectations() throws Exception {
+        storageUtil.expectWriteOperation();
+        storageUtil.updateStore.saveJobUpdate(update);
+        streamMatcher.expectTransaction(Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder())))
+            .andReturn(position);
+      }
+
+      @Override
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getUpdateStore().saveJobUpdate(update);
       }
     }.run();
   }

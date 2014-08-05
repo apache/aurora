@@ -20,6 +20,8 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.Hosts;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobUpdateQuery;
+import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.LockValidation;
@@ -29,8 +31,6 @@ import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.TaskQuery;
-import org.apache.aurora.gen.UpdateQuery;
-import org.apache.aurora.gen.UpdateRequest;
 import org.apache.thrift.TException;
 
 import static java.util.Objects.requireNonNull;
@@ -266,34 +266,36 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response startUpdate(UpdateRequest request, Lock lock, SessionKey session)
+  public Response startJobUpdate(JobUpdateRequest request, Lock lock, SessionKey session)
       throws TException {
 
-    return delegate.startUpdate(request, lock, session);
+    return delegate.startJobUpdate(request, lock, session);
   }
 
   @Override
-  public Response pauseUpdate(String updateId, Lock lock, SessionKey session) throws TException {
-    return delegate.pauseUpdate(updateId, lock, session);
+  public Response pauseJobUpdate(String updateId, Lock lock, SessionKey session) throws TException {
+    return delegate.pauseJobUpdate(updateId, lock, session);
   }
 
   @Override
-  public Response resumeUpdate(String updateId, Lock lock, SessionKey session) throws TException {
-    return delegate.resumeUpdate(updateId, lock, session);
+  public Response resumeJobUpdate(String updateId, Lock lock, SessionKey session)
+      throws TException {
+
+    return delegate.resumeJobUpdate(updateId, lock, session);
   }
 
   @Override
-  public Response abortUpdate(String updateId, Lock lock, SessionKey session) throws TException {
-    return delegate.abortUpdate(updateId, lock, session);
+  public Response abortJobUpdate(String updateId, Lock lock, SessionKey session) throws TException {
+    return delegate.abortJobUpdate(updateId, lock, session);
   }
 
   @Override
-  public Response getUpdates(UpdateQuery updateQuery) throws TException {
-    return delegate.getUpdates(updateQuery);
+  public Response getJobUpdateSummaries(JobUpdateQuery updateQuery) throws TException {
+    return delegate.getJobUpdateSummaries(updateQuery);
   }
 
   @Override
-  public Response getUpdateDetails(String updateId) throws TException {
-    return delegate.getUpdateDetails(updateId);
+  public Response getJobUpdateDetails(String updateId) throws TException {
+    return delegate.getJobUpdateDetails(updateId);
   }
 }

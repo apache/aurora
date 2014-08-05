@@ -69,6 +69,8 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
+import org.apache.aurora.gen.JobUpdateQuery;
+import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.ListBackupsResult;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
@@ -91,8 +93,6 @@ import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.gen.StartMaintenanceResult;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskQuery;
-import org.apache.aurora.gen.UpdateQuery;
-import org.apache.aurora.gen.UpdateRequest;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Jobs;
 import org.apache.aurora.scheduler.base.Query;
@@ -1247,32 +1247,32 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response startUpdate(UpdateRequest request, Lock lock, SessionKey session) {
+  public Response startJobUpdate(JobUpdateRequest request, Lock lock, SessionKey session) {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public Response pauseUpdate(String updateId, Lock lock, SessionKey session) {
+  public Response pauseJobUpdate(String updateId, Lock lock, SessionKey session) {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public Response resumeUpdate(String updateId, Lock lock, SessionKey session) {
+  public Response resumeJobUpdate(String updateId, Lock lock, SessionKey session) {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public Response abortUpdate(String updateId, Lock lock, SessionKey session) {
+  public Response abortJobUpdate(String updateId, Lock lock, SessionKey session) {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public Response getUpdates(UpdateQuery updateQuery) throws TException {
+  public Response getJobUpdateSummaries(JobUpdateQuery updateQuery) throws TException {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public Response getUpdateDetails(String updateId) {
+  public Response getJobUpdateDetails(String updateId) {
     throw new UnsupportedOperationException("Not implemented");
   }
 

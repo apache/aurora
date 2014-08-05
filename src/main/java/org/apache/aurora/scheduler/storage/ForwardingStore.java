@@ -40,7 +40,8 @@ public class ForwardingStore implements
     TaskStore,
     LockStore,
     QuotaStore,
-    AttributeStore {
+    AttributeStore,
+    JobUpdateStore {
 
   private final SchedulerStore schedulerStore;
   private final JobStore jobStore;
@@ -50,7 +51,7 @@ public class ForwardingStore implements
   private final AttributeStore attributeStore;
 
   /**
-   * Creats a new forwarding store that delegates to the providing default stores.
+   * Creates a new forwarding store that delegates to the providing default stores.
    *
    * @param schedulerStore Delegate.
    * @param jobStore Delegate.
@@ -58,6 +59,7 @@ public class ForwardingStore implements
    * @param lockStore Delegate.
    * @param quotaStore Delegate.
    * @param attributeStore Delegate.
+   * @param jobUpdateStore Delegate.
    */
   public ForwardingStore(
       SchedulerStore schedulerStore,
@@ -65,7 +67,8 @@ public class ForwardingStore implements
       TaskStore taskStore,
       LockStore lockStore,
       QuotaStore quotaStore,
-      AttributeStore attributeStore) {
+      AttributeStore attributeStore,
+      JobUpdateStore jobUpdateStore) {
 
     this.schedulerStore = requireNonNull(schedulerStore);
     this.jobStore = requireNonNull(jobStore);
@@ -73,6 +76,7 @@ public class ForwardingStore implements
     this.lockStore = requireNonNull(lockStore);
     this.quotaStore = requireNonNull(quotaStore);
     this.attributeStore = requireNonNull(attributeStore);
+    requireNonNull(jobUpdateStore);
   }
 
   @Override
