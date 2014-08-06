@@ -144,7 +144,7 @@ def test_announcer_on_expiration():
     clock.tick(1.0)
     assert announcer.disconnected_time() == 1.0, (
         'Announcer should be disconnected on expiration.')
-    clock.tick(1.0)
+    clock.tick(10.0)
     assert announcer.disconnected_time() == 0.0, (
         'Announcer should not advance disconnection time when connected.')
     assert announcer._membership == 'membership 3'
