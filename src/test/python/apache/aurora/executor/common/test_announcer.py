@@ -15,6 +15,7 @@
 import threading
 
 import mock
+import pytest
 from kazoo.client import KazooClient
 from kazoo.exceptions import KazooException
 from twitter.common.quantity import Amount, Time
@@ -107,6 +108,8 @@ def test_announcer_under_normal_circumstances():
       'Announcer should not advance disconnection time when stopped.')
 
 
+# TODO(wickman) https://issues.apache.org/jira/browse/AURORA-639
+@pytest.mark.skipif('True')
 def test_announcer_on_expiration():
   joined = threading.Event()
   operations = []
