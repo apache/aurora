@@ -33,8 +33,12 @@ import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.EVALUATE_AFTER_RUNNING_LIMIT;
+import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.FAILED;
-import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.SUCCESS;
+import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.SUCCEEDED;
 
 /**
  * In part of a job update, this manages the update of an individual instance. This includes
@@ -52,14 +56,6 @@ class InstanceUpdater {
   private final Amount<Long, Time> maxNonRunningTime;
   private final Clock clock;
 
-  /**
-   * Keep an optional controller reference so that we may discard the reference after we've
-   * advertised completion through {@link TaskController#updateCompleted(Result) updateCompleted}.
-   * This gives us a signal to no-op (when this is reset to absent), and ensures we can't send any
-   * control signals from that point on.
-   */
-  private Optional<TaskController> controllerRef = Optional.absent();
-
   private int observedFailures = 0;
 
   InstanceUpdater(
@@ -67,15 +63,13 @@ class InstanceUpdater {
       int toleratedFailures,
       Amount<Long, Time> minRunningTime,
       Amount<Long, Time> maxNonRunningTime,
-      Clock clock,
-      final TaskController controller) {
+      Clock clock) {
 
     this.desiredState = requireNonNull(desiredState);
     this.toleratedFailures = toleratedFailures;
     this.minRunningTime = requireNonNull(minRunningTime);
     this.maxNonRunningTime = requireNonNull(maxNonRunningTime);
     this.clock = requireNonNull(clock);
-    this.controllerRef = Optional.of(controller);
   }
 
   private long millisSince(ITaskEvent event) {
@@ -110,71 +104,54 @@ class InstanceUpdater {
     return Tasks.isActive(status) && status != ScheduleStatus.KILLING;
   }
 
-  private void completed(Result status) {
-    controllerRef.get().updateCompleted(status);
-    controllerRef = Optional.absent();
-  }
-
   /**
    * Evaluates the state differences between the originally-provided {@code desiredState} and the
-   * provided {@code actualState}, and invokes any necessary actions on the provided
-   * {@link TaskController}.
+   * provided {@code actualState}.
    * <p>
    * This function should be idempotent, with the exception of an internal failure counter that
    * increments when an updating task exits, or an active but not
    * {@link ScheduleStatus#RUNNING RUNNING} task takes too long to start.
    *
    * <p>
-   * It is the reponsibility of the caller to ensure that the {@code actualState} is the latest
+   * It is the responsibility of the caller to ensure that the {@code actualState} is the latest
    * value.  Note: the caller should avoid calling this when a terminal task is moving to another
    * terminal state.  It should also suppress deletion events for tasks that have been replaced by
    * an active task.
    *
    * @param actualState The actual observed state of the task.
+   * @return the evaluation result, including the state of the instance update, and a necessary
+   *         action to perform.
    */
-  synchronized void evaluate(Optional<IScheduledTask> actualState) {
-    if (!controllerRef.isPresent()) {
-      // Avoid any further action if a result was already given.
-      return;
-    }
-
-    TaskController controller = controllerRef.get();
-
+  synchronized Result evaluate(Optional<IScheduledTask> actualState) {
     boolean desiredPresent = desiredState.isPresent();
     boolean actualPresent = actualState.isPresent();
 
     if (desiredPresent && actualPresent) {
       // The update is changing the task configuration.
-      handleActualAndDesiredPresent(actualState.get());
+      return handleActualAndDesiredPresent(actualState.get());
     } else if (desiredPresent) {
       // The update is introducing a new instance.
-      controller.addReplacement();
+      return REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
     } else if (actualPresent) {
       // The update is removing an instance.
-      if (isKillable(actualState.get().getStatus())) {
-        controller.killTask();
-      }
+      return isKillable(actualState.get().getStatus())
+          ? KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE
+          : EVALUATE_ON_STATE_CHANGE;
     } else {
       // No-op update.
-      completed(SUCCESS);
+      return SUCCEEDED;
     }
   }
 
-  private boolean addFailureAndCheckIfFailed() {
+  private Result addFailureAndCheckIfFailed() {
     LOG.info("Observed updated task failure.");
     observedFailures++;
-    if (observedFailures > toleratedFailures) {
-      completed(FAILED);
-      return true;
-    }
-    return false;
+    return observedFailures > toleratedFailures ? FAILED : EVALUATE_ON_STATE_CHANGE;
   }
 
-  private void handleActualAndDesiredPresent(IScheduledTask actualState) {
+  private Result handleActualAndDesiredPresent(IScheduledTask actualState) {
     Preconditions.checkState(desiredState.isPresent());
     Preconditions.checkArgument(!actualState.getTaskEvents().isEmpty());
-
-    TaskController controller = controllerRef.get();
 
     ScheduleStatus status = actualState.getStatus();
     if (desiredState.get().equals(actualState.getAssignedTask().getTask())) {
@@ -183,38 +160,45 @@ class InstanceUpdater {
         // The desired task is running.
         if (appearsStable(actualState)) {
           // Stably running, our work here is done.
-          completed(SUCCESS);
+          return SUCCEEDED;
         } else {
           // Not running long enough to consider stable, check again later.
-          controller.reevaluteAfterRunningLimit();
+          return EVALUATE_AFTER_RUNNING_LIMIT;
         }
       } else if (Tasks.isTerminated(status)) {
         // The desired task has terminated, this is a failure.
-        addFailureAndCheckIfFailed();
+        return addFailureAndCheckIfFailed();
       } else if (appearsStuck(actualState)) {
         // The task is not running, but not terminated, and appears to have been in this state
         // long enough that we should intervene.
-        if (!addFailureAndCheckIfFailed()) {
-          controller.killTask();
-        }
+        Result updaterStatus = addFailureAndCheckIfFailed();
+        return (updaterStatus == FAILED)
+            ? updaterStatus
+            : KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       } else {
         // The task is in a transient state on the way into or out of running, check back later.
-        controller.reevaluteAfterRunningLimit();
+        return EVALUATE_AFTER_RUNNING_LIMIT;
       }
     } else {
       // This is not the configuration that we would like to run.
       if (isKillable(status)) {
         // Task is active, kill it.
-        controller.killTask();
+        return Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       } else if (Tasks.isTerminated(status) && permanentlyKilled(actualState)) {
         // The old task has exited, it is now safe to add the new one.
-        controller.addReplacement();
+        return Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       }
     }
+
+    return EVALUATE_ON_STATE_CHANGE;
   }
 
   enum Result {
-    SUCCESS,
+    EVALUATE_ON_STATE_CHANGE,
+    REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE,
+    KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE,
+    EVALUATE_AFTER_RUNNING_LIMIT,
+    SUCCEEDED,
     FAILED
   }
 }

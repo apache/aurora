@@ -13,25 +13,18 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import java.util.List;
-
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
-import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
@@ -42,12 +35,15 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result;
-import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.SUCCESS;
-import static org.easymock.EasyMock.expectLastCall;
+import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.EVALUATE_AFTER_RUNNING_LIMIT;
+import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.EVALUATE_ON_STATE_CHANGE;
+import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.SUCCEEDED;
+import static org.junit.Assert.assertEquals;
 
-public class InstanceUpdaterTest extends EasyMockTest {
+public class InstanceUpdaterTest {
   private static final Optional<ITaskConfig> NO_CONFIG = Optional.absent();
-  private static final Optional<IScheduledTask> NO_TASK = Optional.absent();
 
   private static final ITaskConfig OLD = ITaskConfig.build(new TaskConfig().setNumCpus(1.0));
   private static final ITaskConfig NEW = ITaskConfig.build(new TaskConfig().setNumCpus(2.0));
@@ -55,250 +51,191 @@ public class InstanceUpdaterTest extends EasyMockTest {
   private static final Amount<Long, Time> MIN_RUNNING_TIME = Amount.of(1L, Time.MINUTES);
   private static final Amount<Long, Time> MAX_NON_RUNNING_TIME = Amount.of(5L, Time.MINUTES);
 
-  private FakeClock clock;
-  private TaskController controller;
-  private InstanceUpdater updater;
+  private static class TestFixture {
+    private final FakeClock clock;
+    private final InstanceUpdater updater;
+    private final TaskUtil taskUtil;
+    private Optional<IScheduledTask> task = Optional.absent();
 
-  @Before
-  public void setUp() {
-    clock = new FakeClock();
-    controller = createMock(TaskController.class);
-  }
-
-  private void newUpdater(Optional<ITaskConfig> newConfig, int maxToleratedFailures) {
-    updater = new InstanceUpdater(
-        newConfig,
-        maxToleratedFailures,
-        MIN_RUNNING_TIME,
-        MAX_NON_RUNNING_TIME,
-        clock,
-        controller);
-  }
-
-  private void newUpdater(ITaskConfig newConfig, int maxToleratedFailures) {
-    newUpdater(Optional.of(newConfig), maxToleratedFailures);
-  }
-
-  private IScheduledTask makeTask(ITaskConfig config, ScheduleStatus status) {
-    List<TaskEvent> events = Lists.newArrayList();
-    if (status != PENDING) {
-      events.add(new TaskEvent().setTimestamp(clock.nowMillis()).setStatus(PENDING));
-    }
-    if (Tasks.isTerminated(status) || status == KILLING) {
-      events.add(new TaskEvent().setTimestamp(clock.nowMillis()).setStatus(ASSIGNED));
-      events.add(new TaskEvent().setTimestamp(clock.nowMillis()).setStatus(RUNNING));
+    TestFixture(Optional<ITaskConfig> newConfig, int maxToleratedFailures) {
+      this.clock = new FakeClock();
+      this.updater = new InstanceUpdater(
+          newConfig,
+          maxToleratedFailures,
+          MIN_RUNNING_TIME,
+          MAX_NON_RUNNING_TIME,
+          clock);
+      this.taskUtil = new TaskUtil(clock);
     }
 
-    events.add(new TaskEvent().setTimestamp(clock.nowMillis()).setStatus(status));
+    TestFixture(ITaskConfig newConfig, int maxToleratedFailures) {
+      this(Optional.of(newConfig), maxToleratedFailures);
+    }
 
-    return IScheduledTask.build(
-        new ScheduledTask()
-            .setStatus(status)
-            .setTaskEvents(ImmutableList.copyOf(events))
-            .setAssignedTask(
-                new AssignedTask()
-                    .setTask(config.newBuilder())));
-  }
+    void setActualState(ITaskConfig config) {
+      this.task = Optional.of(taskUtil.makeTask(config, PENDING));
+    }
 
-  private void evaluate(ITaskConfig config, ScheduleStatus status, ScheduleStatus... statuses) {
-    IScheduledTask task = makeTask(config, status);
+    void setActualStateAbsent() {
+      this.task = Optional.absent();
+    }
 
-    updater.evaluate(Optional.of(task));
-    for (ScheduleStatus s : statuses) {
-      ScheduledTask builder = task.newBuilder();
-      builder.setStatus(s);
-      builder.addToTaskEvents(new TaskEvent().setTimestamp(clock.nowMillis()).setStatus(s));
-      task = IScheduledTask.build(builder);
-      updater.evaluate(Optional.of(task));
+    private Result changeStatusAndEvaluate(ScheduleStatus status) {
+      ScheduledTask builder = task.get().newBuilder();
+      if (builder.getStatus() != status) {
+        // Only add a task event if this is a state change.
+        builder.addToTaskEvents(new TaskEvent().setTimestamp(clock.nowMillis()).setStatus(status));
+      }
+      builder.setStatus(status);
+
+      task = Optional.of(IScheduledTask.build(builder));
+      return updater.evaluate(task);
+    }
+
+    void evaluateCurrentState(Result expectedResult) {
+      assertEquals(expectedResult, updater.evaluate(task));
+    }
+
+    void evaluate(
+        Result expectedResult,
+        ScheduleStatus status,
+        ScheduleStatus... statuses) {
+
+      assertEquals(expectedResult, changeStatusAndEvaluate(status));
+      for (ScheduleStatus s : statuses) {
+        assertEquals(expectedResult, changeStatusAndEvaluate(s));
+      }
+    }
+
+    void advanceTime(Amount<Long, Time> time) {
+      clock.advance(time);
     }
   }
 
   @Test
   public void testSuccessfulUpdate() {
-    controller.killTask();
-    controller.addReplacement();
-    controller.reevaluteAfterRunningLimit();
-    expectLastCall().times(4);
-    controller.updateCompleted(SUCCESS);
-
-    control.replay();
-
-    newUpdater(NEW, 1);
-    evaluate(OLD, RUNNING, KILLING, FINISHED);
-    evaluate(NEW, PENDING, ASSIGNED, STARTING);
-    IScheduledTask task = makeTask(NEW, RUNNING);
-    updater.evaluate(Optional.of(task));
-    clock.advance(MIN_RUNNING_TIME);
-    updater.evaluate(Optional.of(task));
+    TestFixture f = new TestFixture(NEW, 1);
+    f.setActualState(OLD);
+    f.evaluate(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
+    f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
+    f.setActualState(NEW);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.advanceTime(MIN_RUNNING_TIME);
+    f.evaluateCurrentState(SUCCEEDED);
   }
 
   @Test
   public void testUpdateRetryOnTaskExit() {
-    controller.killTask();
-    controller.addReplacement();
-    controller.reevaluteAfterRunningLimit();
-    expectLastCall().times(8);
-    controller.updateCompleted(SUCCESS);
-
-    control.replay();
-
-    newUpdater(NEW, 1);
-    evaluate(OLD, RUNNING, KILLING, FINISHED);
-    evaluate(NEW, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
-    evaluate(NEW, PENDING, ASSIGNED, STARTING);
-    IScheduledTask task = makeTask(NEW, RUNNING);
-    updater.evaluate(Optional.of(task));
-    clock.advance(MIN_RUNNING_TIME);
-    updater.evaluate(Optional.of(task));
+    TestFixture f = new TestFixture(NEW, 1);
+    f.setActualState(OLD);
+    f.evaluate(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
+    f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
+    f.setActualState(NEW);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, FAILED);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, RUNNING);
+    f.advanceTime(MIN_RUNNING_TIME);
+    f.evaluateCurrentState(SUCCEEDED);
   }
 
   @Test
   public void testUpdateRetryFailure() {
-    controller.killTask();
-    controller.addReplacement();
-    controller.reevaluteAfterRunningLimit();
-    expectLastCall().times(4);
-    controller.updateCompleted(Result.FAILED);
-
-    control.replay();
-
-    newUpdater(NEW, 0);
-    evaluate(OLD, RUNNING, KILLING, FINISHED);
-    evaluate(NEW, PENDING, ASSIGNED, STARTING, RUNNING, FAILED);
+    TestFixture f = new TestFixture(NEW, 0);
+    f.setActualState(OLD);
+    f.evaluate(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
+    f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
+    f.setActualState(NEW);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(Result.FAILED, FAILED);
   }
 
   @Test
   public void testNoopUpdate() {
-    controller.updateCompleted(SUCCESS);
-
-    control.replay();
-
-    newUpdater(NEW, 1);
-    IScheduledTask task = makeTask(NEW, RUNNING);
-    clock.advance(MIN_RUNNING_TIME);
-    updater.evaluate(Optional.of(task));
+    TestFixture f = new TestFixture(NEW, 1);
+    f.setActualState(NEW);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, RUNNING);
+    f.advanceTime(MIN_RUNNING_TIME);
+    f.evaluate(SUCCEEDED, RUNNING);
   }
 
   @Test
   public void testPointlessUpdate() {
-    controller.updateCompleted(SUCCESS);
-
-    control.replay();
-
-    newUpdater(NO_CONFIG, 1);
-    updater.evaluate(NO_TASK);
+    TestFixture f = new TestFixture(NO_CONFIG, 1);
+    f.setActualStateAbsent();
+    f.evaluateCurrentState(SUCCEEDED);
   }
 
   @Test
   public void testNoOldConfig() {
-    controller.addReplacement();
-    controller.reevaluteAfterRunningLimit();
-    expectLastCall().times(4);
-    controller.updateCompleted(SUCCESS);
-
-    control.replay();
-
-    newUpdater(NEW, 1);
-    updater.evaluate(NO_TASK);
-    evaluate(NEW, PENDING, ASSIGNED, STARTING);
-    IScheduledTask task = makeTask(NEW, RUNNING);
-    updater.evaluate(Optional.of(task));
-    clock.advance(MIN_RUNNING_TIME);
-    updater.evaluate(Optional.of(task));
+    TestFixture f = new TestFixture(NEW, 1);
+    f.setActualStateAbsent();
+    f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
+    f.setActualState(NEW);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.advanceTime(MIN_RUNNING_TIME);
+    f.evaluateCurrentState(SUCCEEDED);
   }
 
   @Test
   public void testNoNewConfig() {
-    controller.killTask();
-    controller.updateCompleted(SUCCESS);
-
-    control.replay();
-
-    newUpdater(NO_CONFIG, 1);
-    evaluate(OLD, RUNNING, KILLING, FINISHED);
-    updater.evaluate(NO_TASK);
-  }
-
-  @Test
-  public void testAvoidsMultipleResults() {
-    controller.killTask();
-    controller.addReplacement();
-    controller.reevaluteAfterRunningLimit();
-    expectLastCall().times(4);
-    controller.updateCompleted(SUCCESS);
-
-    control.replay();
-
-    newUpdater(NEW, 1);
-    evaluate(OLD, RUNNING, KILLING, FINISHED);
-    evaluate(NEW, PENDING, ASSIGNED, STARTING);
-    IScheduledTask task = makeTask(NEW, RUNNING);
-    updater.evaluate(Optional.of(task));
-    clock.advance(MIN_RUNNING_TIME);
-    updater.evaluate(Optional.of(task));
-    // The extra evaluation should not result in another updateCompleted().
-    updater.evaluate(Optional.of(task));
+    TestFixture f = new TestFixture(NO_CONFIG, 1);
+    f.setActualState(OLD);
+    f.evaluate(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING, FINISHED);
+    f.setActualStateAbsent();
+    f.evaluateCurrentState(SUCCEEDED);
   }
 
   @Test
   public void testStuckInPending() {
-    controller.killTask();
-    controller.addReplacement();
-    controller.reevaluteAfterRunningLimit();
-    expectLastCall().times(2);
-    controller.killTask();
-    controller.addReplacement();
-    controller.updateCompleted(Result.FAILED);
-
-    control.replay();
-
-    newUpdater(NEW, 1);
-    evaluate(OLD, RUNNING, KILLING, FINISHED);
-    evaluate(NEW, PENDING);
-    IScheduledTask task1 = makeTask(NEW, PENDING);
-    clock.advance(MAX_NON_RUNNING_TIME);
-    updater.evaluate(Optional.of(task1));
-    updater.evaluate(NO_TASK);
-    evaluate(NEW, PENDING);
-    IScheduledTask task2 = makeTask(NEW, PENDING);
-    clock.advance(MAX_NON_RUNNING_TIME);
-    updater.evaluate(Optional.of(task2));
+    TestFixture f = new TestFixture(NEW, 1);
+    f.setActualState(OLD);
+    f.evaluate(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
+    f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
+    f.setActualState(NEW);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING);
+    f.advanceTime(MAX_NON_RUNNING_TIME);
+    f.evaluateCurrentState(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE);
+    f.setActualStateAbsent();
+    f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
+    f.setActualState(NEW);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING);
+    f.advanceTime(MAX_NON_RUNNING_TIME);
+    f.evaluateCurrentState(Result.FAILED);
   }
 
   @Test
   public void testStuckInKilling() {
-    controller.killTask();
-    controller.addReplacement();
-    controller.reevaluteAfterRunningLimit();
-    expectLastCall().times(6);
-    controller.killTask();
-    controller.addReplacement();
-    controller.updateCompleted(Result.FAILED);
-
-    control.replay();
-
-    newUpdater(NEW, 1);
-    evaluate(OLD, RUNNING, KILLING, FINISHED);
-    evaluate(NEW, PENDING);
-    IScheduledTask task1 = makeTask(NEW, PENDING);
-    clock.advance(MAX_NON_RUNNING_TIME);
-    updater.evaluate(Optional.of(task1));
-    updater.evaluate(NO_TASK);
-    evaluate(NEW, PENDING, ASSIGNED, STARTING, RUNNING);
-    IScheduledTask task2 = makeTask(NEW, KILLING);
-    updater.evaluate(Optional.of(task2));
-    clock.advance(MAX_NON_RUNNING_TIME);
-    updater.evaluate(Optional.of(task2));
+    TestFixture f = new TestFixture(NEW, 1);
+    f.setActualState(OLD);
+    f.evaluate(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE, RUNNING);
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
+    f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
+    f.setActualState(NEW);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING);
+    f.advanceTime(MAX_NON_RUNNING_TIME);
+    f.evaluateCurrentState(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE);
+    f.setActualStateAbsent();
+    f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
+    f.setActualState(NEW);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, KILLING);
+    f.advanceTime(MAX_NON_RUNNING_TIME);
+    f.evaluateCurrentState(Result.FAILED);
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testInvalidInput() {
-    control.replay();
-
-    newUpdater(NEW, 1);
-    IScheduledTask noEvents = IScheduledTask.build(
-        makeTask(OLD, RUNNING).newBuilder().setTaskEvents(ImmutableList.<TaskEvent>of()));
-    updater.evaluate(Optional.of(noEvents));
+    TestFixture f = new TestFixture(NEW, 1);
+    ScheduledTask noEvents = new TaskUtil(new FakeClock())
+        .makeTask(OLD, RUNNING).newBuilder().setTaskEvents(ImmutableList.<TaskEvent>of());
+    f.updater.evaluate(Optional.of(IScheduledTask.build(noEvents)));
   }
 
   @Test
@@ -306,12 +243,10 @@ public class InstanceUpdaterTest extends EasyMockTest {
     // If the original task dies, the updater should not add a replacement if the task will be
     // resuscitated.  Only a task that has passed through KILLING will not be resuscitated.
 
-    control.replay();
-
-    newUpdater(NEW, 1);
-
-    // Task did not pass through KILLING, therefore will be rescheudled.
-    evaluate(OLD, FINISHED);
+    TestFixture f = new TestFixture(NEW, 1);
+    f.setActualState(OLD);
+    // Task did not pass through KILLING, therefore will be rescheduled.
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, FINISHED);
   }
 
   @Test
@@ -320,24 +255,17 @@ public class InstanceUpdaterTest extends EasyMockTest {
     // If the original task dies, the updater should not add a replacement if the task will be
     // resuscitated.  Only a task that has passed through KILLING will not be resuscitated.
 
-    controller.killTask();
-    controller.addReplacement();
-    controller.reevaluteAfterRunningLimit();
-    expectLastCall().times(4);
-    controller.updateCompleted(SUCCESS);
+    TestFixture f = new TestFixture(NEW, 1);
+    f.setActualState(OLD);
 
-    control.replay();
-
-    newUpdater(NEW, 1);
-
-    // Task did not pass through KILLING, therefore will be rescheudled.
-    evaluate(OLD, FINISHED);
-    evaluate(OLD, PENDING);
-    updater.evaluate(NO_TASK);
-    evaluate(NEW, PENDING, ASSIGNED, STARTING);
-    IScheduledTask task = makeTask(NEW, RUNNING);
-    updater.evaluate(Optional.of(task));
-    clock.advance(MIN_RUNNING_TIME);
-    updater.evaluate(Optional.of(task));
+    // Task did not pass through KILLING, therefore will be rescheduled.
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, FINISHED);
+    f.evaluate(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE, PENDING);
+    f.setActualStateAbsent();
+    f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
+    f.setActualState(NEW);
+    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.advanceTime(MIN_RUNNING_TIME);
+    f.evaluateCurrentState(SUCCEEDED);
   }
 }
