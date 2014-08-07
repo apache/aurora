@@ -62,6 +62,7 @@
       v.name AS v_name,
       v.value AS v_value
     FROM host_attributes as a
+    // Left outer join since a host attribute may have an empty set of values (no matching rows).
     LEFT OUTER JOIN host_attribute_values AS v ON v.host_attribute_id = a.id
   </sql>
 

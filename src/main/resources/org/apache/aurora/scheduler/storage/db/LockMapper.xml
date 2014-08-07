@@ -60,7 +60,7 @@
     JOIN job_keys AS key ON job_key_id = key.id
   </select>
   <sql id="jobKeyScope">
-    LEFT OUTER JOIN job_keys AS key ON key.role = #{job.role}
+    JOIN job_keys AS key ON key.role = #{job.role}
     AND key.environment = #{job.environment}
     AND key.name = #{job.name}
     AND key.id = job_key_id

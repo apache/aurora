@@ -163,16 +163,26 @@ public class DbLockStoreTest {
   public void testGetLock() throws Exception {
     assertLocks();
 
-    String role = "testRole";
+    String role1 = "testRole1";
+    String role2 = "testRole2";
     String env = "testEnv";
     String job = "testJob";
 
-    final ILock lock = makeLock(JobKeys.from(role, env, job).newBuilder());
+    ILock lock1 = makeLock(JobKeys.from(role1, env, job).newBuilder());
+    ILock lock2 = makeLock(JobKeys.from(role2, env, job).newBuilder());
 
-    assertEquals(Optional.absent(), getLock(lock.getKey()));
+    assertEquals(Optional.<ILock>absent(), getLock(lock1.getKey()));
+    assertEquals(Optional.<ILock>absent(), getLock(lock2.getKey()));
 
-    saveLocks(lock);
-    assertEquals(Optional.<ILock>of(lock), getLock(lock.getKey()));
+    saveLocks(lock1);
+    assertEquals(Optional.of(lock1), getLock(lock1.getKey()));
+    assertEquals(Optional.<ILock>absent(), getLock(lock2.getKey()));
+    saveLocks(lock2);
+    assertEquals(Optional.of(lock1), getLock(lock1.getKey()));
+    assertEquals(Optional.of(lock2), getLock(lock2.getKey()));
+    removeLocks(lock1);
+    assertEquals(Optional.<ILock>absent(), getLock(lock1.getKey()));
+    assertEquals(Optional.of(lock2), getLock(lock2.getKey()));
   }
 
   @Test
