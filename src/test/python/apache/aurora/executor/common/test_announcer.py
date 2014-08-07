@@ -156,6 +156,8 @@ def test_announcer_on_expiration():
     announcer.stop()
 
 
+# TODO(wickman) https://issues.apache.org/jira/browse/AURORA-639
+@pytest.mark.skipif('True')
 def test_announcer_under_abnormal_circumstances():
   mock_serverset = mock.MagicMock(spec=ServerSet)
   mock_serverset.join = mock.MagicMock()
