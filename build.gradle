@@ -167,7 +167,7 @@ dependencies {
   compile 'javax.servlet:servlet-api:2.5'
   compile "log4j:log4j:${log4jRev}"
   compile 'org.antlr:stringtemplate:3.2.1'
-  compile 'org.apache.mesos:mesos:0.18.0'
+  compile 'org.apache.mesos:mesos:0.19.0'
   compile thriftLib
   compile 'org.apache.zookeeper:zookeeper:3.3.4'
   compile 'org.mybatis:mybatis:3.2.7'
