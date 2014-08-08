@@ -23,7 +23,7 @@ CREATE TABLE framework_id(
 );
 
 CREATE TABLE job_keys(
-  id INT IDENTITY,
+  id IDENTITY,
   role VARCHAR NOT NULL,
   environment VARCHAR NOT NULL,
   name VARCHAR NOT NULL,
@@ -32,8 +32,8 @@ CREATE TABLE job_keys(
 );
 
 CREATE TABLE locks(
-  id INT IDENTITY,
-  job_key_id INT NOT NULL REFERENCES job_keys(id),
+  id IDENTITY,
+  job_key_id BIGINT NOT NULL REFERENCES job_keys(id),
   token VARCHAR NOT NULL,
   user VARCHAR NOT NULL,
   timestampMs BIGINT NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE locks(
 );
 
 CREATE TABLE quotas(
-  id INT IDENTITY,
+  id IDENTITY,
   role VARCHAR NOT NULL,
   num_cpus FLOAT NOT NULL,
   ram_mb INT NOT NULL,
@@ -60,9 +60,9 @@ CREATE TABLE maintenance_modes(
 );
 
 CREATE TABLE host_attributes(
-  id INT IDENTITY,
+  id IDENTITY,
   host VARCHAR NOT NULL,
-  mode TINYINT NOT NULL REFERENCES maintenance_modes(id),
+  mode INT NOT NULL REFERENCES maintenance_modes(id),
   slave_id VARCHAR NOT NULL,
 
   UNIQUE(host),
@@ -70,8 +70,8 @@ CREATE TABLE host_attributes(
 );
 
 CREATE TABLE host_attribute_values(
-  id INT IDENTITY,
-  host_attribute_id INT NOT NULL REFERENCES host_attributes(id)
+  id IDENTITY,
+  host_attribute_id BIGINT NOT NULL REFERENCES host_attributes(id)
   ON DELETE CASCADE,
   name VARCHAR NOT NULL,
   value VARCHAR NOT NULL,
@@ -94,43 +94,41 @@ CREATE TABLE job_update_statuses(
 );
 
 CREATE TABLE job_updates(
-  id INT IDENTITY,
-  job_key_id INT NOT NULL REFERENCES job_keys(id),
+  id IDENTITY,
+  job_key_id BIGINT NOT NULL REFERENCES job_keys(id),
   update_id VARCHAR NOT NULL,
-  user_name VARCHAR NOT NULL,
+  user VARCHAR NOT NULL,
   status INT NOT NULL REFERENCES job_update_statuses(id),
-  inserted_timestamp_ms BIGINT NOT NULL,
-  modified_timestamp_ms BIGINT NOT NULL,
+  created_timestamp_ms BIGINT NOT NULL,
+  last_modified_timestamp_ms BIGINT NOT NULL,
   update_group_size INT NOT NULL,
   max_per_instance_failures INT NOT NULL,
   max_failed_instances INT NOT NULL,
   max_wait_to_instance_running_ms INT NOT NULL,
   min_wait_in_instance_running_ms INT NOT NULL,
   rollback_on_failure BOOLEAN NOT NULL,
-  update_only_these_instances ARRAY,
 
   UNIQUE(update_id)
 );
 
 CREATE TABLE job_update_configs(
-  id INT IDENTITY,
-  update_id INT NOT NULL REFERENCES job_updates(id),
+  id IDENTITY,
+  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
   task_config VARCHAR NOT NULL,
-  instances ARRAY NOT NULL,
   is_new BOOLEAN NOT NULL
 );
 
 CREATE TABLE job_update_events(
-  id BIGINT IDENTITY,
-  update_id INT NOT NULL REFERENCES job_updates(id),
-  update_status INT NOT NULL REFERENCES job_update_statuses(id),
+  id IDENTITY,
+  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  status INT NOT NULL REFERENCES job_update_statuses(id),
   timestamp_ms BIGINT NOT NULL
 );
 
 CREATE TABLE job_instance_update_events(
-  id BIGINT IDENTITY,
-  update_id INT NOT NULL REFERENCES job_updates(id),
-  update_action INT NOT NULL REFERENCES job_instance_update_actions(id),
+  id IDENTITY,
+  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  action INT NOT NULL REFERENCES job_instance_update_actions(id),
   instance_id INT NOT NULL,
   timestamp_ms BIGINT NOT NULL
 );

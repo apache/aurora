@@ -13,28 +13,21 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
-import java.util.List;
-
-import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobUpdateEvent;
+import org.apache.ibatis.annotations.Param;
 
 /**
- * MyBatis mapper class for JobKeyMapper.xml
+ * MyBatis mapper class for JobUpdateEventMapper.xml
  *
  * See http://mybatis.github.io/mybatis-3/sqlmap-xml.html for more details.
  */
-interface JobKeyMapper {
-  /**
-   * Saves the job key, updating the existing value if it exists.
-   */
-  void merge(JobKey key);
+interface JobUpdateEventMapper {
 
   /**
-   * Permanently deletes a job key from the database.
+   * Inserts a new job update event into the database.
+   *
+   * @param updateId Update ID of the event.
+   * @param event Event to insert.
    */
-  void delete(JobKey key);
-
-  /**
-   * Selects all job keys from the database.
-   */
-  List<JobKey> selectAll();
+  void insert(@Param("updateId") String updateId, @Param("event") JobUpdateEvent event);
 }

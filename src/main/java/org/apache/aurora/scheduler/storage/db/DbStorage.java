@@ -21,6 +21,8 @@ import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
 
+import org.apache.aurora.gen.JobUpdateAction;
+import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.JobStore;
@@ -32,7 +34,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.ibatis.builder.StaticSqlSource;
 import org.apache.ibatis.exceptions.PersistenceException;
-import org.apache.ibatis.logging.jdk14.Jdk14LoggingImpl;
+import org.apache.ibatis.logging.LogFactory;
 import org.apache.ibatis.mapping.MappedStatement.Builder;
 import org.apache.ibatis.mapping.SqlCommandType;
 import org.apache.ibatis.session.Configuration;
@@ -66,7 +68,8 @@ class DbStorage extends AbstractIdleService implements Storage {
       final SchedulerStore.Mutable schedulerStore,
       final AttributeStore.Mutable attributeStore,
       final LockStore.Mutable lockStore,
-      final QuotaStore.Mutable quotaStore) {
+      final QuotaStore.Mutable quotaStore,
+      final JobUpdateStore.Mutable jobUpdateStore) {
 
     this.sessionFactory = requireNonNull(sessionFactory);
     this.enumValueMapper = requireNonNull(enumValueMapper);
@@ -74,6 +77,7 @@ class DbStorage extends AbstractIdleService implements Storage {
     requireNonNull(attributeStore);
     requireNonNull(lockStore);
     requireNonNull(quotaStore);
+    requireNonNull(jobUpdateStore);
     storeProvider = new MutableStoreProvider() {
       @Override
       public SchedulerStore.Mutable getSchedulerStore() {
@@ -112,7 +116,7 @@ class DbStorage extends AbstractIdleService implements Storage {
 
       @Override
       public JobUpdateStore.Mutable getJobUpdateStore() {
-        throw new UnsupportedOperationException("Not implemented.");
+        return jobUpdateStore;
       }
     };
   }
@@ -161,6 +165,8 @@ class DbStorage extends AbstractIdleService implements Storage {
   @Override
   @Transactional
   protected void startUp() throws IOException {
+    LogFactory.useJdkLogging();
+
     Configuration configuration = sessionFactory.getConfiguration();
     String createStatementName = "create_tables";
     configuration.setMapUnderscoreToCamelCase(true);
@@ -176,14 +182,20 @@ class DbStorage extends AbstractIdleService implements Storage {
         SqlCommandType.UPDATE)
         .build());
 
-    configuration.setLogImpl(Jdk14LoggingImpl.class);
-
     try (SqlSession session = sessionFactory.openSession()) {
       session.update(createStatementName);
     }
 
     for (MaintenanceMode mode : MaintenanceMode.values()) {
       enumValueMapper.addEnumValue("maintenance_modes", mode.getValue(), mode.name());
+    }
+
+    for (JobUpdateStatus status : JobUpdateStatus.values()) {
+      enumValueMapper.addEnumValue("job_update_statuses", status.getValue(), status.name());
+    }
+
+    for (JobUpdateAction action : JobUpdateAction.values()) {
+      enumValueMapper.addEnumValue("job_instance_update_actions", action.getValue(), action.name());
     }
   }
 

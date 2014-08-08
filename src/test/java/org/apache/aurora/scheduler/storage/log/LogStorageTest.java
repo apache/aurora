@@ -752,8 +752,8 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveUpdate() throws Exception {
     final IJobUpdate update = IJobUpdate.build(new JobUpdate()
-        .setUpdateId(UPDATE_ID)
         .setSummary(new JobUpdateSummary()
+            .setUpdateId(UPDATE_ID)
             .setJobKey(JOB_KEY.newBuilder())
             .setStatus(JobUpdateStatus.ROLLED_FORWARD)
             .setUser("user"))

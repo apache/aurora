@@ -105,14 +105,17 @@ public class DbModule extends PrivateModule {
         bindConstant().annotatedWith(named("JDBC.driver")).to(Driver.class.getName());
         bind(Key.get(String.class, named("JDBC.url"))).toInstance(jdbcUrl);
 
-        bindDataSourceProviderType(PooledDataSourceProvider.class);
         bindTransactionFactoryType(JdbcTransactionFactory.class);
+        bindDataSourceProviderType(PooledDataSourceProvider.class);
         addMapperClass(AttributeMapper.class);
         addMapperClass(EnumValueMapper.class);
-        addMapperClass(LockMapper.class);
-        addMapperClass(JobKeyMapper.class);
-        addMapperClass(QuotaMapper.class);
         addMapperClass(FrameworkIdMapper.class);
+        addMapperClass(JobInstanceUpdateEventMapper.class);
+        addMapperClass(JobKeyMapper.class);
+        addMapperClass(JobUpdateEventMapper.class);
+        addMapperClass(JobUpdateDetailsMapper.class);
+        addMapperClass(LockMapper.class);
+        addMapperClass(QuotaMapper.class);
         Properties props = new Properties();
         // We have no plans to take advantage of multiple DB environments. This is a required
         // property though, so we use an unnamed environment.

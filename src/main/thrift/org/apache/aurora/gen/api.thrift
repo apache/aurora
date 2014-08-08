@@ -620,29 +620,23 @@ struct JobUpdateSummary {
 
 /** Update configuration and setting details. */
 struct JobUpdateConfiguration {
-  /** Update ID. */
-  1: string updateId
-
   /** Actual InstanceId -> TaskConfig mapping when the update was requested. */
-  2: set<InstanceTaskConfig> oldTaskConfigs
+  1: set<InstanceTaskConfig> oldTaskConfigs
 
   /** Desired InstanceId -> TaskConfig mapping when the update completes. */
-  3: set<InstanceTaskConfig> newTaskConfigs
+  2: set<InstanceTaskConfig> newTaskConfigs
 
   /** Update specific settings. */
-  4: JobUpdateSettings settings
+  3: JobUpdateSettings settings
 }
 
 /** Full definition of the job update. */
 struct JobUpdate {
-  /** Update ID. */
-  1: string updateId
-
   /** Update summary. */
-  2: JobUpdateSummary summary
+  1: JobUpdateSummary summary
 
   /** Update configuration. */
-  3: JobUpdateConfiguration configuration
+  2: JobUpdateConfiguration configuration
 }
 
 struct JobUpdateDetails {

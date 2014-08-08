@@ -11,30 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.db;
+package org.apache.aurora.scheduler.storage.db.typehandlers;
 
-import java.util.List;
-
-import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobUpdateStatus;
 
 /**
- * MyBatis mapper class for JobKeyMapper.xml
- *
- * See http://mybatis.github.io/mybatis-3/sqlmap-xml.html for more details.
+ * Type handler for {@link JobUpdateStatus}.
  */
-interface JobKeyMapper {
-  /**
-   * Saves the job key, updating the existing value if it exists.
-   */
-  void merge(JobKey key);
-
-  /**
-   * Permanently deletes a job key from the database.
-   */
-  void delete(JobKey key);
-
-  /**
-   * Selects all job keys from the database.
-   */
-  List<JobKey> selectAll();
+class JobUpdateStatusTypeHandler extends AbstractTEnumTypeHandler<JobUpdateStatus> {
+  @Override
+  protected JobUpdateStatus fromValue(int value) {
+    return JobUpdateStatus.findByValue(value);
+  }
 }

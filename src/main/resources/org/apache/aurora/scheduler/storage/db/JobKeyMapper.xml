@@ -17,12 +17,12 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.apache.aurora.scheduler.storage.db.JobKeyMapper">
-  <insert id="insert">
-    INSERT INTO job_keys (
+  <insert id="merge">
+    MERGE INTO job_keys (
       role,
       environment,
       name
-    ) VALUES (
+    ) KEY(role, environment, name) VALUES (
       #{role},
       #{environment},
       #{name}
@@ -44,4 +44,8 @@
   <select id="selectAll" resultType="org.apache.aurora.gen.JobKey">
     SELECT * FROM job_keys
   </select>
+
+  <resultMap id="jobKeyMap" type="org.apache.aurora.gen.JobKey">
+    <id column="id" />
+  </resultMap>
 </mapper>

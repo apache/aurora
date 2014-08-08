@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+ -->
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.apache.aurora.scheduler.storage.db.JobUpdateDetailsMapper">
+  <insert id="merge">
+    MERGE INTO job_updates (
+      job_key_id,
+      update_id,
+      user,
+      status,
+      created_timestamp_ms,
+      last_modified_timestamp_ms,
+      update_group_size,
+      max_per_instance_failures,
+      max_failed_instances,
+      max_wait_to_instance_running_ms,
+      min_wait_in_instance_running_ms,
+      rollback_on_failure
+    ) KEY(update_id) VALUES (
+      (
+        SELECT ID
+        FROM job_keys
+        WHERE role = #{summary.jobKey.role}
+          AND environment = #{summary.jobKey.environment}
+          AND name = #{summary.jobKey.name}
+      ),
+      #{summary.updateId},
+      #{summary.user},
+      #{summary.status, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler},
+      #{summary.createdTimestampMs},
+      #{summary.lastModifiedTimestampMs},
+      #{configuration.settings.updateGroupSize},
+      #{configuration.settings.maxPerInstanceFailures},
+      #{configuration.settings.maxFailedInstances},
+      #{configuration.settings.maxWaitToInstanceRunningMs},
+      #{configuration.settings.minWaitInInstanceRunningMs},
+      #{configuration.settings.rollbackOnFailure}
+    )
+  </insert>
+
+  <resultMap id="jobUpdateSummaryMap" type="org.apache.aurora.gen.JobUpdateSummary">
+    <id column="update_id" property="updateId"/>
+    <result property="status"
+            column="status"
+            typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler" />
+    <association property="jobKey"
+                 resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap"
+                 columnPrefix="jk_"/>
+  </resultMap>
+
+  <resultMap id="jobUpdateSettingsMap" type="org.apache.aurora.gen.JobUpdateSettings">
+    <id column="created_timestamp_ms" />
+  </resultMap>
+
+  <resultMap id="jobUpdateConfigurationMap" type="org.apache.aurora.gen.JobUpdateConfiguration">
+    <association property="settings" resultMap="jobUpdateSettingsMap" columnPrefix="juse_"/>
+  </resultMap>
+
+  <resultMap id="jobUpdateMap" type="org.apache.aurora.gen.JobUpdate">
+    <association property="summary" resultMap="jobUpdateSummaryMap" columnPrefix="jusm_"/>
+    <association property="configuration" resultMap="jobUpdateConfigurationMap" />
+  </resultMap>
+
+  <resultMap id="jobUpdateDetailsMap" type="org.apache.aurora.gen.JobUpdateDetails">
+    <id column="u_id" />
+    <association property="update" resultMap="jobUpdateMap" />
+    <!--Using notNullColumn attribute is required below as LEFT JOIN with empty right side
+    will produce an empty row.-->
+    <collection property="updateEvents"
+                ofType="org.apache.aurora.gen.JobUpdateEvent"
+                columnPrefix="e_"
+                notNullColumn="id">
+      <id column="id" />
+      <result property="status"
+              column="status"
+              typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler" />
+    </collection>
+    <collection property="instanceEvents"
+                ofType="org.apache.aurora.gen.JobInstanceUpdateEvent"
+                columnPrefix="i_"
+                notNullColumn="id">
+      <id column="id" />
+      <result property="action"
+              column="action"
+              typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateActionTypeHandler"/>
+    </collection>
+  </resultMap>
+
+  <select id="selectDetails" resultMap="jobUpdateDetailsMap">
+    SELECT
+      u.id AS u_id,
+      u.update_id AS jusm_update_id,
+      u.user AS jusm_user,
+      u.status AS jusm_status,
+      u.created_timestamp_ms AS jusm_created_timestamp_ms,
+      u.last_modified_timestamp_ms AS jusm_last_modified_timestamp_ms,
+      u.update_group_size AS juse_update_group_size,
+      u.max_per_instance_failures AS juse_max_per_instance_failures,
+      u.max_failed_instances AS juse_max_failed_instances,
+      u.max_wait_to_instance_running_ms AS juse_max_wait_to_instance_running_ms,
+      u.min_wait_in_instance_running_ms AS juse_min_wait_in_instance_running_ms,
+      u.rollback_on_failure AS juse_rollback_on_failure,
+      j.id AS jusm_jk_id,
+      j.role AS jusm_jk_role,
+      j.environment AS jusm_jk_environment,
+      j.name AS jusm_jk_name,
+      e.id AS e_id,
+      e.status AS e_status,
+      e.timestamp_ms AS e_timestamp_ms,
+      i.id AS i_id,
+      i.action AS i_action,
+      i.instance_id AS i_instance_id,
+      i.timestamp_ms AS i_timestamp_ms
+    FROM job_updates AS u
+    INNER JOIN job_keys AS j ON j.id = u.job_key_id
+    LEFT OUTER JOIN job_update_events AS e ON e.update_id = u.id
+    LEFT OUTER JOIN job_instance_update_events AS i ON i.update_id = u.id
+    WHERE u.update_id = #{id}
+    ORDER BY e_timestamp_ms, i_timestamp_ms
+  </select>
+
+  <delete id="truncate">
+    DELETE FROM job_updates;
+  </delete>
+</mapper>

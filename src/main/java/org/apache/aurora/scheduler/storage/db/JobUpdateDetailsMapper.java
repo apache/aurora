@@ -13,28 +13,36 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
-import java.util.List;
+import javax.annotation.Nullable;
 
-import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.JobUpdate;
+import org.apache.aurora.gen.JobUpdateDetails;
 
 /**
- * MyBatis mapper class for JobKeyMapper.xml
+ * MyBatis mapper class for JobUpdateDetailsMapper.xml
  *
  * See http://mybatis.github.io/mybatis-3/sqlmap-xml.html for more details.
  */
-interface JobKeyMapper {
-  /**
-   * Saves the job key, updating the existing value if it exists.
-   */
-  void merge(JobKey key);
+interface JobUpdateDetailsMapper {
 
   /**
-   * Permanently deletes a job key from the database.
+   * Saves the job update, modifies the existing value if one exists.
+   *
+   * @param jobUpdate Job update to save/modify.
    */
-  void delete(JobKey key);
+  void merge(JobUpdate jobUpdate);
 
   /**
-   * Selects all job keys from the database.
+   * Deletes all updates and events from the database.
    */
-  List<JobKey> selectAll();
+  void truncate();
+
+  /**
+   * Gets {@link JobUpdateDetails} for the provided {@code updateId}.
+   *
+   * @param updateId Update ID to get.
+   * @return {@link JobUpdateDetails} instance, if it exists.
+   */
+  @Nullable
+  JobUpdateDetails selectDetails(String updateId);
 }

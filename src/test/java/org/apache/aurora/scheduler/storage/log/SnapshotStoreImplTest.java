@@ -33,6 +33,7 @@ import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateEvent;
 import org.apache.aurora.gen.JobUpdateStatus;
+import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -101,7 +102,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setVersion(CURRENT_API_VERSION);
     final String updateId = "updateId";
     IJobUpdateDetails updateDetails = IJobUpdateDetails.build(new JobUpdateDetails()
-        .setUpdate(new JobUpdate().setUpdateId(updateId))
+        .setUpdate(new JobUpdate().setSummary(new JobUpdateSummary().setUpdateId(updateId)))
         .setUpdateEvents(ImmutableList.of(new JobUpdateEvent().setStatus(JobUpdateStatus.INIT)))
         .setInstanceEvents(ImmutableList.of(new JobInstanceUpdateEvent().setTimestampMs(123L))));
 

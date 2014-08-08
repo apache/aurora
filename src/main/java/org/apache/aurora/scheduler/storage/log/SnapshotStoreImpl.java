@@ -222,12 +222,12 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
               for (JobUpdateEvent updateEvent : details.getUpdateEvents()) {
                 updateStore.saveJobUpdateEvent(
                     IJobUpdateEvent.build(updateEvent),
-                    details.getUpdate().getUpdateId());
+                    details.getUpdate().getSummary().getUpdateId());
               }
               for (JobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
                 updateStore.saveJobInstanceUpdateEvent(
                     IJobInstanceUpdateEvent.build(instanceEvent),
-                    details.getUpdate().getUpdateId());
+                    details.getUpdate().getSummary().getUpdateId());
               }
             }
           }

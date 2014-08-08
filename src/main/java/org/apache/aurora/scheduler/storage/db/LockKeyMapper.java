@@ -30,7 +30,7 @@ import static java.util.Objects.requireNonNull;
  * with the SQL to satisfy the interface.
  *
  */
-public class LockKeyMapper {
+class LockKeyMapper {
 
   private final JobKeyMapper jobKeyMapper;
 
@@ -41,7 +41,7 @@ public class LockKeyMapper {
 
   public void insert(LockKey key) {
     if (key.isSetJob()) {
-      jobKeyMapper.insert(requireNonNull(key.getJob()));
+      jobKeyMapper.merge(requireNonNull(key.getJob()));
     } else {
       throw new IllegalArgumentException("Unsupported lock type on LockKey.");
     }

@@ -28,6 +28,9 @@ public final class TypeHandlers {
   }
 
   public static List<Class<? extends TypeHandler<?>>> getAll() {
-    return ImmutableList.<Class<? extends TypeHandler<?>>>of(MaintenanceModeTypeHandler.class);
+    return ImmutableList.<Class<? extends TypeHandler<?>>>of(
+        JobUpdateActionTypeHandler.class,
+        JobUpdateStatusTypeHandler.class,
+        MaintenanceModeTypeHandler.class);
   }
 }

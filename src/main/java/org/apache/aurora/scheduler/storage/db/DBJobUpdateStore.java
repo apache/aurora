@@ -13,9 +13,13 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
+import javax.inject.Inject;
+
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -24,24 +28,50 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * A relational database-backed job update store.
  */
 public class DBJobUpdateStore implements JobUpdateStore.Mutable {
 
+  private final JobKeyMapper jobKeyMapper;
+  private final JobUpdateDetailsMapper detailsMapper;
+  private final JobUpdateEventMapper jobEventMapper;
+  private final JobInstanceUpdateEventMapper instanceEventMapper;
+
+  @Inject
+  DBJobUpdateStore(
+      JobKeyMapper jobKeyMapper,
+      JobUpdateDetailsMapper detailsMapper,
+      JobUpdateEventMapper jobEventMapper,
+      JobInstanceUpdateEventMapper instanceEventMapper) {
+
+    this.jobKeyMapper = requireNonNull(jobKeyMapper);
+    this.detailsMapper = requireNonNull(detailsMapper);
+    this.jobEventMapper = requireNonNull(jobEventMapper);
+    this.instanceEventMapper = requireNonNull(instanceEventMapper);
+  }
+
   @Override
   public void saveJobUpdate(IJobUpdate update) {
-    // TODO(maxim): implement DB mapping logic.
+    jobKeyMapper.merge(update.getSummary().getJobKey().newBuilder());
+    detailsMapper.merge(update.newBuilder());
   }
 
   @Override
   public void saveJobUpdateEvent(IJobUpdateEvent event, String updateId) {
-    // TODO(maxim): implement DB mapping logic.
+    jobEventMapper.insert(updateId, event.newBuilder());
   }
 
   @Override
   public void saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent event, String updateId) {
-    // TODO(maxim): implement DB mapping logic.
+    instanceEventMapper.insert(event.newBuilder(), updateId);
+  }
+
+  @Override
+  public void deleteAllUpdatesAndEvents() {
+    detailsMapper.truncate();
   }
 
   @Override
@@ -51,14 +81,15 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   }
 
   @Override
-  public void deleteAllUpdatesAndEvents() {
-    // TODO(maxim): implement DB mapping logic.
-  }
-
-  @Override
-  public Optional<IJobUpdateDetails> fetchJobUpdateDetails(String updateId) {
-    // TODO(maxim): implement DB mapping logic.
-    return Optional.absent();
+  public Optional<IJobUpdateDetails> fetchJobUpdateDetails(final String updateId) {
+    // TODO(maxim): add support for job_update_configs and update_only_these_instances.
+    return Optional.fromNullable(detailsMapper.selectDetails(updateId))
+        .transform(new Function<JobUpdateDetails, IJobUpdateDetails>() {
+          @Override
+          public IJobUpdateDetails apply(JobUpdateDetails input) {
+            return IJobUpdateDetails.build(input);
+          }
+        });
   }
 
   @Override
