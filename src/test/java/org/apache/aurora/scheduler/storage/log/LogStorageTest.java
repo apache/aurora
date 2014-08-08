@@ -45,6 +45,7 @@ import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -186,15 +187,30 @@ public class LogStorageTest extends EasyMockTest {
 
     Entry entry1 = createMock(Entry.class);
     Entry entry2 = createMock(Entry.class);
+    Entry entry3 = createMock(Entry.class);
+    Entry entry4 = createMock(Entry.class);
     String frameworkId1 = "bob";
     LogEntry recoveredEntry1 =
         createTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId1)));
     String frameworkId2 = "jim";
     LogEntry recoveredEntry2 =
         createTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId2)));
+    // This entry lacks a slave ID, and should therefore be discarded.
+    LogEntry recoveredEntry3 =
+        createTransaction(Op.saveHostAttributes(new SaveHostAttributes(new HostAttributes()
+            .setHost("host1")
+            .setMode(MaintenanceMode.DRAINED))));
+    IHostAttributes attributes = IHostAttributes.build(new HostAttributes()
+        .setHost("host2")
+        .setSlaveId("slave2")
+        .setMode(MaintenanceMode.DRAINED));
+    LogEntry recoveredEntry4 =
+        createTransaction(Op.saveHostAttributes(new SaveHostAttributes(attributes.newBuilder())));
     expect(entry1.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry1));
     expect(entry2.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry2));
-    expect(stream.readAll()).andReturn(Iterators.forArray(entry1, entry2));
+    expect(entry3.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry3));
+    expect(entry4.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry4));
+    expect(stream.readAll()).andReturn(Iterators.forArray(entry1, entry2, entry3, entry4));
 
     final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
     expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
@@ -207,6 +223,7 @@ public class LogStorageTest extends EasyMockTest {
         });
     storageUtil.schedulerStore.saveFrameworkId(frameworkId1);
     storageUtil.schedulerStore.saveFrameworkId(frameworkId2);
+    storageUtil.attributeStore.saveHostAttributes(attributes);
 
     final Capture<MutateWork<Void, RuntimeException>> initializationWork = createCapture();
     expect(storageUtil.storage.write(capture(initializationWork))).andAnswer(
@@ -238,7 +255,7 @@ public class LogStorageTest extends EasyMockTest {
             snapshotWork.getValue().apply(storageUtil.mutableStoreProvider);
             return null;
           }
-        }).times(2);
+        }).times(4);
 
     control.replay();
 

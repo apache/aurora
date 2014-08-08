@@ -80,7 +80,14 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
 
           if (snapshot.isSetHostAttributes()) {
             for (HostAttributes attributes : snapshot.getHostAttributes()) {
-              store.getAttributeStore().saveHostAttributes(IHostAttributes.build(attributes));
+              // Prior to commit 5cf760b, the store would persist maintenance mode changes for
+              // unknown hosts.  5cf760b began rejecting these, but the replicated log may still
+              // contain entries with a null slave ID.
+              if (attributes.isSetSlaveId()) {
+                store.getAttributeStore().saveHostAttributes(IHostAttributes.build(attributes));
+              } else {
+                LOG.info("Dropping host attributes with no slave ID: " + attributes);
+              }
             }
           }
         }

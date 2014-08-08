@@ -36,6 +36,7 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.RewriteTask;
@@ -439,8 +440,15 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         break;
 
       case SAVE_HOST_ATTRIBUTES:
-        writeBehindAttributeStore.saveHostAttributes(
-            IHostAttributes.build(op.getSaveHostAttributes().hostAttributes));
+        HostAttributes attributes = op.getSaveHostAttributes().hostAttributes;
+        // Prior to commit 5cf760b, the store would persist maintenance mode changes for
+        // unknown hosts.  5cf760b began rejecting these, but the replicated log may still
+        // contain entries with a null slave ID.
+        if (attributes.isSetSlaveId()) {
+          writeBehindAttributeStore.saveHostAttributes(IHostAttributes.build(attributes));
+        } else {
+          LOG.info("Dropping host attributes with no slave ID: " + attributes);
+        }
         break;
 
       case SAVE_LOCK:

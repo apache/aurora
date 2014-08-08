@@ -80,8 +80,13 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     Set<QuotaConfiguration> quotas =
         ImmutableSet.of(
             new QuotaConfiguration("steve", ResourceAggregates.none().newBuilder()));
-    IHostAttributes attribute = IHostAttributes.build(new HostAttributes("host",
-        ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value")))));
+    IHostAttributes attribute = IHostAttributes.build(
+        new HostAttributes("host", ImmutableSet.of(new Attribute("attr", ImmutableSet.of("value"))))
+            .setSlaveId("slave id"));
+    // A legacy attribute that has a maintenance mode set, but nothing else.  These should be
+    // dropped.
+    IHostAttributes legacyAttribute = IHostAttributes.build(
+        new HostAttributes("host", ImmutableSet.<Attribute>of()));
     StoredJob job = new StoredJob(
         "jobManager",
         new JobConfiguration().setKey(new JobKey("owner", "env", "name")));
@@ -104,7 +109,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);
     expect(storageUtil.quotaStore.fetchQuotas())
         .andReturn(ImmutableMap.of("steve", ResourceAggregates.none()));
-    expect(storageUtil.attributeStore.getHostAttributes()).andReturn(ImmutableSet.of(attribute));
+    expect(storageUtil.attributeStore.getHostAttributes())
+        .andReturn(ImmutableSet.of(attribute, legacyAttribute));
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of("jobManager"));
     expect(storageUtil.jobStore.fetchJobs("jobManager"))
         .andReturn(ImmutableSet.of(IJobConfiguration.build(job.getJobConfiguration())));
@@ -136,7 +142,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setTimestamp(NOW)
         .setTasks(IScheduledTask.toBuildersSet(tasks))
         .setQuotaConfigurations(quotas)
-        .setHostAttributes(ImmutableSet.of(attribute.newBuilder()))
+        .setHostAttributes(ImmutableSet.of(attribute.newBuilder(), legacyAttribute.newBuilder()))
         .setJobs(ImmutableSet.of(job))
         .setSchedulerMetadata(metadata)
         .setLocks(ImmutableSet.of(lock.newBuilder()))
