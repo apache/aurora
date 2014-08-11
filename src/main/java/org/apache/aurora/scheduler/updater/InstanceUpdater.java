@@ -33,12 +33,12 @@ import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.EVALUATE_AFTER_RUNNING_LIMIT;
-import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.EVALUATE_ON_STATE_CHANGE;
-import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.FAILED;
-import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
-import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
-import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.SUCCEEDED;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_RUNNING_LIMIT;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.SUCCEEDED;
 
 /**
  * In part of a job update, this manages the update of an individual instance. This includes
@@ -47,7 +47,7 @@ import static org.apache.aurora.scheduler.updater.InstanceUpdater.Result.SUCCEED
  *
  * TODO(wfarner): This probably needs to be parameterized so that it may be reused for rollbacks.
  */
-class InstanceUpdater {
+class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
   private static final Logger LOG = Logger.getLogger(InstanceUpdater.class.getName());
 
   private final Optional<ITaskConfig> desiredState;
@@ -104,25 +104,8 @@ class InstanceUpdater {
     return Tasks.isActive(status) && status != ScheduleStatus.KILLING;
   }
 
-  /**
-   * Evaluates the state differences between the originally-provided {@code desiredState} and the
-   * provided {@code actualState}.
-   * <p>
-   * This function should be idempotent, with the exception of an internal failure counter that
-   * increments when an updating task exits, or an active but not
-   * {@link ScheduleStatus#RUNNING RUNNING} task takes too long to start.
-   *
-   * <p>
-   * It is the responsibility of the caller to ensure that the {@code actualState} is the latest
-   * value.  Note: the caller should avoid calling this when a terminal task is moving to another
-   * terminal state.  It should also suppress deletion events for tasks that have been replaced by
-   * an active task.
-   *
-   * @param actualState The actual observed state of the task.
-   * @return the evaluation result, including the state of the instance update, and a necessary
-   *         action to perform.
-   */
-  synchronized Result evaluate(Optional<IScheduledTask> actualState) {
+  @Override
+  public synchronized StateEvaluator.Result evaluate(Optional<IScheduledTask> actualState) {
     boolean desiredPresent = desiredState.isPresent();
     boolean actualPresent = actualState.isPresent();
 
@@ -143,13 +126,13 @@ class InstanceUpdater {
     }
   }
 
-  private Result addFailureAndCheckIfFailed() {
+  private StateEvaluator.Result addFailureAndCheckIfFailed() {
     LOG.info("Observed updated task failure.");
     observedFailures++;
     return observedFailures > toleratedFailures ? FAILED : EVALUATE_ON_STATE_CHANGE;
   }
 
-  private Result handleActualAndDesiredPresent(IScheduledTask actualState) {
+  private StateEvaluator.Result handleActualAndDesiredPresent(IScheduledTask actualState) {
     Preconditions.checkState(desiredState.isPresent());
     Preconditions.checkArgument(!actualState.getTaskEvents().isEmpty());
 
@@ -171,7 +154,7 @@ class InstanceUpdater {
       } else if (appearsStuck(actualState)) {
         // The task is not running, but not terminated, and appears to have been in this state
         // long enough that we should intervene.
-        Result updaterStatus = addFailureAndCheckIfFailed();
+        StateEvaluator.Result updaterStatus = addFailureAndCheckIfFailed();
         return (updaterStatus == FAILED)
             ? updaterStatus
             : KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
@@ -183,22 +166,13 @@ class InstanceUpdater {
       // This is not the configuration that we would like to run.
       if (isKillable(status)) {
         // Task is active, kill it.
-        return Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+        return StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       } else if (Tasks.isTerminated(status) && permanentlyKilled(actualState)) {
         // The old task has exited, it is now safe to add the new one.
-        return Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
+        return StateEvaluator.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       }
     }
 
     return EVALUATE_ON_STATE_CHANGE;
-  }
-
-  enum Result {
-    EVALUATE_ON_STATE_CHANGE,
-    REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE,
-    KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE,
-    EVALUATE_AFTER_RUNNING_LIMIT,
-    SUCCEEDED,
-    FAILED
   }
 }
