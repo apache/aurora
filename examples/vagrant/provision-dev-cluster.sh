@@ -30,15 +30,15 @@ update-alternatives --set java /usr/lib/jvm/java-7-openjdk-amd64/jre/bin/java
 # that want to advertise the hostname to the user, or other components.
 hostname 192.168.33.7
 
-MESOS_VERSION=0.19.0
+MESOS_VERSION=0.19.1
 
 function prepare_extras() {
   pushd aurora
     # Fetch the mesos egg, needed to build python components.
     mkdir -p third_party
     pushd third_party
-      wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_$MESOS_VERSION_amd64.egg \
-        -O mesos-$MESOS_VERSION-py2.7-linux-x86_64.egg
+      wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos-${MESOS_VERSION}-py2.7-linux-x86_64.egg \
+        -O mesos-${MESOS_VERSION}-py2.7-linux-x86_64.egg
     popd
 
     # Install thrift, needed for code generation in the scheduler build.
@@ -58,8 +58,8 @@ function prepare_extras() {
 }
 
 function install_mesos {
-  wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_$MESOS_VERSION_amd64.deb
-  dpkg --install mesos_$MESOS_VERSION_amd64.deb
+  wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos_${MESOS_VERSION}-1.0.ubuntu1204_amd64.deb
+  dpkg --install mesos_${MESOS_VERSION}-1.0.ubuntu1204_amd64.deb
 }
 
 function install_cluster_config {
