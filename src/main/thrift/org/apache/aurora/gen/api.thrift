@@ -509,32 +509,29 @@ struct PendingReason {
 
 /** States that a job update may be in. */
 enum JobUpdateStatus {
-  /** Update is created but not yet started. */
-  INIT = 0,
-
   /** Update is in progress. */
-  ROLLING_FORWARD = 1,
+  ROLLING_FORWARD = 0,
 
   /** Update has failed and is being rolled back. */
-  ROLLING_BACK = 2,
+  ROLLING_BACK = 1,
 
   /** Update has been paused while in progress. */
-  ROLL_FORWARD_PAUSED = 3,
+  ROLL_FORWARD_PAUSED = 2,
 
   /** Update has been paused during rollback. */
-  ROLL_BACK_PAUSED = 4,
+  ROLL_BACK_PAUSED = 3,
 
   /** Update has completed successfully. */
-  ROLLED_FORWARD = 5,
+  ROLLED_FORWARD = 4,
 
   /** Update has failed and rolled back. */
-  ROLLED_BACK = 6,
+  ROLLED_BACK = 5,
 
   /** Update was aborted. */
-  ABORTED = 7,
+  ABORTED = 6,
 
   /** Unknown error during update. */
-  ERROR = 8
+  ERROR = 7
 }
 
 /** Job update actions that can be applied to job instances. */
@@ -563,8 +560,8 @@ struct JobUpdateSettings {
   /** If true, enables failed update rollback. */
   6: bool rollbackOnFailure
 
-  /** A set of instance IDs to act on. */
-  7: set<i32> updateOnlyTheseInstances
+  /** Instance IDs to act on. All instances will be affected if this is not set. */
+  7: set<Range> updateOnlyTheseInstances
 }
 
 /** Event marking a state transition in job update lifecycle. */
@@ -594,10 +591,22 @@ struct InstanceTaskConfig {
   1: TaskConfig task
 
   /** Instances associated with the TaskConfig. */
-  2: list<Range> instances
+  2: set<Range> instances
 }
 
-/** Job update state. */
+/** Current job update state including status and created/modified timestamps. */
+struct JobUpdateState {
+  /** Current status of the update. */
+  1: JobUpdateStatus status
+
+  /** Created timestamp in milliseconds. */
+  2: i64 createdTimestampMs
+
+  /** Last modified timestamp in milliseconds. */
+  3: i64 lastModifiedTimestampMs
+}
+
+/** Summary of the job update including job key, user and current state. */
 struct JobUpdateSummary {
   /** Update ID. */
   1: string updateId
@@ -608,14 +617,8 @@ struct JobUpdateSummary {
   /** User initiated an update. */
   3: string user
 
-  /** Current status of the update. */
-  4: JobUpdateStatus status
-
-  /** Creation timestamp in milliseconds. */
-  5: i64 createdTimestampMs
-
-  /** Last modified timestamp in milliseconds. */
-  6: i64 lastModifiedTimestampMs
+  /** Current job update state. */
+  4: JobUpdateState state
 }
 
 /** Update configuration and setting details. */
@@ -623,11 +626,14 @@ struct JobUpdateConfiguration {
   /** Actual InstanceId -> TaskConfig mapping when the update was requested. */
   1: set<InstanceTaskConfig> oldTaskConfigs
 
-  /** Desired InstanceId -> TaskConfig mapping when the update completes. */
-  2: set<InstanceTaskConfig> newTaskConfigs
+  /** Desired TaskConfig when the update completes. */
+  2: TaskConfig newTaskConfig
+
+  /** Desired instance count when the update completes. */
+  3: i32 instanceCount
 
   /** Update specific settings. */
-  3: JobUpdateSettings settings
+  4: JobUpdateSettings settings
 }
 
 /** Full definition of the job update. */
@@ -679,14 +685,17 @@ struct JobUpdateQuery {
   /** Job key. */
   3: JobKey jobKey
 
+  /** User who created the update. */
+  4: string user
+
   /** Set of update statuses. */
-  4: set<JobUpdateStatus> updateStatus
+  5: set<JobUpdateStatus> updateStatuses
 
   /** Offset to serve data from. Used by pagination. */
-  5: i32 offset
+  6: i32 offset
 
   /** Number or records to serve. Used by pagination. */
-  6: i32 limit
+  7: i32 limit
 }
 
 struct ListBackupsResult {
@@ -740,7 +749,7 @@ struct StartJobUpdateResult {
 
 /** Result of the getJobUpdateSummaries call. */
 struct GetJobUpdateSummariesResult {
-  1: set<JobUpdateSummary> updateSummaries
+  1: list<JobUpdateSummary> updateSummaries
 }
 
 /** Result of the getJobUpdateDetails call. */

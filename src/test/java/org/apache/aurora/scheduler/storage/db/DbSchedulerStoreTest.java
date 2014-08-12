@@ -16,9 +16,6 @@ package org.apache.aurora.scheduler.storage.db;
 import java.io.IOException;
 
 import com.google.common.base.Optional;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.twitter.common.inject.Bindings;
 
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
@@ -36,9 +33,7 @@ public class DbSchedulerStoreTest {
 
   @Before
   public void setUp() throws IOException {
-    Injector injector = Guice.createInjector(DbModule.testModule(Bindings.KeyFactory.PLAIN));
-    storage = injector.getInstance(Storage.class);
-    storage.prepare();
+    storage = DbUtil.createStorage();
   }
 
   @Test

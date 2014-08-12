@@ -17,21 +17,19 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.apache.aurora.scheduler.storage.db.JobUpdateDetailsMapper">
-  <insert id="merge">
-    MERGE INTO job_updates (
+  <insert id="insert">
+    INSERT INTO job_updates (
       job_key_id,
       update_id,
       user,
-      status,
-      created_timestamp_ms,
-      last_modified_timestamp_ms,
+      instance_count,
       update_group_size,
       max_per_instance_failures,
       max_failed_instances,
       max_wait_to_instance_running_ms,
       min_wait_in_instance_running_ms,
       rollback_on_failure
-    ) KEY(update_id) VALUES (
+    ) VALUES (
       (
         SELECT ID
         FROM job_keys
@@ -41,9 +39,7 @@
       ),
       #{summary.updateId},
       #{summary.user},
-      #{summary.status, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler},
-      #{summary.createdTimestampMs},
-      #{summary.lastModifiedTimestampMs},
+      #{configuration.instanceCount},
       #{configuration.settings.updateGroupSize},
       #{configuration.settings.maxPerInstanceFailures},
       #{configuration.settings.maxFailedInstances},
@@ -53,27 +49,105 @@
     )
   </insert>
 
-  <resultMap id="jobUpdateSummaryMap" type="org.apache.aurora.gen.JobUpdateSummary">
-    <id column="update_id" property="updateId"/>
+  <insert id="insertTaskConfig" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
+    INSERT INTO job_update_configs (
+      update_id,
+      task_config,
+      is_new
+    ) VALUES (
+      (
+        SELECT id
+        FROM job_updates
+        WHERE update_id = #{updateId}
+      ),
+      #{config, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.TaskConfigTypeHandler},
+      #{isNew}
+    )
+  </insert>
+
+  <insert id="insertTaskConfigInstances">
+    INSERT INTO job_update_configs_to_instances (
+      config_id,
+      first,
+      last
+    ) VALUES
+    <foreach item="element" collection="ranges" open="(" separator="),(" close=")">
+      #{configId},
+      #{element.first},
+      #{element.last}
+    </foreach>
+  </insert>
+
+  <insert id="insertInstanceOverrides">
+    INSERT INTO job_updates_to_instance_overrides (
+      update_id,
+      first,
+      last
+    ) VALUES
+    <foreach item="element" collection="ranges" open="(" separator="),(" close=")">
+      (
+        SELECT id
+        FROM job_updates
+        WHERE update_id = #{updateId}
+      ),
+      #{element.first},
+      #{element.last}
+    </foreach>
+  </insert>
+
+  <resultMap id="jobUpdateStateMap" type="org.apache.aurora.gen.JobUpdateState">
+    <id column="update_id" />
     <result property="status"
             column="status"
             typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler" />
+  </resultMap>
+
+  <resultMap id="jobUpdateSummaryMap" type="org.apache.aurora.gen.JobUpdateSummary">
+    <id column="update_id" property="updateId"/>
     <association property="jobKey"
                  resultMap="org.apache.aurora.scheduler.storage.db.JobKeyMapper.jobKeyMap"
                  columnPrefix="jk_"/>
+    <association property="state"
+                 resultMap="jobUpdateStateMap"
+                 columnPrefix="just_" />
+  </resultMap>
+
+  <resultMap id="rangeMap" type="org.apache.aurora.gen.Range">
+    <id column="id" />
+  </resultMap>
+
+  <resultMap id="instanceConfigMap" type="org.apache.aurora.gen.InstanceTaskConfig">
+    <id column="id" />
+    <result property="task"
+            column="task"
+            typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.TaskConfigTypeHandler" />
+    <collection property="instances" resultMap="rangeMap" columnPrefix="r_" notNullColumn="id" />
   </resultMap>
 
   <resultMap id="jobUpdateSettingsMap" type="org.apache.aurora.gen.JobUpdateSettings">
-    <id column="created_timestamp_ms" />
+    <id column="id" />
+    <collection property="updateOnlyTheseInstances"
+                resultMap="rangeMap"
+                columnPrefix="r_"
+                notNullColumn="id" />
   </resultMap>
 
   <resultMap id="jobUpdateConfigurationMap" type="org.apache.aurora.gen.JobUpdateConfiguration">
+    <id column="id" />
+    <result property="newTaskConfig"
+            column="new_task_config"
+            typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.TaskConfigTypeHandler" />
     <association property="settings" resultMap="jobUpdateSettingsMap" columnPrefix="juse_"/>
+    <collection property="oldTaskConfigs"
+                resultMap="instanceConfigMap"
+                columnPrefix="itc_"
+                notNullColumn="id" />
   </resultMap>
 
   <resultMap id="jobUpdateMap" type="org.apache.aurora.gen.JobUpdate">
+    <id column="u_id" />
     <association property="summary" resultMap="jobUpdateSummaryMap" columnPrefix="jusm_"/>
-    <association property="configuration" resultMap="jobUpdateConfigurationMap" />
+    <association property="configuration" resultMap="jobUpdateConfigurationMap" columnPrefix="juc_"/>
   </resultMap>
 
   <resultMap id="jobUpdateDetailsMap" type="org.apache.aurora.gen.JobUpdateDetails">
@@ -101,20 +175,108 @@
     </collection>
   </resultMap>
 
-  <select id="selectDetails" resultMap="jobUpdateDetailsMap">
+  <sql id="timestamps_join">
+    INNER JOIN
+    (
+      SELECT
+        e_s.update_id,
+        e_s.status
+      FROM job_update_events AS e_s
+      INNER JOIN
+      (
+        SELECT
+          update_id,
+          MAX(timestamp_ms) AS timestamp_ms
+        FROM job_update_events
+        GROUP BY update_id
+      ) AS e_t ON e_t.update_id = e_s.update_id AND e_t.timestamp_ms = e_s.timestamp_ms
+    ) AS max_status ON max_status.update_id = u.id
+    INNER JOIN
+    (
+      SELECT
+        update_id,
+        MIN(timestamp_ms) AS timestamp_ms
+      FROM job_update_events
+      GROUP BY update_id
+    ) AS min_ts ON min_ts.update_id = u.id
+    INNER JOIN
+    (
+      SELECT
+        update_id,
+        MAX(timestamp_ms) AS timestamp_ms
+      FROM
+      (
+        SELECT
+          update_id,
+          timestamp_ms
+        FROM job_update_events
+        UNION ALL
+        SELECT
+          update_id,
+          timestamp_ms
+        FROM job_instance_update_events
+      )
+      GROUP BY update_id
+    ) AS max_ts ON max_ts.update_id = u.id
+  </sql>
+
+  <select id="selectSummaries" resultMap="jobUpdateSummaryMap">
     SELECT
+      u.update_id AS update_id,
+      u.user AS user,
+      max_status.status AS just_status,
+      min_ts.timestamp_ms AS just_created_timestamp_ms,
+      max_ts.timestamp_ms AS just_last_modified_timestamp_ms,
+      j.id AS jk_id,
+      j.role AS jk_role,
+      j.environment AS jk_environment,
+      j.name AS jk_name
+    FROM job_updates AS u
+    INNER JOIN job_keys AS j ON j.id = u.job_key_id
+    <include refid="timestamps_join" />
+    <if test="updateId != null || role != null || user != null || jobKey != null || updateStatuses != null || limit != 0 || offset != 0">
+    WHERE TRUE
+      <if test="updateId != null">AND u.update_id = #{updateId}</if>
+      <if test="user != null">AND u.user = #{user}</if>
+      <if test="role != null">AND j.role = #{role}</if>
+      <if test="jobKey != null">
+        AND j.role = #{jobKey.role}
+        AND j.name = #{jobKey.name}
+        AND j.environment = #{jobKey.environment}
+      </if>
+      <if test="updateStatuses != null">
+        <if test="updateStatuses.size() > 0">
+          AND (max_status.status IN
+          <foreach item="element" collection="updateStatuses" open="(" separator="," close="))">
+            #{element, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler}
+          </foreach>
+        </if>
+      </if>
+    </if>
+    ORDER BY max_ts.timestamp_ms
+    <if test="limit != 0">LIMIT #{limit}</if>
+    <if test="offset != 0">OFFSET #{offset}</if>
+  </select>
+
+  <!--Column naming convention below follows the thrift object hierarchy and columnPrefix
+      attributes used in associations.
+      For example: jusm_just_status maps to JobUpdateSummary/JobUpdateState/status field.-->
+  <sql id="unscoped_details_select">
+     SELECT
       u.id AS u_id,
+      u.id AS juc_juse_id,
       u.update_id AS jusm_update_id,
       u.user AS jusm_user,
-      u.status AS jusm_status,
-      u.created_timestamp_ms AS jusm_created_timestamp_ms,
-      u.last_modified_timestamp_ms AS jusm_last_modified_timestamp_ms,
-      u.update_group_size AS juse_update_group_size,
-      u.max_per_instance_failures AS juse_max_per_instance_failures,
-      u.max_failed_instances AS juse_max_failed_instances,
-      u.max_wait_to_instance_running_ms AS juse_max_wait_to_instance_running_ms,
-      u.min_wait_in_instance_running_ms AS juse_min_wait_in_instance_running_ms,
-      u.rollback_on_failure AS juse_rollback_on_failure,
+      max_status.status AS jusm_just_status,
+      min_ts.timestamp_ms AS jusm_just_created_timestamp_ms,
+      max_ts.timestamp_ms AS jusm_just_last_modified_timestamp_ms,
+      u.instance_count AS juc_instance_count,
+      u.update_group_size AS juc_juse_update_group_size,
+      u.max_per_instance_failures AS juc_juse_max_per_instance_failures,
+      u.max_failed_instances AS juc_juse_max_failed_instances,
+      u.max_wait_to_instance_running_ms AS juc_juse_max_wait_to_instance_running_ms,
+      u.min_wait_in_instance_running_ms AS juc_juse_min_wait_in_instance_running_ms,
+      u.rollback_on_failure AS juc_juse_rollback_on_failure,
       j.id AS jusm_jk_id,
       j.role AS jusm_jk_role,
       j.environment AS jusm_jk_environment,
@@ -125,13 +287,38 @@
       i.id AS i_id,
       i.action AS i_action,
       i.instance_id AS i_instance_id,
-      i.timestamp_ms AS i_timestamp_ms
+      i.timestamp_ms AS i_timestamp_ms,
+      cn.id AS juc_id,
+      cn.task_config AS juc_new_task_config,
+      co.id AS juc_itc_id,
+      co.task_config AS juc_itc_task,
+      ci.id AS juc_itc_r_id,
+      ci.first AS juc_itc_r_first,
+      ci.last AS juc_itc_r_last,
+      io.id AS juc_juse_r_id,
+      io.first AS juc_juse_r_first,
+      io.last AS juc_juse_r_last
     FROM job_updates AS u
     INNER JOIN job_keys AS j ON j.id = u.job_key_id
+    INNER JOIN job_update_configs AS cn ON cn.update_id = u.id AND cn.is_new = TRUE
+    INNER JOIN job_update_configs AS co ON co.update_id = u.id AND co.is_new = FALSE
+    INNER JOIN job_update_configs_to_instances AS ci ON ci.config_id = co.id
+    <include refid="timestamps_join" />
+    LEFT OUTER JOIN job_updates_to_instance_overrides AS io ON io.update_id = u.id
     LEFT OUTER JOIN job_update_events AS e ON e.update_id = u.id
     LEFT OUTER JOIN job_instance_update_events AS i ON i.update_id = u.id
+  </sql>
+
+  <select id="selectDetails" resultMap="jobUpdateDetailsMap">
+    <include refid="unscoped_details_select"/>
     WHERE u.update_id = #{id}
     ORDER BY e_timestamp_ms, i_timestamp_ms
+  </select>
+
+  <!--Order by ID to facilitate proper re-insertion during recovery.-->
+  <select id="selectAllDetails" resultMap="jobUpdateDetailsMap">
+    <include refid="unscoped_details_select"/>
+    ORDER BY u_id
   </select>
 
   <delete id="truncate">

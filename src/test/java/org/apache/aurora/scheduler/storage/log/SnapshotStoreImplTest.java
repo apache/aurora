@@ -103,7 +103,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     final String updateId = "updateId";
     IJobUpdateDetails updateDetails = IJobUpdateDetails.build(new JobUpdateDetails()
         .setUpdate(new JobUpdate().setSummary(new JobUpdateSummary().setUpdateId(updateId)))
-        .setUpdateEvents(ImmutableList.of(new JobUpdateEvent().setStatus(JobUpdateStatus.INIT)))
+        .setUpdateEvents(ImmutableList.of(new JobUpdateEvent().setStatus(JobUpdateStatus.ERROR)))
         .setInstanceEvents(ImmutableList.of(new JobInstanceUpdateEvent().setTimestampMs(123L))));
 
     storageUtil.expectOperations();
@@ -118,7 +118,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(frameworkId));
     expect(storageUtil.lockStore.fetchLocks()).andReturn(ImmutableSet.of(lock));
     expect(storageUtil.updateStore.fetchAllJobUpdateDetails())
-        .andReturn(ImmutableSet.of(updateDetails));
+        .andReturn(ImmutableList.of(updateDetails));
 
     expectDataWipe();
     storageUtil.taskStore.saveTasks(tasks);

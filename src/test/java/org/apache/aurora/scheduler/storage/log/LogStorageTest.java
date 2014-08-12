@@ -755,15 +755,13 @@ public class LogStorageTest extends EasyMockTest {
         .setSummary(new JobUpdateSummary()
             .setUpdateId(UPDATE_ID)
             .setJobKey(JOB_KEY.newBuilder())
-            .setStatus(JobUpdateStatus.ROLLED_FORWARD)
             .setUser("user"))
         .setConfiguration(new JobUpdateConfiguration()
-            .setNewTaskConfigs(ImmutableSet.of(new InstanceTaskConfig()
-                .setTask(new TaskConfig())
-                .setInstances(ImmutableList.of(new Range(0, 3)))))
+            .setNewTaskConfig(new TaskConfig())
+            .setInstanceCount(4)
             .setOldTaskConfigs(ImmutableSet.of(new InstanceTaskConfig()
                 .setTask(new TaskConfig())
-                .setInstances(ImmutableList.of(new Range(0, 3)))))
+                .setInstances(ImmutableSet.of(new Range(0, 3)))))
             .setSettings(new JobUpdateSettings())));
 
     new MutationFixture() {

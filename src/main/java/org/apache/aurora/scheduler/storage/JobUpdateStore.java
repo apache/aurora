@@ -13,14 +13,15 @@
  */
 package org.apache.aurora.scheduler.storage;
 
-import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
+import java.util.List;
 
-import org.apache.aurora.gen.JobUpdateQuery;
+import com.google.common.base.Optional;
+
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 
 /**
@@ -34,7 +35,7 @@ public interface JobUpdateStore {
    * @param query Query to identify job update summaries with.
    * @return A read-only view of job update summaries.
    */
-  ImmutableSet<IJobUpdateSummary> fetchJobUpdateSummaries(JobUpdateQuery query);
+  List<IJobUpdateSummary> fetchJobUpdateSummaries(IJobUpdateQuery query);
 
   /**
    * Fetches a read-only view of job update details.
@@ -49,12 +50,23 @@ public interface JobUpdateStore {
    *
    * @return A read-only view of all job update details.
    */
-  ImmutableSet<IJobUpdateDetails> fetchAllJobUpdateDetails();
+  List<IJobUpdateDetails> fetchAllJobUpdateDetails();
 
   interface Mutable extends JobUpdateStore {
 
     /**
      * Saves a new job update.
+     *
+     * <p>
+     * Note: This call must be followed by the {@link #saveJobUpdateEvent(IJobUpdateEvent, String)}
+     * before fetching a saved update as it does not save the following required fields:
+     * <ul>
+     *   <li>{@link org.apache.aurora.gen.JobUpdateState#status}</li>
+     *   <li>{@link org.apache.aurora.gen.JobUpdateState#createdTimestampMs}</li>
+     *   <li>{@link org.apache.aurora.gen.JobUpdateState#lastModifiedTimestampMs}</li>
+     * </ul>
+     * The above fields are auto-populated from the update events and any attempt to fetch an update
+     * without having at least one {@link IJobUpdateEvent} present in the store will return empty.
      *
      * @param update Update to save.
      */

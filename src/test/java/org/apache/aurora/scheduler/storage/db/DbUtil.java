@@ -11,27 +11,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.storage.db.typehandlers;
+package org.apache.aurora.scheduler.storage.db;
 
-import java.util.List;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.twitter.common.inject.Bindings;
 
-import com.google.common.collect.ImmutableList;
+import org.apache.aurora.scheduler.storage.Storage;
 
-import org.apache.ibatis.type.TypeHandler;
+final class DbUtil {
 
-/**
- * Utility class to access the available type handler classes.
- */
-public final class TypeHandlers {
-  private TypeHandlers() {
+  private DbUtil() {
     // Utility class.
   }
 
-  public static List<Class<? extends TypeHandler<?>>> getAll() {
-    return ImmutableList.<Class<? extends TypeHandler<?>>>of(
-        JobUpdateActionTypeHandler.class,
-        JobUpdateStatusTypeHandler.class,
-        MaintenanceModeTypeHandler.class,
-        TaskConfigTypeHandler.class);
+  static Storage createStorage() {
+    Injector injector = Guice.createInjector(DbModule.testModule(Bindings.KeyFactory.PLAIN));
+    Storage storage = injector.getInstance(Storage.class);
+    storage.prepare();
+    return storage;
   }
 }

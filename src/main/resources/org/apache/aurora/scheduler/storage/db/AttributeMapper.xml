@@ -76,7 +76,6 @@
   </select>
 
   <delete id="truncate">
-    DELETE FROM host_attribute_values;
     DELETE FROM host_attributes
   </delete>
 </mapper>

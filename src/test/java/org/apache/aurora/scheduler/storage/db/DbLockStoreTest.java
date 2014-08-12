@@ -18,9 +18,6 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.twitter.common.inject.Bindings;
 
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.Lock;
@@ -42,7 +39,7 @@ import static org.junit.Assert.fail;
 
 public class DbLockStoreTest {
 
-  private DbStorage storage;
+  private Storage storage;
 
   private void assertLocks(final ILock... expected) {
     assertEquals(
@@ -99,9 +96,7 @@ public class DbLockStoreTest {
 
   @Before
   public void setUp() throws IOException {
-    Injector injector = Guice.createInjector(DbModule.testModule(Bindings.KeyFactory.PLAIN));
-    storage = injector.getInstance(DbStorage.class);
-    storage.prepare();
+    storage = DbUtil.createStorage();
   }
 
   @Test

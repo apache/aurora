@@ -13,18 +13,19 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
@@ -139,7 +140,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public ImmutableSet<IJobUpdateSummary> fetchJobUpdateSummaries(JobUpdateQuery query) {
+  public List<IJobUpdateSummary> fetchJobUpdateSummaries(IJobUpdateQuery query) {
     return jobUpdateStore.fetchJobUpdateSummaries(query);
   }
 
@@ -149,7 +150,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public ImmutableSet<IJobUpdateDetails> fetchAllJobUpdateDetails() {
+  public List<IJobUpdateDetails> fetchAllJobUpdateDetails() {
     return jobUpdateStore.fetchAllJobUpdateDetails();
   }
 }

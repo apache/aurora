@@ -18,9 +18,6 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.twitter.common.inject.Bindings;
 
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
@@ -61,9 +58,7 @@ public class DbAttributeStoreTest {
 
   @Before
   public void setUp() throws IOException {
-    Injector injector = Guice.createInjector(DbModule.testModule(Bindings.KeyFactory.PLAIN));
-    storage = injector.getInstance(Storage.class);
-    storage.prepare();
+    storage = DbUtil.createStorage();
   }
 
   @Test

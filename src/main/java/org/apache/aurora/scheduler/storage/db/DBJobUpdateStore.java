@@ -13,20 +13,24 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
+import java.util.List;
+import java.util.Set;
+
 import javax.inject.Inject;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
 
 import org.apache.aurora.gen.JobUpdateDetails;
-import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
+import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
+import org.apache.aurora.scheduler.storage.entities.IRange;
 
 import static java.util.Objects.requireNonNull;
 
@@ -56,7 +60,34 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   @Override
   public void saveJobUpdate(IJobUpdate update) {
     jobKeyMapper.merge(update.getSummary().getJobKey().newBuilder());
-    detailsMapper.merge(update.newBuilder());
+    detailsMapper.insert(update.newBuilder());
+
+    String updateId = update.getSummary().getUpdateId();
+
+    // Insert optional instance update overrides.
+    Set<IRange> instanceOverrides =
+        update.getConfiguration().getSettings().getUpdateOnlyTheseInstances();
+
+    if (instanceOverrides != null && !instanceOverrides.isEmpty()) {
+      detailsMapper.insertInstanceOverrides(updateId, IRange.toBuildersSet(instanceOverrides));
+    }
+
+    // Insert new task config.
+    detailsMapper.insertTaskConfig(
+        updateId,
+        update.getConfiguration().getNewTaskConfig().newBuilder(),
+        true,
+        new InsertResult());
+
+    // Insert old task configs and instance mappings.
+    for (IInstanceTaskConfig config : update.getConfiguration().getOldTaskConfigs()) {
+      InsertResult result = new InsertResult();
+      detailsMapper.insertTaskConfig(updateId, config.getTask().newBuilder(), false, result);
+
+      detailsMapper.insertTaskConfigInstances(
+          result.getId(),
+          IRange.toBuildersSet(config.getInstances()));
+    }
   }
 
   @Override
@@ -75,14 +106,12 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   }
 
   @Override
-  public ImmutableSet<IJobUpdateSummary> fetchJobUpdateSummaries(JobUpdateQuery query) {
-    // TODO(maxim): implement DB mapping logic.
-    return ImmutableSet.of();
+  public List<IJobUpdateSummary> fetchJobUpdateSummaries(IJobUpdateQuery query) {
+    return IJobUpdateSummary.listFromBuilders(detailsMapper.selectSummaries(query.newBuilder()));
   }
 
   @Override
   public Optional<IJobUpdateDetails> fetchJobUpdateDetails(final String updateId) {
-    // TODO(maxim): add support for job_update_configs and update_only_these_instances.
     return Optional.fromNullable(detailsMapper.selectDetails(updateId))
         .transform(new Function<JobUpdateDetails, IJobUpdateDetails>() {
           @Override
@@ -93,8 +122,7 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   }
 
   @Override
-  public ImmutableSet<IJobUpdateDetails> fetchAllJobUpdateDetails() {
-    // TODO(maxim): implement DB mapping logic.
-    return ImmutableSet.of();
+  public List<IJobUpdateDetails> fetchAllJobUpdateDetails() {
+    return IJobUpdateDetails.listFromBuilders(detailsMapper.selectAllDetails());
   }
 }

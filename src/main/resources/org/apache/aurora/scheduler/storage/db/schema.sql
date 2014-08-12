@@ -98,9 +98,7 @@ CREATE TABLE job_updates(
   job_key_id BIGINT NOT NULL REFERENCES job_keys(id),
   update_id VARCHAR NOT NULL,
   user VARCHAR NOT NULL,
-  status INT NOT NULL REFERENCES job_update_statuses(id),
-  created_timestamp_ms BIGINT NOT NULL,
-  last_modified_timestamp_ms BIGINT NOT NULL,
+  instance_count INT NOT NULL,
   update_group_size INT NOT NULL,
   max_per_instance_failures INT NOT NULL,
   max_failed_instances INT NOT NULL,
@@ -114,8 +112,26 @@ CREATE TABLE job_updates(
 CREATE TABLE job_update_configs(
   id IDENTITY,
   update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
-  task_config VARCHAR NOT NULL,
+  task_config BINARY NOT NULL,
   is_new BOOLEAN NOT NULL
+);
+
+CREATE TABLE job_updates_to_instance_overrides(
+  id IDENTITY,
+  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  first INT NOT NULL,
+  last INT NOT NULL,
+
+  UNIQUE(update_id, first, last)
+);
+
+CREATE TABLE job_update_configs_to_instances(
+  id IDENTITY,
+  config_id BIGINT NOT NULL REFERENCES job_update_configs(id) ON DELETE CASCADE,
+  first INT NOT NULL,
+  last INT NOT NULL,
+
+  UNIQUE(config_id, first, last)
 );
 
 CREATE TABLE job_update_events(
