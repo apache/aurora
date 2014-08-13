@@ -835,24 +835,8 @@ def restart(args, options):
 def really_cancel_update(args, options):
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
       args, options, make_client_factory())
-  new_cmd = ["job", "restart"]
-  instance_key = args[0]
-  if options.shards is not None:
-    instance_key += "/" + ",".join(map(str, option.shards))
-  new_cmd.append(instance_key)
-  if config_file is not None:
-    new_cmd.append("--config=%s" % config_file)
-  if options.batch_size != 1:
-    new_cmd.append("--batch-size=%s" % options.batch_size)
-  if options.max_per_shard_failures != 0:
-    new_cmd.append("--max-per-shard-failures=%s" % options.max_per_shard_failures)
-  if options.max_total_failures != 0:
-    new_cmd.append("--max-total-failures=%s" % options.max_total_failures)
-  if options.restart_threshold != 60:
-    new_cmd.append("--restart-threshold=%s" % options.restart)
-  if options.watch_secs != 30:
-    new_cmd.append("--watch-secs=%s" % options.watch_secs)
-  v1_deprecation_warning("update", new_cmd)
+  new_cmd = ["job", "cancel-update", str(job_key)]
+  v1_deprecation_warning("cancel_update", new_cmd)
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
   resp = api.cancel_update(job_key, config=config)
   check_and_log_response(resp)
