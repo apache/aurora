@@ -47,6 +47,9 @@ public class StateModule extends AbstractModule {
     bind(LockManager.class).to(LockManagerImpl.class);
     bind(LockManagerImpl.class).in(Singleton.class);
 
+    bind(JobUpdater.class).to(JobUpdaterImpl.class);
+    bind(JobUpdaterImpl.class).in(Singleton.class);
+
     bindMaintenanceController(binder());
   }
 

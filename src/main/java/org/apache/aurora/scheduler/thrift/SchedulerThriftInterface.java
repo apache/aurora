@@ -90,6 +90,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduleStatusResult;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.StartMaintenanceResult;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskQuery;
@@ -111,6 +112,8 @@ import org.apache.aurora.scheduler.metadata.NearestFit;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
+import org.apache.aurora.scheduler.state.JobUpdater;
+import org.apache.aurora.scheduler.state.JobUpdater.UpdaterException;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -127,6 +130,7 @@ import org.apache.aurora.scheduler.storage.backup.StorageBackup;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -184,6 +188,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final QuotaManager quotaManager;
   private final NearestFit nearestFit;
   private final StateManager stateManager;
+  private final JobUpdater jobUpdater;
 
   @Inject
   SchedulerThriftInterface(
@@ -198,7 +203,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       MaintenanceController maintenance,
       QuotaManager quotaManager,
       NearestFit nearestFit,
-      StateManager stateManager) {
+      StateManager stateManager,
+      JobUpdater jobUpdater) {
 
     this(storage,
         schedulerCore,
@@ -211,7 +217,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         cronPredictor,
         quotaManager,
         nearestFit,
-        stateManager);
+        stateManager,
+        jobUpdater);
   }
 
   @VisibleForTesting
@@ -227,7 +234,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       CronPredictor cronPredictor,
       QuotaManager quotaManager,
       NearestFit nearestFit,
-      StateManager stateManager) {
+      StateManager stateManager,
+      JobUpdater jobUpdater) {
 
     this.storage = requireNonNull(storage);
     this.schedulerCore = requireNonNull(schedulerCore);
@@ -241,6 +249,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.quotaManager = requireNonNull(quotaManager);
     this.nearestFit = requireNonNull(nearestFit);
     this.stateManager = requireNonNull(stateManager);
+    this.jobUpdater = requireNonNull(jobUpdater);
   }
 
   @Override
@@ -1247,8 +1256,56 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response startJobUpdate(JobUpdateRequest request, Lock lock, SessionKey session) {
-    throw new UnsupportedOperationException("Not implemented");
+  public Response startJobUpdate(
+      JobUpdateRequest mutableRequest,
+      Lock mutableLock,
+      SessionKey session) {
+
+    // TODO(maxim): validate JobUpdateRequest fields.
+    requireNonNull(mutableRequest);
+    requireNonNull(session);
+
+    final ILock lock = ILock.build(requireNonNull(mutableLock));
+    final Response response = emptyResponse();
+
+    final SessionContext context;
+    final IJobUpdateRequest request;
+    try {
+      context = sessionValidator.checkAuthenticated(
+          session,
+          ImmutableSet.of(mutableRequest.getJobKey().getRole()));
+
+      request = IJobUpdateRequest.build(new JobUpdateRequest(mutableRequest).setTaskConfig(
+          ConfigurationManager.validateAndPopulate(
+              ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
+
+    } catch (AuthFailedException e) {
+      return addMessage(response, AUTH_FAILED, e);
+    } catch (TaskDescriptionException e) {
+      return addMessage(response, INVALID_REQUEST, e);
+    }
+
+    return storage.write(new MutateWork.Quiet<Response>() {
+      @Override
+      public Response apply(MutableStoreProvider storeProvider) {
+        try {
+          lockManager.validateIfLocked(
+              ILockKey.build(LockKey.job(request.getJobKey().newBuilder())),
+              Optional.of(lock));
+        } catch (LockException e) {
+          return addMessage(response, LOCK_ERROR, e);
+        }
+
+        // TODO(maxim): Wire in task limits and quota checks from SchedulerCore.
+
+        try {
+          String updateId = jobUpdater.startJobUpdate(request, context.getIdentity());
+          return okResponse(Result.startJobUpdateResult(new StartJobUpdateResult(updateId)));
+        } catch (UpdaterException e) {
+          return addMessage(response, INVALID_REQUEST, e);
+        }
+      }
+    });
   }
 
   @Override

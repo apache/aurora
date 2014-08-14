@@ -64,6 +64,8 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobStats;
 import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
+import org.apache.aurora.gen.JobUpdateRequest;
+import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
@@ -99,6 +101,8 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.metadata.NearestFit;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
+import org.apache.aurora.scheduler.state.JobUpdater;
+import org.apache.aurora.scheduler.state.JobUpdater.UpdaterException;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -110,6 +114,7 @@ import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -163,6 +168,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final JobConfiguration CRON_JOB = makeJob().setCronSchedule("* * * * *");
   private static final Lock DEFAULT_LOCK = null;
   private static final String TASK_ID = "task_id";
+  private static final String UPDATE_ID = "82d6d790-3212-11e3-aa6e-0800200c9a74";
 
   private static final IResourceAggregate QUOTA =
       IResourceAggregate.build(new ResourceAggregate(10.0, 1024, 2048));
@@ -191,6 +197,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private QuotaManager quotaManager;
   private NearestFit nearestFit;
   private StateManager stateManager;
+  private JobUpdater jobUpdater;
 
   @Before
   public void setUp() throws Exception {
@@ -209,6 +216,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     quotaManager = createMock(QuotaManager.class);
     nearestFit = createMock(NearestFit.class);
     stateManager = createMock(StateManager.class);
+    jobUpdater = createMock(JobUpdater.class);
 
     // Use guice and install AuthModule to apply AOP-style auth layer.
     Module testModule = new AbstractModule() {
@@ -229,6 +237,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(CronPredictor.class).toInstance(cronPredictor);
         bind(NearestFit.class).toInstance(nearestFit);
         bind(StateManager.class).toInstance(stateManager);
+        bind(JobUpdater.class).toInstance(jobUpdater);
       }
     };
     Injector injector = Guice.createInjector(testModule, new AopModule());
@@ -1599,14 +1608,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testAddInstances() throws Exception {
-    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
+    AddInstancesConfig config = createInstanceConfig(populatedTask());
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     scheduler.addInstances(
-        eq(JOB_KEY),
-        eq(ImmutableSet.copyOf(config.getInstanceIds())),
-        anyObject(ITaskConfig.class));
+        JOB_KEY,
+        ImmutableSet.copyOf(config.getInstanceIds()),
+        ITaskConfig.build(config.getTaskConfig()));
 
     control.replay();
 
@@ -1615,14 +1624,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testAddInstancesWithNullLock() throws Exception {
-    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
+    AddInstancesConfig config = createInstanceConfig(populatedTask());
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     scheduler.addInstances(
-        eq(JOB_KEY),
-        eq(ImmutableSet.copyOf(config.getInstanceIds())),
-        anyObject(ITaskConfig.class));
+        JOB_KEY,
+        ImmutableSet.copyOf(config.getInstanceIds()),
+        ITaskConfig.build(config.getTaskConfig()));
     control.replay();
 
     assertOkResponse(thrift.addInstances(config, null, SESSION));
@@ -1630,14 +1639,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testAddInstancesFails() throws Exception {
-    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
+    AddInstancesConfig config = createInstanceConfig(populatedTask());
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     scheduler.addInstances(
-        eq(JOB_KEY),
-        eq(ImmutableSet.copyOf(config.getInstanceIds())),
-        anyObject(ITaskConfig.class));
+        JOB_KEY,
+        ImmutableSet.copyOf(config.getInstanceIds()),
+        ITaskConfig.build(config.getTaskConfig()));
     expectLastCall().andThrow(new ScheduleException("Failed"));
 
     control.replay();
@@ -1798,6 +1807,71 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         response.getResult().getGetQuotaResult().getNonProdConsumption());
   }
 
+  @Test
+  public void testStartUpdate() throws Exception {
+    JobUpdateRequest request = createJobRequest(populatedTask());
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    expect(jobUpdater.startJobUpdate(IJobUpdateRequest.build(request), USER)).andReturn(UPDATE_ID);
+
+    control.replay();
+
+    Response response =
+        assertOkResponse(thrift.startJobUpdate(request, LOCK.newBuilder(), SESSION));
+    assertEquals(UPDATE_ID, response.getResult().getStartJobUpdateResult().getUpdateId());
+  }
+
+  @Test
+  public void testStartUpdateFailsAuth() throws Exception {
+    JobUpdateRequest request = createJobRequest(populatedTask());
+    expectAuth(ROLE, false);
+
+    control.replay();
+    assertResponse(AUTH_FAILED, thrift.startJobUpdate(request, LOCK.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsConfigValidation() throws Exception {
+    JobUpdateRequest request = createJobRequest(populatedTask().setJobName(null));
+    expectAuth(ROLE, true);
+
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, LOCK.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsLockValidation() throws Exception {
+    JobUpdateRequest request = createJobRequest(populatedTask());
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    expectLastCall().andThrow(new LockException("lock failed"));
+
+    control.replay();
+
+    assertResponse(LOCK_ERROR, thrift.startJobUpdate(request, LOCK.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsInUpdater() throws Exception {
+    JobUpdateRequest request = createJobRequest(populatedTask());
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    expect(jobUpdater.startJobUpdate(IJobUpdateRequest.build(request), USER))
+        .andThrow(new UpdaterException("failed update"));
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, LOCK.newBuilder(), SESSION));
+  }
+
+  private static JobUpdateRequest createJobRequest(TaskConfig config) {
+    return new JobUpdateRequest()
+        .setInstanceCount(5)
+        .setJobKey(JOB_KEY.newBuilder())
+        .setSettings(new JobUpdateSettings())
+        .setTaskConfig(config);
+  }
+
   private static JobConfiguration makeJob() {
     return makeJob(nonProductionTask(), 1);
   }
@@ -1872,7 +1946,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setNumCpus(1)
         .setRamMb(1024)
         .setDiskMb(1024)
-        .setProduction(production);
+        .setProduction(production)
+        .setRequestedPorts(ImmutableSet.<String>of())
+        .setTaskLinks(ImmutableMap.<String, String>of())
+        .setMaxTaskFailures(1);
+  }
+
+  private static TaskConfig populatedTask() {
+    return defaultTask(true).setConstraints(ImmutableSet.of(
+        new Constraint("host", TaskConstraint.limit(new LimitConstraint(1)))));
   }
 
   private static TaskConfig productionTask() {

@@ -35,6 +35,7 @@ import org.apache.aurora.gen.SessionKey;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.quota.QuotaManager;
+import org.apache.aurora.scheduler.state.JobUpdater;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.SchedulerCore;
@@ -154,6 +155,7 @@ public class ThriftIT extends EasyMockTest {
             bindMock(LockManager.class);
             bindMock(ShutdownRegistry.class);
             bindMock(StateManager.class);
+            bindMock(JobUpdater.class);
             storageTestUtil = new StorageTestUtil(ThriftIT.this);
             bind(Storage.class).toInstance(storageTestUtil.storage);
             bind(NonVolatileStorage.class).toInstance(storageTestUtil.storage);
