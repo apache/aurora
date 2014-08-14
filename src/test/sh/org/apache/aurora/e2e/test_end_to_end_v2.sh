@@ -34,16 +34,26 @@ test_http_example() {
   local _base_config=$6 _updated_config=$7
   jobkey="$_cluster/$_role/$_env/$_job"
 
-  vagrant ssh -c "aurora job inspect $jobkey $_base_config"
+  joblist=$(vagrant ssh -c "aurora2 config list $_base_config")
+  test "$joblist" = "jobs=[$jobkey]"
+
+  vagrant ssh -c "aurora2 job inspect $jobkey $_base_config"
 
   echo '== Creating job'
   vagrant ssh -c "aurora2 job create $jobkey $_base_config"
 
+  echo "== Checking job status"
+  vagrant ssh -c "aurora2 job list $_cluster/$_role/$_env" | grep "$jobkey"
+  vagrant ssh -c "aurora2 job status $jobkey"
   # Check that scheduler UI pages shown
   base_url="http://$_sched_ip:8081"
   check_url_live "$base_url/scheduler"
   check_url_live "$base_url/scheduler/$_role"
   check_url_live "$base_url/scheduler/$_role/$_env/$_job"
+
+  echo "== Restarting test job"
+
+  vagrant ssh -c "aurora2 job restart $jobkey $_updated_config"
 
   echo '== Updating test job'
   vagrant ssh -c "aurora2 job update $jobkey $_updated_config"
@@ -57,8 +67,16 @@ test_http_example() {
   runlen=$(vagrant ssh -c "aurora2 task run $jobkey 'pwd'" | wc -l)
   test $runlen -eq 4
 
-  vagrant ssh -c "aurora2 quota get $_cluster/$_role"
+  # Run a kill without specifying instances, and verify that it gets an error, and the job
+  # isn't affected. (TODO(mchucarroll): the failed kill should return non-zero!)
+  vagrant ssh -c "aurora2 job kill $jobkey" 2>&1 | grep -q "The instances list cannot be omitted in a kill command"
+  check_url_live "$base_url/scheduler/$_role/$_env/$_job"
+
+  vagrant ssh -c "aurora2 job kill $jobkey/1"
+
   vagrant ssh -c "aurora2 job killall  $jobkey"
+
+  vagrant ssh -c "aurora2 quota get $_cluster/$_role"
 }
 
 RETCODE=1
