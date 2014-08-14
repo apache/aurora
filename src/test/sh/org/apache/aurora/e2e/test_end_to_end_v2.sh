@@ -33,6 +33,9 @@ test_http_example() {
   local _cluster=$1 _role=$2 _env=$3 _job=$4 _sched_ip=$5
   local _base_config=$6 _updated_config=$7
   jobkey="$_cluster/$_role/$_env/$_job"
+
+  vagrant ssh -c "aurora job inspect $jobkey $_base_config"
+
   echo '== Creating job'
   vagrant ssh -c "aurora2 job create $jobkey $_base_config"
 

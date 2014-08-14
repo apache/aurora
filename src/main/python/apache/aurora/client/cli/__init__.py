@@ -240,11 +240,13 @@ class CommandLine(object):
   def name(self):
     """Returns the name of this command-line tool"""
 
-  def print_out(self, str):
-    print(str)
+  def print_out(self, s, indent=0):
+    indent_str = " " * indent
+    print("%s%s" % (indent_str, s))
 
-  def print_err(self, str):
-    print(str, file=sys.stderr)
+  def print_err(self, s, indent=0):
+    indent_str = " " * indent
+    print("%s%s" % (indent_str, s), file=sys.stderr)
 
   def __init__(self):
     self.nouns = None

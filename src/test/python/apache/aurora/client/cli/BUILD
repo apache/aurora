@@ -20,6 +20,7 @@ python_test_suite(
     pants(':command_hooks'),
     pants(':cron'),
     pants(':help'),
+    pants(':inspect'),
     pants(':job'),
     pants(':config'),
     pants(':logging'),
@@ -36,6 +37,18 @@ python_library(
   dependencies = [
     pants('3rdparty/python:mock'),
     pants('src/main/python/apache/aurora/client/cli'),
+  ]
+)
+
+python_tests(
+  name='inspect',
+  sources = [ 'test_inspect.py' ],
+  dependencies = [
+    pants(':util'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.contextutil'),
+    pants('src/main/python/apache/aurora/client/cli'),
+    pants('src/main/python/apache/aurora/client/cli:client_lib'),
   ]
 )
 

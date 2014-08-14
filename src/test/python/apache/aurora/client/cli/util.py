@@ -67,11 +67,13 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     mock_api.scheduler_proxy = mock_scheduler_proxy
     return mock_api
 
-  def print_out(self, str):
-    self.out.append(str)
+  def print_out(self, msg, indent=0):
+    indent_str = " " * indent
+    self.out.append("%s%s" % (indent_str, msg))
 
-  def print_err(self, str):
-    self.err.append(str)
+  def print_err(self, msg, indent=0):
+    indent_str = " " * indent
+    self.err.append("%s%s" % (indent_str, msg))
 
   def get_out(self):
     return self.out

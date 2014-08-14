@@ -228,37 +228,37 @@ the parsed configuration."""
     job = config.raw()
     job_thrift = config.job()
     context.print_out("Job level information")
-    context.print_out("name:       %s" % job.name(), indent=2)
-    context.print_out("role:       %s" % job.role(), indent=2)
-    context.print_out("contact:    %s" % job.contact(), indent=2)
-    context.print_out("cluster:    %s" % job.cluster(), indent=2)
-    context.print_out("instances:  %s" % job.instances(), indent=2)
+    context.print_out("name:       '%s'" % job.name(), indent=2)
+    context.print_out("role:       '%s'" % job.role(), indent=2)
+    context.print_out("contact:    '%s'" % job.contact(), indent=2)
+    context.print_out("cluster:    '%s'" % job.cluster(), indent=2)
+    context.print_out("instances:  '%s'" % job.instances(), indent=2)
     if job.has_cron_schedule():
       context.print_out("cron:", indent=2)
-      context.print_out("schedule: %s" % job.cron_schedule(), ident=4)
-      context.print_out("policy:   %s" % job.cron_collision_policy(), indent=4)
+      context.print_out("schedule: '%s'" % job.cron_schedule(), indent=4)
+      context.print_out("policy:   '%s'" % job.cron_collision_policy(), indent=4)
     if job.has_constraints():
       context.print_out("constraints:", indent=2)
       for constraint, value in job.constraints().get().items():
-        context.print_out("%s: %s" % (constraint, value), indent=4)
+        context.print_out("'%s': '%s'" % (constraint, value), indent=4)
     context.print_out("service:    %s" % job_thrift.taskConfig.isService, indent=2)
     context.print_out("production: %s" % bool(job.production().get()), indent=2)
-    context.print_out()
+    context.print_out("")
 
     task = job.task()
     context.print_out("Task level information")
-    context.print_out("name: %s" % task.name(), indent=2)
+    context.print_out("name: '%s'" % task.name(), indent=2)
 
     if len(task.constraints().get()) > 0:
       context.print_out("constraints:", indent=2)
       for constraint in task.constraints():
         context.print_out("%s" % (" < ".join(st.get() for st in constraint.order() or [])),
             indent=2)
-    context.print_out()
+    context.print_out("")
 
     processes = task.processes()
     for process in processes:
-      context.print_out("Process %s:" % process.name())
+      context.print_out("Process '%s':" % process.name())
       if process.daemon().get():
         context.print_out("daemon", indent=2)
       if process.ephemeral().get():
@@ -268,7 +268,7 @@ the parsed configuration."""
       context.print_out("cmdline:", indent=2)
       for line in process.cmdline().get().splitlines():
         context.print_out(line, indent=4)
-      context.print_out()
+      context.print_out("")
     return EXIT_OK
 
 
