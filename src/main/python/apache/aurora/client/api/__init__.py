@@ -24,9 +24,20 @@ from .restarter import Restarter
 from .scheduler_client import SchedulerProxy
 from .sla import Sla
 from .updater import Updater
+from .updater_util import UpdaterConfig
 
 from gen.apache.aurora.api.constants import LIVE_STATES
-from gen.apache.aurora.api.ttypes import Identity, ResourceAggregate, ResponseCode, TaskQuery
+from gen.apache.aurora.api.ttypes import (
+    Identity,
+    JobKey,
+    JobUpdateRequest,
+    Lock,
+    LockKey,
+    LockValidation,
+    ResourceAggregate,
+    ResponseCode,
+    TaskQuery
+)
 
 
 class AuroraClientAPI(object):
@@ -36,6 +47,7 @@ class AuroraClientAPI(object):
   class TypeError(Error, TypeError): pass
   class ClusterMismatch(Error, ValueError): pass
   class ThriftInternalError(Error): pass
+  class UpdateConfigError(Error): pass
 
   def __init__(self, cluster, verbose=False, session_key_factory=make_session_key):
     if not isinstance(cluster, Cluster):
@@ -84,9 +96,7 @@ class AuroraClientAPI(object):
 
   def kill_job(self, job_key, instances=None, lock=None):
     log.info("Killing tasks for job: %s" % job_key)
-    if not isinstance(job_key, AuroraJobKey):
-      raise TypeError('Expected type of job_key %r to be %s but got %s instead'
-          % (job_key, AuroraJobKey.__name__, job_key.__class__.__name__))
+    self._assert_valid_job_key(job_key)
 
     # Leave query.owner.user unset so the query doesn't filter jobs only submitted by a particular
     # user.
@@ -133,6 +143,48 @@ class AuroraClientAPI(object):
     updater = Updater(config, health_check_interval_seconds, self._scheduler_proxy)
 
     return updater.update(instances)
+
+  def acquire_job_lock(self, job_key):
+    """Acquires an exclusive job lock preventing any simultaneous mutations (update, kill, etc.)
+
+    Arguments:
+    job_key - AuroraJobKey instance.
+    """
+    self._assert_valid_job_key(job_key)
+    return self._scheduler_proxy.acquireLock(LockKey(job=job_key.to_thrift()))
+
+  def release_job_lock(self, lock):
+    """Releases the previously-acquired job lock.
+
+    Requires valid Lock instance. See cancel_update if release without lock handle is required.
+
+    Arguments:
+    lock - Previously acquired Lock instance.
+    """
+    self._assert_valid_lock(lock)
+    return self._scheduler_proxy.releaseLock(lock, LockValidation.CHECKED)
+
+  def start_job_update(self, config, lock, instances=None):
+    """Requests Scheduler to start job update process.
+
+    Arguments:
+    config - AuroraConfig instance with update details.
+    lock - Job Lock instance to ensure exclusive job mutation access.
+    instances - Optional list of instances to restrict update to.
+    """
+    try:
+      settings = UpdaterConfig(**config.update_config().get()).to_thrift_update_settings(instances)
+    except ValueError as e:
+      raise self.UpdateConfigError(str(e))
+
+    request = JobUpdateRequest(
+        jobKey=JobKey(role=config.role(), environment=config.environment(), name=config.name()),
+        instanceCount=config.instances(),
+        settings=settings,
+        taskConfig=config.job().taskConfig
+    )
+
+    return self._scheduler_proxy.startJobUpdate(request, lock)
 
   def cancel_update(self, job_key):
     """Cancel the update represented by job_key. Returns whether or not the cancellation was
@@ -226,6 +278,11 @@ class AuroraClientAPI(object):
         self._cluster,
         min_instance_count,
         hosts)
+
+  def _assert_valid_lock(self, lock):
+    if not isinstance(lock, Lock):
+      raise self.TypeError('Invalid lock %r: expected %s but got %s'
+                           % (lock, AuroraJobKey.__name__, lock.__class__.__name__))
 
   def _assert_valid_job_key(self, job_key):
     if not isinstance(job_key, AuroraJobKey):

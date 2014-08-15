@@ -13,8 +13,12 @@
 #
 
 import collections
+from itertools import groupby
+from operator import itemgetter
 
 from twitter.common import log
+
+from gen.apache.aurora.api.ttypes import JobUpdateSettings, Range
 
 
 class UpdaterConfig(object):
@@ -53,6 +57,44 @@ class UpdaterConfig(object):
     self.max_per_instance_failures = max_per_shard_failures
     self.rollback_on_failure = rollback_on_failure
     self.wait_for_batch_completion = wait_for_batch_completion
+
+  @classmethod
+  def instances_to_ranges(cls, instances):
+    """Groups instance IDs into a set of contiguous integer ranges.
+
+    Every Range(first, last) represents a closed span of instance IDs. For example,
+    :param instances:
+    instances=[0,1,2,5,8,9] would result in the following set of ranges:
+    (Range(first=0, last=2], Range(first=5, last=5), Range(first=8, last=9))
+
+    Algorithm: http://stackoverflow.com/questions/3149440
+
+    Arguments:
+    instances - sorted list of instance IDs.
+    """
+    if not instances:
+      return None
+
+    ranges = set()
+    for _, group in groupby(enumerate(instances), lambda(element, position): element - position):
+      range_seq = map(itemgetter(1), group)
+      ranges.add(Range(first=range_seq[0], last=range_seq[-1]))
+    return ranges
+
+  def to_thrift_update_settings(self, instances=None):
+    """Converts UpdateConfig into thrift JobUpdateSettings object.
+
+    Arguments:
+    instances - optional list of instances to update.
+    """
+    return JobUpdateSettings(
+        updateGroupSize=self.batch_size,
+        maxPerInstanceFailures=self.max_per_instance_failures,
+        maxFailedInstances=self.max_total_failures,
+        maxWaitToInstanceRunningMs=self.restart_threshold,
+        minWaitInInstanceRunningMs=self.watch_secs,
+        rollbackOnFailure=self.rollback_on_failure,
+        updateOnlyTheseInstances=self.instances_to_ranges(instances) if instances else None)
 
 
 class FailureThreshold(object):
