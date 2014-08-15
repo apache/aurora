@@ -164,7 +164,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final SessionKey SESSION = new SessionKey();
   private static final IJobKey JOB_KEY = JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, JOB_NAME);
   private static final ILockKey LOCK_KEY = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
-  private static final ILock LOCK = ILock.build(new Lock().setKey(LOCK_KEY.newBuilder()));
+  private static final ILock LOCK =
+      ILock.build(new Lock().setKey(LOCK_KEY.newBuilder()).setToken("token"));
   private static final JobConfiguration CRON_JOB = makeJob().setCronSchedule("* * * * *");
   private static final Lock DEFAULT_LOCK = null;
   private static final String TASK_ID = "task_id";
@@ -1811,8 +1812,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testStartUpdate() throws Exception {
     JobUpdateRequest request = createJobRequest(populatedTask());
     expectAuth(ROLE, true);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
-    expect(jobUpdater.startJobUpdate(IJobUpdateRequest.build(request), USER)).andReturn(UPDATE_ID);
+    expect(lockManager.acquireLock(LOCK_KEY, USER)).andReturn(LOCK);
+    expect(jobUpdater.startJobUpdate(IJobUpdateRequest.build(request), USER, LOCK.getToken()))
+        .andReturn(UPDATE_ID);
 
     control.replay();
 
@@ -1843,8 +1845,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testStartUpdateFailsLockValidation() throws Exception {
     JobUpdateRequest request = createJobRequest(populatedTask());
     expectAuth(ROLE, true);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
-    expectLastCall().andThrow(new LockException("lock failed"));
+    expect(lockManager.acquireLock(LOCK_KEY, USER)).andThrow(new LockException("lock failed"));
 
     control.replay();
 
@@ -1855,8 +1856,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testStartUpdateFailsInUpdater() throws Exception {
     JobUpdateRequest request = createJobRequest(populatedTask());
     expectAuth(ROLE, true);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
-    expect(jobUpdater.startJobUpdate(IJobUpdateRequest.build(request), USER))
+    expect(lockManager.acquireLock(LOCK_KEY, USER)).andReturn(LOCK);
+    expect(jobUpdater.startJobUpdate(IJobUpdateRequest.build(request), USER, LOCK.getToken()))
         .andThrow(new UpdaterException("failed update"));
 
     control.replay();

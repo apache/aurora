@@ -1265,7 +1265,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(mutableRequest);
     requireNonNull(session);
 
-    final ILock lock = ILock.build(requireNonNull(mutableLock));
     final Response response = emptyResponse();
 
     final SessionContext context;
@@ -1288,10 +1287,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return storage.write(new MutateWork.Quiet<Response>() {
       @Override
       public Response apply(MutableStoreProvider storeProvider) {
+        // TODO(wfarner): Move lock acquisition down into the update controller once introduced.
+        ILock lock;
         try {
-          lockManager.validateIfLocked(
+          lock = lockManager.acquireLock(
               ILockKey.build(LockKey.job(request.getJobKey().newBuilder())),
-              Optional.of(lock));
+              context.getIdentity());
         } catch (LockException e) {
           return addMessage(response, LOCK_ERROR, e);
         }
@@ -1299,7 +1300,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         // TODO(maxim): Wire in task limits and quota checks from SchedulerCore.
 
         try {
-          String updateId = jobUpdater.startJobUpdate(request, context.getIdentity());
+          String updateId =
+              jobUpdater.startJobUpdate(request, context.getIdentity(), lock.getToken());
           return okResponse(Result.startJobUpdateResult(new StartJobUpdateResult(updateId)));
         } catch (UpdaterException e) {
           return addMessage(response, INVALID_REQUEST, e);

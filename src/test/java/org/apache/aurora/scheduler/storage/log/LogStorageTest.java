@@ -763,19 +763,21 @@ public class LogStorageTest extends EasyMockTest {
                 .setTask(new TaskConfig())
                 .setInstances(ImmutableSet.of(new Range(0, 3)))))
             .setSettings(new JobUpdateSettings())));
+    final String lockToken = "token";
 
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWriteOperation();
-        storageUtil.updateStore.saveJobUpdate(update);
-        streamMatcher.expectTransaction(Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder())))
+        storageUtil.updateStore.saveJobUpdate(update, lockToken);
+        streamMatcher.expectTransaction(
+            Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder(), lockToken)))
             .andReturn(position);
       }
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().saveJobUpdate(update);
+        storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
       }
     }.run();
   }

@@ -39,7 +39,8 @@ CREATE TABLE locks(
   timestampMs BIGINT NOT NULL,
   message VARCHAR,
 
-  UNIQUE(job_key_id)
+  UNIQUE(job_key_id),
+  UNIQUE(token)
 );
 
 CREATE TABLE quotas(
@@ -107,6 +108,15 @@ CREATE TABLE job_updates(
   rollback_on_failure BOOLEAN NOT NULL,
 
   UNIQUE(update_id)
+);
+
+CREATE TABLE job_update_locks(
+  id IDENTITY,
+  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  lock_token VARCHAR NOT NULL REFERENCES locks(token) ON DELETE CASCADE,
+
+  UNIQUE(update_id),
+  UNIQUE(lock_token)
 );
 
 CREATE TABLE job_update_configs(

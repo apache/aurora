@@ -69,10 +69,18 @@ struct SaveHostAttributes {
 
 struct SaveJobUpdate {
   1: api.JobUpdate jobUpdate
+  2: string lockToken
+}
+
+struct StoredJobUpdateDetails {
+  1: api.JobUpdateDetails details
+  /** ID of the lock associated with this update. */
+  2: string lockToken
 }
 
 struct SaveJobUpdateEvent {
   1: api.JobUpdateEvent event
+  /** ID of the lock associated with this update. */
   2: string updateId
 }
 
@@ -147,7 +155,7 @@ struct Snapshot {
   6: SchedulerMetadata schedulerMetadata
   8: set<QuotaConfiguration> quotaConfigurations
   9: set<api.Lock> locks
-  10: set<api.JobUpdateDetails> jobUpdateDetails
+  10: set<StoredJobUpdateDetails> jobUpdateDetails
 }
 
 // A message header that calls out the number of expected FrameChunks to follow to form a complete

@@ -25,10 +25,12 @@ public interface JobUpdater {
    *
    * @param request Job update request.
    * @param user User who initiated the update.
+   * @param lockToken Token for the lock held for this update.
    * @return Saved job update ID.
    * @throws UpdaterException Throws if update fails to start for any reason.
    */
-  String startJobUpdate(IJobUpdateRequest request, String user) throws UpdaterException;
+  String startJobUpdate(IJobUpdateRequest request, String user, String lockToken)
+      throws UpdaterException;
 
   /**
    * Thrown when job update related operation failed.

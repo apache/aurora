@@ -20,8 +20,9 @@ import javax.inject.Inject;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.gen.JobUpdateDetails;
+import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
@@ -58,11 +59,15 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   }
 
   @Override
-  public void saveJobUpdate(IJobUpdate update) {
+  public void saveJobUpdate(IJobUpdate update, String lockToken) {
+    requireNonNull(update);
+    requireNonNull(lockToken);
+
     jobKeyMapper.merge(update.getSummary().getJobKey().newBuilder());
     detailsMapper.insert(update.newBuilder());
 
     String updateId = update.getSummary().getUpdateId();
+    detailsMapper.insertLockToken(updateId, lockToken);
 
     // Insert optional instance update overrides.
     Set<IRange> instanceOverrides =
@@ -113,16 +118,24 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   @Override
   public Optional<IJobUpdateDetails> fetchJobUpdateDetails(final String updateId) {
     return Optional.fromNullable(detailsMapper.selectDetails(updateId))
-        .transform(new Function<JobUpdateDetails, IJobUpdateDetails>() {
+        .transform(new Function<StoredJobUpdateDetails, IJobUpdateDetails>() {
           @Override
-          public IJobUpdateDetails apply(JobUpdateDetails input) {
-            return IJobUpdateDetails.build(input);
+          public IJobUpdateDetails apply(StoredJobUpdateDetails input) {
+            return IJobUpdateDetails.build(input.getDetails());
           }
         });
   }
 
   @Override
-  public List<IJobUpdateDetails> fetchAllJobUpdateDetails() {
-    return IJobUpdateDetails.listFromBuilders(detailsMapper.selectAllDetails());
+  public Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails() {
+    return ImmutableSet.copyOf(detailsMapper.selectAllDetails());
+  }
+
+  @Override
+  public boolean isActive(String updateId) {
+    // We assume here that cascading deletes will cause a lock-update associative row to disappear
+    // when the lock is invalidated.  This further assumes that a lock row is deleted when a lock
+    // is no longer valid.
+    return detailsMapper.selectLockToken(updateId) != null;
   }
 }

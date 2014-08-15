@@ -19,11 +19,11 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import org.apache.aurora.gen.JobUpdate;
-import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.ibatis.annotations.Param;
 
 /**
@@ -34,17 +34,26 @@ import org.apache.ibatis.annotations.Param;
 interface JobUpdateDetailsMapper {
 
   /**
-   * Inserts new {@link JobUpdate}.
+   * Inserts new job update.
    *
    * @param jobUpdate Job update to insert.
    */
   void insert(JobUpdate jobUpdate);
 
   /**
-   * Inserts {@link TaskConfig} entries associated with the current update.
+   * Inserts an association between an update and a lock.
+   *
+   * @param updateId Unique update identifier.
+   * @param lockToken Unique lock identifier, resulting from
+   *        {@link org.apache.aurora.scheduler.storage.entities.ILock#getToken()}.
+   */
+  void insertLockToken(@Param("updateId") String updateId, @Param("lockToken") String lockToken);
+
+  /**
+   * Inserts a task configuration entry for an update.
    *
    * @param updateId Update ID to insert task configs for.
-   * @param taskConfig {@link TaskConfig} to insert.
+   * @param taskConfig task configuration to insert.
    * @param isNew Flag to identify if the task config is existing {@code false} or
    *              desired {@code true}.
    * @param result Container for auto-generated ID of the inserted job update row.
@@ -82,7 +91,7 @@ interface JobUpdateDetailsMapper {
   void truncate();
 
   /**
-   * Gets all {@link JobUpdateSummary} matching the provided {@code query}.
+   * Gets all job update summaries matching the provided {@code query}.
    * All {@code query} fields are ANDed together.
    *
    * @param query Query to filter results by.
@@ -91,18 +100,27 @@ interface JobUpdateDetailsMapper {
   List<JobUpdateSummary> selectSummaries(JobUpdateQuery query);
 
   /**
-   * Gets {@link JobUpdateDetails} for the provided {@code updateId}.
+   * Gets details for the provided {@code updateId}.
    *
    * @param updateId Update ID to get.
-   * @return {@link JobUpdateDetails} instance, if it exists.
+   * @return job update details for the provided update ID, if it exists.
    */
   @Nullable
-  JobUpdateDetails selectDetails(String updateId);
+  StoredJobUpdateDetails selectDetails(String updateId);
 
   /**
-   * Gets all stored {@link JobUpdateDetails}.
+   * Gets all stored job update details.
    *
    * @return All stored job update details.
    */
-  List<JobUpdateDetails> selectAllDetails();
+  Set<StoredJobUpdateDetails> selectAllDetails();
+
+  /**
+   * Gets the token associated with an update.
+   *
+   * @param updateId Update identifier.
+   * @return The associated lock token, or {@code null} if no association exists.
+   */
+  @Nullable
+  String selectLockToken(String updateId);
 }

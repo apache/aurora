@@ -85,10 +85,10 @@ public class DbLockStoreTest {
     });
   }
 
-  private static ILock makeLock(JobKey key) {
+  private static ILock makeLock(JobKey key, String token) {
     return ILock.build(new Lock()
       .setKey(LockKey.job(key))
-      .setToken("lock1")
+      .setToken(token)
       .setUser("testUser")
       .setMessage("Test message")
       .setTimestampMs(12345L));
@@ -108,8 +108,8 @@ public class DbLockStoreTest {
     String job1 = "testJob1";
     String job2 = "testJob2";
 
-    ILock lock1 = makeLock(JobKeys.from(role, env, job1).newBuilder());
-    ILock lock2 = makeLock(JobKeys.from(role, env, job2).newBuilder());
+    ILock lock1 = makeLock(JobKeys.from(role, env, job1).newBuilder(), "token1");
+    ILock lock2 = makeLock(JobKeys.from(role, env, job2).newBuilder(), "token2");
 
     saveLocks(lock1, lock2);
     assertLocks(lock1, lock2);
@@ -126,7 +126,7 @@ public class DbLockStoreTest {
     String env = "testEnv";
     String job = "testJob";
 
-    ILock lock = makeLock(JobKeys.from(role, env, job).newBuilder());
+    ILock lock = makeLock(JobKeys.from(role, env, job).newBuilder(), "token1");
 
     saveLocks(lock);
     try {
@@ -145,7 +145,7 @@ public class DbLockStoreTest {
     String env = "testEnv";
     String job = "testJob";
 
-    ILock lock = makeLock(JobKeys.from(role, env, job).newBuilder());
+    ILock lock = makeLock(JobKeys.from(role, env, job).newBuilder(), "token1");
 
     saveLocks(lock);
     removeLocks(lock);
@@ -163,8 +163,8 @@ public class DbLockStoreTest {
     String env = "testEnv";
     String job = "testJob";
 
-    ILock lock1 = makeLock(JobKeys.from(role1, env, job).newBuilder());
-    ILock lock2 = makeLock(JobKeys.from(role2, env, job).newBuilder());
+    ILock lock1 = makeLock(JobKeys.from(role1, env, job).newBuilder(), "token1");
+    ILock lock2 = makeLock(JobKeys.from(role2, env, job).newBuilder(), "token2");
 
     assertEquals(Optional.<ILock>absent(), getLock(lock1.getKey()));
     assertEquals(Optional.<ILock>absent(), getLock(lock2.getKey()));
@@ -189,8 +189,8 @@ public class DbLockStoreTest {
     String job1 = "testJob1";
     String job2 = "testJob2";
 
-    ILock lock1 = makeLock(JobKeys.from(role, env, job1).newBuilder());
-    ILock lock2 = makeLock(JobKeys.from(role, env, job2).newBuilder());
+    ILock lock1 = makeLock(JobKeys.from(role, env, job1).newBuilder(), "token1");
+    ILock lock2 = makeLock(JobKeys.from(role, env, job2).newBuilder(), "token2");
 
     saveLocks(lock1, lock2);
     assertLocks(lock1, lock2);
@@ -204,5 +204,19 @@ public class DbLockStoreTest {
     });
 
     assertLocks();
+  }
+
+  @Test
+  public void testDuplicateToken() throws Exception {
+    ILock lock = makeLock(JobKeys.from("role", "env", "job1").newBuilder(), "token1");
+    saveLocks(lock);
+    try {
+      saveLocks(makeLock(JobKeys.from("role", "env", "job2").newBuilder(), "token1"));
+      fail();
+    } catch (StorageException e) {
+      // Expected.
+    }
+
+    assertLocks(lock);
   }
 }

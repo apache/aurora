@@ -27,7 +27,6 @@ import com.twitter.common.util.testing.FakeClock;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.JobUpdateDetails;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -35,6 +34,7 @@ import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.StoredJob;
+import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
@@ -165,7 +165,7 @@ public class RecoveryTest extends EasyMockTest {
         .setQuotaConfigurations(ImmutableSet.<QuotaConfiguration>of())
         .setTasks(ImmutableSet.<ScheduledTask>builder().add(tasks).build())
         .setLocks(ImmutableSet.<Lock>of())
-        .setJobUpdateDetails(ImmutableSet.<JobUpdateDetails>of());
+        .setJobUpdateDetails(ImmutableSet.<StoredJobUpdateDetails>of());
   }
 
   private static ScheduledTask makeTask(String taskId) {

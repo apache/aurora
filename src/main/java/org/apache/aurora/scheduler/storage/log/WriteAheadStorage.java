@@ -281,11 +281,11 @@ class WriteAheadStorage extends ForwardingStore implements
   }
 
   @Override
-  public void saveJobUpdate(IJobUpdate update) {
+  public void saveJobUpdate(IJobUpdate update, String lockToken) {
     requireNonNull(update);
 
-    write(Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder())));
-    jobUpdateStore.saveJobUpdate(update);
+    write(Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder(), lockToken)));
+    jobUpdateStore.saveJobUpdate(update, lockToken);
   }
 
   @Override

@@ -14,9 +14,11 @@
 package org.apache.aurora.scheduler.storage;
 
 import java.util.List;
+import java.util.Set;
 
 import com.google.common.base.Optional;
 
+import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
@@ -47,10 +49,20 @@ public interface JobUpdateStore {
 
   /**
    * Fetches a read-only view of all job update details available in the store.
+   * TODO(wfarner): Generate immutable wrappers for storage.thrift structs, use an immutable object
+   *                here.
    *
    * @return A read-only view of all job update details.
    */
-  List<IJobUpdateDetails> fetchAllJobUpdateDetails();
+  Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails();
+
+  /**
+   * Determines whether an update ID represents a currently-active job update.
+   *
+   * @param updateId Job update ID.
+   * @return {@code true} if this update has exclusive access to the job, otherwise {@code false}.
+   */
+  boolean isActive(String updateId);
 
   interface Mutable extends JobUpdateStore {
 
@@ -69,8 +81,9 @@ public interface JobUpdateStore {
      * without having at least one {@link IJobUpdateEvent} present in the store will return empty.
      *
      * @param update Update to save.
+     * @param lockToken UUID identifying the lock associated with this update.
      */
-    void saveJobUpdate(IJobUpdate update);
+    void saveJobUpdate(IJobUpdate update, String lockToken);
 
     /**
      * Saves a new job update event.

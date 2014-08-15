@@ -20,6 +20,7 @@ import java.util.Set;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -150,7 +151,12 @@ public class ForwardingStore implements
   }
 
   @Override
-  public List<IJobUpdateDetails> fetchAllJobUpdateDetails() {
+  public Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails() {
     return jobUpdateStore.fetchAllJobUpdateDetails();
+  }
+
+  @Override
+  public boolean isActive(String updateId) {
+    return jobUpdateStore.isActive(updateId);
   }
 }

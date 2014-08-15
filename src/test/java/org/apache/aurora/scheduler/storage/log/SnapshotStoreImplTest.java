@@ -42,6 +42,7 @@ import org.apache.aurora.gen.storage.QuotaConfiguration;
 import org.apache.aurora.gen.storage.SchedulerMetadata;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.StoredJob;
+import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ResourceAggregates;
@@ -117,8 +118,10 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .andReturn(ImmutableSet.of(IJobConfiguration.build(job.getJobConfiguration())));
     expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(frameworkId));
     expect(storageUtil.lockStore.fetchLocks()).andReturn(ImmutableSet.of(lock));
+    String lockToken = "token";
     expect(storageUtil.updateStore.fetchAllJobUpdateDetails())
-        .andReturn(ImmutableList.of(updateDetails));
+        .andReturn(ImmutableSet.of(
+            new StoredJobUpdateDetails(updateDetails.newBuilder(), lockToken)));
 
     expectDataWipe();
     storageUtil.taskStore.saveTasks(tasks);
@@ -129,7 +132,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         IJobConfiguration.build(job.getJobConfiguration()));
     storageUtil.schedulerStore.saveFrameworkId(frameworkId);
     storageUtil.lockStore.saveLock(lock);
-    storageUtil.updateStore.saveJobUpdate(updateDetails.getUpdate());
+    storageUtil.updateStore.saveJobUpdate(updateDetails.getUpdate(), lockToken);
     storageUtil.updateStore.saveJobUpdateEvent(
         Iterables.getOnlyElement(updateDetails.getUpdateEvents()),
         updateId);
@@ -147,7 +150,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setJobs(ImmutableSet.of(job))
         .setSchedulerMetadata(metadata)
         .setLocks(ImmutableSet.of(lock.newBuilder()))
-        .setJobUpdateDetails(ImmutableSet.of(updateDetails.newBuilder()));
+        .setJobUpdateDetails(ImmutableSet.of(
+            new StoredJobUpdateDetails(updateDetails.newBuilder(), lockToken)));
 
     assertEquals(expected, snapshotStore.createSnapshot());
 

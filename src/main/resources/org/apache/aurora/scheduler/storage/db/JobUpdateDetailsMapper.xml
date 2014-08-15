@@ -17,6 +17,14 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.apache.aurora.scheduler.storage.db.JobUpdateDetailsMapper">
+  <sql id="selectUpdateIdentity">
+      (
+        SELECT id
+        FROM job_updates
+        WHERE update_id = #{updateId}
+      )
+  </sql>
+
   <insert id="insert">
     INSERT INTO job_updates (
       job_key_id,
@@ -49,17 +57,23 @@
     )
   </insert>
 
+  <insert id="insertLockToken">
+    INSERT INTO job_update_locks (
+      update_id,
+      lock_token
+    ) VALUES (
+      <include refid="selectUpdateIdentity"/>,
+      #{lockToken}
+    )
+  </insert>
+
   <insert id="insertTaskConfig" useGeneratedKeys="true" keyColumn="id" keyProperty="result.id">
     INSERT INTO job_update_configs (
       update_id,
       task_config,
       is_new
     ) VALUES (
-      (
-        SELECT id
-        FROM job_updates
-        WHERE update_id = #{updateId}
-      ),
+      <include refid="selectUpdateIdentity"/>,
       #{config, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.TaskConfigTypeHandler},
       #{isNew}
     )
@@ -85,11 +99,7 @@
       last
     ) VALUES
     <foreach item="element" collection="ranges" open="(" separator="),(" close=")">
-      (
-        SELECT id
-        FROM job_updates
-        WHERE update_id = #{updateId}
-      ),
+      <include refid="selectUpdateIdentity"/>,
       #{element.first},
       #{element.last}
     </foreach>
@@ -150,12 +160,12 @@
     <association property="configuration" resultMap="jobUpdateConfigurationMap" columnPrefix="juc_"/>
   </resultMap>
 
-  <resultMap id="jobUpdateDetailsMap" type="org.apache.aurora.gen.JobUpdateDetails">
+  <resultMap id="jobUpdateDetailsMap" type="org.apache.aurora.gen.storage.StoredJobUpdateDetails">
     <id column="u_id" />
-    <association property="update" resultMap="jobUpdateMap" />
+    <association property="details.update" resultMap="jobUpdateMap" />
     <!--Using notNullColumn attribute is required below as LEFT JOIN with empty right side
     will produce an empty row.-->
-    <collection property="updateEvents"
+    <collection property="details.updateEvents"
                 ofType="org.apache.aurora.gen.JobUpdateEvent"
                 columnPrefix="e_"
                 notNullColumn="id">
@@ -164,7 +174,7 @@
               column="status"
               typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler" />
     </collection>
-    <collection property="instanceEvents"
+    <collection property="details.instanceEvents"
                 ofType="org.apache.aurora.gen.JobInstanceUpdateEvent"
                 columnPrefix="i_"
                 notNullColumn="id">
@@ -262,7 +272,7 @@
       attributes used in associations.
       For example: jusm_just_status maps to JobUpdateSummary/JobUpdateState/status field.-->
   <sql id="unscoped_details_select">
-     SELECT
+    SELECT
       u.id AS u_id,
       u.id AS juc_juse_id,
       u.update_id AS jusm_update_id,
@@ -297,7 +307,8 @@
       ci.last AS juc_itc_r_last,
       io.id AS juc_juse_r_id,
       io.first AS juc_juse_r_first,
-      io.last AS juc_juse_r_last
+      io.last AS juc_juse_r_last,
+      l.lock_token AS lock_token
     FROM job_updates AS u
     INNER JOIN job_keys AS j ON j.id = u.job_key_id
     INNER JOIN job_update_configs AS cn ON cn.update_id = u.id AND cn.is_new = TRUE
@@ -307,6 +318,7 @@
     LEFT OUTER JOIN job_updates_to_instance_overrides AS io ON io.update_id = u.id
     LEFT OUTER JOIN job_update_events AS e ON e.update_id = u.id
     LEFT OUTER JOIN job_instance_update_events AS i ON i.update_id = u.id
+    LEFT OUTER JOIN job_update_locks AS l on l.update_id = u.id
   </sql>
 
   <select id="selectDetails" resultMap="jobUpdateDetailsMap">
@@ -315,10 +327,16 @@
     ORDER BY e_timestamp_ms, i_timestamp_ms
   </select>
 
-  <!--Order by ID to facilitate proper re-insertion during recovery.-->
   <select id="selectAllDetails" resultMap="jobUpdateDetailsMap">
     <include refid="unscoped_details_select"/>
-    ORDER BY u_id
+  </select>
+
+  <select id="selectLockToken" resultType="String">
+    SELECT
+      lock_token
+    FROM job_update_locks AS l
+    INNER JOIN job_updates u ON l.update_id = u.id
+    WHERE u.update_id = #{id}
   </select>
 
   <delete id="truncate">

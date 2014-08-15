@@ -101,8 +101,10 @@ class JobUpdaterImpl implements JobUpdater {
   }
 
   @Override
-  public String startJobUpdate(final IJobUpdateRequest request, final String user)
-      throws UpdaterException {
+  public String startJobUpdate(
+      final IJobUpdateRequest request,
+      final String user,
+      final String lockToken) throws UpdaterException {
 
     return storage.write(new MutateWork<String, UpdaterException>() {
       @Override
@@ -125,7 +127,7 @@ class JobUpdaterImpl implements JobUpdater {
             .setTimestampMs(clock.nowMillis()));
 
         try {
-          storeProvider.getJobUpdateStore().saveJobUpdate(update);
+          storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
           storeProvider.getJobUpdateStore().saveJobUpdateEvent(event, updateId);
         } catch (StorageException e) {
           throw new UpdaterException("Failed to start update.", e);

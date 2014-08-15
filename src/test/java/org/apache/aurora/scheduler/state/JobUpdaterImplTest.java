@@ -59,6 +59,7 @@ public class JobUpdaterImplTest extends EasyMockTest {
   private static final IJobKey JOB = JobKeys.from("role", "env", "name");
   private static final Identity IDENTITY = new Identity("role", "user");
   private static final Long TIMESTAMP = 1234L;
+  private static final String LOCK = "lock token";
 
   private JobUpdater updater;
   private StorageTestUtil storageUtil;
@@ -106,12 +107,14 @@ public class JobUpdaterImplTest extends EasyMockTest {
         oldTask6,
         oldTask7);
 
-    storageUtil.updateStore.saveJobUpdate(update);
+    storageUtil.updateStore.saveJobUpdate(update, LOCK);
     storageUtil.updateStore.saveJobUpdateEvent(buildUpdateEvent(), UPDATE_ID);
 
     control.replay();
 
-    assertEquals(UPDATE_ID, updater.startJobUpdate(buildJobRequest(update), IDENTITY.getUser()));
+    assertEquals(
+        UPDATE_ID,
+        updater.startJobUpdate(buildJobRequest(update), IDENTITY.getUser(), LOCK));
   }
 
   @Test(expected = UpdaterException.class)
@@ -128,12 +131,12 @@ public class JobUpdaterImplTest extends EasyMockTest {
 
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB).active());
 
-    storageUtil.updateStore.saveJobUpdate(update);
+    storageUtil.updateStore.saveJobUpdate(update, LOCK);
     expectLastCall().andThrow(new Storage.StorageException("fail"));
 
     control.replay();
 
-    updater.startJobUpdate(buildJobRequest(update), IDENTITY.getUser());
+    updater.startJobUpdate(buildJobRequest(update), IDENTITY.getUser(), LOCK);
   }
 
   private static IJobUpdateRequest buildJobRequest(IJobUpdate update) {
