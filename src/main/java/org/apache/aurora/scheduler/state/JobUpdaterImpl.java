@@ -20,15 +20,11 @@ import java.util.Set;
 import javax.inject.Inject;
 
 import com.google.common.base.Function;
-import com.google.common.base.Functions;
-import com.google.common.collect.ContiguousSet;
-import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Range;
-import com.google.common.collect.RangeSet;
-import com.google.common.collect.TreeRangeSet;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.InstanceTaskConfig;
@@ -37,6 +33,7 @@ import org.apache.aurora.gen.JobUpdateConfiguration;
 import org.apache.aurora.gen.JobUpdateEvent;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
+import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -60,38 +57,6 @@ class JobUpdaterImpl implements JobUpdater {
   private final Storage storage;
   private final UUIDGenerator uuidGenerator;
   private final Clock clock;
-
-  private static final Function<Integer, Range<Integer>> INSTANCE_ID_TO_RANGE =
-      new Function<Integer, Range<Integer>>() {
-        @Override
-        public Range<Integer> apply(Integer id) {
-          return Range.closed(id, id).canonical(DiscreteDomain.integers());
-        }
-      };
-
-  private static final Function<Collection<Range<Integer>>, Set<org.apache.aurora.gen.Range>>
-      REDUCE_RANGES = new Function<Collection<Range<Integer>>, Set<org.apache.aurora.gen.Range>>() {
-        @Override
-        public Set<org.apache.aurora.gen.Range> apply(Collection<Range<Integer>> input) {
-          RangeSet<Integer> rangeSet = TreeRangeSet.create();
-          for (Range<Integer> range : input) {
-            rangeSet.add(range);
-          }
-
-          ImmutableSet.Builder<org.apache.aurora.gen.Range> builder = ImmutableSet.builder();
-          for (Range<Integer> range : rangeSet.asRanges()) {
-            // Canonical range of integers is closedOpen, which makes extracting upper bound
-            // a problem without resorting to subtraction. The workaround is to convert range
-            // into Contiguous set and get first/last.
-            ContiguousSet<Integer> set = ContiguousSet.create(range, DiscreteDomain.integers());
-            builder.add(new org.apache.aurora.gen.Range(
-                set.first(),
-                set.last()));
-          }
-
-          return builder.build();
-        }
-      };
 
   @Inject
   JobUpdaterImpl(Storage storage, Clock clock, UUIDGenerator uuidGenerator) {
@@ -140,6 +105,14 @@ class JobUpdaterImpl implements JobUpdater {
     });
   }
 
+  private static final Function<Collection<Integer>, Set<Range<Integer>>> TO_RANGES  =
+      new Function<Collection<Integer>, Set<Range<Integer>>>() {
+        @Override
+        public Set<Range<Integer>> apply(Collection<Integer> numbers) {
+          return Numbers.toRanges(numbers);
+        }
+      };
+
   private Set<InstanceTaskConfig> buildOldTaskConfigs(
       IJobKey jobKey,
       StoreProvider storeProvider) {
@@ -147,17 +120,28 @@ class JobUpdaterImpl implements JobUpdater {
     Set<IScheduledTask> tasks =
         storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active());
 
-    Map<ITaskConfig, Set<org.apache.aurora.gen.Range>> rangesByTask = Maps.transformValues(
-        Multimaps.transformValues(
-            Multimaps.index(tasks, Tasks.SCHEDULED_TO_INFO),
-            Functions.compose(INSTANCE_ID_TO_RANGE, Tasks.SCHEDULED_TO_INSTANCE_ID)).asMap(),
-        REDUCE_RANGES);
+    // Group tasks by their configurations.
+    Multimap<ITaskConfig, IScheduledTask> tasksByConfig =
+        Multimaps.index(tasks, Tasks.SCHEDULED_TO_INFO);
+
+    // Translate tasks into instance IDs.
+    Multimap<ITaskConfig, Integer> instancesByConfig =
+        Multimaps.transformValues(tasksByConfig, Tasks.SCHEDULED_TO_INSTANCE_ID);
+
+    // Reduce instance IDs into contiguous ranges.
+    Map<ITaskConfig, Set<Range<Integer>>> rangesByConfig =
+        Maps.transformValues(instancesByConfig.asMap(), TO_RANGES);
 
     ImmutableSet.Builder<InstanceTaskConfig> builder = ImmutableSet.builder();
-    for (Map.Entry<ITaskConfig, Set<org.apache.aurora.gen.Range>> entry : rangesByTask.entrySet()) {
+    for (Map.Entry<ITaskConfig, Set<Range<Integer>>> entry : rangesByConfig.entrySet()) {
+      ImmutableSet.Builder<org.apache.aurora.gen.Range> ranges = ImmutableSet.builder();
+      for (Range<Integer> range : entry.getValue()) {
+        ranges.add(new org.apache.aurora.gen.Range(range.lowerEndpoint(), range.upperEndpoint()));
+      }
+
       builder.add(new InstanceTaskConfig()
           .setTask(entry.getKey().newBuilder())
-          .setInstances(entry.getValue()));
+          .setInstances(ranges.build()));
     }
 
     return builder.build();
