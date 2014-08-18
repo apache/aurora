@@ -58,6 +58,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_ADDED;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -165,8 +166,8 @@ public class DBJobUpdateStoreTest {
   public void testSaveInstanceEvents() {
     String updateId = "u3";
     IJobUpdate update = makeJobUpdate(JOB, updateId);
-    IJobInstanceUpdateEvent event1 = makeJobInstanceEvent(0, 125L, JobUpdateAction.ADD_INSTANCE);
-    IJobInstanceUpdateEvent event2 = makeJobInstanceEvent(1, 126L, JobUpdateAction.ADD_INSTANCE);
+    IJobInstanceUpdateEvent event1 = makeJobInstanceEvent(0, 125L, INSTANCE_ADDED);
+    IJobInstanceUpdateEvent event2 = makeJobInstanceEvent(1, 126L, INSTANCE_ADDED);
 
     saveUpdate(update, "lock");
     assertEquals(populateExpected(update), getUpdateDetails(updateId).get().getUpdate());
@@ -195,7 +196,7 @@ public class DBJobUpdateStoreTest {
 
   @Test(expected = StorageException.class)
   public void testSaveInstanceEventWithoutUpdateFails() {
-    saveJobInstanceEvent(makeJobInstanceEvent(0, 125L, JobUpdateAction.ADD_INSTANCE), "u1");
+    saveJobInstanceEvent(makeJobInstanceEvent(0, 125L, INSTANCE_ADDED), "u1");
   }
 
   @Test
@@ -247,13 +248,13 @@ public class DBJobUpdateStoreTest {
 
     IJobUpdateEvent jEvent11 = makeJobUpdateEvent(JobUpdateStatus.ROLLING_FORWARD, 456L);
     IJobUpdateEvent jEvent12 = makeJobUpdateEvent(JobUpdateStatus.ERROR, 457L);
-    IJobInstanceUpdateEvent iEvent11 = makeJobInstanceEvent(1, 451L, JobUpdateAction.ADD_INSTANCE);
-    IJobInstanceUpdateEvent iEvent12 = makeJobInstanceEvent(2, 452L, JobUpdateAction.ADD_INSTANCE);
+    IJobInstanceUpdateEvent iEvent11 = makeJobInstanceEvent(1, 451L, INSTANCE_ADDED);
+    IJobInstanceUpdateEvent iEvent12 = makeJobInstanceEvent(2, 452L, INSTANCE_ADDED);
 
     IJobUpdateEvent jEvent21 = makeJobUpdateEvent(JobUpdateStatus.ROLL_FORWARD_PAUSED, 567L);
     IJobUpdateEvent jEvent22 = makeJobUpdateEvent(JobUpdateStatus.ABORTED, 568L);
-    IJobInstanceUpdateEvent iEvent21 = makeJobInstanceEvent(3, 561L, JobUpdateAction.ADD_INSTANCE);
-    IJobInstanceUpdateEvent iEvent22 = makeJobInstanceEvent(4, 562L, JobUpdateAction.ADD_INSTANCE);
+    IJobInstanceUpdateEvent iEvent21 = makeJobInstanceEvent(3, 561L, INSTANCE_ADDED);
+    IJobInstanceUpdateEvent iEvent22 = makeJobInstanceEvent(4, 562L, INSTANCE_ADDED);
 
     saveJobEvent(jEvent11, updateId1);
     saveJobEvent(jEvent12, updateId1);
@@ -290,7 +291,7 @@ public class DBJobUpdateStoreTest {
     IJobUpdateEvent updateEvent = IJobUpdateEvent.build(
         new JobUpdateEvent(JobUpdateStatus.ROLLING_FORWARD, 123L));
     IJobInstanceUpdateEvent instanceEvent = IJobInstanceUpdateEvent.build(
-        new JobInstanceUpdateEvent(0, 125L, JobUpdateAction.ADD_INSTANCE));
+        new JobInstanceUpdateEvent(0, 125L, INSTANCE_ADDED));
 
     saveUpdate(update, "lock");
     saveJobEvent(updateEvent, updateId);

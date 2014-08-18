@@ -536,8 +536,32 @@ enum JobUpdateStatus {
 
 /** Job update actions that can be applied to job instances. */
 enum JobUpdateAction {
-  // TODO(maxim): Define when instance update part is completed.
-  ADD_INSTANCE = 1
+  /** An instance was updated and the updater declared the instance healthy. */
+  INSTANCE_UPDATED = 1,
+
+  /** A new instance was added. */
+  INSTANCE_ADDED = 2,
+
+  /** The instance was removed to match the instance count. */
+  INSTANCE_REMOVED = 3,
+
+  /** An instance was not updated because it already matches the new TaskConfig. */
+  INSTANCE_SKIPPED = 4,
+
+  /** An update was performed or attempted, but had to be rolled back due to update failure. */
+  INSTANCE_ROLLED_BACK = 5,
+
+  /** An update is in progress. */
+  INSTANCE_UPDATING = 6,
+
+  /** An instance is being rolled back */
+  INSTANCE_ROLLING_BACK = 7,
+
+  /** An instance update was attempted but failed and was not rolled back. */
+  INSTANCE_UPDATE_FAILED = 8,
+
+  /** An instance rollback was attempted but failed. */
+  INSTANCE_ROLLBACK_FAILED = 9
 }
 
 /** Job update thresholds and limits. */

@@ -808,7 +808,7 @@ public class LogStorageTest extends EasyMockTest {
   @Test
   public void testSaveJobInstanceUpdateEvent() throws Exception {
     final IJobInstanceUpdateEvent event = IJobInstanceUpdateEvent.build(new JobInstanceUpdateEvent()
-        .setAction(JobUpdateAction.ADD_INSTANCE)
+        .setAction(JobUpdateAction.INSTANCE_ADDED)
         .setTimestampMs(12345L)
         .setInstanceId(0));
 
