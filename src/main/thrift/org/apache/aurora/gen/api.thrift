@@ -768,6 +768,7 @@ struct GetPendingReasonResult {
 
 /** Result of the startUpdate call. */
 struct StartJobUpdateResult {
+  /** Job update ID. */
   1: string updateId
 }
 
@@ -947,19 +948,19 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   Response replaceCronTemplate(1: JobConfiguration config, 2: Lock lock, 3: SessionKey session)
 
   /** Starts update of the existing service job. Not implemented yet. */
-  Response startJobUpdate(
-      1: JobUpdateRequest request,
-      2: Lock lock,
-      3: SessionKey session)
+  Response startJobUpdate(1: JobUpdateRequest request, 2: SessionKey session)
 
-  /** Pauses the update progress. Can be resumed by resumeUpdate call. Not implemented yet. */
-  Response pauseJobUpdate(1: string updateId, 2: Lock lock, 3: SessionKey session)
+  /**
+   * Pauses the update progress for the specified job. Can be resumed by resumeUpdate call.
+   * Not implemented yet.
+   */
+  Response pauseJobUpdate(1: JobKey jobKey, 2: SessionKey session)
 
-  /** Resumes progress of a previously paused update. Not implemented yet. */
-  Response resumeJobUpdate(1: string updateId, 2: Lock lock, 3: SessionKey session)
+  /** Resumes progress of a previously paused job update. Not implemented yet. */
+  Response resumeJobUpdate(1: JobKey jobKey, 2: SessionKey session)
 
-  /** Permanently aborts the update. Does not remove the update history. Not implemented yet. */
-  Response abortJobUpdate(1: string updateId, 2: Lock lock, 3: SessionKey session)
+  /** Permanently aborts the job update. Does not remove the update history. Not implemented yet. */
+  Response abortJobUpdate(1: JobKey jobKey, 2: SessionKey session)
 }
 
 struct InstanceConfigRewrite {

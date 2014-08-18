@@ -1258,7 +1258,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @Override
   public Response startJobUpdate(
       JobUpdateRequest mutableRequest,
-      Lock mutableLock,
       SessionKey session) {
 
     // TODO(maxim): validate JobUpdateRequest fields.
@@ -1288,7 +1287,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       @Override
       public Response apply(MutableStoreProvider storeProvider) {
         // TODO(wfarner): Move lock acquisition down into the update controller once introduced.
-        ILock lock;
+        final ILock lock;
         try {
           lock = lockManager.acquireLock(
               ILockKey.build(LockKey.job(request.getJobKey().newBuilder())),
@@ -1311,17 +1310,17 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response pauseJobUpdate(String updateId, Lock lock, SessionKey session) {
+  public Response pauseJobUpdate(JobKey jobKey, SessionKey session) {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public Response resumeJobUpdate(String updateId, Lock lock, SessionKey session) {
+  public Response resumeJobUpdate(JobKey jobKey, SessionKey session) {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public Response abortJobUpdate(String updateId, Lock lock, SessionKey session) {
+  public Response abortJobUpdate(JobKey jobKey, SessionKey session) {
     throw new UnsupportedOperationException("Not implemented");
   }
 

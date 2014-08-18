@@ -149,6 +149,8 @@ class AuroraClientAPI(object):
 
     Arguments:
     job_key - AuroraJobKey instance.
+
+    Returns response object with acquired job lock.
     """
     self._assert_valid_job_key(job_key)
     return self._scheduler_proxy.acquireLock(LockKey(job=job_key.to_thrift()))
@@ -160,17 +162,20 @@ class AuroraClientAPI(object):
 
     Arguments:
     lock - Previously acquired Lock instance.
+
+    Returns response object.
     """
     self._assert_valid_lock(lock)
     return self._scheduler_proxy.releaseLock(lock, LockValidation.CHECKED)
 
-  def start_job_update(self, config, lock, instances=None):
+  def start_job_update(self, config, instances=None):
     """Requests Scheduler to start job update process.
 
     Arguments:
     config - AuroraConfig instance with update details.
-    lock - Job Lock instance to ensure exclusive job mutation access.
     instances - Optional list of instances to restrict update to.
+
+    Returns response object with update ID and acquired job lock.
     """
     try:
       settings = UpdaterConfig(**config.update_config().get()).to_thrift_update_settings(instances)
@@ -184,7 +189,7 @@ class AuroraClientAPI(object):
         taskConfig=config.job().taskConfig
     )
 
-    return self._scheduler_proxy.startJobUpdate(request, lock)
+    return self._scheduler_proxy.startJobUpdate(request)
 
   def cancel_update(self, job_key):
     """Cancel the update represented by job_key. Returns whether or not the cancellation was

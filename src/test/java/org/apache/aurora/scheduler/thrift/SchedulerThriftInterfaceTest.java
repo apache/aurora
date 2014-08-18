@@ -1819,7 +1819,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     Response response =
-        assertOkResponse(thrift.startJobUpdate(request, LOCK.newBuilder(), SESSION));
+        assertOkResponse(thrift.startJobUpdate(request, SESSION));
     assertEquals(UPDATE_ID, response.getResult().getStartJobUpdateResult().getUpdateId());
   }
 
@@ -1829,7 +1829,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, false);
 
     control.replay();
-    assertResponse(AUTH_FAILED, thrift.startJobUpdate(request, LOCK.newBuilder(), SESSION));
+    assertResponse(AUTH_FAILED, thrift.startJobUpdate(request, SESSION));
   }
 
   @Test
@@ -1838,7 +1838,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
 
     control.replay();
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, LOCK.newBuilder(), SESSION));
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
   }
 
   @Test
@@ -1849,7 +1849,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(LOCK_ERROR, thrift.startJobUpdate(request, LOCK.newBuilder(), SESSION));
+    assertResponse(LOCK_ERROR, thrift.startJobUpdate(request, SESSION));
   }
 
   @Test
@@ -1862,7 +1862,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, LOCK.newBuilder(), SESSION));
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
   }
 
   private static JobUpdateRequest createJobRequest(TaskConfig config) {

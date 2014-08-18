@@ -135,12 +135,11 @@ class TestJobUpdateApis(unittest.TestCase):
   def test_start_job_update(self):
     """Test successful job update start."""
     api, mock_proxy = self.mock_api()
-    lock = Lock()
     task_config = TaskConfig()
     mock_proxy.startJobUpdate.return_value = self.create_simple_success_response()
 
-    api.start_job_update(self.mock_job_config(), lock)
-    mock_proxy.startJobUpdate.assert_called_once_with(self.create_update_request(task_config), lock)
+    api.start_job_update(self.mock_job_config())
+    mock_proxy.startJobUpdate.assert_called_once_with(self.create_update_request(task_config))
 
   def test_start_job_update_fails_parse_update_config(self):
     """Test start_job_update fails to parse invalid UpdateConfig."""
@@ -149,4 +148,4 @@ class TestJobUpdateApis(unittest.TestCase):
     self.assertRaises(
         AuroraClientAPI.UpdateConfigError,
         api.start_job_update,
-        self.mock_job_config(error=ValueError()), None)
+        self.mock_job_config(error=ValueError()))

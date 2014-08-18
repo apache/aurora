@@ -263,24 +263,24 @@ class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
     self.make_scheduler_proxy().getJobUpdateDetails('update_id')
 
   def test_startJobUpdate(self):
-    self.mock_thrift_client.startJobUpdate(IsA(JobUpdateRequest), IsA(Lock), IsA(SessionKey))
+    self.mock_thrift_client.startJobUpdate(IsA(JobUpdateRequest), IsA(SessionKey))
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().startJobUpdate(JobUpdateRequest(), Lock())
+    self.make_scheduler_proxy().startJobUpdate(JobUpdateRequest())
 
   def test_pauseJobUpdate(self):
-    self.mock_thrift_client.pauseJobUpdate('update_id', IsA(Lock), IsA(SessionKey))
+    self.mock_thrift_client.pauseJobUpdate('update_id', IsA(SessionKey))
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().pauseJobUpdate('update_id', Lock())
+    self.make_scheduler_proxy().pauseJobUpdate('update_id')
 
   def test_resumeJobUpdate(self):
-    self.mock_thrift_client.resumeJobUpdate('update_id', IsA(Lock), IsA(SessionKey))
+    self.mock_thrift_client.resumeJobUpdate('update_id', IsA(SessionKey))
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().resumeJobUpdate('update_id', Lock())
+    self.make_scheduler_proxy().resumeJobUpdate('update_id')
 
   def test_abortJobUpdate(self):
-    self.mock_thrift_client.abortJobUpdate('update_id', IsA(Lock), IsA(SessionKey))
+    self.mock_thrift_client.abortJobUpdate('update_id', IsA(SessionKey))
     self.mox.ReplayAll()
-    self.make_scheduler_proxy().abortJobUpdate('update_id', Lock())
+    self.make_scheduler_proxy().abortJobUpdate('update_id')
 
 
 @pytest.mark.parametrize('scheme', ('http', 'https'))
