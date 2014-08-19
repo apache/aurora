@@ -66,10 +66,21 @@ interface JobUpdateController {
   void abort(IJobKey job) throws UpdateStateException;
 
   /**
-   * Notifies the updater that an instance has changed state.
+   * Notifies the updater that the state of an instance has changed. A state change could also mean
+   * deletion.
    *
    * @param instance Identifier fo the instance whose state has changed.
-   * @param deleted {@code true} if the state change was a task deletion, otherwise {@code false}.
    */
-  void handleStateChange(IInstanceKey instance, boolean deleted);
+  void instanceChangedState(IInstanceKey instance);
+
+  /**
+   * Restores an active update for a job that has been halted due to the scheduler restarting.
+   * This is distinct from {@link #resume(IJobKey)} in that it does not change the state of the
+   * update, but resumes after a restart of the scheduler process.
+   *
+   * @param job Job to resume.
+   * @throws UpdateStateException If the update cannot resume, such as if the update is already
+   *                              active.
+   */
+  void systemResume(IJobKey job) throws UpdateStateException;
 }

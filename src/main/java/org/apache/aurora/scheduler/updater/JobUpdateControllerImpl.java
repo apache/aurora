@@ -42,7 +42,12 @@ public class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   @Override
-  public void handleStateChange(IInstanceKey instance, boolean deleted) {
+  public void instanceChangedState(IInstanceKey instance) {
+    throw new UnsupportedOperationException("Not yet implemented.");
+  }
+
+  @Override
+  public void systemResume(IJobKey job) throws UpdateStateException {
     throw new UnsupportedOperationException("Not yet implemented.");
   }
 }
