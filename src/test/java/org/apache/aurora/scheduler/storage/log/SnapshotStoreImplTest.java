@@ -119,7 +119,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(frameworkId));
     expect(storageUtil.lockStore.fetchLocks()).andReturn(ImmutableSet.of(lock));
     String lockToken = "token";
-    expect(storageUtil.updateStore.fetchAllJobUpdateDetails())
+    expect(storageUtil.jobUpdateStore.fetchAllJobUpdateDetails())
         .andReturn(ImmutableSet.of(
             new StoredJobUpdateDetails(updateDetails.newBuilder(), lockToken)));
 
@@ -132,11 +132,11 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         IJobConfiguration.build(job.getJobConfiguration()));
     storageUtil.schedulerStore.saveFrameworkId(frameworkId);
     storageUtil.lockStore.saveLock(lock);
-    storageUtil.updateStore.saveJobUpdate(updateDetails.getUpdate(), lockToken);
-    storageUtil.updateStore.saveJobUpdateEvent(
+    storageUtil.jobUpdateStore.saveJobUpdate(updateDetails.getUpdate(), lockToken);
+    storageUtil.jobUpdateStore.saveJobUpdateEvent(
         Iterables.getOnlyElement(updateDetails.getUpdateEvents()),
         updateId);
-    storageUtil.updateStore.saveJobInstanceUpdateEvent(
+    storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(
         Iterables.getOnlyElement(updateDetails.getInstanceEvents()),
         updateId);
 
@@ -164,6 +164,6 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     storageUtil.attributeStore.deleteHostAttributes();
     storageUtil.jobStore.deleteJobs();
     storageUtil.lockStore.deleteLocks();
-    storageUtil.updateStore.deleteAllUpdatesAndEvents();
+    storageUtil.jobUpdateStore.deleteAllUpdatesAndEvents();
   }
 }

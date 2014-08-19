@@ -91,8 +91,9 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
 
   @Test
   public void testSchedulerStartup() throws Exception {
-    expect(storageUtil.updateStore.fetchJobUpdateSummaries(JobUpdateEventSubscriber.ACTIVE_QUERY))
-        .andReturn(ImmutableList.of(SUMMARY));
+    expect(storageUtil.jobUpdateStore.fetchJobUpdateSummaries(
+        JobUpdateEventSubscriber.ACTIVE_QUERY)).andReturn(ImmutableList.of(SUMMARY));
+
     updater.systemResume(JOB_A);
 
     control.replay();
@@ -102,8 +103,8 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
 
   @Test
   public void testSchedulerStartupNoUpdates() throws Exception {
-    expect(storageUtil.updateStore.fetchJobUpdateSummaries(JobUpdateEventSubscriber.ACTIVE_QUERY))
-        .andReturn(ImmutableList.<IJobUpdateSummary>of());
+    expect(storageUtil.jobUpdateStore.fetchJobUpdateSummaries(
+        JobUpdateEventSubscriber.ACTIVE_QUERY)).andReturn(ImmutableList.<IJobUpdateSummary>of());
 
     control.replay();
 

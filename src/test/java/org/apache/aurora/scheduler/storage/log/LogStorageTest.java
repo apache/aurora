@@ -149,7 +149,7 @@ public class LogStorageTest extends EasyMockTest {
             storageUtil.lockStore,
             storageUtil.quotaStore,
             storageUtil.attributeStore,
-            storageUtil.updateStore);
+            storageUtil.jobUpdateStore);
 
     stream = createMock(Stream.class);
     streamMatcher = LogOpMatcher.matcherFor(stream);
@@ -769,7 +769,7 @@ public class LogStorageTest extends EasyMockTest {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWriteOperation();
-        storageUtil.updateStore.saveJobUpdate(update, lockToken);
+        storageUtil.jobUpdateStore.saveJobUpdate(update, lockToken);
         streamMatcher.expectTransaction(
             Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder(), lockToken)))
             .andReturn(position);
@@ -792,7 +792,7 @@ public class LogStorageTest extends EasyMockTest {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWriteOperation();
-        storageUtil.updateStore.saveJobUpdateEvent(event, UPDATE_ID);
+        storageUtil.jobUpdateStore.saveJobUpdateEvent(event, UPDATE_ID);
         streamMatcher.expectTransaction(Op.saveJobUpdateEvent(new SaveJobUpdateEvent(
             event.newBuilder(),
             UPDATE_ID))).andReturn(position);
@@ -816,7 +816,7 @@ public class LogStorageTest extends EasyMockTest {
       @Override
       protected void setupExpectations() throws Exception {
         storageUtil.expectWriteOperation();
-        storageUtil.updateStore.saveJobInstanceUpdateEvent(event, UPDATE_ID);
+        storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(event, UPDATE_ID);
         streamMatcher.expectTransaction(Op.saveJobInstanceUpdateEvent(
             new SaveJobInstanceUpdateEvent(event.newBuilder(), UPDATE_ID))).andReturn(position);
       }

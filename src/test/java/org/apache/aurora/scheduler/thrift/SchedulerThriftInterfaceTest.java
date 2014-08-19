@@ -67,6 +67,8 @@ import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateConfiguration;
+import org.apache.aurora.gen.JobUpdateDetails;
+import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateSummary;
@@ -119,6 +121,9 @@ import org.apache.aurora.scheduler.storage.backup.StorageBackup;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -1822,6 +1827,63 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertEquals(
         nonProdConsumed.newBuilder(),
         response.getResult().getGetQuotaResult().getNonProdConsumption());
+  }
+
+  @Test
+  public void testGetJobUpdateSummaries() throws Exception {
+    JobUpdateQuery query = new JobUpdateQuery().setRole(ROLE);
+    List<JobUpdateSummary> summaries = createJobUpdateSummaries(5);
+    expect(storageUtil.jobUpdateStore.fetchJobUpdateSummaries(IJobUpdateQuery.build(query)))
+        .andReturn(IJobUpdateSummary.listFromBuilders(summaries));
+
+    control.replay();
+
+    Response response = assertOkResponse(thrift.getJobUpdateSummaries(query));
+    assertEquals(
+        summaries,
+        response.getResult().getGetJobUpdateSummariesResult().getUpdateSummaries());
+  }
+
+  @Test
+  public void testGetJobUpdateDetails() throws Exception {
+    String id = "id";
+    JobUpdateDetails details = createJobUpdateDetails();
+    expect(storageUtil.jobUpdateStore.fetchJobUpdateDetails(id))
+        .andReturn(Optional.of(IJobUpdateDetails.build(details)));
+
+    control.replay();
+
+    Response response = assertOkResponse(thrift.getJobUpdateDetails(id));
+    assertEquals(
+        details,
+        response.getResult().getGetJobUpdateDetailsResult().getDetails());
+  }
+
+  @Test
+  public void testGetJobUpdateDetailsInvalidId() throws Exception {
+    String id = "id";
+    expect(storageUtil.jobUpdateStore.fetchJobUpdateDetails(id))
+        .andReturn(Optional.<IJobUpdateDetails>absent());
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.getJobUpdateDetails(id));
+  }
+
+  private static List<JobUpdateSummary> createJobUpdateSummaries(int count) {
+    ImmutableList.Builder<JobUpdateSummary> builder = ImmutableList.builder();
+    for (int i = 0; i < count; i++) {
+      builder.add(new JobUpdateSummary()
+          .setUpdateId("id" + i)
+          .setJobKey(JOB_KEY.newBuilder())
+          .setUser(USER));
+    }
+    return builder.build();
+  }
+
+  private static JobUpdateDetails createJobUpdateDetails() {
+    return new JobUpdateDetails()
+        .setUpdate(new JobUpdate().setSummary(createJobUpdateSummaries(1).get(0)));
   }
 
   @Test

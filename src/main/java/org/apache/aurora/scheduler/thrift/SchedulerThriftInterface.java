@@ -58,6 +58,8 @@ import org.apache.aurora.gen.ConfigSummary;
 import org.apache.aurora.gen.ConfigSummaryResult;
 import org.apache.aurora.gen.DrainHostsResult;
 import org.apache.aurora.gen.EndMaintenanceResult;
+import org.apache.aurora.gen.GetJobUpdateDetailsResult;
+import org.apache.aurora.gen.GetJobUpdateSummariesResult;
 import org.apache.aurora.gen.GetJobsResult;
 import org.apache.aurora.gen.GetLocksResult;
 import org.apache.aurora.gen.GetPendingReasonResult;
@@ -129,6 +131,8 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
+import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
@@ -136,7 +140,10 @@ import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -1433,13 +1440,35 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response getJobUpdateSummaries(JobUpdateQuery updateQuery) throws TException {
-    throw new UnsupportedOperationException("Not implemented");
+  public Response getJobUpdateSummaries(final JobUpdateQuery mutableQuery) {
+    final IJobUpdateQuery query = IJobUpdateQuery.build(requireNonNull(mutableQuery));
+    return okResponse(Result.getJobUpdateSummariesResult(
+        new GetJobUpdateSummariesResult().setUpdateSummaries(IJobUpdateSummary.toBuildersList(
+            storage.weaklyConsistentRead(new Work.Quiet<List<IJobUpdateSummary>>() {
+              @Override
+              public List<IJobUpdateSummary> apply(StoreProvider storeProvider) {
+                return storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(query);
+              }
+            })))));
   }
 
   @Override
-  public Response getJobUpdateDetails(String updateId) {
-    throw new UnsupportedOperationException("Not implemented");
+  public Response getJobUpdateDetails(final String updateId) {
+    requireNonNull(updateId);
+    Optional<IJobUpdateDetails> details =
+        storage.weaklyConsistentRead(new Work.Quiet<Optional<IJobUpdateDetails>>() {
+          @Override
+          public Optional<IJobUpdateDetails> apply(StoreProvider storeProvider) {
+            return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(updateId);
+          }
+        });
+
+    if (details.isPresent()) {
+      return okResponse(Result.getJobUpdateDetailsResult(
+          new GetJobUpdateDetailsResult().setDetails(details.get().newBuilder())));
+    } else {
+      return addMessage(emptyResponse(), INVALID_REQUEST, "Invalid update ID:" + updateId);
+    }
   }
 
   @VisibleForTesting
