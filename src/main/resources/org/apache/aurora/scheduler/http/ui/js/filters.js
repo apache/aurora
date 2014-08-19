@@ -78,7 +78,7 @@
 
   auroraUI.filter('toLocalTime', function () {
     return function (timestamp, timezone) {
-      return moment(timestamp).format('MM/DD h:mm:ss') + ' LOCAL';
+      return moment(timestamp).format('MM/DD HH:mm:ss') + ' LOCAL';
     };
   });
 })();
