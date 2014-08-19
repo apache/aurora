@@ -20,9 +20,9 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 /**
  * TODO(wfarner): Implement this as part of AURORA-610.
  */
-public class JobUpdateControllerImpl implements JobUpdateController {
+class JobUpdateControllerImpl implements JobUpdateController {
   @Override
-  public void start(IJobUpdate update) throws UpdateStateException {
+  public void start(IJobUpdate update, String lockToken) throws UpdateStateException {
     throw new UnsupportedOperationException("Not yet implemented.");
   }
 

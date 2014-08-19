@@ -55,6 +55,7 @@ import org.apache.aurora.scheduler.sla.SlaModule;
 import org.apache.aurora.scheduler.state.StateModule;
 import org.apache.aurora.scheduler.stats.AsyncStatsModule;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
+import org.apache.aurora.scheduler.updater.UpdaterModule;
 import org.apache.mesos.Scheduler;
 import org.apache.zookeeper.data.ACL;
 
@@ -117,6 +118,7 @@ class AppModule extends AbstractModule {
     install(new SchedulerModule());
     install(new StateModule());
     install(new SlaModule());
+    install(new UpdaterModule());
 
     bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
   }

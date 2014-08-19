@@ -11,20 +11,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.state;
+package org.apache.aurora.scheduler.updater;
 
-import java.util.UUID;
+import javax.inject.Singleton;
+
+import com.google.inject.AbstractModule;
 
 /**
- * Wraps {@link java.util.UUID#randomUUID()} to facilitate unit testing.
+ * Binding module for scheduling logic and higher-level state management.
  */
-public interface UUIDGenerator {
-  UUID createNew();
+public class UpdaterModule extends AbstractModule {
 
-  class UUIDGeneratorImpl implements UUIDGenerator {
-    @Override
-    public UUID createNew() {
-      return UUID.randomUUID();
-    }
+  @Override
+  protected void configure() {
+    bind(JobUpdateController.class).to(JobUpdateControllerImpl.class);
+    bind(JobUpdateControllerImpl.class).in(Singleton.class);
   }
 }

@@ -20,17 +20,18 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 /**
  * A controller that exposes commands to initiate and modify active job updates.
  */
-interface JobUpdateController {
+public interface JobUpdateController {
 
   /**
    * Initiates an update.
    *
    * @param update Instructions for what job to update, and how to update it.
+   * @param lockToken UUID identifying the lock associated with this update.
    * @throws UpdateStateException If the update cannot be started, for example if the instructions
    *                              are invalid, or if there is already an in-progress update for the
    *                              job.
    */
-  void start(IJobUpdate update) throws UpdateStateException;
+  void start(IJobUpdate update, String lockToken) throws UpdateStateException;
 
   /**
    * Pauses an in-progress update.
