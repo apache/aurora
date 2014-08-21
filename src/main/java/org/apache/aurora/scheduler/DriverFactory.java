@@ -100,7 +100,13 @@ public interface DriverFactory extends Function<String, SchedulerDriver> {
             + "DriverFactory.java for more information.")
     private static final Arg<Boolean> REQUIRE_SLAVE_CHECKPOINT = Arg.create(false);
 
-    private static final String EXECUTOR_USER = "root";
+    @CmdLine(name = "executor_user",
+        help = "User to start the executor. Defaults to \"root\". "
+            + "Set this to an unprivileged user if the mesos master was started with \"--no-root_submissions\". "
+            + "If set to anything other than \"root\", the executor will ignore the \"role\" setting for jobs "
+            + "since it can't use setuid() anymore. This means that all your jobs will run under "
+            + "the specified user and the user has to exist on the mesos slaves.")
+    private static final Arg<String> EXECUTOR_USER = Arg.create("root");
 
     private static final String TWITTER_FRAMEWORK_NAME = "TwitterScheduler";
 
@@ -132,7 +138,7 @@ public interface DriverFactory extends Function<String, SchedulerDriver> {
       LOG.info("Connecting to mesos master: " + MESOS_MASTER_ADDRESS.get());
 
       FrameworkInfo.Builder frameworkInfo = FrameworkInfo.newBuilder()
-          .setUser(EXECUTOR_USER)
+          .setUser(EXECUTOR_USER.get())
           .setName(TWITTER_FRAMEWORK_NAME)
           .setCheckpoint(REQUIRE_SLAVE_CHECKPOINT.get())
           .setFailoverTimeout(FRAMEWORK_FAILOVER_TIMEOUT.get().as(Time.SECONDS));
