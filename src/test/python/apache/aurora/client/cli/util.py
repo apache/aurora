@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import textwrap
 import unittest
 
 from mock import Mock
@@ -201,6 +202,28 @@ HELLO_WORLD = Job(
 jobs = [HELLO_WORLD]
 """
 
+  UNBOUND_CONFIG = textwrap.dedent("""\
+      HELLO_WORLD = Job(
+        name = '%(job)s',
+        role = '%(role)s',
+        cluster = '{{cluster_binding}}',
+        environment = '%(env)s',
+        instances = '{{instances_binding}}',
+        update_config = UpdateConfig(
+          batch_size = 1,
+          restart_threshold = 60,
+          watch_secs = 45,
+          max_per_shard_failures = 2,
+        ),
+        task = Task(
+          name = 'test',
+          processes = [Process(name = 'hello_world', cmdline = 'echo {{thermos.ports[http]}}')],
+          resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
+        )
+      )
+      jobs = [HELLO_WORLD]
+""")
+
   TEST_ROLE = 'bozo'
 
   TEST_ENV = 'test'
@@ -223,6 +246,13 @@ jobs = [HELLO_WORLD]
     """Create a config from the template"""
     return cls.CONFIG_BASE % {'job': job, 'role': role, 'env': env, 'cluster': cluster,
         'inner': filler}
+
+  @classmethod
+  def get_unbound_test_config(cls, role=None, env=None, job=None):
+    result = cls.UNBOUND_CONFIG % {'job': job or cls.TEST_JOB, 'role': role or cls.TEST_ROLE,
+        'env': env or cls.TEST_ENV}
+    print("CONFIG:===========================\n%s\n=============================" % result)
+    return result
 
   @classmethod
   def get_valid_config(cls):

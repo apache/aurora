@@ -188,8 +188,8 @@ BATCH_OPTION = CommandOption('--batch-size', type=int, default=5,
 
 BIND_OPTION = CommandOption('--bind', type=str, default=[], dest='bindings',
     action='append',
-    metavar="pystachio-binding",
-    help='Bind a thermos mustache variable name to a value. '
+    metavar="var=value",
+    help='Bind a pystachio variable name to a value. '
     'Multiple flags may be used to specify multiple values.')
 
 

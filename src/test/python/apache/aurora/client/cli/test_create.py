@@ -223,3 +223,35 @@ class TestClientCreateCommand(AuroraClientCommandTest):
             fp.name])
         assert result == EXIT_UNKNOWN_ERROR
         assert api.create_job.call_count == 0
+
+  def test_simple_successful_create_job_with_bindings(self):
+    """Run a test of the "create" command against a mocked-out API:
+    Verifies that the creation command sends the right API RPCs, and performs the correct
+    tests on the result."""
+
+    mock_context = FakeAuroraCommandContext()
+    with contextlib.nested(
+        patch('threading._Event.wait'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
+      mock_query = self.create_mock_query()
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.PENDING))
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+      api = mock_context.get_api('west')
+      api.create_job.return_value = self.get_createjob_response()
+      mock_context.enable_reveal_errors()
+
+      # This is the real test: invoke create as if it had been called by the command line.
+      with temporary_file() as fp:
+        fp.write(self.get_unbound_test_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'create', '--wait-until=RUNNING', '--bind', 'cluster_binding=west',
+            '--bind', 'instances_binding=20', 'west/bozo/test/hello',
+            fp.name])
+
+      # Now check that the right API calls got made.
+      # Check that create_job was called exactly once, with an AuroraConfig parameter.
+      self.assert_create_job_called(api)
+      self.assert_scheduler_called(api, mock_query, 2)

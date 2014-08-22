@@ -38,6 +38,22 @@ from gen.apache.aurora.api.ttypes import ResponseCode
 PartialJobKey = namedtuple('PartialJobKey', ['cluster', 'role', 'env', 'name'])
 
 
+def bindings_to_list(bindings):
+  """Pystachio takes bindings in the form of a list of dictionaries. Each pystachio binding
+  becomes another dictionary in the list. So we need to convert the bindings specified by
+  the user from a list of "name=value" formatted strings to a list of the dictionaries 
+  expected by pystachio.
+  """
+  result = []
+  for b in bindings:
+    binding_parts = b.split("=")
+    if len(binding_parts) != 2:
+      raise ValueError('Binding parameter must be formatted name=value')
+    result.append({binding_parts[0]: binding_parts[1]})
+  return result
+
+
+
 class AuroraCommandContext(Context):
   """A context object used by Aurora commands to manage command processing state
   and common operations.
@@ -65,11 +81,12 @@ class AuroraCommandContext(Context):
       # file without double-reading.
       with open(config_file, "r") as fp:
         self.print_log(TRANSCRIPT, "Config: %s" % fp.readlines())
+      bindings = bindings_to_list(self.options.bindings) if self.options.bindings else None
       return get_config(
         jobname,
         config_file,
         self.options.read_json,
-        self.options.bindings,
+        bindings,
         select_cluster=jobkey.cluster,
         select_role=jobkey.role,
         select_env=jobkey.env)
