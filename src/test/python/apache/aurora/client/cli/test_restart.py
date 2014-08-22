@@ -156,8 +156,6 @@ class TestRestartCommand(AuroraClientCommandTest):
         mock_log.assert_called_with(20, 'Error executing command: %s', 'Damn')
 
   def test_restart_failed_restart(self):
-    # Test the client-side updater logic in its simplest case: everything succeeds, and no rolling
-    # updates.
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
     self.setup_mock_scheduler_for_simple_restart(mock_api)
@@ -179,3 +177,73 @@ class TestRestartCommand(AuroraClientCommandTest):
         mock_scheduler_proxy.restartShards.assert_called_with(JobKey(environment=self.TEST_ENV,
             role=self.TEST_ROLE, name=self.TEST_JOB), [0, 1, 2, 3, 4], None)
         assert result == EXIT_API_ERROR
+
+  MOCK_OUT = []
+  MOCK_ERR = []
+
+  @classmethod
+  def reset_mock_io(cls):
+    cls.MOCK_OUT = []
+    cls.MOCK_ERR = []
+
+  @classmethod
+  def mock_print_out(cls, msg, indent=0):
+    indent_str = " " * indent
+    cls.MOCK_OUT.append("%s%s" % (indent_str, msg))
+
+  @classmethod
+  def mock_print_err(cls, msg, indent=0):
+    indent_str = " " * indent
+    cls.MOCK_ERR.append("%s%s" % (indent_str, msg))
+
+  def test_restart_simple_output(self):
+    self.reset_mock_io()
+    # Test the client-side restart logic in its simplest case: everything succeeds
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_health_check = self.setup_health_checks(mock_api)
+    self.setup_mock_scheduler_for_simple_restart(mock_api)
+    with contextlib.nested(
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
+            return_value=mock_health_check),
+        patch('time.time', side_effect=functools.partial(self.fake_time, self)),
+        patch('threading._Event.wait'),
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.print_out',
+            side_effect=self.mock_print_out),
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.print_err',
+            side_effect=self.mock_print_err)
+    ):
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello', fp.name])
+        print(self.MOCK_OUT)
+        assert self.MOCK_OUT == ['Job west/bozo/test/hello restarted successfully']
+        assert self.MOCK_ERR == []
+
+  def test_restart_failed_restart_output(self):
+    self.reset_mock_io()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_health_check = self.setup_health_checks(mock_api)
+    self.setup_mock_scheduler_for_simple_restart(mock_api)
+    mock_scheduler_proxy.restartShards.return_value = self.create_error_response()
+    with contextlib.nested(
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
+            return_value=mock_health_check),
+        patch('time.time', side_effect=functools.partial(self.fake_time, self)),
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.print_out',
+            side_effect=self.mock_print_out),
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.print_err',
+            side_effect=self.mock_print_err),
+        patch('threading._Event.wait')):
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello', fp.name])
+      assert self.MOCK_OUT == []
+      assert self.MOCK_ERR == ['Error restarting job west/bozo/test/hello; see log for details']

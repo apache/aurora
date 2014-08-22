@@ -102,6 +102,10 @@ class AuroraCommandContext(Context):
     self.open_page(synthesize_url(api.scheduler_proxy.scheduler_client().url, jobkey.role,
         jobkey.env, jobkey.name))
 
+  def get_job_page(self, api, jobkey):
+    return synthesize_url(api.scheduler_proxy.scheduler_client().url, jobkey.role,
+        jobkey.env, jobkey.name)
+
   def open_scheduler_page(self, cluster, role, env, name):
     """Open a scheduler page"""
     api = self.get_api(cluster)

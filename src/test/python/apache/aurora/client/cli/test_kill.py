@@ -332,3 +332,76 @@ class TestClientKillCommand(AuroraClientCommandTest):
       mock_scheduler_proxy.killTasks.assert_called_with(
         TaskQuery(jobName='hello', environment='test', instanceIds=frozenset([0, 2, 4, 5, 6]),
             owner=Identity(role='bozo')), None)
+
+  def test_killall_job_output(self):
+    """Test kill output."""
+    mock_context = FakeAuroraCommandContext()
+    mock_scheduler_proxy = Mock()
+    with contextlib.nested(
+        patch('threading._Event.wait'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+
+      api = mock_context.get_api('west')
+      mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_call_result()
+      api.kill_job.return_value = self.get_kill_job_response()
+      mock_scheduler_proxy.killTasks.return_value = self.get_kill_job_response()
+      mock_context.add_expected_status_query_result(self.create_status_call_result(
+          self.create_mock_task(ScheduleStatus.KILLED)))
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'killall', '--no-batching', '--config=%s' % fp.name,
+            'west/bozo/test/hello'])
+      assert mock_context.get_out() == ['job killall succeeded']
+      assert mock_context.get_err() == []
+
+  def test_kill_job_with_instances_batched_output(self):
+    """Test kill client-side API logic."""
+    mock_context = FakeAuroraCommandContext()
+    with contextlib.nested(
+        patch('threading._Event.wait'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      api = mock_context.get_api('west')
+      status_result = self.create_status_call_result()
+      mock_context.add_expected_status_query_result(status_result)
+      api.kill_job.return_value = self.get_kill_job_response()
+      mock_context.add_expected_status_query_result(self.create_status_call_result(
+          self.create_mock_task(ScheduleStatus.KILLED)))
+
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'kill', '--config=%s' % fp.name, 'west/bozo/test/hello/0,2,4-6'])
+
+    assert mock_context.get_out() == ['Successfully killed shards [0, 2, 4, 5, 6]',
+        'job kill succeeded']
+    assert mock_context.get_err() == []
+
+  def test_kill_job_with_instances_batched_maxerrors_output(self):
+    """Test kill client-side API logic."""
+    mock_context = FakeAuroraCommandContext()
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      api = mock_context.get_api('west')
+      status_result = self.create_status_call_result()
+      mock_context.add_expected_status_query_result(status_result)
+      api.kill_job.return_value = self.create_error_response()
+
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'kill', '--max-total-failures=1', '--config=%s' % fp.name,
+            'west/bozo/test/hello/0,2,4-13'])
+
+      assert mock_context.get_out() == []
+      print(mock_context.get_err())
+      assert mock_context.get_err() == [
+          'Kill of shards [0, 2, 4, 5, 6] failed with error; see log for details',
+          'Kill of shards [7, 8, 9, 10, 11] failed with error; see log for details',
+          'Exceeded maximum number of errors while killing instances']

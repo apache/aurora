@@ -117,8 +117,10 @@ class CreateJobCommand(Verb):
     resp = api.create_job(config)
     context.log_response(resp)
     if resp.responseCode == ResponseCode.INVALID_REQUEST:
+      context.print_err("job create failed because job not found")
       raise context.CommandError(EXIT_INVALID_PARAMETER, "Job not found")
     elif resp.responseCode == ResponseCode.ERROR:
+      context.print_err("job create failed because of scheduler error")
       raise context.CommandError(EXIT_COMMAND_FAILURE, "Error reported by scheduler; see log for details")
     if context.options.open_browser:
       context.open_job_page(api, config)
@@ -126,6 +128,8 @@ class CreateJobCommand(Verb):
       JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.running_or_finished)
     elif context.options.wait_until == "FINISHED":
       JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.terminal)
+    context.print_out("job create succeeded: job url=%s" %
+        context.get_job_page(api, context.options.jobspec))
     return EXIT_OK
 
 
@@ -309,12 +313,14 @@ class AbstractKillCommand(Verb):
       context.log_response(resp)
       if resp.responseCode is not ResponseCode.OK or self.wait_kill_tasks(
           context, api.scheduler_proxy, job, batch) is not EXIT_OK:
-        context.print_log(logging.INFO,
-            "Kill of shards %s failed with error; see log for details" % batch)
+        context.print_err("Kill of shards %s failed with error; see log for details" % batch)
         errors += 1
         if errors > context.options.max_total_failures:
+          context.print_err("Exceeded maximum number of errors while killing instances")
           raise context.CommandError(EXIT_COMMAND_FAILURE,
                "Exceeded maximum number of errors while killing instances")
+      else:
+        context.print_out("Successfully killed shards %s" % batch)
     if errors > 0:
       context.print_err("Warning: Errors occurred during batch kill")
       raise context.CommandError(EXIT_COMMAND_FAILURE, "Errors occurred while killing instances")
@@ -352,6 +358,7 @@ class KillCommand(AbstractKillCommand):
       self.kill_in_batches(context, job, instances_arg)
     if context.options.open_browser:
       context.open_job_page(api, context.options.jobspec)
+    context.print_out("job kill succeeded")
     return EXIT_OK
 
 
@@ -380,6 +387,7 @@ class KillAllJobCommand(AbstractKillCommand):
       self.kill_in_batches(context, job, None)
     if context.options.open_browser:
       context.open_job_page(api, job)
+    context.print_out("job killall succeeded")
     return EXIT_OK
 
 
@@ -480,6 +488,10 @@ Restarts are fully controlled client-side, so aborting halts the restart."""
     resp = api.restart(job, instances, updater_config,
         context.options.healthcheck_interval_seconds, config=config)
 
+    if resp.responseCode != ResponseCode.OK:
+      context.print_err("Error restarting job %s; see log for details" % str(job))
+    else:
+      context.print_out("Job %s restarted successfully" % str(job))
     context.check_and_log_response(resp)
     if context.options.open_browser:
       context.open_job_page(api, context.options.jobspec)
