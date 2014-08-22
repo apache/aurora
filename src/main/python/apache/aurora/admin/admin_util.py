@@ -19,6 +19,9 @@ import os
 import subprocess
 from uuid import uuid1
 
+from twitter.common.quantity import Amount, Time
+from twitter.common.quantity.parse_simple import parse_time
+
 from apache.aurora.client.base import die
 
 """Admin client utility functions shared between admin and maintenance modules."""
@@ -27,6 +30,10 @@ from apache.aurora.client.base import die
 LOGGER_NAME = 'aurora_admin'
 logger = logging.getLogger(LOGGER_NAME)
 CLIENT_ID = uuid1()
+
+# Default SLA limits
+SLA_UPTIME_PERCENTAGE_LIMIT = 95
+SLA_UPTIME_DURATION_LIMIT = Amount(30, Time.MINUTES)
 
 
 def log_admin_message(sev, msg, *args, **kwargs):
@@ -46,17 +53,55 @@ def log_admin_message(sev, msg, *args, **kwargs):
 
 
 FILENAME_OPTION = optparse.Option(
-  '--filename',
-  dest='filename',
-  default=None,
-  help='Name of the file with hostnames')
+    '--filename',
+    dest='filename',
+    default=None,
+    help='Name of the file with hostnames')
 
 
 HOSTS_OPTION = optparse.Option(
-  '--hosts',
-  dest='hosts',
-  default=None,
-  help='Comma separated list of hosts')
+    '--hosts',
+    dest='hosts',
+    default=None,
+    help='Comma separated list of hosts')
+
+
+POST_DRAIN_SCRIPT_OPTION = optparse.Option(
+    '--post_drain_script',
+    dest='post_drain_script',
+    default=None,
+    help='Path to a script to run for each host if needed.')
+
+OVERRIDE_SLA_PERCENTAGE_OPTION = optparse.Option(
+    '--override_percentage',
+    dest='percentage',
+    default=None,
+    help='Percentage of tasks required to be up all the time within the duration. '
+         'Default value:%s. DO NOT override default value unless absolutely necessary! '
+         'See sla_probe_hosts and sla_list_safe_domain commands '
+         'for more details on SLA.' % SLA_UPTIME_PERCENTAGE_LIMIT)
+
+OVERRIDE_SLA_DURATION_OPTION = optparse.Option(
+    '--override_duration',
+    dest='duration',
+    default=None,
+    help='Time interval (now - value) for the percentage of up tasks. Format: XdYhZmWs. '
+         'Default value:%s. DO NOT override default value unless absolutely necessary! '
+         'See sla_probe_hosts and sla_list_safe_domain commands '
+         'for more details on SLA.' % SLA_UPTIME_DURATION_LIMIT)
+
+OVERRIDE_SLA_REASON_OPTION = optparse.Option(
+    '--override_reason',
+    dest='reason',
+    default=None,
+    help='Reason for overriding default SLA values. Provide details including the '
+         'maintenance ticket number.')
+
+UNSAFE_SLA_HOSTS_FILE_OPTION = optparse.Option(
+    '--unsafe_hosts_file',
+    dest='unsafe_hosts_filename',
+    default=None,
+    help='Output file to write host names that did not pass SLA check.')
 
 
 def parse_sla_percentage(percentage):
@@ -147,6 +192,39 @@ def parse_script(filename):
     return callback
   else:
     return None
+
+
+def parse_and_validate_sla_overrides(options, hostnames):
+  """Parses and validates host SLA override 3-tuple (percentage, duration, reason).
+
+  In addition, logs an admin message about overriding default SLA values.
+
+  :param options: command line options
+  :type options: list of app.option
+  :param hostnames: host names override is issued to
+  :type hostnames: list of string
+  :rtype: a tuple of: override percentage (float) and override duration (Amount)
+  """
+  has_override = bool(options.percentage) or bool(options.duration) or bool(options.reason)
+  all_overrides = bool(options.percentage) and bool(options.duration) and bool(options.reason)
+  if has_override != all_overrides:
+    die('All --override_* options are required when attempting to override default SLA values.')
+
+  percentage = parse_sla_percentage(options.percentage) if options.percentage else None
+  duration = parse_time(options.duration) if options.duration else None
+  if options.reason:
+    log_admin_message(
+      logging.WARNING,
+      'Default SLA values (percentage: %s, duration: %s) are overridden for the following '
+      'hosts: %s. New percentage: %s, duration: %s, override reason: %s' % (
+        SLA_UPTIME_PERCENTAGE_LIMIT,
+        SLA_UPTIME_DURATION_LIMIT,
+        hostnames,
+        percentage,
+        duration,
+        options.reason))
+
+  return percentage or SLA_UPTIME_PERCENTAGE_LIMIT, duration or SLA_UPTIME_DURATION_LIMIT
 
 
 def print_results(results):

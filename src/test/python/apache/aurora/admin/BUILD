@@ -36,6 +36,7 @@ python_tests(name = 'admin_util',
   sources = ['test_admin_util.py'],
   dependencies = [
     pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.quantity'),
     pants('3rdparty/python:twitter.common.contextutil'),
     pants('src/main/python/apache/aurora/admin:util'),
   ],

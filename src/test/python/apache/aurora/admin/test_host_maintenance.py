@@ -117,13 +117,6 @@ class TestHostMaintenance(unittest.TestCase):
     mock_maintenance_status.assert_called_once_with(test_hosts)
     mock_warning.assert_called_once_with('%s is DRAINING or in DRAINED' % TEST_HOSTNAMES[2])
 
-  def test_operate_on_hosts(self):
-    mock_callback = mock.Mock()
-    test_hosts = Hosts(TEST_HOSTNAMES)
-    maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
-    maintenance._operate_on_hosts(test_hosts, mock_callback)
-    assert mock_callback.call_count == 3
-
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._complete_maintenance",
     spec=HostMaintenance._complete_maintenance)
   def test_end_maintenance(self, mock_complete_maintenance):
@@ -140,39 +133,23 @@ class TestHostMaintenance(unittest.TestCase):
     maintenance.start_maintenance(TEST_HOSTNAMES)
     mock_api.assert_called_once_with(Hosts(set(TEST_HOSTNAMES)))
 
-  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._complete_maintenance",
-    spec=HostMaintenance._complete_maintenance)
-  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._operate_on_hosts",
-    spec=HostMaintenance._operate_on_hosts)
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._drain_hosts",
     spec=HostMaintenance._drain_hosts)
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance.start_maintenance",
     spec=HostMaintenance.start_maintenance)
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._check_sla",
     spec=HostMaintenance._check_sla)
-  def test_perform_maintenance(self, mock_check_sla, mock_start_maintenance,
-      mock_drain_hosts, mock_operate_on_hosts, mock_complete_maintenance):
-    mock_callback = mock.Mock()
+  def test_perform_maintenance(self, mock_check_sla, mock_start_maintenance, mock_drain_hosts):
     mock_check_sla.return_value = set()
     mock_start_maintenance.return_value = TEST_HOSTNAMES
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
-    maintenance.perform_maintenance(TEST_HOSTNAMES, callback=mock_callback)
+    maintenance.perform_maintenance(TEST_HOSTNAMES)
     mock_start_maintenance.assert_called_once_with(TEST_HOSTNAMES)
     assert mock_check_sla.call_count == 3
     assert mock_drain_hosts.call_count == 3
     assert mock_drain_hosts.call_args_list == [
         mock.call(Hosts(set([hostname]))) for hostname in TEST_HOSTNAMES]
-    assert mock_operate_on_hosts.call_count == 3
-    assert mock_operate_on_hosts.call_args_list == [
-        mock.call(Hosts(set([hostname])), mock_callback) for hostname in TEST_HOSTNAMES]
-    assert mock_complete_maintenance.call_count == 3
-    assert mock_complete_maintenance.call_args_list == [
-        mock.call(Hosts(set([hostname]))) for hostname in TEST_HOSTNAMES]
 
-  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._complete_maintenance",
-              spec=HostMaintenance._complete_maintenance)
-  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._operate_on_hosts",
-              spec=HostMaintenance._operate_on_hosts)
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._drain_hosts",
               spec=HostMaintenance._drain_hosts)
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance.start_maintenance",
@@ -180,8 +157,7 @@ class TestHostMaintenance(unittest.TestCase):
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._check_sla",
               spec=HostMaintenance._check_sla)
   def test_perform_maintenance_partial_sla_failure(self, mock_check_sla, mock_start_maintenance,
-                               mock_drain_hosts, mock_operate_on_hosts, mock_complete_maintenance):
-    mock_callback = mock.Mock()
+                               mock_drain_hosts):
     failed_host = 'us-west-001.example.com'
     mock_check_sla.return_value = set([failed_host])
     mock_start_maintenance.return_value = TEST_HOSTNAMES
@@ -190,9 +166,8 @@ class TestHostMaintenance(unittest.TestCase):
 
     with temporary_file() as fp:
       with group_by_rack():
-        maintenance.perform_maintenance(
+        drained = maintenance.perform_maintenance(
             TEST_HOSTNAMES,
-            callback=mock_callback,
             grouping_function='by_rack',
             output_file=fp.name)
 
@@ -201,15 +176,11 @@ class TestHostMaintenance(unittest.TestCase):
           assert failed_host in content
 
         mock_start_maintenance.assert_called_once_with(TEST_HOSTNAMES)
+        assert len(drained) == 2
+        assert failed_host not in drained
         assert mock_check_sla.call_count == 1
         assert mock_drain_hosts.call_count == 1
         assert mock_drain_hosts.call_args_list == [mock.call(Hosts(drained_hosts))]
-        assert mock_operate_on_hosts.call_count == 1
-        assert mock_operate_on_hosts.call_args_list == [
-            mock.call(Hosts(drained_hosts), mock_callback)]
-        assert mock_complete_maintenance.call_count == 2
-        assert mock_complete_maintenance.call_args_list == [
-            mock.call(Hosts(set([failed_host]))), mock.call(Hosts(drained_hosts))]
 
   @mock.patch("apache.aurora.client.api.AuroraClientAPI.maintenance_status",
       spec=AuroraClientAPI.maintenance_status)

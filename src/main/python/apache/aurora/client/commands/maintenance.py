@@ -15,15 +15,18 @@
 import logging
 
 from twitter.common import app, log
-from twitter.common.quantity.parse_simple import parse_time
 
 from apache.aurora.admin.admin_util import (
     FILENAME_OPTION,
     HOSTS_OPTION,
-    log_admin_message,
+    OVERRIDE_SLA_DURATION_OPTION,
+    OVERRIDE_SLA_PERCENTAGE_OPTION,
+    OVERRIDE_SLA_REASON_OPTION,
+    parse_and_validate_sla_overrides,
     parse_hostnames,
     parse_script,
-    parse_sla_percentage
+    POST_DRAIN_SCRIPT_OPTION,
+    UNSAFE_SLA_HOSTS_FILE_OPTION
 )
 from apache.aurora.admin.host_maintenance import HostMaintenance
 from apache.aurora.client.base import die, get_grouping_or_die, GROUPING_OPTION, requires
@@ -34,9 +37,18 @@ from apache.aurora.common.clusters import CLUSTERS
 @app.command_option(FILENAME_OPTION)
 @app.command_option(HOSTS_OPTION)
 @requires.exactly('cluster')
-def start_maintenance_hosts(cluster):
-  """usage: start_maintenance_hosts {--filename=filename | --hosts=hosts}
-                                    cluster
+def host_deactivate(cluster):
+  """usage: host_deactivate {--filename=filename | --hosts=hosts}
+                            cluster
+
+  Puts hosts into maintenance mode.
+
+  The list of hosts is marked for maintenance, and will be de-prioritized
+  from consideration for scheduling.  Note, they are not removed from
+  consideration, and may still schedule tasks if resources are very scarce.
+  Usually you would mark a larger set of machines for drain, and then do
+  them in batches within the larger set, to help drained tasks not land on
+  future hosts that will be drained shortly in subsequent batches.
   """
   options = app.get_options()
   HostMaintenance(CLUSTERS[cluster], options.verbosity).start_maintenance(
@@ -47,9 +59,14 @@ def start_maintenance_hosts(cluster):
 @app.command_option(FILENAME_OPTION)
 @app.command_option(HOSTS_OPTION)
 @requires.exactly('cluster')
-def end_maintenance_hosts(cluster):
-  """usage: end_maintenance_hosts {--filename=filename | --hosts=hosts}
-                                  cluster
+def host_activate(cluster):
+  """usage: host_activate {--filename=filename | --hosts=hosts}
+                          cluster
+
+  Removes maintenance mode from hosts.
+
+  The list of hosts is marked as not in a drained state anymore. This will
+  allow normal scheduling to resume on the given list of hosts.
   """
   options = app.get_options()
   HostMaintenance(CLUSTERS[cluster], options.verbosity).end_maintenance(
@@ -57,84 +74,66 @@ def end_maintenance_hosts(cluster):
 
 
 @app.command
-@app.command_option('--post_drain_script', dest='post_drain_script', default=None,
-    help='Path to a script to run for each host.')
-@app.command_option('--override_percentage', dest='percentage', default=None,
-    help='Percentage of tasks required to be up all the time within the duration. '
-         'Default value:%s. DO NOT override default value unless absolutely necessary! '
-         'See sla_probe_hosts and sla_list_safe_domain commands '
-         'for more details on SLA.' % HostMaintenance.SLA_UPTIME_PERCENTAGE_LIMIT)
-@app.command_option('--override_duration', dest='duration', default=None,
-    help='Time interval (now - value) for the percentage of up tasks. Format: XdYhZmWs. '
-         'Default value:%s. DO NOT override default value unless absolutely necessary! '
-         'See sla_probe_hosts and sla_list_safe_domain commands '
-         'for more details on SLA.' % HostMaintenance.SLA_UPTIME_DURATION_LIMIT)
-@app.command_option('--override_reason', dest='reason', default=None,
-    help='Reason for overriding default SLA values. Provide details including the '
-         'maintenance ticket number.')
-@app.command_option('--unsafe_hosts_file', dest='unsafe_hosts_filename', default=None,
-    help='Output file to write host names that did not pass SLA check.')
 @app.command_option(FILENAME_OPTION)
 @app.command_option(HOSTS_OPTION)
+@app.command_option(POST_DRAIN_SCRIPT_OPTION)
 @app.command_option(GROUPING_OPTION)
+@app.command_option(OVERRIDE_SLA_PERCENTAGE_OPTION)
+@app.command_option(OVERRIDE_SLA_DURATION_OPTION)
+@app.command_option(OVERRIDE_SLA_REASON_OPTION)
+@app.command_option(UNSAFE_SLA_HOSTS_FILE_OPTION)
 @requires.exactly('cluster')
-def perform_maintenance_hosts(cluster):
-  """usage: perform_maintenance_hosts {--filename=filename | --hosts=hosts}
-                                      [--post_drain_script=path]
-                                      [--grouping=function]
-                                      [--override_percentage=percentage]
-                                      [--override_duration=duration]
-                                      [--override_reason=reason]
-                                      [--unsafe_hosts_file=unsafe_hosts_filename]
-                                      cluster
+def host_drain(cluster):
+  """usage: host_drain {--filename=filename | --hosts=hosts}
+                       [--post_drain_script=path]
+                       [--grouping=function]
+                       [--override_percentage=percentage]
+                       [--override_duration=duration]
+                       [--override_reason=reason]
+                       [--unsafe_hosts_file=unsafe_hosts_filename]
+                       cluster
 
-  Asks the scheduler to remove any running tasks from the machine and remove it
-  from service temporarily, perform some action on them, then return the machines
-  to service.
+  Asks the scheduler to start maintenance on the list of provided hosts (see host_deactivate
+  for more details) and drains any active tasks on them.
+
+  The list of hosts is drained and marked in a drained state.  This will kill
+  off any tasks currently running on these hosts, as well as prevent future
+  tasks from scheduling on these hosts while they are drained.
+
+  The hosts are left in maintenance mode upon completion. Use host_activate to
+  return hosts back to service and allow scheduling tasks on them.
   """
   options = app.get_options()
   drainable_hosts = parse_hostnames(options.filename, options.hosts)
   get_grouping_or_die(options.grouping)
 
-  has_override = bool(options.percentage) or bool(options.duration) or bool(options.reason)
-  all_overrides = bool(options.percentage) and bool(options.duration) and bool(options.reason)
-  if has_override != all_overrides:
-    die('All --override_* options are required when attempting to override default SLA values.')
+  override_percentage, override_duration = parse_and_validate_sla_overrides(
+      options,
+      drainable_hosts)
 
-  percentage = parse_sla_percentage(options.percentage) if options.percentage else None
-  duration = parse_time(options.duration) if options.duration else None
-  if options.reason:
-    log_admin_message(
-        logging.WARNING,
-        'Default SLA values (percentage: %s, duration: %s) are overridden for the following '
-        'hosts: %s. New percentage: %s, duration: %s, override reason: %s' % (
-            HostMaintenance.SLA_UPTIME_PERCENTAGE_LIMIT,
-            HostMaintenance.SLA_UPTIME_DURATION_LIMIT,
-            drainable_hosts,
-            percentage,
-            duration,
-            options.reason))
+  post_drain_callback = parse_script(options.post_drain_script)
 
-  drained_callback = parse_script(options.post_drain_script)
-
-  HostMaintenance(CLUSTERS[cluster], options.verbosity).perform_maintenance(
+  drained_hostnames = HostMaintenance(CLUSTERS[cluster], options.verbosity).perform_maintenance(
       drainable_hosts,
       grouping_function=options.grouping,
-      callback=drained_callback,
-      percentage=percentage,
-      duration=duration,
+      percentage=override_percentage,
+      duration=override_duration,
       output_file=options.unsafe_hosts_filename)
+
+  if post_drain_callback:
+    for hostname in drained_hostnames:
+      post_drain_callback(hostname)
 
 
 @app.command
 @app.command_option(FILENAME_OPTION)
 @app.command_option(HOSTS_OPTION)
 @requires.exactly('cluster')
-def host_maintenance_status(cluster):
-  """usage: host_maintenance_status {--filename=filename | --hosts=hosts}
-                                    cluster
+def host_status(cluster):
+  """usage: host_status {--filename=filename | --hosts=hosts}
+                        cluster
 
-  Check on the schedulers maintenance status for a list of hosts in the cluster.
+  Print the drain status of each supplied host.
   """
   options = app.get_options()
   checkable_hosts = parse_hostnames(options.filename, options.hosts)
