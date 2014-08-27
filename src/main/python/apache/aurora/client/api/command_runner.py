@@ -98,7 +98,7 @@ class DistributedCommandRunner(object):
     return TaskQuery(statuses=LIVE_STATES, owner=Identity(role), jobName=job, environment=env)
 
   def __init__(self, cluster, role, env, jobs, ssh_user=None,
-      log_fn=log.error):
+      log_fn=log.log):
     self._cluster = cluster
     self._api = AuroraClientAPI(cluster=cluster)
     self._role = role
