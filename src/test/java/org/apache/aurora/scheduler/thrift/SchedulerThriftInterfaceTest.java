@@ -1813,7 +1813,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testGetQuota() throws Exception {
     QuotaInfo infoMock = createMock(QuotaInfo.class);
     expect(quotaManager.getQuotaInfo(ROLE)).andReturn(infoMock);
-    expect(infoMock.guota()).andReturn(QUOTA);
+    expect(infoMock.getQuota()).andReturn(QUOTA);
     expect(infoMock.getProdConsumption()).andReturn(CONSUMED);
     IResourceAggregate nonProdConsumed = IResourceAggregate.build(new ResourceAggregate(1, 0, 0));
     expect(infoMock.getNonProdConsumption()).andReturn(nonProdConsumed);

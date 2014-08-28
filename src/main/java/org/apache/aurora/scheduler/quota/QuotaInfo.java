@@ -40,7 +40,7 @@ public class QuotaInfo {
    *
    * @return Available quota.
    */
-  public IResourceAggregate guota() {
+  public IResourceAggregate getQuota() {
     return quota;
   }
 

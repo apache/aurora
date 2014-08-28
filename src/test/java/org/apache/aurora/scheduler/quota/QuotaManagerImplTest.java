@@ -14,6 +14,8 @@
 package org.apache.aurora.scheduler.quota;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableMap;
+
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -56,6 +58,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void setUp() throws Exception {
     storageUtil = new StorageTestUtil(this);
     quotaManager = new QuotaManagerImpl(storageUtil.storage);
+    storageUtil.expectOperations();
   }
 
   @Test
@@ -66,12 +69,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     expectQuota(quota);
     expectTasks(prodTask, nonProdTask);
-    storageUtil.expectOperations();
 
     control.replay();
 
     QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ROLE);
-    assertEquals(quota, quotaInfo.guota());
+    assertEquals(quota, quotaInfo.getQuota());
     assertEquals(
         IResourceAggregate.build(new ResourceAggregate(3, 3, 3)), quotaInfo.getProdConsumption());
     assertEquals(
@@ -85,12 +87,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     expectQuota(quota);
     expectNoTasks();
-    storageUtil.expectOperations();
 
     control.replay();
 
     QuotaInfo quotaInfo = quotaManager.getQuotaInfo(ROLE);
-    assertEquals(quota, quotaInfo.guota());
+    assertEquals(quota, quotaInfo.getQuota());
     assertEquals(ResourceAggregates.none(), quotaInfo.getProdConsumption());
     assertEquals(ResourceAggregates.none(), quotaInfo.getNonProdConsumption());
   }
@@ -99,23 +100,89 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testCheckQuotaPasses() {
     expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectTasks(createTask("foo", "id1", 3, 3, 3, true));
-    storageUtil.expectOperations();
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.<ITaskConfig, Integer>of(),
+        createTaskConfig(1, 1, 1, true),
+        1);
+
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
+  }
+
+  @Test
+  public void testCheckQuotaWithReleasedPasses() {
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectTasks(createTask("foo", "id1", 3, 3, 3, true));
+
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.of(createTaskConfig(1, 1, 1, true), 1),
+        createTaskConfig(2, 2, 2, true),
+        1);
+
+    assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
+  }
+
+  @Test
+  public void testCheckQuotaWithReleasedMoreThanAddedPasses() {
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectTasks(createTask("foo", "id1", 3, 3, 3, true));
+
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.of(createTaskConfig(3, 3, 3, true), 1),
+        createTaskConfig(1, 1, 1, true),
+        1);
+
+    assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
+  }
+
+  @Test
+  public void testCheckQuotaWithReleasedNonToProdPasses() {
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectTasks(createTask("foo", "id1", 3, 3, 3, true));
+
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.of(createTaskConfig(1, 1, 1, false), 1),
+        createTaskConfig(1, 1, 1, true),
+        1);
+
+    assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
+  }
+
+  @Test
+  public void testCheckQuotaWithReleasedNonToProdFails() {
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
+    expectTasks(createTask("foo", "id1", 3, 3, 3, true));
+
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.of(createTaskConfig(3, 3, 3, false), 1),
+        createTaskConfig(2, 2, 2, true),
+        1);
+
+    assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
   @Test
   public void testCheckQuotaPassesNoTasks() {
     expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectNoTasks();
-    storageUtil.expectOperations();
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.<ITaskConfig, Integer>of(),
+        createTaskConfig(1, 1, 1, true),
+        1);
+
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -123,11 +190,14 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testCheckQuotaPassesNonProdUnaccounted() {
     expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectTasks(createTask("foo", "id1", 3, 3, 3, true), createTask("bar", "id2", 5, 5, 5, false));
-    storageUtil.expectOperations();
 
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 1, true), 1);
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.<ITaskConfig, Integer>of(),
+        createTaskConfig(1, 1, 1, true),
+        1);
+
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -135,7 +205,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testCheckQuotaSkippedForNonProdRequest() {
     control.replay();
 
-    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 1, false), 1);
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.<ITaskConfig, Integer>of(),
+        createTaskConfig(1, 1, 1, false),
+        1);
+
     assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -145,10 +219,14 @@ public class QuotaManagerImplTest extends EasyMockTest {
         .andReturn(Optional.<IResourceAggregate>absent());
 
     expectNoTasks();
-    storageUtil.expectOperations();
 
     control.replay();
-    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 1, true), 1);
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.<ITaskConfig, Integer>of(),
+        createTaskConfig(1, 1, 1, true),
+        1);
+
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
   }
 
@@ -156,10 +234,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testCheckQuotaExceedsCpu() {
     expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectTasks(createTask("foo", "id1", 3, 3, 3, true));
-    storageUtil.expectOperations();
 
     control.replay();
-    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(2, 1, 1, true), 1);
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.<ITaskConfig, Integer>of(),
+        createTaskConfig(2, 1, 1, true),
+        1);
+
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertTrue(checkQuota.getDetails().get().contains("CPU"));
   }
@@ -168,10 +249,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testCheckQuotaExceedsRam() {
     expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectTasks(createTask("foo", "id1", 3, 3, 3, true));
-    storageUtil.expectOperations();
 
     control.replay();
-    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 2, 1, true), 1);
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.<ITaskConfig, Integer>of(),
+        createTaskConfig(1, 2, 1, true),
+        1);
+
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertTrue(checkQuota.getDetails().get().contains("RAM"));
   }
@@ -180,10 +264,13 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testCheckQuotaExceedsDisk() {
     expectQuota(IResourceAggregate.build(new ResourceAggregate(4, 4, 4)));
     expectTasks(createTask("foo", "id1", 3, 3, 3, true));
-    storageUtil.expectOperations();
 
     control.replay();
-    QuotaCheckResult checkQuota = quotaManager.checkQuota(createTaskConfig(1, 1, 2, true), 1);
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(
+        ImmutableMap.<ITaskConfig, Integer>of(),
+        createTaskConfig(1, 1, 2, true),
+        1);
+
     assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
     assertTrue(checkQuota.getDetails().get().contains("DISK"));
   }
@@ -191,7 +278,6 @@ public class QuotaManagerImplTest extends EasyMockTest {
   @Test
   public void testSaveQuotaPasses() throws Exception {
     storageUtil.quotaStore.saveQuota(ROLE, QUOTA);
-    storageUtil.expectOperations();
 
     control.replay();
     quotaManager.saveQuota(ROLE, QUOTA);
@@ -199,16 +285,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
   @Test(expected = QuotaException.class)
   public void testSaveQuotaFailsMissingSpecs() throws Exception {
-    storageUtil.expectOperations();
-
     control.replay();
     quotaManager.saveQuota(ROLE, IResourceAggregate.build(new ResourceAggregate()));
   }
 
   @Test(expected = QuotaException.class)
   public void testSaveQuotaFailsNegativeValues() throws Exception {
-    storageUtil.expectOperations();
-
     control.replay();
     quotaManager.saveQuota(ROLE, IResourceAggregate.build(new ResourceAggregate(-2.0, 4, 5)));
   }

@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.state;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -141,8 +142,11 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
     eventSink.post(EasyMock.<PubsubEvent>anyObject());
     expectLastCall().anyTimes();
 
-    expect(quotaManager.checkQuota(anyObject(ITaskConfig.class), anyInt()))
-        .andStubReturn(ENOUGH_QUOTA);
+    expect(quotaManager.checkQuota(
+        EasyMock.<Map<ITaskConfig, Integer>>anyObject(),
+        anyObject(ITaskConfig.class),
+        anyInt())).andStubReturn(ENOUGH_QUOTA);
+
     expect(cronJobManager.hasJob(anyObject(IJobKey.class))).andStubReturn(false);
   }
 
@@ -561,8 +565,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testFilterFailRejectsCreate() throws Exception {
     SanitizedConfiguration job = makeJob(KEY_A, 1);
-    expect(quotaManager.checkQuota(anyObject(ITaskConfig.class), anyInt()))
-        .andReturn(NOT_ENOUGH_QUOTA);
+    expect(quotaManager.checkQuota(
+        EasyMock.<Map<ITaskConfig, Integer>>anyObject(),
+        anyObject(ITaskConfig.class),
+        anyInt())).andReturn(NOT_ENOUGH_QUOTA);
 
     control.replay();
 
@@ -573,8 +579,10 @@ public abstract class BaseSchedulerCoreImplTest extends EasyMockTest {
   @Test(expected = ScheduleException.class)
   public void testFilterFailRejectsAddInstances() throws Exception {
     IJobConfiguration job = makeJob(KEY_A, 1).getJobConfig();
-    expect(quotaManager.checkQuota(anyObject(ITaskConfig.class), anyInt()))
-        .andReturn(NOT_ENOUGH_QUOTA);
+    expect(quotaManager.checkQuota(
+        EasyMock.<Map<ITaskConfig, Integer>>anyObject(),
+        anyObject(ITaskConfig.class),
+        anyInt())).andReturn(NOT_ENOUGH_QUOTA);
 
     control.replay();
 

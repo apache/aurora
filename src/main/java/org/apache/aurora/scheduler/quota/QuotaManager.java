@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.quota;
 
+import java.util.Map;
+
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
@@ -55,14 +57,19 @@ public interface QuotaManager {
   QuotaInfo getQuotaInfo(String role);
 
   /**
-   * Checks if there is enough resource quota available for adding {@code instances}
-   * of {@code template} tasks. The quota is defined at the task owner (role) level.
+   * Checks if there is enough resource quota available for adding {@code instances} of
+   * {@code template} tasks provided resources consumed by {@code releasedTemplates} tasks
+   * are released. The quota is defined at the task owner (role) level.
    *
-   * @param template Single task resource requirements.
+   * @param releasedTemplates Map of task resources to number of task instances to be released.
+   * @param newTemplate Single task resource requirements.
    * @param instances Number of task instances.
    * @return {@code QuotaComparisonResult} instance with quota check result details.
    */
-  QuotaCheckResult checkQuota(ITaskConfig template, int instances);
+  QuotaCheckResult checkQuota(
+      Map<ITaskConfig, Integer> releasedTemplates,
+      ITaskConfig newTemplate,
+      int instances);
 
   /**
    * Thrown when quota related operation failed.
@@ -126,19 +133,37 @@ public interface QuotaManager {
     }
 
     @Override
-    public QuotaCheckResult checkQuota(ITaskConfig template, int instances) {
-      if (!template.isProduction()) {
+    public QuotaCheckResult checkQuota(
+        Map<ITaskConfig, Integer> releasedTemplates,
+        ITaskConfig newTemplate,
+        int instances) {
+
+      if (!newTemplate.isProduction()) {
         return new QuotaCheckResult(SUFFICIENT_QUOTA);
       }
 
-      QuotaInfo quotaInfo = getQuotaInfo(JobKeys.from(template).getRole());
+      QuotaInfo quotaInfo = getQuotaInfo(JobKeys.from(newTemplate).getRole());
 
+      // Calculate total additional requested resources.
       IResourceAggregate additionalRequested =
-          ResourceAggregates.scale(fromTasks(ImmutableSet.of(template)), instances);
+          ResourceAggregates.scale(fromTasks(ImmutableSet.of(newTemplate)), instances);
 
+      // Calculate total released resources (i.e. resources freed up from removed instances).
+      IResourceAggregate totalReleased = ResourceAggregates.EMPTY;
+      for (Map.Entry<ITaskConfig, Integer> entry : releasedTemplates.entrySet()) {
+        ITaskConfig released = entry.getKey();
+        if (released.isProduction()) {
+          totalReleased = add(
+              totalReleased,
+              ResourceAggregates.scale(fromTasks(ImmutableSet.of(released)), entry.getValue()));
+        }
+      }
+
+      // Subtract released resources from additional requested (this is the overall net change) and
+      // compare the result against available production quota.
       return QuotaCheckResult.greaterOrEqual(
-          quotaInfo.guota(),
-          add(quotaInfo.getProdConsumption(), additionalRequested));
+          quotaInfo.getQuota(),
+          add(quotaInfo.getProdConsumption(), subtract(additionalRequested, totalReleased)));
     }
 
     private static IResourceAggregate fromTasks(Iterable<ITaskConfig> tasks) {
@@ -162,6 +187,13 @@ public interface QuotaManager {
           .setNumCpus(a.getNumCpus() + b.getNumCpus())
           .setRamMb(a.getRamMb() + b.getRamMb())
           .setDiskMb(a.getDiskMb() + b.getDiskMb()));
+    }
+
+    private static IResourceAggregate subtract(IResourceAggregate a, IResourceAggregate b) {
+      return IResourceAggregate.build(new ResourceAggregate()
+          .setNumCpus(a.getNumCpus() - b.getNumCpus())
+          .setRamMb(a.getRamMb() - b.getRamMb())
+          .setDiskMb(a.getDiskMb() - b.getDiskMb()));
     }
   }
 }

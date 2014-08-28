@@ -21,6 +21,7 @@ import javax.inject.Inject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -165,7 +166,11 @@ class SchedulerCoreImpl implements SchedulerCore {
       throw new ScheduleException("Job exceeds task limit of " + MAX_TASKS_PER_JOB.get());
     }
 
-    QuotaCheckResult quotaCheck = quotaManager.checkQuota(task, instances);
+    QuotaCheckResult quotaCheck = quotaManager.checkQuota(
+        ImmutableMap.<ITaskConfig, Integer>of(),
+        task,
+        instances);
+
     if (quotaCheck.getResult() == INSUFFICIENT_QUOTA) {
       throw new ScheduleException("Insufficient resource quota: " + quotaCheck.getDetails().or(""));
     }
