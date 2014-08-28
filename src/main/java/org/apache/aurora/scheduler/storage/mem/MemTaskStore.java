@@ -417,8 +417,10 @@ class MemTaskStore implements TaskStore.Mutable {
           public Iterable<String> apply(Set<K> keys) {
             hitCount.incrementAndGet();
             ImmutableSet.Builder<String> builder = ImmutableSet.builder();
-            for (K key : keys) {
-              builder.addAll(index.get(key));
+            synchronized (index) {
+              for (K key : keys) {
+                builder.addAll(index.get(key));
+              }
             }
             return builder.build();
           }

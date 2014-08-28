@@ -15,6 +15,9 @@ package org.apache.aurora.scheduler.storage.mem;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -23,6 +26,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ExecutorConfig;
@@ -43,6 +50,7 @@ import org.junit.Test;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class MemTaskStoreTest {
@@ -385,6 +393,47 @@ public class MemTaskStoreTest {
     store.saveTasks(ImmutableSet.of(updated));
     assertQueryResults(Query.taskScoped(Tasks.id(a)), updated);
     assertQueryResults(Query.slaveScoped(host), updated);
+  }
+
+  @Test
+  public void testReadSecondaryIndexMultipleThreads() throws Exception {
+    ExecutorService executor = Executors.newFixedThreadPool(4,
+        new ThreadFactoryBuilder().setNameFormat("SlowRead-%d").setDaemon(true).build());
+
+    try {
+      ImmutableSet.Builder<IScheduledTask> builder = ImmutableSet.builder();
+      final int numTasks = 100;
+      final int numJobs = 100;
+      for (int j = 0; j < numJobs; j++) {
+        for (int t = 0; t < numTasks; t++) {
+          builder.add(makeTask("" + j + "-" + t, "role", "env", "name" + j));
+        }
+      }
+      store.saveTasks(builder.build());
+
+      final CountDownLatch read = new CountDownLatch(numJobs);
+      for (int j = 0; j < numJobs; j++) {
+        final int id = j;
+        executor.submit(new Runnable() {
+          @Override
+          public void run() {
+            assertNotNull(store.fetchTasks(Query.jobScoped(
+                JobKeys.from("role", "env", "name" + id))));
+            read.countDown();
+          }
+        });
+        executor.submit(new Runnable() {
+          @Override
+          public void run() {
+            store.saveTasks(ImmutableSet.of(makeTask("TaskNew1" + id)));
+          }
+        });
+      }
+
+      read.await();
+    } finally {
+      new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
+    }
   }
 
   private void assertStoreContents(IScheduledTask... tasks) {
