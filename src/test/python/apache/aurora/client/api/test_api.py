@@ -149,3 +149,45 @@ class TestJobUpdateApis(unittest.TestCase):
         AuroraClientAPI.UpdateConfigError,
         api.start_job_update,
         self.mock_job_config(error=ValueError()))
+
+  def test_pause_job_update(self):
+    """Test successful job update pause."""
+    job_key = AuroraJobKey("foo", "role", "env", "name")
+    api, mock_proxy = self.mock_api()
+    mock_proxy.pauseJobUpdate.return_value = self.create_simple_success_response()
+
+    api.pause_job_update(job_key)
+    mock_proxy.pauseJobUpdate.assert_called_once_with(job_key.to_thrift())
+
+  def test_pause_job_update_invalid_key(self):
+    """Test job update pause with invalid job key."""
+    api, mock_proxy = self.mock_api()
+    self.assertRaises(AuroraClientAPI.TypeError, api.pause_job_update, "invalid")
+
+  def test_resume_job_update(self):
+    """Test successful job update resume."""
+    job_key = AuroraJobKey("foo", "role", "env", "name")
+    api, mock_proxy = self.mock_api()
+    mock_proxy.resumeJobUpdate.return_value = self.create_simple_success_response()
+
+    api.resume_job_update(job_key)
+    mock_proxy.resumeJobUpdate.assert_called_once_with(job_key.to_thrift())
+
+  def test_resume_job_update_invalid_key(self):
+    """Test job update resume with invalid job key."""
+    api, mock_proxy = self.mock_api()
+    self.assertRaises(AuroraClientAPI.TypeError, api.resume_job_update, "invalid")
+
+  def test_abort_job_update(self):
+    """Test successful job update abort."""
+    job_key = AuroraJobKey("foo", "role", "env", "name")
+    api, mock_proxy = self.mock_api()
+    mock_proxy.abortJobUpdate.return_value = self.create_simple_success_response()
+
+    api.abort_job_update(job_key)
+    mock_proxy.abortJobUpdate.assert_called_once_with(job_key.to_thrift())
+
+  def test_abort_job_update_invalid_key(self):
+    """Test job update abort with invalid job key."""
+    api, mock_proxy = self.mock_api()
+    self.assertRaises(AuroraClientAPI.TypeError, api.abort_job_update, "invalid")

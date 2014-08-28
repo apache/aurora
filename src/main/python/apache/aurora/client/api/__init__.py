@@ -191,6 +191,39 @@ class AuroraClientAPI(object):
 
     return self._scheduler_proxy.startJobUpdate(request)
 
+  def pause_job_update(self, job_key):
+    """Requests Scheduler to pause active job update.
+
+    Arguments:
+    job_key - Job key identifying the update to pause.
+
+    Returns response object.
+    """
+    self._assert_valid_job_key(job_key)
+    return self._scheduler_proxy.pauseJobUpdate(job_key.to_thrift())
+
+  def resume_job_update(self, job_key):
+    """Requests Scheduler to resume a job update paused previously.
+
+    Arguments:
+    job_key - Job key identifying the update to resume.
+
+    Returns response object.
+    """
+    self._assert_valid_job_key(job_key)
+    return self._scheduler_proxy.resumeJobUpdate(job_key.to_thrift())
+
+  def abort_job_update(self, job_key):
+    """Requests Scheduler to abort active or paused job update.
+
+    Arguments:
+    job_key - Job key identifying the update to abort.
+
+    Returns response object.
+    """
+    self._assert_valid_job_key(job_key)
+    return self._scheduler_proxy.abortJobUpdate(job_key.to_thrift())
+
   def cancel_update(self, job_key):
     """Cancel the update represented by job_key. Returns whether or not the cancellation was
        successful."""
