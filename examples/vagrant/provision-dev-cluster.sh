@@ -76,6 +76,16 @@ function install_cluster_config {
 EOF
 }
 
+function install_ssh_config {
+  cat >> /etc/ssh/ssh_config <<EOF
+
+# Allow local ssh w/out strict host checking
+Host $(hostname)
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+EOF
+}
+
 function start_services {
   start zookeeper
   start mesos-master
@@ -98,5 +108,6 @@ prepare_sources
 install_mesos
 prepare_extras
 install_cluster_config
+install_ssh_config
 start_services
 aurorabuild client client2 admin_client executor observer scheduler

@@ -61,11 +61,13 @@ test_http_example() {
   echo '== Validating announce'
   validate_serverset "/aurora/$_role/$_env/$_job"
 
-  # TODO(mchucarroll): Get "run" working: the vagrant configuration currently doesn't set up ssh
-  # to allow automatic logins to the slaves. "aurora run" therefore tries to prompt the user for
-  # a password, finds that it's not running in a TTY, and aborts.
-  runlen=$(vagrant ssh -c "aurora2 task run $jobkey 'pwd'" | wc -l)
-  test $runlen -eq 4
+  # In order for `aurora task run` to work, the VM needs to be forwarded a local ssh identity. To avoid
+  # polluting the global ssh-agent with this identity, we run this test in the context of a local
+  # agent. A slightly cleaner solution would be to use a here doc (ssh-agent sh <<EOF ...), but
+  # due to a strange confluence of issues, this required some unpalatable hacks. Simply putting
+  # the meat of this test in a separate file seems preferable.
+  ssh-agent src/test/sh/org/apache/aurora/e2e/test_run.sh $jobkey $_sched_ip
+  test $? -eq 0
 
   # Run a kill without specifying instances, and verify that it gets an error, and the job
   # isn't affected. (TODO(mchucarroll): the failed kill should return non-zero!)
