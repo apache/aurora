@@ -30,6 +30,7 @@ from gen.apache.aurora.api.constants import LIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     Identity,
     JobKey,
+    JobUpdateQuery,
     JobUpdateRequest,
     Lock,
     LockKey,
@@ -144,36 +145,12 @@ class AuroraClientAPI(object):
 
     return updater.update(instances)
 
-  def acquire_job_lock(self, job_key):
-    """Acquires an exclusive job lock preventing any simultaneous mutations (update, kill, etc.)
-
-    Arguments:
-    job_key - AuroraJobKey instance.
-
-    Returns response object with acquired job lock.
-    """
-    self._assert_valid_job_key(job_key)
-    return self._scheduler_proxy.acquireLock(LockKey(job=job_key.to_thrift()))
-
-  def release_job_lock(self, lock):
-    """Releases the previously-acquired job lock.
-
-    Requires valid Lock instance. See cancel_update if release without lock handle is required.
-
-    Arguments:
-    lock - Previously acquired Lock instance.
-
-    Returns response object.
-    """
-    self._assert_valid_lock(lock)
-    return self._scheduler_proxy.releaseLock(lock, LockValidation.CHECKED)
-
   def start_job_update(self, config, instances=None):
     """Requests Scheduler to start job update process.
 
     Arguments:
-    config - AuroraConfig instance with update details.
-    instances - Optional list of instances to restrict update to.
+    config -- AuroraConfig instance with update details.
+    instances -- Optional list of instances to restrict update to.
 
     Returns response object with update ID and acquired job lock.
     """
@@ -182,6 +159,7 @@ class AuroraClientAPI(object):
     except ValueError as e:
       raise self.UpdateConfigError(str(e))
 
+    log.info("Starting update for: %s" % config.name())
     request = JobUpdateRequest(
         jobKey=JobKey(role=config.role(), environment=config.environment(), name=config.name()),
         instanceCount=config.instances(),
@@ -195,34 +173,68 @@ class AuroraClientAPI(object):
     """Requests Scheduler to pause active job update.
 
     Arguments:
-    job_key - Job key identifying the update to pause.
+    job_key -- Job key identifying the update to pause.
 
     Returns response object.
     """
     self._assert_valid_job_key(job_key)
+    log.info("Pausing update for: %s" % job_key.to_path())
     return self._scheduler_proxy.pauseJobUpdate(job_key.to_thrift())
 
   def resume_job_update(self, job_key):
     """Requests Scheduler to resume a job update paused previously.
 
     Arguments:
-    job_key - Job key identifying the update to resume.
+    job_key -- Job key identifying the update to resume.
 
     Returns response object.
     """
     self._assert_valid_job_key(job_key)
+    log.info("Resuming update for: %s" % job_key.to_path())
     return self._scheduler_proxy.resumeJobUpdate(job_key.to_thrift())
 
   def abort_job_update(self, job_key):
     """Requests Scheduler to abort active or paused job update.
 
     Arguments:
-    job_key - Job key identifying the update to abort.
+    job_key -- Job key identifying the update to abort.
 
     Returns response object.
     """
     self._assert_valid_job_key(job_key)
+    log.info("Aborting update for: %s" % job_key.to_path())
     return self._scheduler_proxy.abortJobUpdate(job_key.to_thrift())
+
+  def query_job_updates(self, update_id=None, role=None, job_key=None, user=None,
+                        update_statuses=None):
+    """Returns all job updates matching the query.
+
+    Arguments:
+    update_id -- job update ID.
+    role -- job role.
+    job_key -- job key.
+    user -- user who initiated an update.
+    update_statuses -- set of JobUpdateStatus to match.
+
+    Returns response object with all matching job update summaries.
+    """
+    return self._scheduler_proxy.getJobUpdateSummaries(
+        JobUpdateQuery(
+            updateId=update_id,
+            role=role,
+            jobKey=job_key.to_thrift() if job_key else None,
+            user=user,
+            updateStatuses=update_statuses))
+
+  def get_job_update_details(self, id):
+    """Gets JobUpdateDetails for the specified job update ID.
+
+    Arguments:
+    id -- job update ID.
+
+    Returns a response object with JobUpdateDetails.
+    """
+    return self._scheduler_proxy.getJobUpdateDetails(id)
 
   def cancel_update(self, job_key):
     """Cancel the update represented by job_key. Returns whether or not the cancellation was
