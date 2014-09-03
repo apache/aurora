@@ -1889,6 +1889,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testStartUpdate() throws Exception {
     expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     expect(lockManager.acquireLock(LOCK_KEY, USER)).andReturn(LOCK);
 
     IScheduledTask oldTask1 = buildScheduledTask(0, 5);
@@ -1937,6 +1938,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testStartUpdateFailsForCronJob() throws Exception {
+    JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
+
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+  }
+
+  @Test
   public void testStartUpdateFailsConfigValidation() throws Exception {
     JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setJobName(null));
     expectAuth(ROLE, true);
@@ -1949,6 +1960,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testStartUpdateFailsLockValidation() throws Exception {
     JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
     expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     expect(lockManager.acquireLock(LOCK_KEY, USER)).andThrow(new LockException("lock failed"));
 
     control.replay();
@@ -1959,6 +1971,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testStartUpdateFailsInController() throws Exception {
     expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     expect(lockManager.acquireLock(LOCK_KEY, USER)).andReturn(LOCK);
 
     IScheduledTask oldTask = buildScheduledTask(0, 5);

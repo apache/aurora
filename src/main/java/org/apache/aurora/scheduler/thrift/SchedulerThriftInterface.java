@@ -1339,6 +1339,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ConfigurationManager.validateAndPopulate(
               ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
 
+      if (cronJobManager.hasJob(request.getJobKey())) {
+        return addMessage(
+            response,
+            INVALID_REQUEST,
+            "Cron jobs may only be updated by calling replaceCronTemplate.");
+      }
     } catch (AuthFailedException e) {
       return addMessage(response, AUTH_FAILED, e);
     } catch (TaskDescriptionException e) {
