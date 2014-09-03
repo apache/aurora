@@ -15,9 +15,7 @@
 python_test_suite(name = 'all',
   dependencies = [
     pants(':executor-small'),
-
-    # TODO(jfarrell): AURORA-14 for executor_builds, gc_executor and thermos_executor
-    # pants(':executor-large'),
+    pants(':executor-large'),
   ]
 )
 
@@ -25,8 +23,10 @@ python_test_suite(name = 'all',
 python_test_suite(
   name = 'executor-small',
   dependencies = [
+    pants(':executor_base'),
     pants(':executor_detector'),
     pants(':executor_vars'),
+    pants(':status_manager'),
     pants(':thermos_task_runner'),
     pants('src/test/python/apache/aurora/executor/common:all'),
   ],
@@ -36,7 +36,8 @@ python_test_suite(
 python_test_suite(
   name = 'executor-large',
   dependencies = [
-    pants(':executor_builds'),
+    # TODO(jfarrell): AURORA-14 for executor_builds
+    #pants(':executor_builds'),
     pants(':gc_executor'),
     pants(':thermos_executor'),
   ]
@@ -93,15 +94,35 @@ python_tests(name = 'thermos_executor',
 python_tests(name = 'thermos_task_runner',
   sources = ['test_thermos_task_runner.py'],
   dependencies = [
+    pants('3rdparty/python:mesos.interface'),
     pants('3rdparty/python:twitter.common.contextutil'),
     pants('3rdparty/python:twitter.common.dirutil'),
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.quantity'),
     pants('src/main/python/apache/aurora/config:schema'),
     pants('src/main/python/apache/aurora/executor/common:sandbox'),
-    pants('src/main/python/apache/aurora/executor/common:status_checker'),
     pants('src/main/python/apache/aurora/executor:thermos_task_runner'),
   ]
+)
+
+python_tests(name = 'executor_base',
+  sources = ['test_executor_base.py'],
+  dependencies = [
+    pants('3rdparty/python:mesos.interface'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.log'),
+    pants('src/main/python/apache/aurora/executor:executor_base'),
+  ],
+)
+
+python_tests(name = 'status_manager',
+  sources = ['test_status_manager.py'],
+  dependencies = [
+    pants('3rdparty/python:mesos.interface'),
+    pants('3rdparty/python:mock'),
+    pants('src/main/python/apache/aurora/executor:status_manager'),
+    pants('src/main/python/apache/aurora/executor/common:status_checker'),
+  ],
 )
 
 python_tests(name = 'executor_vars',

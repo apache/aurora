@@ -19,7 +19,7 @@ slave.
 
 """
 
-import mesos
+from mesos.native import MesosExecutorDriver
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 from twitter.common.metrics.sampler import DiskMetricWriter
@@ -48,7 +48,7 @@ def proxy_main():
     metric_writer.start()
 
     # Create driver stub
-    driver = mesos.MesosExecutorDriver(thermos_gc_executor)
+    driver = MesosExecutorDriver(thermos_gc_executor)
 
     # Start GC executor
     driver.run()

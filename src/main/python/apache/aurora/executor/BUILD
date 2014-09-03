@@ -18,6 +18,7 @@ python_library(
   name = 'thermos_task_runner',
   sources = ['thermos_task_runner.py'],
   dependencies = [
+    pants('3rdparty/python:mesos.interface'),
     pants('3rdparty/python:twitter.common.dirutil'),
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.quantity'),
@@ -68,7 +69,7 @@ python_library(
   name = 'executor_base',
   sources = ['executor_base.py'],
   dependencies = [
-    pants('3rdparty/python:mesos'),
+    pants('3rdparty/python:mesos.interface'),
     pants('3rdparty/python:twitter.common.log'),
   ]
 )
@@ -79,7 +80,7 @@ python_library(
   dependencies = [
     pants(':status_manager'),
     pants(':executor_base'),
-    pants('3rdparty/python:mesos'),
+    pants('3rdparty/python:mesos.interface'),
     pants('3rdparty/python:pystachio'),
     pants('3rdparty/python:twitter.common.app'),
     pants('3rdparty/python:twitter.common.concurrent'),
@@ -110,7 +111,7 @@ python_library(
   dependencies = [
     pants(':executor_detector'),
     pants(':executor_base'),
-    pants('3rdparty/python:mesos'),
+    pants('3rdparty/python:mesos.interface'),
     pants('3rdparty/python:psutil'),
     pants('3rdparty/python:twitter.common.collections'),
     pants('3rdparty/python:twitter.common.exceptions'),

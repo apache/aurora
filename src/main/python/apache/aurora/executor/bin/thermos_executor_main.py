@@ -21,7 +21,7 @@ slave.
 
 import os
 
-import mesos
+from mesos.native import MesosExecutorDriver
 from twitter.common import app, log
 from twitter.common.log.options import LogOptions
 
@@ -101,7 +101,7 @@ def proxy_main():
     )
 
     # Create driver stub
-    driver = mesos.MesosExecutorDriver(thermos_executor)
+    driver = MesosExecutorDriver(thermos_executor)
 
     # This is an ephemeral executor -- shutdown if we receive no tasks within a certain
     # time period

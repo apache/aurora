@@ -16,6 +16,7 @@ python_library(
   name = 'status_checker',
   sources = ['status_checker.py'],
   dependencies = [
+    pants('3rdparty/python:mesos.interface'),
     pants('3rdparty/python:twitter.common.lang'),
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.metrics'),
@@ -37,6 +38,7 @@ python_library(
   dependencies = [
     pants(':status_checker'),
     pants(':task_info'),
+    pants('3rdparty/python:mesos.interface'),
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.exceptions'),
     pants('src/main/python/apache/aurora/common:http_signaler'),
@@ -72,6 +74,7 @@ python_library(
   name = 'kill_manager',
   sources = ['kill_manager.py'],
   dependencies = [
+    pants('3rdparty/python:mesos.interface'),
     pants(':status_checker'),
   ]
 )

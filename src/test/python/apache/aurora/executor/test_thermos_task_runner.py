@@ -20,6 +20,7 @@ import sys
 import tempfile
 import time
 
+from mesos.interface.mesos_pb2 import TaskState
 from twitter.common import log
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
@@ -28,7 +29,6 @@ from twitter.common.quantity import Amount, Time
 
 from apache.aurora.config.schema.base import MB, MesosTaskInstance, Process, Resources, Task
 from apache.aurora.executor.common.sandbox import DirectorySandbox
-from apache.aurora.executor.common.status_checker import ExitState
 from apache.aurora.executor.thermos_task_runner import ThermosTaskRunner
 
 TASK = MesosTaskInstance(
@@ -106,13 +106,13 @@ class TestThermosTaskRunnerIntegration(object):
       self.run_to_completion(task_runner)
 
       assert task_runner.status is not None
-      assert task_runner.status.status == ExitState.FINISHED
+      assert TaskState.Name(task_runner.status.status) == 'TASK_FINISHED'
 
       # no-op
       task_runner.stop()
 
       assert task_runner.status is not None
-      assert task_runner.status.status == ExitState.FINISHED
+      assert TaskState.Name(task_runner.status.status) == 'TASK_FINISHED'
 
   def test_integration_failed(self):
     with self.yield_sleepy(ThermosTaskRunner, sleep=0, exit_code=1) as task_runner:
@@ -122,13 +122,13 @@ class TestThermosTaskRunnerIntegration(object):
       self.run_to_completion(task_runner)
 
       assert task_runner.status is not None
-      assert task_runner.status.status == ExitState.FAILED
+      assert TaskState.Name(task_runner.status.status) == 'TASK_FAILED'
 
       # no-op
       task_runner.stop()
 
       assert task_runner.status is not None
-      assert task_runner.status.status == ExitState.FAILED
+      assert TaskState.Name(task_runner.status.status) == 'TASK_FAILED'
 
   def test_integration_stop(self):
     with self.yield_sleepy(ThermosTaskRunner, sleep=1000, exit_code=0) as task_runner:
@@ -140,7 +140,7 @@ class TestThermosTaskRunnerIntegration(object):
       task_runner.stop()
 
       assert task_runner.status is not None
-      assert task_runner.status.status == ExitState.KILLED
+      assert TaskState.Name(task_runner.status.status) == 'TASK_KILLED'
 
   def test_integration_lose(self):
     with self.yield_sleepy(ThermosTaskRunner, sleep=1000, exit_code=0) as task_runner:
@@ -153,7 +153,7 @@ class TestThermosTaskRunnerIntegration(object):
       task_runner.stop()
 
       assert task_runner.status is not None
-      assert task_runner.status.status == ExitState.LOST
+      assert TaskState.Name(task_runner.status.status) == 'TASK_LOST'
 
   def test_integration_quitquitquit(self):
     ignorant_script = ';'.join([
@@ -173,4 +173,4 @@ class TestThermosTaskRunnerIntegration(object):
       task_runner.forked.wait()
       task_runner.stop(timeout=Amount(5, Time.SECONDS))
       assert task_runner.status is not None
-      assert task_runner.status.status == ExitState.KILLED
+      assert TaskState.Name(task_runner.status.status) == 'TASK_KILLED'

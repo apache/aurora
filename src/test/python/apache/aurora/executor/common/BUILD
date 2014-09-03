@@ -17,6 +17,7 @@ python_test_suite(
   dependencies = [
     pants(':announcer'),
     pants(':directory_sandbox'),
+    pants(':executor_timeout'),
     pants(':health_checker'),
     pants(':status_checker'),
     pants(':task_info'),
@@ -48,6 +49,7 @@ python_tests(
   name = 'health_checker',
   sources = ['test_health_checker.py'],
   dependencies = [
+    pants('3rdparty/python:mesos.interface'),
     pants('3rdparty/python:mox'),
     pants('3rdparty/python:twitter.common.testing'),
     pants('src/main/python/apache/aurora/executor/common:health_checker'),
@@ -58,8 +60,19 @@ python_tests(
   name = 'status_checker',
   sources = ['test_status_checker.py'],
   dependencies = [
+    pants('3rdparty/python:mesos.interface'),
     pants('src/main/python/apache/aurora/executor/common:status_checker'),
   ]
+)
+
+python_tests(
+  name = 'kill_manager',
+  sources = ['test_kill_manager.py'],
+  dependencies = [
+    pants('3rdparty/python:mesos.interface'),
+    pants('src/main/python/apache/aurora/executor/common:kill_manager'),
+    pants('src/main/python/apache/aurora/executor/common:status_checker'),
+  ],
 )
 
 python_tests(
@@ -70,4 +83,15 @@ python_tests(
     pants('src/main/python/apache/aurora/config/schema'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
+)
+
+python_tests(
+  name = 'executor_timeout',
+  sources = ['test_executor_timeout.py'],
+  dependencies = [
+    pants('3rdparty/python:mesos.interface'),
+    pants('3rdparty/python:mock'),
+    pants('3rdparty/python:twitter.common.quantity'),
+    pants('src/main/python/apache/aurora/executor/common:executor_timeout'),
+  ],
 )

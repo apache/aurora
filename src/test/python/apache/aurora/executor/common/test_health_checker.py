@@ -16,6 +16,7 @@ import time
 import unittest
 
 import mox
+from mesos.interface.mesos_pb2 import TaskState
 from twitter.common.testing.clock import ThreadedClock
 
 from apache.aurora.executor.common.health_checker import HealthCheckerThread
@@ -54,7 +55,7 @@ class TestHealthChecker(unittest.TestCase):
     assert hct.status is None
     self._clock.tick(5)
     thread_yield()
-    assert hct.status is not None
+    assert hct.status.status == TaskState.Value('TASK_FAILED')
     hct.stop()
     self.verify()
 
@@ -67,7 +68,7 @@ class TestHealthChecker(unittest.TestCase):
       initial_interval_secs=0,
       clock=self._clock)
     hct.start()
-    assert hct.status is not None
+    assert hct.status.status == TaskState.Value('TASK_FAILED')
     hct.stop()
     self.verify()
 
@@ -102,6 +103,6 @@ class TestHealthChecker(unittest.TestCase):
     assert hct.status is None
     self._clock.tick(interval_secs)
     thread_yield()
-    assert hct.status is not None
+    assert hct.status.status == TaskState.Value('TASK_FAILED')
     hct.stop()
     self.verify()

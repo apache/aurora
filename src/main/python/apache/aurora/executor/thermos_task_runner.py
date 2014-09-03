@@ -20,6 +20,7 @@ import subprocess
 import threading
 import time
 
+from mesos.interface import mesos_pb2
 from twitter.common import log
 from twitter.common.dirutil import chmod_plus_x, safe_mkdtemp
 from twitter.common.log.options import LogOptions
@@ -31,7 +32,7 @@ from apache.thermos.config.loader import ThermosTaskWrapper
 from apache.thermos.core import runner as core
 from apache.thermos.monitoring.monitor import TaskMonitor
 
-from .common.status_checker import ExitState, StatusResult
+from .common.status_checker import StatusResult
 from .common.task_info import mesos_task_instance_from_assigned_task, resolve_ports
 from .common.task_runner import TaskError, TaskRunner, TaskRunnerProvider
 
@@ -41,11 +42,11 @@ from gen.apache.thermos.ttypes import TaskState
 class ThermosTaskRunner(TaskRunner):
   ESCALATION_WAIT = Amount(5, Time.SECONDS)
   EXIT_STATE_MAP = {
-      TaskState.ACTIVE: StatusResult('Runner died while task was active.', ExitState.LOST),
-      TaskState.FAILED: StatusResult('Task failed.', ExitState.FAILED),
-      TaskState.KILLED: StatusResult('Task killed.', ExitState.KILLED),
-      TaskState.LOST: StatusResult('Task lost.', ExitState.LOST),
-      TaskState.SUCCESS: StatusResult('Task finished.', ExitState.FINISHED),
+      TaskState.ACTIVE: StatusResult('Runner died while task was active.', mesos_pb2.TASK_LOST),
+      TaskState.FAILED: StatusResult('Task failed.', mesos_pb2.TASK_FAILED),
+      TaskState.KILLED: StatusResult('Task killed.', mesos_pb2.TASK_KILLED),
+      TaskState.LOST: StatusResult('Task lost.', mesos_pb2.TASK_LOST),
+      TaskState.SUCCESS: StatusResult('Task finished.', mesos_pb2.TASK_FINISHED),
   }
   MAX_WAIT = Amount(1, Time.MINUTES)
   PEX_NAME = 'thermos_runner.pex'

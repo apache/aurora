@@ -30,14 +30,14 @@ update-alternatives --set java /usr/lib/jvm/java-7-openjdk-amd64/jre/bin/java
 # that want to advertise the hostname to the user, or other components.
 hostname 192.168.33.7
 
-MESOS_VERSION=0.19.1
+MESOS_VERSION=0.20.0
 
 function prepare_extras() {
   pushd aurora
     # Fetch the mesos egg, needed to build python components.
     mkdir -p third_party
     pushd third_party
-      wget -c http://downloads.mesosphere.io/master/ubuntu/12.04/mesos-${MESOS_VERSION}-py2.7-linux-x86_64.egg \
+      wget -c http://downloads.mesosphere.io/master/ubuntu/14.04/mesos-${MESOS_VERSION}-py2.7-linux-x86_64.egg \
         -O mesos-${MESOS_VERSION}-py2.7-linux-x86_64.egg
     popd
 

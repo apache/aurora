@@ -18,6 +18,7 @@ python_binary(
   entry_point = 'apache.aurora.executor.bin.thermos_executor_main:proxy_main',
   always_write_cache = True,
   dependencies = [
+    pants('3rdparty/python:mesos.native'),
     pants('3rdparty/python:twitter.common.app'),
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.metrics'),
@@ -38,6 +39,7 @@ python_binary(
   entry_point = 'apache.aurora.executor.bin.gc_executor_main:proxy_main',
   always_write_cache = True,
   dependencies = [
+    pants('3rdparty/python:mesos.native'),
     pants('3rdparty/python:twitter.common.app'),
     pants('3rdparty/python:twitter.common.log'),
     pants('3rdparty/python:twitter.common.metrics'),

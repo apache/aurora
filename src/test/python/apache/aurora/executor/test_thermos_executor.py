@@ -22,7 +22,7 @@ import time
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from collections import defaultdict
 
-import mesos_pb2 as mesos_pb
+from mesos.interface import mesos_pb2
 from thrift.TSerialization import serialize
 from twitter.common import log
 from twitter.common.contextutil import temporary_dir
@@ -140,7 +140,7 @@ def make_task(thermos_config, assigned_ports={}, **kw):
           owner=Identity(role=role, user=role)),
       assignedPorts=assigned_ports,
       **kw)
-  td = mesos_pb.TaskInfo()
+  td = mesos_pb2.TaskInfo()
   td.task_id.value = task_id
   td.name = thermos_config.task().name().get()
   td.data = serialize(at)
@@ -210,8 +210,8 @@ def make_executor(
   updates = proxy_driver.method_calls['sendStatusUpdate']
   assert len(updates) == 2
   status_updates = [arg_tuple[0][0] for arg_tuple in updates]
-  assert status_updates[0].state == mesos_pb.TASK_STARTING
-  assert status_updates[1].state == mesos_pb.TASK_RUNNING
+  assert status_updates[0].state == mesos_pb2.TASK_STARTING
+  assert status_updates[1].state == mesos_pb2.TASK_RUNNING
 
   # wait for the runner to bind to a task
   while True:
@@ -297,9 +297,9 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     status_updates = [arg_tuple[0][0] for arg_tuple in updates]
-    assert status_updates[0].state == mesos_pb.TASK_STARTING
-    assert status_updates[1].state == mesos_pb.TASK_RUNNING
-    assert status_updates[2].state == mesos_pb.TASK_FINISHED
+    assert status_updates[0].state == mesos_pb2.TASK_STARTING
+    assert status_updates[1].state == mesos_pb2.TASK_RUNNING
+    assert status_updates[2].state == mesos_pb2.TASK_FINISHED
 
   def test_basic_as_job(self):
     proxy_driver = ProxyDriver()
@@ -321,9 +321,9 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     status_updates = [arg_tuple[0][0] for arg_tuple in updates]
-    assert status_updates[0].state == mesos_pb.TASK_STARTING
-    assert status_updates[1].state == mesos_pb.TASK_RUNNING
-    assert status_updates[2].state == mesos_pb.TASK_FINISHED
+    assert status_updates[0].state == mesos_pb2.TASK_STARTING
+    assert status_updates[1].state == mesos_pb2.TASK_RUNNING
+    assert status_updates[2].state == mesos_pb2.TASK_FINISHED
 
   def test_runner_disappears(self):
     proxy_driver = ProxyDriver()
@@ -339,7 +339,7 @@ class TestThermosExecutor(object):
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
-    assert updates[-1][0][0].state == mesos_pb.TASK_LOST
+    assert updates[-1][0][0].state == mesos_pb2.TASK_LOST
 
   def test_task_killed(self):
     proxy_driver = ProxyDriver()
@@ -351,7 +351,7 @@ class TestThermosExecutor(object):
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
-    assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+    assert updates[-1][0][0].state == mesos_pb2.TASK_KILLED
 
   def test_killTask(self):  # noqa
     proxy_driver = ProxyDriver()
@@ -359,13 +359,13 @@ class TestThermosExecutor(object):
     with temporary_dir() as checkpoint_root:
       _, executor = make_executor(proxy_driver, checkpoint_root, SLEEP60_MTI)
       # send two, expect at most one delivered
-      executor.killTask(proxy_driver, mesos_pb.TaskID(value='sleep60-001'))
-      executor.killTask(proxy_driver, mesos_pb.TaskID(value='sleep60-001'))
+      executor.killTask(proxy_driver, mesos_pb2.TaskID(value='sleep60-001'))
+      executor.killTask(proxy_driver, mesos_pb2.TaskID(value='sleep60-001'))
       executor.terminated.wait()
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
-    assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+    assert updates[-1][0][0].state == mesos_pb2.TASK_KILLED
 
   def test_shutdown(self):
     proxy_driver = ProxyDriver()
@@ -377,7 +377,7 @@ class TestThermosExecutor(object):
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
-    assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+    assert updates[-1][0][0].state == mesos_pb2.TASK_KILLED
 
   def test_task_lost(self):
     proxy_driver = ProxyDriver()
@@ -389,7 +389,7 @@ class TestThermosExecutor(object):
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
-    assert updates[-1][0][0].state == mesos_pb.TASK_LOST
+    assert updates[-1][0][0].state == mesos_pb2.TASK_LOST
 
   def test_task_health_failed(self):
     proxy_driver = ProxyDriver()
@@ -407,7 +407,7 @@ class TestThermosExecutor(object):
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
-    assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
+    assert updates[-1][0][0].state == mesos_pb2.TASK_FAILED
 
   def test_task_health_ok(self):
     proxy_driver = ProxyDriver()
@@ -424,7 +424,7 @@ class TestThermosExecutor(object):
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
-    assert updates[-1][0][0].state == mesos_pb.TASK_FINISHED
+    assert updates[-1][0][0].state == mesos_pb2.TASK_FINISHED
 
   def test_failing_runner_start(self):
     proxy_driver = ProxyDriver()
@@ -438,7 +438,7 @@ class TestThermosExecutor(object):
       proxy_driver.wait_stopped()
 
       updates = proxy_driver.method_calls['sendStatusUpdate']
-      assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
+      assert updates[-1][0][0].state == mesos_pb2.TASK_FAILED
 
   def test_failing_runner_initialize(self):
     proxy_driver = ProxyDriver()
@@ -451,7 +451,7 @@ class TestThermosExecutor(object):
       proxy_driver.wait_stopped()
 
       updates = proxy_driver.method_calls['sendStatusUpdate']
-      assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
+      assert updates[-1][0][0].state == mesos_pb2.TASK_FAILED
 
   def test_slow_runner_initialize(self):
     proxy_driver = ProxyDriver()
@@ -468,7 +468,7 @@ class TestThermosExecutor(object):
 
       updates = proxy_driver.method_calls['sendStatusUpdate']
       assert len(updates) == 2
-      assert updates[-1][0][0].state == mesos_pb.TASK_FAILED
+      assert updates[-1][0][0].state == mesos_pb2.TASK_FAILED
 
       te._sandbox._init_start.set()
 
@@ -483,7 +483,7 @@ class TestThermosExecutor(object):
           sandbox_provider=SlowSandboxProvider)
       te.launchTask(proxy_driver, task)
       te.sandbox_initialized.wait()
-      te.killTask(proxy_driver, mesos_pb.TaskID(value=task.task_id.value))
+      te.killTask(proxy_driver, mesos_pb2.TaskID(value=task.task_id.value))
       assert te.runner_aborted.is_set()
       assert not te.sandbox_created.is_set()
 
@@ -502,13 +502,13 @@ class TestThermosExecutor(object):
 
       updates = proxy_driver.method_calls['sendStatusUpdate']
       assert len(updates) == 2
-      assert updates[-1][0][0].state == mesos_pb.TASK_KILLED
+      assert updates[-1][0][0].state == mesos_pb2.TASK_KILLED
 
   def test_launchTask_deserialization_fail(self):  # noqa
     proxy_driver = ProxyDriver()
 
     role = getpass.getuser()
-    task_info = mesos_pb.TaskInfo()
+    task_info = mesos_pb2.TaskInfo()
     task_info.name = task_info.task_id.value = 'broken'
     task_info.data = serialize(
         AssignedTask(
@@ -524,8 +524,8 @@ class TestThermosExecutor(object):
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 2
-    assert updates[0][0][0].state == mesos_pb.TASK_STARTING
-    assert updates[1][0][0].state == mesos_pb.TASK_FAILED
+    assert updates[0][0][0].state == mesos_pb2.TASK_STARTING
+    assert updates[1][0][0].state == mesos_pb2.TASK_FAILED
 
 
 def test_waiting_executor():

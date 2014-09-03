@@ -12,27 +12,26 @@
 # limitations under the License.
 #
 
-import mesos
-import mesos_pb2 as mesos_pb
+from mesos.interface import Executor, mesos_pb2
 from twitter.common import log
 
 
-class ExecutorBase(mesos.Executor):
+class ExecutorBase(Executor):
   # Statuses are hard, let's go shopping.
   STATES_TO_STR = {
-      mesos_pb.TASK_STARTING: 'STARTING',
-      mesos_pb.TASK_RUNNING: 'RUNNING',
-      mesos_pb.TASK_FINISHED: 'FINISHED',
-      mesos_pb.TASK_FAILED: 'FAILED',
-      mesos_pb.TASK_KILLED: 'KILLED',
-      mesos_pb.TASK_LOST: 'LOST',
+      mesos_pb2.TASK_STARTING: 'STARTING',
+      mesos_pb2.TASK_RUNNING: 'RUNNING',
+      mesos_pb2.TASK_FINISHED: 'FINISHED',
+      mesos_pb2.TASK_FAILED: 'FAILED',
+      mesos_pb2.TASK_KILLED: 'KILLED',
+      mesos_pb2.TASK_LOST: 'LOST',
   }
 
   TERMINAL_STATES = frozenset([
-        mesos_pb.TASK_FAILED,
-        mesos_pb.TASK_FINISHED,
-        mesos_pb.TASK_KILLED,
-        mesos_pb.TASK_LOST,
+        mesos_pb2.TASK_FAILED,
+        mesos_pb2.TASK_FINISHED,
+        mesos_pb2.TASK_KILLED,
+        mesos_pb2.TASK_LOST,
   ])
 
   @classmethod
@@ -63,7 +62,7 @@ class ExecutorBase(mesos.Executor):
     self.log('disconnected() called')
 
   def send_update(self, driver, task_id, state, message=None):
-    update = mesos_pb.TaskStatus()
+    update = mesos_pb2.TaskStatus()
     if not isinstance(state, int):
       raise TypeError('Invalid state type %s, should be int.' % type(state))
     if state not in self.STATES_TO_STR:

@@ -24,8 +24,8 @@ import os
 import threading
 import time
 
-import mesos_pb2 as mesos_pb
 import psutil
+from mesos.interface import mesos_pb2
 from thrift.TSerialization import deserialize as thrift_deserialize
 from thrift.TSerialization import serialize as thrift_serialize
 from twitter.common.collections import OrderedDict
@@ -62,11 +62,11 @@ THERMOS_TO_TWITTER_STATES = {
 
 
 THERMOS_TO_MESOS_STATES = {
-    TaskState.ACTIVE: mesos_pb.TASK_RUNNING,
-    TaskState.SUCCESS: mesos_pb.TASK_FINISHED,
-    TaskState.FAILED: mesos_pb.TASK_FAILED,
-    TaskState.KILLED: mesos_pb.TASK_KILLED,
-    TaskState.LOST: mesos_pb.TASK_LOST,
+    TaskState.ACTIVE: mesos_pb2.TASK_RUNNING,
+    TaskState.SUCCESS: mesos_pb2.TASK_FINISHED,
+    TaskState.FAILED: mesos_pb2.TASK_FAILED,
+    TaskState.KILLED: mesos_pb2.TASK_KILLED,
+    TaskState.LOST: mesos_pb2.TASK_LOST,
 }
 
 
@@ -288,7 +288,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
           self.send_update(
               driver,
               task_id,
-              THERMOS_TO_MESOS_STATES.get(last_state, mesos_pb.TASK_LOST),
+              THERMOS_TO_MESOS_STATES.get(last_state, mesos_pb2.TASK_LOST),
               'Task finish detected by GC executor.')
         else:
           local_gc.update(self.should_gc_task(task_id))
@@ -298,7 +298,8 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
       if task_id not in local_task_ids and task_id in sched_active:
         self.log('Know nothing about task %s, telling scheduler of LOSS.' % task_id)
         updates[task_id] = ScheduleStatus.LOST
-        self.send_update(driver, task_id, mesos_pb.TASK_LOST, 'GC executor found no trace of task.')
+        self.send_update(
+            driver, task_id, mesos_pb2.TASK_LOST, 'GC executor found no trace of task.')
       if task_id not in local_task_ids and task_id in sched_starting:
         self.log('Know nothing about task %s, but scheduler says STARTING - passing' % task_id)
 
@@ -354,7 +355,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
       if self._terminate_task(task_id, kill=False):
         updates[task_id] = ScheduleStatus.LOST
         self.send_update(
-            driver, task_id, mesos_pb.TASK_LOST, 'GC executor detected failed task runner.')
+            driver, task_id, mesos_pb2.TASK_LOST, 'GC executor detected failed task runner.')
 
     return updates
 
@@ -441,7 +442,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
       self._driver.sendFrameworkMessage(thrift_serialize(
           SchedulerMessage(deletedTasks=DeletedTasks(taskIds=deleted_tasks))))
     self.send_update(
-        self._driver, task.task_id.value, mesos_pb.TASK_FINISHED, 'Garbage collection finished.')
+        self._driver, task.task_id.value, mesos_pb2.TASK_FINISHED, 'Garbage collection finished.')
     self.log('Garbage collection complete [task_id=%s]' % task_id)
     self._task_id = self._start_time = None
 
@@ -480,7 +481,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
       except KeyError:  # no enqueued GC tasks
         pass
       else:
-        self.send_update(self._driver, prev_task_id, mesos_pb.TASK_FINISHED,
+        self.send_update(self._driver, prev_task_id, mesos_pb2.TASK_FINISHED,
                          'Garbage collection skipped - GC executor shutting down')
         # TODO(jon) Remove this once external MESOS-243 is resolved.
         self.log('Sleeping briefly to mitigate https://issues.apache.org/jira/browse/MESOS-243')
@@ -507,7 +508,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
     except Exception as err:
       self.log('Error deserializing task: %s' % err)
       self.send_update(
-          self._driver, task_id, mesos_pb.TASK_FAILED, 'Deserialization of GC task failed')
+          self._driver, task_id, mesos_pb2.TASK_FAILED, 'Deserialization of GC task failed')
       return
     try:
       prev_task_id, _ = self._gc_task_queue.popitem(0)
@@ -517,7 +518,7 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
       self.log('=> Dropping previously queued GC with task_id %s' % prev_task_id)
       self._dropped_tasks.increment()
       self.log('=> Updating scheduler')
-      self.send_update(self._driver, prev_task_id, mesos_pb.TASK_FINISHED,
+      self.send_update(self._driver, prev_task_id, mesos_pb2.TASK_FINISHED,
                        'Garbage collection skipped - GC executor received another task')
     self.log('=> Adding %s to GC queue' % task_id)
     self._gc_task_queue[task_id] = (task, art.retainedTasks, self._clock.time())

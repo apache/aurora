@@ -22,8 +22,8 @@ import unittest
 from collections import namedtuple
 from itertools import product
 
-import mesos_pb2 as mesos
 import mock
+from mesos.interface import mesos_pb2
 from thrift.TSerialization import deserialize as thrift_deserialize
 from thrift.TSerialization import serialize as thrift_serialize
 from twitter.common.concurrent import deadline, Timeout
@@ -113,7 +113,7 @@ class ProxyDriver(object):
 
 
 def serialize_art(art, task_id=TASK_ID):
-  td = mesos.TaskInfo()
+  td = mesos_pb2.TaskInfo()
   td.slave_id.value = 'ignore_me'
   td.task_id.value = task_id
   td.data = thrift_serialize(art)
@@ -333,7 +333,7 @@ def run_gc_with(active_executors, retained_tasks, lose=False):
   assert len(proxy_driver.updates) >= 1
   if not lose:  # if the task is lost it will be cleaned out of band (by clean_orphans),
                 # so we don't care when the GC task actually finishes
-    assert proxy_driver.updates[-1][0] == mesos.TASK_FINISHED
+    assert proxy_driver.updates[-1][0] == mesos_pb2.TASK_FINISHED
     assert proxy_driver.updates[-1][1] == TASK_ID
   return executor, proxy_driver
 
@@ -345,7 +345,7 @@ def test_gc_with_loss():
   assert len(executor.gcs) == len(FINISHED_TASKS)
   assert len(proxy_driver.messages) == 0
   assert len(proxy_driver.updates) >= 1
-  assert StatusUpdate(mesos.TASK_LOST, ACTIVE_TASKS[0]) in proxy_driver.updates
+  assert StatusUpdate(mesos_pb2.TASK_LOST, ACTIVE_TASKS[0]) in proxy_driver.updates
 
 
 def test_gc_with_starting_task():
@@ -464,7 +464,7 @@ def test_gc_multiple_launchtasks():
     assert len(executor._gc_task_queue) == 1
   assert not proxy_driver.stopped.is_set()
   assert len(proxy_driver.updates) >= 1
-  assert StatusUpdate(mesos.TASK_FINISHED, TASK2) in proxy_driver.updates
+  assert StatusUpdate(mesos_pb2.TASK_FINISHED, TASK2) in proxy_driver.updates
 
 
 def test_gc_shutdown():
@@ -497,7 +497,7 @@ def test_gc_shutdown_queued():
   proxy_driver.stopped.wait(timeout=1.0)
   assert proxy_driver.stopped.is_set()
   assert len(proxy_driver.updates) == 1
-  assert proxy_driver.updates[-1][0] == mesos.TASK_FINISHED
+  assert proxy_driver.updates[-1][0] == mesos_pb2.TASK_FINISHED
   assert proxy_driver.updates[-1][1] == TASK2_ID
 
 
