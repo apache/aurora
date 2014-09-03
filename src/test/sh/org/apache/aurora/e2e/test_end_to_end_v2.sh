@@ -53,8 +53,8 @@ test_http_example() {
 
   echo "== Restarting test job"
 
-  vagrant ssh -c "aurora2 job restart $jobkey $_updated_config"
-
+  vagrant ssh -c "aurora2 job restart $jobkey"
+  
   echo '== Updating test job'
   vagrant ssh -c "aurora2 job update $jobkey $_updated_config"
 

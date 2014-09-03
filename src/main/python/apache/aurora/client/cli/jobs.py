@@ -45,6 +45,7 @@ from apache.aurora.client.cli.options import (
     BROWSER_OPTION,
     CommandOption,
     CONFIG_ARGUMENT,
+    CONFIG_OPTION,
     FORCE_OPTION,
     HEALTHCHECK_OPTION,
     INSTANCES_SPEC_ARGUMENT,
@@ -449,11 +450,12 @@ class RestartCommand(Verb):
         CommandOption('--restart-threshold', type=int, default=60,
              help='Maximum number of seconds before a shard must move into the RUNNING state '
                   'before considered a failure.'),
+        CONFIG_OPTION,
         MAX_TOTAL_FAILURES_OPTION,
         STRICT_OPTION,
         CommandOption("--rollback-on-failure", default=True, action="store_false",
             help="If false, prevent update from performing a rollback."),
-        INSTANCES_SPEC_ARGUMENT, CONFIG_ARGUMENT]
+        INSTANCES_SPEC_ARGUMENT]
 
   @property
   def help(self):
@@ -476,8 +478,8 @@ Restarts are fully controlled client-side, so aborting halts the restart."""
     if instances is not None and context.options.strict:
       context.verify_shards_option_validity(job, instances)
     api = context.get_api(job.cluster)
-    config = (context.get_job_config(job, context.options.config_file)
-        if context.options.config_file else None)
+    config = (context.get_job_config(job, context.options.config)
+        if context.options.config else None)
     updater_config = UpdaterConfig(
         context.options.batch_size,
         context.options.restart_threshold,
