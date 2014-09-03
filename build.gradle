@@ -493,3 +493,9 @@ task FlagSchemaChanges(type: Test) << {
 javadoc {
   classpath += sourceSets.generated.output
 }
+
+run {
+  classpath += sourceSets.generated.output
+  classpath += sourceSets.test.output
+  main = 'org.apache.aurora.scheduler.app.local.LocalSchedulerMain'
+}

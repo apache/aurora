@@ -123,7 +123,7 @@ public class SchedulerMain extends AbstractApplication {
   }
 
   @VisibleForTesting
-  static Iterable<? extends Module> getModules(
+  Iterable<? extends Module> getModules(
       String clusterName,
       String serverSetPath,
       ClientConfig zkClientConfig,
@@ -134,7 +134,7 @@ public class SchedulerMain extends AbstractApplication {
         .add(new StatsModule())
         .add(new AppModule(clusterName, serverSetPath, zkClientConfig, statsURLPrefix))
         .addAll(getExtraModules())
-        .add(new LogStorageModule())
+        .add(getPersistentStorageModule())
         .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
         .add(new CronModule())
         .add(new DbModule(Bindings.annotatedKeyFactory(Delegated.class)))
@@ -147,11 +147,18 @@ public class SchedulerMain extends AbstractApplication {
         .build();
   }
 
-  @Override
-  public Iterable<? extends Module> getModules() {
+  protected Module getPersistentStorageModule() {
+    return new AbstractModule() {
+      @Override
+      protected void configure() {
+        install(new LogStorageModule());
+      }
+    };
+  }
+
+  protected Module getMesosModules() {
     final ClientConfig zkClientConfig = FlaggedClientConfig.create();
-      // TODO(Kevin Sweeney): Push these bindings down into a "production" module.
-    Module additional = new AbstractModule() {
+    return new AbstractModule() {
       @Override
       protected void configure() {
         bind(DriverFactory.class).to(DriverFactoryImpl.class);
@@ -159,14 +166,11 @@ public class SchedulerMain extends AbstractApplication {
         install(new MesosLogStreamModule(zkClientConfig));
       }
     };
+  }
 
-    Module configModule = new AbstractModule() {
-      @Override
-      protected void configure() {
-        bind(ExecutorConfig.class).toInstance(new ExecutorConfig(THERMOS_EXECUTOR_PATH.get()));
-      }
-    };
-
+  @Override
+  public Iterable<? extends Module> getModules() {
+    ClientConfig zkClientConfig = FlaggedClientConfig.create();
     return ImmutableList.<Module>builder()
         .add(new BackupModule(SnapshotStoreImpl.class))
         .addAll(
@@ -176,8 +180,13 @@ public class SchedulerMain extends AbstractApplication {
                 zkClientConfig,
                 STATS_URL_PREFIX.get()))
         .add(new ZooKeeperClientModule(zkClientConfig))
-        .add(configModule)
-        .add(additional)
+        .add(new AbstractModule() {
+          @Override
+          protected void configure() {
+            bind(ExecutorConfig.class).toInstance(new ExecutorConfig(THERMOS_EXECUTOR_PATH.get()));
+          }
+        })
+        .add(getMesosModules())
         .build();
   }
 

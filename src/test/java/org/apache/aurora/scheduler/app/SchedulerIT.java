@@ -163,7 +163,11 @@ public class SchedulerIT extends BaseZooKeeperTest {
     entrySerializer = new EntrySerializer(LogStorageModule.MAX_LOG_ENTRY_SIZE.get());
 
     zkClient = createZkClient();
+  }
 
+  private void startScheduler() throws Exception {
+    // TODO(wfarner): Try to accomplish all this by subclassing SchedulerMain and actually using
+    // AppLauncher.
     Module testModule = new AbstractModule() {
       @Override
       protected void configure() {
@@ -173,28 +177,25 @@ public class SchedulerIT extends BaseZooKeeperTest {
         install(new BackupModule(backupDir, SnapshotStoreImpl.class));
       }
     };
-
     ClientConfig zkClientConfig = ClientConfig
         .create(ImmutableList.of(InetSocketAddress.createUnresolved("localhost", getPort())))
         .withCredentials(ZooKeeperClient.digestCredentials("mesos", "mesos"));
+    final SchedulerMain main = SchedulerMain.class.newInstance();
     injector = Guice.createInjector(
         ImmutableList.<Module>builder()
-            .addAll(SchedulerMain.getModules(
-                CLUSTER_NAME, SERVERSET_PATH, zkClientConfig, STATS_URL_PREFIX))
+            .addAll(main.getModules(CLUSTER_NAME, SERVERSET_PATH, zkClientConfig, STATS_URL_PREFIX))
             .add(new LifecycleModule())
             .add(new AppLauncherModule())
             .add(new ZooKeeperClientModule(zkClientConfig))
             .add(testModule)
             .build()
     );
+    injector.injectMembers(main);
     lifecycle = injector.getInstance(Lifecycle.class);
-  }
 
-  private void startScheduler() throws Exception {
     injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
 
     // Mimic AppLauncher running main.
-    final SchedulerMain main = injector.getInstance(SchedulerMain.class);
     executor.submit(new Runnable() {
       @Override
       public void run() {
