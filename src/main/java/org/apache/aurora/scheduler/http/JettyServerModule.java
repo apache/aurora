@@ -13,17 +13,23 @@
  */
 package org.apache.aurora.scheduler.http;
 
+import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nonnegative;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Ordering;
 import com.google.common.io.Resources;
 import com.google.common.net.MediaType;
 import com.google.inject.AbstractModule;
@@ -41,20 +47,20 @@ import com.twitter.common.application.http.HttpFilterConfig;
 import com.twitter.common.application.http.HttpServletConfig;
 import com.twitter.common.application.http.Registration;
 import com.twitter.common.application.modules.LifecycleModule;
+import com.twitter.common.application.modules.LifecycleModule.LaunchException;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Command;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.base.ExceptionalSupplier;
 import com.twitter.common.base.MoreSuppliers;
-import com.twitter.common.net.http.HttpServerDispatch;
-import com.twitter.common.net.http.RequestLogger;
 import com.twitter.common.net.http.handlers.AbortHandler;
 import com.twitter.common.net.http.handlers.ContentionPrinter;
 import com.twitter.common.net.http.handlers.HealthHandler;
 import com.twitter.common.net.http.handlers.LogConfig;
 import com.twitter.common.net.http.handlers.QuitHandler;
 import com.twitter.common.net.http.handlers.StringTemplateServlet;
+import com.twitter.common.net.http.handlers.TextResponseHandler;
 import com.twitter.common.net.http.handlers.ThreadStackPrinter;
 import com.twitter.common.net.http.handlers.TimeSeriesDataSource;
 import com.twitter.common.net.http.handlers.VarsHandler;
@@ -62,8 +68,15 @@ import com.twitter.common.net.http.handlers.VarsJsonHandler;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 
 import org.apache.aurora.scheduler.http.api.ApiBeta;
-import org.mortbay.jetty.RequestLog;
-import org.mortbay.servlet.GzipFilter;
+import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.DispatcherType;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.server.handler.RequestLogHandler;
+import org.eclipse.jetty.server.nio.SelectChannelConnector;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.servlets.GzipFilter;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;
@@ -75,7 +88,8 @@ import static com.twitter.common.application.modules.LocalServiceRegistry.LocalS
  * Binding module for scheduler HTTP servlets.
  * <p>
  * TODO(wfarner): Continue improvements here by simplifying serving of static assets.  Jetty's
- * DefaultServlet can take over this responsibility.
+ * DefaultServlet can take over this responsibility, and jetty-rewite can be used to rewrite
+ * requests (for static assets) similar to what we currently do with path specs.
  */
 public class JettyServerModule extends AbstractModule {
 
@@ -114,8 +128,6 @@ public class JettyServerModule extends AbstractModule {
 
     bindConstant().annotatedWith(StringTemplateServlet.CacheTemplates.class).to(true);
 
-    bind(HttpServerDispatch.class).in(Singleton.class);
-    bind(RequestLog.class).to(RequestLogger.class);
     Registration.registerServlet(binder(), "/abortabortabort", AbortHandler.class, true);
     Registration.registerServlet(binder(), "/contention", ContentionPrinter.class, false);
     Registration.registerServlet(binder(), "/graphdata", TimeSeriesDataSource.class, true);
@@ -330,7 +342,6 @@ public class JettyServerModule extends AbstractModule {
 
   // TODO(wfarner): Use guava's Service to enforce the lifecycle of this.
   public static final class HttpServerLauncher implements LifecycleModule.ServiceRunner {
-    private final HttpServerDispatch httpServer;
     private final Set<HttpServletConfig> httpServlets;
     private final Set<HttpAssetConfig> httpAssets;
     private final Set<HttpFilterConfig> httpFilters;
@@ -339,14 +350,12 @@ public class JettyServerModule extends AbstractModule {
 
     @Inject
     HttpServerLauncher(
-        HttpServerDispatch httpServer,
         Set<HttpServletConfig> httpServlets,
         Set<HttpAssetConfig> httpAssets,
         Set<HttpFilterConfig> httpFilters,
         @Registration.IndexLink Set<String> additionalIndexLinks,
         Injector injector) {
 
-      this.httpServer = checkNotNull(httpServer);
       this.httpServlets = checkNotNull(httpServlets);
       this.httpAssets = checkNotNull(httpAssets);
       this.httpFilters = checkNotNull(httpFilters);
@@ -354,37 +363,105 @@ public class JettyServerModule extends AbstractModule {
       this.injector = checkNotNull(injector);
     }
 
+    private String makeRecursivePathSpec(String path) {
+      return path.replaceFirst("/?$", "/*");
+    }
+
     @Override
-    public LocalService launch() {
-      if (!httpServer.listen(HTTP_PORT.get())) {
-        throw new IllegalStateException("Failed to start HTTP server, all servlets disabled.");
-      }
+    public LocalService launch() throws LaunchException {
+      final Server server = new Server();
+      ServletContextHandler servletHandler =
+          new ServletContextHandler(server, "/", ServletContextHandler.NO_SESSIONS);
+
+      ImmutableSet.Builder<String> indexLinks = ImmutableSet.builder();
 
       for (HttpServletConfig config : httpServlets) {
-        HttpServlet handler = injector.getInstance(config.handlerClass);
-        httpServer.registerHandler(config.path, handler, config.params, config.silent);
+        ServletHolder holder = new ServletHolder(injector.getInstance(config.handlerClass));
+        if (config.params != null) {
+          holder.setInitParameters(config.params);
+        }
+        servletHandler.addServlet(holder, makeRecursivePathSpec(config.path));
+        if (!config.silent) {
+          indexLinks.add(config.path);
+        }
       }
 
       for (HttpAssetConfig config : httpAssets) {
-        httpServer.registerHandler(config.path, config.handler, null, config.silent);
+        servletHandler.addServlet(
+            new ServletHolder(config.handler),
+            makeRecursivePathSpec(config.path));
+        if (!config.silent) {
+          indexLinks.add(config.path);
+        }
       }
 
       for (HttpFilterConfig filter : httpFilters) {
-        httpServer.registerFilter(filter.filterClass, filter.pathSpec, filter.dispatch);
+        servletHandler.addFilter(
+            filter.filterClass,
+            filter.pathSpec,
+            EnumSet.of(DispatcherType.REQUEST));
       }
 
       for (String indexLink : additionalIndexLinks) {
-        httpServer.registerIndexLink(indexLink);
+        indexLinks.add(indexLink);
+      }
+
+      servletHandler.addServlet(
+          new ServletHolder(new RootHandler(Ordering.natural().sortedCopy(indexLinks.build()))),
+          "/");
+
+      HandlerCollection rootHandler = new HandlerCollection();
+      RequestLogHandler loghandler = new RequestLogHandler();
+      loghandler.setRequestLog(new RequestLogger());
+      rootHandler.addHandler(loghandler);
+      rootHandler.addHandler(servletHandler);
+
+      Connector connector = new SelectChannelConnector();
+      connector.setPort(HTTP_PORT.get());
+      server.addConnector(connector);
+      server.setHandler(rootHandler);
+
+      try {
+        connector.open();
+        server.start();
+      } catch (Exception e) {
+        throw new LaunchException("Failed to start jetty server: " + e, e);
       }
 
       Command shutdown = new Command() {
         @Override public void execute() {
           LOG.info("Shutting down embedded http server");
-          httpServer.stop();
+          try {
+            server.stop();
+          } catch (Exception e) {
+            LOG.log(Level.INFO, "Failed to stop jetty server: " + e, e);
+          }
         }
       };
 
-      return LocalService.auxiliaryService("http", httpServer.getPort(), shutdown);
+      return LocalService.auxiliaryService("http", connector.getLocalPort(), shutdown);
+    }
+  }
+
+  // TODO(wfarner): Replace this with an index.html asset.
+  private static class RootHandler extends TextResponseHandler {
+    private final List<String> lines;
+
+    public RootHandler(List<String> lines) {
+      super("text/html");
+
+      ImmutableList.Builder<String> builder = ImmutableList.builder();
+      builder.add("<html>");
+      for (String handler : lines) {
+        builder.add(String.format("<a href='%s'>%s</a><br />", handler, handler));
+      }
+      builder.add("</html>");
+      this.lines = builder.build();
+    }
+
+    @Override
+    public Iterable<String> getLines(HttpServletRequest request) {
+      return lines;
     }
   }
 }

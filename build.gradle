@@ -148,6 +148,9 @@ dependencies {
 
   def gsonDep = 'com.google.code.gson:gson:2.2.4'
   def guavaDep = 'com.google.guava:guava:16.0'
+  // NOTE: We are using the jetty 7.x series due to a large number of dependencies impacted
+  // by 8.x and later resulting from using newer javax.servlet servlet-api.
+  def jettyDep = '7.6.15.v20140411'
   def thriftLib = "org.apache.thrift:libthrift:${thriftVersion}"
 
   compile 'aopalliance:aopalliance:1.0'
@@ -170,6 +173,9 @@ dependencies {
   compile 'org.apache.mesos:mesos:0.20.0'
   compile thriftLib
   compile 'org.apache.zookeeper:zookeeper:3.3.4'
+  compile "org.eclipse.jetty:jetty-server:${jettyDep}"
+  compile "org.eclipse.jetty:jetty-servlet:${jettyDep}"
+  compile "org.eclipse.jetty:jetty-servlets:${jettyDep}"
   compile 'org.mybatis:mybatis:3.2.7'
   compile 'org.mybatis:mybatis-guice:3.6'
   compile 'org.quartz-scheduler:quartz:2.2.1'
@@ -183,7 +189,11 @@ dependencies {
   compile 'com.twitter.common.zookeeper:group:0.0.69'
   compile 'com.twitter.common.zookeeper:server-set:1.0.74'
   compile 'com.twitter.common.zookeeper:singleton-service:0.0.85'
-  compile 'com.twitter.common:application-http:0.0.59'
+  compile('com.twitter.common:application-http:0.0.59') {
+    // TODO(wfarner): Contribute a patch to twitter commons that allows us to register /graphview
+    // resources without pulling in a jetty dependency.
+    exclude(group: 'org.mortbay.jetty', module: 'jetty')
+  }
   compile 'com.twitter.common:application-module-applauncher:0.0.51'
   compile 'com.twitter.common:application-module-lifecycle:0.0.48'
   compile 'com.twitter.common:application-module-log:0.0.56'
