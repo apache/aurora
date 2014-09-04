@@ -13,6 +13,7 @@
 #
 
 import contextlib
+import re
 import textwrap
 
 from mock import Mock, patch
@@ -171,24 +172,24 @@ class TestJobStatus(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
+      actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
       expected = textwrap.dedent("""\
           Active tasks (3):
           \tTask:
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
-          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \t   1970-11-23 ##:##:## RUNNING: Hi there
           \tTask:
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
-          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \t   1970-11-23 ##:##:## RUNNING: Hi there
           \tTask:
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
-          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \t   1970-11-23 ##:##:## RUNNING: Hi there
           Inactive tasks (0):
           """)
-
-      assert '\n'.join(mock_context.get_out()) == expected
+      assert actual == expected
 
   def test_successful_status_output_with_metadata(self):
     """Test the status command more deeply: in a request with a fully specified
@@ -200,32 +201,33 @@ class TestJobStatus(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
+      actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
       expected = textwrap.dedent("""\
           Active tasks (3):
           \tTask:
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
-          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \t   1970-11-23 ##:##:## RUNNING: Hi there
           \t  metadata:
           \t\t  (key: 'meta', value: 'data')
           \t\t  (key: 'data', value: 'meta')
           \tTask:
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
-          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \t   1970-11-23 ##:##:## RUNNING: Hi there
           \t  metadata:
           \t\t  (key: 'meta', value: 'data')
           \t\t  (key: 'data', value: 'meta')
           \tTask:
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
-          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \t   1970-11-23 ##:##:## RUNNING: Hi there
           \t  metadata:
           \t\t  (key: 'meta', value: 'data')
           \t\t  (key: 'data', value: 'meta')
           Inactive tasks (0):
           """)
-      assert '\n'.join(mock_context.get_out()) == expected
+      assert actual == expected
 
   def test_successful_status_deep_null_metadata(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
