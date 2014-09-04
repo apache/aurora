@@ -13,6 +13,7 @@
 #
 
 import contextlib
+import textwrap
 
 from mock import Mock, patch
 
@@ -25,6 +26,7 @@ from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
     JobKey,
+    Metadata,
     ResponseCode,
     ScheduleStatus,
     ScheduleStatusResult,
@@ -72,6 +74,13 @@ class TestJobStatus(AuroraClientCommandTest):
     return result
 
   @classmethod
+  def create_mock_scheduled_task_with_metadata(cls):
+    result = cls.create_mock_scheduled_tasks()
+    for job in result:
+      job.assignedTask.task.metadata = [Metadata("meta", "data"), Metadata("data", "meta")]
+    return result
+
+  @classmethod
   def create_getjobs_response(cls):
     result = cls.create_simple_success_response()
     result.result = Mock()
@@ -101,6 +110,13 @@ class TestJobStatus(AuroraClientCommandTest):
     resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_no_metadata())
+    return resp
+
+  @classmethod
+  def create_status_with_metadata(cls):
+    resp = cls.create_simple_success_response()
+    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
+    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_with_metadata())
     return resp
 
   @classmethod
@@ -144,6 +160,72 @@ class TestJobStatus(AuroraClientCommandTest):
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
           environment='test', owner=Identity(role='bozo')))
+
+  def test_successful_status_output_no_metadata(self):
+    """Test the status command more deeply: in a request with a fully specified
+    job, it should end up doing a query using getTasksWithoutConfigs."""
+    mock_context = FakeAuroraCommandContext()
+    mock_context.add_expected_status_query_result(self.create_status_null_metadata())
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'status', 'west/bozo/test/hello'])
+      expected = textwrap.dedent("""\
+          Active tasks (3):
+          \tTask:
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \tTask:
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \tTask:
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          Inactive tasks (0):
+          """)
+
+      assert '\n'.join(mock_context.get_out()) == expected
+
+  def test_successful_status_output_with_metadata(self):
+    """Test the status command more deeply: in a request with a fully specified
+    job, it should end up doing a query using getTasksWithoutConfigs."""
+    mock_context = FakeAuroraCommandContext()
+    mock_context.add_expected_status_query_result(self.create_status_with_metadata())
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'status', 'west/bozo/test/hello'])
+      expected = textwrap.dedent("""\
+          Active tasks (3):
+          \tTask:
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \t  metadata:
+          \t\t  (key: 'meta', value: 'data')
+          \t\t  (key: 'data', value: 'meta')
+          \tTask:
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \t  metadata:
+          \t\t  (key: 'meta', value: 'data')
+          \t\t  (key: 'data', value: 'meta')
+          \tTask:
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 13:58:46 RUNNING: Hi there
+          \t  metadata:
+          \t\t  (key: 'meta', value: 'data')
+          \t\t  (key: 'data', value: 'meta')
+          Inactive tasks (0):
+          """)
+      assert '\n'.join(mock_context.get_out()) == expected
 
   def test_successful_status_deep_null_metadata(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()

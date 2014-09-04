@@ -533,24 +533,25 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
     def render_task_pretty(scheduled_task):
       assigned_task = scheduled_task.assignedTask
       task_info = assigned_task.task
-      task_strings = []
+      task_strings = ["\tTask:"]
       if task_info:
-        task_strings.append("""\tcpus: %s, ram: %s MB, disk: %s MB""" % (
+        task_strings.append("""\t  cpus: %s, ram: %s MB, disk: %s MB""" % (
             task_info.numCpus, task_info.ramMb, task_info.diskMb))
       if assigned_task.assignedPorts:
-        task_strings.append("ports: %s" % assigned_task.assignedPorts)
+        task_strings.append("\t  ports: %s" % assigned_task.assignedPorts)
         # TODO(mchucarroll): only add the max if taskInfo is filled in!
-        task_strings.append("failure count: %s (max %s)" % (scheduled_task.failureCount,
+        task_strings.append("\t  failure count: %s (max %s)" % (scheduled_task.failureCount,
             task_info.maxTaskFailures))
-        task_strings.append("events:")
+      task_strings.append("\t  events:")
       for event in scheduled_task.taskEvents:
-        task_strings.append("\t %s %s: %s" % (datetime.fromtimestamp(event.timestamp / 1000),
+        task_strings.append("\t   %s %s: %s" % (datetime.fromtimestamp(event.timestamp / 1000),
             ScheduleStatus._VALUES_TO_NAMES[event.status], event.message))
-        task_strings.append("metadata:")
-        if assigned_task.task.metadata is not None:
-          for md in assigned_task.task.metadata:
-            task_strings.append("\t%s: %s" % (md.key, md.value))
-      return "\n\t".join(task_strings)
+      if assigned_task.task.metadata is not None and len(assigned_task.task.metadata) > 0:
+        task_strings.append("\t  metadata:")
+        for md in assigned_task.task.metadata:
+          task_strings.append("\t\t  (key: '%s', value: '%s')" % (md.key, md.value))
+      task_strings.append('')
+      return "\n".join(task_strings)
 
     result = ["Active tasks (%s):\n" % len(active_tasks)]
     for t in active_tasks:
