@@ -50,6 +50,7 @@ import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.TaskVars.jobStatName;
 import static org.apache.aurora.scheduler.TaskVars.rackStatName;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -61,24 +62,35 @@ public class TaskVarsTest extends EasyMockTest {
   private static final String JOB_A = "job_a";
   private static final String JOB_B = "job_b";
   private static final String TASK_ID = "task_id";
+  private static final String ENV = "test";
 
   private StorageTestUtil storageUtil;
-  private StatsProvider trackedStats;
+  private StatsProvider trackedProvider;
+  private StatsProvider untrackedProvider;
   private TaskVars vars;
   private Map<String, Supplier<Long>> globalCounters;
 
   @Before
   public void setUp() {
     storageUtil = new StorageTestUtil(this);
-    trackedStats = createMock(StatsProvider.class);
-    vars = new TaskVars(storageUtil.storage, trackedStats);
-
+    trackedProvider = createMock(StatsProvider.class);
+    untrackedProvider = createMock(StatsProvider.class);
+    expect(trackedProvider.untracked()).andReturn(untrackedProvider);
     storageUtil.expectOperations();
     globalCounters = Maps.newHashMap();
   }
 
-  private void expectStatExport(final String name) {
-    expect(trackedStats.makeGauge(EasyMock.eq(name), EasyMock.<Supplier<Long>>anyObject()))
+  private void replayAndBuild() {
+    control.replay();
+    vars = new TaskVars(storageUtil.storage, trackedProvider);
+  }
+
+  private void expectStatExport(String name) {
+    expectStatExport(name, trackedProvider);
+  }
+
+  private void expectStatExport(final String name, StatsProvider provider) {
+    expect(provider.makeGauge(EasyMock.eq(name), EasyMock.<Supplier<Long>>anyObject()))
         .andAnswer(new IAnswer<Stat<Long>>() {
           @SuppressWarnings("unchecked")
           @Override
@@ -116,6 +128,7 @@ public class TaskVarsTest extends EasyMockTest {
             .setTaskId(TASK_ID)
             .setTask(new TaskConfig()
                 .setJobName(job)
+                .setEnvironment(ENV)
                 .setOwner(new Identity(ROLE_A, ROLE_A + "-user"))));
     if (Tasks.SLAVE_ASSIGNED_STATES.contains(status) || Tasks.isTerminated(status)) {
       task.getAssignedTask().setSlaveHost(host);
@@ -138,7 +151,7 @@ public class TaskVarsTest extends EasyMockTest {
   public void testStartsAtZero() {
     expectStatusCountersInitialized();
 
-    control.replay();
+    replayAndBuild();
     schedulerActivated();
 
     assertAllZero();
@@ -146,10 +159,9 @@ public class TaskVarsTest extends EasyMockTest {
 
   @Test
   public void testNoEarlyExport() {
-    control.replay();
+    replayAndBuild();
 
     // No variables should be exported since schedulerActive is never called.
-    vars = new TaskVars(storageUtil.storage, trackedStats);
     IScheduledTask taskA = makeTask(JOB_A, INIT);
     changeState(taskA, PENDING);
     changeState(IScheduledTask.build(taskA.newBuilder().setStatus(PENDING)), ASSIGNED);
@@ -171,7 +183,7 @@ public class TaskVarsTest extends EasyMockTest {
     expectGetHostRack("hostA", "rackA").atLeastOnce();
     expectStatExport(rackStatName("rackA"));
 
-    control.replay();
+    replayAndBuild();
     schedulerActivated();
 
     changeState(makeTask(JOB_A, INIT), PENDING);
@@ -200,13 +212,16 @@ public class TaskVarsTest extends EasyMockTest {
     expectStatExport(rackStatName("rackA"));
     expectStatExport(rackStatName("rackB"));
 
-    control.replay();
+    IScheduledTask failedTask = makeTask(JOB_B, FAILED, "hostB");
+    expectStatExport(jobStatName(failedTask, FAILED), untrackedProvider);
+
+    replayAndBuild();
     schedulerActivated(
         makeTask(JOB_A, PENDING),
         makeTask(JOB_A, RUNNING, "hostA"),
         makeTask(JOB_A, FINISHED, "hostA"),
         makeTask(JOB_B, PENDING),
-        makeTask(JOB_B, FAILED, "hostB"));
+        failedTask);
 
     assertEquals(2, getValue(PENDING));
     assertEquals(1, getValue(RUNNING));
@@ -214,6 +229,7 @@ public class TaskVarsTest extends EasyMockTest {
     assertEquals(1, getValue(FAILED));
     assertEquals(0, getValue(rackStatName("rackA")));
     assertEquals(0, getValue(rackStatName("rackB")));
+    assertEquals(1, getValue(jobStatName(failedTask, FAILED)));
   }
 
   private IExpectationSetters<?> expectGetHostRack(String host, String rackToReturn) {
@@ -235,13 +251,17 @@ public class TaskVarsTest extends EasyMockTest {
     expectStatExport(rackStatName("rackA"));
     expectStatExport(rackStatName("rackB"));
 
-    control.replay();
-    schedulerActivated();
-
     IScheduledTask a = makeTask("jobA", RUNNING, "host1");
     IScheduledTask b = makeTask("jobB", RUNNING, "host2");
-    IScheduledTask c = makeTask("jobC", RUNNING, "host3");
+    IScheduledTask c = makeTask("jobD", RUNNING, "host3");
     IScheduledTask d = makeTask("jobD", RUNNING, "host1");
+
+    expectStatExport(jobStatName(a, LOST), untrackedProvider);
+    expectStatExport(jobStatName(b, LOST), untrackedProvider);
+    expectStatExport(jobStatName(c, LOST), untrackedProvider);
+
+    replayAndBuild();
+    schedulerActivated();
 
     changeState(a, LOST);
     changeState(b, LOST);
@@ -250,6 +270,10 @@ public class TaskVarsTest extends EasyMockTest {
 
     assertEquals(2, getValue(rackStatName("rackA")));
     assertEquals(2, getValue(rackStatName("rackB")));
+
+    assertEquals(1, getValue(jobStatName(a, LOST)));
+    assertEquals(1, getValue(jobStatName(b, LOST)));
+    assertEquals(2, getValue(jobStatName(c, LOST)));
   }
 
   @Test
@@ -258,10 +282,12 @@ public class TaskVarsTest extends EasyMockTest {
     expect(storageUtil.attributeStore.getHostAttributes("a"))
         .andReturn(Optional.<IHostAttributes>absent());
 
-    control.replay();
+    IScheduledTask a = makeTask(JOB_A, RUNNING, "a");
+    expectStatExport(jobStatName(a, LOST), untrackedProvider);
+
+    replayAndBuild();
     schedulerActivated();
 
-    IScheduledTask a = makeTask(JOB_A, RUNNING, "a");
     changeState(a, LOST);
     // Since no attributes are stored for the host, a variable is not exported/updated.
   }

@@ -29,11 +29,13 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
 import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
@@ -52,8 +54,11 @@ import static java.util.Objects.requireNonNull;
  */
 class TaskVars implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(TaskVars.class.getName());
+  private static final ImmutableSet<ScheduleStatus> TRACKED_JOB_STATES =
+      ImmutableSet.of(ScheduleStatus.LOST, ScheduleStatus.FAILED);
 
   private final LoadingCache<String, Counter> counters;
+  private final LoadingCache<String, Counter> untrackedCounters;
   private final Storage storage;
   private volatile boolean exporting = false;
 
@@ -61,10 +66,15 @@ class TaskVars implements EventSubscriber {
   TaskVars(Storage storage, final StatsProvider statProvider) {
     this.storage = requireNonNull(storage);
     requireNonNull(statProvider);
-    counters = CacheBuilder.newBuilder().build(new CacheLoader<String, Counter>() {
+    counters = buildCache(statProvider);
+    untrackedCounters = buildCache(statProvider.untracked());
+  }
+
+  private LoadingCache<String, Counter> buildCache(final StatsProvider provider) {
+    return CacheBuilder.newBuilder().build(new CacheLoader<String, Counter>() {
       @Override
       public Counter load(String statName) {
-        Counter counter = new Counter(statProvider);
+        Counter counter = new Counter(provider);
         if (exporting) {
           counter.exportAs(statName);
         }
@@ -81,6 +91,14 @@ class TaskVars implements EventSubscriber {
   @VisibleForTesting
   static String rackStatName(String rack) {
     return "tasks_lost_rack_" + rack;
+  }
+
+  @VisibleForTesting
+  static String jobStatName(IScheduledTask task, ScheduleStatus status) {
+    return String.format(
+        "tasks_%s_%s",
+        status,
+        JobKeys.canonicalString(JobKeys.from(task.getAssignedTask().getTask())));
   }
 
   private static final Predicate<IAttribute> IS_RACK = new Predicate<IAttribute>() {
@@ -110,13 +128,10 @@ class TaskVars implements EventSubscriber {
     getCounter(status).decrement();
   }
 
-  @Subscribe
-  public void taskChangedState(TaskStateChange stateChange) {
-    IScheduledTask task = stateChange.getTask();
-    Optional<ScheduleStatus> previousState = stateChange.getOldState();
-    final String host = stateChange.getTask().getAssignedTask().getSlaveHost();
+  private void updateRackCounters(IScheduledTask task, ScheduleStatus newState) {
+    final String host = task.getAssignedTask().getSlaveHost();
     Optional<String> rack;
-    if (Strings.isNullOrEmpty(stateChange.getTask().getAssignedTask().getSlaveHost())) {
+    if (Strings.isNullOrEmpty(task.getAssignedTask().getSlaveHost())) {
       rack = Optional.absent();
     } else {
       rack = storage.consistentRead(new Work.Quiet<Optional<String>>() {
@@ -136,19 +151,33 @@ class TaskVars implements EventSubscriber {
       counters.getUnchecked(rackStatName(rack.get()));
     }
 
-    if (stateChange.isTransition() && !previousState.equals(Optional.of(ScheduleStatus.INIT))) {
-      decrementCount(previousState.get());
-    }
-
-    incrementCount(task.getStatus());
-
-    if (stateChange.getNewState() == ScheduleStatus.LOST) {
+    if (newState == ScheduleStatus.LOST) {
       if (rack.isPresent()) {
         counters.getUnchecked(rackStatName(rack.get())).increment();
       } else {
         LOG.warning("Failed to find rack attribute associated with host " + host);
       }
     }
+  }
+
+  private void updateJobCounters(IScheduledTask task, ScheduleStatus newState) {
+    if (TRACKED_JOB_STATES.contains(newState)) {
+      untrackedCounters.getUnchecked(jobStatName(task, newState)).increment();
+    }
+  }
+
+  @Subscribe
+  public void taskChangedState(TaskStateChange stateChange) {
+    IScheduledTask task = stateChange.getTask();
+    Optional<ScheduleStatus> previousState = stateChange.getOldState();
+
+    if (stateChange.isTransition() && !previousState.equals(Optional.of(ScheduleStatus.INIT))) {
+      decrementCount(previousState.get());
+    }
+    incrementCount(task.getStatus());
+
+    updateRackCounters(task, task.getStatus());
+    updateJobCounters(task, task.getStatus());
   }
 
   @Subscribe
@@ -160,10 +189,15 @@ class TaskVars implements EventSubscriber {
       getCounter(status);
     }
 
+    exportCounters(counters.asMap());
+    exportCounters(untrackedCounters.asMap());
+  }
+
+  private void exportCounters(Map<String, Counter> counterMap) {
     // Initiate export of all counters.  This is not done initially to avoid exporting values that
     // do not represent the entire storage contents.
     exporting = true;
-    for (Map.Entry<String, Counter> entry : counters.asMap().entrySet()) {
+    for (Map.Entry<String, Counter> entry : counterMap.entrySet()) {
       entry.getValue().exportAs(entry.getKey());
     }
   }
