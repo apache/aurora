@@ -28,7 +28,7 @@
       <tbody>
         $slaves:{ slave |
         <tr>
-          <td><a href="http://$slave.host$:8081">$slave.host$</a>
+          <td><a href="http://$slave.host$:1338">$slave.host$</a>
           <td>$slave.id$
           <td>$slave.mode$
           <td>$slave.attributes$
