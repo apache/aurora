@@ -28,30 +28,30 @@ function upstart_update {
   # Stop and start is necessary to update a the configuration of
   # an upstart job.  We'll rarely change the configuration, but
   # it's probably better to do this upfront and avoid surprises/confusion.
-  stop $1
-  start $1
+  sudo stop $1
+  sudo start $1
 }
 
 function build_client {
   ./pants src/main/python/apache/aurora/client/bin:aurora_client
-  ln -sf $DIST_DIR/aurora_client.pex /usr/local/bin/aurora
+  sudo ln -sf $DIST_DIR/aurora_client.pex /usr/local/bin/aurora
 }
 
 function build_client2 {
   ./pants src/main/python/apache/aurora/client/cli:aurora2
-  ln -sf $DIST_DIR/aurora2.pex /usr/local/bin/aurora2
+  sudo ln -sf $DIST_DIR/aurora2.pex /usr/local/bin/aurora2
 }
 
 function build_admin_client {
   ./pants src/main/python/apache/aurora/client/bin:aurora_admin
-  ln -sf $DIST_DIR/aurora_admin.pex /usr/local/bin/aurora_admin
+  sudo ln -sf $DIST_DIR/aurora_admin.pex /usr/local/bin/aurora_admin
 }
 
 function build_scheduler {
   ./gradlew installApp
 
   export LD_LIBRARY_PATH=/usr/lib/jvm/java-7-openjdk-amd64/jre/lib/amd64/server
-  mkdir -p $AURORA_HOME/scheduler
+  sudo mkdir -p $AURORA_HOME/scheduler
   if sudo mesos-log initialize --path="$AURORA_HOME/scheduler/db"
   then
     echo "Replicated log initialized."

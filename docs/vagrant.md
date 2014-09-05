@@ -39,7 +39,7 @@ destroying and rebuilding your VM.
 `aurorabuild` accepts a list of components to build and update.  You may invoke the command with
 no arguments to get a list of supported components.
 
-     vagrant ssh -c 'sudo aurorabuild client'
+     vagrant ssh -c 'aurorabuild client'
 
 
 Troubleshooting
