@@ -35,7 +35,7 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result;
-import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_RUNNING_LIMIT;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
@@ -120,7 +120,7 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
     f.evaluateCurrentState(SUCCEEDED);
   }
@@ -133,10 +133,10 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
     f.evaluate(EVALUATE_ON_STATE_CHANGE, FAILED);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, RUNNING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
     f.evaluateCurrentState(SUCCEEDED);
   }
@@ -149,7 +149,7 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
     f.evaluate(Result.FAILED, FAILED);
   }
 
@@ -157,7 +157,7 @@ public class InstanceUpdaterTest {
   public void testNoopUpdate() {
     TestFixture f = new TestFixture(NEW, 1);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, RUNNING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
     f.evaluate(SUCCEEDED, RUNNING);
   }
@@ -175,7 +175,7 @@ public class InstanceUpdaterTest {
     f.setActualStateAbsent();
     f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
     f.evaluateCurrentState(SUCCEEDED);
   }
@@ -198,13 +198,13 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING);
     f.advanceTime(MAX_NON_RUNNING_TIME);
     f.evaluateCurrentState(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE);
     f.setActualStateAbsent();
     f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING);
     f.advanceTime(MAX_NON_RUNNING_TIME);
     f.evaluateCurrentState(Result.FAILED);
   }
@@ -217,15 +217,15 @@ public class InstanceUpdaterTest {
     f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
     f.evaluate(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE, FINISHED);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING);
     f.advanceTime(MAX_NON_RUNNING_TIME);
     f.evaluateCurrentState(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE);
     f.setActualStateAbsent();
     f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, ASSIGNED, STARTING, RUNNING);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, KILLING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, KILLING);
     f.advanceTime(MAX_NON_RUNNING_TIME);
     f.evaluateCurrentState(Result.FAILED);
   }
@@ -264,7 +264,7 @@ public class InstanceUpdaterTest {
     f.setActualStateAbsent();
     f.evaluateCurrentState(REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
     f.setActualState(NEW);
-    f.evaluate(EVALUATE_AFTER_RUNNING_LIMIT, PENDING, ASSIGNED, STARTING, RUNNING);
+    f.evaluate(EVALUATE_AFTER_MIN_RUNNING_MS, PENDING, ASSIGNED, STARTING, RUNNING);
     f.advanceTime(MIN_RUNNING_TIME);
     f.evaluateCurrentState(SUCCEEDED);
   }

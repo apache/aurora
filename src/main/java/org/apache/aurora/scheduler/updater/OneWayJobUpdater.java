@@ -17,11 +17,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.twitter.common.util.StateMachine;
 
@@ -106,8 +108,8 @@ class OneWayJobUpdater<K, T> {
         return Optional.of(InstanceAction.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
       case KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE:
         return Optional.of(InstanceAction.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE);
-      case EVALUATE_AFTER_RUNNING_LIMIT:
-        return Optional.of(InstanceAction.EVALUATE_AFTER_RUNNING_LIMIT);
+      case EVALUATE_AFTER_MIN_RUNNING_MS:
+        return Optional.of(InstanceAction.EVALUATE_AFTER_MIN_RUNNING_MS);
       default:
         break;
     }
@@ -115,10 +117,15 @@ class OneWayJobUpdater<K, T> {
     return Optional.absent();
   }
 
+  @VisibleForTesting
+  Set<K> getInstances() {
+    return ImmutableSet.copyOf(instances.keySet());
+  }
+
   /**
    * Performs an evaluation of the job.  An evaluation would normally be triggered to initiate the
    * update, as a result of a state change relevant to the update, or due to a
-   * {@link InstanceAction#EVALUATE_AFTER_RUNNING_LIMIT requested} instance re-evaluation.
+   * {@link InstanceAction#EVALUATE_AFTER_MIN_RUNNING_MS requested} instance re-evaluation.
    *
    * @param instancesNeedingUpdate Instances triggering the event, if any.
    * @param stateProvider Provider to fetch state of instances, and pass to
@@ -270,7 +277,7 @@ class OneWayJobUpdater<K, T> {
     EVALUATE_ON_STATE_CHANGE,
     REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE,
     KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE,
-    EVALUATE_AFTER_RUNNING_LIMIT
+    EVALUATE_AFTER_MIN_RUNNING_MS
   }
 
   /**

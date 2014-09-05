@@ -28,7 +28,7 @@ import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.EvaluationRes
 import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.InstanceAction;
 import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.OneWayStatus;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result;
-import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_RUNNING_LIMIT;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
@@ -38,7 +38,7 @@ import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-public class OneWayJobUpdaterTest extends EasyMockTest {
+public class OneWayJobUpdateControllerTest extends EasyMockTest {
   private static final Set<Integer> EMPTY = ImmutableSet.of();
   private static final Map<Integer, InstanceAction> NO_ACTIONS = ImmutableMap.of();
 
@@ -128,7 +128,7 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
         3,
         instance3,
         s3,
-        EVALUATE_AFTER_RUNNING_LIMIT);
+        EVALUATE_AFTER_MIN_RUNNING_MS);
     expectEvaluate(3, instance3, s3, SUCCEEDED);
 
     control.replay();
@@ -152,7 +152,7 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
         2,
         OneWayStatus.WORKING,
         ImmutableMap.of(
-            3, InstanceAction.EVALUATE_AFTER_RUNNING_LIMIT));
+            3, InstanceAction.EVALUATE_AFTER_MIN_RUNNING_MS));
     evaluate(
         3,
         OneWayStatus.SUCCEEDED,

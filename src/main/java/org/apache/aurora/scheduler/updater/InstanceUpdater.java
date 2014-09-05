@@ -33,7 +33,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_RUNNING_LIMIT;
+import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.FAILED;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
@@ -146,7 +146,7 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
           return SUCCEEDED;
         } else {
           // Not running long enough to consider stable, check again later.
-          return EVALUATE_AFTER_RUNNING_LIMIT;
+          return EVALUATE_AFTER_MIN_RUNNING_MS;
         }
       } else if (Tasks.isTerminated(status)) {
         // The desired task has terminated, this is a failure.
@@ -160,7 +160,7 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
             : KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       } else {
         // The task is in a transient state on the way into or out of running, check back later.
-        return EVALUATE_AFTER_RUNNING_LIMIT;
+        return EVALUATE_AFTER_MIN_RUNNING_MS;
       }
     } else {
       // This is not the configuration that we would like to run.
