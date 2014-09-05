@@ -24,6 +24,15 @@ python_test_suite(
   ]
 )
 
+python_library(
+  name = 'fixtures',
+  sources = 'fixtures.py',
+  dependencies = [
+    pants('src/main/python/apache/aurora/config/schema'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+  ],
+)
+
 python_tests(
   name = 'announcer',
   sources = ['test_announcer.py'],
@@ -49,10 +58,13 @@ python_tests(
   name = 'health_checker',
   sources = ['test_health_checker.py'],
   dependencies = [
+    pants(':fixtures'),
     pants('3rdparty/python:mesos.interface'),
-    pants('3rdparty/python:mox'),
+    pants('3rdparty/python:mock'),
     pants('3rdparty/python:twitter.common.testing'),
+    pants('src/main/python/apache/aurora/common:http_signaler'),
     pants('src/main/python/apache/aurora/executor/common:health_checker'),
+    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )
 
@@ -79,8 +91,8 @@ python_tests(
   name = 'task_info',
   sources = ['test_task_info.py'],
   dependencies = [
+    pants(':fixtures'),
     pants('src/main/python/apache/aurora/executor/common:task_info'),
-    pants('src/main/python/apache/aurora/config/schema'),
     pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
   ]
 )

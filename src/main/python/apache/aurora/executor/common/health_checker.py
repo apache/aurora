@@ -25,8 +25,83 @@ from .status_checker import StatusChecker, StatusCheckerProvider, StatusResult
 from .task_info import mesos_task_instance_from_assigned_task, resolve_ports
 
 
-class HealthCheckerThread(StatusChecker, ExceptionalThread):
-  """Generic, StatusChecker-conforming thread for arbitrary periodic health checks
+class ThreadedHealthChecker(ExceptionalThread):
+  """Perform a health check to determine if a service is healthy or not
+
+    health_checker should be a callable returning a tuple of (boolean, reason), indicating
+    respectively the health of the service and the reason for its failure (or None if the service is
+    still healthy).
+  """
+
+  def __init__(self,
+      health_checker,
+      interval_secs,
+      initial_interval_secs,
+      max_consecutive_failures,
+      clock):
+    """
+    :param health_checker: health checker to confirm service health
+    :type health_checker: function that returns (boolean, <string>)
+    :param interval_secs: delay between checks
+    :type interval_secs: int
+    :param initial_interval_secs: seconds to wait before starting checks
+    :type initial_interval_secs: int
+    :param max_consecutive_failures: number of failures to allow before marking dead
+    :type max_consecutive_failures: int
+    :param clock: time module available to be mocked for testing
+    :type clock: time module
+    """
+    self.checker = health_checker
+    self.clock = clock
+    self.current_consecutive_failures = 0
+    self.dead = threading.Event()
+    self.interval = interval_secs
+    self.max_consecutive_failures = max_consecutive_failures
+
+    if initial_interval_secs is not None:
+      self.initial_interval = initial_interval_secs
+    else:
+      self.initial_interval = interval_secs * 2
+
+    if self.initial_interval > 0:
+      self.healthy, self.reason = True, None
+    else:
+      self.healthy, self.reason = self.checker()
+    super(ThreadedHealthChecker, self).__init__()
+    self.daemon = True
+
+  def _maybe_update_failure_count(self, is_healthy, reason):
+    if not is_healthy:
+      log.warning('Health check failure: %s' % reason)
+      self.current_consecutive_failures += 1
+      if self.current_consecutive_failures > self.max_consecutive_failures:
+        log.warning('Reached consecutive failure limit.')
+        self.healthy = False
+        self.reason = reason
+    else:
+      if self.current_consecutive_failures > 0:
+        log.debug('Reset consecutive failures counter.')
+      self.current_consecutive_failures = 0
+
+  def run(self):
+    log.debug('Health checker thread started.')
+    self.clock.sleep(self.initial_interval)
+    log.debug('Initial interval expired.')
+    while not self.dead.is_set():
+      is_healthy, reason = self.checker()
+      self._maybe_update_failure_count(is_healthy, reason)
+      self.clock.sleep(self.interval)
+
+  def start(self):
+    ExceptionalThread.start(self)
+
+  def stop(self):
+    log.debug('Health checker thread stopped.')
+    self.dead.set()
+
+
+class HealthChecker(StatusChecker):
+  """Generic StatusChecker-conforming class which uses a thread for arbitrary periodic health checks
 
     health_checker should be a callable returning a tuple of (boolean, reason), indicating
     respectively the health of the service and the reason for its failure (or None if the service is
@@ -39,57 +114,25 @@ class HealthCheckerThread(StatusChecker, ExceptionalThread):
                initial_interval_secs=None,
                max_consecutive_failures=0,
                clock=time):
-    self._checker = health_checker
-    self._interval = interval_secs
-    if initial_interval_secs is not None:
-      self._initial_interval = initial_interval_secs
-    else:
-      self._initial_interval = interval_secs * 2
-    self._current_consecutive_failures = 0
-    self._max_consecutive_failures = max_consecutive_failures
-    self._dead = threading.Event()
-    if self._initial_interval > 0:
-      self._healthy, self._reason = True, None
-    else:
-      self._healthy, self._reason = self._checker()
-    self._clock = clock
-    super(HealthCheckerThread, self).__init__()
-    self.daemon = True
+    self.threaded_health_checker = ThreadedHealthChecker(
+        health_checker,
+        interval_secs,
+        initial_interval_secs,
+        max_consecutive_failures,
+        clock)
 
   @property
   def status(self):
-    if not self._healthy:
-      return StatusResult('Failed health check! %s' % self._reason, TaskState.Value('TASK_FAILED'))
-
-  def run(self):
-    log.debug('Health checker thread started.')
-    self._clock.sleep(self._initial_interval)
-    log.debug('Initial interval expired.')
-    while not self._dead.is_set():
-      self._maybe_update_failure_count(*self._checker())
-      self._clock.sleep(self._interval)
-
-  def _maybe_update_failure_count(self, is_healthy, reason):
-    if not is_healthy:
-      log.warning('Health check failure: %s' % reason)
-      self._current_consecutive_failures += 1
-      if self._current_consecutive_failures > self._max_consecutive_failures:
-        log.warning('Reached consecutive failure limit.')
-        self._healthy = False
-        self._reason = reason
-    else:
-      if self._current_consecutive_failures > 0:
-        log.debug('Reset consecutive failures counter.')
-      self._current_consecutive_failures = 0
+    if not self.threaded_health_checker.healthy:
+      return StatusResult('Failed health check! %s' % self.threaded_health_checker.reason,
+          TaskState.Value('TASK_FAILED'))
 
   def start(self):
-    StatusChecker.start(self)
-    ExceptionalThread.start(self)
+    super(HealthChecker, self).start()
+    self.threaded_health_checker.start()
 
   def stop(self):
-    log.debug('Health checker thread stopped.')
-    self._dead.set()
-
+    self.threaded_health_checker.stop()
 
 class HealthCheckerProvider(StatusCheckerProvider):
   def from_assigned_task(self, assigned_task, _):
@@ -103,7 +146,7 @@ class HealthCheckerProvider(StatusCheckerProvider):
     http_signaler = HttpSignaler(
         portmap['health'],
         timeout_secs=health_check_config.get('timeout_secs'))
-    health_checker = HealthCheckerThread(
+    health_checker = HealthChecker(
         http_signaler.health,
         interval_secs=health_check_config.get('interval_secs'),
         initial_interval_secs=health_check_config.get('initial_interval_secs'),
