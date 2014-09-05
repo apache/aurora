@@ -13,20 +13,17 @@
  */
 package org.apache.aurora.scheduler.configuration;
 
-import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Functions;
 import com.google.common.base.Objects;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Range;
 
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.commons.lang.StringUtils;
 
 /**
@@ -37,22 +34,20 @@ public final class SanitizedConfiguration {
   private static final Logger LOG = Logger.getLogger(SanitizedConfiguration.class.getName());
 
   private final IJobConfiguration sanitized;
-  private final Map<Integer, ITaskConfig> tasks;
+  private final Set<Integer> instanceIds;
 
   /**
-   * Constructs a SanitizedConfiguration object and populates the set of {@link ITaskConfig}s for
-   * the provided config.
+   * Constructs a SanitizedConfiguration object and populates the set of instance IDs for
+   * the provided {@link org.apache.aurora.scheduler.storage.entities.ITaskConfig}.
    *
    * @param sanitized A sanitized configuration.
    */
   @VisibleForTesting
   public SanitizedConfiguration(IJobConfiguration sanitized) {
     this.sanitized = sanitized;
-    this.tasks = Maps.toMap(
-        ContiguousSet.create(
-            Range.closedOpen(0, sanitized.getInstanceCount()),
-            DiscreteDomain.integers()),
-        Functions.constant(sanitized.getTaskConfig()));
+    this.instanceIds = ContiguousSet.create(
+        Range.closedOpen(0, sanitized.getInstanceCount()),
+        DiscreteDomain.integers());
   }
 
   /**
@@ -72,9 +67,8 @@ public final class SanitizedConfiguration {
     return sanitized;
   }
 
-  // TODO(William Farner): Rework this API now that all configs are identical.
-  public Map<Integer, ITaskConfig> getTaskConfigs() {
-    return tasks;
+  public Set<Integer> getInstanceIds() {
+    return instanceIds;
   }
 
   /**

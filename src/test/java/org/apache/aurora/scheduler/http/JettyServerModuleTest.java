@@ -52,7 +52,6 @@ import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
-import org.apache.aurora.scheduler.state.SchedulerCore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -113,7 +112,6 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
             bindMock(OfferQueue.class);
             bindMock(QuotaManager.class);
             bindMock(RescheduleCalculator.class);
-            bindMock(SchedulerCore.class);
             bindMock(TaskScheduler.class);
             bindMock(Thread.UncaughtExceptionHandler.class);
           }

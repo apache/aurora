@@ -18,7 +18,6 @@ import java.net.UnknownHostException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,6 +39,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
+
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -49,6 +49,7 @@ import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -115,21 +116,32 @@ public class StateManagerImpl implements StateManager {
   }
 
   @Override
-  public void insertPendingTasks(final Map<Integer, ITaskConfig> tasks) {
-    requireNonNull(tasks);
+  public void insertPendingTasks(final ITaskConfig task, final Set<Integer> instanceIds) {
+    requireNonNull(task);
+    checkNotBlank(instanceIds);
 
     // Done outside the write transaction to minimize the work done inside a transaction.
-    final Set<IScheduledTask> scheduledTasks = FluentIterable.from(tasks.entrySet())
-        .transform(new Function<Entry<Integer, ITaskConfig>, IScheduledTask>() {
+    final Set<IScheduledTask> scheduledTasks = FluentIterable.from(instanceIds)
+        .transform(new Function<Integer, IScheduledTask>() {
           @Override
-          public IScheduledTask apply(Entry<Integer, ITaskConfig> entry) {
-            return createTask(entry.getKey(), entry.getValue());
+          public IScheduledTask apply(Integer instanceId) {
+            return createTask(instanceId, task);
           }
         }).toSet();
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
       protected void execute(MutableStoreProvider storeProvider) {
+          ImmutableSet<IScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
+            Query.jobScoped(JobKeys.from(task)).active());
+
+        Set<Integer> existingInstanceIds =
+            FluentIterable.from(existingTasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet();
+
+        if (!Sets.intersection(existingInstanceIds, instanceIds).isEmpty()) {
+          throw new IllegalArgumentException("Instance ID collision detected.");
+        }
+
         storeProvider.getUnsafeTaskStore().saveTasks(scheduledTasks);
 
         for (IScheduledTask task : scheduledTasks) {

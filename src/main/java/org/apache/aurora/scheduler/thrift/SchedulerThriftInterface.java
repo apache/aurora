@@ -105,7 +105,6 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Jobs;
 import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.base.ScheduleException;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
@@ -123,8 +122,8 @@ import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
-import org.apache.aurora.scheduler.state.SchedulerCore;
 import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.state.TaskLimitValidator;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
 import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -169,6 +168,7 @@ import static org.apache.aurora.gen.ResponseCode.OK;
 import static org.apache.aurora.gen.ResponseCode.WARNING;
 import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 import static org.apache.aurora.scheduler.base.Tasks.ACTIVE_STATES;
+import static org.apache.aurora.scheduler.state.TaskLimitValidator.TaskValidationException;
 import static org.apache.aurora.scheduler.thrift.Util.addMessage;
 import static org.apache.aurora.scheduler.thrift.Util.emptyResponse;
 
@@ -192,7 +192,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       Tasks.SCHEDULED_TO_INFO);
 
   private final NonVolatileStorage storage;
-  private final SchedulerCore schedulerCore;
   private final LockManager lockManager;
   private final CapabilityValidator sessionValidator;
   private final StorageBackup backup;
@@ -203,13 +202,13 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final QuotaManager quotaManager;
   private final NearestFit nearestFit;
   private final StateManager stateManager;
+  private final TaskLimitValidator taskLimitValidator;
   private final UUIDGenerator uuidGenerator;
   private final JobUpdateController jobUpdateController;
 
   @Inject
   SchedulerThriftInterface(
       NonVolatileStorage storage,
-      SchedulerCore schedulerCore,
       LockManager lockManager,
       CapabilityValidator sessionValidator,
       StorageBackup backup,
@@ -220,11 +219,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       QuotaManager quotaManager,
       NearestFit nearestFit,
       StateManager stateManager,
+      TaskLimitValidator taskLimitValidator,
       UUIDGenerator uuidGenerator,
       JobUpdateController jobUpdateController) {
 
     this(storage,
-        schedulerCore,
         lockManager,
         sessionValidator,
         backup,
@@ -235,6 +234,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         quotaManager,
         nearestFit,
         stateManager,
+        taskLimitValidator,
         uuidGenerator,
         jobUpdateController);
   }
@@ -242,7 +242,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @VisibleForTesting
   SchedulerThriftInterface(
       NonVolatileStorage storage,
-      SchedulerCore schedulerCore,
       LockManager lockManager,
       CapabilityValidator sessionValidator,
       StorageBackup backup,
@@ -253,11 +252,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       QuotaManager quotaManager,
       NearestFit nearestFit,
       StateManager stateManager,
+      TaskLimitValidator taskLimitValidator,
       UUIDGenerator uuidGenerator,
       JobUpdateController jobUpdateController) {
 
     this.storage = requireNonNull(storage);
-    this.schedulerCore = requireNonNull(schedulerCore);
     this.lockManager = requireNonNull(lockManager);
     this.sessionValidator = requireNonNull(sessionValidator);
     this.backup = requireNonNull(backup);
@@ -268,6 +267,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.quotaManager = requireNonNull(quotaManager);
     this.nearestFit = requireNonNull(nearestFit);
     this.stateManager = requireNonNull(stateManager);
+    this.taskLimitValidator = requireNonNull(taskLimitValidator);
     this.uuidGenerator = requireNonNull(uuidGenerator);
     this.jobUpdateController = requireNonNull(jobUpdateController);
   }
@@ -275,36 +275,65 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @Override
   public Response createJob(
       JobConfiguration mutableJob,
-      @Nullable Lock mutableLock,
+      @Nullable final Lock mutableLock,
       SessionKey session) {
 
-    IJobConfiguration job = IJobConfiguration.build(mutableJob);
-    IJobKey jobKey = JobKeys.assertValid(job.getKey());
     requireNonNull(session);
+    final Response response = emptyResponse();
 
-    Response response = Util.emptyResponse();
-
+    final SanitizedConfiguration sanitized;
     try {
-      sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
+      sessionValidator.checkAuthenticated(
+          session,
+          ImmutableSet.of(mutableJob.getOwner().getRole()));
+      sanitized = SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(mutableJob));
     } catch (AuthFailedException e) {
       return addMessage(response, AUTH_FAILED, e);
+    } catch (TaskDescriptionException e) {
+      return addMessage(response, INVALID_REQUEST, e);
     }
 
-    try {
-      SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
+    return storage.write(new MutateWork.Quiet<Response>() {
+      @Override
+      public Response apply(MutableStoreProvider storeProvider) {
+        final IJobConfiguration job = sanitized.getJobConfig();
 
-      lockManager.validateIfLocked(
-          ILockKey.build(LockKey.job(jobKey.newBuilder())),
-          Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
+        try {
+          lockManager.validateIfLocked(
+              ILockKey.build(LockKey.job(job.getKey().newBuilder())),
+              Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-      schedulerCore.createJob(sanitized);
-      response.setResponseCode(OK);
-    } catch (LockException e) {
-      addMessage(response, LOCK_ERROR, e);
-    } catch (TaskDescriptionException | ScheduleException e) {
-      addMessage(response, INVALID_REQUEST, e);
-    }
-    return response;
+          if (!storeProvider.getTaskStore().fetchTasks(
+              Query.jobScoped(job.getKey()).active()).isEmpty()
+              || cronJobManager.hasJob(job.getKey())) {
+
+            return addMessage(
+                response,
+                INVALID_REQUEST,
+                "Job already exists: " + JobKeys.canonicalString(job.getKey()));
+          }
+
+          taskLimitValidator.validateTaskLimits(job.getTaskConfig(), job.getInstanceCount());
+
+          // TODO(mchucarroll): deprecate cron as a part of create/kill job.(AURORA-454)
+          if (sanitized.isCron()) {
+            LOG.warning("Deprecated behavior: scheduling job " + job.getKey()
+                + " with cron via createJob (AURORA_454)");
+            cronJobManager.createJob(SanitizedCronJob.from(sanitized));
+          } else {
+            LOG.info("Launching " + sanitized.getInstanceIds().size() + " tasks.");
+            stateManager.insertPendingTasks(
+                sanitized.getJobConfig().getTaskConfig(),
+                sanitized.getInstanceIds());
+          }
+          return response.setResponseCode(OK);
+        } catch (LockException e) {
+          return addMessage(response, LOCK_ERROR, e);
+        } catch (CronException | TaskValidationException e) {
+          return addMessage(response, INVALID_REQUEST, e);
+        }
+      }
+    });
   }
 
   @Override
@@ -430,7 +459,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(description));
 
       PopulateJobResult result = new PopulateJobResult()
-          .setPopulated(ITaskConfig.toBuildersSet(sanitized.getTaskConfigs().values()));
+          .setPopulated(ImmutableSet.of(sanitized.getJobConfig().getTaskConfig().newBuilder()));
 
       response.setResult(Result.populateJobResult(result));
       response.setResponseCode(OK);
@@ -1175,38 +1204,52 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response addInstances(
-      AddInstancesConfig config,
-      @Nullable Lock mutableLock,
-      SessionKey session) {
+      final AddInstancesConfig config,
+      @Nullable final Lock mutableLock,
+      final SessionKey session) {
 
     requireNonNull(config);
     requireNonNull(session);
     checkNotBlank(config.getInstanceIds());
-    IJobKey jobKey = JobKeys.assertValid(IJobKey.build(config.getKey()));
+    final IJobKey jobKey = JobKeys.assertValid(IJobKey.build(config.getKey()));
+    final Response resp = emptyResponse();
 
-    Response resp = Util.emptyResponse();
+    final ITaskConfig task;
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
-      ITaskConfig task = ConfigurationManager.validateAndPopulate(
+      task = ConfigurationManager.validateAndPopulate(
           ITaskConfig.build(config.getTaskConfig()));
-
-      if (cronJobManager.hasJob(jobKey)) {
-        return addMessage(resp, INVALID_REQUEST, "Instances may not be added to cron jobs.");
-      }
-
-      lockManager.validateIfLocked(
-          ILockKey.build(LockKey.job(jobKey.newBuilder())),
-          Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
-
-      schedulerCore.addInstances(jobKey, ImmutableSet.copyOf(config.getInstanceIds()), task);
-      return resp.setResponseCode(OK);
     } catch (AuthFailedException e) {
       return addMessage(resp, AUTH_FAILED, e);
-    } catch (LockException e) {
-      return addMessage(resp, LOCK_ERROR, e);
-    } catch (TaskDescriptionException | ScheduleException e) {
+    } catch (TaskDescriptionException e) {
       return addMessage(resp, INVALID_REQUEST, e);
     }
+
+    return storage.write(new MutateWork.Quiet<Response>() {
+      @Override
+      public Response apply(MutableStoreProvider storeProvider) {
+        try {
+          if (cronJobManager.hasJob(jobKey)) {
+            return addMessage(resp, INVALID_REQUEST, "Instances may not be added to cron jobs.");
+          }
+
+          lockManager.validateIfLocked(
+              ILockKey.build(LockKey.job(jobKey.newBuilder())),
+              Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
+
+          Set<Integer> instanceIds = ImmutableSet.copyOf(config.getInstanceIds());
+          taskLimitValidator.validateTaskLimits(task, instanceIds.size());
+
+          stateManager.insertPendingTasks(task, instanceIds);
+
+          return resp.setResponseCode(OK);
+        } catch (LockException e) {
+          return addMessage(resp, LOCK_ERROR, e);
+        } catch (TaskValidationException | IllegalArgumentException e) {
+          return addMessage(resp, INVALID_REQUEST, e);
+        }
+      }
+    });
   }
 
   private String getRoleFromLockKey(ILockKey lockKey) {

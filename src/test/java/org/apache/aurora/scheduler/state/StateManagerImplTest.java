@@ -36,6 +36,7 @@ import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -43,6 +44,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
@@ -76,6 +78,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final String HOST_A = "host_a";
   private static final Identity JIM = new Identity("jim", "jim-user");
   private static final String MY_JOB = "myJob";
+  private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
 
   private Driver driver;
   private TaskIdGenerator taskIdGenerator;
@@ -466,6 +469,27 @@ public class StateManagerImplTest extends EasyMockTest {
     assertEquals(ImmutableMap.of("one", 86), actual.getAssignedTask().getAssignedPorts());
   }
 
+  @Test(expected = IllegalArgumentException.class)
+  public void insertEmptyPendingInstancesFails() {
+    control.replay();
+    stateManager.insertPendingTasks(makeTask(JIM, MY_JOB), ImmutableSet.<Integer>of());
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void insertPendingInstancesInstanceCollision() {
+    ITaskConfig task = makeTask(JIM, MY_JOB);
+    String taskId = "a";
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId).times(2);
+    expectStateTransitions(taskId, INIT, PENDING);
+
+    control.replay();
+
+    insertTask(task, 0);
+    Iterables.getOnlyElement(Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId)));
+
+    insertTask(task, 0);
+  }
+
   private void expectStateTransitions(
       String taskId,
       ScheduleStatus initial,
@@ -489,7 +513,7 @@ public class StateManagerImplTest extends EasyMockTest {
   }
 
   private void insertTask(ITaskConfig task, int instanceId) {
-    stateManager.insertPendingTasks(ImmutableMap.of(instanceId, task));
+    stateManager.insertPendingTasks(task, ImmutableSet.of(instanceId));
   }
 
   private boolean changeState(String taskId, ScheduleStatus status) {

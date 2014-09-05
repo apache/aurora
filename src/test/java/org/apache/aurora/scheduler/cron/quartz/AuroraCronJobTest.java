@@ -13,7 +13,7 @@
  */
 package org.apache.aurora.scheduler.cron.quartz;
 
-import java.util.Map;
+import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
@@ -90,7 +90,9 @@ public class AuroraCronJobTest extends EasyMockTest {
 
   @Test
   public void testEmptyStorage() throws JobExecutionException {
-    stateManager.insertPendingTasks(EasyMock.<Map<Integer, ITaskConfig>>anyObject());
+    stateManager.insertPendingTasks(
+        EasyMock.<ITaskConfig>anyObject(),
+        EasyMock.<Set<Integer>>anyObject());
     expectLastCall().times(3);
 
     control.replay();
@@ -126,7 +128,9 @@ public class AuroraCronJobTest extends EasyMockTest {
         AuroraCronJob.KILL_AUDIT_MESSAGE))
         .andReturn(true);
     backoffHelper.doUntilSuccess(EasyMock.capture(capture));
-    stateManager.insertPendingTasks(EasyMock.<Map<Integer, ITaskConfig>>anyObject());
+    stateManager.insertPendingTasks(
+        EasyMock.<ITaskConfig>anyObject(),
+        EasyMock.<Set<Integer>>anyObject());
 
     control.replay();
 

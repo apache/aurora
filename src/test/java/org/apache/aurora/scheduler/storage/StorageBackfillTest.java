@@ -106,18 +106,19 @@ public class StorageBackfillTest {
 
     final AtomicInteger taskId = new AtomicInteger();
 
-    SanitizedConfiguration job = makeJob(JOB_KEY, defaultTask(), 10);
+    final TaskConfig task = defaultTask();
+    SanitizedConfiguration job = makeJob(JOB_KEY, task, 10);
     final Set<IScheduledTask> badTasks = ImmutableSet.copyOf(Iterables.transform(
-        job.getTaskConfigs().values(),
-        new Function<ITaskConfig, IScheduledTask>() {
+        job.getInstanceIds(),
+        new Function<Integer, IScheduledTask>() {
           @Override
-          public IScheduledTask apply(ITaskConfig task) {
+          public IScheduledTask apply(Integer instanceId) {
             return IScheduledTask.build(new ScheduledTask()
                 .setStatus(RUNNING)
                 .setAssignedTask(new AssignedTask()
                     .setInstanceId(0)
                     .setTaskId("task-" + taskId.incrementAndGet())
-                    .setTask(task.newBuilder())));
+                    .setTask(task)));
           }
         }));
 

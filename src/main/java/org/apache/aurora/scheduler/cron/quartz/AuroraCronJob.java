@@ -14,7 +14,6 @@
 package org.apache.aurora.scheduler.cron.quartz;
 
 import java.util.Date;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -24,7 +23,6 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
 import com.twitter.common.base.Supplier;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffHelper;
@@ -94,11 +92,13 @@ class AuroraCronJob implements Job {
   }
 
   private static final class DeferredLaunch {
-    private final Map<Integer, ITaskConfig> pendingTasks;
+    private final ITaskConfig task;
+    private final Set<Integer> instanceIds;
     private final Set<String> activeTaskIds;
 
-    DeferredLaunch(Map<Integer, ITaskConfig> pendingTasks, Set<String> activeTaskIds) {
-      this.pendingTasks = pendingTasks;
+    DeferredLaunch(ITaskConfig task, Set<Integer> instanceIds, Set<String> activeTaskIds) {
+      this.task = task;
+      this.instanceIds = instanceIds;
       this.activeTaskIds = activeTaskIds;
     }
   }
@@ -145,22 +145,22 @@ class AuroraCronJob implements Job {
                 "Cron triggered for %s at %s with policy %s", path, new Date(), collisionPolicy));
             CRON_JOB_TRIGGERS.incrementAndGet();
 
-            ImmutableMap<Integer, ITaskConfig> pendingTasks =
-                ImmutableMap.copyOf(cronJob.getSanitizedConfig().getTaskConfigs());
-
             final Query.Builder activeQuery = Query.jobScoped(key).active();
             Set<String> activeTasks =
                 Tasks.ids(storeProvider.getTaskStore().fetchTasks(activeQuery));
 
+            ITaskConfig task = cronJob.getSanitizedConfig().getJobConfig().getTaskConfig();
+            Set<Integer> instanceIds = cronJob.getSanitizedConfig().getInstanceIds();
             if (activeTasks.isEmpty()) {
-              stateManager.insertPendingTasks(pendingTasks);
+              stateManager.insertPendingTasks(task, instanceIds);
+
               return Optional.absent();
             }
 
             CRON_JOB_COLLISIONS.incrementAndGet();
             switch (collisionPolicy) {
               case KILL_EXISTING:
-                return Optional.of(new DeferredLaunch(pendingTasks, activeTasks));
+                return Optional.of(new DeferredLaunch(task, instanceIds, activeTasks));
 
               case RUN_OVERLAP:
                 LOG.severe(String.format("Ignoring trigger for job %s with deprecated collision"
@@ -200,7 +200,9 @@ class AuroraCronJob implements Job {
         public Boolean get() {
           if (Storage.Util.consistentFetchTasks(storage, query).isEmpty()) {
             LOG.info("Initiating delayed launch of cron " + path);
-            stateManager.insertPendingTasks(deferredLaunch.get().pendingTasks);
+            stateManager.insertPendingTasks(
+                deferredLaunch.get().task,
+                deferredLaunch.get().instanceIds);
             return true;
           } else {
             LOG.info("Not yet safe to run cron " + path);

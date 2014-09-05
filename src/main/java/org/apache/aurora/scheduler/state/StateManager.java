@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.state;
 
-import java.util.Map;
 import java.util.Set;
 
 import com.google.common.base.Optional;
@@ -70,12 +69,13 @@ public interface StateManager {
       Set<Integer> assignedPorts);
 
   /**
-   * Inserts new tasks into the store. Tasks will immediately move into PENDING and will be eligible
-   * for scheduling.
+   * Inserts pending instances using {@code task} as their configuration. Tasks will immediately
+   * move into PENDING and will be eligible for scheduling.
    *
-   * @param tasks Tasks to insert, mapped by their instance IDs.
+   * @param task Task template.
+   * @param instanceIds Instance IDs to assign to new PENDING tasks.
    */
-  void insertPendingTasks(Map<Integer, ITaskConfig> tasks);
+  void insertPendingTasks(ITaskConfig task, Set<Integer> instanceIds);
 
   /**
    * Attempts to delete tasks from the task store.

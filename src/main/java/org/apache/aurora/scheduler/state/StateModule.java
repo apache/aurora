@@ -24,6 +24,7 @@ import org.apache.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.state.MaintenanceController.MaintenanceControllerImpl;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
+import org.apache.aurora.scheduler.state.TaskLimitValidator.TaskLimitValidatorImpl;
 import org.apache.aurora.scheduler.state.UUIDGenerator.UUIDGeneratorImpl;
 
 /**
@@ -37,8 +38,6 @@ public class StateModule extends AbstractModule {
     bind(TaskAssignerImpl.class).in(Singleton.class);
     bind(MesosTaskFactory.class).to(MesosTaskFactoryImpl.class);
 
-    bind(SchedulerCore.class).to(SchedulerCoreImpl.class).in(Singleton.class);
-
     bind(StateManager.class).to(StateManagerImpl.class);
     bind(StateManagerImpl.class).in(Singleton.class);
 
@@ -46,6 +45,8 @@ public class StateModule extends AbstractModule {
     bind(UUIDGeneratorImpl.class).in(Singleton.class);
     bind(LockManager.class).to(LockManagerImpl.class);
     bind(LockManagerImpl.class).in(Singleton.class);
+    bind(TaskLimitValidator.class).to(TaskLimitValidatorImpl.class);
+    bind(TaskLimitValidatorImpl.class).in(Singleton.class);
 
     bindMaintenanceController(binder());
   }

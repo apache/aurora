@@ -301,6 +301,7 @@ struct ConfigSummary {
 }
 
 struct PopulateJobResult {
+  // TODO(maxim): Convert to ITaskConfig as there is always a single element returned.
   1: set<TaskConfig> populated
 }
 
