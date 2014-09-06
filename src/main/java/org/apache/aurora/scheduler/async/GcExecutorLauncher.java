@@ -13,11 +13,11 @@
  */
 package org.apache.aurora.scheduler.async;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
@@ -28,8 +28,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.twitter.common.quantity.Amount;
@@ -99,7 +97,7 @@ public class GcExecutorLauncher implements TaskLauncher {
   private final Executor executor;
   private final Driver driver;
   private final Supplier<String> uuidGenerator;
-  private final Cache<String, Long> pulses;
+  private final Map<String, Long> pulses;
   private final AtomicLong lostTasks;
 
   @Inject
@@ -142,9 +140,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     this.executor = requireNonNull(executor);
     this.driver = requireNonNull(driver);
     this.uuidGenerator = requireNonNull(uuidGenerator);
-    this.pulses = CacheBuilder.newBuilder()
-        .expireAfterWrite(settings.getMaxGcInterval(), TimeUnit.MILLISECONDS)
-        .build();
+    this.pulses = Collections.synchronizedMap(Maps.<String, Long>newHashMap());
     this.lostTasks = statsProvider.makeCounter(LOST_TASKS_STAT_NAME);
   }
 
@@ -207,13 +203,12 @@ public class GcExecutorLauncher implements TaskLauncher {
   @Override
   public boolean willUse(final Offer offer) {
     if (!settings.getGcExecutorPath().isPresent()
-        || isAlive(offer.getHostname())
-        || !sufficientResources(offer)) {
+        || !sufficientResources(offer)
+        || !isTimeToCollect(offer.getHostname())) {
 
       return false;
     }
 
-    pulses.put(offer.getHostname(), clock.nowMillis() + settings.getDelayMs());
     executor.execute(new Runnable() {
       @Override
       public void run() {
@@ -242,9 +237,19 @@ public class GcExecutorLauncher implements TaskLauncher {
     // No-op.
   }
 
-  private boolean isAlive(String hostname) {
-    Optional<Long> timestamp = Optional.fromNullable(pulses.getIfPresent(hostname));
-    return timestamp.isPresent() && clock.nowMillis() < timestamp.get();
+  private boolean isTimeToCollect(String hostname) {
+    boolean result = false;
+    Optional<Long> timestamp = Optional.fromNullable(pulses.get(hostname));
+    if (timestamp.isPresent()) {
+      if (clock.nowMillis() >= timestamp.get()) {
+        pulses.put(hostname, clock.nowMillis() + settings.getDelayMs());
+        result = true;
+      }
+    } else {
+      pulses.put(hostname, clock.nowMillis() + settings.getDelayMs());
+    }
+
+    return result;
   }
 
   public static class GcExecutorSettings {
@@ -255,11 +260,6 @@ public class GcExecutorLauncher implements TaskLauncher {
     GcExecutorSettings(Amount<Long, Time> gcInterval, Optional<String> gcExecutorPath) {
       this.gcInterval = requireNonNull(gcInterval);
       this.gcExecutorPath = requireNonNull(gcExecutorPath);
-    }
-
-    @VisibleForTesting
-    long getMaxGcInterval() {
-      return gcInterval.as(Time.MILLISECONDS);
     }
 
     @VisibleForTesting

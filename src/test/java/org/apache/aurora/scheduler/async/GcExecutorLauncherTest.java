@@ -119,25 +119,37 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     IScheduledTask b = makeTask(JOB_A, FAILED);
     IScheduledTask c = makeTask(JOB_A, FAILED);
 
-    // First call - no tasks to be collected.
+    // Third call - no tasks to be collected.
     expectGetTasksByHost(HOST, a, b, c);
     expectAdjustRetainedTasks(a, b, c);
 
-    // Third call - two tasks collected.
+    // Fourth call - two tasks collected.
     expectGetTasksByHost(HOST, a);
     expectAdjustRetainedTasks(a);
+
+    // Fifth call - the last task collected.
+    expectGetTasksByHost(HOST);
+    expectAdjustRetainedTasks();
 
     replayAndConstruct();
 
     // First call - no items in the cache, no tasks collected.
-    assertTrue(gcExecutorLauncher.willUse(OFFER));
+    assertFalse(gcExecutorLauncher.willUse(OFFER));
 
     // Second call - host item alive, no tasks collected.
     clock.advance(Amount.of((long) SETTINGS.getDelayMs() - 1, Time.MILLISECONDS));
     assertFalse(gcExecutorLauncher.willUse(OFFER));
 
-    // Third call - two tasks collected.
-    clock.advance(Amount.of(15L, Time.MINUTES));
+    // Third call - host item expires (initial delay), no tasks collected
+    clock.advance(Amount.of(1L, Time.HOURS));
+    assertTrue(gcExecutorLauncher.willUse(OFFER));
+
+    // Fourth call - host item expires (regular delay), two tasks collected
+    clock.advance(Amount.of(1L, Time.HOURS));
+    assertTrue(gcExecutorLauncher.willUse(OFFER));
+
+    // Fifth call - host item expires (regular delay), one task collected
+    clock.advance(Amount.of(1L, Time.HOURS));
     assertTrue(gcExecutorLauncher.willUse(OFFER));
   }
 
@@ -205,6 +217,10 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     replayAndConstruct();
 
     // First call - no items in the cache, no tasks collected.
+    assertFalse(gcExecutorLauncher.willUse(OFFER));
+
+    // Second call - host item expires initial delay, one task collected.
+    clock.advance(Amount.of(1L, Time.HOURS));
     assertTrue(gcExecutorLauncher.willUse(OFFER));
   }
 
