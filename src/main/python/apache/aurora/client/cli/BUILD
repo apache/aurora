@@ -54,6 +54,7 @@ python_library(
     'command_hooks.py',
     'cron.py',
     'jobs.py',
+    'json_tree_diff.py',
     'logsetup.py',
     'options.py',
     'quota.py',
