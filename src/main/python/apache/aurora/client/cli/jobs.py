@@ -21,10 +21,10 @@ import pprint
 import subprocess
 import time
 from datetime import datetime
+from tempfile import NamedTemporaryFile
 
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
-from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.updater_util import UpdaterConfig
@@ -38,7 +38,6 @@ from apache.aurora.client.cli import (
     Verb
 )
 from apache.aurora.client.cli.context import AuroraCommandContext
-from apache.aurora.client.cli.json_tree_diff import canonicalize_json, compare_pruned_json
 from apache.aurora.client.cli.options import (
     ALL_INSTANCES,
     BATCH_OPTION,
@@ -143,20 +142,8 @@ class DiffCommand(Verb):
   @property
   def help(self):
     return """Compare a job configuration against a running job.
-
-Prints a list of the changes between the local configuration, and the remote
-executing job spec.
-
-If the "--write-json" option is passed, then this will print the differences
-between the deployed and local configuration in JSON format as a list containing
-one dict for each difference.
-
-The dicts contain a field "difftype" which identifies the type of difference described
-by that dict. If the lengths of the task lists differ, then there will be a single
-record: {"difftype": "num_tasks", "remote" #, "local": #}. If fields of corresponding
-tasks differ, there will be a record {"difftype": "fields", "task": #, [ field_diffs ]}
-where each field_diff is: {"field": fieldname, "local": value, "remote": value}
-"""
+By default the diff will be displayed using 'diff', though you may choose an
+alternate diff program by setting the DIFF_VIEWER environment variable."""
 
   @property
   def name(self):
@@ -164,25 +151,9 @@ where each field_diff is: {"field": fieldname, "local": value, "remote": value}
 
   def get_options(self):
     return [BIND_OPTION, JSON_READ_OPTION,
-        JSON_WRITE_OPTION,
         CommandOption("--from", dest="rename_from", type=AuroraJobKey.from_path, default=None,
             help="If specified, the job key to diff against."),
-        CommandOption("--use-shell-diff", default=False, action="store_true",
-            help=("If specified, write the configs to disk, and use DIFF_VIEWER or unix diff to "
-                " compare them")),
-        CommandOption("--exclude-field", default=[], action="append",
-            help=("Path expression for task config fields that should be skipped in comparison\n"
-                "  (applies to tree diff only)")),
         JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
-
-  def get_task_json(self, task):
-    task.configuration = None
-    task.executorConfig = ExecutorConfig(name=AURORA_EXECUTOR_NAME,
-        data=json.loads(task.executorConfig.data))
-    data = canonicalize_json(serialize(task,
-        protocol_factory=TJSONProtocol.TSimpleJSONProtocolFactory()))
-
-    return json.loads(data)
 
   def pretty_print_task(self, task):
     task.configuration = None
@@ -199,84 +170,6 @@ where each field_diff is: {"field": fieldname, "local": value, "remote": value}
     out_file.write("\n")
     out_file.flush()
 
-  def do_shell_diff(self, context, local_tasks, remote_tasks):
-    """Compute diffs externally, using a unix diff program"""
-    diff_program = os.environ.get("DIFF_VIEWER", "diff")
-    with temporary_file() as local:
-      self.dump_tasks(local_tasks, local)
-      with temporary_file() as remote:
-        self.dump_tasks(remote_tasks, remote)
-        result = subprocess.call([diff_program, remote.name, local.name])
-        # Unlike most commands, diff doesn't return zero on success; it returns
-        # 1 when a successful diff is non-empty.
-        if result not in (0, 1):
-          raise context.CommandError(EXIT_COMMAND_FAILURE, "Error running diff command")
-        else:
-          return EXIT_OK
-
-  def _parse_excludes_parameters(self, context):
-    result = []
-    for f in context.options.exclude_field:
-      path = f.split(".")
-      result.append(path)
-    return result
-
-  def do_json_diff(self, context, local_tasks, remote_tasks):
-    """Compute diffs internally, based on the JSON tree form of the task configs."""
-    # String constants, for generating JSON
-    DIFFTYPE = "difftype"
-    NUMTASKS = "num_tasks"
-    LOCAL = "local"
-    REMOTE = "remote"
-    FIELDS = "fields"
-    FIELD = "field"
-    TASK = "task"
-
-    write_json = context.options.write_json
-    found_diffs = 0
-    json_out = []
-    # Compare lengths
-    if len(local_tasks) != len(remote_tasks):
-      found_diffs += abs(len(local_tasks) - len(remote_tasks))
-      if write_json:
-        json_out.append({DIFFTYPE: NUMTASKS,
-            LOCAL: len(local_tasks), REMOTE: len(remote_tasks)})
-      else:
-        context.print_out("Local config has a different number of tasks: %s local vs %s running" %
-            (len(local_tasks), len(remote_tasks)))
-
-    # Compare each instance, excluding the Identity.user:
-    excludes = [["owner", "user"]] + self._parse_excludes_parameters(context)
-    for i in range(min(len(local_tasks), len(remote_tasks))):
-      local_task = self.get_task_json(local_tasks[i])
-      remote_task = self.get_task_json(remote_tasks[i])
-      task_diffs = compare_pruned_json(local_task, remote_task, excludes)
-      if len(task_diffs) > 0:
-        if write_json:
-          json_task_diffs = {DIFFTYPE: FIELDS, TASK: i}
-          field_diffs = []
-          for task_diff in task_diffs:
-            field_diffs.append({FIELD: task_diff.name,
-                LOCAL: task_diff.base, REMOTE: task_diff.other})
-            found_diffs += 1
-          json_task_diffs[FIELDS] = field_diffs
-          json_out.append(json_task_diffs)
-        else:
-          context.print_out("Task diffs found in instance %s" % i)
-          for task_diff in task_diffs:
-            context.print_out("\tField '%s' is '%s' local, but '%s' remote" %
-                (task_diff.name, task_diff.base, task_diff.other))
-            found_diffs += 1
-
-    if write_json:
-      context.print_out(json.dumps(json_out, indent=2, separators=[",", ": "], sort_keys=False))
-    else:
-      if found_diffs > 0:
-        context.print_out("%s total diff(s) found" % found_diffs)
-      else:
-        context.print_out("No diffs found!")
-    return EXIT_OK
-
   def execute(self, context):
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
     if context.options.rename_from is not None:
@@ -289,22 +182,27 @@ where each field_diff is: {"field": fieldname, "local": value, "remote": value}
       role = config.role()
       env = config.environment()
       name = config.name()
-
     api = context.get_api(cluster)
     resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
     context.check_and_log_response(resp, err_code=EXIT_INVALID_PARAMETER,
         err_msg="Could not find job to diff against")
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
-    # The remote_tasks are a list of TaskConfigs.
     resp = api.populate_job_config(config)
     context.check_and_log_response(resp, err_code=EXIT_INVALID_CONFIGURATION,
           err_msg="Error loading configuration; see log for details")
     local_tasks = resp.result.populateJobResult.populated
-    if context.options.use_shell_diff:
-      return self.do_shell_diff(context, local_tasks, remote_tasks)
-    else:
-      return self.do_json_diff(context, local_tasks, remote_tasks)
-
+    diff_program = os.environ.get("DIFF_VIEWER", "diff")
+    with NamedTemporaryFile() as local:
+      self.dump_tasks(local_tasks, local)
+      with NamedTemporaryFile() as remote:
+        self.dump_tasks(remote_tasks, remote)
+        result = subprocess.call([diff_program, remote.name, local.name])
+        # Unlike most commands, diff doesn't return zero on success; it returns
+        # 1 when a successful diff is non-empty.
+        if result not in (0, 1):
+          raise context.CommandError(EXIT_COMMAND_FAILURE, "Error running diff command")
+        else:
+          return EXIT_OK
 
 
 class InspectCommand(Verb):
