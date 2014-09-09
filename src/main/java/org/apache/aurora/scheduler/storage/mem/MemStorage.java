@@ -182,13 +182,24 @@ public class MemStorage implements Storage {
   }
 
   @Override
-  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
-    return doWork(LockType.READ, storeProvider, work, readStats, readLockWaitNanos);
+  public <T, E extends Exception> T consistentRead(final Work<T, E> work)
+          throws StorageException, E {
+    return delegatedStore.consistentRead(new Work<T, E>() {
+      @Override
+      public T apply(StoreProvider provider) throws E {
+        return doWork(LockType.READ, storeProvider, work, readStats, readLockWaitNanos);
+      }
+    });
   }
 
   @Override
-  public <T, E extends Exception> T write(MutateWork<T, E> work) throws StorageException, E {
-    return doWork(LockType.WRITE, storeProvider, work, writeStats, writeLockWaitNanos);
+  public <T, E extends Exception> T write(final MutateWork<T, E> work) throws StorageException, E {
+    return delegatedStore.write(new MutateWork<T, E>() {
+      @Override
+      public T apply(MutableStoreProvider provider) throws E {
+       return doWork(LockType.WRITE, storeProvider, work, writeStats, writeLockWaitNanos);
+      }
+    });
   }
 
   @Override
@@ -198,9 +209,15 @@ public class MemStorage implements Storage {
 
   @Timed("mem_storage_weakly_consistent_read_operation")
   @Override
-  public <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work)
+  public <T, E extends Exception> T weaklyConsistentRead(final Work<T, E> work)
       throws StorageException, E {
 
-    return work.apply(storeProvider);
+    return delegatedStore.weaklyConsistentRead(new Work<T, E>() {
+      @Override
+      public T apply(StoreProvider provider) throws E {
+        return work.apply(storeProvider);
+      }
+    });
+
   }
 }

@@ -21,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.testing.TearDown;
@@ -32,6 +33,7 @@ import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
@@ -41,6 +43,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
+import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
 import org.junit.Test;
@@ -138,6 +141,35 @@ public class MemStorageTest extends TearDownTestCase {
             .transform(Tasks.SCHEDULED_TO_ID)
             .toSet();
         assertEquals(ImmutableSet.<String>builder().add(taskIds).build(), ids);
+        return null;
+      }
+    });
+  }
+
+  @Test
+  public void testWritesUnderTransaction() {
+    final IResourceAggregate quota = IResourceAggregate
+            .build(new ResourceAggregate().setDiskMb(100).setNumCpus(2.0).setRamMb(512));
+
+    try {
+      storage.write(new MutateWork.NoResult.Quiet() {
+        @Override
+        protected void execute(MutableStoreProvider storeProvider) {
+          storeProvider.getQuotaStore().saveQuota("a", quota);
+          throw new CustomException();
+        }
+      });
+      fail("Expected CustomException to be thrown.");
+    } catch (CustomException e) {
+      // Expected
+    }
+
+    storage.consistentRead(new Work.Quiet<Void>() {
+      @Override
+      public Void apply(StoreProvider storeProvider) {
+        // If the previous write was under a transaction then there would be no quota records.
+        assertEquals(ImmutableMap.<String, IResourceAggregate>of(),
+                storeProvider.getQuotaStore().fetchQuotas());
         return null;
       }
     });
