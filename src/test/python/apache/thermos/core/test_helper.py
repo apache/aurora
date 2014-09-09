@@ -30,27 +30,29 @@ COORDINATOR_PID = 13337
 
 
 def test_this_is_really_our_pid():
-  process = mock.Mock(spec=psutil.Process, username=USER1, pid=PID, create_time=CREATE_TIME)
+  process = mock.Mock(spec=psutil.Process, pid=PID)
+  process.username.return_value = USER1
+  process.create_time.return_value = CREATE_TIME
   assert TRH.this_is_really_our_pid(
       process,
-      process.username,
-      process.create_time)
+      process.username(),
+      process.create_time())
   assert TRH.this_is_really_our_pid(
       process,
-      process.username,
-      process.create_time + TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) - 1)
+      process.username(),
+      process.create_time() + TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) - 1)
   assert not TRH.this_is_really_our_pid(
       process,
       'user2',
-      process.create_time)
+      process.create_time())
   assert not TRH.this_is_really_our_pid(
       process,
-      process.username,
-      process.create_time + TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) + 1)
+      process.username(),
+      process.create_time() + TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) + 1)
   assert not TRH.this_is_really_our_pid(
       process,
-      process.username,
-      process.create_time - (TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) + 1))
+      process.username(),
+      process.create_time() - (TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) + 1))
 
 
 TRH_PATH = 'apache.thermos.core.helper.TaskRunnerHelper'

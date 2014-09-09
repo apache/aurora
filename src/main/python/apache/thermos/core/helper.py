@@ -99,14 +99,17 @@ class TaskRunnerHelper(object):
       Raises:
         psutil.NoSuchProcess - if the Process supplied no longer exists
     """
-    if process.username != current_user:
+    process_username = process.username()
+    process_create_time = process.create_time()
+
+    if process_username != current_user:
       log.info("Expected pid %s to be ours but the pid user is %s and we're %s" % (
-        process.pid, process.username, current_user))
+        process.pid, process_username, current_user))
       return False
 
-    if abs(start_time - process.create_time) >= cls.MAX_START_TIME_DRIFT.as_(Time.SECONDS):
+    if abs(start_time - process_create_time) >= cls.MAX_START_TIME_DRIFT.as_(Time.SECONDS):
       log.info("Expected pid %s start time to be %s but it's %s" % (
-        process.pid, start_time, process.create_time))
+        process.pid, start_time, process_create_time))
       return False
 
     return True
@@ -148,7 +151,7 @@ class TaskRunnerHelper(object):
       else:
         if pid:
           try:
-            tree = set(proc.pid for proc in process.get_children(recursive=True))
+            tree = set(child.pid for child in process.children(recursive=True))
           except psutil.Error:
             log.warning('  Error gathering information on children of pid %s' % pid)
 

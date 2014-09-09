@@ -314,9 +314,9 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
     inspector = CheckpointInspector(self._checkpoint_root)
 
     def is_our_process(process, uid, timestamp):
-      if process.uids.real != uid:
+      if process.uids().real != uid:
         return False
-      estimated_start_time = self._clock.time() - process.create_time
+      estimated_start_time = self._clock.time() - process.create_time()
       return abs(timestamp - estimated_start_time) < self.MAX_PID_TIME_DRIFT.as_(Time.SECONDS)
 
     for task_id in active_tasks:

@@ -63,10 +63,10 @@ class ExecutorVars(Observable, ExceptionalThread):
   def __init__(self, clock=time):
     self._clock = clock
     self._self = psutil.Process(os.getpid())
-    if hasattr(self._self, 'getcwd'):
+    try:
       self._version = self.get_release_from_binary(
-        os.path.join(self._self.getcwd(), self._self.cmdline[1]))
-    else:
+        os.path.join(self._self.cwd(), self._self.cmdline()[1]))
+    except (IndexError, psutil.Error):
       self._version = 'UNKNOWN'
     self.metrics.register(NamedGauge('version', self._version))
     self._orphan = False
@@ -83,10 +83,10 @@ class ExecutorVars(Observable, ExceptionalThread):
   @classmethod
   def thermos_children(cls, parent):
     try:
-      for child in parent.get_children():
+      for child in parent.children():
         yield child  # thermos_runner
         try:
-          for grandchild in child.get_children():
+          for grandchild in child.children():
             yield grandchild  # thermos_coordinator
         except psutil.Error:
           continue
@@ -96,15 +96,15 @@ class ExecutorVars(Observable, ExceptionalThread):
   @classmethod
   def aggregate_memory(cls, process, attribute='pss'):
     try:
-      return sum(getattr(mmap, attribute) for mmap in process.get_memory_maps())
+      return sum(getattr(mmap, attribute) for mmap in process.memory_maps())
     except (psutil.Error, AttributeError):
       # psutil on OS X does not support get_memory_maps
       return 0
 
   @classmethod
   def cpu_rss_pss(cls, process):
-    return (process.get_cpu_percent(0),
-            process.get_memory_info().rss,
+    return (process.cpu_percent(0),
+            process.memory_info().rss,
             cls.aggregate_memory(process, attribute='pss'))
 
   def run(self):
@@ -117,7 +117,7 @@ class ExecutorVars(Observable, ExceptionalThread):
       executor_cpu, executor_rss, _ = self.cpu_rss_pss(self._self)
       self.write_metric('cpu', executor_cpu)
       self.write_metric('rss', executor_rss)
-      self._orphan = self._self.ppid == 1
+      self._orphan = self._self.ppid() == 1
     except psutil.Error:
       return False
 
