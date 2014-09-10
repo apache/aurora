@@ -33,6 +33,7 @@ import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.NotNegative;
 import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -92,8 +93,15 @@ public class AsyncModule extends AbstractModule {
 
   @CmdLine(name = "min_offer_hold_time",
       help = "Minimum amount of time to hold a resource offer before declining.")
+  @NotNegative
   private static final Arg<Amount<Integer, Time>> MIN_OFFER_HOLD_TIME =
       Arg.create(Amount.of(5, Time.MINUTES));
+
+  @CmdLine(name = "offer_hold_jitter_window",
+      help = "Maximum amount of random jitter to add to the offer hold time window.")
+  @NotNegative
+  private static final Arg<Amount<Integer, Time>> OFFER_HOLD_JITTER_WINDOW =
+      Arg.create(Amount.of(1, Time.MINUTES));
 
   @CmdLine(name = "history_prune_threshold",
       help = "Time after which the scheduler will prune terminated task history.")
@@ -238,7 +246,11 @@ public class AsyncModule extends AbstractModule {
     install(new PrivateModule() {
       @Override
       protected void configure() {
-        bind(OfferReturnDelay.class).to(RandomJitterReturnDelay.class);
+        bind(OfferReturnDelay.class).toInstance(
+            new RandomJitterReturnDelay(
+                MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS),
+                OFFER_HOLD_JITTER_WINDOW.get().as(Time.MILLISECONDS),
+                new Random.SystemRandom(new java.util.Random())));
         bind(ScheduledExecutorService.class).toInstance(executor);
         bind(OfferQueue.class).to(OfferQueueImpl.class);
         bind(OfferQueueImpl.class).in(Singleton.class);
@@ -312,20 +324,5 @@ public class AsyncModule extends AbstractModule {
           }
         });
         PubsubEventModule.bindSubscriber(binder, TaskScheduler.class);
-  }
-
-  /**
-   * Returns offers after a random duration within a fixed window.
-   */
-  private static class RandomJitterReturnDelay implements OfferReturnDelay {
-    private static final int JITTER_WINDOW_MS = Amount.of(1, Time.MINUTES).as(Time.MILLISECONDS);
-
-    private final int minHoldTimeMs = MIN_OFFER_HOLD_TIME.get().as(Time.MILLISECONDS);
-    private final Random random = new Random.SystemRandom(new java.util.Random());
-
-    @Override
-    public Amount<Integer, Time> get() {
-      return Amount.of(minHoldTimeMs + random.nextInt(JITTER_WINDOW_MS), Time.MILLISECONDS);
-    }
   }
 }
