@@ -29,6 +29,7 @@ from gen.apache.aurora.api.ttypes import (
     JobKey,
     Metadata,
     ResponseCode,
+    ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
     TaskConfig,
@@ -111,6 +112,57 @@ class TestJobStatus(AuroraClientCommandTest):
     resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_no_metadata())
+    return resp
+
+  @classmethod
+  def create_empty_status(cls):
+    resp = cls.create_simple_success_response()
+    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
+    resp.result.scheduleStatusResult.tasks = None
+    return resp
+
+  def get_task_status_json(cls):
+    def create_task_events(start_time):
+      """Create a list of task events, tracing the task from pending to assigned to running"""
+      return [
+          TaskEvent(timestamp=start_time, status=0, message="looking for a host"),
+          TaskEvent(timestamp=start_time + 10, status=9, message="found a host"),
+          TaskEvent(timestamp=start_time + 20, status=2, message="running")
+      ]
+
+    def create_scheduled_task(instance, start_time):
+      task = ScheduledTask()
+      task.assignedTask = AssignedTask()
+      task.assignedTask.taskId = "task_%s" % instance
+      task.assignedTask.slaveId = "random_machine_id"
+      task.assignedTask.slaveHost = "junk.nothing"
+      task.assignedTask.task = TaskConfig()
+      task.assignedTask.task.owner = Identity(role="nobody")
+      task.assignedTask.task.environment = "prod"
+      task.assignedTask.task.jobName = "flibber"
+      task.assignedTask.task.isService = False
+      task.assignedTask.task.numCpus = 2
+      task.assignedTask.task.ramMb = 2048
+      task.assignedTask.task.diskMb = 4096
+      task.assignedTask.task.priority = 7
+      task.assignedTask.task.maxTaskFailures = 3
+      task.assignedTask.task.production = False
+      task.assignedTask.task.requestedPorts = ["http"]
+      task.assignedTask.assignedPorts = {"http": 1001}
+      task.assignedTask.instanceId = 0
+      task.status = 2
+      task.failureCount = instance + 4
+      task.taskEvents = create_task_events(start_time)
+      task.ancestorId = "random_task_ancestor%s" % instance
+      return task
+
+    resp = cls.create_simple_success_response()
+    scheduleStatus = ScheduleStatusResult()
+    scheduleStatus.tasks = [
+      create_scheduled_task(0, 123456),
+      create_scheduled_task(1, 234567)
+    ]
+    resp.result.scheduleStatusResult = scheduleStatus
     return resp
 
   @classmethod
@@ -299,3 +351,134 @@ class TestJobStatus(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       result = cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       assert result == EXIT_INVALID_PARAMETER
+
+  def test_successful_status_json_output_no_metadata(self):
+    """Test the status command more deeply: in a request with a fully specified
+    job, it should end up doing a query using getTasksWithoutConfigs."""
+    mock_context = FakeAuroraCommandContext()
+    mock_context.add_expected_status_query_result(self.get_task_status_json())
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'status', '--write-json', 'west/bozo/test/hello'])
+      actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
+      expected = textwrap.dedent("""\
+        [
+          {
+            "active": [
+              {
+                "status": "RUNNING",
+                "assignedTask": {
+                  "task": {
+                    "isService": false,
+                    "environment": "prod",
+                    "requestedPorts": [
+                      "http"
+                    ],
+                    "jobName": "flibber",
+                    "priority": 7,
+                    "owner": {
+                      "role": "nobody"
+                    },
+                    "production": false,
+                    "diskMb": 4096,
+                    "ramMb": 2048,
+                    "maxTaskFailures": 3,
+                    "numCpus": 2
+                  },
+                  "taskId": "task_0",
+                  "instanceId": 0,
+                  "assignedPorts": {
+                    "http": 1001
+                  },
+                  "slaveHost": "junk.nothing",
+                  "slaveId": "random_machine_id"
+                },
+                "ancestorId": "random_task_ancestor0",
+                "taskEvents": [
+                  {
+                    "status": "PENDING",
+                    "timestamp": 123456,
+                    "message": "looking for a host"
+                  },
+                  {
+                    "status": "ASSIGNED",
+                    "timestamp": 123466,
+                    "message": "found a host"
+                  },
+                  {
+                    "status": "RUNNING",
+                    "timestamp": 123476,
+                    "message": "running"
+                  }
+                ],
+                "failureCount": 4
+              },
+              {
+                "status": "RUNNING",
+                "assignedTask": {
+                  "task": {
+                    "isService": false,
+                    "environment": "prod",
+                    "requestedPorts": [
+                      "http"
+                    ],
+                    "jobName": "flibber",
+                    "priority": 7,
+                    "owner": {
+                      "role": "nobody"
+                    },
+                    "production": false,
+                    "diskMb": 4096,
+                    "ramMb": 2048,
+                    "maxTaskFailures": 3,
+                    "numCpus": 2
+                  },
+                  "taskId": "task_1",
+                  "instanceId": 0,
+                  "assignedPorts": {
+                    "http": 1001
+                  },
+                  "slaveHost": "junk.nothing",
+                  "slaveId": "random_machine_id"
+                },
+                "ancestorId": "random_task_ancestor1",
+                "taskEvents": [
+                  {
+                    "status": "PENDING",
+                    "timestamp": 234567,
+                    "message": "looking for a host"
+                  },
+                  {
+                    "status": "ASSIGNED",
+                    "timestamp": 234577,
+                    "message": "found a host"
+                  },
+                  {
+                    "status": "RUNNING",
+                    "timestamp": 234587,
+                    "message": "running"
+                  }
+                ],
+                "failureCount": 5
+              }
+            ],
+            "job": "west/bozo/test/hello",
+            "inactive": []
+          }
+        ]""")
+      assert actual == expected
+
+  def test_status_job_not_found(self):
+    """Regression test: there was a crasher bug when metadata was None."""
+
+    mock_context = FakeAuroraCommandContext()
+    mock_api = mock_context.get_api('west')
+    mock_api.check_status.return_value = self.create_empty_status()
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
+      cmd = AuroraCommandLine()
+      result = cmd.execute(['job', 'status', 'west/bozo/test/hello'])
+      assert result == EXIT_INVALID_PARAMETER
+      assert mock_context.get_err() == ["No matching jobs found"]

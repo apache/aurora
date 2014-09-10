@@ -186,7 +186,11 @@ alternate diff program by setting the DIFF_VIEWER environment variable."""
     resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
     context.check_and_log_response(resp, err_code=EXIT_INVALID_PARAMETER,
         err_msg="Could not find job to diff against")
-    remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
+    if resp.result.scheduleStatusResult.tasks is None:
+      context.print_err("No tasks found for job %s" % context.options.jobspec)
+      return EXIT_COMMAND_FAILURE
+    else:
+      remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     resp = api.populate_job_config(config)
     context.check_and_log_response(resp, err_code=EXIT_INVALID_CONFIGURATION,
           err_msg="Error loading configuration; see log for details")
@@ -521,8 +525,20 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
       give us all of the job status data, while allowing us to compose it with
       other stuff and pretty-print it.
       """
-      return json.loads(serialize(scheduled_task,
+      task = json.loads(serialize(scheduled_task,
           protocol_factory=TJSONProtocol.TSimpleJSONProtocolFactory()))
+      # Now, clean it up: take all fields that are actually enums, and convert
+      # their values to strings.
+      task['status'] = ScheduleStatus._VALUES_TO_NAMES[task['status']]
+      for event in task['taskEvents']:
+        event['status'] = ScheduleStatus._VALUES_TO_NAMES[event['status']]
+      # convert boolean fields to boolean value names.
+      assigned = task['assignedTask']
+      task_config = assigned['task']
+      task_config['isService'] = (task_config['isService'] != 0)
+      if 'production' in task_config:
+        task_config['production'] = (task_config['production'] != 0)
+      return task
 
     return {"job": str(jobkey),
         "active": [render_task_json(task) for task in active_tasks],
@@ -569,12 +585,18 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
     result = []
     for jk in jobkeys:
       job_tasks = context.get_job_status(jk)
+      if job_tasks is None or job_tasks is []:
+        context.print_log(logging.INFO, "No tasks were found for jobkey %s" % jk)
+        continue
       active_tasks = [t for t in job_tasks if is_active(t)]
       inactive_tasks = [t for t in job_tasks if not is_active(t)]
       if context.options.write_json:
         result.append(self.render_tasks_json(jk, active_tasks, inactive_tasks))
       else:
         result.append(self.render_tasks_pretty(jk, active_tasks, inactive_tasks))
+    if result == []:
+      context.print_err("No matching jobs found")
+      return None
     if context.options.write_json:
       return json.dumps(result, indent=2, separators=[',', ': '], sort_keys=False)
     else:
@@ -582,10 +604,16 @@ The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
 
   def execute(self, context):
     jobs = context.get_jobs_matching_key(context.options.jobspec)
-    result = self.get_status_for_jobs(jobs, context)
-    context.print_out(result)
-    return EXIT_OK
+    if jobs is None or jobs == []:
+      context.print_err("Found no jobs matching %s" % context.options.jobspec)
+      return EXIT_INVALID_PARAMETER
 
+    result = self.get_status_for_jobs(jobs, context)
+    if result is not None:
+      context.print_out(result)
+      return EXIT_OK
+    else:
+      return EXIT_INVALID_PARAMETER
 
 class UpdateCommand(Verb):
   @property
