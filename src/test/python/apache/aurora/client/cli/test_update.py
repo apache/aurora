@@ -21,9 +21,9 @@ from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import QuotaCheck
 from apache.aurora.client.api.scheduler_mux import SchedulerMux
-from apache.aurora.client.cli import EXIT_INVALID_CONFIGURATION
+from apache.aurora.client.cli import EXIT_INVALID_CONFIGURATION, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext, IOMock
 from apache.aurora.config import AuroraConfig
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES
@@ -88,7 +88,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         assert mock_api.update_job.call_count == 0
 
   @classmethod
-  def setup_mock_scheduler_for_simple_update(cls, api):
+  def setup_mock_scheduler_for_simple_update(cls, api, count=20):
     """Set up all of the API mocks for scheduler calls during a simple update"""
     sched_proxy = api.scheduler_proxy
     # First, the updater acquires a lock
@@ -97,7 +97,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     # Then it gets the status of the tasks for the updating job.
     cls.setup_get_tasks_status_calls(sched_proxy)
     # Next, it needs to populate the update config.
-    cls.setup_populate_job_config(sched_proxy)
+    cls.setup_populate_job_config(sched_proxy, count)
     # Then it does the update, which kills and restarts jobs, and monitors their
     # health with the status call.
     cls.setup_kill_tasks(sched_proxy)
@@ -118,11 +118,11 @@ class TestUpdateCommand(AuroraClientCommandTest):
     return kill_response
 
   @classmethod
-  def setup_populate_job_config(cls, api):
+  def setup_populate_job_config(cls, api, count=20):
     populate = cls.create_simple_success_response()
     populate.result.populateJobResult = Mock(spec=PopulateJobResult)
     api.populateJobConfig.return_value = populate
-    configs = [TaskConfig(numCpus=1.0, ramMb=1, diskMb=1) for i in range(20)]
+    configs = [TaskConfig(numCpus=1.0, ramMb=1, diskMb=1) for i in range(count)]
     populate.result.populateJobResult.populated = set(configs)
     return populate
 
@@ -202,6 +202,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.updater.QuotaCheck', return_value=mock_quota_check),
         patch('apache.aurora.client.api.updater.SchedulerMux', return_value=fake_mux),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
+        patch('time.sleep', return_value=None),
         patch('threading._Event.wait')):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -223,6 +224,82 @@ class TestUpdateCommand(AuroraClientCommandTest):
       self.assert_correct_addinstance_calls(mock_scheduler_proxy)
       self.assert_correct_status_calls(mock_scheduler_proxy)
       assert mock_scheduler_proxy.releaseLock.call_count == 1
+
+  def test_updater_simple_small_doesnt_warn(self):
+    mock_out = IOMock()
+    mock_err = IOMock()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_health_check = self.setup_health_checks(mock_api)
+    mock_quota_check = self.setup_quota_check()
+    mock_job_monitor = self.setup_job_monitor()
+    fake_mux = self.FakeSchedulerMux()
+    self.setup_mock_scheduler_for_simple_update(mock_api)
+    # This doesn't work, because:
+    # - The mock_context stubs out the API.
+    # - the test relies on using live code in the API.
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.jobs.AuroraCommandContext.print_out',
+            side_effect=mock_out.put),
+        patch('apache.aurora.client.cli.jobs.AuroraCommandContext.print_err',
+            side_effect=mock_err.put),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
+            return_value=mock_health_check),
+        patch('apache.aurora.client.api.updater.JobMonitor', return_value=mock_job_monitor),
+        patch('apache.aurora.client.api.updater.QuotaCheck', return_value=mock_quota_check),
+        patch('apache.aurora.client.api.updater.SchedulerMux', return_value=fake_mux),
+        patch('time.time', side_effect=functools.partial(self.fake_time, self)),
+        patch('time.sleep', return_value=None),
+        patch('threading._Event.wait')):
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        cmd.execute(['job', 'update', 'west/bozo/test/hello', fp.name])
+      assert mock_out.get() == ['Update completed successfully']
+      assert mock_err.get() == []
+
+  def test_updater_simple_large_does_warn(self):
+    mock_out = IOMock()
+    mock_err = IOMock()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_health_check = self.setup_health_checks(mock_api)
+    mock_quota_check = self.setup_quota_check()
+    mock_job_monitor = self.setup_job_monitor()
+    fake_mux = self.FakeSchedulerMux()
+    self.setup_mock_scheduler_for_simple_update(mock_api, count=2)
+    # This doesn't work, because:
+    # - The mock_context stubs out the API.
+    # - the test relies on using live code in the API.
+    config = self.get_valid_config()
+    config = config.replace("instances = 20", "instances = 2")
+    print("CONFIG = %s" % config)
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.jobs.AuroraCommandContext.print_out',
+            side_effect=mock_out.put),
+        patch('apache.aurora.client.cli.jobs.AuroraCommandContext.print_err',
+            side_effect=mock_err.put),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
+            return_value=mock_health_check),
+        patch('apache.aurora.client.api.updater.JobMonitor', return_value=mock_job_monitor),
+        patch('apache.aurora.client.api.updater.QuotaCheck', return_value=mock_quota_check),
+        patch('apache.aurora.client.api.updater.SchedulerMux', return_value=fake_mux),
+        patch('time.time', side_effect=functools.partial(self.fake_time, self)),
+        patch('time.sleep', return_value=None),
+        patch('threading._Event.wait')):
+      with temporary_file() as fp:
+        fp.write(config)
+        fp.flush()
+        cmd = AuroraCommandLine()
+        result = cmd.execute(['job', 'update', 'west/bozo/test/hello', fp.name])
+        assert result == EXIT_OK
+      assert mock_out.get() == [
+          "Warning: this update is a large change. Press ^C within 5 seconds to abort",
+          'Update completed successfully']
+      assert mock_err.get() == []
 
   @classmethod
   def assert_correct_addinstance_calls(cls, api):

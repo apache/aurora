@@ -629,8 +629,10 @@ to preview what changes will take effect.
         err_msg="Server could not populate job config for comparison; see log for details.")
     local_task_count = len(resp.result.populateJobResult.populated)
     remote_task_count = len(remote_tasks)
+
+    # Dangerous if it's more than a factor-of-four change in number of instances.
     if (local_task_count >= 4 * remote_task_count or
-        local_task_count <= 4 * remote_task_count or
+        4 * local_task_count <= remote_task_count or
         local_task_count == 0):
       context.print_out("Warning: this update is a large change. "
           "Press ^C within 5 seconds to abort")
@@ -650,6 +652,7 @@ to preview what changes will take effect.
         instances)
     context.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE,
         err_msg="Update failed; see log for details.")
+    context.print_out("Update completed successfully")
     return EXIT_OK
 
 

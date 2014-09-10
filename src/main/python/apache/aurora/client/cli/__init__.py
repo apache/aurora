@@ -405,7 +405,7 @@ class CommandLine(object):
     try:
       result = noun.execute(context)
       if result == EXIT_OK:
-        print_aurora_log(logging.INFO, "Command terminated successfully")
+        print_aurora_log(TRANSCRIPT, "Command terminated successfully")
         GlobalCommandHookRegistry.run_post_hooks(context, context.options.noun,
             context.options.verb, result)
       else:

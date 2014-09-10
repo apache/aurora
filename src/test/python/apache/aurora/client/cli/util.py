@@ -262,3 +262,14 @@ jobs = [HELLO_WORLD]
   def get_invalid_config(cls, bad_clause):
     return cls.get_test_config(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB,
         bad_clause)
+
+
+class IOMock(object):
+  def __init__(self):
+    self.out = []
+
+  def put(self, s):
+    self.out.append(s)
+
+  def get(self):
+    return self.out
