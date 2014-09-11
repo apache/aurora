@@ -89,6 +89,17 @@ should be set to `2`, and in a cluster of 5 it should be set to `3`.
 
 *Incorrectly setting this flag will cause data corruption to occur!*
 
+Initializing the Replicated Log
+-------------------------------
+
+Before you start Aurora you will also need to initialize the log on the first master.
+
+    mesos-log initialize --path="$AURORA_HOME/scheduler/db"
+
+Failing to do this will result the following message when you try to start the scheduler.
+
+    Replica in EMPTY status received a broadcasted recover request
+
 Network considerations
 ----------------------
 The Aurora scheduler listens on 2 ports - an HTTP port used for client RPCs and a web UI,
