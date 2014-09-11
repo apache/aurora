@@ -25,7 +25,9 @@ import javax.annotation.Nonnegative;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.HttpMethod;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -113,6 +115,10 @@ public class JettyServerModule extends AbstractModule {
       PROPERTY_CONTAINER_REQUEST_FILTERS, GZIPContentEncodingFilter.class.getName(),
       PROPERTY_CONTAINER_RESPONSE_FILTERS, GZIPContentEncodingFilter.class.getName());
 
+  private static final Set<String> GZIP_FILTER_METHODS = ImmutableSet.of(
+      HttpMethod.GET,
+      HttpMethod.POST);
+
   @Override
   protected void configure() {
     bind(Runnable.class)
@@ -152,10 +158,6 @@ public class JettyServerModule extends AbstractModule {
     // Register /api end point
     Registration.registerServlet(binder(), "/api", SchedulerAPIServlet.class, true);
 
-    // NOTE: GzipFilter is applied only to /api instead of globally because the Jersey-managed
-    // servlets have a conflicting filter applied to them.
-    Registration.registerServletFilter(binder(), GzipFilter.class, "/api/*");
-    Registration.registerServletFilter(binder(), GzipFilter.class, "/apibetabeta/*");
     Registration.registerServletFilter(binder(), GuiceFilter.class, "/*");
 
     install(new JerseyServletModule() {
@@ -174,6 +176,12 @@ public class JettyServerModule extends AbstractModule {
         filter("/scheduler*").through(HttpStatsFilter.class);
         bind(LeaderRedirectFilter.class).in(Singleton.class);
         filterRegex("/scheduler(?:/.*)?").through(LeaderRedirectFilter.class);
+
+        // NOTE: GzipFilter is applied only to /api instead of globally because the Jersey-managed
+        // servlets have a conflicting filter applied to them.
+        bind(GzipFilter.class).in(Singleton.class);
+        filterRegex("/api(?:beta)?(?:/.*)?").through(GzipFilter.class, ImmutableMap.of(
+            "methods", Joiner.on(',').join(GZIP_FILTER_METHODS)));
 
         // Add CORS support for all /api end points.
         if (ENABLE_CORS_SUPPORT.get()) {

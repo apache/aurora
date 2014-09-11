@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.http;
 
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
@@ -23,8 +24,10 @@ import com.sun.jersey.api.client.ClientResponse.Status;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
+import org.apache.aurora.gen.Response;
 import org.junit.Test;
 
+import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class ServletFilterTest extends JettyServerModuleTest {
@@ -35,26 +38,41 @@ public class ServletFilterTest extends JettyServerModuleTest {
         .get(ClientResponse.class);
   }
 
-  private void assertContentEncoding(String path, Optional<String> encoding) {
-    assertEquals(encoding.orNull(), get(path).getHeaders().getFirst(HttpHeaders.CONTENT_ENCODING));
+  protected ClientResponse post(String path, String body) {
+    return getRequestBuilder(path)
+        .header(HttpHeaders.ACCEPT_ENCODING, "gzip")
+        .type(MediaType.TEXT_PLAIN_TYPE)
+        .post(ClientResponse.class, body);
   }
 
-  private void assertGzipEncoded(String path) {
-    assertContentEncoding(path, Optional.of("gzip"));
+  private void assertContentEncoding(ClientResponse response, Optional<String> encoding) {
+    assertEquals(encoding.orNull(), response.getHeaders().getFirst(HttpHeaders.CONTENT_ENCODING));
+  }
+
+  private void assertGzipEncodedGet(String path) {
+    assertContentEncoding(get(path), Optional.of("gzip"));
+  }
+
+  private void assertGzipEncodedPost(String path, String body) {
+    assertContentEncoding(post(path, body), Optional.of("gzip"));
   }
 
   @Test
   public void testGzipEncoding() throws Exception {
+    expect(thrift.getJobSummary("www-data")).andReturn(new Response()).times(2);
     replayAndStart();
 
-    assertContentEncoding("/", Optional.<String>absent());
-    assertGzipEncoded("/scheduler");
-    assertGzipEncoded("/scheduler/");
-    assertGzipEncoded("/scheduler/role");
-    assertGzipEncoded("/scheduler/role/");
-    assertGzipEncoded("/scheduler/role/env/");
-    assertGzipEncoded("/scheduler/role/env/job");
-    assertGzipEncoded("/scheduler/role/env/job/");
+    assertContentEncoding(get("/"), Optional.<String>absent());
+    assertGzipEncodedGet("/scheduler");
+    assertGzipEncodedGet("/scheduler/");
+    assertGzipEncodedGet("/scheduler/role");
+    assertGzipEncodedGet("/scheduler/role/");
+    assertGzipEncodedGet("/scheduler/role/env/");
+    assertGzipEncodedGet("/scheduler/role/env/job");
+    assertGzipEncodedGet("/scheduler/role/env/job/");
+
+    assertGzipEncodedPost("/api", "[1,\"getJobSummary\",1,0,{\"1\":{\"str\":\"www-data\"}}]");
+    assertGzipEncodedPost("/apibeta/getJobSummary", "{\"role\":\"www-data\"}");
   }
 
   private void assertResponseStatus(String path, Status expectedStatus) {
