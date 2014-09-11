@@ -13,7 +13,8 @@
  */
 (function () {
   /* global auroraUI:false, Identity:false, TaskQuery:false, ReadOnlySchedulerClient:false,
-            ACTIVE_STATES:false, CronCollisionPolicy: false, JobKey: false */
+            ACTIVE_STATES:false, CronCollisionPolicy: false, JobKey: false,
+            ScheduleStatus:false */
   'use strict';
 
   function makeJobTaskQuery(role, environment, jobName) {
@@ -75,6 +76,36 @@
             var result = auroraClient.processResponse(response);
             result.tasks = response.result !== null ?
               response.result.scheduleStatusResult.tasks : [];
+
+            // Attach current pending reasons to any pending tasks we might have
+            var pendingTasks = _.filter(result.tasks, function (t) {
+              return t.status === ScheduleStatus.PENDING;
+            });
+
+            if (pendingTasks.length > 0) {
+              var pendingResponse = auroraClient.getSchedulerClient().getPendingReason(query);
+              var reasons = pendingResponse.result !== null ?
+                pendingResponse.result.getPendingReasonResult.reasons : [];
+
+              reasons = _.indexBy(reasons, 'taskId');
+              pendingTasks.forEach(function (t) {
+                if (reasons.hasOwnProperty(t.assignedTask.taskId)) {
+                  // find the latest task event (that is pending)
+                  // and set the message to be this reason
+                  var latestPending = _.chain(t.taskEvents)
+                    .filter(function (e) {
+                      return e.status === ScheduleStatus.PENDING;
+                    })
+                    .sortBy(function (e) {
+                      return e.timestamp;
+                    })
+                    .last().value();
+
+                  latestPending.message = reasons[t.assignedTask.taskId].reason;
+                }
+              });
+            }
+
             return result;
           },
 
