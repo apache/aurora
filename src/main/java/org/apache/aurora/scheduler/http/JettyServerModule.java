@@ -39,6 +39,7 @@ import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
 import com.google.inject.name.Names;
 import com.google.inject.servlet.GuiceFilter;
+import com.google.inject.servlet.GuiceServletContextListener;
 import com.sun.jersey.api.container.filter.GZIPContentEncodingFilter;
 import com.sun.jersey.guice.JerseyServletModule;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
@@ -76,11 +77,11 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.handler.RequestLogHandler;
 import org.eclipse.jetty.server.nio.SelectChannelConnector;
+import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.servlets.GzipFilter;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_REQUEST_FILTERS;
 import static com.sun.jersey.api.core.ResourceConfig.PROPERTY_CONTAINER_RESPONSE_FILTERS;
 import static com.sun.jersey.api.json.JSONConfiguration.FEATURE_POJO_MAPPING;
@@ -157,51 +158,6 @@ public class JettyServerModule extends AbstractModule {
 
     // Register /api end point
     Registration.registerServlet(binder(), "/api", SchedulerAPIServlet.class, true);
-
-    Registration.registerServletFilter(binder(), GuiceFilter.class, "/*");
-
-    install(new JerseyServletModule() {
-      private void registerJerseyEndpoint(String indexPath, Class<?>... servlets) {
-        filter(indexPath + "*").through(LeaderRedirectFilter.class);
-        filter(indexPath + "*").through(GuiceContainer.class, CONTAINER_PARAMS);
-        Registration.registerEndpoint(binder(), indexPath);
-        for (Class<?> servlet : servlets) {
-          bind(servlet);
-        }
-      }
-
-      @Override
-      protected void configureServlets() {
-        bind(HttpStatsFilter.class).in(Singleton.class);
-        filter("/scheduler*").through(HttpStatsFilter.class);
-        bind(LeaderRedirectFilter.class).in(Singleton.class);
-        filterRegex("/scheduler(?:/.*)?").through(LeaderRedirectFilter.class);
-
-        // NOTE: GzipFilter is applied only to /api instead of globally because the Jersey-managed
-        // servlets have a conflicting filter applied to them.
-        bind(GzipFilter.class).in(Singleton.class);
-        filterRegex("/api(?:beta)?(?:/.*)?").through(GzipFilter.class, ImmutableMap.of(
-            "methods", Joiner.on(',').join(GZIP_FILTER_METHODS)));
-
-        // Add CORS support for all /api end points.
-        if (ENABLE_CORS_SUPPORT.get()) {
-          bind(CorsFilter.class).toInstance(new CorsFilter(ENABLE_CORS_FOR.get()));
-          filter("/api*").through(CorsFilter.class);
-        }
-
-        registerJerseyEndpoint("/apibeta", ApiBeta.class);
-        registerJerseyEndpoint("/cron", Cron.class);
-        registerJerseyEndpoint("/locks", Locks.class);
-        registerJerseyEndpoint("/maintenance", Maintenance.class);
-        registerJerseyEndpoint("/mname", Mname.class);
-        registerJerseyEndpoint("/offers", Offers.class);
-        registerJerseyEndpoint("/pendingtasks", PendingTasks.class);
-        registerJerseyEndpoint("/quotas", Quotas.class);
-        registerJerseyEndpoint("/slaves", Slaves.class);
-        registerJerseyEndpoint("/structdump", StructDump.class);
-        registerJerseyEndpoint("/utilization", Utilization.class);
-      }
-    });
 
     // Static assets.
     registerJQueryAssets();
@@ -354,7 +310,7 @@ public class JettyServerModule extends AbstractModule {
     private final Set<HttpAssetConfig> httpAssets;
     private final Set<HttpFilterConfig> httpFilters;
     private final Set<String> additionalIndexLinks;
-    private final Injector injector;
+    private final Injector parentInjector;
 
     @Inject
     HttpServerLauncher(
@@ -362,13 +318,13 @@ public class JettyServerModule extends AbstractModule {
         Set<HttpAssetConfig> httpAssets,
         Set<HttpFilterConfig> httpFilters,
         @Registration.IndexLink Set<String> additionalIndexLinks,
-        Injector injector) {
+        Injector parentInjector) {
 
-      this.httpServlets = checkNotNull(httpServlets);
-      this.httpAssets = checkNotNull(httpAssets);
-      this.httpFilters = checkNotNull(httpFilters);
-      this.additionalIndexLinks = checkNotNull(additionalIndexLinks);
-      this.injector = checkNotNull(injector);
+      this.httpServlets = requireNonNull(httpServlets);
+      this.httpAssets = requireNonNull(httpAssets);
+      this.httpFilters = requireNonNull(httpFilters);
+      this.additionalIndexLinks = requireNonNull(additionalIndexLinks);
+      this.parentInjector = requireNonNull(parentInjector);
     }
 
     private String makeRecursivePathSpec(String path) {
@@ -381,42 +337,84 @@ public class JettyServerModule extends AbstractModule {
       ServletContextHandler servletHandler =
           new ServletContextHandler(server, "/", ServletContextHandler.NO_SESSIONS);
 
-      ImmutableSet.Builder<String> indexLinks = ImmutableSet.builder();
+      servletHandler.addServlet(DefaultServlet.class, "/");
+      servletHandler.addFilter(GuiceFilter.class,  "/*", EnumSet.allOf(DispatcherType.class));
 
-      for (HttpServletConfig config : httpServlets) {
-        ServletHolder holder = new ServletHolder(injector.getInstance(config.handlerClass));
-        if (config.params != null) {
-          holder.setInitParameters(config.params);
+      servletHandler.addEventListener(new GuiceServletContextListener() {
+        @Override
+        protected Injector getInjector() {
+          return parentInjector.createChildInjector(new JerseyServletModule() {
+            private ImmutableSet.Builder<String> indexLinks = ImmutableSet.builder();
+
+            private void registerJerseyEndpoint(String indexPath, Class<?> servlet) {
+              filter(indexPath + "*").through(LeaderRedirectFilter.class);
+              filter(indexPath + "*").through(GuiceContainer.class, CONTAINER_PARAMS);
+              indexLinks.add(indexPath);
+              bind(servlet);
+            }
+
+            @Override
+            protected void configureServlets() {
+              for (HttpServletConfig config : httpServlets) {
+                serve(config.path, makeRecursivePathSpec(config.path))
+                    .with(config.handlerClass, config.params);
+                bind(config.handlerClass).in(Singleton.class);
+                if (!config.silent) {
+                  indexLinks.add(config.path);
+                }
+              }
+
+              for (HttpAssetConfig config : httpAssets) {
+                serve(config.path, makeRecursivePathSpec(config.path)).with(config.handler);
+                if (!config.silent) {
+                  indexLinks.add(config.path);
+                }
+              }
+
+              for (HttpFilterConfig filter : httpFilters) {
+                filter(filter.pathSpec).through(filter.filterClass);
+                bind(filter.filterClass).in(Singleton.class);
+              }
+
+              for (String indexLink : additionalIndexLinks) {
+                indexLinks.add(indexLink);
+              }
+
+              bind(HttpStatsFilter.class).in(Singleton.class);
+              filter("/scheduler*").through(HttpStatsFilter.class);
+              bind(LeaderRedirectFilter.class).in(Singleton.class);
+              filterRegex("/scheduler(?:/.*)?").through(LeaderRedirectFilter.class);
+
+              // NOTE: GzipFilter is applied only to /api instead of globally because the
+              // Jersey-managed servlets have a conflicting filter applied to them.
+              bind(GzipFilter.class).in(Singleton.class);
+              filterRegex("/api(?:beta)?(?:/.*)?").through(GzipFilter.class, ImmutableMap.of(
+                  "methods", Joiner.on(',').join(GZIP_FILTER_METHODS)));
+
+              // Add CORS support for all /api end points.
+              if (ENABLE_CORS_SUPPORT.get()) {
+                bind(CorsFilter.class).toInstance(new CorsFilter(ENABLE_CORS_FOR.get()));
+                filter("/api*").through(CorsFilter.class);
+              }
+
+              bind(GuiceContainer.class).in(Singleton.class);
+              registerJerseyEndpoint("/apibeta", ApiBeta.class);
+              registerJerseyEndpoint("/cron", Cron.class);
+              registerJerseyEndpoint("/locks", Locks.class);
+              registerJerseyEndpoint("/maintenance", Maintenance.class);
+              registerJerseyEndpoint("/mname", Mname.class);
+              registerJerseyEndpoint("/offers", Offers.class);
+              registerJerseyEndpoint("/pendingtasks", PendingTasks.class);
+              registerJerseyEndpoint("/quotas", Quotas.class);
+              registerJerseyEndpoint("/slaves", Slaves.class);
+              registerJerseyEndpoint("/structdump", StructDump.class);
+              registerJerseyEndpoint("/utilization", Utilization.class);
+
+              serve("/").with(new RootHandler(Ordering.natural().sortedCopy(indexLinks.build())));
+            }
+          });
         }
-        servletHandler.addServlet(holder, makeRecursivePathSpec(config.path));
-        if (!config.silent) {
-          indexLinks.add(config.path);
-        }
-      }
-
-      for (HttpAssetConfig config : httpAssets) {
-        servletHandler.addServlet(
-            new ServletHolder(config.handler),
-            makeRecursivePathSpec(config.path));
-        if (!config.silent) {
-          indexLinks.add(config.path);
-        }
-      }
-
-      for (HttpFilterConfig filter : httpFilters) {
-        servletHandler.addFilter(
-            filter.filterClass,
-            filter.pathSpec,
-            EnumSet.of(DispatcherType.REQUEST));
-      }
-
-      for (String indexLink : additionalIndexLinks) {
-        indexLinks.add(indexLink);
-      }
-
-      servletHandler.addServlet(
-          new ServletHolder(new RootHandler(Ordering.natural().sortedCopy(indexLinks.build()))),
-          "/");
+      });
 
       HandlerCollection rootHandler = new HandlerCollection();
       RequestLogHandler loghandler = new RequestLogHandler();
