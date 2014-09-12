@@ -91,7 +91,7 @@ class LockManagerImpl implements LockManager {
   }
 
   @Override
-  public synchronized void validateIfLocked(final ILockKey context, Optional<ILock> heldLock)
+  public void validateIfLocked(final ILockKey context, Optional<ILock> heldLock)
       throws LockException {
 
     Optional<ILock> stored = storage.consistentRead(new Work.Quiet<Optional<ILock>>() {
