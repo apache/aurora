@@ -14,10 +14,17 @@
 
 import contextlib
 
-from mock import Mock, patch
+from mock import Mock, patch, PropertyMock
 
 from apache.aurora.client.api import AuroraClientAPI
-from apache.aurora.client.commands.admin import get_locks, increase_quota, query, set_quota
+from apache.aurora.client.api.scheduler_client import SchedulerClient, SchedulerProxy
+from apache.aurora.client.commands.admin import (
+    get_locks,
+    get_scheduler,
+    increase_quota,
+    query,
+    set_quota
+)
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES, TERMINAL_STATES
@@ -115,12 +122,6 @@ class TestQueryCommand(AuroraClientCommandTest):
 class TestIncreaseQuotaCommand(AuroraClientCommandTest):
 
   @classmethod
-  def setup_mock_options(cls):
-    mock_options = Mock(spec=['verbosity'])
-    mock_options.verbosity = 'verbose'
-    return mock_options
-
-  @classmethod
   def create_response(cls, quota, prod, non_prod, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
     resp = Response(responseCode=response_code, messageDEPRECATED='test')
@@ -155,12 +156,6 @@ class TestIncreaseQuotaCommand(AuroraClientCommandTest):
 
 
 class TestSetQuotaCommand(AuroraClientCommandTest):
-
-  @classmethod
-  def setup_mock_options(cls):
-    mock_options = Mock(spec=['verbosity'])
-    mock_options.verbosity = 'verbose'
-    return mock_options
 
   @classmethod
   def create_response(cls, quota, prod, non_prod, response_code=None):
@@ -203,12 +198,6 @@ class TestGetLocksCommand(AuroraClientCommandTest):
     message=MESSAGE)]
 
   @classmethod
-  def setup_mock_options(cls):
-    mock_options = Mock(spec=['verbosity'])
-    mock_options.verbosity = 'verbose'
-    return mock_options
-
-  @classmethod
   def create_response(cls, locks, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
     resp = Response(responseCode=response_code, messageDEPRECATED='test')
@@ -234,3 +223,28 @@ class TestGetLocksCommand(AuroraClientCommandTest):
       assert mock_print_results.call_count == 1
       assert "'message': '%s'" % self.MESSAGE in mock_print_results.call_args[0][0][0]
       assert "'user': '%s'" % self.USER in mock_print_results.call_args[0][0][0]
+
+
+class TestGetSchedulerCommand(AuroraClientCommandTest):
+
+  def test_get_scheduler(self):
+    """Tests successful execution of the get_scheduler command."""
+    mock_options = self.setup_mock_options()
+    mock_proxy = Mock(spec=SchedulerProxy)
+    mock_scheduler_client = Mock(spec=SchedulerClient)
+    mock_raw_url = PropertyMock(return_value="url")
+    mock_proxy.scheduler_client.return_value = mock_scheduler_client
+    mock_scheduler_client.raw_url = mock_raw_url
+
+    with contextlib.nested(
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('apache.aurora.client.commands.admin.AuroraClientAPI',
+              new=Mock(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+    ) as (_, api, _):
+
+      api.return_value.scheduler_proxy = PropertyMock(return_value=mock_proxy)
+
+      get_scheduler([self.TEST_CLUSTER])
+
+      mock_raw_url.assert_called_once()

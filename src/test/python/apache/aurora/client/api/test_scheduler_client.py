@@ -316,10 +316,12 @@ def test_url_when_not_connected_and_cluster_has_no_proxy_url(scheme):
 
   client = make_mock_client(proxy_url=None)
   assert client.url == '%s://%s:%d' % (scheme, host, port)
+  assert client.url == client.raw_url
   client._connect_scheduler.assert_has_calls([])
 
   client = make_mock_client(proxy_url='https://scheduler.proxy')
   assert client.url == 'https://scheduler.proxy'
+  assert client.raw_url == '%s://%s:%d' % (scheme, host, port)
   client._connect_scheduler.assert_has_calls([])
 
   client = make_mock_client(proxy_url=None)

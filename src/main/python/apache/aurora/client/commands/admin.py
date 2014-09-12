@@ -510,3 +510,16 @@ def get_cluster_config(cluster):
   else:
     for line in shellify(cluster, options.export, prefix="AURORA_CLUSTER_"):
       print(line)
+
+
+@app.command
+@requires.exactly('cluster')
+def get_scheduler(cluster):
+  """usage: get_scheduler CLUSTER
+
+  Dumps the leading scheduler endpoint URL.
+  """
+  options = app.get_options()
+  print("Found leading scheduler at: %s" % AuroraClientAPI(
+      CLUSTERS[cluster],
+      options.verbosity).scheduler_proxy.scheduler_client().raw_url)

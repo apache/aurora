@@ -142,3 +142,9 @@ jobs = [HELLO_WORLD]
     job = AuroraJobKey.from_path('west/role/env/job-%s' % hostname)
     hosts[hostname].append(JobUpTimeDetails(job, predicted, safe, safe_in))
     return [hosts]
+
+  @classmethod
+  def setup_mock_options(cls):
+    mock_options = Mock(spec=['verbosity'])
+    mock_options.verbosity = 'verbose'
+    return mock_options

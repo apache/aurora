@@ -56,6 +56,16 @@ test_http_example() {
   vagrant ssh -c "aurora killall  $jobkey"
 }
 
+test_admin() {
+  local _cluster=$1 _sched_ip=$2
+
+  base_url="http://$_sched_ip:8081"
+
+  echo '== Testing Aurora Admin commands...'
+  echo '== Getting leading scheduler'
+  vagrant ssh -c "aurora_admin get_scheduler $_cluster" | grep "$base_url"
+}
+
 RETCODE=1
 # Set up shorthands for test
 export EXAMPLE_DIR=/vagrant/src/test/sh/org/apache/aurora/e2e/http
@@ -74,9 +84,15 @@ TEST_ARGS=(
   $EXAMPLE_DIR/http_example_updated.aurora
   )
 
+TEST_ADMIN_ARGS=(
+  $TEST_CLUSTER
+  $TEST_SCHEDULER_IP
+)
+
 trap collect_result EXIT
 vagrant up
 # wipe the pseudo-deploy dir, and then create it fresh, to guarantee that the
 # test runs clean.
 test_http_example "${TEST_ARGS[@]}"
+test_admin "${TEST_ADMIN_ARGS[@]}"
 RETCODE=0

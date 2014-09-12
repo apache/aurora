@@ -153,6 +153,10 @@ class ZookeeperSchedulerClient(SchedulerClient):
     proxy_url = self._cluster.proxy_url
     if proxy_url:
       return proxy_url
+    return self.raw_url
+
+  @property
+  def raw_url(self):
     if self._uri is None:
       self._resolve()
     if self._uri:
@@ -169,6 +173,10 @@ class DirectSchedulerClient(SchedulerClient):
 
   @property
   def url(self):
+    return self._uri
+
+  @property
+  def raw_url(self):
     return self._uri
 
 
