@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.http;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -296,7 +295,7 @@ public class JettyServerModule extends AbstractModule {
 
     @Inject
     RedirectMonitor(LeaderRedirect redirector) {
-      this.redirector = Objects.requireNonNull(redirector);
+      this.redirector = requireNonNull(redirector);
     }
 
     @Override
