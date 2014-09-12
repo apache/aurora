@@ -79,8 +79,15 @@ class TestSshCommand(AuroraClientCommandTest):
   @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
+    resp.result.scheduleStatusResult = ScheduleStatusResult()
     resp.result.scheduleStatusResult.tasks = cls.create_mock_scheduled_tasks()
+    return resp
+
+  @classmethod
+  def create_nojob_status_response(cls):
+    resp = cls.create_simple_success_response()
+    resp.result.scheduleStatusResult = ScheduleStatusResult()
+    resp.result.scheduleStatusResult.tasks = []
     return resp
 
   @classmethod
@@ -115,3 +122,21 @@ class TestSshCommand(AuroraClientCommandTest):
       mock_subprocess.assert_called_with(['ssh', '-t', 'mchucarroll@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])
+
+  def test_ssh_job_not_found(self):
+    """Test the ssh command when the query returns no tasks."""
+    mock_options = self.setup_mock_options()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_nojob_status_response()
+    with contextlib.nested(
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('subprocess.call', return_value=0)) as (
+            mock_scheduler_proxy_class,
+            mock_clusters,
+            options,
+            mock_subprocess):
+      self.assertRaises(SystemExit, ssh, ['west/mchucarroll/test/hello', '1', 'ls'], mock_options)
+
+      assert mock_subprocess.call_count == 0

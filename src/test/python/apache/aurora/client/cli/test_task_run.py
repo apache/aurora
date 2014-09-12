@@ -16,6 +16,7 @@ import contextlib
 
 from mock import Mock, patch
 
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
 
@@ -184,6 +185,13 @@ class TestSshCommand(AuroraClientCommandTest):
     return resp
 
   @classmethod
+  def create_nojob_status_response(cls):
+    resp = cls.create_simple_success_response()
+    resp.result.scheduleStatusResult = ScheduleStatusResult()
+    resp.result.scheduleStatusResult.tasks = []
+    return resp
+
+  @classmethod
   def create_failed_status_response(cls):
     return cls.create_blank_response(ResponseCode.INVALID_REQUEST, 'No tasks found for query')
 
@@ -215,3 +223,19 @@ class TestSshCommand(AuroraClientCommandTest):
       mock_subprocess.assert_called_with(['ssh', '-t', 'bozo@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])
+
+  def test_ssh_job_not_found(self):
+    """Test the ssh command when the jobkey parameter specifies a job that isn't running."""
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_nojob_status_response()
+    with contextlib.nested(
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('subprocess.call', return_value=0)) as (
+            mock_scheduler_proxy_class,
+            mock_clusters,
+            mock_subprocess):
+      cmd = AuroraCommandLine()
+      result = cmd.execute(['task', 'ssh', 'west/bozo/test/hello/1', '--command=ls'])
+      assert result == EXIT_INVALID_PARAMETER
+      assert mock_subprocess.call_count == 0

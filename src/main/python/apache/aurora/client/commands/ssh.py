@@ -71,6 +71,9 @@ def ssh(args, options):
   resp = api.query(api.build_query(role, name, set([int(shard)]), env=env))
   check_and_log_response(resp)
 
+  if (resp.result.scheduleStatusResult.tasks is None or
+      len(resp.result.scheduleStatusResult.tasks) == 0):
+    die("Job %s not found" % job_path)
   first_task = resp.result.scheduleStatusResult.tasks[0]
   remote_cmd = 'bash' if not args else ' '.join(args)
   command = DistributedCommandRunner.substitute(remote_cmd, first_task,

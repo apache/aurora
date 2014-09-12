@@ -114,6 +114,10 @@ class SshCommand(Verb):
     resp = api.query(api.build_query(role, name, set([int(instance)]), env=env))
     context.check_and_log_response(resp,
         err_msg=('Unable to get information about instance: %s' % resp.messageDEPRECATED))
+    if (resp.result.scheduleStatusResult.tasks is None or
+        len(resp.result.scheduleStatusResult.tasks) == 0):
+      raise context.CommandError(EXIT_INVALID_PARAMETER,
+          "Job %s not found" % context.options.task_instance.jobkey)
     first_task = resp.result.scheduleStatusResult.tasks[0]
     remote_cmd = context.options.command or 'bash'
     command = DistributedCommandRunner.substitute(remote_cmd, first_task,
