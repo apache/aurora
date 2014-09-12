@@ -186,7 +186,7 @@ class UpdaterTest(TestCase):
     response_code = ResponseCode.OK if response_code is None else response_code
     resp = Response(responseCode=response_code, messageDEPRECATED='test')
     result = set([deepcopy(job_config.taskConfig)])
-    resp.result = Result(populateJobResult=PopulateJobResult(populated=result))
+    resp.result = Result(populateJobResult=PopulateJobResult(populatedDEPRECATED=result))
     self._scheduler.populateJobConfig(job_config).AndReturn(resp)
 
   def expect_get_tasks(self, tasks, ignore_ids=None, response_code=None):

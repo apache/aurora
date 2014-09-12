@@ -123,7 +123,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     populate.result.populateJobResult = Mock(spec=PopulateJobResult)
     api.populateJobConfig.return_value = populate
     configs = [TaskConfig(numCpus=1.0, ramMb=1, diskMb=1) for i in range(count)]
-    populate.result.populateJobResult.populated = set(configs)
+    populate.result.populateJobResult.populatedDEPRECATED = set(configs)
     return populate
 
   @classmethod

@@ -291,9 +291,25 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testPopulateJobConfig() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
+    SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
     control.replay();
 
-    assertOkResponse(thrift.populateJobConfig(job.newBuilder()));
+    Response response = assertOkResponse(thrift.populateJobConfig(job.newBuilder()));
+    assertEquals(
+        ImmutableSet.of(sanitized.getJobConfig().getTaskConfig().newBuilder()),
+        response.result.getPopulateJobResult().getPopulatedDEPRECATED());
+
+    assertEquals(
+        sanitized.getJobConfig().getTaskConfig().newBuilder(),
+        response.result.getPopulateJobResult().getTaskConfig());
+  }
+
+  @Test
+  public void testPopulateJobConfigFails() throws Exception {
+    IJobConfiguration job = IJobConfiguration.build(makeJob(null));
+    control.replay();
+
+    assertResponse(ResponseCode.INVALID_REQUEST, thrift.populateJobConfig(job.newBuilder()));
   }
 
   @Test

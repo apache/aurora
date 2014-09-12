@@ -263,7 +263,7 @@ def diff(job_spec, config_file):
   resp = api.populate_job_config(config)
   if resp.responseCode != ResponseCode.OK:
     die('Request failed, server responded with "%s"' % resp.messageDEPRECATED)
-  local_tasks = resp.result.populateJobResult.populated
+  local_tasks = resp.result.populateJobResult.populatedDEPRECATED
 
   pp = pprint.PrettyPrinter(indent=2)
   def pretty_print_task(task):
@@ -690,7 +690,7 @@ def really_update(job_spec, config_file, options):
     resp = api.populate_job_config(config)
     if resp.responseCode != ResponseCode.OK:
       die('Server could not populate job config for comparison: %s' % resp.messageDEPRECATED)
-    local_task_count = len(resp.result.populateJobResult.populated)
+    local_task_count = len(resp.result.populateJobResult.populatedDEPRECATED)
     remote_task_count = len(remote_tasks)
     if (local_task_count >= 4 * remote_task_count or local_task_count <= 4 * remote_task_count
         or local_task_count == 0):

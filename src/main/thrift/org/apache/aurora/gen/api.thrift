@@ -301,8 +301,9 @@ struct ConfigSummary {
 }
 
 struct PopulateJobResult {
-  // TODO(maxim): Convert to ITaskConfig as there is always a single element returned.
-  1: set<TaskConfig> populated
+  // TODO(maxim): Remove populated field in 0.7.0. (AURORA-691)
+  1: set<TaskConfig> populatedDEPRECATED
+  2: TaskConfig taskConfig
 }
 
 struct GetQuotaResult {

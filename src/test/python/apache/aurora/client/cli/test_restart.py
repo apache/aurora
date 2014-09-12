@@ -41,7 +41,7 @@ class TestRestartCommand(AuroraClientCommandTest):
     populate.result.populateJobResult = Mock(spec=PopulateJobResult)
     api.populateJobConfig.return_value = populate
     configs = [Mock(spec=TaskConfig) for i in range(20)]
-    populate.result.populateJobResult.populated = set(configs)
+    populate.result.populateJobResult.populatedDEPRECATED = set(configs)
     return populate
 
   @classmethod

@@ -151,7 +151,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     for _ in range(20):
       task_config = TaskConfig(numCpus=1.0, ramMb=1, diskMb=1)
       configs.append(task_config)
-    populate.result.populateJobResult.populated = set(configs)
+    populate.result.populateJobResult.populatedDEPRECATED = set(configs)
     return populate
 
   @classmethod

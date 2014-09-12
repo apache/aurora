@@ -194,7 +194,7 @@ alternate diff program by setting the DIFF_VIEWER environment variable."""
     resp = api.populate_job_config(config)
     context.check_and_log_response(resp, err_code=EXIT_INVALID_CONFIGURATION,
           err_msg="Error loading configuration; see log for details")
-    local_tasks = resp.result.populateJobResult.populated
+    local_tasks = resp.result.populateJobResult.populatedDEPRECATED
     diff_program = os.environ.get("DIFF_VIEWER", "diff")
     with NamedTemporaryFile() as local:
       self.dump_tasks(local_tasks, local)
@@ -655,7 +655,7 @@ to preview what changes will take effect.
     resp = api.populate_job_config(config)
     context.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE,
         err_msg="Server could not populate job config for comparison; see log for details.")
-    local_task_count = len(resp.result.populateJobResult.populated)
+    local_task_count = len(resp.result.populateJobResult.populatedDEPRECATED)
     remote_task_count = len(remote_tasks)
 
     # Dangerous if it's more than a factor-of-four change in number of instances.

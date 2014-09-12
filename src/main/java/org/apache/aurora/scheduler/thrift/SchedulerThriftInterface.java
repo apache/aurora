@@ -455,11 +455,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     Response response = Util.emptyResponse();
     try {
-      SanitizedConfiguration sanitized =
-          SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(description));
+      ITaskConfig populatedTaskConfig = SanitizedConfiguration.fromUnsanitized(
+          IJobConfiguration.build(description)).getJobConfig().getTaskConfig();
 
       PopulateJobResult result = new PopulateJobResult()
-          .setPopulated(ImmutableSet.of(sanitized.getJobConfig().getTaskConfig().newBuilder()));
+          .setPopulatedDEPRECATED(ImmutableSet.of(populatedTaskConfig.newBuilder()))
+          .setTaskConfig(populatedTaskConfig.newBuilder());
 
       response.setResult(Result.populateJobResult(result));
       response.setResponseCode(OK);

@@ -626,7 +626,7 @@ class Updater(object):
     self._check_and_log_response(resp)
 
     # Safe to take the first element as Scheduler would throw in case zero instances provided.
-    return list(resp.result.populateJobResult.populated)[0]
+    return list(resp.result.populateJobResult.populatedDEPRECATED)[0]
 
   def _replace_template_if_cron(self):
     """Checks if the provided job config represents a cron job and if so, replaces it.

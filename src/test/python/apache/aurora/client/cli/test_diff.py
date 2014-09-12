@@ -100,7 +100,7 @@ class TestDiffCommand(AuroraClientCommandTest):
     populate = cls.create_simple_success_response()
     populate.result.populateJobResult = Mock(spec=PopulateJobResult)
     api.populateJobConfig.return_value = populate
-    populate.result.populateJobResult.populated = cls.create_mock_scheduled_tasks()
+    populate.result.populateJobResult.populatedDEPRECATED = cls.create_mock_scheduled_tasks()
     return populate
 
   def test_successful_diff(self):
