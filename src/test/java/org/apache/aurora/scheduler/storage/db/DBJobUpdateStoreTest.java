@@ -49,6 +49,7 @@ import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
@@ -90,11 +91,14 @@ public class DBJobUpdateStoreTest {
     IJobUpdate update1 = makeJobUpdate(JobKeys.from("role", "env", "name1"), updateId1);
     IJobUpdate update2 = makeJobUpdate(JobKeys.from("role", "env", "name2"), updateId2);
 
+    assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId1));
+    assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId2));
+
     saveUpdate(update1, "lock1");
-    assertEquals(populateExpected(update1), getUpdateDetails(updateId1).get().getUpdate());
+    assertUpdate(update1);
 
     saveUpdate(update2, "lock2");
-    assertEquals(populateExpected(update1), getUpdateDetails(updateId1).get().getUpdate());
+    assertUpdate(update2);
   }
 
   @Test
@@ -109,7 +113,7 @@ public class DBJobUpdateStoreTest {
 
     // Save with empty overrides.
     saveUpdate(expected, "lock");
-    assertEquals(populateExpected(expected), getUpdateDetails(updateId).get().getUpdate());
+    assertUpdate(expected);
   }
 
   @Test
@@ -125,7 +129,7 @@ public class DBJobUpdateStoreTest {
     // Save with null overrides.
     builder.getConfiguration().getSettings().setUpdateOnlyTheseInstances(null);
     saveUpdate(IJobUpdate.build(builder), "lock");
-    assertEquals(populateExpected(expected), getUpdateDetails(updateId).get().getUpdate());
+    assertUpdate(expected);
   }
 
   @Test(expected = StorageException.class)
@@ -145,7 +149,7 @@ public class DBJobUpdateStoreTest {
     IJobUpdateEvent event2 = makeJobUpdateEvent(JobUpdateStatus.ROLL_FORWARD_PAUSED, 125L);
 
     saveUpdate(update, "lock1");
-    assertEquals(populateExpected(update), getUpdateDetails(updateId).get().getUpdate());
+    assertUpdate(update);
     assertEquals(ImmutableList.of(FIRST_EVENT), getUpdateDetails(updateId).get().getUpdateEvents());
 
     saveJobEvent(event1, updateId);
@@ -170,7 +174,7 @@ public class DBJobUpdateStoreTest {
     IJobInstanceUpdateEvent event2 = makeJobInstanceEvent(1, 126L, INSTANCE_ADDED);
 
     saveUpdate(update, "lock");
-    assertEquals(populateExpected(update), getUpdateDetails(updateId).get().getUpdate());
+    assertUpdate(update);
     assertEquals(0, getUpdateDetails(updateId).get().getInstanceEvents().size());
 
     saveJobInstanceEvent(event1, updateId);
@@ -212,7 +216,7 @@ public class DBJobUpdateStoreTest {
     saveUpdate(update, "lock1");
 
     // Assert state fields were ignored.
-    assertEquals(populateExpected(update), getUpdateDetails(updateId).get().getUpdate());
+    assertUpdate(update);
   }
 
   @Test
@@ -298,7 +302,7 @@ public class DBJobUpdateStoreTest {
     saveJobInstanceEvent(instanceEvent, updateId);
     assertEquals(
         populateExpected(update, JobUpdateStatus.ROLLING_FORWARD, CREATED_MS, 125L),
-        getUpdateDetails(updateId).get().getUpdate());
+        getUpdate(updateId).get());
     assertEquals(2, getUpdateDetails(updateId).get().getUpdateEvents().size());
     assertEquals(1, getUpdateDetails(updateId).get().getInstanceEvents().size());
 
@@ -458,6 +462,42 @@ public class DBJobUpdateStoreTest {
     assertEquals(
         ImmutableList.<IJobUpdateSummary>of(),
         getSummaries(new JobUpdateQuery().setRole("no_match")));
+  }
+
+  @Test
+  public void testGetConfiguration() {
+    String updateId = "u1";
+
+    IJobUpdate update = makeJobUpdate(JobKeys.from("role", "env", "name1"), updateId);
+
+    assertEquals(Optional.<IJobUpdate>absent(), getUpdateConfiguration(updateId));
+
+    saveUpdate(update, "lock1");
+    assertEquals(Optional.of(makeJobUpdateConfiguration()), getUpdateConfiguration(updateId));
+  }
+
+  private void assertUpdate(IJobUpdate expected) {
+    String updateId = expected.getSummary().getUpdateId();
+    assertEquals(populateExpected(expected), getUpdate(updateId).get());
+    assertEquals(getUpdate(updateId).get(), getUpdateDetails(updateId).get().getUpdate());
+  }
+
+  private Optional<IJobUpdate> getUpdate(final String updateId) {
+    return storage.consistentRead(new Quiet<Optional<IJobUpdate>>() {
+      @Override
+      public Optional<IJobUpdate> apply(Storage.StoreProvider storeProvider) {
+        return storeProvider.getJobUpdateStore().fetchJobUpdate(updateId);
+      }
+    });
+  }
+
+  private Optional<IJobUpdateConfiguration> getUpdateConfiguration(final String updateId) {
+    return storage.consistentRead(new Quiet<Optional<IJobUpdateConfiguration>>() {
+      @Override
+      public Optional<IJobUpdateConfiguration> apply(Storage.StoreProvider storeProvider) {
+        return storeProvider.getJobUpdateStore().fetchJobUpdateConfiguration(updateId);
+      }
+    });
   }
 
   private Optional<IJobUpdateDetails> getUpdateDetails(final String updateId) {
@@ -630,18 +670,22 @@ public class DBJobUpdateStoreTest {
 
   private IJobUpdate makeJobUpdate() {
     return IJobUpdate.build(new JobUpdate()
-        .setConfiguration(new JobUpdateConfiguration()
-            .setNewTaskConfig(makeTaskConfig())
-            .setInstanceCount(8)
-            .setOldTaskConfigs(ImmutableSet.of(
-                new InstanceTaskConfig()
-                    .setInstances(ImmutableSet.of(new Range(0, 1), new Range(2, 3)))
-                    .setTask(makeTaskConfig()),
-                new InstanceTaskConfig()
-                    .setInstances(ImmutableSet.of(new Range(4, 5), new Range(6, 7)))
-                    .setTask(makeTaskConfig())))
-            .setSettings(new JobUpdateSettings()
-                .setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(0, 0), new Range(3, 5))))));
+        .setConfiguration(makeJobUpdateConfiguration().newBuilder()));
+  }
+
+  private IJobUpdateConfiguration makeJobUpdateConfiguration() {
+    return IJobUpdateConfiguration.build(new JobUpdateConfiguration()
+        .setNewTaskConfig(makeTaskConfig())
+        .setInstanceCount(8)
+        .setOldTaskConfigs(ImmutableSet.of(
+            new InstanceTaskConfig()
+                .setInstances(ImmutableSet.of(new Range(0, 1), new Range(2, 3)))
+                .setTask(makeTaskConfig()),
+            new InstanceTaskConfig()
+                .setInstances(ImmutableSet.of(new Range(4, 5), new Range(6, 7)))
+                .setTask(makeTaskConfig())))
+        .setSettings(new JobUpdateSettings()
+            .setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(0, 0), new Range(3, 5)))));
   }
 
   private TaskConfig makeTaskConfig() {

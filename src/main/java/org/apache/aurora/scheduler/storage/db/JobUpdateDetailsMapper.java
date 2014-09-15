@@ -19,6 +19,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import org.apache.aurora.gen.JobUpdate;
+import org.apache.aurora.gen.JobUpdateConfiguration;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Range;
@@ -107,6 +108,24 @@ interface JobUpdateDetailsMapper {
    */
   @Nullable
   StoredJobUpdateDetails selectDetails(String updateId);
+
+  /**
+   * Gets job update for the provided {@code updateId}.
+   *
+   * @param updateId Update ID to select by.
+   * @return job update for the provided update ID, if it exists.
+   */
+  @Nullable
+  JobUpdate selectUpdate(String updateId);
+
+  /**
+   * Gets job update configuration for the provided {@code updateId}.
+   *
+   * @param updateId Update ID to select by.
+   * @return job update configuration for the provided update ID, if it exists.
+   */
+  @Nullable
+  JobUpdateConfiguration selectConfiguration(String updateId);
 
   /**
    * Gets all stored job update details.

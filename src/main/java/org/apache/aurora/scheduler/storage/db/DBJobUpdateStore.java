@@ -22,11 +22,14 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 
+import org.apache.aurora.gen.JobUpdate;
+import org.apache.aurora.gen.JobUpdateConfiguration;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
@@ -73,7 +76,7 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
     Set<IRange> instanceOverrides =
         update.getConfiguration().getSettings().getUpdateOnlyTheseInstances();
 
-    if (instanceOverrides != null && !instanceOverrides.isEmpty()) {
+    if (!instanceOverrides.isEmpty()) {
       detailsMapper.insertInstanceOverrides(updateId, IRange.toBuildersSet(instanceOverrides));
     }
 
@@ -122,6 +125,28 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
           @Override
           public IJobUpdateDetails apply(StoredJobUpdateDetails input) {
             return IJobUpdateDetails.build(input.getDetails());
+          }
+        });
+  }
+
+  @Override
+  public Optional<IJobUpdate> fetchJobUpdate(String updateId) {
+    return Optional.fromNullable(detailsMapper.selectUpdate(updateId))
+        .transform(new Function<JobUpdate, IJobUpdate>() {
+          @Override
+          public IJobUpdate apply(JobUpdate input) {
+            return IJobUpdate.build(input);
+          }
+        });
+  }
+
+  @Override
+  public Optional<IJobUpdateConfiguration> fetchJobUpdateConfiguration(String updateId) {
+    return Optional.fromNullable(detailsMapper.selectConfiguration(updateId))
+        .transform(new Function<JobUpdateConfiguration, IJobUpdateConfiguration>() {
+          @Override
+          public IJobUpdateConfiguration apply(JobUpdateConfiguration input) {
+            return IJobUpdateConfiguration.build(input);
           }
         });
   }
