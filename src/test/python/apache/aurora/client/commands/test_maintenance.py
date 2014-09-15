@@ -134,19 +134,15 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     ])
 
     with contextlib.nested(
-        patch('time.sleep'),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
               return_value=mock_vector),
         patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.commands.maintenance.parse_script', return_value=mock_callback),
-        patch('twitter.common.app.get_options', return_value=mock_options)) as (
-            mock_sleep, _, _, _, _, _):
+        patch('twitter.common.app.get_options', return_value=mock_options)):
       host_drain([self.TEST_CLUSTER])
 
       mock_scheduler_proxy.startMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
-      #TODO(jsmith): Consider not mocking out sleep and instead refactoring
-      assert mock_sleep.call_count == 3
       assert mock_scheduler_proxy.maintenanceStatus.call_count == 3
       assert mock_scheduler_proxy.drainHosts.call_count == 3
       assert mock_callback.call_count == 3
@@ -173,17 +169,14 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     ])
 
     with contextlib.nested(
-        patch('time.sleep'),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
               return_value=mock_vector),
         patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options)) as (
-            mock_sleep, _, _, _, _):
+        patch('twitter.common.app.get_options', return_value=mock_options)):
       host_drain([self.TEST_CLUSTER])
 
       mock_scheduler_proxy.startMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
-      assert mock_sleep.call_count == 2
       assert mock_scheduler_proxy.maintenanceStatus.call_count == 2
       assert mock_scheduler_proxy.drainHosts.call_count == 2
 
@@ -204,7 +197,6 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
       ])
 
       with contextlib.nested(
-          patch('time.sleep'),
           patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
           patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
                 return_value=mock_vector),
@@ -234,14 +226,12 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
       ])
 
       with contextlib.nested(
-          patch('time.sleep'),
           patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
           patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
                 return_value=mock_vector),
           patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
           patch('apache.aurora.admin.admin_util.log_admin_message'),
-          patch('twitter.common.app.get_options', return_value=mock_options)) as (
-              _, _, _, _, log, _):
+          patch('twitter.common.app.get_options', return_value=mock_options)) as (_, _, _, log, _):
         host_drain([self.TEST_CLUSTER])
 
         assert 'Test overrides' in log.call_args[0][1]
@@ -268,18 +258,15 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
       return mock_vector
 
     with contextlib.nested(
-        patch('time.sleep'),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
               return_value=create_empty_sla_results()),
         patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options)) as (
-            mock_sleep, _, _, _, _):
+        patch('twitter.common.app.get_options', return_value=mock_options)):
 
       host_drain([self.TEST_CLUSTER])
 
       mock_scheduler_proxy.startMaintenance.assert_called_with(Hosts(set(self.HOSTNAMES)))
-      assert mock_sleep.call_count == 3
       assert mock_scheduler_proxy.maintenanceStatus.call_count == 3
       assert mock_scheduler_proxy.drainHosts.call_count == 3
 
