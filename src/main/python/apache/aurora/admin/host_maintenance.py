@@ -12,8 +12,6 @@
 # limitations under the License.
 #
 
-import time
-
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
 
@@ -37,8 +35,6 @@ class HostMaintenance(object):
   task from being constantly killed as its hosts go down from underneath it.
   """
 
-  START_MAINTENANCE_DELAY = Amount(30, Time.SECONDS)
-
   SLA_MIN_JOB_INSTANCE_COUNT = 20
 
 
@@ -52,7 +48,7 @@ class HostMaintenance(object):
   def __init__(self, cluster, verbosity):
     self._client = AuroraClientAPI(cluster, verbosity == 'verbose')
 
-  def _drain_hosts(self, drainable_hosts, clock=time):
+  def _drain_hosts(self, drainable_hosts):
     """"Drains tasks from the specified hosts.
 
     This will move active tasks on these hosts to the DRAINING state, causing them to be
@@ -60,14 +56,10 @@ class HostMaintenance(object):
 
     :param drainable_hosts: Hosts that are in maintenance mode and ready to be drained
     :type drainable_hosts: gen.apache.aurora.ttypes.Hosts
-    :param clock: time module for testing
-    :type clock: time
     """
     check_and_log_response(self._client.drain_hosts(drainable_hosts))
     not_ready_hostnames = [hostname for hostname in drainable_hosts.hostNames]
     while not_ready_hostnames:
-      log.info("Sleeping for %s." % self.START_MAINTENANCE_DELAY)
-      clock.sleep(self.START_MAINTENANCE_DELAY.as_(Time.SECONDS))
       resp = self._client.maintenance_status(Hosts(set(not_ready_hostnames)))
       if not resp.result.maintenanceStatusResult.statuses:
         not_ready_hostnames = None

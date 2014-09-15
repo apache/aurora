@@ -13,14 +13,12 @@
 #
 
 import copy
-import time
 import unittest
 from contextlib import contextmanager
 
 import mock
 from twitter.common import log
 from twitter.common.contextutil import temporary_file
-from twitter.common.quantity import Time
 
 from apache.aurora.admin.host_maintenance import HostMaintenance
 from apache.aurora.client.api import AuroraClientAPI
@@ -79,16 +77,12 @@ class TestHostMaintenance(unittest.TestCase):
       fake_maintenance_status_call_args.append(copy.deepcopy(hosts))
       return fake_maintenance_status_response.pop(0)
 
-    clock = mock.Mock(time)
     mock_drain_hosts.return_value = Response(responseCode=ResponseCode.OK)
     mock_maintenance_status.side_effect = fake_maintenance_status_side_effect
     test_hosts = Hosts(set(TEST_HOSTNAMES))
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
-    maintenance._drain_hosts(test_hosts, clock)
+    maintenance._drain_hosts(test_hosts)
     mock_drain_hosts.assert_called_once_with(test_hosts)
-    assert clock.sleep.call_count == 4
-    assert clock.sleep.call_args == mock.call(
-        HostMaintenance.START_MAINTENANCE_DELAY.as_(Time.SECONDS))
     assert mock_maintenance_status.call_count == 4
     assert fake_maintenance_status_call_args == [
         (Hosts(set(TEST_HOSTNAMES))),
