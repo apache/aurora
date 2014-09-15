@@ -16,10 +16,10 @@ python_library(
   name = 'status_checker',
   sources = ['status_checker.py'],
   dependencies = [
-    pants('3rdparty/python:mesos.interface'),
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.metrics'),
+    '3rdparty/python:mesos.interface',
+    '3rdparty/python:twitter.common.lang',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.metrics',
   ]
 )
 
@@ -27,8 +27,8 @@ python_library(
   name = 'task_runner',
   sources = ['task_runner.py'],
   dependencies = [
-    pants(':status_checker'),
-    pants('3rdparty/python:twitter.common.lang'),
+    ':status_checker',
+    '3rdparty/python:twitter.common.lang',
   ]
 )
 
@@ -36,12 +36,12 @@ python_library(
   name = 'health_checker',
   sources = ['health_checker.py'],
   dependencies = [
-    pants(':status_checker'),
-    pants(':task_info'),
-    pants('3rdparty/python:mesos.interface'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.exceptions'),
-    pants('src/main/python/apache/aurora/common:http_signaler'),
+    ':status_checker',
+    ':task_info',
+    '3rdparty/python:mesos.interface',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.exceptions',
+    'src/main/python/apache/aurora/common:http_signaler',
   ]
 )
 
@@ -49,14 +49,14 @@ python_library(
   name = 'announcer',
   sources = ['announcer.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.concurrent'),
-    pants('3rdparty/python:twitter.common.exceptions'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.metrics'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('3rdparty/python:twitter.common.zookeeper'),
-    pants(':status_checker'),
-    pants(':task_info'),
+    '3rdparty/python:twitter.common.concurrent',
+    '3rdparty/python:twitter.common.exceptions',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.metrics',
+    '3rdparty/python:twitter.common.quantity',
+    '3rdparty/python:twitter.common.zookeeper',
+    ':status_checker',
+    ':task_info',
   ]
 )
 
@@ -64,9 +64,9 @@ python_library(
   name = 'executor_timeout',
   sources = ['executor_timeout.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.exceptions'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.quantity'),
+    '3rdparty/python:twitter.common.exceptions',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.quantity',
   ]
 )
 
@@ -74,8 +74,8 @@ python_library(
   name = 'kill_manager',
   sources = ['kill_manager.py'],
   dependencies = [
-    pants('3rdparty/python:mesos.interface'),
-    pants(':status_checker'),
+    '3rdparty/python:mesos.interface',
+    ':status_checker',
   ]
 )
 
@@ -83,8 +83,8 @@ python_library(
   name = 'sandbox',
   sources = ['sandbox.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.dirutil'),
-    pants('3rdparty/python:twitter.common.log'),
+    '3rdparty/python:twitter.common.dirutil',
+    '3rdparty/python:twitter.common.log',
   ]
 )
 
@@ -92,10 +92,10 @@ python_library(
   name = 'task_info',
   sources = ['task_info.py'],
   dependencies = [
-    pants('3rdparty/python:pystachio'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('src/main/python/apache/aurora/config'),
-    pants('src/main/python/apache/aurora/config/schema'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:pystachio',
+    '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/aurora/config',
+    'src/main/python/apache/aurora/config/schema',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )

@@ -16,9 +16,9 @@ python_library(
   name = 'hooks',
   sources = ['__init__.py', 'hooked_api.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.log'),
-    pants('src/main/python/apache/aurora/client:api'),
-    pants('src/main/python/apache/aurora/common:aurora_job_key'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/aurora/client:api',
+    'src/main/python/apache/aurora/common:aurora_job_key',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )

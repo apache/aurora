@@ -15,21 +15,21 @@
 python_test_suite(
   name = 'all',
   dependencies = [
-    pants(':announcer'),
-    pants(':directory_sandbox'),
-    pants(':executor_timeout'),
-    pants(':health_checker'),
-    pants(':status_checker'),
-    pants(':task_info'),
+    ':announcer',
+    ':directory_sandbox',
+    ':executor_timeout',
+    ':health_checker',
+    ':status_checker',
+    ':task_info',
   ]
 )
 
 python_library(
   name = 'fixtures',
-  sources = 'fixtures.py',
+  sources = ['fixtures.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/config/schema'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    'src/main/python/apache/aurora/config/schema',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
 )
 
@@ -37,10 +37,10 @@ python_tests(
   name = 'announcer',
   sources = ['test_announcer.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('3rdparty/python:twitter.common.testing'),
-    pants('src/main/python/apache/aurora/executor/common:announcer'),
+    '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.quantity',
+    '3rdparty/python:twitter.common.testing',
+    'src/main/python/apache/aurora/executor/common:announcer',
   ],
 )
 
@@ -48,9 +48,9 @@ python_tests(
   name = 'directory_sandbox',
   sources = ['test_directory_sandbox.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:twitter.common.contextutil'),
-    pants('src/main/python/apache/aurora/executor/common:sandbox'),
+    '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.contextutil',
+    'src/main/python/apache/aurora/executor/common:sandbox',
   ],
 )
 
@@ -58,13 +58,13 @@ python_tests(
   name = 'health_checker',
   sources = ['test_health_checker.py'],
   dependencies = [
-    pants(':fixtures'),
-    pants('3rdparty/python:mesos.interface'),
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:twitter.common.testing'),
-    pants('src/main/python/apache/aurora/common:http_signaler'),
-    pants('src/main/python/apache/aurora/executor/common:health_checker'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    ':fixtures',
+    '3rdparty/python:mesos.interface',
+    '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.testing',
+    'src/main/python/apache/aurora/common:http_signaler',
+    'src/main/python/apache/aurora/executor/common:health_checker',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -72,8 +72,8 @@ python_tests(
   name = 'status_checker',
   sources = ['test_status_checker.py'],
   dependencies = [
-    pants('3rdparty/python:mesos.interface'),
-    pants('src/main/python/apache/aurora/executor/common:status_checker'),
+    '3rdparty/python:mesos.interface',
+    'src/main/python/apache/aurora/executor/common:status_checker',
   ]
 )
 
@@ -81,9 +81,9 @@ python_tests(
   name = 'kill_manager',
   sources = ['test_kill_manager.py'],
   dependencies = [
-    pants('3rdparty/python:mesos.interface'),
-    pants('src/main/python/apache/aurora/executor/common:kill_manager'),
-    pants('src/main/python/apache/aurora/executor/common:status_checker'),
+    '3rdparty/python:mesos.interface',
+    'src/main/python/apache/aurora/executor/common:kill_manager',
+    'src/main/python/apache/aurora/executor/common:status_checker',
   ],
 )
 
@@ -91,9 +91,9 @@ python_tests(
   name = 'task_info',
   sources = ['test_task_info.py'],
   dependencies = [
-    pants(':fixtures'),
-    pants('src/main/python/apache/aurora/executor/common:task_info'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    ':fixtures',
+    'src/main/python/apache/aurora/executor/common:task_info',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -101,9 +101,9 @@ python_tests(
   name = 'executor_timeout',
   sources = ['test_executor_timeout.py'],
   dependencies = [
-    pants('3rdparty/python:mesos.interface'),
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('src/main/python/apache/aurora/executor/common:executor_timeout'),
+    '3rdparty/python:mesos.interface',
+    '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.quantity',
+    'src/main/python/apache/aurora/executor/common:executor_timeout',
   ],
 )

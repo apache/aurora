@@ -18,7 +18,7 @@ import os
 python_library(
   name = 'schema',
   dependencies = [
-    pants('src/main/python/apache/aurora/config/schema'),
+    'src/main/python/apache/aurora/config/schema',
   ]
 )
 
@@ -31,11 +31,11 @@ python_library(
     'thrift.py',
   ),
   dependencies = [
-    pants('3rdparty/python:pystachio'),
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('src/main/python/apache/aurora/common'),
-    pants('src/main/python/apache/aurora/config/schema'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:pystachio',
+    '3rdparty/python:twitter.common.lang',
+    'src/main/python/apache/aurora/common',
+    'src/main/python/apache/aurora/config/schema',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
 
 )
@@ -43,10 +43,10 @@ python_library(
 python_library(
   name = 'config-packaged',
   dependencies = [
-    pants(':config'),
+    ':config',
 
     # covering dependencies
-    pants('src/main/python/apache/thermos/config'),
+    'src/main/python/apache/thermos/config',
   ],
   provides = setup_py(
     name = 'apache.aurora.config',

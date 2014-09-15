@@ -18,8 +18,8 @@ python_library(
   name = 'aurora_job_key',
   sources = ['aurora_job_key.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:twitter.common.lang',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -27,7 +27,7 @@ python_library(
   name = 'cluster',
   sources = ['cluster.py'],
   dependencies = [
-    pants('3rdparty/python:pystachio'),
+    '3rdparty/python:pystachio',
   ]
 )
 
@@ -35,9 +35,9 @@ python_library(
   name = 'clusters',
   sources = ['clusters.py'],
   dependencies = [
-    pants(':cluster'),
-    pants('3rdparty/python:pystachio'),
-    pants('3rdparty/python:twitter.common.collections'),
+    ':cluster',
+    '3rdparty/python:pystachio',
+    '3rdparty/python:twitter.common.collections',
   ]
 )
 
@@ -45,7 +45,7 @@ python_library(
   name = 'cluster_option',
   sources = ['cluster_option.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.lang'),
+    '3rdparty/python:twitter.common.lang',
   ]
 )
 
@@ -53,8 +53,8 @@ python_library(
   name = 'http_signaler',
   sources = ['http_signaler.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('3rdparty/python:twitter.common.log'),
+    '3rdparty/python:twitter.common.lang',
+    '3rdparty/python:twitter.common.log',
   ]
 )
 
@@ -62,7 +62,7 @@ python_library(
   name = 'shellify',
   sources = ['shellify.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.lang'),
+    '3rdparty/python:twitter.common.lang',
   ],
 )
 
@@ -70,25 +70,25 @@ python_library(
   name = 'transport',
   sources = ['transport.py'],
   dependencies = [
-    pants('3rdparty/python:requests'),
-    pants('3rdparty/python:thrift'),
+    '3rdparty/python:requests',
+    '3rdparty/python:thrift',
   ],
 )
 
 python_library(
   name = 'common',
   dependencies = [
-    pants(':aurora_job_key'),
-    pants(':cluster'),
-    pants(':cluster_option'),
-    pants(':clusters'),
-    pants(':http_signaler'),
-    pants(':shellify'),
-    pants(':transport'),
-    pants('src/main/python/apache/aurora/common/auth'),
+    ':aurora_job_key',
+    ':cluster',
+    ':cluster_option',
+    ':clusters',
+    ':http_signaler',
+    ':shellify',
+    ':transport',
+    'src/main/python/apache/aurora/common/auth',
 
     # covering dependency on gen.*
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift-packaged'),
+    'src/main/thrift/org/apache/aurora/gen:py-thrift-packaged',
   ],
   provides = setup_py(
     name = 'apache.aurora.common',

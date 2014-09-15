@@ -16,8 +16,8 @@ python_library(
   name = 'schema',
   sources = ['base.py'],
   dependencies = [
-    pants('3rdparty/python:pystachio'),
-    pants('src/main/python/apache/thermos/config:schema'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:pystachio',
+    'src/main/python/apache/thermos/config:schema',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )

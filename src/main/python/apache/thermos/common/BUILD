@@ -18,9 +18,9 @@ python_library(
   name = 'ckpt',
   sources = ['ckpt.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.recordio'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift')
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.recordio',
+    'src/main/thrift/org/apache/thermos:py-thrift'
   ]
 )
 
@@ -38,18 +38,18 @@ python_library(
   name = 'options',
   sources = ['options.py'],
   dependencies = [
-    pants('3rdparty/python:pystachio'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    '3rdparty/python:pystachio',
+    'src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
 python_library(
   name = 'common',
   dependencies = [
-    pants(':ckpt'),
-    pants(':options'),
-    pants(':path'),
-    pants(':planner'),
+    ':ckpt',
+    ':options',
+    ':path',
+    ':planner',
   ],
   provides = setup_py(
     name = 'apache.thermos.common',

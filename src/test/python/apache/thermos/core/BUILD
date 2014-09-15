@@ -14,102 +14,102 @@
 
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':small'),
-    pants(':medium'),
-    pants(':large'),
+    ':small',
+    ':medium',
+    ':large',
   ]
 )
 
 python_test_suite(name = 'small',
   dependencies = [
-    pants(':test_process'),
+    ':test_process',
   ]
 )
 
 python_test_suite(name = 'medium',
   dependencies = [
-    pants(':test_ephemerals'),
-    pants(':test_failing_runner'),
-    pants(':test_failure_limit'),
-    pants(':test_finalization'),
-    pants(':test_helper'),
-    pants(':test_runner_integration'),
+    ':test_ephemerals',
+    ':test_failing_runner',
+    ':test_failure_limit',
+    ':test_finalization',
+    ':test_helper',
+    ':test_runner_integration',
  ]
 )
 
 python_test_suite(name = 'large',
   dependencies = [
-    pants(':test_angry'),
-    pants(':test_staged_kill')
+    ':test_angry',
+    ':test_staged_kill'
   ]
 )
 
 python_tests(name = 'test_runner_integration',
   sources = ['test_runner_integration.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/testing:runner'),
+    'src/main/python/apache/thermos/testing:runner',
   ],
 )
 
 python_tests(name = 'test_angry',
   sources = ['test_angry.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/testing:runner'),
+    'src/main/python/apache/thermos/testing:runner',
   ],
-  timeout = Amount(5, Time.MINUTES)
+#  timeout = Amount(5, Time.MINUTES)
 )
 
 python_tests(name = 'test_ephemerals',
   sources = ['test_ephemerals.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/testing:runner'),
+    'src/main/python/apache/thermos/testing:runner',
   ],
 )
 
 python_tests(name = 'test_failing_runner',
   sources = ['test_failing_runner.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/testing:runner'),
+    'src/main/python/apache/thermos/testing:runner',
   ],
 )
 
 python_tests(name = 'test_finalization',
   sources = ['test_finalization.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/testing:runner'),
+    'src/main/python/apache/thermos/testing:runner',
   ],
 )
 
 python_tests(name = 'test_failure_limit',
   sources = ['test_failure_limit.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/testing:runner'),
+    'src/main/python/apache/thermos/testing:runner',
   ],
 )
 
 python_tests(name = 'test_helper',
   sources = ['test_helper.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:psutil'),
-    pants('src/main/python/apache/thermos/core:helper'),
+    '3rdparty/python:mock',
+    '3rdparty/python:psutil',
+    'src/main/python/apache/thermos/core:helper',
   ]
 )
 
 python_tests(name = 'test_process',
   sources = ['test_process.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:twitter.common.contextutil'),
-    pants('src/main/python/apache/thermos/testing:runner'),
+    '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.contextutil',
+    'src/main/python/apache/thermos/testing:runner',
   ],
 )
 
 python_tests(name = 'test_staged_kill',
   sources = ['test_staged_kill.py'],
   dependencies = [
-     pants('3rdparty/python:twitter.common.process'),
-     pants('src/main/python/apache/thermos/testing:runner'),
-     pants('src/main/python/apache/thermos/monitoring:monitor'),
+     '3rdparty/python:twitter.common.process',
+     'src/main/python/apache/thermos/testing:runner',
+     'src/main/python/apache/thermos/monitoring:monitor',
   ]
 )

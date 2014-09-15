@@ -18,18 +18,18 @@ python_binary(
   entry_point = 'apache.aurora.executor.bin.thermos_executor_main:proxy_main',
   always_write_cache = True,
   dependencies = [
-    pants('3rdparty/python:mesos.native'),
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.metrics'),
-    pants('src/main/python/apache/aurora/executor/common:announcer'),
-    pants('src/main/python/apache/aurora/executor/common:executor_timeout'),
-    pants('src/main/python/apache/aurora/executor/common:health_checker'),
-    pants('src/main/python/apache/aurora/executor/common:sandbox'),
-    pants('src/main/python/apache/aurora/executor:executor_detector'),
-    pants('src/main/python/apache/aurora/executor:executor_vars'),
-    pants('src/main/python/apache/aurora/executor:aurora_executor'),
-    pants('src/main/python/apache/aurora/executor:thermos_task_runner'),
+    '3rdparty/python:mesos.native',
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.metrics',
+    'src/main/python/apache/aurora/executor/common:announcer',
+    'src/main/python/apache/aurora/executor/common:executor_timeout',
+    'src/main/python/apache/aurora/executor/common:health_checker',
+    'src/main/python/apache/aurora/executor/common:sandbox',
+    'src/main/python/apache/aurora/executor:executor_detector',
+    'src/main/python/apache/aurora/executor:executor_vars',
+    'src/main/python/apache/aurora/executor:aurora_executor',
+    'src/main/python/apache/aurora/executor:thermos_task_runner',
   ]
 )
 
@@ -39,14 +39,14 @@ python_binary(
   entry_point = 'apache.aurora.executor.bin.gc_executor_main:proxy_main',
   always_write_cache = True,
   dependencies = [
-    pants('3rdparty/python:mesos.native'),
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.metrics'),
-    pants('src/main/python/apache/thermos/common:path'),
-    pants('src/main/python/apache/aurora/executor:executor_detector'),
-    pants('src/main/python/apache/aurora/executor:executor_vars'),
-    pants('src/main/python/apache/aurora/executor:gc_executor'),
+    '3rdparty/python:mesos.native',
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.metrics',
+    'src/main/python/apache/thermos/common:path',
+    'src/main/python/apache/aurora/executor:executor_detector',
+    'src/main/python/apache/aurora/executor:executor_vars',
+    'src/main/python/apache/aurora/executor:gc_executor',
   ]
 )
 
@@ -55,8 +55,8 @@ python_binary(
   source = 'thermos_runner_main.py',
   entry_point = 'apache.aurora.executor.bin.thermos_runner_main:proxy_main',
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('src/main/python/apache/aurora/executor:thermos_runner'),
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/aurora/executor:thermos_runner',
   ],
 )

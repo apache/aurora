@@ -15,10 +15,10 @@
 python_library(
   name = 'all',
   dependencies = [
-    pants(':core'),
-    pants(':help'),
-    pants(':run'),
-    pants(':ssh'),
+    ':core',
+    ':help',
+    ':run',
+    ':ssh',
   ]
 )
 
@@ -26,14 +26,14 @@ python_library(
   name = 'admin',
   sources = ['admin.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('src/main/python/apache/aurora/admin:util'),
-    pants('src/main/python/apache/aurora/client/api'),
-    pants('src/main/python/apache/aurora/client:base'),
-    pants('src/main/python/apache/aurora/common:clusters'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.quantity',
+    'src/main/python/apache/aurora/admin:util',
+    'src/main/python/apache/aurora/client/api',
+    'src/main/python/apache/aurora/client:base',
+    'src/main/python/apache/aurora/common:clusters',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -41,11 +41,11 @@ python_library(
   name = 'maintenance',
   sources = ['maintenance.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('src/main/python/apache/aurora/admin:host_maintenance'),
-    pants('src/main/python/apache/aurora/client:base'),
-    pants('src/main/python/apache/aurora/common:clusters'),
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/aurora/admin:host_maintenance',
+    'src/main/python/apache/aurora/client:base',
+    'src/main/python/apache/aurora/common:clusters',
   ]
 )
 
@@ -53,21 +53,21 @@ python_library(
   name = 'core',
   sources = ['core.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.python'),
-    pants('src/main/python/apache/aurora/client/api:command_runner'),
-    pants('src/main/python/apache/aurora/client/api:disambiguator'),
-    pants('src/main/python/apache/aurora/client/api:job_monitor'),
-    pants('src/main/python/apache/aurora/client/api:quota_check'),
-    pants('src/main/python/apache/aurora/client/api:updater'),
-    pants('src/main/python/apache/aurora/client/hooks'),
-    pants('src/main/python/apache/aurora/client:base'),
-    pants('src/main/python/apache/aurora/client:config'),
-    pants('src/main/python/apache/aurora/client:factory'),
-    pants('src/main/python/apache/aurora/client:options'),
-    pants('src/main/python/apache/aurora/common'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.python',
+    'src/main/python/apache/aurora/client/api:command_runner',
+    'src/main/python/apache/aurora/client/api:disambiguator',
+    'src/main/python/apache/aurora/client/api:job_monitor',
+    'src/main/python/apache/aurora/client/api:quota_check',
+    'src/main/python/apache/aurora/client/api:updater',
+    'src/main/python/apache/aurora/client/hooks',
+    'src/main/python/apache/aurora/client:base',
+    'src/main/python/apache/aurora/client:config',
+    'src/main/python/apache/aurora/client:factory',
+    'src/main/python/apache/aurora/client:options',
+    'src/main/python/apache/aurora/common',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -75,8 +75,8 @@ python_library(
   name = 'help',
   sources = ['help.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('src/main/python/apache/aurora/client:base'),
+    '3rdparty/python:twitter.common.app',
+    'src/main/python/apache/aurora/client:base',
   ]
 )
 
@@ -84,12 +84,12 @@ python_library(
   name = 'run',
   sources = ['run.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('src/main/python/apache/aurora/client/api:command_runner'),
-    pants('src/main/python/apache/aurora/client:base'),
-    pants('src/main/python/apache/aurora/client:options'),
-    pants('src/main/python/apache/aurora/common:aurora_job_key'),
-    pants('src/main/python/apache/aurora/common:clusters'),
+    '3rdparty/python:twitter.common.app',
+    'src/main/python/apache/aurora/client/api:command_runner',
+    'src/main/python/apache/aurora/client:base',
+    'src/main/python/apache/aurora/client:options',
+    'src/main/python/apache/aurora/common:aurora_job_key',
+    'src/main/python/apache/aurora/common:clusters',
   ]
 )
 
@@ -97,12 +97,12 @@ python_library(
   name = 'ssh',
   sources = ['ssh.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('src/main/python/apache/aurora/client/api:command_runner'),
-    pants('src/main/python/apache/aurora/client:base'),
-    pants('src/main/python/apache/aurora/client:factory'),
-    pants('src/main/python/apache/aurora/client:options'),
-    pants('src/main/python/apache/aurora/common:aurora_job_key'),
-    pants('src/main/python/apache/aurora/common:clusters'),
+    '3rdparty/python:twitter.common.app',
+    'src/main/python/apache/aurora/client/api:command_runner',
+    'src/main/python/apache/aurora/client:base',
+    'src/main/python/apache/aurora/client:factory',
+    'src/main/python/apache/aurora/client:options',
+    'src/main/python/apache/aurora/common:aurora_job_key',
+    'src/main/python/apache/aurora/common:clusters',
   ]
 )

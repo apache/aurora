@@ -33,16 +33,16 @@ python_thrift_library(
   name = 'py-thrift-storage',
   sources = ['storage.thrift'],
   dependencies = [
-    pants(':py-thrift'),
+    ':py-thrift',
   ],
 )
 
 python_library(
   name = 'py-thrift-packaged',
   dependencies = [
-    pants(':py-thrift'),
-    pants(':py-thrift-test'),
-    pants(':py-thrift-storage'),
+    ':py-thrift',
+    ':py-thrift-test',
+    ':py-thrift-storage',
   ],
   provides = setup_py(
     name = 'apache.gen.aurora',

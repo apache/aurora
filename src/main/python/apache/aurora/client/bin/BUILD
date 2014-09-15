@@ -16,7 +16,7 @@ python_binary(
   name = 'aurora_client',
   entry_point = 'apache.aurora.client.bin.aurora_client:proxy_main',
   dependencies = [
-    pants(':aurora_client_lib')
+    ':aurora_client_lib'
   ]
 )
 
@@ -24,10 +24,10 @@ python_library(
   name = 'aurora_client_lib',
   sources = [ 'aurora_client.py' ],
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('src/main/python/apache/aurora/client/commands:all'),
-    pants('src/main/python/apache/aurora/client:base'),
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/aurora/client/commands:all',
+    'src/main/python/apache/aurora/client:base',
   ]
 )
 
@@ -35,7 +35,7 @@ python_binary(
   name = 'aurora_admin',
   entry_point = 'apache.aurora.client.bin.aurora_admin:proxy_main',
   dependencies = [
-    pants(':aurora_admin_lib')
+    ':aurora_admin_lib'
   ]
 )
 
@@ -43,12 +43,12 @@ python_library(
   name = 'aurora_admin_lib',
   sources = [ 'aurora_admin.py' ],
   dependencies = [
-      pants('3rdparty/python:twitter.common.app'),
-      pants('3rdparty/python:twitter.common.log'),
-      pants('src/main/python/apache/aurora/client/commands:admin'),
-      pants('src/main/python/apache/aurora/client/commands:help'),
-      pants('src/main/python/apache/aurora/client/commands:maintenance'),
-      pants('src/main/python/apache/aurora/client:base'),
-      pants('src/main/python/apache/aurora/client:options'),
+      '3rdparty/python:twitter.common.app',
+      '3rdparty/python:twitter.common.log',
+      'src/main/python/apache/aurora/client/commands:admin',
+      'src/main/python/apache/aurora/client/commands:help',
+      'src/main/python/apache/aurora/client/commands:maintenance',
+      'src/main/python/apache/aurora/client:base',
+      'src/main/python/apache/aurora/client:options',
     ]
 )

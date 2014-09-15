@@ -16,7 +16,7 @@ python_binary(
   name='aurora2',
   entry_point = 'apache.aurora.client.cli.client:proxy_main',
   dependencies = [
-    pants(':client_lib')
+    ':client_lib'
   ],
 )
 
@@ -24,7 +24,7 @@ python_binary(
   name='aurora2_so',
   entry_point = 'apache.aurora.client.cli.standalone_client:proxy_main',
   dependencies = [
-    pants(':client_lib')
+    ':client_lib'
   ]
 )
 
@@ -37,11 +37,11 @@ python_library(
   name = 'client_lib',
   sources = [ 'client.py' ],
   dependencies = [
-    pants(':cli'),
-    pants(':bridge'),
-    pants('3rdparty/python:twitter.common.python'),
-    pants('src/main/python/apache/aurora/client/bin:aurora_admin_lib'),
-    pants('src/main/python/apache/aurora/client/bin:aurora_client_lib')
+    ':cli',
+    ':bridge',
+    '3rdparty/python:twitter.common.python',
+    'src/main/python/apache/aurora/client/bin:aurora_admin_lib',
+    'src/main/python/apache/aurora/client/bin:aurora_client_lib'
   ]
 )
 
@@ -62,20 +62,20 @@ python_library(
     'task.py',
   ],
   dependencies = [
-    pants('3rdparty/python:argparse'),
-    pants('3rdparty/python:requests'),
-    pants('3rdparty/python:twitter.common.python'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('src/main/python/apache/aurora/client/api:command_runner'),
-    pants('src/main/python/apache/aurora/client/api:disambiguator'),
-    pants('src/main/python/apache/aurora/client/api:job_monitor'),
-    pants('src/main/python/apache/aurora/client/api:updater'),
-    pants('src/main/python/apache/aurora/client/hooks'),
-    pants('src/main/python/apache/aurora/client:base'),
-    pants('src/main/python/apache/aurora/client:config'),
-    pants('src/main/python/apache/aurora/client:factory'),
-    pants('src/main/python/apache/aurora/client:options'),
-    pants('src/main/python/apache/aurora/common'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:argparse',
+    '3rdparty/python:requests',
+    '3rdparty/python:twitter.common.python',
+    '3rdparty/python:twitter.common.quantity',
+    'src/main/python/apache/aurora/client/api:command_runner',
+    'src/main/python/apache/aurora/client/api:disambiguator',
+    'src/main/python/apache/aurora/client/api:job_monitor',
+    'src/main/python/apache/aurora/client/api:updater',
+    'src/main/python/apache/aurora/client/hooks',
+    'src/main/python/apache/aurora/client:base',
+    'src/main/python/apache/aurora/client:config',
+    'src/main/python/apache/aurora/client:factory',
+    'src/main/python/apache/aurora/client:options',
+    'src/main/python/apache/aurora/common',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
 )

@@ -16,11 +16,11 @@ python_library(
   name = 'host_maintenance',
   sources = ['host_maintenance.py'],
   dependencies = [
-    pants(':util'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('src/main/python/apache/aurora/client:api'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    ':util',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.quantity',
+    'src/main/python/apache/aurora/client:api',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -28,6 +28,6 @@ python_library(
   name = 'util',
   sources = ['admin_util.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/client:base'),
+    'src/main/python/apache/aurora/client:base',
   ]
 )

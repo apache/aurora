@@ -18,7 +18,7 @@ python_library(
   name = 'detector',
   sources = ['detector.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/common:path'),
+    'src/main/python/apache/thermos/common:path',
   ]
 )
 
@@ -26,12 +26,12 @@ python_library(
   name = 'garbage',
   sources = ['garbage.py'],
   dependencies = [
-    pants(':detector'),
-    pants('3rdparty/python:twitter.common.dirutil'),
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('src/main/python/apache/thermos/common:ckpt'),
-    pants('src/main/python/apache/thermos/common:path'),
+    ':detector',
+    '3rdparty/python:twitter.common.dirutil',
+    '3rdparty/python:twitter.common.lang',
+    '3rdparty/python:twitter.common.quantity',
+    'src/main/python/apache/thermos/common:ckpt',
+    'src/main/python/apache/thermos/common:path',
   ]
 )
 
@@ -39,10 +39,10 @@ python_library(
   name = 'monitor',
   sources = ['monitor.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.recordio'),
-    pants('src/main/python/apache/thermos/common:ckpt'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.recordio',
+    'src/main/python/apache/thermos/common:ckpt',
+    'src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
@@ -50,12 +50,12 @@ python_library(
   name = 'disk',
   sources = ['disk.py'],
   dependencies = [
-    pants('3rdparty/python:watchdog'),
-    pants('3rdparty/python:twitter.common.dirutil'),
-    pants('3rdparty/python:twitter.common.exceptions'),
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.quantity'),
+    '3rdparty/python:watchdog',
+    '3rdparty/python:twitter.common.dirutil',
+    '3rdparty/python:twitter.common.exceptions',
+    '3rdparty/python:twitter.common.lang',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.quantity',
   ]
 )
 
@@ -68,9 +68,9 @@ python_library(
   name = 'process_collector_psutil',
   sources = ['process_collector_psutil.py'],
   dependencies = [
-    pants(':process'),
-    pants('3rdparty/python:psutil'),
-    pants('3rdparty/python:twitter.common.log'),
+    ':process',
+    '3rdparty/python:psutil',
+    '3rdparty/python:twitter.common.log',
   ]
 )
 
@@ -78,30 +78,30 @@ python_library(
   name = 'resource',
   sources = ['resource.py'],
   dependencies = [
-    pants(':disk'),
-    pants(':monitor'),
-    pants(':process'),
-    pants(':process_collector_psutil'),
-    pants('3rdparty/python:twitter.common.collections'),
-    pants('3rdparty/python:twitter.common.concurrent'),
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.quantity'),
+    ':disk',
+    ':monitor',
+    ':process',
+    ':process_collector_psutil',
+    '3rdparty/python:twitter.common.collections',
+    '3rdparty/python:twitter.common.concurrent',
+    '3rdparty/python:twitter.common.lang',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.quantity',
   ]
 )
 
 python_library(
   name = 'monitoring',
   dependencies = [
-    pants(':detector'),
-    pants(':disk'),
-    pants(':garbage'),
-    pants(':monitor'),
-    pants(':process'),
-    pants(':resource'),
+    ':detector',
+    ':disk',
+    ':garbage',
+    ':monitor',
+    ':process',
+    ':resource',
 
     # covering dependency for common
-    pants('src/main/python/apache/thermos/common'),
+    'src/main/python/apache/thermos/common',
   ],
   provides = setup_py(
     name = 'apache.thermos.monitoring',

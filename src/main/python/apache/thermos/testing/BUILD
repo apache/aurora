@@ -16,13 +16,13 @@ python_library(
   name = 'runner',
   sources = ['runner.py'],
   dependencies = [
-    pants('3rdparty/python:thrift'),
-    pants('3rdparty/python:twitter.common.contextutil'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('src/main/python/apache/thermos/common:ckpt'),
-    pants('src/main/python/apache/thermos/common:path'),
-    pants('src/main/python/apache/thermos/config'),
-    pants('src/main/python/apache/thermos/core'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    '3rdparty/python:thrift',
+    '3rdparty/python:twitter.common.contextutil',
+    '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/thermos/common:ckpt',
+    'src/main/python/apache/thermos/common:path',
+    'src/main/python/apache/thermos/config',
+    'src/main/python/apache/thermos/core',
+    'src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )

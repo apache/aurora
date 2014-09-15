@@ -18,7 +18,7 @@ import os
 python_library(
   name = 'api',
   dependencies = [
-    pants('src/main/python/apache/aurora/client/api')
+    'src/main/python/apache/aurora/client/api'
   ]
 )
 
@@ -26,9 +26,9 @@ python_library(
   name = 'base',
   sources = ['base.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -36,7 +36,7 @@ python_library(
   name = 'binding_helper',
   sources = ['binding_helper.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.lang'),
+    '3rdparty/python:twitter.common.lang',
   ]
 )
 
@@ -44,13 +44,13 @@ python_library(
   name = 'config',
   sources = ['config.py'],
   dependencies = [
-    pants(':base'),
-    pants(':binding_helper'),
-    pants('3rdparty/python:pystachio'),
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('src/main/python/apache/aurora/config'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    ':base',
+    ':binding_helper',
+    '3rdparty/python:pystachio',
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/aurora/config',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -58,11 +58,11 @@ python_library(
   name = 'factory',
   sources = ['factory.py'],
   dependencies = [
-    pants(':base'),
-    pants('3rdparty/python:twitter.common.app'),
-    pants('src/main/python/apache/aurora/client/hooks'),
-    pants('src/main/python/apache/aurora/common:cluster'),
-    pants('src/main/python/apache/aurora/common:clusters'),
+    ':base',
+    '3rdparty/python:twitter.common.app',
+    'src/main/python/apache/aurora/client/hooks',
+    'src/main/python/apache/aurora/common:cluster',
+    'src/main/python/apache/aurora/common:clusters',
   ]
 )
 
@@ -70,39 +70,39 @@ python_library(
   name = 'options',
   sources = ['options.py'],
   dependencies = [
-    pants('src/main/python/apache/thermos/common:options'),
-    pants('src/main/python/apache/aurora/common:aurora_job_key'),
+    'src/main/python/apache/thermos/common:options',
+    'src/main/python/apache/aurora/common:aurora_job_key',
   ]
 )
 
 python_library(
   name = 'client-packaged',
   dependencies = [
-    pants('src/main/python/apache/aurora/common'),
-    pants('src/main/python/apache/aurora/config:config-packaged'),
-    pants('src/main/python/apache/thermos/common'),
+    'src/main/python/apache/aurora/common',
+    'src/main/python/apache/aurora/config:config-packaged',
+    'src/main/python/apache/thermos/common',
   ],
   provides = setup_py(
     name = 'apache.aurora.client',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
   ).with_binaries(
-    aurora_admin = pants('src/main/python/apache/aurora/client/bin:aurora_admin'),
-    aurora = pants('src/main/python/apache/aurora/client/bin:aurora_client'),
+    aurora_admin = 'src/main/python/apache/aurora/client/bin:aurora_admin',
+    aurora = 'src/main/python/apache/aurora/client/bin:aurora_client',
   )
 )
 
 python_library(
   name = 'clientv2-packaged',
   dependencies = [
-    pants('src/main/python/apache/aurora/common'),
-    pants('src/main/python/apache/aurora/config:config-packaged'),
-    pants('src/main/python/apache/thermos/common'),
+    'src/main/python/apache/aurora/common',
+    'src/main/python/apache/aurora/config:config-packaged',
+    'src/main/python/apache/thermos/common',
   ],
   provides = setup_py(
     name = 'apache.aurora.clientv2',
     version = open(os.path.join(get_buildroot(), '.auroraversion')).read().strip().upper(),
   ).with_binaries(
-    aurora2 = pants('src/main/python/apache/aurora/client/cli:aurora2'),
+    aurora2 = 'src/main/python/apache/aurora/client/cli:aurora2',
   )
 )
 

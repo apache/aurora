@@ -18,17 +18,17 @@ python_library(
   name = 'schema',
   sources = globs('*.py'),
   dependencies = [
-    pants('3rdparty/python:pystachio'),
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('src/main/python/apache/thermos/common:planner')
+    '3rdparty/python:pystachio',
+    '3rdparty/python:twitter.common.lang',
+    'src/main/python/apache/thermos/common:planner'
   ],
 )
 
 python_library(
   name = 'config',
   dependencies = [
-    pants(':schema'),
-    pants('src/main/python/apache/thermos/common'),  # cover common:planner
+    ':schema',
+    'src/main/python/apache/thermos/common',  # cover common:planner
   ],
   provides = setup_py(
     name = 'apache.thermos.config',

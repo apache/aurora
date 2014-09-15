@@ -16,7 +16,7 @@ python_library(
   name = 'json',
   sources = ['json.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.http'),
+    '3rdparty/python:twitter.common.http',
   ]
 )
 
@@ -25,7 +25,7 @@ python_library(
   sources = ['static_assets.py'],
   resources = rglobs('assets/*'),
   dependencies = [
-    pants('3rdparty/python:bottle'),
+    '3rdparty/python:bottle',
   ]
 )
 
@@ -39,11 +39,11 @@ python_library(
   name = 'file_browser',
   sources = ['file_browser.py'],
   dependencies = [
-    pants(':templating'),
-    pants('3rdparty/python:bottle'),
-    pants('3rdparty/python:mako'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.http'),
+    ':templating',
+    '3rdparty/python:bottle',
+    '3rdparty/python:mako',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.http',
   ]
 )
 
@@ -51,11 +51,11 @@ python_library(
   name = 'http_observer',
   sources = ['__init__.py', 'http_observer.py'],
   dependencies = [
-    pants(':file_browser'),
-    pants(':json'),
-    pants(':static_assets'),
-    pants(':templating'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.http'),
+    ':file_browser',
+    ':json',
+    ':static_assets',
+    ':templating',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.http',
   ]
 )

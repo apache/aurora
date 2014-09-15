@@ -18,14 +18,14 @@ python_library(
   name = 'helper',
   sources = ['helper.py'],
   dependencies = [
-    pants('3rdparty/python:psutil'),
-    pants('3rdparty/python:twitter.common.dirutil'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('3rdparty/python:twitter.common.recordio'),
-    pants('src/main/python/apache/thermos/common:ckpt'),
-    pants('src/main/python/apache/thermos/common:path'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    '3rdparty/python:psutil',
+    '3rdparty/python:twitter.common.dirutil',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.quantity',
+    '3rdparty/python:twitter.common.recordio',
+    'src/main/python/apache/thermos/common:ckpt',
+    'src/main/python/apache/thermos/common:path',
+    'src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
@@ -33,11 +33,11 @@ python_library(
   name = 'inspector',
   sources = ['inspector.py'],
   dependencies = [
-    pants(':muxer'),
-    pants('3rdparty/python:twitter.common.recordio'),
-    pants('src/main/python/apache/thermos/common:ckpt'),
-    pants('src/main/python/apache/thermos/common:path'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    ':muxer',
+    '3rdparty/python:twitter.common.recordio',
+    'src/main/python/apache/thermos/common:ckpt',
+    'src/main/python/apache/thermos/common:path',
+    'src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
@@ -45,9 +45,9 @@ python_library(
   name = 'muxer',
   sources = ['muxer.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.recordio'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.recordio',
+    'src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
@@ -55,12 +55,12 @@ python_library(
   name = 'process',
   sources = ['process.py'],
   dependencies = [
-    pants('3rdparty/python:twitter.common.dirutil'),
-    pants('3rdparty/python:twitter.common.lang'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('3rdparty/python:twitter.common.recordio'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    '3rdparty/python:twitter.common.dirutil',
+    '3rdparty/python:twitter.common.lang',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.quantity',
+    '3rdparty/python:twitter.common.recordio',
+    'src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
@@ -68,32 +68,32 @@ python_library(
   name = 'runner',
   sources = ['__init__.py', 'runner.py'],
   dependencies = [
-    pants(':helper'),
-    pants(':muxer'),
-    pants(':process'),
-    pants('3rdparty/python:psutil'),
-    pants('3rdparty/python:twitter.common.dirutil'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('3rdparty/python:twitter.common.recordio'),
-    pants('src/main/python/apache/thermos/common:ckpt'),
-    pants('src/main/python/apache/thermos/common:path'),
-    pants('src/main/python/apache/thermos/common:planner'),
-    pants('src/main/python/apache/thermos/config:schema'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    ':helper',
+    ':muxer',
+    ':process',
+    '3rdparty/python:psutil',
+    '3rdparty/python:twitter.common.dirutil',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.quantity',
+    '3rdparty/python:twitter.common.recordio',
+    'src/main/python/apache/thermos/common:ckpt',
+    'src/main/python/apache/thermos/common:path',
+    'src/main/python/apache/thermos/common:planner',
+    'src/main/python/apache/thermos/config:schema',
+    'src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
 python_library(
   name = 'core',
   dependencies = [
-    pants(':inspector'),
-    pants(':runner'),
+    ':inspector',
+    ':runner',
 
     # covering libs
-    pants('src/main/python/apache/thermos/common'),
-    pants('src/main/python/apache/thermos/config'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    'src/main/python/apache/thermos/common',
+    'src/main/python/apache/thermos/config',
+    'src/main/thrift/org/apache/thermos:py-thrift',
   ],
   provides = setup_py(
     name = 'apache.thermos.core',

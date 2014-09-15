@@ -14,27 +14,27 @@
 
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':hooked_api'),
-    pants(':non_hooked_api'),
+    ':hooked_api',
+    ':non_hooked_api',
   ],
 )
 
 python_tests(name = 'hooked_api',
   sources = ['test_hooked_api.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('src/main/python/apache/aurora/common:cluster'),
-    pants('src/main/python/apache/aurora/client:api'),
-    pants('src/main/python/apache/aurora/client/hooks'),
-    pants('src/main/python/apache/aurora/client:config')
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/common:cluster',
+    'src/main/python/apache/aurora/client:api',
+    'src/main/python/apache/aurora/client/hooks',
+    'src/main/python/apache/aurora/client:config'
   ]
 )
 
 python_tests(name = 'non_hooked_api',
   sources = ['test_non_hooked_api.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/common:aurora_job_key'),
-    pants('src/main/python/apache/aurora/client/hooks'),
-    pants('src/main/python/apache/aurora/client:config')
+    'src/main/python/apache/aurora/common:aurora_job_key',
+    'src/main/python/apache/aurora/client/hooks',
+    'src/main/python/apache/aurora/client:config'
   ],
 )

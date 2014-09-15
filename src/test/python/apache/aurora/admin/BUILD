@@ -14,31 +14,31 @@
 
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':host_maintenance'),
-    pants(':admin_util'),
+    ':host_maintenance',
+    ':admin_util',
   ],
 )
 
 python_tests(name = 'host_maintenance',
   sources = ['test_host_maintenance.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('src/main/python/apache/aurora/client:api'),
-    pants('src/main/python/apache/aurora/common:cluster'),
-    pants('src/main/python/apache/aurora/admin:host_maintenance'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.quantity',
+    'src/main/python/apache/aurora/client:api',
+    'src/main/python/apache/aurora/common:cluster',
+    'src/main/python/apache/aurora/admin:host_maintenance',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
 )
 
 python_tests(name = 'admin_util',
   sources = ['test_admin_util.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:twitter.common.quantity'),
-    pants('3rdparty/python:twitter.common.contextutil'),
-    pants('src/main/python/apache/aurora/admin:util'),
+    '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.quantity',
+    '3rdparty/python:twitter.common.contextutil',
+    'src/main/python/apache/aurora/admin:util',
   ],
 )
 

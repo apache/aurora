@@ -14,27 +14,27 @@
 
 python_test_suite(name = 'all',
   dependencies = [
-    pants(':api'),
-    pants(':disambiguator'),
-    pants(':instance_watcher'),
-    pants(':job_monitor'),
-    pants(':mux'),
-    pants(':quota_check'),
-    pants(':restarter'),
-    pants(':scheduler_client'),
-    pants(':sla'),
-    pants(':updater'),
-    pants(':updater_util')
+    ':api',
+    ':disambiguator',
+    ':instance_watcher',
+    ':job_monitor',
+    ':mux',
+    ':quota_check',
+    ':restarter',
+    ':scheduler_client',
+    ':sla',
+    ':updater',
+    ':updater_util'
   ],
 )
 
 python_tests(name = 'api',
   sources = ['test_api.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('src/main/python/apache/aurora/client/api:api'),
-    pants('src/main/python/apache/aurora/client:config'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift')
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/client/api:api',
+    'src/main/python/apache/aurora/client:config',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift'
   ],
 )
 
@@ -42,102 +42,102 @@ python_tests(
   name = 'disambiguator',
   sources = ['test_disambiguator.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('3rdparty/python:twitter.common.app'),
-    pants('src/main/python/apache/aurora/client/api:disambiguator'),
+    '3rdparty/python:mox',
+    '3rdparty/python:twitter.common.app',
+    'src/main/python/apache/aurora/client/api:disambiguator',
   ],
 )
 
 python_tests(name = 'job_monitor',
   sources = ['test_job_monitor.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('src/main/python/apache/aurora/client/api:api'),
-    pants('src/main/python/apache/aurora/client/api:job_monitor'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
-    pants('src/test/python/apache/aurora/client:fake_scheduler_proxy'),
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/client/api:api',
+    'src/main/python/apache/aurora/client/api:job_monitor',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/test/python/apache/aurora/client:fake_scheduler_proxy',
   ],
 )
 
 python_tests(name = 'instance_watcher',
   sources = ['test_instance_watcher.py', 'test_health_check.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('src/main/python/apache/aurora/client/api:instance_watcher'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:mox',
+    'src/main/python/apache/aurora/client/api:instance_watcher',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
 python_tests(name = 'mux',
   sources = ['test_scheduler_mux.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/client/api:scheduler_mux'),
+    'src/main/python/apache/aurora/client/api:scheduler_mux',
   ]
 )
 
 python_tests(name = 'quota_check',
   sources = ['test_quota_check.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('src/main/python/apache/aurora/client/api:quota_check'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/client/api:quota_check',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
 python_tests(name = 'restarter',
   sources = ['test_restarter.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('src/main/python/apache/aurora/client/api:restarter'),
-    pants('src/main/python/apache/aurora/common:aurora_job_key'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
-    pants('src/test/python/apache/aurora/client:fake_scheduler_proxy'),
+    '3rdparty/python:mox',
+    'src/main/python/apache/aurora/client/api:restarter',
+    'src/main/python/apache/aurora/common:aurora_job_key',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/test/python/apache/aurora/client:fake_scheduler_proxy',
   ],
 )
 
 python_tests(name = 'scheduler_client',
   sources = ['test_scheduler_client.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:mox'),
-    pants('src/main/python/apache/aurora/client/api:scheduler_client'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:mock',
+    '3rdparty/python:mox',
+    'src/main/python/apache/aurora/client/api:scheduler_client',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
 python_tests(name = 'sla',
   sources = ['test_sla.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('src/main/python/apache/aurora/client/api:sla'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/client/api:sla',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
 python_tests(name = 'task_util',
   sources = ['test_task_util.py'],
   dependencies = [
-    pants('3rdparty/python:mock'),
-    pants('src/main/python/apache/aurora/client/api:task_util'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/client/api:task_util',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
 python_tests(name = 'updater',
   sources = ['test_updater.py'],
   dependencies = [
-    pants('3rdparty/python:mox'),
-    pants('src/main/python/apache/aurora/common:aurora_job_key'),
-    pants('src/main/python/apache/aurora/client/api:updater'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift'),
-    pants('src/test/python/apache/aurora/client:fake_scheduler_proxy'),
+    '3rdparty/python:mox',
+    'src/main/python/apache/aurora/common:aurora_job_key',
+    'src/main/python/apache/aurora/client/api:updater',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/test/python/apache/aurora/client:fake_scheduler_proxy',
   ]
 )
 
 python_tests(name = 'updater_util',
   sources = ['test_updater_util.py'],
   dependencies = [
-    pants('src/main/python/apache/aurora/client/api:api'),
-    pants('src/main/thrift/org/apache/aurora/gen:py-thrift')
+    'src/main/python/apache/aurora/client/api:api',
+    'src/main/thrift/org/apache/aurora/gen:py-thrift'
   ],
 )

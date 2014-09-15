@@ -16,10 +16,10 @@ python_binary(
   name = 'thermos_ckpt',
   source = 'thermos_ckpt.py',
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.recordio'),
-    pants('src/main/python/apache/thermos/common'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift')
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.recordio',
+    'src/main/python/apache/thermos/common',
+    'src/main/thrift/org/apache/thermos:py-thrift'
   ]
 )
 
@@ -27,12 +27,12 @@ python_binary(
   name = 'thermos',
   source = 'thermos.py',
   dependencies = [
-    pants('3rdparty/python:twitter.common.app'),
-    pants('3rdparty/python:twitter.common.log'),
-    pants('src/main/python/apache/thermos/common'),
-    pants('src/main/python/apache/thermos/config:schema'),
-    pants('src/main/python/apache/thermos/core'),
-    pants('src/main/python/apache/thermos/monitoring'),
-    pants('src/main/thrift/org/apache/thermos:py-thrift'),
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/thermos/common',
+    'src/main/python/apache/thermos/config:schema',
+    'src/main/python/apache/thermos/core',
+    'src/main/python/apache/thermos/monitoring',
+    'src/main/thrift/org/apache/thermos:py-thrift',
   ],
 )
