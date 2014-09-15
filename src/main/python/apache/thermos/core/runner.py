@@ -806,20 +806,22 @@ class TaskRunner(object):
       Collects and applies updates from process checkpoint streams.  Returns the number
       of applied process checkpoints.
     """
-    if self.has_active_processes():
-      sleep_interval = self.COORDINATOR_INTERVAL_SLEEP.as_(Time.SECONDS)
-      total_time = 0.0
-      while True:
-        process_updates = self._watcher.select()
-        for process_update in process_updates:
-          self._dispatcher.dispatch(self._state, process_update, self._recovery)
-        if process_updates:
-          return len(process_updates)
-        if timeout and total_time >= timeout:
-          break
-        total_time += sleep_interval
-        self._clock.sleep(sleep_interval)
-    return 0
+    if not self.has_active_processes():
+      return 0
+
+    sleep_interval = self.COORDINATOR_INTERVAL_SLEEP.as_(Time.SECONDS)
+    total_time = 0.0
+
+    while True:
+      process_updates = self._watcher.select()
+      for process_update in process_updates:
+        self._dispatcher.dispatch(self._state, process_update, self._recovery)
+      if process_updates:
+        return len(process_updates)
+      if timeout is not None and total_time >= timeout:
+        return 0
+      total_time += sleep_interval
+      self._clock.sleep(sleep_interval)
 
   def is_terminal(self):
     return TaskRunnerHelper.is_task_terminal(self.task_state())
