@@ -416,7 +416,9 @@ task generateSources(dependsOn: ['bootstrapThrift', 'checkPython']) {
     thriftFiles.each { File file ->
       exec {
         executable = project.thrift
-        args = ['--gen', 'java:hashcode', '--gen', 'js:jquery', '-o', outputDir, file]
+        args = ['--gen', 'java:hashcode,private-members',
+                '--gen', 'js:jquery',
+                '-o', outputDir, file]
       }
     }
     exec {

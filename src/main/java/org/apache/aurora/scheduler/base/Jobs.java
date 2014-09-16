@@ -53,7 +53,7 @@ public final class Jobs {
       case INIT:
       case PENDING:
       case THROTTLED:
-        stats.pendingTaskCount++;
+        stats.setPendingTaskCount(stats.getPendingTaskCount() + 1);
         break;
 
       case ASSIGNED:
@@ -63,17 +63,17 @@ public final class Jobs {
       case KILLING:
       case DRAINING:
       case PREEMPTING:
-        stats.activeTaskCount++;
+        stats.setActiveTaskCount(stats.getActiveTaskCount() + 1);
         break;
 
       case KILLED:
       case FINISHED:
-        stats.finishedTaskCount++;
+        stats.setFinishedTaskCount(stats.getFinishedTaskCount() + 1);
         break;
 
       case LOST:
       case FAILED:
-        stats.failedTaskCount++;
+        stats.setFailedTaskCount(stats.getFailedTaskCount() + 1);
         break;
 
       default:

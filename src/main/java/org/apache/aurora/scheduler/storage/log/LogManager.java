@@ -198,10 +198,10 @@ public final class LogManager {
         return null;
       }
       FrameHeader header = frame.getHeader();
-      byte[][] chunks = new byte[header.chunkCount][];
+      byte[][] chunks = new byte[header.getChunkCount()][];
 
       digest.reset();
-      for (int i = 0; i < header.chunkCount; i++) {
+      for (int i = 0; i < header.getChunkCount(); i++) {
         if (!entries.hasNext()) {
           logBadFrame(header, i);
           return null;
@@ -240,7 +240,7 @@ public final class LogManager {
 
     private void logBadFrame(FrameHeader header, int chunkIndex) {
       LOG.info(String.format("Found an aborted transaction, required %d frames and found %d",
-          header.chunkCount, chunkIndex));
+          header.getChunkCount(), chunkIndex));
       vars.badFramesRead.incrementAndGet();
     }
 

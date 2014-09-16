@@ -297,11 +297,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Response response = assertOkResponse(thrift.populateJobConfig(job.newBuilder()));
     assertEquals(
         ImmutableSet.of(sanitized.getJobConfig().getTaskConfig().newBuilder()),
-        response.result.getPopulateJobResult().getPopulatedDEPRECATED());
+        response.getResult().getPopulateJobResult().getPopulatedDEPRECATED());
 
     assertEquals(
         sanitized.getJobConfig().getTaskConfig().newBuilder(),
-        response.result.getPopulateJobResult().getTaskConfig());
+        response.getResult().getPopulateJobResult().getTaskConfig());
   }
 
   @Test

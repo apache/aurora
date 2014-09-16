@@ -504,7 +504,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         new Function<ScheduledTask, ScheduledTask>() {
           @Override
           public ScheduledTask apply(ScheduledTask task) {
-            task.assignedTask.task.executorConfig = null;
+            task.getAssignedTask().getTask().unsetExecutorConfig();
             return task;
           }
         });

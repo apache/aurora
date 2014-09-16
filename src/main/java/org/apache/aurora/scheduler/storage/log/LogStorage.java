@@ -440,7 +440,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         break;
 
       case SAVE_HOST_ATTRIBUTES:
-        HostAttributes attributes = op.getSaveHostAttributes().hostAttributes;
+        HostAttributes attributes = op.getSaveHostAttributes().getHostAttributes();
         // Prior to commit 5cf760b, the store would persist maintenance mode changes for
         // unknown hosts.  5cf760b began rejecting these, but the replicated log may still
         // contain entries with a null slave ID.

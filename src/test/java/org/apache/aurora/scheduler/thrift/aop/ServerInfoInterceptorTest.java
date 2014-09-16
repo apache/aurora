@@ -78,7 +78,7 @@ public class ServerInfoInterceptorTest extends EasyMockTest {
     expect(realThrift.getJobs(ROLE)).andReturn(response);
     control.replay();
 
-    assertNotNull(decoratedThrift.getJobs(ROLE).DEPRECATEDversion);
+    assertNotNull(decoratedThrift.getJobs(ROLE).getDEPRECATEDversion());
   }
 
   @Test
@@ -95,7 +95,7 @@ public class ServerInfoInterceptorTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(SERVER_INFO.newBuilder(), decoratedThrift.getJobs(ROLE).serverInfo);
+    assertEquals(SERVER_INFO.newBuilder(), decoratedThrift.getJobs(ROLE).getServerInfo());
   }
 
   private static Response okResponse(Result result) {
