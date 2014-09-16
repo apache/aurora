@@ -12,8 +12,10 @@
  * limitations under the License.
  */
 (function () {
-  /* global ScheduleStatus:false */
+  /* global ScheduleStatus:false, JobUpdateQuery:false, JobKey:false */
   'use strict';
+
+  var AURORA_UPDATE_POLL_MS = 10000;
 
   /* Controllers */
 
@@ -226,8 +228,64 @@
     }
   );
 
+  auroraUIControllers.controller('UpdateController',
+    function ($scope, $routeParams, $timeout, auroraClient, updateUtil) {
+      var updateId = $routeParams.update;
+
+      $scope.role = $routeParams.role;
+      $scope.environment = $routeParams.environment;
+      $scope.job = $routeParams.job;
+
+      var getUpdateProgress = function () {
+        $scope.update = auroraClient.getJobUpdateDetails(updateId).details;
+        $scope.inProgress = updateUtil.isInProgress($scope.update.update.summary.state.status);
+
+        var duration = $scope.update.update.summary.state.lastModifiedTimestampMs -
+          $scope.update.update.summary.state.createdTimestampMs;
+
+        $scope.duration = moment.duration(duration).humanize();
+
+        $scope.stats = updateUtil.getUpdateStats($scope.update);
+        $scope.configJson = JSON
+          .stringify($scope.update.update.configuration.newTaskConfig, undefined, 2);
+
+        // pagination for instance events
+        var instanceEvents = $scope.instanceEvents = $scope.update.instanceEvents;
+        $scope.eventsPerPage = 10;
+        $scope.changeInstancePage = function () {
+          var start = ($scope.currentPage - 1) * $scope.eventsPerPage;
+          var end   = start + $scope.eventsPerPage;
+          $scope.instanceEvents = instanceEvents.slice(start, end);
+        };
+        $scope.totalEvents = instanceEvents.length;
+        $scope.currentPage = 1;
+        $scope.changeInstancePage();
+
+        // Instance summary display.
+        $scope.instanceSummary = updateUtil.fillInstanceSummary($scope.update, $scope.stats);
+
+        if ($scope.instanceSummary.length <= 20) {
+          $scope.instanceGridSize = 'big';
+        } else if ($scope.instanceSummary.length <= 1000) {
+          $scope.instanceGridSize = 'medium';
+        } else {
+          $scope.instanceGridSize = 'small';
+        }
+
+        // Poll for updates while this update is in progress.
+        if ($scope.inProgress) {
+          $timeout(function () {
+            getUpdateProgress();
+          }, AURORA_UPDATE_POLL_MS);
+        }
+      };
+
+      getUpdateProgress();
+    }
+  );
+
   auroraUIControllers.controller('JobController',
-    function ($scope, $routeParams, auroraClient, taskUtil) {
+    function ($scope, $routeParams, $timeout, auroraClient, taskUtil, updateUtil) {
       $scope.error = '';
 
       $scope.role = $routeParams.role;
@@ -330,6 +388,35 @@
         });
       }
 
+      function getUpdatesForJob($scope) {
+        var query = new JobUpdateQuery();
+        var jobKey = new JobKey();
+        jobKey.role = $scope.role;
+        jobKey.environment = $scope.environment;
+        jobKey.name = $scope.job;
+        query.jobKey = jobKey;
+
+        $scope.updates = auroraClient.getJobUpdateSummaries(query).summaries;
+
+        function getUpdateInProgress() {
+          if ($scope.updates.length > 0 &&
+             updateUtil.isInProgress($scope.updates[0].status)) {
+
+            $scope.updateInProgress =
+              auroraClient.getJobUpdateDetails($scope.updates[0].updateId).details;
+
+            $scope.updateStats = updateUtil.getUpdateStats($scope.updateInProgress);
+
+            // Poll for updates as long as this update is in progress.
+            $timeout(function () {
+              getUpdateInProgress();
+            }, AURORA_UPDATE_POLL_MS);
+          }
+        }
+
+        getUpdateInProgress();
+      }
+
       function getTasksForJob(role, environment, job) {
         var response = auroraClient.getTasksWithoutConfigs(role, environment, job);
 
@@ -341,6 +428,7 @@
         $scope.jobDashboardUrl = getJobDashboardUrl(response.statsUrlPrefix);
 
         buildGroupSummary($scope);
+        getUpdatesForJob($scope);
 
         var tasks = _.map(response.tasks, function (task) {
           return summarizeTask(task);

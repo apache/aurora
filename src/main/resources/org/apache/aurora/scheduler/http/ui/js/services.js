@@ -14,7 +14,8 @@
 (function () {
   /* global auroraUI:false, Identity:false, TaskQuery:false, ReadOnlySchedulerClient:false,
             ACTIVE_STATES:false, CronCollisionPolicy: false, JobKey: false,
-            ScheduleStatus:false */
+            ScheduleStatus: false, JobUpdateQuery:false, JobUpdateAction:false,
+            JobUpdateStatus: false */
   'use strict';
 
   function makeJobTaskQuery(role, environment, jobName) {
@@ -121,6 +122,23 @@
             return result;
           },
 
+          getJobUpdateSummaries: function (query) {
+            query = query || new JobUpdateQuery();
+            var response = auroraClient.getSchedulerClient().getJobUpdateSummaries(query);
+            var result = auroraClient.processResponse(response);
+            result.summaries = response.result !== null ?
+              response.result.getJobUpdateSummariesResult.updateSummaries : [];
+            return result;
+          },
+
+          getJobUpdateDetails: function (id) {
+            var response = auroraClient.getSchedulerClient().getJobUpdateDetails(id);
+            var result = auroraClient.processResponse(response);
+            result.details = response.result !== null ?
+              response.result.getJobUpdateDetailsResult.details : {};
+            return result;
+          },
+
           // Utility functions
           // TODO(Suman Karumuri): Make schedulerClient a service
           schedulerClient: null,
@@ -165,6 +183,203 @@
         return auroraClient;
       }
     ]);
+
+  auroraUI.factory(
+    'updateUtil',
+    function () {
+      function toSet(values) {
+        var tmp = {};
+        values.forEach(function (key) {
+          tmp[key] = true;
+        });
+        return tmp;
+      }
+
+      var UPDATE_TERMINAL = toSet([
+        JobUpdateStatus.ROLLED_FORWARD,
+        JobUpdateStatus.ROLLED_BACK,
+        JobUpdateStatus.ABORTED,
+        JobUpdateStatus.ERROR
+      ]);
+
+      var INSTANCE_SUCCESSFUL = toSet([
+        JobUpdateAction.INSTANCE_UPDATED,
+        JobUpdateAction.INSTANCE_SKIPPED,
+        JobUpdateAction.INSTANCE_REMOVED
+      ]);
+
+      var INSTANCE_TERMINAL = toSet([
+        JobUpdateAction.INSTANCE_UPDATED,
+        JobUpdateAction.INSTANCE_SKIPPED,
+        JobUpdateAction.INSTANCE_REMOVED,
+        JobUpdateAction.INSTANCE_ROLLED_BACK,
+        JobUpdateAction.INSTANCE_UPDATE_FAILED,
+        JobUpdateAction.INSTANCE_ROLLBACK_FAILED
+      ]);
+
+      var instanceActionLookup = _.invert(JobUpdateAction);
+
+      var updateUtil = {
+        isTerminal: function (status) {
+          return UPDATE_TERMINAL.hasOwnProperty(status);
+        },
+        isInProgress: function (status) {
+          return ! updateUtil.isTerminal(status);
+        },
+        isInstanceSuccessful: function (action) {
+          return INSTANCE_SUCCESSFUL.hasOwnProperty(action);
+        },
+        isInstanceTerminal: function (action) {
+          return INSTANCE_TERMINAL.hasOwnProperty(action);
+        },
+        instanceCountFromRanges: function (ranges) {
+          // add the deltas of remaining ranges
+          // note - we don't check for overlapping ranges here
+          // because that would be a bug in the scheduler
+          var instanceCount = 0;
+
+          ranges.forEach(function (r) {
+            instanceCount += (r.last - r.first + 1);
+          });
+
+          return instanceCount;
+        },
+        instanceCountFromConfigs: function (instanceTaskConfigs) {
+          var flattenedRanges = [];
+
+          // get all ranges
+          instanceTaskConfigs.forEach(function (iTaskConfig) {
+            iTaskConfig.instances.forEach(function (range) {
+              flattenedRanges.push(range);
+            });
+          });
+
+          return updateUtil.instanceCountFromRanges(flattenedRanges);
+        },
+        progressFromEvents: function (instanceEvents) {
+          var successful = updateUtil.getLatestInstanceEvents(instanceEvents, function (e) {
+            return updateUtil.isInstanceSuccessful(e.action);
+          });
+          return Object.keys(successful).length;
+        },
+        displayClassForInstanceStatus: function (action) {
+          return instanceActionLookup[action].toLowerCase().replace(/_/g, '-');
+        },
+        getLatestInstanceEvents: function (instanceEvents, condition) {
+          var events = _.sortBy(instanceEvents, 'timestampMs');
+          var instanceMap = {};
+          condition = condition || function () { return true; };
+
+          for (var i = events.length - 1; i >= 0; i--) {
+            if (!instanceMap.hasOwnProperty(events[i].instanceId) && condition(events[i])) {
+              instanceMap[events[i].instanceId] = events[i];
+            }
+          }
+
+          return instanceMap;
+        },
+        fillInstanceSummary: function (details, stats) {
+          // get latest event for each instance
+          var instanceMap = updateUtil.getLatestInstanceEvents(details.instanceEvents);
+
+          // total number of instances to show is the max between
+          // new instance count and old instance count
+          var totalInstances = Math.max(
+              stats.oldInstanceCount,
+              details.update.configuration.instanceCount
+            );
+
+          var instances = [];
+          var instanceSubset = details.update.configuration.settings.updateOnlyTheseInstances;
+
+          function inRanges(ranges, x) {
+            if (ranges && x) {
+              for (var i = 0; i < ranges.length; i++) {
+                if (x >= ranges[i].first && x <= ranges[i].last) {
+                  return true;
+                }
+              }
+            }
+            return false;
+          }
+
+          for (var i = 0; i < totalInstances; i++) {
+            if (instanceMap.hasOwnProperty(i)) {
+              var event = instanceMap[i];
+              var className = updateUtil.displayClassForInstanceStatus(event.action);
+              instances.push({
+                instanceId: i,
+                className: className,
+                event: event
+              });
+            } else if (instanceSubset && !inRanges(instanceSubset, i)) {
+              // If they have declared a subset of instances to update
+              // AND this instance isn't part of that subset, it will be ignored.
+              instances.push({
+                instanceId: i,
+                className: 'ignore'
+              });
+            } else {
+              // Otherwise it is pending an update.
+              instances.push({
+                instanceId: i,
+                className: 'pending'
+              });
+            }
+          }
+          return instances;
+        },
+        getUpdateStats: function (details) {
+          if (!details || !details.update) {
+            return {};
+          }
+
+          // find number of instances to be updated
+          var newInstanceCount = details.update.configuration.instanceCount;
+          var updateSubset = false;
+
+          // find total number of existing instances
+          var oldInstanceCount = updateUtil.instanceCountFromConfigs(
+            details.update.configuration.oldTaskConfigs);
+
+          // max of those two numbers is the number of instances to be updated
+          var totalInstancesToBeUpdated = Math.max(oldInstanceCount, newInstanceCount);
+
+          if (details.update.configuration.settings.updateOnlyTheseInstances) {
+            newInstanceCount = updateUtil.instanceCountFromRanges(
+              details.update.configuration.settings.updateOnlyTheseInstances
+            );
+            updateSubset = true;
+            totalInstancesToBeUpdated = newInstanceCount;
+          }
+
+          // if necessary, differentiate between number of instances updated
+          // and number of instances that will be discarded
+          var instancesToBeUpdated = newInstanceCount;
+          var instancesToBeDiscarded = 0;
+          if (!updateSubset && (oldInstanceCount > newInstanceCount)) {
+            instancesToBeDiscarded = oldInstanceCount - newInstanceCount;
+          }
+
+          var instancesUpdated = updateUtil.progressFromEvents(details.instanceEvents);
+
+          // calculate the percentage of work done so far
+          var progress = Math.round((instancesUpdated / totalInstancesToBeUpdated) * 100);
+
+          return {
+            onlySubset: updateSubset,
+            oldInstanceCount: oldInstanceCount,
+            totalInstancesToBeUpdated: totalInstancesToBeUpdated,
+            instancesToBeUpdated: instancesToBeUpdated,
+            instancesToBeDiscarded: instancesToBeDiscarded,
+            instancesUpdatedSoFar: instancesUpdated,
+            progress: progress
+          };
+        }
+      };
+
+      return updateUtil;
+    });
 
   auroraUI.factory(
     'taskUtil',

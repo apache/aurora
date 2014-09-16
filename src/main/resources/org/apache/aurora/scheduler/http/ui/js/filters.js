@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 (function () {
-  /* global auroraUI:false */
+  /* global auroraUI:false, JobUpdateStatus: false, JobUpdateAction: false */
   'use strict';
 
   auroraUI.filter('scheduleStatusTooltip', function () {
@@ -44,6 +44,42 @@
     };
   });
 
+  auroraUI.filter('toNiceStatus', function () {
+    var updateStatusLookup = _.invert(JobUpdateStatus);
+
+    var STATUS_MAP = {
+      'ROLLED_FORWARD': 'SUCCESS',
+      'ROLLING_FORWARD': 'IN PROGRESS',
+      'ROLLING_BACK': 'ROLLING BACK',
+      'ROLL_BACK_PAUSED': 'ROLL BACK PAUSED',
+      'ROLL_FORWARD_PAUSED': 'PAUSED',
+      'ROLLED_BACK': 'ROLLED BACK'
+    };
+
+    return function (status) {
+      status = updateStatusLookup[status] || 'UNKNOWN';
+      return STATUS_MAP.hasOwnProperty(status) ? STATUS_MAP[status] : status;
+    };
+  });
+
+  auroraUI.filter('toNiceAction', function () {
+    var instanceActionLookup = _.invert(JobUpdateAction);
+
+    return function (action) {
+      return (instanceActionLookup[action] || 'UNKNOWN')
+        .replace(/INSTANCE_/, '')
+        .replace(/_/g, ' ');
+    };
+  });
+
+  auroraUI.filter('toNiceRanges', function () {
+    return function (ranges) {
+      return ranges.map(function (range) {
+        return range.first + '-' + range.last;
+      }).join(', ');
+    };
+  });
+
   auroraUI.filter('scaleMb', function () {
     var SCALE = ['MiB', 'GiB', 'TiB', 'PiB', 'EiB'];
 
@@ -72,7 +108,7 @@
 
   auroraUI.filter('toUtcTime', function () {
     return function (timestamp, timezone) {
-      return moment(timestamp).utc().format('MM/DD h:mm:ss') + ' UTC';
+      return moment(timestamp).utc().format('MM/DD HH:mm:ss') + ' UTC';
     };
   });
 
@@ -81,4 +117,17 @@
       return moment(timestamp).format('MM/DD HH:mm:ss') + ' LOCAL';
     };
   });
+
+  auroraUI.filter('toLocalDay', function () {
+    return function (timestamp) {
+      return moment(timestamp).format('ddd, MMM Do');
+    };
+  });
+
+  auroraUI.filter('toLocalTimeOnly', function () {
+    return function (timestamp) {
+      return moment(timestamp).format('HH:mm');
+    };
+  });
+
 })();

@@ -574,13 +574,13 @@ struct JobUpdateSettings {
   /** Max number of instance failures to tolerate before marking instance as FAILED. */
   2: i32 maxPerInstanceFailures
 
-  /** Max number of FAILED instances to tolerate before terminating the forward roll. */
+  /** Max number of FAILED instances to tolerate before terminating the update. */
   3: i32 maxFailedInstances
 
   /** Max time to wait until an instance reaches RUNNING state. */
   4: i32 maxWaitToInstanceRunningMs
 
-  /** Min time to watch to watch a RUNNING instance. */
+  /** Min time to watch a RUNNING instance. */
   5: i32 minWaitInInstanceRunningMs
 
   /** If true, enables failed update rollback. */

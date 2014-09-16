@@ -22,7 +22,6 @@
         <breadcrumb/>
       </div>
 
-      <div class='container-fluid'>
         <div class='page-header'>
           <h2 class='text-center'>
             Job <em>{{job}}</em> in role <em>{{role}}</em> and environment <em>{{environment}}</em>
@@ -34,7 +33,24 @@
             </span>
           </h2>
         </div>
+
+      <!-- begin update progress preview -->
+      <div ng-if="updateInProgress" class="content-box in-progress-alert">
+        <div class="row">
+          <div class="col-md-4">
+            <a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{updateInProgress.update.summary.updateId}}">Update In Progress</a>
+          </div>
+          <div class="col-md-4">
+            <progressbar class="progress" max="updateStats.totalInstancesToBeUpdated" value="updateStats.instancesUpdatedSoFar" type="success"><i>{{updateStats.instancesUpdatedSoFar}} of {{updateStats.totalInstancesToBeUpdated}}</i></progressbar>
+          </div>
+          <div class="col-md-4">
+            <span>started by <strong>{{updateInProgress.update.summary.user}}</strong></span><br/>
+            <span>{{updateInProgress.update.summary.state.createdTimestampMs | toElapsedTime}} ago</span>
+          </div>
+        </div>
       </div>
+      <!-- end update progress preview -->
+
 
       <div ng-controller='CronJobSummaryController'>
         <div ng-show='error'>
@@ -42,7 +58,6 @@
         </div>
 
         <div ng-hide='error'>
-          <div class='container-fluid'>
             <div ng-if='cronJobSummary'>
               <h3>Cron Job Summary</h3>
 
@@ -54,9 +69,9 @@
                 </smart-table>
               </div>
             </div>
-          </div>
         </div>
       </div>
+
 
       <tabset justified='true'>
         <tab heading='Active tasks ({{activeTasks.length}})' title='All Active tasks for this job.'>
@@ -112,8 +127,44 @@
         </tab>
       </tabset>
 
-      <div class='container-fluid'>
-        <a class='bottomRight' ng-click='toggleTaskInfoLinkVisibility()'>π</a>
+      <div ng-if="updates" class="content-box">
+        <div class='row'>
+          <div class='col-md-12'>
+            <h3>Update History</h3>
+            <table class="table table-bordered table-striped table-hover">
+              <tr>
+                <th>id</th>
+                <th>status</th>
+                <th>started</th>
+                <th>ended</th>
+                <th>user</th>
+              </tr>
+              <tr ng-repeat="update in updates">
+                <td>
+                  <a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{update.updateId}}">  {{update.updateId}}
+                  </a>
+                </td>
+                <td>
+                  {{update.state.status | toNiceStatus}}
+                </td>
+                <td>
+                  {{update.state.createdTimestampMs | toElapsedTime}} ago
+                </td>
+                <td>
+                  {{update.state.lastModifiedTimestampMs | toElapsedTime}} ago
+                </td>
+                <td>
+                  {{update.user}}
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+        <div class="container-fluid">
+          <a class='bottomRight' ng-click='toggleTaskInfoLinkVisibility()'>π</a>
+        </div>
       </div>
     </div>
   </div>

@@ -128,4 +128,54 @@
       replace: true
     };
   });
+
+  auroraUI.directive('timeDisplay', function () {
+    return {
+      restrict: 'E',
+      scope: {
+        'timestamp': '='
+      },
+      templateUrl: '/timeDisplay.html'
+    };
+  });
+
+  auroraUI.directive('updateSettings', function () {
+    return {
+      restrict: 'E',
+      scope: {
+        'update': '='
+      },
+      templateUrl: '/updateSettings.html'
+    };
+  });
+
+  auroraUI.directive('instanceSummary', function ($compile) {
+    return {
+      restrict: 'E',
+      scope: {
+        'instances': '=',
+        'size': '=',
+        'stats': '='
+      },
+      link: function (scope, element, attrs) {
+        var list = angular.element('<ul class="instance-grid ' + scope.size + '"></ul>');
+
+        scope.instances.forEach(function (i, n) {
+          list.append('<li class="' + i.className + '" tooltip="INSTANCE ' + n +
+            ': ' + i.className.toUpperCase() + '"><span class="instance-id">' + n +
+            '</span></li>');
+        });
+
+        var title = angular.element('<div class="instance-summary-title"></div>');
+        title.append('<span class="instance-title">Instance Status</span>');
+        title.append('<span class="instance-progress">' + scope.stats.instancesUpdatedSoFar +
+          ' / ' + scope.stats.totalInstancesToBeUpdated + ' (' + scope.stats.progress +
+          '%)<div>');
+
+        element.append(title);
+        element.append(list);
+        $compile(list)(scope);
+      }
+    };
+  });
 })();

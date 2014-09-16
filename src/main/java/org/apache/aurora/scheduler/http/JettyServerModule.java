@@ -231,6 +231,9 @@ public class JettyServerModule extends AbstractModule {
     registerAsset("ui/schedulingDetail.html", "/schedulingDetail.html");
     registerAsset("ui/groupSummary.html", "/groupSummary.html");
     registerAsset("ui/configSummary.html", "/configSummary.html");
+    registerAsset("ui/update.html", "/update.html");
+    registerAsset("ui/timeDisplay.html", "/timeDisplay.html");
+    registerAsset("ui/updateSettings.html", "/updateSettings.html");
 
     registerAsset("ui/css/app.css", "/css/app.css");
 
