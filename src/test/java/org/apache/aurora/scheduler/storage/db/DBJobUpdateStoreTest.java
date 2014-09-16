@@ -61,8 +61,6 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_ADDED;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class DBJobUpdateStoreTest {
 
@@ -367,30 +365,40 @@ public class DBJobUpdateStoreTest {
     saveUpdate(makeJobUpdate(JOB, "update2"), "lock2");
   }
 
+  private static final Optional<String> NO_TOKEN = Optional.absent();
+
   @Test
-  public void testIsActive() {
+  public void testGetLockToken() {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
         final IJobUpdate update1 = makeJobUpdate(JobKeys.from("role", "env", "name1"), "update1");
         final IJobUpdate update2 = makeJobUpdate(JobKeys.from("role", "env", "name2"), "update2");
         saveUpdate(update1, "lock1");
-        assertTrue(storeProvider.getJobUpdateStore().isActive("update1"));
-        assertFalse(storeProvider.getJobUpdateStore().isActive("update2"));
+        assertEquals(
+            Optional.of("lock1"),
+            storeProvider.getJobUpdateStore().getLockToken("update1"));
+        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken("update2"));
 
         saveUpdate(update2, "lock2");
-        assertTrue(storeProvider.getJobUpdateStore().isActive("update1"));
-        assertTrue(storeProvider.getJobUpdateStore().isActive("update2"));
+        assertEquals(
+            Optional.of("lock1"),
+            storeProvider.getJobUpdateStore().getLockToken("update1"));
+        assertEquals(
+            Optional.of("lock2"),
+            storeProvider.getJobUpdateStore().getLockToken("update2"));
 
         storeProvider.getLockStore().removeLock(
             makeLock(update1.getSummary().getJobKey(), "lock1").getKey());
-        assertFalse(storeProvider.getJobUpdateStore().isActive("update1"));
-        assertTrue(storeProvider.getJobUpdateStore().isActive("update2"));
+        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken("update1"));
+        assertEquals(
+            Optional.of("lock2"),
+            storeProvider.getJobUpdateStore().getLockToken("update2"));
 
         storeProvider.getLockStore().removeLock(
             makeLock(update2.getSummary().getJobKey(), "lock2").getKey());
-        assertFalse(storeProvider.getJobUpdateStore().isActive("update1"));
-        assertFalse(storeProvider.getJobUpdateStore().isActive("update2"));
+        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken("update1"));
+        assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken("update2"));
       }
     });
   }

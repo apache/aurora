@@ -211,14 +211,6 @@ public final class Tasks {
     return Maps.uniqueIndex(tasks, SCHEDULED_TO_ID);
   }
 
-  public static String getRole(IScheduledTask task) {
-    return task.getAssignedTask().getTask().getOwner().getRole();
-  }
-
-  public static String getJob(IScheduledTask task) {
-    return task.getAssignedTask().getTask().getJobName();
-  }
-
   /**
    * Get the latest active task or the latest inactive task if no active task exists.
    *
@@ -232,10 +224,6 @@ public final class Tasks {
         .onResultOf(GET_STATUS)
         .compound(LATEST_ACTIVITY)
         .max(tasks);
-  }
-
-  public static ITaskEvent getSecondToLatestEvent(IScheduledTask task) {
-    return task.getTaskEvents().get(task.getTaskEvents().size() - 2);
   }
 
   public static ITaskEvent getLatestEvent(IScheduledTask task) {

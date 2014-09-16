@@ -25,7 +25,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.EvaluationResult;
-import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.InstanceAction;
 import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.OneWayStatus;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
@@ -36,9 +35,10 @@ import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.REPLACE_
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.SUCCEEDED;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.fail;
 
-public class OneWayJobUpdateControllerTest extends EasyMockTest {
+public class OneWayJobUpdaterTest extends EasyMockTest {
   private static final Set<Integer> EMPTY = ImmutableSet.of();
   private static final Map<Integer, InstanceAction> NO_ACTIONS = ImmutableMap.of();
 
@@ -70,20 +70,29 @@ public class OneWayJobUpdateControllerTest extends EasyMockTest {
   private void evaluate(OneWayStatus expectedStatus, Map<Integer, InstanceAction> expectedActions) {
     assertEquals(
         new EvaluationResult<>(expectedStatus, expectedActions),
-        jobUpdater.evaluate(ImmutableSet.<Integer>of(), stateProvider));
+        jobUpdater.evaluate(ImmutableMap.<Integer, String>of(), stateProvider));
   }
 
   private void evaluate(
       int instanceId,
+      String state,
       OneWayStatus expectedStatus,
       Map<Integer, InstanceAction> expectedActions) {
 
     assertEquals(
         new EvaluationResult<>(expectedStatus, expectedActions),
-        jobUpdater.evaluate(ImmutableSet.of(instanceId), stateProvider));
+        jobUpdater.evaluate(ImmutableMap.of(instanceId, state), stateProvider));
   }
 
   private void expectEvaluate(
+      StateEvaluator<String> instanceMock,
+      String state,
+      Result result) {
+
+    expect(instanceMock.evaluate(state)).andReturn(result);
+  }
+
+  private void expectFetchAndEvaluate(
       int instanceId,
       StateEvaluator<String> instanceMock,
       String state,
@@ -101,35 +110,27 @@ public class OneWayJobUpdateControllerTest extends EasyMockTest {
     String s1 = "1";
     String s2 = "2";
     String s3 = "3";
-    expectEvaluate(
+    expectFetchAndEvaluate(
         0,
         instance0,
         s0,
         KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE);
-    expectEvaluate(
+    expectFetchAndEvaluate(
         2,
         instance2,
         s2,
         REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE);
 
-    expectEvaluate(0, instance0, s0, EVALUATE_ON_STATE_CHANGE);
+    expectEvaluate(instance0, s0, EVALUATE_ON_STATE_CHANGE);
     expect(strategy.getNextGroup(ImmutableSet.of(1, 3), ImmutableSet.of(0, 2))).andReturn(EMPTY);
-    expectEvaluate(0, instance0, s0, SUCCEEDED);
+    expectEvaluate(instance0, s0, SUCCEEDED);
     expect(strategy.getNextGroup(ImmutableSet.of(1, 3), ImmutableSet.of(2))).andReturn(EMPTY);
-    expectEvaluate(2, instance2, s2, SUCCEEDED);
+    expectEvaluate(instance2, s2, SUCCEEDED);
     expect(strategy.getNextGroup(ImmutableSet.of(1, 3), EMPTY))
         .andReturn(ImmutableSet.of(1, 3));
-    expectEvaluate(
-        1,
-        instance1,
-        s1,
-        SUCCEEDED);
-    expectEvaluate(
-        3,
-        instance3,
-        s3,
-        EVALUATE_AFTER_MIN_RUNNING_MS);
-    expectEvaluate(3, instance3, s3, SUCCEEDED);
+    expectFetchAndEvaluate(1, instance1, s1, SUCCEEDED);
+    expectEvaluate(instance3, s3, EVALUATE_AFTER_MIN_RUNNING_MS);
+    expectFetchAndEvaluate(3, instance3, s3, SUCCEEDED);
 
     control.replay();
 
@@ -138,23 +139,26 @@ public class OneWayJobUpdateControllerTest extends EasyMockTest {
     evaluate(
         OneWayStatus.WORKING,
         ImmutableMap.of(
-            0, InstanceAction.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE,
-            2, InstanceAction.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE));
+            0, InstanceAction.KILL_TASK,
+            2, InstanceAction.ADD_TASK));
     evaluate(
         0,
+        s0,
         OneWayStatus.WORKING,
-        ImmutableMap.of(0, InstanceAction.EVALUATE_ON_STATE_CHANGE));
+        ImmutableMap.of(0, InstanceAction.AWAIT_STATE_CHANGE));
     evaluate(
         0,
+        s0,
         OneWayStatus.WORKING,
         NO_ACTIONS);
     evaluate(
         2,
+        s2,
         OneWayStatus.WORKING,
-        ImmutableMap.of(
-            3, InstanceAction.EVALUATE_AFTER_MIN_RUNNING_MS));
+        ImmutableMap.of(3, InstanceAction.WATCH_TASK));
     evaluate(
         3,
+        s3,
         OneWayStatus.SUCCEEDED,
         NO_ACTIONS);
   }
@@ -165,12 +169,12 @@ public class OneWayJobUpdateControllerTest extends EasyMockTest {
         .andReturn(ImmutableSet.of(0, 1));
     String s0 = "0";
     String s1 = "1";
-    expectEvaluate(
+    expectFetchAndEvaluate(
         0,
         instance0,
         s0,
         FAILED);
-    expectEvaluate(
+    expectFetchAndEvaluate(
         1,
         instance1,
         s1,
@@ -183,11 +187,11 @@ public class OneWayJobUpdateControllerTest extends EasyMockTest {
     evaluate(
         OneWayStatus.FAILED,
         ImmutableMap.of(
-            1, InstanceAction.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE));
+            1, InstanceAction.KILL_TASK));
 
     // The updater should now reject further attempts to evaluate.
     try {
-      jobUpdater.evaluate(ImmutableSet.<Integer>of(), stateProvider);
+      jobUpdater.evaluate(ImmutableMap.<Integer, String>of(), stateProvider);
       fail();
     } catch (IllegalStateException e) {
       // Expected.
@@ -206,13 +210,21 @@ public class OneWayJobUpdateControllerTest extends EasyMockTest {
     expect(strategy.getNextGroup(ImmutableSet.of(0, 1, 2, 3), EMPTY))
         .andReturn(ImmutableSet.of(0));
     expect(strategy.getNextGroup(ImmutableSet.of(1, 2, 3), EMPTY))
+        .andReturn(ImmutableSet.of(1));
+    expect(strategy.getNextGroup(ImmutableSet.of(2, 3), ImmutableSet.of(1)))
         .andReturn(ImmutableSet.<Integer>of());
     String s0 = "0";
-    expectEvaluate(
+    String s1 = "1";
+    expectFetchAndEvaluate(
         0,
         instance0,
         s0,
         SUCCEEDED);
+    expectFetchAndEvaluate(
+        1,
+        instance1,
+        s1,
+        EVALUATE_ON_STATE_CHANGE);
 
     control.replay();
 
@@ -220,13 +232,37 @@ public class OneWayJobUpdateControllerTest extends EasyMockTest {
 
     evaluate(
         OneWayStatus.WORKING,
-        NO_ACTIONS);
+        ImmutableMap.of(1, InstanceAction.AWAIT_STATE_CHANGE));
 
     // Instance 0 is already considered finished, so any further notifications of its state will
     // no-op.
     evaluate(
         0,
+        s0,
         OneWayStatus.WORKING,
         NO_ACTIONS);
+  }
+
+  @Test
+  public void testResultsObjectOverrides() {
+    control.replay();
+
+    EvaluationResult<String> a = new EvaluationResult<>(
+        OneWayStatus.WORKING,
+        ImmutableMap.of("a", InstanceAction.KILL_TASK));
+    EvaluationResult<String> a2 = new EvaluationResult<>(
+        OneWayStatus.WORKING,
+        ImmutableMap.of("a", InstanceAction.KILL_TASK));
+    EvaluationResult<String> b = new EvaluationResult<>(
+        OneWayStatus.WORKING,
+        ImmutableMap.of("b", InstanceAction.KILL_TASK));
+    EvaluationResult<String> c = new EvaluationResult<>(
+        OneWayStatus.FAILED,
+        ImmutableMap.of("b", InstanceAction.KILL_TASK));
+    assertEquals(ImmutableSet.of(a, b), ImmutableSet.of(a, a2, b));
+    assertEquals(a, a2);
+    assertNotEquals(a, b);
+    assertNotEquals(b, c);
+    assertNotEquals(a, "");
   }
 }

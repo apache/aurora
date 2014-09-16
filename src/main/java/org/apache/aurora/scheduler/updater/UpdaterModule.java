@@ -13,18 +13,52 @@
  */
 package org.apache.aurora.scheduler.updater;
 
+import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+
 import javax.inject.Singleton;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
+import com.google.inject.PrivateModule;
+
+import org.apache.aurora.scheduler.events.PubsubEventModule;
 
 /**
  * Binding module for scheduling logic and higher-level state management.
  */
 public class UpdaterModule extends AbstractModule {
 
+  private final ScheduledExecutorService executor;
+
+  public UpdaterModule() {
+    this(Executors.newSingleThreadScheduledExecutor(
+        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("updater-%d").build()));
+  }
+
+  @VisibleForTesting
+  UpdaterModule(ScheduledExecutorService executor) {
+    this.executor = Objects.requireNonNull(executor);
+  }
+
   @Override
   protected void configure() {
-    bind(JobUpdateController.class).to(JobUpdateControllerImpl.class);
-    bind(JobUpdateControllerImpl.class).in(Singleton.class);
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(ScheduledExecutorService.class).toInstance(executor);
+        bind(UpdateFactory.class).to(UpdateFactory.UpdateFactoryImpl.class);
+        bind(UpdateFactory.UpdateFactoryImpl.class).in(Singleton.class);
+        bind(JobUpdateController.class).to(JobUpdateControllerImpl.class);
+        bind(JobUpdateControllerImpl.class).in(Singleton.class);
+        expose(JobUpdateController.class);
+        bind(JobUpdateEventSubscriber.class);
+        expose(JobUpdateEventSubscriber.class);
+      }
+    });
+
+    PubsubEventModule.bindSubscriber(binder(), JobUpdateEventSubscriber.class);
   }
 }

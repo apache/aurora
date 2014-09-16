@@ -534,6 +534,13 @@ enum JobUpdateStatus {
 
   /** Unknown error during update. */
   ERROR = 7
+
+  /**
+   * Update failed to complete.
+   * This can happen if failure thresholds are met while rolling forward, but rollback is disabled,
+   * or if failure thresholds are met when rolling back.
+   */
+  FAILED = 8
 }
 
 /** Job update actions that can be applied to job instances. */

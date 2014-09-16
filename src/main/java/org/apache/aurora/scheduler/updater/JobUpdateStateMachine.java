@@ -15,15 +15,22 @@ package org.apache.aurora.scheduler.updater;
 
 import java.util.Map;
 
+import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 
+import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateStatus;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 
 import static org.apache.aurora.gen.JobUpdateStatus.ABORTED;
 import static org.apache.aurora.gen.JobUpdateStatus.ERROR;
+import static org.apache.aurora.gen.JobUpdateStatus.FAILED;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
@@ -51,7 +58,7 @@ final class JobUpdateStateMachine {
               ROLLED_FORWARD,
               ABORTED,
               ERROR)
-          .putAll(ROLLING_BACK, ROLL_BACK_PAUSED, ROLLED_BACK, ABORTED, ERROR)
+          .putAll(ROLLING_BACK, ROLL_BACK_PAUSED, ROLLED_BACK, ABORTED, ERROR, FAILED)
           .putAll(ROLL_FORWARD_PAUSED, ROLLING_FORWARD, ABORTED, ERROR)
           .putAll(ROLL_BACK_PAUSED, ROLLING_BACK, ABORTED, ERROR)
           .build();
@@ -62,20 +69,64 @@ final class JobUpdateStateMachine {
           .put(ROLLING_BACK, ROLL_BACK)
           .build();
 
+  private static final BiMap<JobUpdateStatus, JobUpdateStatus> ACTIVE_TO_PAUSED_STATES =
+      ImmutableBiMap.of(
+          ROLLING_FORWARD, ROLL_FORWARD_PAUSED,
+          ROLLING_BACK, ROLL_BACK_PAUSED);
+
+  static final IJobUpdateQuery ACTIVE_QUERY = IJobUpdateQuery.build(
+      new JobUpdateQuery()
+          .setUpdateStatuses(ImmutableSet.copyOf(ACTIVE_TO_PAUSED_STATES.keySet())));
+
+  private static final Map<JobUpdateStatus, JobUpdateStatus> PAUSE_BEHAVIOR =
+      ImmutableMap.<JobUpdateStatus, JobUpdateStatus>builder()
+          .putAll(ACTIVE_TO_PAUSED_STATES)
+          .put(ROLL_FORWARD_PAUSED, ROLL_FORWARD_PAUSED)
+          .put(ROLL_BACK_PAUSED, ROLL_BACK_PAUSED)
+          .build();
+
+  static final Function<JobUpdateStatus, JobUpdateStatus> GET_PAUSE_STATE =
+      new Function<JobUpdateStatus, JobUpdateStatus>() {
+        @Override
+        public JobUpdateStatus apply(JobUpdateStatus status) {
+          return PAUSE_BEHAVIOR.get(status);
+        }
+      };
+
+  private static final Map<JobUpdateStatus, JobUpdateStatus> RESUME_BEHAVIOR =
+      ImmutableMap.<JobUpdateStatus, JobUpdateStatus>builder()
+          .putAll(ACTIVE_TO_PAUSED_STATES.inverse())
+          .put(ROLLING_FORWARD, ROLLING_FORWARD)
+          .put(ROLLING_BACK, ROLLING_BACK)
+          .build();
+
+  static final Function<JobUpdateStatus, JobUpdateStatus> GET_RESUME_STATE =
+      new Function<JobUpdateStatus, JobUpdateStatus>() {
+        @Override
+        public JobUpdateStatus apply(JobUpdateStatus status) {
+          return RESUME_BEHAVIOR.get(status);
+        }
+      };
+
   /**
    * Determines the action to take in response to a status change on a job update.
    *
    * @param from Starting state.
    * @param to Desired target state.
-   * @return The action to perform when moving from {@code from} to {@code to}.
    * @throws IllegalStateException if the requested transition is not allowed.
    */
-  static MonitorAction transition(JobUpdateStatus from, JobUpdateStatus to) {
+  static void assertTransitionAllowed(JobUpdateStatus from, JobUpdateStatus to) {
     if (!ALLOWED_TRANSITIONS.containsEntry(from, to)) {
       throw new IllegalStateException("Cannot transition update from " + from + " to " + to);
     }
+  }
 
-    return Optional.fromNullable(ACTIONS.get(to)).or(MonitorAction.STOP_WATCHING);
+  static MonitorAction getActionForStatus(JobUpdateStatus status) {
+    return Optional.fromNullable(ACTIONS.get(status)).or(MonitorAction.STOP_WATCHING);
+  }
+
+  static boolean isActive(JobUpdateStatus status) {
+    return ACTIVE_TO_PAUSED_STATES.keySet().contains(status);
   }
 
   /**

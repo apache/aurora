@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.updater.strategy;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Ordering;
 
 /**
  * An update strategy that will only add more work when the current active group is empty.
@@ -29,8 +30,8 @@ public class BatchStrategy<T extends Comparable<T>> extends ActiveLimitedStrateg
    *
    * @param maxActive The maximum number of active entries.
    */
-  public BatchStrategy(int maxActive) {
-    super(maxActive);
+  public BatchStrategy(Ordering<T> ordering, int maxActive) {
+    super(ordering, maxActive);
   }
 
   @Override

@@ -17,6 +17,7 @@ import org.apache.aurora.gen.JobStats;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.storage.entities.IJobStats;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
 /**
  * Convenience methods related to jobs.
@@ -25,6 +26,10 @@ public final class Jobs {
 
   private Jobs() {
     // Utility class.
+  }
+
+  private static ITaskEvent getSecondToLatestEvent(IScheduledTask task) {
+    return task.getTaskEvents().get(task.getTaskEvents().size() - 2);
   }
 
   /**
@@ -39,7 +44,7 @@ public final class Jobs {
       ScheduleStatus status = task.getStatus();
       if (status == ScheduleStatus.SANDBOX_DELETED) {
         // SANDBOX_DELETED must be preceded by the real terminal state.
-        updateStats(stats, Tasks.getSecondToLatestEvent(task).getStatus());
+        updateStats(stats, getSecondToLatestEvent(task).getStatus());
       } else {
         updateStats(stats, status);
       }

@@ -15,11 +15,13 @@ package org.apache.aurora.scheduler.updater;
 
 import java.util.Set;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
@@ -27,6 +29,7 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
@@ -38,10 +41,14 @@ import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
 
 import static java.util.Objects.requireNonNull;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 /**
- * A factory that produces one-way job updaters based on a job update configuration.
+ * A factory that produces job updaters based on a job update configuration.
+ * <p>
+ * TODO(wfarner): Use AssistedInject to inject this (github.com/google/guice/wiki/AssistedInject).
  */
-interface OneWayJobUpdaterFactory {
+interface UpdateFactory {
 
   /**
    * Creates a one-way job updater that will execute the job update configuration in the direction
@@ -49,40 +56,43 @@ interface OneWayJobUpdaterFactory {
    *
    * @param configuration Configuration to act on.
    * @param rollingForward {@code true} if this is a job update, {@code false} if it is a rollback.
-   * @return A one-way updater that will execute the job update as specified in the
+   * @return An updater that will execute the job update as specified in the
    *         {@code configuration}.
    * @throws UpdateConfigurationException If the provided configuration cannot be used.
    */
-  OneWayJobUpdater<Integer, Optional<IScheduledTask>> newUpdate(
+  Update newUpdate(
       IJobUpdateConfiguration configuration,
       boolean rollingForward) throws UpdateConfigurationException;
 
-  /**
-   * Thrown when an invalid job update configuration is encountered.
-   */
-  class UpdateConfigurationException extends Exception {
-    UpdateConfigurationException(String msg) {
-      super(msg);
-    }
-  }
-
-  class OneWayJobUpdaterFactoryImpl implements OneWayJobUpdaterFactory {
+  class UpdateFactoryImpl implements UpdateFactory {
     private final Clock clock;
 
     @Inject
-    OneWayJobUpdaterFactoryImpl(Clock clock) {
+    UpdateFactoryImpl(Clock clock) {
       this.clock = requireNonNull(clock);
     }
 
     @Override
-    public OneWayJobUpdater<Integer, Optional<IScheduledTask>> newUpdate(
+    public Update newUpdate(
         IJobUpdateConfiguration configuration,
         boolean rollingForward) throws UpdateConfigurationException {
 
       requireNonNull(configuration);
+      IJobUpdateSettings settings = configuration.getSettings();
+      checkArgument(
+          settings.getMaxWaitToInstanceRunningMs() > 0,
+          "Max wait to running must be positive.");
+      checkArgument(
+          settings.getMinWaitInInstanceRunningMs() > 0,
+          "Min wait in running must be positive.");
+      checkArgument(
+          settings.getUpdateGroupSize() > 0,
+          "Update group size must be positive.");
+      checkArgument(
+          configuration.getInstanceCount() > 0,
+          "Instance count must be positive.");
 
       Set<Integer> instances;
-      IJobUpdateSettings settings = configuration.getSettings();
       Range<Integer> updateConfigurationInstances =
           Range.closedOpen(0, configuration.getInstanceCount());
       if (settings.getUpdateOnlyTheseInstances().isEmpty()) {
@@ -95,6 +105,8 @@ interface OneWayJobUpdaterFactory {
       } else {
         instances = rangesToInstanceIds(settings.getUpdateOnlyTheseInstances());
 
+        // TODO(wfarner): Move this check out to SchedulerThriftInterface, and remove the
+        // UpdateConfigurationException from this method's signature.
         if (!updateConfigurationInstances.containsAll(instances)) {
           throw new UpdateConfigurationException(
               "When updating specific instances, "
@@ -126,12 +138,20 @@ interface OneWayJobUpdaterFactory {
 
       // TODO(wfarner): Add the batch_completion flag to JobUpdateSettings and pick correct
       // strategy.
-      UpdateStrategy<Integer> strategy = new QueueStrategy<>(settings.getUpdateGroupSize());
+      Ordering<Integer> updateOrder = rollingForward
+          ? Ordering.<Integer>natural()
+          : Ordering.<Integer>natural().reverse();
 
-      return new OneWayJobUpdater<>(
-          strategy,
-          settings.getMaxFailedInstances(),
-          evaluators.build());
+      UpdateStrategy<Integer> strategy =
+          new QueueStrategy<>(updateOrder, settings.getUpdateGroupSize());
+
+      return new Update(
+          new OneWayJobUpdater<>(
+              strategy,
+              settings.getMaxFailedInstances(),
+              evaluators.build()),
+          rollingForward ? JobUpdateStatus.ROLLED_FORWARD : JobUpdateStatus.ROLLED_BACK,
+          rollingForward ? JobUpdateStatus.ROLLING_BACK : JobUpdateStatus.FAILED);
     }
 
     private static Range<Integer> toRange(IRange range) {
@@ -147,7 +167,8 @@ interface OneWayJobUpdaterFactory {
       return instanceIds.build().asSet(DiscreteDomain.integers());
     }
 
-    private static Set<Integer> expandInstanceIds(Set<IInstanceTaskConfig> instanceGroups) {
+    @VisibleForTesting
+    static Set<Integer> expandInstanceIds(Set<IInstanceTaskConfig> instanceGroups) {
       ImmutableRangeSet.Builder<Integer> instanceIds = ImmutableRangeSet.builder();
       for (IInstanceTaskConfig group : instanceGroups) {
         for (IRange range : group.getInstances()) {
@@ -171,6 +192,34 @@ interface OneWayJobUpdaterFactory {
       }
 
       return Optional.absent();
+    }
+  }
+
+  class Update {
+    private final OneWayJobUpdater<Integer, Optional<IScheduledTask>> updater;
+    private final JobUpdateStatus successStatus;
+    private final JobUpdateStatus failureStatus;
+
+    public Update(
+        OneWayJobUpdater<Integer, Optional<IScheduledTask>> updater,
+        JobUpdateStatus successStatus,
+        JobUpdateStatus failureStatus) {
+
+      this.updater = requireNonNull(updater);
+      this.successStatus = requireNonNull(successStatus);
+      this.failureStatus = requireNonNull(failureStatus);
+    }
+
+    public OneWayJobUpdater<Integer, Optional<IScheduledTask>> getUpdater() {
+      return updater;
+    }
+
+    public JobUpdateStatus getSuccessStatus() {
+      return successStatus;
+    }
+
+    public JobUpdateStatus getFailureStatus() {
+      return failureStatus;
     }
   }
 }

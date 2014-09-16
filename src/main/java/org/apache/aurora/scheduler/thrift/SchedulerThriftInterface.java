@@ -151,6 +151,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 import org.apache.aurora.scheduler.thrift.auth.Requires;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
+import org.apache.aurora.scheduler.updater.UpdateConfigurationException;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TException;
@@ -1362,10 +1363,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response startJobUpdate(
-      JobUpdateRequest mutableRequest,
-      SessionKey session) {
-
+  public Response startJobUpdate(JobUpdateRequest mutableRequest, SessionKey session) {
     // TODO(maxim): validate JobUpdateRequest fields.
     requireNonNull(mutableRequest);
     requireNonNull(session);
@@ -1398,15 +1396,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return storage.write(new MutateWork.Quiet<Response>() {
       @Override
       public Response apply(MutableStoreProvider storeProvider) {
-        final ILock lock;
-        try {
-          lock = lockManager.acquireLock(
-              ILockKey.build(LockKey.job(request.getJobKey().newBuilder())),
-              context.getIdentity());
-        } catch (LockException e) {
-          return addMessage(response, LOCK_ERROR, e);
-        }
-
         // TODO(maxim): Wire in task limits and quota checks from SchedulerCore.
 
         String updateId = uuidGenerator.createNew().toString();
@@ -1423,9 +1412,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                 .setOldTaskConfigs(buildOldTaskConfigs(request.getJobKey(), storeProvider))));
 
         try {
-          jobUpdateController.start(update, lock.getToken());
+          jobUpdateController.start(update, context.getIdentity());
           return okResponse(Result.startJobUpdateResult(new StartJobUpdateResult(updateId)));
-        } catch (UpdateStateException e) {
+        } catch (UpdateStateException | UpdateConfigurationException e) {
           return addMessage(response, INVALID_REQUEST, e);
         }
       }

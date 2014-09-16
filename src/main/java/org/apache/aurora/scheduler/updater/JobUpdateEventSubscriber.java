@@ -13,29 +13,21 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
-import com.google.common.collect.FluentIterable;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.Inject;
+import com.twitter.common.stats.Stats;
 
-import org.apache.aurora.gen.InstanceKey;
-import org.apache.aurora.gen.JobUpdateQuery;
+import org.apache.aurora.scheduler.base.InstanceKeys;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent;
-import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
-import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import static org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 
@@ -43,60 +35,55 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
  * A pubsub event subscriber that forwards status updates to the job update controller.
  */
 class JobUpdateEventSubscriber implements PubsubEvent.EventSubscriber {
+  private static final Logger LOG = Logger.getLogger(JobUpdateEventSubscriber.class.getName());
+
+  private static final AtomicLong RECOVERY_ERRORS = Stats.exportLong("job_update_recovery_errors");
+  private static final AtomicLong DELETE_ERRORS = Stats.exportLong("job_update_delete_errors");
+  private static final AtomicLong STATE_CHANGE_ERRORS =
+      Stats.exportLong("job_update_state_change_errors");
+
   private final JobUpdateController controller;
-  private final Storage storage;
 
   @Inject
-  JobUpdateEventSubscriber(JobUpdateController controller, Storage storage) {
+  JobUpdateEventSubscriber(JobUpdateController controller) {
     this.controller = requireNonNull(controller);
-    this.storage = requireNonNull(storage);
   }
-
-  private static final Function<IScheduledTask, IInstanceKey> TASK_TO_INSTANCE_KEY =
-      new Function<IScheduledTask, IInstanceKey>() {
-        @Override
-        public IInstanceKey apply(IScheduledTask task) {
-          return IInstanceKey.build(
-              new InstanceKey()
-                  .setJobKey(Tasks.SCHEDULED_TO_JOB_KEY.apply(task).newBuilder())
-                  .setInstanceId(Tasks.SCHEDULED_TO_INSTANCE_ID.apply(task)));
-        }
-      };
 
   @Subscribe
   public synchronized void taskChangedState(TaskStateChange change) {
-    controller.instanceChangedState(TASK_TO_INSTANCE_KEY.apply(change.getTask()));
+    try {
+      controller.instanceChangedState(change.getTask());
+    } catch (RuntimeException e) {
+      LOG.log(Level.SEVERE, "Failed to handle state change: " + e, e);
+      STATE_CHANGE_ERRORS.incrementAndGet();
+    }
   }
 
   @Subscribe
   public synchronized void tasksDeleted(TasksDeleted event) {
-    Set<IInstanceKey> instances = FluentIterable.from(event.getTasks())
-        .transform(TASK_TO_INSTANCE_KEY)
-        .toSet();
-    for (IInstanceKey instance : instances) {
-      controller.instanceChangedState(instance);
+    for (IScheduledTask task : event.getTasks()) {
+      // Ignore pruned tasks, since they are irrelevant to updates.
+      try {
+        if (!Tasks.isTerminated(task.getStatus())) {
+          controller.instanceDeleted(
+              InstanceKeys.from(
+                  Tasks.SCHEDULED_TO_JOB_KEY.apply(task),
+                  task.getAssignedTask().getInstanceId()));
+        }
+      } catch (RuntimeException e) {
+        LOG.log(Level.SEVERE, "Failed to handle instance deletion: " + e, e);
+        DELETE_ERRORS.incrementAndGet();
+      }
     }
   }
 
-  @VisibleForTesting
-  static final IJobUpdateQuery ACTIVE_QUERY = IJobUpdateQuery.build(
-      new JobUpdateQuery().setUpdateStatuses(ImmutableSet.of(ROLLING_FORWARD, ROLLING_BACK)));
-
   @Subscribe
-  public synchronized void schedulerActive(PubsubEvent.SchedulerActive event)
-      throws UpdateStateException {
-
-    storage.write(new Storage.MutateWork.NoResult<UpdateStateException>() {
-      @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider)
-          throws UpdateStateException {
-
-        for (IJobUpdateSummary summary
-            : storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(ACTIVE_QUERY)) {
-
-          controller.systemResume(summary.getJobKey());
-        }
-      }
-    });
+  public synchronized void schedulerActive(PubsubEvent.SchedulerActive event) {
+    try {
+      controller.systemResume();
+    } catch (RuntimeException e) {
+      LOG.log(Level.SEVERE, "Failed to resume job updates: " + e, e);
+      RECOVERY_ERRORS.incrementAndGet();
+    }
   }
 }

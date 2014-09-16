@@ -168,7 +168,7 @@ public class ForwardingStore implements
   }
 
   @Override
-  public boolean isActive(String updateId) {
-    return jobUpdateStore.isActive(updateId);
+  public Optional<String> getLockToken(String updateId) {
+    return jobUpdateStore.getLockToken(updateId);
   }
 }

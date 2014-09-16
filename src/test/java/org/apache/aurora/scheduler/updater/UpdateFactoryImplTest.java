@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.updater;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -23,18 +22,17 @@ import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateConfiguration;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.updater.OneWayJobUpdaterFactory.UpdateConfigurationException;
+import static org.apache.aurora.scheduler.updater.UpdateFactory.Update;
 import static org.junit.Assert.assertEquals;
 
 /**
  * This test can't exercise much functionality of the output from the factory without duplicating
  * test behavior in the job updater integration test.  So instead, we test only some basic behavior.
  */
-public class OneWayJobUpdaterFactoryImplTest {
+public class UpdateFactoryImplTest {
 
   private static final IJobUpdateConfiguration CONFIG = IJobUpdateConfiguration.build(
       new JobUpdateConfiguration()
@@ -51,23 +49,23 @@ public class OneWayJobUpdaterFactoryImplTest {
               .setUpdateGroupSize(2)
               .setUpdateOnlyTheseInstances(ImmutableSet.<Range>of())));
 
-  private OneWayJobUpdaterFactory factory;
+  private UpdateFactory factory;
 
   @Before
   public void setUp() {
-    factory = new OneWayJobUpdaterFactory.OneWayJobUpdaterFactoryImpl(new FakeClock());
+    factory = new UpdateFactory.UpdateFactoryImpl(new FakeClock());
   }
 
   @Test
   public void testRollingForward() throws Exception  {
-    OneWayJobUpdater<Integer, Optional<IScheduledTask>> update = factory.newUpdate(CONFIG, true);
-    assertEquals(ImmutableSet.of(0, 1, 2), update.getInstances());
+    Update update = factory.newUpdate(CONFIG, true);
+    assertEquals(ImmutableSet.of(0, 1, 2), update.getUpdater().getInstances());
   }
 
   @Test
   public void testRollingBack() throws Exception {
-    OneWayJobUpdater<Integer, Optional<IScheduledTask>> update = factory.newUpdate(CONFIG, false);
-    assertEquals(ImmutableSet.of(0, 1, 2), update.getInstances());
+    Update update = factory.newUpdate(CONFIG, false);
+    assertEquals(ImmutableSet.of(0, 1, 2), update.getUpdater().getInstances());
   }
 
   @Test
@@ -75,9 +73,8 @@ public class OneWayJobUpdaterFactoryImplTest {
     JobUpdateConfiguration config = CONFIG.newBuilder();
     config.getSettings().setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(1, 2)));
 
-    OneWayJobUpdater<Integer, Optional<IScheduledTask>> update =
-        factory.newUpdate(IJobUpdateConfiguration.build(config), true);
-    assertEquals(ImmutableSet.of(1, 2), update.getInstances());
+    Update update = factory.newUpdate(IJobUpdateConfiguration.build(config), true);
+    assertEquals(ImmutableSet.of(1, 2), update.getUpdater().getInstances());
   }
 
   @Test
@@ -85,9 +82,8 @@ public class OneWayJobUpdaterFactoryImplTest {
     JobUpdateConfiguration config = CONFIG.newBuilder();
     config.getSettings().setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(1, 2)));
 
-    OneWayJobUpdater<Integer, Optional<IScheduledTask>> update =
-        factory.newUpdate(IJobUpdateConfiguration.build(config), false);
-    assertEquals(ImmutableSet.of(1, 2), update.getInstances());
+    Update update = factory.newUpdate(IJobUpdateConfiguration.build(config), false);
+    assertEquals(ImmutableSet.of(1, 2), update.getUpdater().getInstances());
   }
 
   @Test(expected = UpdateConfigurationException.class)
@@ -103,8 +99,7 @@ public class OneWayJobUpdaterFactoryImplTest {
     JobUpdateConfiguration config = CONFIG.newBuilder();
     config.setInstanceCount(2);
 
-    OneWayJobUpdater<Integer, Optional<IScheduledTask>> update =
-        factory.newUpdate(IJobUpdateConfiguration.build(config), true);
-    assertEquals(ImmutableSet.of(0, 1, 2), update.getInstances());
+    Update update = factory.newUpdate(IJobUpdateConfiguration.build(config), true);
+    assertEquals(ImmutableSet.of(0, 1, 2), update.getUpdater().getInstances());
   }
 }

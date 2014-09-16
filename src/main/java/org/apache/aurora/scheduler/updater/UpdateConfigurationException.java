@@ -11,25 +11,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.updater.strategy;
-
-import java.util.Set;
-
-import com.google.common.collect.Ordering;
+package org.apache.aurora.scheduler.updater;
 
 /**
- * An update strategy that attempts to keep the in-progress queue full at all times, with an upper
- * bound.
- *
- * @param <T> Instance type.
+ * Thrown when an invalid job update configuration is encountered.
  */
-public class QueueStrategy<T extends Comparable<T>> extends ActiveLimitedStrategy<T> {
-  public QueueStrategy(Ordering<T> ordering, int maxActive) {
-    super(ordering, maxActive);
-  }
-
-  @Override
-  Set<T> doGetNextGroup(Set<T> idle, Set<T> active) {
-    return idle;
+public class UpdateConfigurationException extends Exception {
+  public UpdateConfigurationException(String msg) {
+    super(msg);
   }
 }

@@ -24,9 +24,9 @@ import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
 
 import org.apache.aurora.gen.Identity;
-import org.apache.aurora.gen.InstanceKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 
 import static java.util.Objects.requireNonNull;
@@ -96,8 +96,8 @@ public final class Query {
     return unscoped().byJobKeys(jobKeys);
   }
 
-  public static Builder instanceScoped(InstanceKey instanceKey) {
-    return instanceScoped(IJobKey.build(instanceKey.getJobKey()), instanceKey.getInstanceId());
+  public static Builder instanceScoped(IInstanceKey instanceKey) {
+    return instanceScoped(instanceKey.getJobKey(), instanceKey.getInstanceId());
   }
 
   public static Builder instanceScoped(IJobKey jobKey, int instanceId, int... instanceIds) {

@@ -185,8 +185,8 @@ public class InstanceUpdaterTest {
     TestFixture f = new TestFixture(NO_CONFIG, 1);
     f.setActualState(OLD);
     f.evaluate(KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE, RUNNING);
-    f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING, FINISHED);
-    f.setActualStateAbsent();
+    f.evaluate(EVALUATE_ON_STATE_CHANGE, KILLING);
+    f.evaluate(SUCCEEDED, FINISHED);
     f.evaluateCurrentState(SUCCEEDED);
   }
 

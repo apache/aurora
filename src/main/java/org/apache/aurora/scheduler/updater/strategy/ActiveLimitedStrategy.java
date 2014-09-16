@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.updater.strategy;
 
+import java.util.Objects;
 import java.util.Set;
 
 import com.google.common.base.Preconditions;
@@ -25,6 +26,7 @@ import com.google.common.collect.Ordering;
  * @param <T> Instance type.
  */
 abstract class ActiveLimitedStrategy<T extends Comparable<T>> implements UpdateStrategy<T> {
+  private final Ordering<T> ordering;
   protected final int maxActive;
 
   /**
@@ -33,7 +35,8 @@ abstract class ActiveLimitedStrategy<T extends Comparable<T>> implements UpdateS
    * @param maxActive Maximum number of values to return from
    * {@link #getNextGroup(java.util.Set, java.util.Set)}.
    */
-  protected ActiveLimitedStrategy(int maxActive) {
+  protected ActiveLimitedStrategy(Ordering<T> ordering, int maxActive) {
+    this.ordering = Objects.requireNonNull(ordering);
     Preconditions.checkArgument(maxActive > 0);
     this.maxActive = maxActive;
   }
@@ -41,7 +44,7 @@ abstract class ActiveLimitedStrategy<T extends Comparable<T>> implements UpdateS
   @Override
   public final Set<T> getNextGroup(Set<T> idle, Set<T> active) {
     return FluentIterable
-        .from(Ordering.natural().sortedCopy(doGetNextGroup(idle, active)))
+        .from(ordering.sortedCopy(doGetNextGroup(idle, active)))
         .limit(Math.max(0, maxActive - active.size()))
         .toSet();
   }

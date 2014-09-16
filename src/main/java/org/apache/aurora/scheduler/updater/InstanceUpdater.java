@@ -32,6 +32,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
@@ -94,20 +95,26 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
     return millisSince(earliestNonRunningEvent) >= maxNonRunningTime.as(Time.MILLISECONDS);
   }
 
-  private boolean permanentlyKilled(IScheduledTask task) {
-    return Iterables.any(
-        task.getTaskEvents(),
-        Predicates.compose(Predicates.equalTo(ScheduleStatus.KILLING), Tasks.TASK_EVENT_TO_STATUS));
+  private static boolean isPermanentlyKilled(IScheduledTask task) {
+    boolean wasKilling =
+        Iterables.any(
+            task.getTaskEvents(),
+            Predicates.compose(Predicates.equalTo(KILLING), Tasks.TASK_EVENT_TO_STATUS));
+    return task.getStatus() != KILLING && wasKilling;
   }
 
   private static boolean isKillable(ScheduleStatus status) {
-    return Tasks.isActive(status) && status != ScheduleStatus.KILLING;
+    return Tasks.isActive(status) && status != KILLING;
+  }
+
+  private static boolean isTaskPresent(Optional<IScheduledTask> task) {
+    return task.isPresent() && !isPermanentlyKilled(task.get());
   }
 
   @Override
   public synchronized StateEvaluator.Result evaluate(Optional<IScheduledTask> actualState) {
     boolean desiredPresent = desiredState.isPresent();
-    boolean actualPresent = actualState.isPresent();
+    boolean actualPresent = isTaskPresent(actualState);
 
     if (desiredPresent && actualPresent) {
       // The update is changing the task configuration.
@@ -167,7 +174,7 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
       if (isKillable(status)) {
         // Task is active, kill it.
         return StateEvaluator.Result.KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE;
-      } else if (Tasks.isTerminated(status) && permanentlyKilled(actualState)) {
+      } else if (Tasks.isTerminated(status) && isPermanentlyKilled(actualState)) {
         // The old task has exited, it is now safe to add the new one.
         return StateEvaluator.Result.REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE;
       }

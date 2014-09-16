@@ -157,10 +157,10 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   }
 
   @Override
-  public boolean isActive(String updateId) {
+  public Optional<String> getLockToken(String updateId) {
     // We assume here that cascading deletes will cause a lock-update associative row to disappear
     // when the lock is invalidated.  This further assumes that a lock row is deleted when a lock
     // is no longer valid.
-    return detailsMapper.selectLockToken(updateId) != null;
+    return Optional.fromNullable(detailsMapper.selectLockToken(updateId));
   }
 }

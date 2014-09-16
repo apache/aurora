@@ -17,6 +17,7 @@ import java.util.Date;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.twitter.common.util.Clock;
 
@@ -38,7 +39,8 @@ import static java.util.Objects.requireNonNull;
  * Implements lock-related primitives required to provide mutual exclusion guarantees
  * to the critical Scheduler state-mutating operations.
  */
-class LockManagerImpl implements LockManager {
+@VisibleForTesting
+public class LockManagerImpl implements LockManager {
   private final Storage storage;
   private final Clock clock;
   private final UUIDGenerator tokenGenerator;

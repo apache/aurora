@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.updater;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 /**
  * A controller that exposes commands to initiate and modify active job updates.
@@ -26,12 +27,13 @@ public interface JobUpdateController {
    * Initiates an update.
    *
    * @param update Instructions for what job to update, and how to update it.
-   * @param lockToken UUID identifying the lock associated with this update.
+   * @param updatingUser User initiating the update.
    * @throws UpdateStateException If the update cannot be started, for example if the instructions
    *                              are invalid, or if there is already an in-progress update for the
    *                              job.
    */
-  void start(IJobUpdate update, String lockToken) throws UpdateStateException;
+  void start(IJobUpdate update, String updatingUser)
+      throws UpdateStateException, UpdateConfigurationException;
 
   /**
    * Pauses an in-progress update.
@@ -70,18 +72,21 @@ public interface JobUpdateController {
    * Notifies the updater that the state of an instance has changed. A state change could also mean
    * deletion.
    *
-   * @param instance Identifier fo the instance whose state has changed.
+   * @param updatedTask The latest state for the task that changed.
    */
-  void instanceChangedState(IInstanceKey instance);
+  void instanceChangedState(IScheduledTask updatedTask);
 
   /**
-   * Restores an active update for a job that has been halted due to the scheduler restarting.
-   * This is distinct from {@link #resume(IJobKey)} in that it does not change the state of the
-   * update, but resumes after a restart of the scheduler process.
+   * Notifies the updater that an instance was deleted.
    *
-   * @param job Job to resume.
-   * @throws UpdateStateException If the update cannot resume, such as if the update is already
-   *                              active.
+   * @param instance Identifier of the deleted instance.
    */
-  void systemResume(IJobKey job) throws UpdateStateException;
+  void instanceDeleted(IInstanceKey instance);
+
+  /**
+   * Restores active updates that have been halted due to the scheduler restarting.
+   * This is distinct from {@link #resume(IJobKey)} in that it does not change the state of
+   * updates, but resumes after a restart of the scheduler process.
+   */
+  void systemResume();
 }

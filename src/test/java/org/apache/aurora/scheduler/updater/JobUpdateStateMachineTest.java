@@ -23,6 +23,7 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.JobUpdateStatus.ABORTED;
 import static org.apache.aurora.gen.JobUpdateStatus.ERROR;
+import static org.apache.aurora.gen.JobUpdateStatus.FAILED;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
@@ -49,6 +50,7 @@ public class JobUpdateStateMachineTest {
           .put(Pair.of(ROLLING_BACK, ROLLED_BACK), STOP_WATCHING)
           .put(Pair.of(ROLLING_BACK, ABORTED), STOP_WATCHING)
           .put(Pair.of(ROLLING_BACK, ERROR), STOP_WATCHING)
+          .put(Pair.of(ROLLING_BACK, FAILED), STOP_WATCHING)
           .put(Pair.of(ROLL_FORWARD_PAUSED, ROLLING_FORWARD), ROLL_FORWARD)
           .put(Pair.of(ROLL_FORWARD_PAUSED, ABORTED), STOP_WATCHING)
           .put(Pair.of(ROLL_FORWARD_PAUSED, ERROR), STOP_WATCHING)
@@ -64,7 +66,8 @@ public class JobUpdateStateMachineTest {
         Pair<JobUpdateStatus, JobUpdateStatus> key = Pair.of(from, to);
         MonitorAction expected = EXPECTED.get(key);
         try {
-          MonitorAction actual = JobUpdateStateMachine.transition(from, to);
+          JobUpdateStateMachine.assertTransitionAllowed(from, to);
+          MonitorAction actual = JobUpdateStateMachine.getActionForStatus(to);
           if (expected == null) {
             fail("Transition " + key + " should have been disallowed, but got result " + actual);
           }

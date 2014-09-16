@@ -20,6 +20,7 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -112,12 +113,13 @@ public interface RescheduleCalculator {
       }
     };
 
-    static class RescheduleCalculatorSettings {
+    @VisibleForTesting
+    public static class RescheduleCalculatorSettings {
       private final BackoffStrategy flappingTaskBackoff;
       private final Amount<Long, Time> flappingTaskThreashold;
       private final Amount<Integer, Time>  maxStartupRescheduleDelay;
 
-      RescheduleCalculatorSettings(
+      public RescheduleCalculatorSettings(
           BackoffStrategy flappingTaskBackoff,
           Amount<Long, Time> flappingTaskThreashold,
           Amount<Integer, Time> maxStartupRescheduleDelay) {

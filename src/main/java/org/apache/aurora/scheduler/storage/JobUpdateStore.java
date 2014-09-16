@@ -74,12 +74,12 @@ public interface JobUpdateStore {
   Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails();
 
   /**
-   * Determines whether an update ID represents a currently-active job update.
+   * Gets the lock token associated with a job update.
    *
    * @param updateId Job update ID.
-   * @return {@code true} if this update has exclusive access to the job, otherwise {@code false}.
+   * @return the token associated with the update id, if it exists.
    */
-  boolean isActive(String updateId);
+  Optional<String> getLockToken(String updateId);
 
   interface Mutable extends JobUpdateStore {
 

@@ -15,6 +15,8 @@ package org.apache.aurora.scheduler.updater.strategy;
 
 import java.util.Set;
 
+import com.google.common.collect.Ordering;
+
 import org.junit.Test;
 
 import static com.google.common.collect.ImmutableSet.of;
@@ -23,23 +25,24 @@ import static org.junit.Assert.assertEquals;
 
 public class BatchStrategyTest {
 
+  private static final Ordering<Integer> ORDERING = Ordering.natural();
   private static final Set<Integer> EMPTY = of();
 
   @Test(expected = IllegalArgumentException.class)
   public void testBadParameter() {
-    new BatchStrategy<Integer>(0);
+    new BatchStrategy<>(ORDERING, 0);
   }
 
   @Test
   public void testNoWorkToDo() {
-    UpdateStrategy<Integer> strategy = new BatchStrategy<>(2);
+    UpdateStrategy<Integer> strategy = new BatchStrategy<>(ORDERING, 2);
     assertEquals(EMPTY, strategy.getNextGroup(EMPTY, of(0, 1)));
     assertEquals(EMPTY, strategy.getNextGroup(EMPTY, EMPTY));
   }
 
   @Test
   public void testWaitForBatchCompletion() {
-    UpdateStrategy<Integer> strategy = new BatchStrategy<>(2);
+    UpdateStrategy<Integer> strategy = new BatchStrategy<>(ORDERING, 2);
     assertEquals(EMPTY, strategy.getNextGroup(of(2, 3), of(0, 1)));
     assertEquals(EMPTY, strategy.getNextGroup(of(2, 3), of(1)));
     assertEquals(of(2, 3), strategy.getNextGroup(of(2, 3), EMPTY));
@@ -48,7 +51,7 @@ public class BatchStrategyTest {
   @Test
   public void testBatchesIgnoreInstanceValues() {
     // Batches are defined as groups of instances, not partitioned based on the instance ID values.
-    UpdateStrategy<Integer> strategy = new BatchStrategy<>(2);
+    UpdateStrategy<Integer> strategy = new BatchStrategy<>(ORDERING, 2);
     assertEquals(of(0, 1), strategy.getNextGroup(of(0, 1, 2, 3), EMPTY));
     assertEquals(of(1, 2), strategy.getNextGroup(of(1, 2, 3), EMPTY));
     assertEquals(of(2, 3), strategy.getNextGroup(of(2, 3), EMPTY));
@@ -57,7 +60,7 @@ public class BatchStrategyTest {
 
   @Test
   public void testExhausted() {
-    UpdateStrategy<Integer> strategy = new BatchStrategy<>(3);
+    UpdateStrategy<Integer> strategy = new BatchStrategy<>(ORDERING, 3);
     assertEquals(of(0, 1, 2), strategy.getNextGroup(of(0, 1, 2), EMPTY));
     assertEquals(of(0, 1), strategy.getNextGroup(of(0, 1), EMPTY));
     assertEquals(of(1), strategy.getNextGroup(of(1), EMPTY));
@@ -65,7 +68,7 @@ public class BatchStrategyTest {
 
   @Test
   public void testActiveTooLarge() {
-    UpdateStrategy<Integer> strategy = new BatchStrategy<>(2);
+    UpdateStrategy<Integer> strategy = new BatchStrategy<>(ORDERING, 2);
     assertEquals(EMPTY, strategy.getNextGroup(of(0, 1, 2), of(3, 4, 5)));
   }
 }

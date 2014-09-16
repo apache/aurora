@@ -117,6 +117,7 @@ import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
+import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
@@ -265,7 +266,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         new InvocationHandler() {
           @Override
           public Object invoke(Object o, Method method, Object[] args) throws Throwable {
-            System.out.println("Invoking " + method);
             Response response = (Response) method.invoke(realThrift, args);
             assertTrue(response.isSetResponseCode());
             assertNotNull(response.getDetails());
@@ -1083,7 +1083,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         0);
 
     expectAuth(ROOT, true);
-    storageUtil.expectTaskFetch(Query.instanceScoped(instance).active(), storedTask);
+    storageUtil.expectTaskFetch(
+        Query.instanceScoped(IInstanceKey.build(instance)).active(), storedTask);
 
     control.replay();
 
@@ -1111,7 +1112,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         0);
 
     expectAuth(ROOT, true);
-    storageUtil.expectTaskFetch(Query.instanceScoped(instanceKey).active(), storedTask);
+    storageUtil.expectTaskFetch(
+        Query.instanceScoped(IInstanceKey.build(instanceKey)).active(), storedTask);
     expect(storageUtil.taskStore.unsafeModifyInPlace(
         taskId,
         ITaskConfig.build(ConfigurationManager.applyDefaultsIfUnset(modifiedConfig.newBuilder()))))
@@ -2003,7 +2005,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testStartUpdate() throws Exception {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    expect(lockManager.acquireLock(LOCK_KEY, USER)).andReturn(LOCK);
 
     IScheduledTask oldTask1 = buildScheduledTask(0, 5);
     IScheduledTask oldTask2 = buildScheduledTask(1, 5);
@@ -2032,7 +2033,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         oldTask6,
         oldTask7);
 
-    jobUpdateController.start(update, LOCK.getToken());
+    jobUpdateController.start(update, USER);
 
     control.replay();
 
@@ -2070,22 +2071,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testStartUpdateFailsLockValidation() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
-    expectAuth(ROLE, true);
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    expect(lockManager.acquireLock(LOCK_KEY, USER)).andThrow(new LockException("lock failed"));
-
-    control.replay();
-
-    assertResponse(LOCK_ERROR, thrift.startJobUpdate(request, SESSION));
-  }
-
-  @Test
   public void testStartUpdateFailsInController() throws Exception {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    expect(lockManager.acquireLock(LOCK_KEY, USER)).andReturn(LOCK);
 
     IScheduledTask oldTask = buildScheduledTask(0, 5);
     ITaskConfig newTask = buildScheduledTask(0, 8).getAssignedTask().getTask();
@@ -2097,7 +2085,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
 
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active(), oldTask);
-    jobUpdateController.start(update, LOCK.getToken());
+    jobUpdateController.start(update, USER);
     expectLastCall().andThrow(new UpdateStateException("failed"));
 
     control.replay();

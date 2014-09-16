@@ -259,7 +259,6 @@ def codeQualityTasks = [
     Checkstyle,
     FindBugs,
     nl.javadude.gradle.plugins.license.License,
-    JacocoReport,
     Pmd
 ]
 codeQualityTasks.each {
