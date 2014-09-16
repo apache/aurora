@@ -547,9 +547,6 @@ enum JobUpdateAction {
   /** The instance was removed to match the instance count. */
   INSTANCE_REMOVED = 3,
 
-  /** An instance was not updated because it already matches the new TaskConfig. */
-  INSTANCE_SKIPPED = 4,
-
   /** An update was performed or attempted, but had to be rolled back due to update failure. */
   INSTANCE_ROLLED_BACK = 5,
 

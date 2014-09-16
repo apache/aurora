@@ -204,13 +204,11 @@
 
       var INSTANCE_SUCCESSFUL = toSet([
         JobUpdateAction.INSTANCE_UPDATED,
-        JobUpdateAction.INSTANCE_SKIPPED,
         JobUpdateAction.INSTANCE_REMOVED
       ]);
 
       var INSTANCE_TERMINAL = toSet([
         JobUpdateAction.INSTANCE_UPDATED,
-        JobUpdateAction.INSTANCE_SKIPPED,
         JobUpdateAction.INSTANCE_REMOVED,
         JobUpdateAction.INSTANCE_ROLLED_BACK,
         JobUpdateAction.INSTANCE_UPDATE_FAILED,
