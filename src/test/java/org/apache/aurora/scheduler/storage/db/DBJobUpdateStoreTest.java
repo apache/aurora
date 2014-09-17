@@ -59,7 +59,10 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_ADDED;
+import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_ROLLBACK_FAILED;
+import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_ROLLING_BACK;
+import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_UPDATED;
+import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_UPDATING;
 import static org.junit.Assert.assertEquals;
 
 public class DBJobUpdateStoreTest {
@@ -168,8 +171,8 @@ public class DBJobUpdateStoreTest {
   public void testSaveInstanceEvents() {
     String updateId = "u3";
     IJobUpdate update = makeJobUpdate(JOB, updateId);
-    IJobInstanceUpdateEvent event1 = makeJobInstanceEvent(0, 125L, INSTANCE_ADDED);
-    IJobInstanceUpdateEvent event2 = makeJobInstanceEvent(1, 126L, INSTANCE_ADDED);
+    IJobInstanceUpdateEvent event1 = makeJobInstanceEvent(0, 125L, INSTANCE_UPDATED);
+    IJobInstanceUpdateEvent event2 = makeJobInstanceEvent(1, 126L, INSTANCE_ROLLING_BACK);
 
     saveUpdate(update, "lock");
     assertUpdate(update);
@@ -198,7 +201,7 @@ public class DBJobUpdateStoreTest {
 
   @Test(expected = StorageException.class)
   public void testSaveInstanceEventWithoutUpdateFails() {
-    saveJobInstanceEvent(makeJobInstanceEvent(0, 125L, INSTANCE_ADDED), "u1");
+    saveJobInstanceEvent(makeJobInstanceEvent(0, 125L, INSTANCE_UPDATED), "u1");
   }
 
   @Test
@@ -250,13 +253,13 @@ public class DBJobUpdateStoreTest {
 
     IJobUpdateEvent jEvent11 = makeJobUpdateEvent(JobUpdateStatus.ROLLING_FORWARD, 456L);
     IJobUpdateEvent jEvent12 = makeJobUpdateEvent(JobUpdateStatus.ERROR, 457L);
-    IJobInstanceUpdateEvent iEvent11 = makeJobInstanceEvent(1, 451L, INSTANCE_ADDED);
-    IJobInstanceUpdateEvent iEvent12 = makeJobInstanceEvent(2, 452L, INSTANCE_ADDED);
+    IJobInstanceUpdateEvent iEvent11 = makeJobInstanceEvent(1, 451L, INSTANCE_UPDATED);
+    IJobInstanceUpdateEvent iEvent12 = makeJobInstanceEvent(2, 452L, INSTANCE_UPDATING);
 
     IJobUpdateEvent jEvent21 = makeJobUpdateEvent(JobUpdateStatus.ROLL_FORWARD_PAUSED, 567L);
     IJobUpdateEvent jEvent22 = makeJobUpdateEvent(JobUpdateStatus.ABORTED, 568L);
-    IJobInstanceUpdateEvent iEvent21 = makeJobInstanceEvent(3, 561L, INSTANCE_ADDED);
-    IJobInstanceUpdateEvent iEvent22 = makeJobInstanceEvent(4, 562L, INSTANCE_ADDED);
+    IJobInstanceUpdateEvent iEvent21 = makeJobInstanceEvent(3, 561L, INSTANCE_UPDATED);
+    IJobInstanceUpdateEvent iEvent22 = makeJobInstanceEvent(4, 562L, INSTANCE_UPDATING);
 
     saveJobEvent(jEvent11, updateId1);
     saveJobEvent(jEvent12, updateId1);
@@ -293,7 +296,7 @@ public class DBJobUpdateStoreTest {
     IJobUpdateEvent updateEvent = IJobUpdateEvent.build(
         new JobUpdateEvent(JobUpdateStatus.ROLLING_FORWARD, 123L));
     IJobInstanceUpdateEvent instanceEvent = IJobInstanceUpdateEvent.build(
-        new JobInstanceUpdateEvent(0, 125L, INSTANCE_ADDED));
+        new JobInstanceUpdateEvent(0, 125L, INSTANCE_ROLLBACK_FAILED));
 
     saveUpdate(update, "lock");
     saveJobEvent(updateEvent, updateId);
