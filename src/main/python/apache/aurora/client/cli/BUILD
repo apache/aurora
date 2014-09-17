@@ -60,6 +60,7 @@ python_library(
     'standalone_client.py',
     'sla.py',
     'task.py',
+    'update.py',
   ],
   dependencies = [
     '3rdparty/python:argparse',

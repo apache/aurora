@@ -122,6 +122,7 @@ class AuroraCommandContext(Context):
       err_msg = resp.messageDEPRECATED
     self.log_response(resp)
     if resp.responseCode != ResponseCode.OK:
+      self.print_err("Error: %s" % err_msg)
       raise self.CommandError(err_code, err_msg)
 
   @classmethod

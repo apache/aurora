@@ -272,4 +272,4 @@ class TestRestartCommand(AuroraClientCommandTest):
         cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello',
             '--config', fp.name])
       assert self.MOCK_OUT == []
-      assert self.MOCK_ERR == ['Error restarting job west/bozo/test/hello; see log for details']
+      assert 'Error restarting job west/bozo/test/hello; see log for details' in self.MOCK_ERR

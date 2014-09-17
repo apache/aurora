@@ -117,6 +117,8 @@ class AuroraCommandLine(CommandLine):
     self.register_noun(Sla())
     from apache.aurora.client.cli.task import Task
     self.register_noun(Task())
+    from apache.aurora.client.cli.update import Update
+    self.register_noun(Update())
 
 
 def proxy_main():

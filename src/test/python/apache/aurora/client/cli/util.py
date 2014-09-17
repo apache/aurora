@@ -19,6 +19,7 @@ from mock import Mock
 
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
 
@@ -233,6 +234,8 @@ jobs = [HELLO_WORLD]
   TEST_CLUSTER = 'west'
 
   TEST_JOBSPEC = 'west/bozo/test/hello'
+
+  TEST_JOBKEY = AuroraJobKey('west', 'bozo', 'test', 'hello')
 
   TEST_CLUSTERS = Clusters([Cluster(
       name='west',

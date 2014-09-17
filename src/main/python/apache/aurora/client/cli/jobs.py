@@ -19,6 +19,7 @@ import logging
 import os
 import pprint
 import subprocess
+import textwrap
 import time
 from datetime import datetime
 from tempfile import NamedTemporaryFile
@@ -29,6 +30,7 @@ from thrift.TSerialization import serialize
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.cli import (
+    EXIT_API_ERROR,
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER,
@@ -141,9 +143,10 @@ class DiffCommand(Verb):
 
   @property
   def help(self):
-    return """Compare a job configuration against a running job.
-By default the diff will be displayed using 'diff', though you may choose an
-alternate diff program by setting the DIFF_VIEWER environment variable."""
+    return textwrap.dedent("""\
+        Compare a job configuration against a running job.
+        By default the diff will be displayed using 'diff', though you may choose an
+        alternate diff program by setting the DIFF_VIEWER environment variable.""")
 
   @property
   def name(self):
@@ -213,8 +216,9 @@ class InspectCommand(Verb):
 
   @property
   def help(self):
-    return """Verify that a job can be parsed from a configuration file, and display
-the parsed configuration."""
+    return textwrap.dedent("""\
+        Verify that a job can be parsed from a configuration file, and display
+        the parsed configuration.""")
 
   @property
   def name(self):
@@ -463,8 +467,9 @@ class RestartCommand(Verb):
 
   @property
   def help(self):
-    return """Perform a rolling restart of shards within a job.
-Restarts are fully controlled client-side, so aborting halts the restart."""
+    return textwrap.dedent("""\
+        Perform a rolling restart of shards within a job.
+        Restarts are fully controlled client-side, so aborting halts the restart.""")
 
   def execute(self, context):
     # Check for negative max_total_failures option - negative is an error.
@@ -508,8 +513,9 @@ class StatusCommand(Verb):
 
   @property
   def help(self):
-    return """Get status information about a scheduled job or group of jobs.
-The jobspec parameter can omit parts of the jobkey, or use shell-style globs."""
+    return textwrap.dedent("""\
+        Get status information about a scheduled job or group of jobs.
+        The jobspec parameter can omit parts of the jobkey, or use shell-style globs.""")
 
   @property
   def name(self):
@@ -626,20 +632,21 @@ class UpdateCommand(Verb):
 
   @property
   def help(self):
-    return """Perform a rolling upgrade on a running job, using the update configuration
-within the config file as a control for update velocity and failure tolerance.
+    return textwrap.dedent("""\
+        Perform a rolling upgrade on a running job, using the update configuration
+        within the config file as a control for update velocity and failure tolerance.
 
-Updates are fully controlled client-side, so aborting an update halts the
-update and leaves the job in a 'locked' state on the scheduler.
-Subsequent update attempts will fail until the update is 'unlocked' using the
-'cancel_update' command.
+        Updates are fully controlled client-side, so aborting an update halts the
+        update and leaves the job in a 'locked' state on the scheduler.
+        Subsequent update attempts will fail until the update is 'unlocked' using the
+        'cancel_update' command.
 
-The updater only takes action on instances in a job that have changed, meaning
-that changing a single instance will only induce a restart on the changed task instance.
+        The updater only takes action on instances in a job that have changed, meaning
+        that changing a single instance will only induce a restart on the changed task instance.
 
-You may want to consider using the 'diff' subcommand before updating,
-to preview what changes will take effect.
-"""
+        You may want to consider using the 'diff' subcommand before updating,
+        to preview what changes will take effect.
+        """)
 
   def warn_if_dangerous_change(self, context, api, job_spec, config):
     # Get the current job status, so that we can check if there's anything
@@ -682,6 +689,7 @@ to preview what changes will take effect.
         err_msg="Update failed; see log for details.")
     context.print_out("Update completed successfully")
     return EXIT_OK
+
 
 
 class Job(Noun):
