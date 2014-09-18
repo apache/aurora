@@ -27,7 +27,7 @@ import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.util.DateCache;
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 /**
  * A copy of twitter RequestLogger from twitter commons, which is a port of jetty's NCSARequestLog
@@ -63,8 +63,8 @@ public class RequestLogger extends AbstractLifeCycle implements RequestLog {
 
   @VisibleForTesting
   RequestLogger(Clock clock, LogSink sink) {
-    this.clock = checkNotNull(clock);
-    this.sink = checkNotNull(sink);
+    this.clock = requireNonNull(clock);
+    this.sink = requireNonNull(sink);
     logDateCache = new DateCache("dd/MMM/yyyy:HH:mm:ss Z", Locale.getDefault());
     logDateCache.setTimeZoneID("GMT");
   }

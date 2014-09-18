@@ -27,10 +27,13 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.inject.Inject;
+import com.twitter.common.collections.Pair;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.gen.JobInstanceUpdateEvent;
+import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateEvent;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateStatus;
@@ -46,6 +49,7 @@ import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
+import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
@@ -77,6 +81,7 @@ import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.assertTr
 import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.EvaluationResult;
 import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.OneWayStatus;
 import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.OneWayStatus.SUCCEEDED;
+import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatus;
 
 /**
  * Implementation of an updater that orchestrates the process of gradually updating the
@@ -434,6 +439,21 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
     EvaluationResult<Integer> result = update.getUpdater().evaluate(changedInstance, stateProvider);
     LOG.info(JobKeys.canonicalString(job) + " evaluation result: " + result);
+
+    for (Map.Entry<Integer, SideEffect> entry : result.getSideEffects().entrySet()) {
+      for (InstanceUpdateStatus statusChange : entry.getValue().getStatusChanges()) {
+        JobUpdateAction action = STATE_MAP.get(Pair.of(statusChange, updaterStatus));
+        requireNonNull(action);
+
+        IJobInstanceUpdateEvent event = IJobInstanceUpdateEvent.build(
+            new JobInstanceUpdateEvent()
+                .setInstanceId(entry.getKey())
+                .setTimestampMs(clock.nowMillis())
+                .setAction(action));
+        updateStore.saveJobInstanceUpdateEvent(event, summary.getUpdateId());
+      }
+    }
+
     OneWayStatus status = result.getStatus();
     if (status == SUCCEEDED || status == OneWayStatus.FAILED) {
       if (SideEffect.hasActions(result.getSideEffects().values())) {
@@ -450,7 +470,6 @@ class JobUpdateControllerImpl implements JobUpdateController {
       LOG.info("Executing side-effects for update of " + job + ": " + result.getSideEffects());
       for (Map.Entry<Integer, SideEffect> entry : result.getSideEffects().entrySet()) {
         IInstanceKey instance = InstanceKeys.from(job, entry.getKey());
-        // TODO(wfarner): Persist SideEffect.getStatusChanges as JobInstanceUpdateEvents.
 
         Optional<InstanceAction> action = entry.getValue().getAction();
         if (action.isPresent()) {
@@ -471,6 +490,31 @@ class JobUpdateControllerImpl implements JobUpdateController {
       }
     }
   }
+
+  /**
+   * Associates an instance updater state change and the job's update status to an action.
+   */
+  private static final Map<Pair<InstanceUpdateStatus, JobUpdateStatus>, JobUpdateAction> STATE_MAP =
+      ImmutableMap.<Pair<InstanceUpdateStatus, JobUpdateStatus>, JobUpdateAction>builder()
+          .put(
+              Pair.of(InstanceUpdateStatus.WORKING, ROLLING_FORWARD),
+              JobUpdateAction.INSTANCE_UPDATING)
+          .put(
+              Pair.of(InstanceUpdateStatus.SUCCEEDED, ROLLING_FORWARD),
+              JobUpdateAction.INSTANCE_UPDATED)
+          .put(
+              Pair.of(InstanceUpdateStatus.FAILED, ROLLING_FORWARD),
+              JobUpdateAction.INSTANCE_UPDATE_FAILED)
+          .put(
+              Pair.of(InstanceUpdateStatus.WORKING, ROLLING_BACK),
+              JobUpdateAction.INSTANCE_ROLLING_BACK)
+          .put(
+              Pair.of(InstanceUpdateStatus.SUCCEEDED, ROLLING_BACK),
+              JobUpdateAction.INSTANCE_ROLLED_BACK)
+          .put(
+              Pair.of(InstanceUpdateStatus.FAILED, ROLLING_BACK),
+              JobUpdateAction.INSTANCE_ROLLBACK_FAILED)
+          .build();
 
   private Runnable getDeferredEvaluator(final IInstanceKey instance, final String updateId) {
     return new Runnable() {

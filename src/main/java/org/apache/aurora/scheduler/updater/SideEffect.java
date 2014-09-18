@@ -34,18 +34,25 @@ public class SideEffect {
    * @param action Action to be taken on the instance, if necessary.
    * @param statusChanges Any status changes to the instance monitor.
    */
-  public SideEffect(
-      Optional<InstanceAction> action,
-      Set<InstanceUpdateStatus> statusChanges) {
-
+  public SideEffect(Optional<InstanceAction> action, Set<InstanceUpdateStatus> statusChanges) {
     this.action = requireNonNull(action);
     this.statusChanges = requireNonNull(statusChanges);
   }
 
+  /**
+   * Gets the action that should be performed with this side-effect, if any.
+   *
+   * @return The action associated with this side-effect.
+   */
   public Optional<InstanceAction> getAction() {
     return action;
   }
 
+  /**
+   * Gets the status changes that the instance underwent while being evaluated.
+   *
+   * @return Instance updater status changes.
+   */
   public Set<InstanceUpdateStatus> getStatusChanges() {
     return statusChanges;
   }

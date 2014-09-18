@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage.db;
 
+import java.util.Objects;
 import java.util.Set;
 
 import com.google.common.base.Optional;
@@ -28,8 +29,6 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 /**
  * Attribute store backed by a relational database.
  */
@@ -39,7 +38,7 @@ class DbAttributeStore implements AttributeStore.Mutable {
 
   @Inject
   DbAttributeStore(AttributeMapper mapper) {
-    this.mapper = checkNotNull(mapper);
+    this.mapper = Objects.requireNonNull(mapper);
   }
 
   @Override
