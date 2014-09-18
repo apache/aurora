@@ -50,4 +50,15 @@ public class ThriftBinaryCodecTest {
   public void testDecodeNonNull() throws CodingException {
     ThriftBinaryCodec.decodeNonNull(Identity.class, null);
   }
+
+  @Test
+  public void testInflateDeflateRoundTrip() throws CodingException {
+    Identity original = new Identity("aurora", "jsmith");
+
+    byte[] deflated = ThriftBinaryCodec.deflateNonNull(original);
+
+    Identity inflated = ThriftBinaryCodec.inflateNonNull(Identity.class, deflated);
+
+    assertEquals(original, inflated);
+  }
 }

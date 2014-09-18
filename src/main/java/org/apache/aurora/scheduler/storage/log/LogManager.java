@@ -71,7 +71,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Manages opening, reading from and writing to a {@link Log}.
  */
-public final class LogManager {
+public class LogManager {
 
   /**
    * Identifies the maximum log entry size to permit before chunking entries into frames.
@@ -286,9 +286,11 @@ public final class LogManager {
     void snapshot(Snapshot snapshot)
         throws CodingException, InvalidPositionException, StreamAccessException {
 
-      LogEntry entry = LogEntry.snapshot(snapshot);
+      LogEntry entry;
       if (deflateSnapshots) {
-        entry = Entries.deflate(entry);
+        entry = deflate(snapshot);
+      } else {
+        entry = LogEntry.snapshot(snapshot);
       }
 
       Position position = appendAndGetPosition(entry);
@@ -297,8 +299,19 @@ public final class LogManager {
       stream.truncateBefore(position);
     }
 
+    // Not meant to be subclassed, but timed methods must be non-private.
+    // See https://github.com/google/guice/wiki/AOP#limitations
+    @VisibleForTesting
+    @Timed("log_manager_deflate")
+    LogEntry deflate(Snapshot snapshot) throws CodingException {
+      return Entries.deflate(LogEntry.snapshot(snapshot));
+    }
+
+    // Not meant to be subclassed, but timed methods must be non-private.
+    // See https://github.com/google/guice/wiki/AOP#limitations
+    @VisibleForTesting
     @Timed("log_manager_append")
-    private Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
+    Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
       Position firstPosition = null;
       byte[][] entries = entrySerializer.serialize(logEntry);
       synchronized (writeMutex) { // ensure all sub-entries are written as a unit

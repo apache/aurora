@@ -13,21 +13,13 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterInputStream;
 
 import com.google.common.base.Preconditions;
-import com.google.common.io.ByteStreams;
-import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.LogEntry._Fields;
 
@@ -37,9 +29,6 @@ import org.apache.aurora.gen.storage.LogEntry._Fields;
 final class Entries {
 
   private static final Logger LOG = Logger.getLogger(Entries.class.getName());
-
-  private static final AtomicLong COMPRESSION_BYTES_SAVED =
-      Stats.exportLong("log_compressed_entry_bytes_saved");
 
   private Entries() {
     // Utility class.
@@ -59,28 +48,7 @@ final class Entries {
    * @throws CodingException If the value could not be encoded or deflated.
    */
   static LogEntry deflate(LogEntry entry) throws CodingException {
-    byte[] data = thriftBinaryEncode(entry);
-    int initialLength = data.length;
-    LOG.info("Deflating log entry of size " + initialLength);
-    ByteArrayOutputStream deflated = new ByteArrayOutputStream();
-    DeflaterOutputStream deflater = new DeflaterOutputStream(deflated);
-    try {
-      deflater.write(data);
-      deflater.flush();
-      deflater.close();
-      byte[] deflatedData = deflated.toByteArray();
-      int bytesSaved = initialLength - deflatedData.length;
-      if (bytesSaved < 0) {
-        LOG.warning("Deflated entry is larger than original by " + (bytesSaved * -1) + " bytes");
-      } else {
-        LOG.info("Deflated log entry size: " + deflatedData.length + " (saved " + bytesSaved + ")");
-      }
-
-      COMPRESSION_BYTES_SAVED.addAndGet(bytesSaved);
-      return LogEntry.deflatedEntry(ByteBuffer.wrap(deflatedData));
-    } catch (IOException e) {
-      throw new CodingException("Failed to deflate snapshot: " + e, e);
-    }
+    return LogEntry.deflatedEntry(ThriftBinaryCodec.deflateNonNull(entry));
   }
 
   /**
@@ -96,19 +64,9 @@ final class Entries {
   static LogEntry inflate(LogEntry entry) throws CodingException {
     Preconditions.checkArgument(entry.isSet(_Fields.DEFLATED_ENTRY));
 
-    ByteArrayOutputStream inflated = new ByteArrayOutputStream();
-    ByteBuffer data = entry.bufferForDeflatedEntry();
-    LOG.info("Inflating deflated log entry of size " + data.remaining());
-    InflaterInputStream inflater = new InflaterInputStream(
-        new ByteArrayInputStream(data.array(), data.position(), data.remaining()));
-    try {
-      ByteStreams.copy(inflater, inflated);
-      byte[] inflatedData = inflated.toByteArray();
-      LOG.info("Inflated log entry size: " + inflatedData.length);
-      return thriftBinaryDecode(inflatedData);
-    } catch (IOException e) {
-      throw new CodingException("Failed to inflate compressed log entry.", e);
-    }
+    byte[] data = entry.getDeflatedEntry();
+    LOG.info("Inflating deflated log entry of size " + data.length);
+    return ThriftBinaryCodec.inflateNonNull(LogEntry.class, entry.getDeflatedEntry());
   }
 
   /**
