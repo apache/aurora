@@ -41,36 +41,38 @@
 
       $scope.error = '';
 
-      $scope.roleSummaryColumns = [
-        {label: 'Role', map: 'role', cellTemplateUrl: 'roleLink.html'},
-        {label: 'Jobs', map: 'jobCount'},
-        {label: 'Cron Jobs', map: 'cronJobCount'}
-      ];
+      auroraClient.getRoleSummary().then(function (roleSummaries) {
+        $scope.roleSummaries = parseResponse(roleSummaries);
 
-      $scope.roleSummaries = parseResponse(auroraClient.getRoleSummary());
+        $scope.roleSummaryColumns = [
+          {label: 'Role', map: 'role', cellTemplateUrl: 'roleLink.html'},
+          {label: 'Jobs', map: 'jobCount'},
+          {label: 'Cron Jobs', map: 'cronJobCount'}
+        ];
 
-      function parseResponse(response) {
-        $scope.error = response.error ? 'Error requesting role summary: ' + response.error : '';
+        function parseResponse(response) {
+          $scope.error = response.error ? 'Error requesting role summary: ' + response.error : '';
 
-        if ($scope.error) {
-          return [];
+          if ($scope.error) {
+            return [];
+          }
+
+          // TODO(Suman Karumuri): Replace sort with defaultSortColumn once it lands
+          // https://github.com/lorenzofox3/Smart-Table/pull/61
+          return response.summaries.sort(function (a, b) {
+            if (a.role.toLowerCase() > b.role.toLowerCase()) {
+              return 1;
+            }
+            if (a.role.toLowerCase() < b.role.toLowerCase()) {
+              return -1;
+            }
+            return 0;
+          });
         }
 
-        // TODO(Suman Karumuri): Replace sort with defaultSortColumn once it lands
-        // https://github.com/lorenzofox3/Smart-Table/pull/61
-        return response.summaries.sort(function (a, b) {
-          if (a.role.toLowerCase() > b.role.toLowerCase()) {
-            return 1;
-          }
-          if (a.role.toLowerCase() < b.role.toLowerCase()) {
-            return -1;
-          }
-          return 0;
-        });
-      }
-
-      $scope.roleSummaryTableConfig = infoTableConfig;
-      $scope.roleSummaryTableConfig.columnSpan = $scope.roleSummaryColumns.length;
+        $scope.roleSummaryTableConfig = infoTableConfig;
+        $scope.roleSummaryTableConfig.columnSpan = $scope.roleSummaryColumns.length;
+      });
     });
 
   auroraUIControllers.controller('JobSummaryController',
@@ -94,10 +96,19 @@
       $scope.jobsTableConfig = infoTableConfig;
       $scope.jobsTableConfig.columnSpan = $scope.jobsTableColumns.length;
 
-      $scope.jobs = getJobs();
+      function getJobType(job) {
+        if (job.taskConfig.isService) {
+          return 'service';
+        }
 
-      function getJobs() {
-        var summaries = auroraClient.getJobSummary($scope.role);
+        if (job.cronSchedule !== null) {
+          return 'cron';
+        }
+
+        return 'adhoc';
+      }
+
+      function getJobs(summaries) {
         $scope.error = summaries.error ? 'Error fetching job summaries: ' + summaries.error : '';
 
         if ($scope.error) {
@@ -134,17 +145,10 @@
           .value();
       }
 
-      function getJobType(job) {
-        if (job.taskConfig.isService) {
-          return 'service';
-        }
+      auroraClient.getJobSummary($scope.role).then(function (summaries) {
+        $scope.jobs = getJobs(summaries);
+      });
 
-        if (job.cronSchedule !== null) {
-          return 'cron';
-        }
-
-        return 'adhoc';
-      }
     });
 
   auroraUIControllers.controller('QuotaController',
@@ -160,10 +164,12 @@
 
       $scope.resourcesTableConfig = summaryTableConfig;
 
-      $scope.resources = getQuota();
 
-      function getQuota() {
-        var quotaResponse = auroraClient.getQuota($scope.role);
+      auroraClient.getQuota($scope.role).then(function (quotaResponse) {
+        $scope.resources = getQuota(quotaResponse);
+      });
+
+      function getQuota(quotaResponse) {
         $scope.error = quotaResponse.error ? 'Error fetching quota: ' + quotaResponse.error : '';
 
         if ($scope.error) {
@@ -210,21 +216,21 @@
       $scope.error = '';
       $scope.cronJobSummary = [];
 
-      var cronJobSummary = cronJobSummaryService.getCronJobSummary($scope.role, $scope.environment,
-        $scope.job);
+      cronJobSummaryService.getCronJobSummary($scope.role, $scope.environment,
+       $scope.job).then(function (cronJobSummary) {
+        if (cronJobSummary.error) {
+          $scope.error = 'Error fetching cron job summary: ' + cronJobSummary.error;
+          return [];
+        }
 
-      if (cronJobSummary.error) {
-        $scope.error = 'Error fetching cron job summary: ' + cronJobSummary.error;
-        return [];
-      }
+        if (cronJobSummary.cronJobSummary) {
+          var nextCronRunTs = cronJobSummary.cronJobSummary.nextCronRun;
+          cronJobSummary.cronJobSummary.nextCronRun =
+            $filter('toLocalTime')(nextCronRunTs) + ', ' + $filter('toUtcTime')(nextCronRunTs);
 
-      if (cronJobSummary.cronJobSummary) {
-        var nextCronRunTs = cronJobSummary.cronJobSummary.nextCronRun;
-        cronJobSummary.cronJobSummary.nextCronRun =
-          $filter('toLocalTime')(nextCronRunTs) + ', ' + $filter('toUtcTime')(nextCronRunTs);
-
-        $scope.cronJobSummary = [cronJobSummary.cronJobSummary];
-      }
+          $scope.cronJobSummary = [cronJobSummary.cronJobSummary];
+        }
+      });
     }
   );
 
@@ -237,47 +243,49 @@
       $scope.job = $routeParams.job;
 
       var getUpdateProgress = function () {
-        $scope.update = auroraClient.getJobUpdateDetails(updateId).details;
-        $scope.inProgress = updateUtil.isInProgress($scope.update.update.summary.state.status);
+        auroraClient.getJobUpdateDetails(updateId).then(function (response) {
+          $scope.update = response.details;
+          $scope.inProgress = updateUtil.isInProgress($scope.update.update.summary.state.status);
 
-        var duration = $scope.update.update.summary.state.lastModifiedTimestampMs -
-          $scope.update.update.summary.state.createdTimestampMs;
+          var duration = $scope.update.update.summary.state.lastModifiedTimestampMs -
+            $scope.update.update.summary.state.createdTimestampMs;
 
-        $scope.duration = moment.duration(duration).humanize();
+          $scope.duration = moment.duration(duration).humanize();
 
-        $scope.stats = updateUtil.getUpdateStats($scope.update);
-        $scope.configJson = JSON
-          .stringify($scope.update.update.instructions.desiredState.task, undefined, 2);
+          $scope.stats = updateUtil.getUpdateStats($scope.update);
+          $scope.configJson = JSON
+            .stringify($scope.update.update.instructions.desiredState.task, undefined, 2);
 
-        // pagination for instance events
-        var instanceEvents = $scope.instanceEvents = $scope.update.instanceEvents;
-        $scope.eventsPerPage = 10;
-        $scope.changeInstancePage = function () {
-          var start = ($scope.currentPage - 1) * $scope.eventsPerPage;
-          var end   = start + $scope.eventsPerPage;
-          $scope.instanceEvents = instanceEvents.slice(start, end);
-        };
-        $scope.totalEvents = instanceEvents.length;
-        $scope.currentPage = 1;
-        $scope.changeInstancePage();
+          // pagination for instance events
+          var instanceEvents = $scope.instanceEvents = $scope.update.instanceEvents;
+          $scope.eventsPerPage = 10;
+          $scope.changeInstancePage = function () {
+            var start = ($scope.currentPage - 1) * $scope.eventsPerPage;
+            var end   = start + $scope.eventsPerPage;
+            $scope.instanceEvents = instanceEvents.slice(start, end);
+          };
+          $scope.totalEvents = instanceEvents.length;
+          $scope.currentPage = 1;
+          $scope.changeInstancePage();
 
-        // Instance summary display.
-        $scope.instanceSummary = updateUtil.fillInstanceSummary($scope.update, $scope.stats);
+          // Instance summary display.
+          $scope.instanceSummary = updateUtil.fillInstanceSummary($scope.update, $scope.stats);
 
-        if ($scope.instanceSummary.length <= 20) {
-          $scope.instanceGridSize = 'big';
-        } else if ($scope.instanceSummary.length <= 1000) {
-          $scope.instanceGridSize = 'medium';
-        } else {
-          $scope.instanceGridSize = 'small';
-        }
+          if ($scope.instanceSummary.length <= 20) {
+            $scope.instanceGridSize = 'big';
+          } else if ($scope.instanceSummary.length <= 1000) {
+            $scope.instanceGridSize = 'medium';
+          } else {
+            $scope.instanceGridSize = 'small';
+          }
 
-        // Poll for updates while this update is in progress.
-        if ($scope.inProgress) {
-          $timeout(function () {
-            getUpdateProgress();
-          }, AURORA_UPDATE_POLL_MS);
-        }
+          // Poll for updates while this update is in progress.
+          if ($scope.inProgress) {
+            $timeout(function () {
+              getUpdateProgress();
+            }, AURORA_UPDATE_POLL_MS);
+          }
+        });
       };
 
       getUpdateProgress();
@@ -285,7 +293,7 @@
   );
 
   auroraUIControllers.controller('JobController',
-    function ($scope, $routeParams, $timeout, auroraClient, taskUtil, updateUtil) {
+    function ($scope, $routeParams, $timeout, $q, auroraClient, taskUtil, updateUtil) {
       $scope.error = '';
 
       $scope.role = $routeParams.role;
@@ -346,13 +354,13 @@
       };
 
       $scope.jobDashboardUrl = '';
-
+      // These two task arrays need to be initialized due to a quirk in SmartTable's behavior.
+      $scope.activeTasks = [];
       $scope.completedTasks = [];
+      $scope.tasksReady = false;
 
-      $scope.activeTasks = getTasksForJob($scope.role, $scope.environment, $scope.job);
+      function buildGroupSummary(response) {
 
-      function buildGroupSummary($scope) {
-        var response = auroraClient.getConfigSummary($scope.role, $scope.environment, $scope.job);
         if (response.error) {
           $scope.error = 'Error fetching configuration summary: ' + response.error;
           return [];
@@ -388,47 +396,52 @@
         });
       }
 
-      function getUpdatesForJob($scope) {
-        var query = new JobUpdateQuery();
-        var jobKey = new JobKey();
-        jobKey.role = $scope.role;
-        jobKey.environment = $scope.environment;
-        jobKey.name = $scope.job;
-        query.jobKey = jobKey;
+      auroraClient.getTasksWithoutConfigs($scope.role, $scope.environment, $scope.job)
+        .then(getTasksForJob);
 
-        $scope.updates = auroraClient.getJobUpdateSummaries(query).summaries;
+      auroraClient.getConfigSummary($scope.role, $scope.environment, $scope.job)
+        .then(buildGroupSummary);
+
+      var query = new JobUpdateQuery();
+      var jobKey = new JobKey();
+      jobKey.role = $scope.role;
+      jobKey.environment = $scope.environment;
+      jobKey.name = $scope.job;
+      query.jobKey = jobKey;
+
+      auroraClient.getJobUpdateSummaries(query).then(getUpdatesForJob);
+
+
+      function getUpdatesForJob(response) {
+        $scope.updates = response.summaries;
 
         function getUpdateInProgress() {
-          if ($scope.updates.length > 0 &&
-             updateUtil.isInProgress($scope.updates[0].status)) {
-
-            $scope.updateInProgress =
-              auroraClient.getJobUpdateDetails($scope.updates[0].updateId).details;
+          auroraClient.getJobUpdateDetails($scope.updates[0].updateId).then(function (response) {
+            $scope.updateInProgress = response.details;
 
             $scope.updateStats = updateUtil.getUpdateStats($scope.updateInProgress);
 
-            // Poll for updates as long as this update is in progress.
-            $timeout(function () {
-              getUpdateInProgress();
-            }, AURORA_UPDATE_POLL_MS);
-          }
+            if (updateUtil.isInProgress($scope.updateInProgress.state.status)) {
+              // Poll for updates as long as this update is in progress.
+              $timeout(function () {
+                getUpdateInProgress();
+              }, AURORA_UPDATE_POLL_MS);
+            }
+          });
         }
 
-        getUpdateInProgress();
+        if ($scope.updates.length > 0 && updateUtil.isInProgress($scope.updates[0].state.status)) {
+          getUpdateInProgress();
+        }
       }
 
-      function getTasksForJob(role, environment, job) {
-        var response = auroraClient.getTasksWithoutConfigs(role, environment, job);
-
+      function getTasksForJob(response) {
         if (response.error) {
           $scope.error = 'Error fetching tasks: ' + response.error;
           return [];
         }
 
         $scope.jobDashboardUrl = getJobDashboardUrl(response.statsUrlPrefix);
-
-        buildGroupSummary($scope);
-        getUpdatesForJob($scope);
 
         var tasks = _.map(response.tasks, function (task) {
           return summarizeTask(task);
@@ -438,6 +451,11 @@
           return task.isActive;
         };
 
+        $scope.activeTasks = _.chain(tasks)
+          .filter(activeTaskPredicate)
+          .sortBy('instanceId')
+          .value();
+
         $scope.completedTasks = _.chain(tasks)
           .reject(activeTaskPredicate)
           .sortBy(function (task) {
@@ -445,12 +463,7 @@
           })
           .value();
 
-        return _.chain(tasks)
-          .filter(activeTaskPredicate)
-          .sortBy(function (task) {
-            return task.instanceId;
-          })
-          .value();
+        $scope.tasksReady = true;
       }
 
       function summarizeTask(task) {

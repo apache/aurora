@@ -30,31 +30,46 @@
 
   auroraUI.factory(
     'auroraClient',
-    ['$window',
-      function ($window) {
+    ['$window', '$q',
+      function ($window, $q) {
+        function async(fn) {
+          var deferred = $q.defer();
+          fn(deferred);
+          return deferred.promise;
+        }
+
         var auroraClient = {
           // Each of the functions below wrap an API call on the scheduler.
           getRoleSummary: function () {
-            var response = auroraClient.getSchedulerClient().getRoleSummary();
-            var result = auroraClient.processResponse(response);
-            result.summaries = response.result !== null ?
-              response.result.roleSummaryResult.summaries : [];
-            return result;
+            return async(function (deferred) {
+              auroraClient.getSchedulerClient().getRoleSummary(function (response) {
+                var result = auroraClient.processResponse(response);
+                result.summaries = response.result !== null ?
+                  response.result.roleSummaryResult.summaries : [];
+                deferred.resolve(result);
+              });
+            });
           },
 
           getJobSummary: function (role) {
-            var response = auroraClient.getSchedulerClient().getJobSummary(role);
-            var result = auroraClient.processResponse(response);
-            result.jobs = response.result !== null ?
-              response.result.jobSummaryResult.summaries : [];
-            return result;
+            return async(function (deferred) {
+              auroraClient.getSchedulerClient().getJobSummary(role, function (response) {
+                var result = auroraClient.processResponse(response);
+                result.jobs = response.result !== null ?
+                  response.result.jobSummaryResult.summaries : [];
+                deferred.resolve(result);
+              });
+            });
           },
 
           getQuota: function (role) {
-            var response = auroraClient.getSchedulerClient().getQuota(role);
-            var result = auroraClient.processResponse(response);
-            result.quota = response.result !== null ? response.result.getQuotaResult : [];
-            return result;
+            return async(function (deferred) {
+              auroraClient.getSchedulerClient().getQuota(role, function (response) {
+                var result = auroraClient.processResponse(response);
+                result.quota = response.result !== null ? response.result.getQuotaResult : [];
+                deferred.resolve(result);
+              });
+            });
           },
 
           getTasks: function (role, environment, jobName) {
@@ -64,79 +79,105 @@
             taskQuery.owner = id;
             taskQuery.environment = environment;
             taskQuery.jobName = jobName;
-            var response = auroraClient.getSchedulerClient().getTasksStatus(taskQuery);
-            var result = auroraClient.processResponse(response);
-            result.tasks = response.result !== null ?
-              response.result.scheduleStatusResult.tasks : [];
-            return result;
+            return async(function (deferred) {
+              auroraClient.getSchedulerClient().getTasksStatus(taskQuery, function (response) {
+                var result = auroraClient.processResponse(response);
+                result.tasks = response.result !== null ?
+                  response.result.scheduleStatusResult.tasks : [];
+                deferred.resolve(result);
+              });
+            });
           },
 
           getTasksWithoutConfigs: function (role, environment, jobName) {
             var query = makeJobTaskQuery(role, environment, jobName);
-            var response = auroraClient.getSchedulerClient().getTasksWithoutConfigs(query);
-            var result = auroraClient.processResponse(response);
-            result.tasks = response.result !== null ?
-              response.result.scheduleStatusResult.tasks : [];
 
-            // Attach current pending reasons to any pending tasks we might have
-            var pendingTasks = _.filter(result.tasks, function (t) {
-              return t.status === ScheduleStatus.PENDING;
-            });
-
-            if (pendingTasks.length > 0) {
-              var pendingResponse = auroraClient.getSchedulerClient().getPendingReason(query);
-              var reasons = pendingResponse.result !== null ?
-                pendingResponse.result.getPendingReasonResult.reasons : [];
-
-              reasons = _.indexBy(reasons, 'taskId');
-              pendingTasks.forEach(function (t) {
-                if (reasons.hasOwnProperty(t.assignedTask.taskId)) {
-                  // find the latest task event (that is pending)
-                  // and set the message to be this reason
-                  var latestPending = _.chain(t.taskEvents)
-                    .filter(function (e) {
-                      return e.status === ScheduleStatus.PENDING;
-                    })
-                    .sortBy(function (e) {
-                      return e.timestamp;
-                    })
-                    .last().value();
-
-                  latestPending.message = reasons[t.assignedTask.taskId].reason;
-                }
+            return async(function (deferred) {
+              var tasksPromise = async(function (d1) {
+                auroraClient.getSchedulerClient().getTasksWithoutConfigs(query, function (rsp) {
+                  var result = auroraClient.processResponse(rsp);
+                  result.tasks = rsp.result !== null ?
+                    rsp.result.scheduleStatusResult.tasks : [];
+                  d1.resolve(result);
+                });
               });
-            }
 
-            return result;
+              var pendingPromise = async(function (d2) {
+                auroraClient.getSchedulerClient().getPendingReason(query, function (response) {
+                  var reasons = response.result !== null ?
+                    response.result.getPendingReasonResult.reasons : [];
+                  d2.resolve(reasons);
+                });
+              });
+
+              $q.all([tasksPromise, pendingPromise]).then(function (responses) {
+                var result = responses[0], reasons = responses[1];
+                // Attach current pending reasons to any pending tasks we might have
+                var pendingTasks = _.filter(result.tasks, function (t) {
+                  return t.status === ScheduleStatus.PENDING;
+                });
+
+                if (pendingTasks.length > 0) {
+                  reasons = _.indexBy(reasons, 'taskId');
+                  pendingTasks.forEach(function (t) {
+                    if (reasons.hasOwnProperty(t.assignedTask.taskId)) {
+                      // find the latest task event (that is pending)
+                      // and set the message to be this reason
+                      var latestPending = _.chain(t.taskEvents)
+                        .filter(function (e) {
+                          return e.status === ScheduleStatus.PENDING;
+                        })
+                        .sortBy(function (e) {
+                          return e.timestamp;
+                        })
+                        .last().value();
+
+                      latestPending.message = reasons[t.assignedTask.taskId].reason;
+                    }
+                  });
+                }
+
+                deferred.resolve(result);
+              });
+            });
           },
 
           getConfigSummary: function (role, environment, jobName) {
-            var key = new JobKey();
-            key.role = role;
-            key.environment = environment;
-            key.name = jobName;
-            var response = auroraClient.getSchedulerClient().getConfigSummary(key);
-            var result = auroraClient.processResponse(response);
-            result.groups = response.result !== null ?
-              response.result.configSummaryResult.summary.groups : [];
-            return result;
+            return async(function (deferred) {
+              var key = new JobKey();
+              key.role = role;
+              key.environment = environment;
+              key.name = jobName;
+              auroraClient.getSchedulerClient().getConfigSummary(key, function (response) {
+                var result = auroraClient.processResponse(response);
+                result.groups = response.result !== null ?
+                  response.result.configSummaryResult.summary.groups : [];
+                deferred.resolve(result);
+              });
+            });
           },
 
           getJobUpdateSummaries: function (query) {
-            query = query || new JobUpdateQuery();
-            var response = auroraClient.getSchedulerClient().getJobUpdateSummaries(query);
-            var result = auroraClient.processResponse(response);
-            result.summaries = response.result !== null ?
-              response.result.getJobUpdateSummariesResult.updateSummaries : [];
-            return result;
+            return async(function (deferred) {
+              query = query || new JobUpdateQuery();
+              auroraClient.getSchedulerClient().getJobUpdateSummaries(query, function (response) {
+                var result = auroraClient.processResponse(response);
+                result.summaries = response.result !== null ?
+                  response.result.getJobUpdateSummariesResult.updateSummaries : [];
+                deferred.resolve(result);
+              });
+            });
           },
 
           getJobUpdateDetails: function (id) {
-            var response = auroraClient.getSchedulerClient().getJobUpdateDetails(id);
-            var result = auroraClient.processResponse(response);
-            result.details = response.result !== null ?
-              response.result.getJobUpdateDetailsResult.details : {};
-            return result;
+            return async(function (deferred) {
+              auroraClient.getSchedulerClient().getJobUpdateDetails(id, function (response) {
+                var result = auroraClient.processResponse(response);
+                result.details = response.result !== null ?
+                  response.result.getJobUpdateDetailsResult.details : {};
+                deferred.resolve(result);
+              });
+            });
           },
 
           // Utility functions
@@ -180,6 +221,7 @@
             $window.document.title = auroraClient.getPageTitle(serverInfo);
           }
         };
+
         return auroraClient;
       }
     ]);
@@ -496,40 +538,42 @@
 
   auroraUI.factory(
     'cronJobSummaryService',
-    [ 'auroraClient',
-      function (auroraClient) {
+    [ '$q', 'auroraClient',
+      function ($q, auroraClient) {
         var cronJobSmrySvc = {
           getCronJobSummary: function (role, env, jobName) {
-            var summaries = auroraClient.getJobSummary(role);
+            var deferred = $q.defer();
+            auroraClient.getJobSummary(role).then(function (summaries) {
+              if (summaries.error) {
+                deferred.resolve({error: 'Failed to fetch cron schedule from scheduler.'});
+              }
 
-            if (summaries.error) {
-              return {error: 'Failed to fetch cron schedule from scheduler.'};
-            }
+              var cronJobSummary = _.chain(summaries.jobs)
+                .filter(function (summary) {
+                  // fetch the cron job with a matching name and env.
+                  var job = summary.job;
+                  return job.cronSchedule !== null &&
+                    job.key.environment === env &&
+                    job.taskConfig.jobName === jobName;
+                })
+                .map(function (summary) {
+                  var collisionPolicy =
+                    cronJobSmrySvc.getCronCollisionPolicy(summary.job.cronCollisionPolicy);
+                  // summarize the cron job.
+                  return {
+                    tasks: summary.job.instanceCount,
+                    schedule: summary.job.cronSchedule,
+                    nextCronRun: summary.nextCronRunMs,
+                    collisionPolicy: collisionPolicy,
+                    metadata: cronJobSmrySvc.getMetadata(summary.job.taskConfig.metadata)
+                  };
+                })
+                .last() // there will always be 1 job in this list.
+                .value();
 
-            var cronJobSummary = _.chain(summaries.jobs)
-              .filter(function (summary) {
-                // fetch the cron job with a matching name and env.
-                var job = summary.job;
-                return job.cronSchedule !== null &&
-                  job.key.environment === env &&
-                  job.taskConfig.jobName === jobName;
-              })
-              .map(function (summary) {
-                var collisionPolicy =
-                  cronJobSmrySvc.getCronCollisionPolicy(summary.job.cronCollisionPolicy);
-                // summarize the cron job.
-                return {
-                  tasks: summary.job.instanceCount,
-                  schedule: summary.job.cronSchedule,
-                  nextCronRun: summary.nextCronRunMs,
-                  collisionPolicy: collisionPolicy,
-                  metadata: cronJobSmrySvc.getMetadata(summary.job.taskConfig.metadata)
-                };
-              })
-              .last() // there will always be 1 job in this list.
-              .value();
-
-            return {error: '', cronJobSummary: cronJobSummary};
+              deferred.resolve({error: '', cronJobSummary: cronJobSummary});
+            });
+            return deferred.promise;
           },
 
           getMetadata: function (attributes) {

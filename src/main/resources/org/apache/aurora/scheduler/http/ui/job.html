@@ -72,8 +72,15 @@
         </div>
       </div>
 
+      <div ng-if="!tasksReady">
+        <div class="row">
+          <div class="col-md-12">
+            Loading job information.
+          </div>
+        </div>
+      </div>
 
-      <tabset justified='true'>
+      <tabset ng-if="tasksReady" justified='true'>
         <tab heading='Active tasks ({{activeTasks.length}})' title='All Active tasks for this job.'>
           <div class='task-tab'>
             <div class='group-summary'>
