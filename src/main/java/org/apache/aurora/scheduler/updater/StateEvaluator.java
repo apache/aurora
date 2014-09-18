@@ -13,6 +13,10 @@
  */
 package org.apache.aurora.scheduler.updater;
 
+import java.util.Objects;
+
+import com.google.common.base.Optional;
+
 /**
  * Determines actions that must be taken to change the configuration of a running task.
  * <p>
@@ -44,11 +48,21 @@ interface StateEvaluator<T> {
   Result evaluate(T actualState);
 
   enum Result {
-    EVALUATE_ON_STATE_CHANGE,
-    REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE,
-    KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE,
-    EVALUATE_AFTER_MIN_RUNNING_MS,
-    SUCCEEDED,
-    FAILED
+    EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.AWAIT_STATE_CHANGE)),
+    REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.ADD_TASK)),
+    KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE(Optional.of(InstanceAction.KILL_TASK)),
+    EVALUATE_AFTER_MIN_RUNNING_MS(Optional.of(InstanceAction.WATCH_TASK)),
+    SUCCEEDED(Optional.<InstanceAction>absent()),
+    FAILED(Optional.<InstanceAction>absent());
+
+    private final Optional<InstanceAction> action;
+
+    Result(Optional<InstanceAction> action) {
+      this.action = Objects.requireNonNull(action);
+    }
+
+    public Optional<InstanceAction> getAction() {
+      return action;
+    }
   }
 }

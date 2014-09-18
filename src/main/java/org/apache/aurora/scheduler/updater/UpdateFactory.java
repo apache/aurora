@@ -136,12 +136,12 @@ interface UpdateFactory {
                 clock));
       }
 
-      // TODO(wfarner): Add the batch_completion flag to JobUpdateSettings and pick correct
-      // strategy.
       Ordering<Integer> updateOrder = rollingForward
           ? Ordering.<Integer>natural()
           : Ordering.<Integer>natural().reverse();
 
+      // TODO(wfarner): Add the batch_completion flag to JobUpdateSettings and pick correct
+      // strategy.
       UpdateStrategy<Integer> strategy =
           new QueueStrategy<>(updateOrder, settings.getUpdateGroupSize());
 
@@ -150,8 +150,7 @@ interface UpdateFactory {
               strategy,
               settings.getMaxFailedInstances(),
               evaluators.build()),
-          rollingForward ? JobUpdateStatus.ROLLED_FORWARD : JobUpdateStatus.ROLLED_BACK,
-          rollingForward ? JobUpdateStatus.ROLLING_BACK : JobUpdateStatus.FAILED);
+          rollingForward);
     }
 
     private static Range<Integer> toRange(IRange range) {
@@ -197,29 +196,23 @@ interface UpdateFactory {
 
   class Update {
     private final OneWayJobUpdater<Integer, Optional<IScheduledTask>> updater;
-    private final JobUpdateStatus successStatus;
-    private final JobUpdateStatus failureStatus;
+    private final boolean rollingForward;
 
-    public Update(
-        OneWayJobUpdater<Integer, Optional<IScheduledTask>> updater,
-        JobUpdateStatus successStatus,
-        JobUpdateStatus failureStatus) {
-
+    Update(OneWayJobUpdater<Integer, Optional<IScheduledTask>> updater, boolean rollingForward) {
       this.updater = requireNonNull(updater);
-      this.successStatus = requireNonNull(successStatus);
-      this.failureStatus = requireNonNull(failureStatus);
+      this.rollingForward = rollingForward;
     }
 
-    public OneWayJobUpdater<Integer, Optional<IScheduledTask>> getUpdater() {
+    OneWayJobUpdater<Integer, Optional<IScheduledTask>> getUpdater() {
       return updater;
     }
 
-    public JobUpdateStatus getSuccessStatus() {
-      return successStatus;
+    JobUpdateStatus getSuccessStatus() {
+      return rollingForward ? JobUpdateStatus.ROLLED_FORWARD : JobUpdateStatus.ROLLED_BACK;
     }
 
-    public JobUpdateStatus getFailureStatus() {
-      return failureStatus;
+    JobUpdateStatus getFailureStatus() {
+      return rollingForward ? JobUpdateStatus.ROLLING_BACK : JobUpdateStatus.FAILED;
     }
   }
 }

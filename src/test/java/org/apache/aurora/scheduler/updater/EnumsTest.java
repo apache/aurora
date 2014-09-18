@@ -16,8 +16,8 @@ package org.apache.aurora.scheduler.updater;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.MonitorAction;
-import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.InstanceUpdateStatus;
 import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.OneWayStatus;
+import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatus;
 import static org.junit.Assert.assertEquals;
 
 /**

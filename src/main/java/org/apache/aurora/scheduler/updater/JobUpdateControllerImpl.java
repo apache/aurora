@@ -22,7 +22,6 @@ import java.util.logging.Logger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -437,32 +436,37 @@ class JobUpdateControllerImpl implements JobUpdateController {
     LOG.info(JobKeys.canonicalString(job) + " evaluation result: " + result);
     OneWayStatus status = result.getStatus();
     if (status == SUCCEEDED || status == OneWayStatus.FAILED) {
-      Preconditions.checkArgument(
-          result.getInstanceActions().isEmpty(),
-          "A terminal state should not specify actions.");
+      if (SideEffect.hasActions(result.getSideEffects().values())) {
+        throw new IllegalArgumentException(
+            "A terminal state should not specify actions: " + result);
+      }
 
       if (status == SUCCEEDED) {
         changeUpdateStatus(updateStore, taskStore, summary, update.getSuccessStatus());
       } else {
         changeUpdateStatus(updateStore, taskStore, summary, update.getFailureStatus());
       }
-    } else if (result.getInstanceActions().isEmpty()) {
-      LOG.info("No actions to perform at this time for update of " + job);
     } else {
-      for (Map.Entry<Integer, InstanceAction> entry : result.getInstanceActions().entrySet()) {
+      LOG.info("Executing side-effects for update of " + job + ": " + result.getSideEffects());
+      for (Map.Entry<Integer, SideEffect> entry : result.getSideEffects().entrySet()) {
         IInstanceKey instance = InstanceKeys.from(job, entry.getKey());
-        Optional<InstanceActionHandler> handler = entry.getValue().getHandler();
-        if (handler.isPresent()) {
-          Amount<Long, Time> reevaluateDelay = handler.get().getReevaluationDelay(
-              instance,
-              updateStore.fetchJobUpdateConfiguration(summary.getUpdateId()).get(),
-              taskStore,
-              stateManager,
-              updaterStatus);
-          executor.schedule(
-              getDeferredEvaluator(instance, summary.getUpdateId()),
-              reevaluateDelay.getValue(),
-              reevaluateDelay.getUnit().getTimeUnit());
+        // TODO(wfarner): Persist SideEffect.getStatusChanges as JobInstanceUpdateEvents.
+
+        Optional<InstanceAction> action = entry.getValue().getAction();
+        if (action.isPresent()) {
+          Optional<InstanceActionHandler> handler = action.get().getHandler();
+          if (handler.isPresent()) {
+            Amount<Long, Time> reevaluateDelay = handler.get().getReevaluationDelay(
+                instance,
+                updateStore.fetchJobUpdateConfiguration(summary.getUpdateId()).get(),
+                taskStore,
+                stateManager,
+                updaterStatus);
+            executor.schedule(
+                getDeferredEvaluator(instance, summary.getUpdateId()),
+                reevaluateDelay.getValue(),
+                reevaluateDelay.getUnit().getTimeUnit());
+          }
         }
       }
     }

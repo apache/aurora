@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.updater;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -24,8 +25,13 @@ import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.updater.InstanceAction.ADD_TASK;
+import static org.apache.aurora.scheduler.updater.InstanceAction.AWAIT_STATE_CHANGE;
+import static org.apache.aurora.scheduler.updater.InstanceAction.KILL_TASK;
+import static org.apache.aurora.scheduler.updater.InstanceAction.WATCH_TASK;
 import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.EvaluationResult;
 import static org.apache.aurora.scheduler.updater.OneWayJobUpdater.OneWayStatus;
+import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatus;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_AFTER_MIN_RUNNING_MS;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.EVALUATE_ON_STATE_CHANGE;
@@ -40,7 +46,6 @@ import static org.junit.Assert.fail;
 
 public class OneWayJobUpdaterTest extends EasyMockTest {
   private static final Set<Integer> EMPTY = ImmutableSet.of();
-  private static final Map<Integer, InstanceAction> NO_ACTIONS = ImmutableMap.of();
 
   private UpdateStrategy<Integer> strategy;
   private StateEvaluator<String> instance0;
@@ -67,9 +72,9 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
     stateProvider = createMock(new Clazz<InstanceStateProvider<Integer, String>>() { });
   }
 
-  private void evaluate(OneWayStatus expectedStatus, Map<Integer, InstanceAction> expectedActions) {
+  private void evaluate(OneWayStatus expectedStatus, Map<Integer, SideEffect> expectedSideEffects) {
     assertEquals(
-        new EvaluationResult<>(expectedStatus, expectedActions),
+        new EvaluationResult<>(expectedStatus, expectedSideEffects),
         jobUpdater.evaluate(ImmutableMap.<Integer, String>of(), stateProvider));
   }
 
@@ -77,10 +82,10 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
       int instanceId,
       String state,
       OneWayStatus expectedStatus,
-      Map<Integer, InstanceAction> expectedActions) {
+      Map<Integer, SideEffect> expectedSideEffects) {
 
     assertEquals(
-        new EvaluationResult<>(expectedStatus, expectedActions),
+        new EvaluationResult<>(expectedStatus, expectedSideEffects),
         jobUpdater.evaluate(ImmutableMap.of(instanceId, state), stateProvider));
   }
 
@@ -100,6 +105,18 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
 
     expect(stateProvider.getState(instanceId)).andReturn(state);
     expect(instanceMock.evaluate(state)).andReturn(result);
+  }
+
+  private static SideEffect sideEffect(InstanceAction action, InstanceUpdateStatus... statuses) {
+    return new SideEffect(
+        Optional.of(action),
+        ImmutableSet.<InstanceUpdateStatus>builder().add(statuses).build());
+  }
+
+  private static SideEffect sideEffect(InstanceUpdateStatus... statuses) {
+    return new SideEffect(
+        Optional.<InstanceAction>absent(),
+        ImmutableSet.<InstanceUpdateStatus>builder().add(statuses).build());
   }
 
   @Test
@@ -139,28 +156,31 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
     evaluate(
         OneWayStatus.WORKING,
         ImmutableMap.of(
-            0, InstanceAction.KILL_TASK,
-            2, InstanceAction.ADD_TASK));
+            0, sideEffect(KILL_TASK, InstanceUpdateStatus.WORKING),
+            2, sideEffect(ADD_TASK, InstanceUpdateStatus.WORKING)));
     evaluate(
         0,
         s0,
         OneWayStatus.WORKING,
-        ImmutableMap.of(0, InstanceAction.AWAIT_STATE_CHANGE));
+        ImmutableMap.of(0, sideEffect(AWAIT_STATE_CHANGE)));
     evaluate(
         0,
         s0,
         OneWayStatus.WORKING,
-        NO_ACTIONS);
+        ImmutableMap.of(0, sideEffect(InstanceUpdateStatus.SUCCEEDED)));
     evaluate(
         2,
         s2,
         OneWayStatus.WORKING,
-        ImmutableMap.of(3, InstanceAction.WATCH_TASK));
+        ImmutableMap.of(
+            1, sideEffect(InstanceUpdateStatus.WORKING, InstanceUpdateStatus.SUCCEEDED),
+            2, sideEffect(InstanceUpdateStatus.SUCCEEDED),
+            3, sideEffect(WATCH_TASK, InstanceUpdateStatus.WORKING)));
     evaluate(
         3,
         s3,
         OneWayStatus.SUCCEEDED,
-        NO_ACTIONS);
+        ImmutableMap.of(3, sideEffect(InstanceUpdateStatus.SUCCEEDED)));
   }
 
   @Test
@@ -187,7 +207,8 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
     evaluate(
         OneWayStatus.FAILED,
         ImmutableMap.of(
-            1, InstanceAction.KILL_TASK));
+            0, sideEffect(InstanceUpdateStatus.WORKING, InstanceUpdateStatus.FAILED),
+            1, sideEffect(KILL_TASK, InstanceUpdateStatus.WORKING)));
 
     // The updater should now reject further attempts to evaluate.
     try {
@@ -232,7 +253,9 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
 
     evaluate(
         OneWayStatus.WORKING,
-        ImmutableMap.of(1, InstanceAction.AWAIT_STATE_CHANGE));
+        ImmutableMap.of(
+            0, sideEffect(InstanceUpdateStatus.WORKING, InstanceUpdateStatus.SUCCEEDED),
+            1, sideEffect(AWAIT_STATE_CHANGE, InstanceUpdateStatus.WORKING)));
 
     // Instance 0 is already considered finished, so any further notifications of its state will
     // no-op.
@@ -240,7 +263,7 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
         0,
         s0,
         OneWayStatus.WORKING,
-        NO_ACTIONS);
+        ImmutableMap.<Integer, SideEffect>of());
   }
 
   @Test
@@ -249,16 +272,16 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
 
     EvaluationResult<String> a = new EvaluationResult<>(
         OneWayStatus.WORKING,
-        ImmutableMap.of("a", InstanceAction.KILL_TASK));
+        ImmutableMap.of("a", sideEffect(KILL_TASK)));
     EvaluationResult<String> a2 = new EvaluationResult<>(
         OneWayStatus.WORKING,
-        ImmutableMap.of("a", InstanceAction.KILL_TASK));
+        ImmutableMap.of("a", sideEffect(KILL_TASK)));
     EvaluationResult<String> b = new EvaluationResult<>(
         OneWayStatus.WORKING,
-        ImmutableMap.of("b", InstanceAction.KILL_TASK));
+        ImmutableMap.of("b", sideEffect(KILL_TASK)));
     EvaluationResult<String> c = new EvaluationResult<>(
         OneWayStatus.FAILED,
-        ImmutableMap.of("b", InstanceAction.KILL_TASK));
+        ImmutableMap.of("b", sideEffect(KILL_TASK)));
     assertEquals(ImmutableSet.of(a, b), ImmutableSet.of(a, a2, b));
     assertEquals(a, a2);
     assertNotEquals(a, b);

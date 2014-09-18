@@ -45,8 +45,6 @@ import static org.apache.aurora.scheduler.updater.StateEvaluator.Result.SUCCEEDE
  * In part of a job update, this manages the update of an individual instance. This includes
  * deciding how to effect an update from a possibly-absent old configuration to a possibly-absent
  * new configuration, and detecting whether a replaced instance becomes unstable.
- *
- * TODO(wfarner): This probably needs to be parameterized so that it may be reused for rollbacks.
  */
 class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
   private static final Logger LOG = Logger.getLogger(InstanceUpdater.class.getName());

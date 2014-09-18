@@ -20,7 +20,6 @@ import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableMap;
@@ -35,6 +34,10 @@ import static java.util.Objects.requireNonNull;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatus.FAILED;
+import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatus.IDLE;
+import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatus.SUCCEEDED;
+import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatus.WORKING;
 import static org.apache.aurora.scheduler.updater.StateEvaluator.Result;
 
 /**
@@ -88,36 +91,21 @@ class OneWayJobUpdater<K, T> {
         }));
   }
 
-  private static final Function<InstanceUpdate<?>, InstanceUpdateStatus> GET_STATE =
-      new Function<InstanceUpdate<?>, InstanceUpdateStatus>() {
+  private static final Function<InstanceUpdate<?>, SideEffect.InstanceUpdateStatus> GET_STATE =
+      new Function<InstanceUpdate<?>, SideEffect.InstanceUpdateStatus>() {
         @Override
-        public InstanceUpdateStatus apply(InstanceUpdate<?> manager) {
+        public SideEffect.InstanceUpdateStatus apply(InstanceUpdate<?> manager) {
           return manager.getState();
         }
       };
 
   private static <K, T> Set<K> filterByStatus(
       Map<K, InstanceUpdate<T>> instances,
-      InstanceUpdateStatus status) {
+      SideEffect.InstanceUpdateStatus status) {
 
     return ImmutableSet.copyOf(
         Maps.filterValues(instances, Predicates.compose(Predicates.equalTo(status), GET_STATE))
             .keySet());
-  }
-
-  private static Optional<InstanceAction> resultToAction(Result result) {
-    switch (result) {
-      case EVALUATE_ON_STATE_CHANGE:
-        return Optional.of(InstanceAction.AWAIT_STATE_CHANGE);
-      case REPLACE_TASK_AND_EVALUATE_ON_STATE_CHANGE:
-        return Optional.of(InstanceAction.ADD_TASK);
-      case KILL_TASK_AND_EVALUATE_ON_STATE_CHANGE:
-        return Optional.of(InstanceAction.KILL_TASK);
-      case EVALUATE_AFTER_MIN_RUNNING_MS:
-        return Optional.of(InstanceAction.WATCH_TASK);
-      default:
-        return Optional.absent();
-    }
   }
 
   @VisibleForTesting
@@ -162,7 +150,7 @@ class OneWayJobUpdater<K, T> {
 
     // Call order is important here: update on-demand instances, evaluate new instances, compute
     // job update state.
-    ImmutableMap.Builder<K, InstanceAction> actions = ImmutableMap.<K, InstanceAction>builder()
+    ImmutableMap.Builder<K, SideEffect> actions = ImmutableMap.<K, SideEffect>builder()
         // Re-evaluate instances that are in need of update.
         .putAll(evaluateInstances(instancesNeedingUpdate));
 
@@ -171,64 +159,56 @@ class OneWayJobUpdater<K, T> {
       actions.putAll(startNextInstanceGroup(stateProvider));
     }
 
-    return new EvaluationResult<K>(computeJobUpdateStatus(), actions.build());
+    return new EvaluationResult<>(computeJobUpdateStatus(), actions.build());
   }
 
-  private Map<K, InstanceAction> evaluateInstances(Map<K, T> updatedInstances) {
-    ImmutableMap.Builder<K, InstanceAction> actions = ImmutableMap.builder();
+  private Map<K, SideEffect> evaluateInstances(Map<K, T> updatedInstances) {
+    ImmutableMap.Builder<K, SideEffect> sideEffects = ImmutableMap.builder();
     for (Map.Entry<K, T> entry : updatedInstances.entrySet()) {
       K instanceId = entry.getKey();
       InstanceUpdate<T> update = instances.get(instanceId);
       // Suppress state changes for updates that are not in-progress.
-      if (update.getState() == InstanceUpdateStatus.WORKING) {
-        Optional<InstanceAction> action = resultToAction(update.evaluate(entry.getValue()));
-        if (action.isPresent()) {
-          actions.put(instanceId, action.get());
-        }
+      if (update.getState() == WORKING) {
+        sideEffects.put(instanceId, update.evaluate(entry.getValue()));
       } else {
         LOG.info("Ignoring state change for instance outside working set: " + instanceId);
       }
     }
 
-    return actions.build();
+    return sideEffects.build();
   }
 
-  private Map<K, InstanceAction> startNextInstanceGroup(InstanceStateProvider<K, T> stateProvider) {
-    Set<K> idle = filterByStatus(instances, InstanceUpdateStatus.IDLE);
+  private Map<K, SideEffect> startNextInstanceGroup(InstanceStateProvider<K, T> stateProvider) {
+    Set<K> idle = filterByStatus(instances, IDLE);
     if (idle.isEmpty()) {
       return ImmutableMap.of();
     } else {
-      ImmutableMap.Builder<K, InstanceAction> builder = ImmutableMap.builder();
-      Set<K> working = filterByStatus(instances, InstanceUpdateStatus.WORKING);
+      ImmutableMap.Builder<K, SideEffect> builder = ImmutableMap.builder();
+      Set<K> working = filterByStatus(instances, WORKING);
       Set<K> nextGroup = strategy.getNextGroup(idle, working);
       if (!nextGroup.isEmpty()) {
         for (K instance : nextGroup) {
-          Result result = instances.get(instance).evaluate(stateProvider.getState(instance));
-          Optional<InstanceAction> action = resultToAction(result);
-          if (action.isPresent()) {
-            builder.put(instance, action.get());
-          }
+          builder.put(instance, instances.get(instance).evaluate(stateProvider.getState(instance)));
         }
-        LOG.info("Updated working set for update to "
-            + filterByStatus(instances, InstanceUpdateStatus.WORKING));
+        LOG.info("Changed working set for update to "
+            + filterByStatus(instances, WORKING));
       }
 
-      Map<K, InstanceAction> actions = builder.build();
-      if (!idle.isEmpty() && working.isEmpty() && actions.isEmpty()) {
+      Map<K, SideEffect> sideEffects = builder.build();
+      if (!idle.isEmpty() && working.isEmpty() && !SideEffect.hasActions(sideEffects.values())) {
         // There's no in-flight instances, and no actions - so there's nothing left to initiate more
         // work on this job. Try to find more work, or converge.
-        return startNextInstanceGroup(stateProvider);
+        return builder.putAll(startNextInstanceGroup(stateProvider)).build();
       } else {
-        return actions;
+        return sideEffects;
       }
     }
   }
 
   private OneWayStatus computeJobUpdateStatus() {
-    Set<K> idle = filterByStatus(instances, InstanceUpdateStatus.IDLE);
-    Set<K> working = filterByStatus(instances, InstanceUpdateStatus.WORKING);
-    Set<K> failed = filterByStatus(instances, InstanceUpdateStatus.FAILED);
-    // TODO(wfarner): This needs to be updated to support rollback.
+    Set<K> idle = filterByStatus(instances, IDLE);
+    Set<K> working = filterByStatus(instances, WORKING);
+    Set<K> failed = filterByStatus(instances, FAILED);
     if (failed.size() > maxFailedInstances) {
       stateMachine.transition(OneWayStatus.FAILED);
     } else if (working.isEmpty() && idle.isEmpty()) {
@@ -243,49 +223,44 @@ class OneWayJobUpdater<K, T> {
    */
   private static class InstanceUpdate<T> {
     private final StateEvaluator<T> evaluator;
-    private final StateMachine<InstanceUpdateStatus> stateMachine;
+    private final StateMachine<SideEffect.InstanceUpdateStatus> stateMachine;
 
     InstanceUpdate(String name, StateEvaluator<T> evaluator) {
       this.evaluator = requireNonNull(evaluator);
-      stateMachine = StateMachine.<InstanceUpdateStatus>builder(name)
-          .initialState(InstanceUpdateStatus.IDLE)
-          .addState(InstanceUpdateStatus.IDLE, InstanceUpdateStatus.WORKING)
-          .addState(
-              InstanceUpdateStatus.WORKING,
-              InstanceUpdateStatus.SUCCEEDED,
-              InstanceUpdateStatus.FAILED)
-          .addState(InstanceUpdateStatus.SUCCEEDED)
-          .addState(InstanceUpdateStatus.FAILED)
+      stateMachine = StateMachine.<SideEffect.InstanceUpdateStatus>builder(name)
+          .initialState(IDLE)
+          .addState(IDLE, WORKING)
+          .addState(WORKING, SUCCEEDED, FAILED)
+          .addState(SUCCEEDED)
+          .addState(FAILED)
           .throwOnBadTransition(true)
           .logTransitions()
           .build();
     }
 
-    InstanceUpdateStatus getState() {
+    SideEffect.InstanceUpdateStatus getState() {
       return stateMachine.getState();
     }
 
-    Result evaluate(T actualState) {
-      if (stateMachine.getState() == InstanceUpdateStatus.IDLE) {
-        stateMachine.transition(InstanceUpdateStatus.WORKING);
+    SideEffect evaluate(T actualState) {
+      ImmutableSet.Builder<SideEffect.InstanceUpdateStatus> statusChanges = ImmutableSet.builder();
+
+      if (stateMachine.getState() == IDLE) {
+        stateMachine.transition(WORKING);
+        statusChanges.add(WORKING);
       }
 
       Result result = evaluator.evaluate(actualState);
       if (result == Result.SUCCEEDED) {
-        stateMachine.transition(InstanceUpdateStatus.SUCCEEDED);
+        stateMachine.transition(SUCCEEDED);
+        statusChanges.add(SUCCEEDED);
       } else if (result == Result.FAILED) {
-        stateMachine.transition(InstanceUpdateStatus.FAILED);
+        stateMachine.transition(FAILED);
+        statusChanges.add(FAILED);
       }
-      return result;
-    }
-  }
 
-  @VisibleForTesting
-  enum InstanceUpdateStatus {
-    IDLE,
-    WORKING,
-    SUCCEEDED,
-    FAILED
+      return new SideEffect(result.getAction(), statusChanges.build());
+    }
   }
 
   /**
@@ -303,19 +278,19 @@ class OneWayJobUpdater<K, T> {
    */
   static class EvaluationResult<K> {
     private final OneWayStatus status;
-    private final Map<K, InstanceAction> instanceActions;
+    private final Map<K, SideEffect> sideEffects;
 
-    EvaluationResult(OneWayStatus jobStatus, Map<K, InstanceAction> instanceActions) {
+    EvaluationResult(OneWayStatus jobStatus, Map<K, SideEffect> sideEffects) {
       this.status = requireNonNull(jobStatus);
-      this.instanceActions = requireNonNull(instanceActions);
+      this.sideEffects = requireNonNull(sideEffects);
     }
 
     public OneWayStatus getStatus() {
       return status;
     }
 
-    public Map<K, InstanceAction> getInstanceActions() {
-      return instanceActions;
+    public Map<K, SideEffect> getSideEffects() {
+      return sideEffects;
     }
 
     @Override
@@ -326,19 +301,19 @@ class OneWayJobUpdater<K, T> {
       @SuppressWarnings("unchecked")
       EvaluationResult<K> other = (EvaluationResult<K>) obj;
       return other.getStatus().equals(this.getStatus())
-          && other.getInstanceActions().equals(this.getInstanceActions());
+          && other.getSideEffects().equals(this.getSideEffects());
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(getStatus(), getInstanceActions());
+      return Objects.hash(getStatus(), getSideEffects());
     }
 
     @Override
     public String toString() {
       return com.google.common.base.Objects.toStringHelper(this)
           .add("status", getStatus())
-          .add("instanceActions", getInstanceActions())
+          .add("sideEffects", getSideEffects())
           .toString();
     }
   }
