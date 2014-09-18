@@ -30,7 +30,6 @@
       job_key_id,
       update_id,
       user,
-      instance_count,
       update_group_size,
       max_per_instance_failures,
       max_failed_instances,
@@ -47,13 +46,12 @@
       ),
       #{summary.updateId},
       #{summary.user},
-      #{configuration.instanceCount},
-      #{configuration.settings.updateGroupSize},
-      #{configuration.settings.maxPerInstanceFailures},
-      #{configuration.settings.maxFailedInstances},
-      #{configuration.settings.maxWaitToInstanceRunningMs},
-      #{configuration.settings.minWaitInInstanceRunningMs},
-      #{configuration.settings.rollbackOnFailure}
+      #{instructions.settings.updateGroupSize},
+      #{instructions.settings.maxPerInstanceFailures},
+      #{instructions.settings.maxFailedInstances},
+      #{instructions.settings.maxWaitToInstanceRunningMs},
+      #{instructions.settings.minWaitInInstanceRunningMs},
+      #{instructions.settings.rollbackOnFailure}
     )
   </insert>
 
@@ -79,6 +77,14 @@
     )
   </insert>
 
+  <sql id="insertInstanceRanges">
+    <foreach item="element" collection="ranges" open="(" separator="),(" close=")">
+      <include refid="selectUpdateIdentity"/>,
+      #{element.first},
+      #{element.last}
+    </foreach>
+  </sql>
+
   <insert id="insertTaskConfigInstances">
     INSERT INTO job_update_configs_to_instances (
       config_id,
@@ -98,11 +104,16 @@
       first,
       last
     ) VALUES
-    <foreach item="element" collection="ranges" open="(" separator="),(" close=")">
-      <include refid="selectUpdateIdentity"/>,
-      #{element.first},
-      #{element.last}
-    </foreach>
+  <include refid="insertInstanceRanges" />
+  </insert>
+
+  <insert id="insertDesiredInstances">
+    INSERT INTO job_updates_to_desired_instances (
+      update_id,
+      first,
+      last
+    ) VALUES
+    <include refid="insertInstanceRanges" />
   </insert>
 
   <resultMap id="jobUpdateStateMap" type="org.apache.aurora.gen.JobUpdateState">
@@ -142,22 +153,20 @@
                 notNullColumn="id" />
   </resultMap>
 
-  <resultMap id="jobUpdateConfigurationMap" type="org.apache.aurora.gen.JobUpdateConfiguration">
+  <resultMap id="jobUpdateInstructionMap" type="org.apache.aurora.gen.JobUpdateInstructions">
     <id column="id" />
-    <result property="newTaskConfig"
-            column="new_task_config"
-            typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.TaskConfigTypeHandler" />
+    <association property="desiredState" resultMap="instanceConfigMap" columnPrefix="ditc_" />
     <association property="settings" resultMap="jobUpdateSettingsMap" columnPrefix="juse_"/>
-    <collection property="oldTaskConfigs"
+    <collection property="initialState"
                 resultMap="instanceConfigMap"
-                columnPrefix="itc_"
+                columnPrefix="iitc_"
                 notNullColumn="id" />
   </resultMap>
 
   <resultMap id="jobUpdateMap" type="org.apache.aurora.gen.JobUpdate">
     <id column="u_id" />
     <association property="summary" resultMap="jobUpdateSummaryMap" columnPrefix="jusm_"/>
-    <association property="configuration" resultMap="jobUpdateConfigurationMap" columnPrefix="juc_"/>
+    <association property="instructions" resultMap="jobUpdateInstructionMap" columnPrefix="jui_"/>
   </resultMap>
 
   <resultMap id="jobUpdateDetailsMap" type="org.apache.aurora.gen.storage.StoredJobUpdateDetails">
@@ -282,24 +291,27 @@
       j.role AS jusm_jk_role,
       j.environment AS jusm_jk_environment,
       j.name AS jusm_jk_name,
-      u.id AS juc_juse_id,
-      u.instance_count AS juc_instance_count,
-      u.update_group_size AS juc_juse_update_group_size,
-      u.max_per_instance_failures AS juc_juse_max_per_instance_failures,
-      u.max_failed_instances AS juc_juse_max_failed_instances,
-      u.max_wait_to_instance_running_ms AS juc_juse_max_wait_to_instance_running_ms,
-      u.min_wait_in_instance_running_ms AS juc_juse_min_wait_in_instance_running_ms,
-      u.rollback_on_failure AS juc_juse_rollback_on_failure,
-      cn.id AS juc_id,
-      cn.task_config AS juc_new_task_config,
-      co.id AS juc_itc_id,
-      co.task_config AS juc_itc_task,
-      ci.id AS juc_itc_r_id,
-      ci.first AS juc_itc_r_first,
-      ci.last AS juc_itc_r_last,
-      io.id AS juc_juse_r_id,
-      io.first AS juc_juse_r_first,
-      io.last AS juc_juse_r_last
+      u.id AS jui_juse_id,
+      u.update_group_size AS jui_juse_update_group_size,
+      u.max_per_instance_failures AS jui_juse_max_per_instance_failures,
+      u.max_failed_instances AS jui_juse_max_failed_instances,
+      u.max_wait_to_instance_running_ms AS jui_juse_max_wait_to_instance_running_ms,
+      u.min_wait_in_instance_running_ms AS jui_juse_min_wait_in_instance_running_ms,
+      u.rollback_on_failure AS jui_juse_rollback_on_failure,
+      cn.id AS jui_id,
+      cn.id AS jui_ditc_id,
+      cn.task_config AS jui_ditc_task,
+      di.id AS jui_ditc_r_id,
+      di.first AS jui_ditc_r_first,
+      di.last AS jui_ditc_r_last,
+      co.id AS jui_iitc_id,
+      co.task_config AS jui_iitc_task,
+      ci.id AS jui_iitc_r_id,
+      ci.first AS jui_iitc_r_first,
+      ci.last AS jui_iitc_r_last,
+      io.id AS jui_juse_r_id,
+      io.first AS jui_juse_r_first,
+      io.last AS jui_juse_r_last
   </sql>
 
   <sql id="job_update_to_configs_inner_joins">
@@ -308,6 +320,7 @@
     INNER JOIN job_update_configs AS cn ON cn.update_id = u.id AND cn.is_new = TRUE
     INNER JOIN job_update_configs AS co ON co.update_id = u.id AND co.is_new = FALSE
     INNER JOIN job_update_configs_to_instances AS ci ON ci.config_id = co.id
+    INNER JOIN job_updates_to_desired_instances AS di ON di.update_id = u.id
   </sql>
 
   <sql id="job_update_to_instance_overrides_outer_join">
@@ -333,13 +346,12 @@
     LEFT OUTER JOIN job_update_locks AS l on l.update_id = u.id
   </sql>
 
-  <!--Ideally, update configuration columns could be derived from job_update_columns above but that
-      hits against the limits of mybatis code reuse as specifying a common "juc_" column prefix
+  <!--Ideally, update instruction columns could be derived from job_update_columns above but that
+      hits against the limits of mybatis code reuse as specifying a common "jui_" column prefix
       in case of a standalone (no parent association) select appears to be impossible.-->
-  <select id="selectConfiguration" resultMap="jobUpdateConfigurationMap">
+  <select id="selectInstructions" resultMap="jobUpdateInstructionMap">
     SELECT
       u.id AS juse_id,
-      u.instance_count AS instance_count,
       u.update_group_size AS juse_update_group_size,
       u.max_per_instance_failures AS juse_max_per_instance_failures,
       u.max_failed_instances AS juse_max_failed_instances,
@@ -347,12 +359,16 @@
       u.min_wait_in_instance_running_ms AS juse_min_wait_in_instance_running_ms,
       u.rollback_on_failure AS juse_rollback_on_failure,
       cn.id AS id,
-      cn.task_config AS new_task_config,
-      co.id AS itc_id,
-      co.task_config AS itc_task,
-      ci.id AS itc_r_id,
-      ci.first AS itc_r_first,
-      ci.last AS itc_r_last,
+      cn.id AS ditc_id,
+      cn.task_config AS ditc_task,
+      di.id AS ditc_r_id,
+      di.first AS ditc_r_first,
+      di.last AS ditc_r_last,
+      co.id AS iitc_id,
+      co.task_config AS iitc_task,
+      ci.id AS iitc_r_id,
+      ci.first AS iitc_r_first,
+      ci.last AS iitc_r_last,
       io.id AS juse_r_id,
       io.first AS juse_r_first,
       io.last AS juse_r_last

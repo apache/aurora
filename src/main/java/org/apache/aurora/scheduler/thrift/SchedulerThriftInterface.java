@@ -74,7 +74,7 @@ import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.JobUpdate;
-import org.apache.aurora.gen.JobUpdateConfiguration;
+import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.JobUpdateSummary;
@@ -1328,7 +1328,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         }
       };
 
-  private static Set<InstanceTaskConfig> buildOldTaskConfigs(
+  private static Set<InstanceTaskConfig> buildInitialState(
       IJobKey jobKey,
       Storage.StoreProvider storeProvider) {
 
@@ -1405,11 +1405,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                 .setJobKey(request.getJobKey().newBuilder())
                 .setUpdateId(updateId)
                 .setUser(context.getIdentity()))
-            .setConfiguration(new JobUpdateConfiguration()
+            .setInstructions(new JobUpdateInstructions()
                 .setSettings(request.getSettings().newBuilder())
-                .setInstanceCount(request.getInstanceCount())
-                .setNewTaskConfig(request.getTaskConfig().newBuilder())
-                .setOldTaskConfigs(buildOldTaskConfigs(request.getJobKey(), storeProvider))));
+                .setInitialState(buildInitialState(request.getJobKey(), storeProvider))
+                .setDesiredState(new InstanceTaskConfig()
+                    .setTask(request.getTaskConfig().newBuilder())
+                    .setInstances(ImmutableSet.of(new org.apache.aurora.gen.Range()
+                        .setFirst(0)
+                        .setLast(request.getInstanceCount() - 1))))));
 
         try {
           jobUpdateController.start(update, context.getIdentity());

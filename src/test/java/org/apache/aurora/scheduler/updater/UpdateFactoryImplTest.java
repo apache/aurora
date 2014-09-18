@@ -17,11 +17,11 @@ import com.google.common.collect.ImmutableSet;
 import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.gen.InstanceTaskConfig;
-import org.apache.aurora.gen.JobUpdateConfiguration;
+import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -34,13 +34,14 @@ import static org.junit.Assert.assertEquals;
  */
 public class UpdateFactoryImplTest {
 
-  private static final IJobUpdateConfiguration CONFIG = IJobUpdateConfiguration.build(
-      new JobUpdateConfiguration()
-          .setNewTaskConfig(new TaskConfig())
-          .setInstanceCount(3)
-          .setOldTaskConfigs(ImmutableSet.of(new InstanceTaskConfig()
-              .setInstances(ImmutableSet.of(new Range(1, 2)))
-              .setTask(new TaskConfig())))
+  private static final IJobUpdateInstructions INSTRUCTIONS = IJobUpdateInstructions.build(
+      new JobUpdateInstructions()
+          .setDesiredState(new InstanceTaskConfig()
+              .setTask(new TaskConfig())
+              .setInstances(ImmutableSet.of(new Range(0, 2))))
+          .setInitialState(ImmutableSet.of(new InstanceTaskConfig()
+              .setTask(new TaskConfig())
+              .setInstances(ImmutableSet.of(new Range(1, 2)))))
           .setSettings(new JobUpdateSettings()
               .setMaxFailedInstances(1)
               .setMaxPerInstanceFailures(1)
@@ -58,48 +59,48 @@ public class UpdateFactoryImplTest {
 
   @Test
   public void testRollingForward() throws Exception  {
-    Update update = factory.newUpdate(CONFIG, true);
+    Update update = factory.newUpdate(INSTRUCTIONS, true);
     assertEquals(ImmutableSet.of(0, 1, 2), update.getUpdater().getInstances());
   }
 
   @Test
   public void testRollingBack() throws Exception {
-    Update update = factory.newUpdate(CONFIG, false);
+    Update update = factory.newUpdate(INSTRUCTIONS, false);
     assertEquals(ImmutableSet.of(0, 1, 2), update.getUpdater().getInstances());
   }
 
   @Test
   public void testRollForwardSpecificInstances() throws Exception {
-    JobUpdateConfiguration config = CONFIG.newBuilder();
+    JobUpdateInstructions config = INSTRUCTIONS.newBuilder();
     config.getSettings().setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(1, 2)));
 
-    Update update = factory.newUpdate(IJobUpdateConfiguration.build(config), true);
+    Update update = factory.newUpdate(IJobUpdateInstructions.build(config), true);
     assertEquals(ImmutableSet.of(1, 2), update.getUpdater().getInstances());
   }
 
   @Test
   public void testRollBackSpecificInstances() throws Exception {
-    JobUpdateConfiguration config = CONFIG.newBuilder();
+    JobUpdateInstructions config = INSTRUCTIONS.newBuilder();
     config.getSettings().setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(1, 2)));
 
-    Update update = factory.newUpdate(IJobUpdateConfiguration.build(config), false);
+    Update update = factory.newUpdate(IJobUpdateInstructions.build(config), false);
     assertEquals(ImmutableSet.of(1, 2), update.getUpdater().getInstances());
   }
 
   @Test(expected = UpdateConfigurationException.class)
   public void testInvalidConfiguration() throws Exception {
-    JobUpdateConfiguration config = CONFIG.newBuilder();
+    JobUpdateInstructions config = INSTRUCTIONS.newBuilder();
     config.getSettings().setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(10, 10)));
 
-    factory.newUpdate(IJobUpdateConfiguration.build(config), true);
+    factory.newUpdate(IJobUpdateInstructions.build(config), true);
   }
 
   @Test
   public void testUpdateRemovesInstance() throws Exception {
-    JobUpdateConfiguration config = CONFIG.newBuilder();
-    config.setInstanceCount(2);
+    JobUpdateInstructions config = INSTRUCTIONS.newBuilder();
+    config.getDesiredState().setInstances(ImmutableSet.of(new Range(0, 1)));
 
-    Update update = factory.newUpdate(IJobUpdateConfiguration.build(config), true);
+    Update update = factory.newUpdate(IJobUpdateInstructions.build(config), true);
     assertEquals(ImmutableSet.of(0, 1, 2), update.getUpdater().getInstances());
   }
 }

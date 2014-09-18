@@ -23,7 +23,7 @@
       </span>
     </td>
     <td>
-      <strong>{{update.update.configuration.settings.updateGroupSize}}</strong>
+      <strong>{{update.update.instructions.settings.updateGroupSize}}</strong>
     </td>
   </tr>
   <tr>
@@ -33,7 +33,7 @@
       </span>
     </td>
     <td>
-      <strong>{{update.update.configuration.settings.maxPerInstanceFailures}}</strong>
+      <strong>{{update.update.instructions.settings.maxPerInstanceFailures}}</strong>
     </td>
   </tr>
   <tr>
@@ -43,7 +43,7 @@
       </span>
     </td>
     <td>
-      <strong>{{update.update.configuration.settings.maxFailedInstances}}</strong>
+      <strong>{{update.update.instructions.settings.maxFailedInstances}}</strong>
     </td>
   </tr>
   <tr>
@@ -53,7 +53,7 @@
       </span>
     </td>
     <td>
-      <strong>{{update.update.configuration.settings.maxWaitToInstanceRunningMs}}</strong>
+      <strong>{{update.update.instructions.settings.maxWaitToInstanceRunningMs}}</strong>
     </td>
   </tr>
   <tr>
@@ -63,7 +63,7 @@
       </span>
     </td>
     <td>
-      <strong>{{update.update.configuration.settings.minWaitInInstanceRunningMs}}</strong>
+      <strong>{{update.update.instructions.settings.minWaitInInstanceRunningMs}}</strong>
     </td>
   </tr>
   <tr>
@@ -73,17 +73,17 @@
       </span>
     </td>
     <td>
-      <strong>{{update.update.configuration.settings.rollbackOnFailure}}</strong>
+      <strong>{{update.update.instructions.settings.rollbackOnFailure}}</strong>
     </td>
   </tr>
-  <tr ng-if="update.update.configuration.settings.updateOnlyTheseInstances">
+  <tr ng-if="update.update.instructions.settings.updateOnlyTheseInstances">
     <td>
       <span class="setting-label" tooltip="A subset of instance IDs to act on. All instances will be affected if this is not set.">
         Instance IDs
       </span>
     </td>
     <td>
-      <strong>{{update.update.configuration.settings.updateOnlyTheseInstances | toNiceRanges}}</strong>
+      <strong>{{update.update.instructions.settings.updateOnlyTheseInstances | toNiceRanges}}</strong>
     </td>
   </tr>
 </table>

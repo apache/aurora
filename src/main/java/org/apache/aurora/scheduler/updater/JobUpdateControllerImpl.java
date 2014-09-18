@@ -124,7 +124,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     requireNonNull(updatingUser);
 
     // Validate the update configuration by making sure we can create an updater for it.
-    updateFactory.newUpdate(update.getConfiguration(), true);
+    updateFactory.newUpdate(update.getInstructions(), true);
 
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
       @Override
@@ -380,7 +380,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       IJobUpdate jobUpdate = updateStore.fetchJobUpdate(updateId).get();
       UpdateFactory.Update update;
       try {
-        update = updateFactory.newUpdate(jobUpdate.getConfiguration(), action == ROLL_FORWARD);
+        update = updateFactory.newUpdate(jobUpdate.getInstructions(), action == ROLL_FORWARD);
       } catch (UpdateConfigurationException | RuntimeException e) {
         changeJobUpdateStatus(updateStore, taskStore, updateId, job, ERROR, true);
         return;
@@ -458,7 +458,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
           if (handler.isPresent()) {
             Amount<Long, Time> reevaluateDelay = handler.get().getReevaluationDelay(
                 instance,
-                updateStore.fetchJobUpdateConfiguration(summary.getUpdateId()).get(),
+                updateStore.fetchJobUpdateInstructions(summary.getUpdateId()).get(),
                 taskStore,
                 stateManager,
                 updaterStatus);

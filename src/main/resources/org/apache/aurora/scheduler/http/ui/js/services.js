@@ -282,11 +282,11 @@
           // new instance count and old instance count
           var totalInstances = Math.max(
               stats.oldInstanceCount,
-              details.update.configuration.instanceCount
+              updateUtil.instanceCountFromRanges(details.update.instructions.desiredState.instances)
             );
 
           var instances = [];
-          var instanceSubset = details.update.configuration.settings.updateOnlyTheseInstances;
+          var instanceSubset = details.update.instructions.settings.updateOnlyTheseInstances;
 
           function inRanges(ranges, x) {
             if (ranges && x) {
@@ -331,19 +331,21 @@
           }
 
           // find number of instances to be updated
-          var newInstanceCount = details.update.configuration.instanceCount;
+          var newInstanceCount = updateUtil.instanceCountFromRanges(
+            details.update.instructions.desiredState.instances
+          );
           var updateSubset = false;
 
           // find total number of existing instances
           var oldInstanceCount = updateUtil.instanceCountFromConfigs(
-            details.update.configuration.oldTaskConfigs);
+            details.update.instructions.initialState);
 
           // max of those two numbers is the number of instances to be updated
           var totalInstancesToBeUpdated = Math.max(oldInstanceCount, newInstanceCount);
 
-          if (details.update.configuration.settings.updateOnlyTheseInstances) {
+          if (details.update.instructions.settings.updateOnlyTheseInstances) {
             newInstanceCount = updateUtil.instanceCountFromRanges(
-              details.update.configuration.settings.updateOnlyTheseInstances
+              details.update.instructions.settings.updateOnlyTheseInstances
             );
             updateSubset = true;
             totalInstancesToBeUpdated = newInstanceCount;

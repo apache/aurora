@@ -21,9 +21,9 @@ import com.google.common.base.Optional;
 import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 
@@ -57,12 +57,12 @@ public interface JobUpdateStore {
   Optional<IJobUpdate> fetchJobUpdate(String updateId);
 
   /**
-   * Fetches a read-only view of a job update configuration.
+   * Fetches a read-only view of the instructions for a job update.
    *
-   * @param updateId Update ID to fetch configuration for.
-   * @return A read-only view of job update configuration.
+   * @param updateId Update ID to fetch instructions for.
+   * @return A read-only view of job update instructions.
    */
-  Optional<IJobUpdateConfiguration> fetchJobUpdateConfiguration(String updateId);
+  Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(String updateId);
 
   /**
    * Fetches a read-only view of all job update details available in the store.

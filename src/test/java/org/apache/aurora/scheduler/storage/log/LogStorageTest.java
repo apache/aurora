@@ -38,8 +38,8 @@ import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateAction;
-import org.apache.aurora.gen.JobUpdateConfiguration;
 import org.apache.aurora.gen.JobUpdateEvent;
+import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
@@ -756,10 +756,11 @@ public class LogStorageTest extends EasyMockTest {
             .setUpdateId(UPDATE_ID)
             .setJobKey(JOB_KEY.newBuilder())
             .setUser("user"))
-        .setConfiguration(new JobUpdateConfiguration()
-            .setNewTaskConfig(new TaskConfig())
-            .setInstanceCount(4)
-            .setOldTaskConfigs(ImmutableSet.of(new InstanceTaskConfig()
+        .setInstructions(new JobUpdateInstructions()
+            .setDesiredState(new InstanceTaskConfig()
+                .setTask(new TaskConfig())
+                .setInstances(ImmutableSet.of(new Range(0, 3))))
+            .setInitialState(ImmutableSet.of(new InstanceTaskConfig()
                 .setTask(new TaskConfig())
                 .setInstances(ImmutableSet.of(new Range(0, 3)))))
             .setSettings(new JobUpdateSettings())));

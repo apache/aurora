@@ -19,7 +19,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 import org.apache.aurora.gen.JobUpdate;
-import org.apache.aurora.gen.JobUpdateConfiguration;
+import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.Range;
@@ -80,9 +80,20 @@ interface JobUpdateDetailsMapper {
    * {@link org.apache.aurora.gen.JobUpdateSettings#updateOnlyTheseInstances}.
    *
    * @param updateId Update ID to store overrides for.
-   * @param ranges Instance ID ranges to associate with a task configuration.
+   * @param ranges Instance ID ranges to associate with an update.
    */
   void insertInstanceOverrides(
+      @Param("updateId") String updateId,
+      @Param("ranges") Set<Range> ranges);
+
+  /**
+   * Maps update with a set of instance IDs in
+   * {@link org.apache.aurora.gen.JobUpdateInstructions#desiredState}.
+   *
+   * @param updateId Update ID to store desired instances for.
+   * @param ranges Desired instance ID ranges to associate with an update.
+   */
+  void insertDesiredInstances(
       @Param("updateId") String updateId,
       @Param("ranges") Set<Range> ranges);
 
@@ -119,13 +130,13 @@ interface JobUpdateDetailsMapper {
   JobUpdate selectUpdate(String updateId);
 
   /**
-   * Gets job update configuration for the provided {@code updateId}.
+   * Gets job update instructions for the provided {@code updateId}.
    *
    * @param updateId Update ID to select by.
-   * @return job update configuration for the provided update ID, if it exists.
+   * @return job update instructions for the provided update ID, if it exists.
    */
   @Nullable
-  JobUpdateConfiguration selectConfiguration(String updateId);
+  JobUpdateInstructions selectInstructions(String updateId);
 
   /**
    * Gets all stored job update details.

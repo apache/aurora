@@ -31,7 +31,7 @@ import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -61,7 +61,7 @@ interface UpdateFactory {
    * @throws UpdateConfigurationException If the provided configuration cannot be used.
    */
   Update newUpdate(
-      IJobUpdateConfiguration configuration,
+      IJobUpdateInstructions configuration,
       boolean rollingForward) throws UpdateConfigurationException;
 
   class UpdateFactoryImpl implements UpdateFactory {
@@ -74,11 +74,11 @@ interface UpdateFactory {
 
     @Override
     public Update newUpdate(
-        IJobUpdateConfiguration configuration,
+        IJobUpdateInstructions instructions,
         boolean rollingForward) throws UpdateConfigurationException {
 
-      requireNonNull(configuration);
-      IJobUpdateSettings settings = configuration.getSettings();
+      requireNonNull(instructions);
+      IJobUpdateSettings settings = instructions.getSettings();
       checkArgument(
           settings.getMaxWaitToInstanceRunningMs() > 0,
           "Max wait to running must be positive.");
@@ -89,25 +89,23 @@ interface UpdateFactory {
           settings.getUpdateGroupSize() > 0,
           "Update group size must be positive.");
       checkArgument(
-          configuration.getInstanceCount() > 0,
+          !instructions.getDesiredState().getInstances().isEmpty(),
           "Instance count must be positive.");
 
       Set<Integer> instances;
-      Range<Integer> updateConfigurationInstances =
-          Range.closedOpen(0, configuration.getInstanceCount());
-      if (settings.getUpdateOnlyTheseInstances().isEmpty()) {
-        Set<Integer> newInstanceIds =
-            ImmutableRangeSet.of(updateConfigurationInstances).asSet(DiscreteDomain.integers());
+      Set<Integer> desiredInstances =
+          expandInstanceIds(ImmutableSet.of(instructions.getDesiredState()));
 
+      if (settings.getUpdateOnlyTheseInstances().isEmpty()) {
         // In a full job update, the working set is the union of instance IDs before and after.
         instances =  ImmutableSet.copyOf(
-            Sets.union(expandInstanceIds(configuration.getOldTaskConfigs()), newInstanceIds));
+            Sets.union(expandInstanceIds(instructions.getInitialState()), desiredInstances));
       } else {
         instances = rangesToInstanceIds(settings.getUpdateOnlyTheseInstances());
 
         // TODO(wfarner): Move this check out to SchedulerThriftInterface, and remove the
         // UpdateConfigurationException from this method's signature.
-        if (!updateConfigurationInstances.containsAll(instances)) {
+        if (!desiredInstances.containsAll(instances)) {
           throw new UpdateConfigurationException(
               "When updating specific instances, "
                   + "all specified instances must be in the update configuration.");
@@ -119,11 +117,11 @@ interface UpdateFactory {
       for (int instanceId : instances) {
         Optional<ITaskConfig> desiredState;
         if (rollingForward) {
-          desiredState = updateConfigurationInstances.contains(instanceId)
-              ? Optional.of(configuration.getNewTaskConfig())
+          desiredState = desiredInstances.contains(instanceId)
+              ? Optional.of(instructions.getDesiredState().getTask())
               : Optional.<ITaskConfig>absent();
         } else {
-          desiredState = getConfig(instanceId, configuration.getOldTaskConfigs());
+          desiredState = getConfig(instanceId, instructions.getInitialState());
         }
 
         evaluators.put(

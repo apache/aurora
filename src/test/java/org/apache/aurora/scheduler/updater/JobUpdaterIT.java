@@ -40,8 +40,8 @@ import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceTaskConfig;
 import org.apache.aurora.gen.JobUpdate;
-import org.apache.aurora.gen.JobUpdateConfiguration;
 import org.apache.aurora.gen.JobUpdateEvent;
+import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.gen.JobUpdateSummary;
@@ -238,7 +238,7 @@ public class JobUpdaterIT extends EasyMockTest {
   }
 
   private void insertInitialTasks(IJobUpdate update) {
-    for (IInstanceTaskConfig config : update.getConfiguration().getOldTaskConfigs()) {
+    for (IInstanceTaskConfig config : update.getInstructions().getInitialState()) {
       stateManager.insertPendingTasks(config.getTask(), expandInstanceIds(ImmutableSet.of(config)));
     }
   }
@@ -309,7 +309,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     JobUpdate builder =
         setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, OLD_CONFIG)), 1).newBuilder();
-    builder.getConfiguration().getSettings().setUpdateOnlyTheseInstances(
+    builder.getInstructions().getSettings().setUpdateOnlyTheseInstances(
         ImmutableSet.of(new Range(0, 0)));
     IJobUpdate update = IJobUpdate.build(builder);
     insertInitialTasks(update);
@@ -483,23 +483,24 @@ public class JobUpdaterIT extends EasyMockTest {
     control.replay();
 
     JobUpdate update = makeJobUpdate().newBuilder();
-    update.getConfiguration().getSettings().setUpdateGroupSize(-1);
+    update.getInstructions().getSettings().setUpdateGroupSize(-1);
     expectInvalid(update);
 
     update = makeJobUpdate().newBuilder();
-    update.getConfiguration().getSettings().setMaxWaitToInstanceRunningMs(0);
+    update.getInstructions().getSettings().setMaxWaitToInstanceRunningMs(0);
     expectInvalid(update);
 
     update = makeJobUpdate().newBuilder();
-    update.getConfiguration().getSettings().setMinWaitInInstanceRunningMs(0);
+    update.getInstructions().getSettings().setMinWaitInInstanceRunningMs(0);
     expectInvalid(update);
 
     update = makeJobUpdate().newBuilder();
-    update.getConfiguration().setInstanceCount(0);
+    update.getInstructions().setDesiredState(
+        new InstanceTaskConfig().setInstances(ImmutableSet.<Range>of()));
     expectInvalid(update);
 
     update = makeJobUpdate().newBuilder();
-    update.getConfiguration().getSettings().addToUpdateOnlyTheseInstances(new Range(0, 100));
+    update.getInstructions().getSettings().addToUpdateOnlyTheseInstances(new Range(0, 100));
     try {
       updater.start(IJobUpdate.build(update), USER);
       fail();
@@ -535,7 +536,7 @@ public class JobUpdaterIT extends EasyMockTest {
         store.deleteAllUpdatesAndEvents();
 
         JobUpdate builder = update.newBuilder();
-        builder.getConfiguration().setInstanceCount(0);
+        builder.getInstructions().getSettings().setUpdateGroupSize(0);
         for (ILock lock : lockManager.getLocks()) {
           lockManager.releaseLock(lock);
         }
@@ -713,9 +714,10 @@ public class JobUpdaterIT extends EasyMockTest {
   private static IJobUpdate makeJobUpdate(IInstanceTaskConfig... configs) {
     JobUpdate builder = new JobUpdate()
         .setSummary(makeUpdateSummary().newBuilder())
-        .setConfiguration(new JobUpdateConfiguration()
-            .setNewTaskConfig(NEW_CONFIG.newBuilder())
-            .setInstanceCount(3)
+        .setInstructions(new JobUpdateInstructions()
+            .setDesiredState(new InstanceTaskConfig()
+                .setTask(NEW_CONFIG.newBuilder())
+                .setInstances(ImmutableSet.of(new Range(0, 2))))
             .setSettings(new JobUpdateSettings()
                 .setUpdateGroupSize(1)
                 .setMaxWaitToInstanceRunningMs(RUNNING_TIMEOUT.as(Time.MILLISECONDS).intValue())
@@ -723,7 +725,7 @@ public class JobUpdaterIT extends EasyMockTest {
                 .setUpdateOnlyTheseInstances(ImmutableSet.<Range>of())));
 
     for (IInstanceTaskConfig config : configs) {
-      builder.getConfiguration().addToOldTaskConfigs(config.newBuilder());
+      builder.getInstructions().addToInitialState(config.newBuilder());
     }
 
     return IJobUpdate.build(builder);
@@ -731,7 +733,8 @@ public class JobUpdaterIT extends EasyMockTest {
 
   private static IJobUpdate setInstanceCount(IJobUpdate update, int instanceCount) {
     JobUpdate builder = update.newBuilder();
-    builder.getConfiguration().setInstanceCount(instanceCount);
+    builder.getInstructions().getDesiredState().setInstances(
+        ImmutableSet.of(new Range(0, instanceCount - 1)));
     return IJobUpdate.build(builder);
   }
 

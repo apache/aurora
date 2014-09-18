@@ -16,20 +16,20 @@ package org.apache.aurora.scheduler.updater;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.InstanceKey;
-import org.apache.aurora.gen.JobUpdateConfiguration;
+import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.junit.Before;
 import org.junit.Test;
 
 public class AddTaskTest extends EasyMockTest {
-  private static final IJobUpdateConfiguration CONFIG = IJobUpdateConfiguration.build(
-      new JobUpdateConfiguration()
+  private static final IJobUpdateInstructions INSTRUCTIONS = IJobUpdateInstructions.build(
+      new JobUpdateInstructions()
           .setSettings(
               new JobUpdateSettings()
                   .setMinWaitInInstanceRunningMs(1000)));
@@ -53,7 +53,7 @@ public class AddTaskTest extends EasyMockTest {
 
     handler.getReevaluationDelay(
         INSTANCE,
-        CONFIG,
+        INSTRUCTIONS,
         taskStore,
         stateManager,
         JobUpdateStatus.ROLLING_BACK);

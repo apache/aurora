@@ -26,8 +26,8 @@ import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -158,8 +158,8 @@ public class ForwardingStore implements
   }
 
   @Override
-  public Optional<IJobUpdateConfiguration> fetchJobUpdateConfiguration(String updateId) {
-    return jobUpdateStore.fetchJobUpdateConfiguration(updateId);
+  public Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(String updateId) {
+    return jobUpdateStore.fetchJobUpdateInstructions(updateId);
   }
 
   @Override

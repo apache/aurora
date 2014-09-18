@@ -247,7 +247,7 @@
 
         $scope.stats = updateUtil.getUpdateStats($scope.update);
         $scope.configJson = JSON
-          .stringify($scope.update.update.configuration.newTaskConfig, undefined, 2);
+          .stringify($scope.update.update.instructions.desiredState.task, undefined, 2);
 
         // pagination for instance events
         var instanceEvents = $scope.instanceEvents = $scope.update.instanceEvents;

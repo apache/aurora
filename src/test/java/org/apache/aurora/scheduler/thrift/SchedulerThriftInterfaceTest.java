@@ -66,8 +66,8 @@ import org.apache.aurora.gen.JobStats;
 import org.apache.aurora.gen.JobSummary;
 import org.apache.aurora.gen.JobSummaryResult;
 import org.apache.aurora.gen.JobUpdate;
-import org.apache.aurora.gen.JobUpdateConfiguration;
 import org.apache.aurora.gen.JobUpdateDetails;
+import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.JobUpdateSettings;
@@ -126,6 +126,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
+import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
@@ -2293,12 +2294,22 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setTaskConfig(config);
   }
 
+  private static Integer rangesToInstanceCount(Set<IRange> ranges) {
+    int instanceCount = 0;
+    for (IRange range : ranges) {
+      instanceCount += range.getLast() - range.getFirst() + 1;
+    }
+
+    return instanceCount;
+  }
+
   private static JobUpdateRequest buildJobUpdateRequest(IJobUpdate update) {
     return new JobUpdateRequest()
-        .setInstanceCount(update.getConfiguration().getInstanceCount())
+        .setInstanceCount(rangesToInstanceCount(
+            update.getInstructions().getDesiredState().getInstances()))
         .setJobKey(update.getSummary().getJobKey().newBuilder())
-        .setSettings(update.getConfiguration().getSettings().newBuilder())
-        .setTaskConfig(update.getConfiguration().getNewTaskConfig().newBuilder());
+        .setSettings(update.getInstructions().getSettings().newBuilder())
+        .setTaskConfig(update.getInstructions().getDesiredState().getTask().newBuilder());
   }
 
   private static IJobUpdate buildJobUpdate(
@@ -2316,10 +2327,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .setJobKey(JOB_KEY.newBuilder())
             .setUpdateId(UPDATE_ID)
             .setUser(ROLE_IDENTITY.getUser()))
-        .setConfiguration(new JobUpdateConfiguration()
+        .setInstructions(new JobUpdateInstructions()
             .setSettings(new JobUpdateSettings())
-            .setInstanceCount(instanceCount)
-            .setNewTaskConfig(newConfig.newBuilder())
-            .setOldTaskConfigs(builder.build())));
+            .setDesiredState(new InstanceTaskConfig()
+                .setTask(newConfig.newBuilder())
+                .setInstances(ImmutableSet.of(new Range(0, instanceCount - 1))))
+            .setInitialState(builder.build())));
   }
 }

@@ -30,7 +30,7 @@ import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -40,7 +40,7 @@ interface InstanceActionHandler {
 
   Amount<Long, Time> getReevaluationDelay(
       IInstanceKey instance,
-      IJobUpdateConfiguration updateConfig,
+      IJobUpdateInstructions instructions,
       TaskStore taskStore,
       StateManager stateManager,
       JobUpdateStatus status);
@@ -49,14 +49,14 @@ interface InstanceActionHandler {
 
   class AddTask implements InstanceActionHandler {
     private static ITaskConfig getTargetConfig(
-        IJobUpdateConfiguration configuration,
+        IJobUpdateInstructions instructions,
         boolean rollingForward,
         int instanceId) {
 
       if (rollingForward) {
-        return configuration.getNewTaskConfig();
+        return instructions.getDesiredState().getTask();
       } else {
-        for (IInstanceTaskConfig config : configuration.getOldTaskConfigs()) {
+        for (IInstanceTaskConfig config : instructions.getInitialState()) {
           for (IRange range : config.getInstances()) {
             if (Range.closed(range.getFirst(), range.getLast()).contains(instanceId)) {
               return config.getTask();
@@ -71,7 +71,7 @@ interface InstanceActionHandler {
     @Override
     public Amount<Long, Time> getReevaluationDelay(
         IInstanceKey instance,
-        IJobUpdateConfiguration updateConfig,
+        IJobUpdateInstructions instructions,
         TaskStore taskStore,
         StateManager stateManager,
         JobUpdateStatus status) {
@@ -80,12 +80,12 @@ interface InstanceActionHandler {
       // quota checking to take updates into consideration (AURORA-686).
       LOG.info("Adding instance " + instance + " while " + status);
       ITaskConfig replacement = getTargetConfig(
-          updateConfig,
+          instructions,
           status == ROLLING_FORWARD,
           instance.getInstanceId());
       stateManager.insertPendingTasks(replacement, ImmutableSet.of(instance.getInstanceId()));
       return  Amount.of(
-          (long) updateConfig.getSettings().getMaxWaitToInstanceRunningMs(),
+          (long) instructions.getSettings().getMaxWaitToInstanceRunningMs(),
           Time.MILLISECONDS);
     }
   }
@@ -94,7 +94,7 @@ interface InstanceActionHandler {
     @Override
     public Amount<Long, Time> getReevaluationDelay(
         IInstanceKey instance,
-        IJobUpdateConfiguration updateConfig,
+        IJobUpdateInstructions instructions,
         TaskStore taskStore,
         StateManager stateManager,
         JobUpdateStatus status) {
@@ -108,7 +108,7 @@ interface InstanceActionHandler {
           ScheduleStatus.KILLING,
           Optional.of("Killed for job update."));
       return Amount.of(
-          (long) updateConfig.getSettings().getMaxWaitToInstanceRunningMs(),
+          (long) instructions.getSettings().getMaxWaitToInstanceRunningMs(),
           Time.MILLISECONDS);
     }
   }
@@ -117,13 +117,13 @@ interface InstanceActionHandler {
     @Override
     public Amount<Long, Time> getReevaluationDelay(
         IInstanceKey instance,
-        IJobUpdateConfiguration updateConfig,
+        IJobUpdateInstructions instructions,
         TaskStore taskStore,
         StateManager stateManager,
         JobUpdateStatus status) {
 
       return Amount.of(
-          (long) updateConfig.getSettings().getMinWaitInInstanceRunningMs(),
+          (long) instructions.getSettings().getMinWaitInInstanceRunningMs(),
           Time.MILLISECONDS);
     }
   }

@@ -99,7 +99,6 @@ CREATE TABLE job_updates(
   job_key_id BIGINT NOT NULL REFERENCES job_keys(id),
   update_id VARCHAR NOT NULL,
   user VARCHAR NOT NULL,
-  instance_count INT NOT NULL,
   update_group_size INT NOT NULL,
   max_per_instance_failures INT NOT NULL,
   max_failed_instances INT NOT NULL,
@@ -127,6 +126,15 @@ CREATE TABLE job_update_configs(
 );
 
 CREATE TABLE job_updates_to_instance_overrides(
+  id IDENTITY,
+  update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
+  first INT NOT NULL,
+  last INT NOT NULL,
+
+  UNIQUE(update_id, first, last)
+);
+
+CREATE TABLE job_updates_to_desired_instances(
   id IDENTITY,
   update_id BIGINT NOT NULL REFERENCES job_updates(id) ON DELETE CASCADE,
   first INT NOT NULL,
