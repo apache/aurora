@@ -176,7 +176,7 @@ public final class %(name)s {
       new Function<%(wrapped)s, %(name)s>() {
         @Override
         public %(name)s apply(%(wrapped)s input) {
-          return new %(name)s(input);
+          return %(name)s.build(input);
         }
       };
 
