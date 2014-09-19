@@ -91,8 +91,8 @@ class UpdaterConfig(object):
         updateGroupSize=self.batch_size,
         maxPerInstanceFailures=self.max_per_instance_failures,
         maxFailedInstances=self.max_total_failures,
-        maxWaitToInstanceRunningMs=self.restart_threshold,
-        minWaitInInstanceRunningMs=self.watch_secs,
+        maxWaitToInstanceRunningMs=self.restart_threshold*1000,
+        minWaitInInstanceRunningMs=self.watch_secs*1000,
         rollbackOnFailure=self.rollback_on_failure,
         updateOnlyTheseInstances=self.instances_to_ranges(instances) if instances else None)
 

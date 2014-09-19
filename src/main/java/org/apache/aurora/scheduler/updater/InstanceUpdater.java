@@ -155,8 +155,10 @@ class InstanceUpdater implements StateEvaluator<Optional<IScheduledTask>> {
         }
       } else if (Tasks.isTerminated(status)) {
         // The desired task has terminated, this is a failure.
+        LOG.info("Task is in terminal state " + status);
         return addFailureAndCheckIfFailed();
       } else if (appearsStuck(actualState)) {
+        LOG.info("Task appears stuck.");
         // The task is not running, but not terminated, and appears to have been in this state
         // long enough that we should intervene.
         StateEvaluator.Result updaterStatus = addFailureAndCheckIfFailed();
