@@ -27,6 +27,7 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.inject.BindingAnnotation;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
@@ -462,7 +463,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       case SAVE_JOB_UPDATE:
         writeBehindJobUpdateStore.saveJobUpdate(
             IJobUpdate.build(op.getSaveJobUpdate().getJobUpdate()),
-            op.getSaveJobUpdate().getLockToken());
+            Optional.fromNullable(op.getSaveJobUpdate().getLockToken()));
         break;
 
       case SAVE_JOB_UPDATE_EVENT:

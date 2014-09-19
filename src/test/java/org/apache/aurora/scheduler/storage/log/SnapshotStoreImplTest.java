@@ -101,11 +101,15 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     SchedulerMetadata metadata = new SchedulerMetadata()
         .setFrameworkId(frameworkId)
         .setVersion(CURRENT_API_VERSION);
-    final String updateId = "updateId";
-    IJobUpdateDetails updateDetails = IJobUpdateDetails.build(new JobUpdateDetails()
-        .setUpdate(new JobUpdate().setSummary(new JobUpdateSummary().setUpdateId(updateId)))
+    final String updateId1 = "updateId1";
+    final String updateId2 = "updateId2";
+    IJobUpdateDetails updateDetails1 = IJobUpdateDetails.build(new JobUpdateDetails()
+        .setUpdate(new JobUpdate().setSummary(new JobUpdateSummary().setUpdateId(updateId1)))
         .setUpdateEvents(ImmutableList.of(new JobUpdateEvent().setStatus(JobUpdateStatus.ERROR)))
         .setInstanceEvents(ImmutableList.of(new JobInstanceUpdateEvent().setTimestampMs(123L))));
+
+    IJobUpdateDetails updateDetails2 = IJobUpdateDetails.build(new JobUpdateDetails()
+        .setUpdate(new JobUpdate().setSummary(new JobUpdateSummary().setUpdateId(updateId2))));
 
     storageUtil.expectOperations();
     expect(storageUtil.taskStore.fetchTasks(Query.unscoped())).andReturn(tasks);
@@ -121,7 +125,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     String lockToken = "token";
     expect(storageUtil.jobUpdateStore.fetchAllJobUpdateDetails())
         .andReturn(ImmutableSet.of(
-            new StoredJobUpdateDetails(updateDetails.newBuilder(), lockToken)));
+            new StoredJobUpdateDetails(updateDetails1.newBuilder(), lockToken),
+            new StoredJobUpdateDetails(updateDetails2.newBuilder(), null)));
 
     expectDataWipe();
     storageUtil.taskStore.saveTasks(tasks);
@@ -132,13 +137,16 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         IJobConfiguration.build(job.getJobConfiguration()));
     storageUtil.schedulerStore.saveFrameworkId(frameworkId);
     storageUtil.lockStore.saveLock(lock);
-    storageUtil.jobUpdateStore.saveJobUpdate(updateDetails.getUpdate(), lockToken);
+    storageUtil.jobUpdateStore.saveJobUpdate(
+        updateDetails1.getUpdate(), Optional.fromNullable(lockToken));
     storageUtil.jobUpdateStore.saveJobUpdateEvent(
-        Iterables.getOnlyElement(updateDetails.getUpdateEvents()),
-        updateId);
+        Iterables.getOnlyElement(updateDetails1.getUpdateEvents()),
+        updateId1);
     storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(
-        Iterables.getOnlyElement(updateDetails.getInstanceEvents()),
-        updateId);
+        Iterables.getOnlyElement(updateDetails1.getInstanceEvents()),
+        updateId1);
+    storageUtil.jobUpdateStore.saveJobUpdate(
+        updateDetails2.getUpdate(), Optional.<String>absent());
 
     control.replay();
 
@@ -151,7 +159,8 @@ public class SnapshotStoreImplTest extends EasyMockTest {
         .setSchedulerMetadata(metadata)
         .setLocks(ImmutableSet.of(lock.newBuilder()))
         .setJobUpdateDetails(ImmutableSet.of(
-            new StoredJobUpdateDetails(updateDetails.newBuilder(), lockToken)));
+            new StoredJobUpdateDetails(updateDetails1.newBuilder(), lockToken),
+            new StoredJobUpdateDetails(updateDetails2.newBuilder(), null)));
 
     assertEquals(expected, snapshotStore.createSnapshot());
 

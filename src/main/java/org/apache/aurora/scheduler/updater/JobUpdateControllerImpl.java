@@ -146,7 +146,10 @@ class JobUpdateControllerImpl implements JobUpdateController {
           throw new UpdateStateException(e.getMessage(), e);
         }
 
-        storeProvider.getJobUpdateStore().saveJobUpdate(update, lock.getToken());
+        storeProvider.getJobUpdateStore().saveJobUpdate(
+            update,
+            Optional.of(requireNonNull(lock.getToken())));
+
         recordAndChangeJobUpdateStatus(
             storeProvider.getJobUpdateStore(),
             storeProvider.getTaskStore(),

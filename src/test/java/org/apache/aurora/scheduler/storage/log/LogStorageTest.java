@@ -750,10 +750,21 @@ public class LogStorageTest extends EasyMockTest {
   }
 
   @Test
-  public void testSaveUpdate() throws Exception {
+  public void testSaveUpdateWithLockToken() throws Exception {
+    saveAndAssertJobUpdate("id1", Optional.of("token"));
+  }
+
+  @Test
+  public void testSaveUpdateWithNullLockToken() throws Exception {
+    saveAndAssertJobUpdate("id2", Optional.<String>absent());
+  }
+
+  private void saveAndAssertJobUpdate(final String updateId, final Optional<String> lockToken)
+      throws Exception {
+
     final IJobUpdate update = IJobUpdate.build(new JobUpdate()
         .setSummary(new JobUpdateSummary()
-            .setUpdateId(UPDATE_ID)
+            .setUpdateId(updateId)
             .setJobKey(JOB_KEY.newBuilder())
             .setUser("user"))
         .setInstructions(new JobUpdateInstructions()
@@ -764,7 +775,6 @@ public class LogStorageTest extends EasyMockTest {
                 .setTask(new TaskConfig())
                 .setInstances(ImmutableSet.of(new Range(0, 3)))))
             .setSettings(new JobUpdateSettings())));
-    final String lockToken = "token";
 
     new MutationFixture() {
       @Override
@@ -772,7 +782,7 @@ public class LogStorageTest extends EasyMockTest {
         storageUtil.expectWriteOperation();
         storageUtil.jobUpdateStore.saveJobUpdate(update, lockToken);
         streamMatcher.expectTransaction(
-            Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder(), lockToken)))
+            Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder(), lockToken.orNull())))
             .andReturn(position);
       }
 

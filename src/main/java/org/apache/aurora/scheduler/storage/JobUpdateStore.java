@@ -98,9 +98,11 @@ public interface JobUpdateStore {
      * without having at least one {@link IJobUpdateEvent} present in the store will return empty.
      *
      * @param update Update to save.
-     * @param lockToken UUID identifying the lock associated with this update.
+     * @param lockToken Optional UUID identifying the lock associated with this update.
+     *                  The {@code lockToken} can be absent when terminal updates are re-inserted
+     *                  during snapshot restore.
      */
-    void saveJobUpdate(IJobUpdate update, String lockToken);
+    void saveJobUpdate(IJobUpdate update, Optional<String> lockToken);
 
     /**
      * Saves a new job update event.

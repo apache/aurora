@@ -62,15 +62,16 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   }
 
   @Override
-  public void saveJobUpdate(IJobUpdate update, String lockToken) {
+  public void saveJobUpdate(IJobUpdate update, Optional<String> lockToken) {
     requireNonNull(update);
-    requireNonNull(lockToken);
 
     jobKeyMapper.merge(update.getSummary().getJobKey().newBuilder());
     detailsMapper.insert(update.newBuilder());
 
     String updateId = update.getSummary().getUpdateId();
-    detailsMapper.insertLockToken(updateId, lockToken);
+    if (lockToken.isPresent()) {
+      detailsMapper.insertLockToken(updateId, lockToken.get());
+    }
 
     // Insert optional instance update overrides.
     Set<IRange> instanceOverrides =

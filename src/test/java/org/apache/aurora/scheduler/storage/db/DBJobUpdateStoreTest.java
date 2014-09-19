@@ -63,6 +63,12 @@ import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_ROLLBACK_FAILED;
 import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_UPDATED;
 import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_UPDATING;
+import static org.apache.aurora.gen.JobUpdateStatus.ABORTED;
+import static org.apache.aurora.gen.JobUpdateStatus.ERROR;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_PAUSED;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
 import static org.junit.Assert.assertEquals;
 
 public class DBJobUpdateStoreTest {
@@ -70,7 +76,7 @@ public class DBJobUpdateStoreTest {
   private static final IJobKey JOB = JobKeys.from("testRole", "testEnv", "job");
   private static final long CREATED_MS = 111L;
   private static final IJobUpdateEvent FIRST_EVENT =
-      makeJobUpdateEvent(JobUpdateStatus.ROLLING_FORWARD, CREATED_MS);
+      makeJobUpdateEvent(ROLLING_FORWARD, CREATED_MS);
 
   private Storage storage;
 
@@ -95,10 +101,10 @@ public class DBJobUpdateStoreTest {
     assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId1));
     assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId2));
 
-    saveUpdate(update1, "lock1");
+    saveUpdate(update1, Optional.of("lock1"));
     assertUpdate(update1);
 
-    saveUpdate(update2, "lock2");
+    saveUpdate(update2, Optional.<String>absent());
     assertUpdate(update2);
   }
 
@@ -108,7 +114,7 @@ public class DBJobUpdateStoreTest {
     builder.getInstructions().getDesiredState().setInstances(ImmutableSet.<Range>of());
 
     // Save with empty desired state instances.
-    saveUpdate(IJobUpdate.build(builder), "lock");
+    saveUpdate(IJobUpdate.build(builder), Optional.of("lock"));
   }
 
   @Test
@@ -122,7 +128,7 @@ public class DBJobUpdateStoreTest {
     IJobUpdate expected = IJobUpdate.build(builder);
 
     // Save with empty overrides.
-    saveUpdate(expected, "lock");
+    saveUpdate(expected, Optional.of("lock"));
     assertUpdate(expected);
   }
 
@@ -138,7 +144,7 @@ public class DBJobUpdateStoreTest {
 
     // Save with null overrides.
     builder.getInstructions().getSettings().setUpdateOnlyTheseInstances(null);
-    saveUpdate(IJobUpdate.build(builder), "lock");
+    saveUpdate(IJobUpdate.build(builder), Optional.of("lock"));
     assertUpdate(expected);
   }
 
@@ -147,30 +153,30 @@ public class DBJobUpdateStoreTest {
     String updateId = "u1";
     IJobUpdate update = makeJobUpdate(JOB, updateId);
 
-    saveUpdate(update, "lock1");
-    saveUpdate(update, "lock2");
+    saveUpdate(update, Optional.of("lock1"));
+    saveUpdate(update, Optional.of("lock2"));
   }
 
   @Test
   public void testSaveJobEvents() {
     String updateId = "u3";
     IJobUpdate update = makeJobUpdate(JOB, updateId);
-    IJobUpdateEvent event1 = makeJobUpdateEvent(JobUpdateStatus.ROLLING_FORWARD, 124L);
-    IJobUpdateEvent event2 = makeJobUpdateEvent(JobUpdateStatus.ROLL_FORWARD_PAUSED, 125L);
+    IJobUpdateEvent event1 = makeJobUpdateEvent(ROLLING_FORWARD, 124L);
+    IJobUpdateEvent event2 = makeJobUpdateEvent(ROLL_FORWARD_PAUSED, 125L);
 
-    saveUpdate(update, "lock1");
+    saveUpdate(update, Optional.of("lock1"));
     assertUpdate(update);
     assertEquals(ImmutableList.of(FIRST_EVENT), getUpdateDetails(updateId).get().getUpdateEvents());
 
     saveJobEvent(event1, updateId);
     assertEquals(
-        populateExpected(update, JobUpdateStatus.ROLLING_FORWARD, CREATED_MS, 124L),
+        populateExpected(update, ROLLING_FORWARD, CREATED_MS, 124L),
         getUpdateDetails(updateId).get().getUpdate());
     assertEquals(event1, getUpdateDetails(updateId).get().getUpdateEvents().get(1));
 
     saveJobEvent(event2, updateId);
     assertEquals(
-        populateExpected(update, JobUpdateStatus.ROLL_FORWARD_PAUSED, CREATED_MS, 125L),
+        populateExpected(update, ROLL_FORWARD_PAUSED, CREATED_MS, 125L),
         getUpdateDetails(updateId).get().getUpdate());
     assertEquals(event1, getUpdateDetails(updateId).get().getUpdateEvents().get(1));
     assertEquals(event2, getUpdateDetails(updateId).get().getUpdateEvents().get(2));
@@ -183,13 +189,13 @@ public class DBJobUpdateStoreTest {
     IJobInstanceUpdateEvent event1 = makeJobInstanceEvent(0, 125L, INSTANCE_UPDATED);
     IJobInstanceUpdateEvent event2 = makeJobInstanceEvent(1, 126L, INSTANCE_ROLLING_BACK);
 
-    saveUpdate(update, "lock");
+    saveUpdate(update, Optional.of("lock"));
     assertUpdate(update);
     assertEquals(0, getUpdateDetails(updateId).get().getInstanceEvents().size());
 
     saveJobInstanceEvent(event1, updateId);
     assertEquals(
-        populateExpected(update, JobUpdateStatus.ROLLING_FORWARD, CREATED_MS, 125L),
+        populateExpected(update, ROLLING_FORWARD, CREATED_MS, 125L),
         getUpdateDetails(updateId).get().getUpdate());
     assertEquals(
         event1,
@@ -197,7 +203,7 @@ public class DBJobUpdateStoreTest {
 
     saveJobInstanceEvent(event2, updateId);
     assertEquals(
-        populateExpected(update, JobUpdateStatus.ROLLING_FORWARD, CREATED_MS, 126L),
+        populateExpected(update, ROLLING_FORWARD, CREATED_MS, 126L),
         getUpdateDetails(updateId).get().getUpdate());
     assertEquals(event1, getUpdateDetails(updateId).get().getInstanceEvents().get(0));
     assertEquals(event2, getUpdateDetails(updateId).get().getInstanceEvents().get(1));
@@ -205,7 +211,7 @@ public class DBJobUpdateStoreTest {
 
   @Test(expected = StorageException.class)
   public void testSaveJobEventWithoutUpdateFails() {
-    saveJobEvent(makeJobUpdateEvent(JobUpdateStatus.ROLLING_FORWARD, 123L), "u2");
+    saveJobEvent(makeJobUpdateEvent(ROLLING_FORWARD, 123L), "u2");
   }
 
   @Test(expected = StorageException.class)
@@ -216,14 +222,8 @@ public class DBJobUpdateStoreTest {
   @Test
   public void testSaveJobUpdateStateIgnored() {
     String updateId = "u1";
-
-    IJobUpdate update = populateExpected(
-        makeJobUpdate(JOB, updateId),
-        JobUpdateStatus.ABORTED,
-        567L,
-        567L);
-
-    saveUpdate(update, "lock1");
+    IJobUpdate update = populateExpected(makeJobUpdate(JOB, updateId), ABORTED, 567L, 567L);
+    saveUpdate(update, Optional.of("lock1"));
 
     // Assert state fields were ignored.
     assertUpdate(update);
@@ -237,7 +237,7 @@ public class DBJobUpdateStoreTest {
       public void execute(MutableStoreProvider storeProvider) {
         IJobUpdate update = makeJobUpdate(JOB, updateId);
         storeProvider.getLockStore().saveLock(makeLock(update.getSummary().getJobKey(), "lock1"));
-        storeProvider.getJobUpdateStore().saveJobUpdate(update, "lock1");
+        storeProvider.getJobUpdateStore().saveJobUpdate(update, Optional.of("lock1"));
       }
     });
     assertEquals(Optional.<IJobUpdateDetails>absent(), getUpdateDetails(updateId));
@@ -252,21 +252,21 @@ public class DBJobUpdateStoreTest {
     IJobUpdateDetails details2 =
         makeJobDetails(makeJobUpdate(JobKeys.from("role", "env", "name2"), updateId2));
 
-    saveUpdate(details1.getUpdate(), "lock1");
-    saveUpdate(details2.getUpdate(), "lock2");
+    saveUpdate(details1.getUpdate(), Optional.of("lock1"));
+    saveUpdate(details2.getUpdate(), Optional.of("lock2"));
 
     details1 = updateJobDetails(populateExpected(details1.getUpdate()), FIRST_EVENT);
     details2 = updateJobDetails(populateExpected(details2.getUpdate()), FIRST_EVENT);
     assertEquals(Optional.of(details1), getUpdateDetails(updateId1));
     assertEquals(Optional.of(details2), getUpdateDetails(updateId2));
 
-    IJobUpdateEvent jEvent11 = makeJobUpdateEvent(JobUpdateStatus.ROLLING_FORWARD, 456L);
-    IJobUpdateEvent jEvent12 = makeJobUpdateEvent(JobUpdateStatus.ERROR, 457L);
+    IJobUpdateEvent jEvent11 = makeJobUpdateEvent(ROLLING_FORWARD, 456L);
+    IJobUpdateEvent jEvent12 = makeJobUpdateEvent(ERROR, 457L);
     IJobInstanceUpdateEvent iEvent11 = makeJobInstanceEvent(1, 451L, INSTANCE_UPDATED);
     IJobInstanceUpdateEvent iEvent12 = makeJobInstanceEvent(2, 452L, INSTANCE_UPDATING);
 
-    IJobUpdateEvent jEvent21 = makeJobUpdateEvent(JobUpdateStatus.ROLL_FORWARD_PAUSED, 567L);
-    IJobUpdateEvent jEvent22 = makeJobUpdateEvent(JobUpdateStatus.ABORTED, 568L);
+    IJobUpdateEvent jEvent21 = makeJobUpdateEvent(ROLL_FORWARD_PAUSED, 567L);
+    IJobUpdateEvent jEvent22 = makeJobUpdateEvent(ABORTED, 568L);
     IJobInstanceUpdateEvent iEvent21 = makeJobInstanceEvent(3, 561L, INSTANCE_UPDATED);
     IJobInstanceUpdateEvent iEvent22 = makeJobInstanceEvent(4, 562L, INSTANCE_UPDATING);
 
@@ -281,11 +281,11 @@ public class DBJobUpdateStoreTest {
     saveJobInstanceEvent(iEvent22, updateId2);
 
     details1 = updateJobDetails(
-        populateExpected(details1.getUpdate(), JobUpdateStatus.ERROR, CREATED_MS, 457L),
+        populateExpected(details1.getUpdate(), ERROR, CREATED_MS, 457L),
         ImmutableList.of(FIRST_EVENT, jEvent11, jEvent12), ImmutableList.of(iEvent11, iEvent12));
 
     details2 = updateJobDetails(
-        populateExpected(details2.getUpdate(), JobUpdateStatus.ABORTED, CREATED_MS, 568L),
+        populateExpected(details2.getUpdate(), ABORTED, CREATED_MS, 568L),
         ImmutableList.of(FIRST_EVENT, jEvent21, jEvent22), ImmutableList.of(iEvent21, iEvent22));
 
     assertEquals(Optional.of(details1), getUpdateDetails(updateId1));
@@ -302,16 +302,15 @@ public class DBJobUpdateStoreTest {
   public void testTruncateJobUpdates() {
     String updateId = "u5";
     IJobUpdate update = makeJobUpdate(JOB, updateId);
-    IJobUpdateEvent updateEvent = IJobUpdateEvent.build(
-        new JobUpdateEvent(JobUpdateStatus.ROLLING_FORWARD, 123L));
+    IJobUpdateEvent updateEvent = IJobUpdateEvent.build(new JobUpdateEvent(ROLLING_FORWARD, 123L));
     IJobInstanceUpdateEvent instanceEvent = IJobInstanceUpdateEvent.build(
         new JobInstanceUpdateEvent(0, 125L, INSTANCE_ROLLBACK_FAILED));
 
-    saveUpdate(update, "lock");
+    saveUpdate(update, Optional.of("lock"));
     saveJobEvent(updateEvent, updateId);
     saveJobInstanceEvent(instanceEvent, updateId);
     assertEquals(
-        populateExpected(update, JobUpdateStatus.ROLLING_FORWARD, CREATED_MS, 125L),
+        populateExpected(update, ROLLING_FORWARD, CREATED_MS, 125L),
         getUpdate(updateId).get());
     assertEquals(2, getUpdateDetails(updateId).get().getUpdateEvents().size());
     assertEquals(1, getUpdateDetails(updateId).get().getInstanceEvents().size());
@@ -326,7 +325,7 @@ public class DBJobUpdateStoreTest {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getJobUpdateStore().saveJobUpdate(update, "lock");
+        storeProvider.getJobUpdateStore().saveJobUpdate(update, Optional.of("lock"));
       }
     });
   }
@@ -334,22 +333,22 @@ public class DBJobUpdateStoreTest {
   @Test(expected = StorageException.class)
   public void testSaveTwoUpdatesForOneJob() {
     final IJobUpdate update = makeJobUpdate(JOB, "updateId");
-    saveUpdate(update, "lock1");
-    saveUpdate(update, "lock2");
+    saveUpdate(update, Optional.of("lock1"));
+    saveUpdate(update, Optional.of("lock2"));
   }
 
   @Test(expected = StorageException.class)
   public void testSaveTwoUpdatesSameJobKey() {
     final IJobUpdate update1 = makeJobUpdate(JOB, "update1");
     final IJobUpdate update2 = makeJobUpdate(JOB, "update2");
-    saveUpdate(update1, "lock1");
-    saveUpdate(update2, "lock1");
+    saveUpdate(update1, Optional.of("lock1"));
+    saveUpdate(update2, Optional.of("lock1"));
   }
 
   @Test
   public void testLockCleared() {
     final IJobUpdate update = makeJobUpdate(JOB, "update1");
-    saveUpdate(update, "lock1");
+    saveUpdate(update, Optional.of("lock1"));
 
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
@@ -374,7 +373,7 @@ public class DBJobUpdateStoreTest {
         getSummaries(new JobUpdateQuery().setUpdateId("update1")));
 
     // If the lock has been released for this job, we can start another update.
-    saveUpdate(makeJobUpdate(JOB, "update2"), "lock2");
+    saveUpdate(makeJobUpdate(JOB, "update2"), Optional.of("lock2"));
   }
 
   private static final Optional<String> NO_TOKEN = Optional.absent();
@@ -386,13 +385,13 @@ public class DBJobUpdateStoreTest {
       public void execute(MutableStoreProvider storeProvider) {
         final IJobUpdate update1 = makeJobUpdate(JobKeys.from("role", "env", "name1"), "update1");
         final IJobUpdate update2 = makeJobUpdate(JobKeys.from("role", "env", "name2"), "update2");
-        saveUpdate(update1, "lock1");
+        saveUpdate(update1, Optional.of("lock1"));
         assertEquals(
             Optional.of("lock1"),
             storeProvider.getJobUpdateStore().getLockToken("update1"));
         assertEquals(NO_TOKEN, storeProvider.getJobUpdateStore().getLockToken("update2"));
 
-        saveUpdate(update2, "lock2");
+        saveUpdate(update2, Optional.of("lock2"));
         assertEquals(
             Optional.of("lock1"),
             storeProvider.getJobUpdateStore().getLockToken("update1"));
@@ -424,13 +423,13 @@ public class DBJobUpdateStoreTest {
     IJobKey job4 = JobKeys.from(role1, "env", "name4");
     IJobKey job5 = JobKeys.from("role", "env", "name5");
     IJobUpdateSummary s1 =
-        saveSummary(job1, "u1", 1230L, JobUpdateStatus.ROLLED_BACK, "user", "lock1");
-    IJobUpdateSummary s2 = saveSummary(job2, "u2", 1231L, JobUpdateStatus.ABORTED, "user", "lock2");
-    IJobUpdateSummary s3 = saveSummary(job3, "u3", 1239L, JobUpdateStatus.ERROR, "user2", "lock3");
+        saveSummary(job1, "u1", 1230L, ROLLED_BACK, "user", Optional.of("lock1"));
+    IJobUpdateSummary s2 =  saveSummary(job2, "u2", 1231L, ABORTED, "user", Optional.of("lock2"));
+    IJobUpdateSummary s3 = saveSummary(job3, "u3", 1239L, ERROR, "user2", Optional.of("lock3"));
     IJobUpdateSummary s4 =
-        saveSummary(job4, "u4", 1234L, JobUpdateStatus.ROLL_BACK_PAUSED, "user3", "lock4");
+        saveSummary(job4, "u4", 1234L, ROLL_BACK_PAUSED, "user3", Optional.of("lock4"));
     IJobUpdateSummary s5 =
-        saveSummary(job5, "u5", 1235L, JobUpdateStatus.ROLLING_FORWARD, "user4", "lock5");
+        saveSummary(job5, "u5", 1235L, ROLLING_FORWARD, "user4", Optional.of("lock5"));
 
     // Test empty query returns all.
     assertEquals(ImmutableList.of(s1, s2, s4, s5, s3), getSummaries(new JobUpdateQuery()));
@@ -453,14 +452,11 @@ public class DBJobUpdateStoreTest {
 
     // Test query by one status.
     assertEquals(ImmutableList.of(s3), getSummaries(new JobUpdateQuery().setUpdateStatuses(
-        ImmutableSet.of(JobUpdateStatus.ERROR))));
+        ImmutableSet.of(ERROR))));
 
     // Test query by multiple statuses.
     assertEquals(ImmutableList.of(s1, s2, s3), getSummaries(new JobUpdateQuery().setUpdateStatuses(
-        ImmutableSet.of(
-            JobUpdateStatus.ERROR,
-            JobUpdateStatus.ABORTED,
-            JobUpdateStatus.ROLLED_BACK))));
+        ImmutableSet.of(ERROR, ABORTED, ROLLED_BACK))));
 
     // Test query by empty statuses.
     assertEquals(
@@ -492,7 +488,7 @@ public class DBJobUpdateStoreTest {
 
     assertEquals(Optional.<IJobUpdateInstructions>absent(), getUpdateInstructions(updateId));
 
-    saveUpdate(update, "lock1");
+    saveUpdate(update, Optional.of("lock1"));
     assertEquals(Optional.of(makeJobUpdateInstructions()), getUpdateInstructions(updateId));
   }
 
@@ -556,11 +552,14 @@ public class DBJobUpdateStoreTest {
         .setUser("fake user"));
   }
 
-  private void saveUpdate(final IJobUpdate update, final String lockToken) {
+  private void saveUpdate(final IJobUpdate update, final Optional<String> lockToken) {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getLockStore().saveLock(makeLock(update.getSummary().getJobKey(), lockToken));
+        if (lockToken.isPresent()) {
+          storeProvider.getLockStore().saveLock(
+              makeLock(update.getSummary().getJobKey(), lockToken.get()));
+        }
         storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
         storeProvider.getJobUpdateStore().saveJobUpdateEvent(
             FIRST_EVENT,
@@ -597,7 +596,7 @@ public class DBJobUpdateStoreTest {
   }
 
   private IJobUpdate populateExpected(IJobUpdate update) {
-    return populateExpected(update, JobUpdateStatus.ROLLING_FORWARD, CREATED_MS, CREATED_MS);
+    return populateExpected(update, ROLLING_FORWARD, CREATED_MS, CREATED_MS);
   }
 
   private IJobUpdate populateExpected(
@@ -666,7 +665,7 @@ public class DBJobUpdateStoreTest {
       Long modifiedTimestampMs,
       JobUpdateStatus status,
       String user,
-      String lockToken) {
+      Optional<String> lockToken) {
 
     IJobUpdateSummary summary = IJobUpdateSummary.build(new JobUpdateSummary()
         .setUpdateId(updateId)

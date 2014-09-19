@@ -659,7 +659,7 @@ public class JobUpdaterIT extends EasyMockTest {
       throw Throwables.propagate(e);
     }
 
-    store.saveJobUpdate(update, lock.getToken());
+    store.saveJobUpdate(update, Optional.of(lock.getToken()));
     store.saveJobUpdateEvent(
         IJobUpdateEvent.build(
             new JobUpdateEvent()

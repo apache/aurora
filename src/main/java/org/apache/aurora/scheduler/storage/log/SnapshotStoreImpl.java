@@ -20,6 +20,7 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.util.BuildInfo;
@@ -220,17 +221,22 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
               JobUpdateDetails details = storedDetails.getDetails();
               updateStore.saveJobUpdate(
                   IJobUpdate.build(details.getUpdate()),
-                  storedDetails.getLockToken());
+                  Optional.fromNullable(storedDetails.getLockToken()));
 
-              for (JobUpdateEvent updateEvent : details.getUpdateEvents()) {
-                updateStore.saveJobUpdateEvent(
-                    IJobUpdateEvent.build(updateEvent),
-                    details.getUpdate().getSummary().getUpdateId());
+              if (details.getUpdateEventsSize() > 0) {
+                for (JobUpdateEvent updateEvent : details.getUpdateEvents()) {
+                  updateStore.saveJobUpdateEvent(
+                      IJobUpdateEvent.build(updateEvent),
+                      details.getUpdate().getSummary().getUpdateId());
+                }
               }
-              for (JobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
-                updateStore.saveJobInstanceUpdateEvent(
-                    IJobInstanceUpdateEvent.build(instanceEvent),
-                    details.getUpdate().getSummary().getUpdateId());
+
+              if (details.getInstanceEventsSize() > 0) {
+                for (JobInstanceUpdateEvent instanceEvent : details.getInstanceEvents()) {
+                  updateStore.saveJobInstanceUpdateEvent(
+                      IJobInstanceUpdateEvent.build(instanceEvent),
+                      details.getUpdate().getSummary().getUpdateId());
+                }
               }
             }
           }
