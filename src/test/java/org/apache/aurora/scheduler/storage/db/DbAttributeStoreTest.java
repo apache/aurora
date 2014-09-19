@@ -71,6 +71,7 @@ public class DbAttributeStoreTest {
     assertEquals(ImmutableSet.of(HOST_A_ATTRS), readAll());
 
     insert(HOST_B_ATTRS);
+    insert(HOST_B_ATTRS);  // Double insert should be allowed.
     assertEquals(Optional.of(HOST_B_ATTRS), read(HOST_B));
     assertEquals(ImmutableSet.of(HOST_A_ATTRS, HOST_B_ATTRS), readAll());
 

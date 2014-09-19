@@ -3,6 +3,7 @@
     PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="org.apache.aurora.scheduler.storage.db.AttributeMapper">
+  <cache size="50000" readOnly="true" />
   <insert id="insert">
     INSERT INTO host_attributes (
       host,

@@ -29,6 +29,8 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 
+import static com.twitter.common.inject.TimedInterceptor.Timed;
+
 /**
  * Attribute store backed by a relational database.
  */
@@ -46,6 +48,7 @@ class DbAttributeStore implements AttributeStore.Mutable {
     mapper.truncate();
   }
 
+  @Timed("attribute_store_save")
   @Override
   public void saveHostAttributes(IHostAttributes hostAttributes) {
     HostAttributes mutableAttributes = hostAttributes.newBuilder();
@@ -61,11 +64,21 @@ class DbAttributeStore implements AttributeStore.Mutable {
 
     // If this is an 'upsert', don't overwrite the previously-set maintenance mode.
     Optional<IHostAttributes> existing = getHostAttributes(hostAttributes.getHost());
+    IHostAttributes toSave;
     if (existing.isPresent()) {
       mutableAttributes.setMode(existing.get().getMode());
+
+      toSave = IHostAttributes.build(mutableAttributes);
+
+      // Avoid inserting again if this is a no-op update.
+      if (existing.get().equals(toSave)) {
+        return;
+      }
+    } else {
+      toSave = IHostAttributes.build(mutableAttributes);
     }
 
-    merge(IHostAttributes.build(mutableAttributes));
+    merge(toSave);
   }
 
   private static final Predicate<IAttribute> EMPTY_VALUES = new Predicate<IAttribute>() {
@@ -88,6 +101,7 @@ class DbAttributeStore implements AttributeStore.Mutable {
     }
   }
 
+  @Timed("attribute_store_set_mode")
   @Override
   public boolean setMaintenanceMode(String host, MaintenanceMode mode) {
     Optional<IHostAttributes> existing = getHostAttributes(host);
@@ -99,11 +113,13 @@ class DbAttributeStore implements AttributeStore.Mutable {
     }
   }
 
+  @Timed("attribute_store_fetch_one")
   @Override
   public Optional<IHostAttributes> getHostAttributes(String host) {
     return Optional.fromNullable(mapper.select(host)).transform(IHostAttributes.FROM_BUILDER);
   }
 
+  @Timed("attribute_store_fetch_all")
   @Override
   public Set<IHostAttributes> getHostAttributes() {
     return IHostAttributes.setFromBuilders(mapper.selectAll());
