@@ -75,9 +75,9 @@ def test_combine_tasks():
   r111 = Units.resources_sum(r100, r010, r001)
 
   t1 = Task(name="p1p2", processes=[p1, p2], constraints=order(p1, p2),
-            resources=Units.resources_sum(r100, r010))
+            resources=Units.resources_sum(r100, r010), finalization_wait=60)
   t2 = Task(name="p3p4", processes=[p3, p4], constraints=order(p3, p4),
-            resources=r001)
+            resources=r001, finalization_wait=45)
 
   assert combine_tasks() == Task()
   assert combine_tasks(t1) == t1
@@ -88,6 +88,7 @@ def test_combine_tasks():
   assert t3.resources() == r111
   assert set(t3.processes()) == set([p1, p2, p3, p4])
   assert set(t3.constraints()) == set(order(p1, p2) + order(p3, p4))
+  assert t3.finalization_wait().get() == t1.finalization_wait().get()
 
   t4 = concat_tasks(t1, t2)
   assert t4.name() == t2.name()
@@ -96,6 +97,7 @@ def test_combine_tasks():
   assert set(t4.constraints()) == set(
       order(p1, p2) + order(p3, p4) + order(p1, p3) + order(p1, p4) +
       order(p2, p3) + order(p2, p4))
+  assert t4.finalization_wait().get() == t1.finalization_wait().get() + t2.finalization_wait().get()
 
 
 def test_simple_task():

@@ -53,6 +53,10 @@ class Units(object):
   """Helpers for base units of Tasks and Processes."""
 
   @classmethod
+  def safe_get(cls, unit):
+    return 0 if unit is Empty else unit.get()
+
+  @classmethod
   def optional_resources(cls, resources):
     return Resources() if resources is Empty else resources
 
@@ -60,7 +64,7 @@ class Units(object):
   def resources_sum(cls, *resources):
     """Add two Resources objects together."""
     def add_unit(f1, f2):
-      return (0 if f1 is Empty else f1.get()) + (0 if f2 is Empty else f2.get())
+      return cls.safe_get(f1) + cls.safe_get(f2)
 
     def add(r1, r2):
       return Resources(cpu=add_unit(r1.cpu(), r2.cpu()),
@@ -70,11 +74,16 @@ class Units(object):
     return reduce(add, map(cls.optional_resources, resources), Resources(cpu=0, ram=0, disk=0))
 
   @classmethod
+  def finalization_wait_sum(cls, waits):
+    """Return a finalization_wait that is the sum of the inputs"""
+    return sum(map(cls.safe_get, waits))
+
+  @classmethod
   def resources_max(cls, resources):
     """Return a Resource object that is the maximum of the inputs along each
       resource dimension."""
     def max_unit(f1, f2):
-      return max(0 if f1 is Empty else f1.get(), 0 if f2 is Empty else f2.get())
+      return max(cls.safe_get(f1), cls.safe_get(f2))
 
     def resource_max(r1, r2):
       return Resources(cpu=max_unit(r1.cpu(), r2.cpu()),
@@ -83,6 +92,11 @@ class Units(object):
 
     return reduce(resource_max,
         map(cls.optional_resources, resources), Resources(cpu=0, ram=0, disk=0))
+
+  @classmethod
+  def finalization_wait_max(cls, waits):
+    """Return a finalization_wait that is the maximum of the inputs"""
+    return max([0] + map(cls.safe_get, waits))
 
   @classmethod
   def processes_merge(cls, tasks):
@@ -142,6 +156,7 @@ class Tasks(object):
     return base(
       resources=Units.resources_sum(*(task.resources() for task in tasks)),
       constraints=Units.constraints_merge(tasks),
+      finalization_wait=Units.finalization_wait_max(task.finalization_wait() for task in tasks),
       **kw
     )
 
@@ -152,7 +167,6 @@ class Tasks(object):
     if len(tasks) == 0:
       return Task()
     base = cls._combine_processes(*tasks)
-    base = base(resources=Units.resources_max(task.resources() for task in tasks))
     base_constraints = Units.constraints_merge(tasks)
     # TODO(wickman) be smarter about this in light of existing constraints
     for (t1, t2) in zip(tasks[0:-1], tasks[1:]):
@@ -160,7 +174,11 @@ class Tasks(object):
         for p2 in t2.processes():
           if p1 != p2:
             base_constraints.extend(Processes.order(p1, p2))
-    return base(constraints=base_constraints, **kw)
+    return base(
+        resources=Units.resources_max(task.resources() for task in tasks),
+        constraints=base_constraints,
+        finalization_wait=Units.finalization_wait_sum(task.finalization_wait() for task in tasks),
+        **kw)
 
   @classmethod
   def simple(cls, name, command):
