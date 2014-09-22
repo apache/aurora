@@ -38,6 +38,8 @@ import org.apache.aurora.scheduler.storage.entities.IRange;
 
 import static java.util.Objects.requireNonNull;
 
+import static com.twitter.common.inject.TimedInterceptor.Timed;
+
 /**
  * A relational database-backed job update store.
  */
@@ -61,6 +63,7 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
     this.instanceEventMapper = requireNonNull(instanceEventMapper);
   }
 
+  @Timed("job_update_store_save_update")
   @Override
   public void saveJobUpdate(IJobUpdate update, Optional<String> lockToken) {
     requireNonNull(update);
@@ -102,26 +105,31 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
     }
   }
 
+  @Timed("job_update_store_save_event")
   @Override
   public void saveJobUpdateEvent(IJobUpdateEvent event, String updateId) {
     jobEventMapper.insert(updateId, event.newBuilder());
   }
 
+  @Timed("job_update_store_save_instance_event")
   @Override
   public void saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent event, String updateId) {
     instanceEventMapper.insert(event.newBuilder(), updateId);
   }
 
+  @Timed("job_update_store_delete_all")
   @Override
   public void deleteAllUpdatesAndEvents() {
     detailsMapper.truncate();
   }
 
+  @Timed("job_update_store_fetch_summaries")
   @Override
   public List<IJobUpdateSummary> fetchJobUpdateSummaries(IJobUpdateQuery query) {
     return IJobUpdateSummary.listFromBuilders(detailsMapper.selectSummaries(query.newBuilder()));
   }
 
+  @Timed("job_update_store_fetch_details")
   @Override
   public Optional<IJobUpdateDetails> fetchJobUpdateDetails(final String updateId) {
     return Optional.fromNullable(detailsMapper.selectDetails(updateId))
@@ -133,6 +141,7 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
         });
   }
 
+  @Timed("job_update_store_fetch_update")
   @Override
   public Optional<IJobUpdate> fetchJobUpdate(String updateId) {
     return Optional.fromNullable(detailsMapper.selectUpdate(updateId))
@@ -144,6 +153,7 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
         });
   }
 
+  @Timed("job_update_store_fetch_instructions")
   @Override
   public Optional<IJobUpdateInstructions> fetchJobUpdateInstructions(String updateId) {
     return Optional.fromNullable(detailsMapper.selectInstructions(updateId))
@@ -155,11 +165,13 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
         });
   }
 
+  @Timed("job_update_store_fetch_all_details")
   @Override
   public Set<StoredJobUpdateDetails> fetchAllJobUpdateDetails() {
     return ImmutableSet.copyOf(detailsMapper.selectAllDetails());
   }
 
+  @Timed("job_update_store_get_lock_token")
   @Override
   public Optional<String> getLockToken(String updateId) {
     // We assume here that cascading deletes will cause a lock-update associative row to disappear

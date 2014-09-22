@@ -20,6 +20,8 @@ import com.google.inject.Inject;
 
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 
+import static com.twitter.common.inject.TimedInterceptor.Timed;
+
 /**
  * A relational database-backed scheduler store.
  */
@@ -32,11 +34,13 @@ class DbSchedulerStore implements SchedulerStore.Mutable {
     this.mapper = Objects.requireNonNull(mapper);
   }
 
+  @Timed("scheduler_store_save_framework_id")
   @Override
   public void saveFrameworkId(String frameworkId) {
     mapper.insert(Objects.requireNonNull(frameworkId));
   }
 
+  @Timed("scheduler_store_fetch_framework_id")
   @Override
   public Optional<String> fetchFrameworkId() {
     return Optional.fromNullable(mapper.select());

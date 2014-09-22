@@ -27,6 +27,8 @@ import org.apache.aurora.scheduler.storage.entities.ILockKey;
 
 import static java.util.Objects.requireNonNull;
 
+import static com.twitter.common.inject.TimedInterceptor.Timed;
+
 /**
  * A relational database-backed lock store.
  */
@@ -41,20 +43,35 @@ class DbLockStore implements LockStore.Mutable {
     this.lockKeyMapper = requireNonNull(lockKeyMapper);
   }
 
+  @Timed("lock_store_save_lock")
   @Override
   public void saveLock(ILock lock) {
     lockKeyMapper.insert(lock.getKey().newBuilder());
     mapper.insert(lock.newBuilder());
   }
 
+  @Timed("lock_store_remove_lock")
   @Override
   public void removeLock(ILockKey lockKey) {
     mapper.delete(lockKey.newBuilder());
   }
 
+  @Timed("lock_store_delete_locks")
   @Override
   public void deleteLocks() {
     mapper.truncate();
+  }
+
+  @Timed("lock_store_fetch_locks")
+  @Override
+  public Set<ILock> fetchLocks() {
+    return FluentIterable.from(mapper.selectAll()).transform(TO_ROW).toSet();
+  }
+
+  @Timed("lock_store_fetch_lock")
+  @Override
+  public Optional<ILock> fetchLock(ILockKey lockKey) {
+    return Optional.fromNullable(mapper.select(lockKey.newBuilder())).transform(TO_ROW);
   }
 
   /**
@@ -66,14 +83,4 @@ class DbLockStore implements LockStore.Mutable {
       return ILock.build(input.getLock());
     }
   };
-
-  @Override
-  public Set<ILock> fetchLocks() {
-    return FluentIterable.from(mapper.selectAll()).transform(TO_ROW).toSet();
-  }
-
-  @Override
-  public Optional<ILock> fetchLock(ILockKey lockKey) {
-    return Optional.fromNullable(mapper.select(lockKey.newBuilder())).transform(TO_ROW);
-  }
 }

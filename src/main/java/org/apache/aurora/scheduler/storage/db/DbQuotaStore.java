@@ -25,6 +25,8 @@ import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static java.util.Objects.requireNonNull;
 
+import static com.twitter.common.inject.TimedInterceptor.Timed;
+
 /**
  * Quota store backed by a relational database.
  */
@@ -37,12 +39,14 @@ class DbQuotaStore implements QuotaStore.Mutable {
     this.mapper = requireNonNull(mapper);
   }
 
+  @Timed("quota_store_fetch_quota")
   @Override
   public Optional<IResourceAggregate> fetchQuota(String role) {
     return Optional.fromNullable(mapper.select(role))
         .transform(IResourceAggregate.FROM_BUILDER);
   }
 
+  @Timed("quota_store_fetch_quotas")
   @Override
   public Map<String, IResourceAggregate> fetchQuotas() {
     ImmutableMap.Builder<String, IResourceAggregate> results = ImmutableMap.builder();
@@ -52,16 +56,19 @@ class DbQuotaStore implements QuotaStore.Mutable {
     return results.build();
   }
 
+  @Timed("quota_store_delete_quotas")
   @Override
   public void deleteQuotas() {
     mapper.truncate();
   }
 
+  @Timed("quota_store_remove_quota")
   @Override
   public void removeQuota(String role) {
     mapper.delete(role);
   }
 
+  @Timed("quota_store_save_quota")
   @Override
   public void saveQuota(String role, IResourceAggregate quota) {
     mapper.merge(role, quota.newBuilder());
