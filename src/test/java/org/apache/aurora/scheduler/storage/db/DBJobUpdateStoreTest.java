@@ -432,14 +432,14 @@ public class DBJobUpdateStoreTest {
         saveSummary(job5, "u5", 1235L, ROLLING_FORWARD, "user4", Optional.of("lock5"));
 
     // Test empty query returns all.
-    assertEquals(ImmutableList.of(s1, s2, s4, s5, s3), getSummaries(new JobUpdateQuery()));
+    assertEquals(ImmutableList.of(s3, s5, s4, s2, s1), getSummaries(new JobUpdateQuery()));
 
     // Test query by updateId.
     assertEquals(ImmutableList.of(s1), getSummaries(new JobUpdateQuery().setUpdateId("u1")));
 
     // Test query by role.
     assertEquals(
-        ImmutableList.of(s1, s2, s4, s3),
+        ImmutableList.of(s3, s4, s2, s1),
         getSummaries(new JobUpdateQuery().setRole(role1)));
 
     // Test query by job key.
@@ -448,30 +448,30 @@ public class DBJobUpdateStoreTest {
         getSummaries(new JobUpdateQuery().setJobKey(job5.newBuilder())));
 
     // Test query by user.
-    assertEquals(ImmutableList.of(s1, s2), getSummaries(new JobUpdateQuery().setUser("user")));
+    assertEquals(ImmutableList.of(s2, s1), getSummaries(new JobUpdateQuery().setUser("user")));
 
     // Test query by one status.
     assertEquals(ImmutableList.of(s3), getSummaries(new JobUpdateQuery().setUpdateStatuses(
         ImmutableSet.of(ERROR))));
 
     // Test query by multiple statuses.
-    assertEquals(ImmutableList.of(s1, s2, s3), getSummaries(new JobUpdateQuery().setUpdateStatuses(
+    assertEquals(ImmutableList.of(s3, s2, s1), getSummaries(new JobUpdateQuery().setUpdateStatuses(
         ImmutableSet.of(ERROR, ABORTED, ROLLED_BACK))));
 
     // Test query by empty statuses.
     assertEquals(
-        ImmutableList.of(s1, s2, s4, s5, s3),
+        ImmutableList.of(s3, s5, s4, s2, s1),
         getSummaries(new JobUpdateQuery().setUpdateStatuses(ImmutableSet.<JobUpdateStatus>of())));
 
     // Test paging.
     assertEquals(
-        ImmutableList.of(s1, s2),
+        ImmutableList.of(s3, s5),
         getSummaries(new JobUpdateQuery().setLimit(2).setOffset(0)));
     assertEquals(
-        ImmutableList.of(s4, s5),
+        ImmutableList.of(s4, s2),
         getSummaries(new JobUpdateQuery().setLimit(2).setOffset(2)));
     assertEquals(
-        ImmutableList.of(s3),
+        ImmutableList.of(s1),
         getSummaries(new JobUpdateQuery().setLimit(2).setOffset(4)));
 
     // Test no match.

@@ -241,7 +241,8 @@
         JobUpdateStatus.ROLLED_FORWARD,
         JobUpdateStatus.ROLLED_BACK,
         JobUpdateStatus.ABORTED,
-        JobUpdateStatus.ERROR
+        JobUpdateStatus.ERROR,
+        JobUpdateStatus.FAILED
       ]);
 
       var INSTANCE_SUCCESSFUL = toSet([
@@ -385,7 +386,8 @@
           // max of those two numbers is the number of instances to be updated
           var totalInstancesToBeUpdated = Math.max(oldInstanceCount, newInstanceCount);
 
-          if (details.update.instructions.settings.updateOnlyTheseInstances) {
+          if (details.update.instructions.settings.updateOnlyTheseInstances &&
+            details.update.instructions.settings.updateOnlyTheseInstances.length > 0) {
             newInstanceCount = updateUtil.instanceCountFromRanges(
               details.update.instructions.settings.updateOnlyTheseInstances
             );

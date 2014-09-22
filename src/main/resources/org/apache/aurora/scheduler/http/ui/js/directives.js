@@ -95,25 +95,27 @@
       },
       replace: true,
       link: function (scope) {
-        scope.visibleGroups = scope.visibleGroups || [];
+        scope.$watch('visibleGroups', function () {
+          scope.visibleGroups = scope.visibleGroups || [];
 
-        scope.toggleVisibleGroup = function (index) {
-          var i = _.indexOf(scope.visibleGroups, index, true);
-          if (i > -1) {
-            scope.visibleGroups.splice(i, 1);
-          } else {
-            scope.visibleGroups.push(index);
-            scope.visibleGroups.sort();
-          }
-        };
+          scope.toggleVisibleGroup = function (index) {
+            var i = _.indexOf(scope.visibleGroups, index, true);
+            if (i > -1) {
+              scope.visibleGroups.splice(i, 1);
+            } else {
+              scope.visibleGroups.push(index);
+              scope.visibleGroups.sort();
+            }
+          };
 
-        scope.showAllGroups = function () {
-          scope.visibleGroups = _.range(scope.groups.length);
-        };
+          scope.showAllGroups = function () {
+            scope.visibleGroups = _.range(scope.groups.length);
+          };
 
-        scope.hideAllGroups = function () {
-          scope.visibleGroups = [];
-        };
+          scope.hideAllGroups = function () {
+            scope.visibleGroups = [];
+          };
+        });
       }
     };
   });
@@ -158,23 +160,30 @@
         'stats': '='
       },
       link: function (scope, element, attrs) {
-        var list = angular.element('<ul class="instance-grid ' + scope.size + '"></ul>');
+        scope.$watch('instances', function () {
+          var parent = angular.element('<div></div>');
+          if (!scope.instances || scope.instances.length === 0) {
+            return;
+          }
+          var list = angular.element('<ul class="instance-grid ' + scope.size + '"></ul>');
 
-        scope.instances.forEach(function (i, n) {
-          list.append('<li class="' + i.className + '" tooltip="INSTANCE ' + n +
-            ': ' + i.className.toUpperCase() + '"><span class="instance-id">' + n +
-            '</span></li>');
+          scope.instances.forEach(function (i, n) {
+            list.append('<li class="' + i.className + '" tooltip="INSTANCE ' + n +
+              ': ' + i.className.toUpperCase() + '"><span class="instance-id">' + n +
+              '</span></li>');
+          });
+
+          var title = angular.element('<div class="instance-summary-title"></div>');
+          title.append('<span class="instance-title">Instance Status</span>');
+          title.append('<span class="instance-progress">' + scope.stats.instancesUpdatedSoFar +
+            ' / ' + scope.stats.totalInstancesToBeUpdated + ' (' + scope.stats.progress +
+            '%)<div>');
+
+          parent.append(title);
+          parent.append(list);
+          element.html(parent.html());
+          $compile(list)(scope);
         });
-
-        var title = angular.element('<div class="instance-summary-title"></div>');
-        title.append('<span class="instance-title">Instance Status</span>');
-        title.append('<span class="instance-progress">' + scope.stats.instancesUpdatedSoFar +
-          ' / ' + scope.stats.totalInstancesToBeUpdated + ' (' + scope.stats.progress +
-          '%)<div>');
-
-        element.append(title);
-        element.append(list);
-        $compile(list)(scope);
       }
     };
   });

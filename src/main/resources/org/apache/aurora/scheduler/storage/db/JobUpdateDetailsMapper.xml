@@ -272,7 +272,7 @@
         </if>
       </if>
     </if>
-    ORDER BY max_ts.timestamp_ms
+    ORDER BY max_ts.timestamp_ms DESC
     <if test="limit != 0">LIMIT #{limit}</if>
     <if test="offset != 0">OFFSET #{offset}</if>
   </select>

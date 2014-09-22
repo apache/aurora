@@ -242,6 +242,8 @@
       $scope.environment = $routeParams.environment;
       $scope.job = $routeParams.job;
 
+      $scope.instanceSummary = [];
+
       var getUpdateProgress = function () {
         auroraClient.getJobUpdateDetails(updateId).then(function (response) {
           $scope.update = response.details;
@@ -421,7 +423,7 @@
 
             $scope.updateStats = updateUtil.getUpdateStats($scope.updateInProgress);
 
-            if (updateUtil.isInProgress($scope.updateInProgress.state.status)) {
+            if (updateUtil.isInProgress($scope.updateInProgress.update.summary.state.status)) {
               // Poll for updates as long as this update is in progress.
               $timeout(function () {
                 getUpdateInProgress();
