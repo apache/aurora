@@ -32,6 +32,7 @@ import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.SlidingStats;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
@@ -69,6 +70,11 @@ public class TaskGroups implements EventSubscriber {
   private final TaskScheduler taskScheduler;
   private final BackoffStrategy backoff;
   private final RescheduleCalculator rescheduleCalculator;
+
+  // Track the penalties of tasks at the time they were scheduled. This is to provide data that
+  // may influence the selection of a different backoff strategy.
+  private final SlidingStats scheduledTaskPenalties =
+      new SlidingStats("scheduled_task_penalty", "ms");
 
   public static class TaskGroupsSettings {
     private final BackoffStrategy taskGroupBackoff;
@@ -136,6 +142,7 @@ public class TaskGroups implements EventSubscriber {
         long penaltyMs = 0;
         if (taskId.isPresent()) {
           if (taskScheduler.schedule(taskId.get())) {
+            scheduledTaskPenalties.accumulate(group.getPenaltyMs());
             group.remove(taskId.get());
             if (group.hasMore()) {
               penaltyMs = backoff.calculateBackoffMs(0);

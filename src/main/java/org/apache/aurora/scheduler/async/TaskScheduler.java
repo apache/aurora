@@ -104,8 +104,9 @@ public interface TaskScheduler extends EventSubscriber {
     private final Preemptor preemptor;
     private final Reservations reservations;
 
-    private final AtomicLong scheduleAttemptsFired = Stats.exportLong("schedule_attempts_fired");
-    private final AtomicLong scheduleAttemptsFailed = Stats.exportLong("schedule_attempts_failed");
+    private final AtomicLong attemptsFired = Stats.exportLong("schedule_attempts_fired");
+    private final AtomicLong attemptsFailed = Stats.exportLong("schedule_attempts_failed");
+    private final AtomicLong attemptsNoMatch = Stats.exportLong("schedule_attempts_no_match");
 
     @Inject
     TaskSchedulerImpl(
@@ -176,7 +177,7 @@ public interface TaskScheduler extends EventSubscriber {
     @Timed("task_schedule_attempt")
     @Override
     public boolean schedule(final String taskId) {
-      scheduleAttemptsFired.incrementAndGet();
+      attemptsFired.incrementAndGet();
       try {
         return storage.write(new MutateWork.Quiet<Boolean>() {
           @Override
@@ -194,11 +195,12 @@ public interface TaskScheduler extends EventSubscriber {
                 if (!offerQueue.launchFirst(getAssignerFunction(aggregate, taskId, task))) {
                   // Task could not be scheduled.
                   maybePreemptFor(taskId, aggregate);
+                  attemptsNoMatch.incrementAndGet();
                   return false;
                 }
               } catch (OfferQueue.LaunchException e) {
                 LOG.log(Level.WARNING, "Failed to launch task.", e);
-                scheduleAttemptsFailed.incrementAndGet();
+                attemptsFailed.incrementAndGet();
 
                 // The attempt to schedule the task failed, so we need to backpedal on the
                 // assignment.
@@ -216,7 +218,7 @@ public interface TaskScheduler extends EventSubscriber {
         // We catch the generic unchecked exception here to ensure tasks are not abandoned
         // if there is a transient issue resulting in an unchecked exception.
         LOG.log(Level.WARNING, "Task scheduling unexpectedly failed, will be retried", e);
-        scheduleAttemptsFailed.incrementAndGet();
+        attemptsFailed.incrementAndGet();
         return false;
       }
     }
