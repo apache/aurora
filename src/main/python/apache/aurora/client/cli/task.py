@@ -70,7 +70,7 @@ class RunCommand(Verb):
         SSH_USER_OPTION,
         EXECUTOR_SANDBOX_OPTION,
         INSTANCES_SPEC_ARGUMENT,
-        CommandOption('cmd', type=str)
+        CommandOption('cmd', type=str, metavar="unix_command_line")
     ]
 
   def execute(self, context):
@@ -102,6 +102,7 @@ class SshCommand(Verb):
             default=[],
             help="Add tunnel from local port PART to remote named port NAME"),
         CommandOption('--command', '-c', dest='command', type=str, default=None,
+            metavar="unix_command_line",
             help="Command to execute through the ssh connection."),
         TASK_INSTANCE_ARGUMENT
     ]

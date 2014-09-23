@@ -68,6 +68,7 @@ from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleS
 def arg_type_jobkey(key):
   return AuroraCommandContext.parse_partial_jobkey(key)
 WILDCARD_JOBKEY_OPTION = CommandOption('jobspec', type=arg_type_jobkey,
+        metavar="cluster[/role[/env[/name]]]",
         help="A jobkey, optionally containing wildcards")
 
 class CancelUpdateCommand(Verb):
@@ -82,6 +83,7 @@ class CancelUpdateCommand(Verb):
   def get_options(self):
     return [JSON_READ_OPTION,
         CommandOption("--config", type=str, default=None, dest="config_file",
+            metavar="pathname",
             help="Config file for the job, possibly containing hooks"),
         JOBSPEC_ARGUMENT]
 
@@ -155,6 +157,7 @@ class DiffCommand(Verb):
   def get_options(self):
     return [BIND_OPTION, JSON_READ_OPTION,
         CommandOption("--from", dest="rename_from", type=AuroraJobKey.from_path, default=None,
+            metavar="cluster/role/env/name",
             help="If specified, the job key to diff against."),
         JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
 
@@ -289,6 +292,7 @@ class AbstractKillCommand(Verb):
   def get_options(self):
     return [BROWSER_OPTION,
         CommandOption("--config", type=str, default=None, dest="config",
+            metavar="pathname",
             help="Config file for the job, possibly containing hooks"),
         BATCH_OPTION,
         MAX_TOTAL_FAILURES_OPTION,

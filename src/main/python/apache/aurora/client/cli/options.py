@@ -198,10 +198,10 @@ BROWSER_OPTION = CommandOption('--open-browser', default=False, dest='open_brows
     help='open browser to view job page after job is created')
 
 
-CONFIG_ARGUMENT = CommandOption('config_file', type=str,
+CONFIG_ARGUMENT = CommandOption('config_file', type=str, metavar="pathname",
     help='pathname of the aurora configuration file contain the job specification')
 
-CONFIG_OPTION = CommandOption('--config', type=str, default=None,
+CONFIG_OPTION = CommandOption('--config', type=str, default=None, metavar="pathname",
     help='pathname of the aurora configuration file contain the job specification')
 
 EXECUTOR_SANDBOX_OPTION = CommandOption('--executor-sandbox', action='store_true',
@@ -255,7 +255,7 @@ ROLE_ARGUMENT = CommandOption('role', type=parse_qualified_role, metavar='CLUSTE
     help='Rolename to retrieve information about')
 
 
-SSH_USER_OPTION = CommandOption('--ssh-user', '-l', default=None,
+SSH_USER_OPTION = CommandOption('--ssh-user', '-l', default=None, metavar="ssh_username",
     help='ssh as this username instead of the job\'s role')
 
 
