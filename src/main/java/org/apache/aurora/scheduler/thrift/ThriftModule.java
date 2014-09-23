@@ -13,9 +13,13 @@
  */
 package org.apache.aurora.scheduler.thrift;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.AbstractModule;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
 
 import org.apache.aurora.gen.AuroraAdmin;
+import org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.EnableUpdater;
 import org.apache.aurora.scheduler.thrift.aop.AopModule;
 
 /**
@@ -23,9 +27,15 @@ import org.apache.aurora.scheduler.thrift.aop.AopModule;
  */
 public class ThriftModule extends AbstractModule {
 
+  @VisibleForTesting
+  @CmdLine(name = "enable_beta_updater",
+      help = "Enable the async updater. Use at your own risk, this feature is not yet complete.")
+  static final Arg<Boolean> ENABLE_BETA_UPDATER = Arg.create(false);
+
   @Override
   protected void configure() {
     bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
+    bind(Boolean.class).annotatedWith(EnableUpdater.class).toInstance(ENABLE_BETA_UPDATER.get());
 
     install(new AopModule());
   }

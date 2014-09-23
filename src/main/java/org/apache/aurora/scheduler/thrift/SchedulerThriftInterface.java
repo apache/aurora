@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.thrift;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +25,7 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -156,6 +159,10 @@ import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TException;
 
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
@@ -206,6 +213,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final TaskLimitValidator taskLimitValidator;
   private final UUIDGenerator uuidGenerator;
   private final JobUpdateController jobUpdateController;
+  private final boolean isUpdaterEnabled;
+
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  @interface EnableUpdater { }
 
   @Inject
   SchedulerThriftInterface(
@@ -222,40 +234,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       StateManager stateManager,
       TaskLimitValidator taskLimitValidator,
       UUIDGenerator uuidGenerator,
-      JobUpdateController jobUpdateController) {
-
-    this(storage,
-        lockManager,
-        sessionValidator,
-        backup,
-        recovery,
-        maintenance,
-        cronJobManager,
-        cronPredictor,
-        quotaManager,
-        nearestFit,
-        stateManager,
-        taskLimitValidator,
-        uuidGenerator,
-        jobUpdateController);
-  }
-
-  @VisibleForTesting
-  SchedulerThriftInterface(
-      NonVolatileStorage storage,
-      LockManager lockManager,
-      CapabilityValidator sessionValidator,
-      StorageBackup backup,
-      Recovery recovery,
-      MaintenanceController maintenance,
-      CronJobManager cronJobManager,
-      CronPredictor cronPredictor,
-      QuotaManager quotaManager,
-      NearestFit nearestFit,
-      StateManager stateManager,
-      TaskLimitValidator taskLimitValidator,
-      UUIDGenerator uuidGenerator,
-      JobUpdateController jobUpdateController) {
+      JobUpdateController jobUpdateController,
+      @EnableUpdater boolean isUpdaterEnabled) {
 
     this.storage = requireNonNull(storage);
     this.lockManager = requireNonNull(lockManager);
@@ -271,6 +251,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.taskLimitValidator = requireNonNull(taskLimitValidator);
     this.uuidGenerator = requireNonNull(uuidGenerator);
     this.jobUpdateController = requireNonNull(jobUpdateController);
+    this.isUpdaterEnabled = isUpdaterEnabled;
   }
 
   @Override
@@ -1364,6 +1345,13 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response startJobUpdate(JobUpdateRequest mutableRequest, SessionKey session) {
+    if (!isUpdaterEnabled) {
+      return addMessage(
+          emptyResponse(),
+          INVALID_REQUEST,
+          "Server-side updates are disabled on this cluster.");
+    }
+
     // TODO(maxim): validate JobUpdateRequest fields.
     requireNonNull(mutableRequest);
     requireNonNull(session);

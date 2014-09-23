@@ -37,6 +37,7 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
+
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.auth.CapabilityValidator;
@@ -132,6 +133,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.IServerInfo;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.EnableUpdater;
 import org.apache.aurora.scheduler.thrift.aop.AopModule;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
@@ -254,14 +256,17 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(TaskLimitValidator.class).toInstance(taskValidator);
         bind(UUIDGenerator.class).toInstance(uuidGenerator);
         bind(JobUpdateController.class).toInstance(jobUpdateController);
+        bind(Boolean.class).annotatedWith(EnableUpdater.class).toInstance(true);
       }
     };
     Injector injector = Guice.createInjector(testModule, new AopModule());
-    final AuroraAdmin.Iface realThrift = injector.getInstance(AuroraAdmin.Iface.class);
+    thrift = getResponseProxy(injector.getInstance(AuroraAdmin.Iface.class));
+  }
 
+  private static AuroraAdmin.Iface getResponseProxy(final AuroraAdmin.Iface realThrift) {
     // Capture all API method calls to validate response objects.
     Class<AuroraAdmin.Iface> thriftClass = AuroraAdmin.Iface.class;
-    thrift = (AuroraAdmin.Iface) Proxy.newProxyInstance(
+    return (AuroraAdmin.Iface) Proxy.newProxyInstance(
         thriftClass.getClassLoader(),
         new Class<?>[] {thriftClass},
         new InvocationHandler() {
@@ -2092,6 +2097,40 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertResponse(INVALID_REQUEST, thrift.startJobUpdate(buildJobUpdateRequest(update), SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsInProd() throws Exception {
+    Module testModule = new AbstractModule() {
+      @Override
+      protected void configure() {
+        bind(NonVolatileStorage.class).toInstance(storageUtil.storage);
+        bind(LockManager.class).toInstance(createMock(LockManager.class));
+        bind(CapabilityValidator.class).toInstance(createMock(CapabilityValidator.class));
+        bind(StorageBackup.class).toInstance(createMock(StorageBackup.class));
+        bind(Recovery.class).toInstance(createMock(Recovery.class));
+        bind(MaintenanceController.class).toInstance(createMock(MaintenanceController.class));
+        bind(CronJobManager.class).toInstance(createMock(CronJobManager.class));
+        bind(QuotaManager.class).toInstance(createMock(QuotaManager.class));
+        bind(AuroraAdmin.Iface.class).to(SchedulerThriftInterface.class);
+        bind(IServerInfo.class).toInstance(IServerInfo.build(SERVER_INFO));
+        bind(CronPredictor.class).toInstance(createMock(CronPredictor.class));
+        bind(NearestFit.class).toInstance(createMock(NearestFit.class));
+        bind(StateManager.class).toInstance(createMock(StateManager.class));
+        bind(TaskLimitValidator.class).toInstance(createMock(TaskLimitValidator.class));
+        bind(UUIDGenerator.class).toInstance(createMock(UUIDGenerator.class));
+        bind(JobUpdateController.class).toInstance(createMock(JobUpdateController.class));
+        bind(Boolean.class)
+            .annotatedWith(EnableUpdater.class)
+            .toInstance(ThriftModule.ENABLE_BETA_UPDATER.get());
+      }
+    };
+    Injector injector = Guice.createInjector(testModule, new AopModule());
+    AuroraAdmin.Iface thriftInstance =
+        getResponseProxy(injector.getInstance(AuroraAdmin.Iface.class));
+
+    control.replay();
+    assertResponse(INVALID_REQUEST, thriftInstance.startJobUpdate(null, null));
   }
 
   @Test
