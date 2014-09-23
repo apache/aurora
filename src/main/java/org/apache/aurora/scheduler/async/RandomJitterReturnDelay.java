@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler.async;
 import java.util.Objects;
 
 import com.google.common.annotations.VisibleForTesting;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Random;

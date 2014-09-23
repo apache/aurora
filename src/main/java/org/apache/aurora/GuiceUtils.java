@@ -20,6 +20,8 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.inject.Qualifier;
+
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -31,7 +33,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.Binder;
-import com.google.inject.BindingAnnotation;
 import com.google.inject.matcher.AbstractMatcher;
 import com.google.inject.matcher.Matcher;
 import com.google.inject.matcher.Matchers;
@@ -52,7 +53,7 @@ public final class GuiceUtils {
 
   // Method annotation that allows a trapped interface to whitelist methods that may throw
   // unchecked exceptions.
-  @BindingAnnotation
+  @Qualifier
   @Target(METHOD) @Retention(RUNTIME)
   public @interface AllowUnchecked { }
 

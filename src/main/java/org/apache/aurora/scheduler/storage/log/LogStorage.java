@@ -25,10 +25,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.inject.BindingAnnotation;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -201,7 +201,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
    */
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @BindingAnnotation
+  @Qualifier
   public @interface ShutdownGracePeriod { }
 
   /**
@@ -209,7 +209,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
    */
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @BindingAnnotation
+  @Qualifier
   public @interface SnapshotInterval { }
 
   /**
@@ -218,7 +218,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
    */
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @BindingAnnotation
+  @Qualifier
   public @interface WriteBehind { }
 
   @Inject

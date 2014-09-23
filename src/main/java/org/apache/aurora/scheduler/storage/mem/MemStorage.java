@@ -20,9 +20,9 @@ import java.lang.annotation.Target;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.inject.BindingAnnotation;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
@@ -76,7 +76,7 @@ public class MemStorage implements Storage {
    */
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @BindingAnnotation
+  @Qualifier
   public @interface Delegated { }
 
   @Inject

@@ -31,6 +31,7 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -38,7 +39,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.primitives.Bytes;
-import com.google.inject.BindingAnnotation;
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
@@ -78,7 +78,7 @@ public class LogManager {
    */
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @BindingAnnotation
+  @Qualifier
   public @interface MaxEntrySize { }
 
   /**
@@ -86,7 +86,7 @@ public class LogManager {
    */
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @BindingAnnotation
+  @Qualifier
   public @interface SnapshotSetting { }
 
   private static final Logger LOG = Logger.getLogger(LogManager.class.getName());

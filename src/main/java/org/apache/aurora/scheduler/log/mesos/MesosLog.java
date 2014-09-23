@@ -27,6 +27,7 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -34,7 +35,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.UnmodifiableIterator;
 import com.google.common.primitives.Longs;
-import com.google.inject.BindingAnnotation;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Function;
 import com.twitter.common.base.MorePreconditions;
@@ -63,7 +63,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
   /**
    * Binding annotation for the opaque value of a log noop entry.
    */
-  @BindingAnnotation
+  @Qualifier
   @Retention(RUNTIME)
   @Target({ PARAMETER, METHOD })
   public @interface NoopEntry { }
@@ -71,7 +71,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
   /**
    * Binding annotation for log read timeouts.
    */
-  @BindingAnnotation
+  @Qualifier
   @Retention(RUNTIME)
   @Target({ PARAMETER, METHOD })
   public @interface ReadTimeout { }
@@ -79,7 +79,7 @@ public class MesosLog implements org.apache.aurora.scheduler.log.Log {
   /**
    * Binding annotation for log write timeouts - used for truncates and appends.
    */
-  @BindingAnnotation
+  @Qualifier
   @Retention(RUNTIME)
   @Target({ PARAMETER, METHOD })
   public @interface WriteTimeout { }

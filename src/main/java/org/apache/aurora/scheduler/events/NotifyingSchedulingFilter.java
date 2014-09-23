@@ -18,8 +18,7 @@ import java.lang.annotation.Target;
 import java.util.Set;
 
 import javax.inject.Inject;
-
-import com.google.inject.BindingAnnotation;
+import javax.inject.Qualifier;
 
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
@@ -41,7 +40,7 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   /**
    * Binding annotation that the underlying {@link SchedulingFilter} must be bound with.
    */
-  @BindingAnnotation
+  @Qualifier
   @Target({FIELD, PARAMETER, METHOD}) @Retention(RUNTIME)
   public @interface NotifyDelegate { }
 

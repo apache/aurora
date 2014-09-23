@@ -19,7 +19,6 @@ import com.google.common.base.Preconditions;
 
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
-
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.LogEntry._Fields;
 

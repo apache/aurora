@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -36,7 +37,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
-import com.google.inject.BindingAnnotation;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -92,7 +92,7 @@ public interface Preemptor {
      * Binding annotation for the time interval after which a pending task becomes eligible to
      * preempt other tasks.
      */
-    @BindingAnnotation
+    @Qualifier
     @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
     @interface PreemptionDelay { }
 

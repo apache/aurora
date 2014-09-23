@@ -19,9 +19,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
-import com.google.inject.BindingAnnotation;
 import com.google.inject.Module;
 import com.google.inject.PrivateModule;
 import com.twitter.common.util.StateMachine;
@@ -46,7 +46,7 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
    */
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @BindingAnnotation
+  @Qualifier
   private @interface EnforceOrderOn { }
 
   private final NonVolatileStorage wrapped;

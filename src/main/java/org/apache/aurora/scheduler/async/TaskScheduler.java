@@ -21,6 +21,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
@@ -33,7 +34,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
-import com.google.inject.BindingAnnotation;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -91,7 +91,7 @@ public interface TaskScheduler extends EventSubscriber {
     /**
      * Binding annotation for the time duration of reservations.
      */
-    @BindingAnnotation
+    @Qualifier
     @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
     @interface ReservationDuration { }
 

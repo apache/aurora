@@ -18,8 +18,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import javax.inject.Qualifier;
+
 import com.google.common.collect.ImmutableSet;
-import com.google.inject.BindingAnnotation;
 
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.SchedulerException;
@@ -248,7 +249,7 @@ public interface Storage {
    */
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @BindingAnnotation
+  @Qualifier
   public @interface Volatile { }
 
   /**

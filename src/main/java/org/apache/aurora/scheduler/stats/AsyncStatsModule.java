@@ -20,12 +20,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.inject.AbstractModule;
-import com.google.inject.BindingAnnotation;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -67,7 +67,7 @@ public class AsyncStatsModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> SLOT_STAT_INTERVAL =
       Arg.create(Amount.of(1L, Time.MINUTES));
 
-  @BindingAnnotation
+  @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   private @interface StatExecutor { }
 

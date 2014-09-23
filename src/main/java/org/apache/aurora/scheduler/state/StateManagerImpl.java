@@ -39,7 +39,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
-
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.AssignedTask;

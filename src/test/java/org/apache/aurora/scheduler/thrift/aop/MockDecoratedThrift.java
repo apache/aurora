@@ -19,9 +19,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.inject.Binder;
-import com.google.inject.BindingAnnotation;
 
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
@@ -37,7 +37,7 @@ class MockDecoratedThrift extends ForwardingThrift {
 
   @Retention(RetentionPolicy.RUNTIME)
   @Target({ElementType.PARAMETER, ElementType.METHOD})
-  @BindingAnnotation
+  @Qualifier
   private @interface MockThrift { }
 
   @Inject

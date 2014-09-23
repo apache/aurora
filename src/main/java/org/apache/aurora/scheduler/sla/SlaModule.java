@@ -20,11 +20,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.eventbus.Subscribe;
 import com.google.inject.AbstractModule;
-import com.google.inject.BindingAnnotation;
 import com.google.inject.Singleton;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
@@ -59,7 +59,7 @@ public class SlaModule extends AbstractModule {
       Arg.create(Amount.of(1L, Time.MINUTES));
 
   @VisibleForTesting
-  @BindingAnnotation
+  @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   @interface SlaExecutor { }
 
