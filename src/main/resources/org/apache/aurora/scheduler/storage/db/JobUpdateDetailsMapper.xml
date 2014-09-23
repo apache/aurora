@@ -298,7 +298,7 @@
       u.max_wait_to_instance_running_ms AS jui_juse_max_wait_to_instance_running_ms,
       u.min_wait_in_instance_running_ms AS jui_juse_min_wait_in_instance_running_ms,
       u.rollback_on_failure AS jui_juse_rollback_on_failure,
-      cn.id AS jui_id,
+      u.id AS jui_id,
       cn.id AS jui_ditc_id,
       cn.task_config AS jui_ditc_task,
       di.id AS jui_ditc_r_id,
@@ -314,16 +314,16 @@
       io.last AS jui_juse_r_last
   </sql>
 
-  <sql id="job_update_to_configs_inner_joins">
+  <sql id="job_update_inner_joins">
     FROM job_updates AS u
     INNER JOIN job_keys AS j ON j.id = u.job_key_id
-    INNER JOIN job_update_configs AS cn ON cn.update_id = u.id AND cn.is_new = TRUE
-    INNER JOIN job_update_configs AS co ON co.update_id = u.id AND co.is_new = FALSE
-    INNER JOIN job_update_configs_to_instances AS ci ON ci.config_id = co.id
-    INNER JOIN job_updates_to_desired_instances AS di ON di.update_id = u.id
   </sql>
 
-  <sql id="job_update_to_instance_overrides_outer_join">
+  <sql id="job_update_outer_joins">
+    LEFT OUTER JOIN job_update_configs AS cn ON cn.update_id = u.id AND cn.is_new = TRUE
+    LEFT OUTER JOIN job_update_configs AS co ON co.update_id = u.id AND co.is_new = FALSE
+    LEFT OUTER JOIN job_update_configs_to_instances AS ci ON ci.config_id = co.id
+    LEFT OUTER JOIN job_updates_to_desired_instances AS di ON di.update_id = u.id
     LEFT OUTER JOIN job_updates_to_instance_overrides AS io ON io.update_id = u.id
   </sql>
 
@@ -338,9 +338,9 @@
       i.instance_id AS i_instance_id,
       i.timestamp_ms AS i_timestamp_ms,
       l.lock_token AS lock_token
-    <include refid="job_update_to_configs_inner_joins" />
+    <include refid="job_update_inner_joins" />
     <include refid="timestamps_inner_joins" />
-    <include refid="job_update_to_instance_overrides_outer_join" />
+    <include refid="job_update_outer_joins" />
     LEFT OUTER JOIN job_update_events AS e ON e.update_id = u.id
     LEFT OUTER JOIN job_instance_update_events AS i ON i.update_id = u.id
     LEFT OUTER JOIN job_update_locks AS l on l.update_id = u.id
@@ -358,7 +358,7 @@
       u.max_wait_to_instance_running_ms AS juse_max_wait_to_instance_running_ms,
       u.min_wait_in_instance_running_ms AS juse_min_wait_in_instance_running_ms,
       u.rollback_on_failure AS juse_rollback_on_failure,
-      cn.id AS id,
+      u.id AS id,
       cn.id AS ditc_id,
       cn.task_config AS ditc_task,
       di.id AS ditc_r_id,
@@ -372,17 +372,17 @@
       io.id AS juse_r_id,
       io.first AS juse_r_first,
       io.last AS juse_r_last
-    <include refid="job_update_to_configs_inner_joins" />
-    <include refid="job_update_to_instance_overrides_outer_join" />
+    <include refid="job_update_inner_joins" />
+    <include refid="job_update_outer_joins" />
     WHERE u.update_id = #{id}
   </select>
 
   <select id="selectUpdate" resultMap="jobUpdateMap">
     SELECT
       <include refid="job_update_columns" />
-    <include refid="job_update_to_configs_inner_joins" />
+    <include refid="job_update_inner_joins" />
     <include refid="timestamps_inner_joins" />
-    <include refid="job_update_to_instance_overrides_outer_join" />
+    <include refid="job_update_outer_joins" />
     WHERE u.update_id = #{id}
   </select>
 

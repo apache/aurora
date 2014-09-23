@@ -21,6 +21,7 @@ import javax.inject.Inject;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
+import com.twitter.common.base.MorePreconditions;
 
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
@@ -67,6 +68,11 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
   @Override
   public void saveJobUpdate(IJobUpdate update, Optional<String> lockToken) {
     requireNonNull(update);
+    if (!update.getInstructions().isSetDesiredState()
+        && update.getInstructions().getInitialState().isEmpty()) {
+      throw new IllegalArgumentException(
+          "Missing both initial and desired states. At least one is required.");
+    }
 
     jobKeyMapper.merge(update.getSummary().getJobKey().newBuilder());
     detailsMapper.insert(update.newBuilder());
@@ -85,23 +91,29 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
     }
 
     // Insert desired state task config and instance mappings.
-    IInstanceTaskConfig desired = update.getInstructions().getDesiredState();
-    detailsMapper.insertTaskConfig(
-        updateId,
-        desired.getTask().newBuilder(),
-        true,
-        new InsertResult());
+    if (update.getInstructions().isSetDesiredState()) {
+      IInstanceTaskConfig desired = update.getInstructions().getDesiredState();
+      detailsMapper.insertTaskConfig(
+          updateId,
+          desired.getTask().newBuilder(),
+          true,
+          new InsertResult());
 
-    detailsMapper.insertDesiredInstances(updateId, IRange.toBuildersSet(desired.getInstances()));
+      detailsMapper.insertDesiredInstances(
+          updateId,
+          IRange.toBuildersSet(MorePreconditions.checkNotBlank(desired.getInstances())));
+    }
 
     // Insert initial state task configs and instance mappings.
-    for (IInstanceTaskConfig config : update.getInstructions().getInitialState()) {
-      InsertResult result = new InsertResult();
-      detailsMapper.insertTaskConfig(updateId, config.getTask().newBuilder(), false, result);
+    if (!update.getInstructions().getInitialState().isEmpty()) {
+      for (IInstanceTaskConfig config : update.getInstructions().getInitialState()) {
+        InsertResult result = new InsertResult();
+        detailsMapper.insertTaskConfig(updateId, config.getTask().newBuilder(), false, result);
 
-      detailsMapper.insertTaskConfigInstances(
-          result.getId(),
-          IRange.toBuildersSet(config.getInstances()));
+        detailsMapper.insertTaskConfigInstances(
+            result.getId(),
+            IRange.toBuildersSet(MorePreconditions.checkNotBlank(config.getInstances())));
+      }
     }
   }
 

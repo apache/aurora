@@ -108,12 +108,69 @@ public class DBJobUpdateStoreTest {
     assertUpdate(update2);
   }
 
-  @Test(expected = StorageException.class)
-  public void testSaveWithEmptyDesiredStateInstancesThrows() {
+  @Test
+  public void testSaveNullInitialState() {
+    JobUpdate builder = makeJobUpdate(JOB, "u1").newBuilder();
+    builder.getInstructions().unsetInitialState();
+
+    // Save with null initial state instances.
+    saveUpdate(IJobUpdate.build(builder), Optional.of("lock"));
+
+    builder.getInstructions().setInitialState(ImmutableSet.<InstanceTaskConfig>of());
+    assertUpdate(IJobUpdate.build(builder));
+  }
+
+  @Test
+  public void testSaveNullDesiredState() {
+    JobUpdate builder = makeJobUpdate(JOB, "u1").newBuilder();
+    builder.getInstructions().unsetDesiredState();
+
+    // Save with null desired state instances.
+    saveUpdate(IJobUpdate.build(builder), Optional.of("lock"));
+
+    assertUpdate(IJobUpdate.build(builder));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testSaveBothInitialAndDesiredMissingThrows() {
+    JobUpdate builder = makeJobUpdate(JOB, "u1").newBuilder();
+    builder.getInstructions().unsetInitialState();
+    builder.getInstructions().unsetDesiredState();
+
+    saveUpdate(IJobUpdate.build(builder), Optional.of("lock"));
+  }
+
+  @Test(expected = NullPointerException.class)
+  public void testSaveNullInitialStateTaskThrows() {
+    JobUpdate builder = makeJobUpdate(JOB, "u1").newBuilder();
+    builder.getInstructions().getInitialState().add(
+        new InstanceTaskConfig(null, ImmutableSet.<Range>of()));
+
+    saveUpdate(IJobUpdate.build(builder), Optional.of("lock"));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testSaveEmptyInitialStateRangesThrows() {
+    JobUpdate builder = makeJobUpdate(JOB, "u1").newBuilder();
+    builder.getInstructions().getInitialState().add(
+        new InstanceTaskConfig(new TaskConfig(), ImmutableSet.<Range>of()));
+
+    saveUpdate(IJobUpdate.build(builder), Optional.of("lock"));
+  }
+
+  @Test(expected = NullPointerException.class)
+  public void testSaveNullDesiredStateTaskThrows() {
+    JobUpdate builder = makeJobUpdate(JOB, "u1").newBuilder();
+    builder.getInstructions().getDesiredState().setTask(null);
+
+    saveUpdate(IJobUpdate.build(builder), Optional.of("lock"));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testSaveEmptyDesiredStateRangesThrows() {
     JobUpdate builder = makeJobUpdate(JOB, "u1").newBuilder();
     builder.getInstructions().getDesiredState().setInstances(ImmutableSet.<Range>of());
 
-    // Save with empty desired state instances.
     saveUpdate(IJobUpdate.build(builder), Optional.of("lock"));
   }
 
@@ -480,22 +537,11 @@ public class DBJobUpdateStoreTest {
         getSummaries(new JobUpdateQuery().setRole("no_match")));
   }
 
-  @Test
-  public void testGetConfiguration() {
-    String updateId = "u1";
-
-    IJobUpdate update = makeJobUpdate(JobKeys.from("role", "env", "name1"), updateId);
-
-    assertEquals(Optional.<IJobUpdateInstructions>absent(), getUpdateInstructions(updateId));
-
-    saveUpdate(update, Optional.of("lock1"));
-    assertEquals(Optional.of(makeJobUpdateInstructions()), getUpdateInstructions(updateId));
-  }
-
   private void assertUpdate(IJobUpdate expected) {
     String updateId = expected.getSummary().getUpdateId();
     assertEquals(populateExpected(expected), getUpdate(updateId).get());
     assertEquals(getUpdate(updateId).get(), getUpdateDetails(updateId).get().getUpdate());
+    assertEquals(getUpdateInstructions(updateId).get(), expected.getInstructions());
   }
 
   private Optional<IJobUpdate> getUpdate(final String updateId) {
