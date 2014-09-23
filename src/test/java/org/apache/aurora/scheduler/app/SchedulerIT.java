@@ -32,6 +32,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.hash.Hashing;
 import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.Atomics;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -81,7 +82,7 @@ import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
-import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager.EntrySerializer;
+import org.apache.aurora.scheduler.storage.log.EntrySerializer;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
@@ -160,7 +161,9 @@ public class SchedulerIT extends BaseZooKeeperTest {
     log = control.createMock(Log.class);
     logStream = control.createMock(Stream.class);
     streamMatcher = LogOpMatcher.matcherFor(logStream);
-    entrySerializer = new EntrySerializer(LogStorageModule.MAX_LOG_ENTRY_SIZE.get());
+    entrySerializer = new EntrySerializer.EntrySerializerImpl(
+        LogStorageModule.MAX_LOG_ENTRY_SIZE.get(),
+        Hashing.md5());
 
     zkClient = createZkClient();
   }

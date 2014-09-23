@@ -22,6 +22,8 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
+import com.google.common.hash.HashFunction;
+import com.google.common.hash.Hashing;
 import com.google.common.testing.TearDown;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
@@ -131,7 +133,20 @@ public class LogStorageTest extends EasyMockTest {
   public void setUp() {
     log = createMock(Log.class);
 
-    LogManager logManager = new LogManager(log, Amount.of(1, Data.GB), false);
+    StreamManagerFactory streamManagerFactory = new StreamManagerFactory() {
+      @Override
+      public StreamManager create(Stream logStream) {
+        HashFunction md5 = Hashing.md5();
+        return new StreamManagerImpl(
+            logStream,
+            new EntrySerializer.EntrySerializerImpl(
+                Amount.of(1, Data.GB),
+                md5),
+            false,
+            md5);
+      }
+    };
+    LogManager logManager = new LogManager(log, streamManagerFactory);
 
     schedulingService = createMock(SchedulingService.class);
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });

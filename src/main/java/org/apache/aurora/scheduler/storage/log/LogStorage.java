@@ -70,8 +70,6 @@ import org.apache.aurora.scheduler.storage.entities.ILockKey;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager;
-import org.apache.aurora.scheduler.storage.log.LogManager.StreamManager.StreamTransaction;
 
 import static java.util.Objects.requireNonNull;
 

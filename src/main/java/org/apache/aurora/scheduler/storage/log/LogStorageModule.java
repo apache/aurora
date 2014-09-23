@@ -18,9 +18,12 @@ import java.lang.annotation.Annotation;
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.hash.HashFunction;
+import com.google.common.hash.Hashing;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
+import com.google.inject.assistedinject.FactoryModuleBuilder;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -33,9 +36,10 @@ import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.storage.CallOrderEnforcingStorage;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
-import org.apache.aurora.scheduler.storage.log.LogManager.SnapshotSetting;
 import org.apache.aurora.scheduler.storage.log.LogStorage.ShutdownGracePeriod;
 import org.apache.aurora.scheduler.storage.log.LogStorage.SnapshotInterval;
+
+import static org.apache.aurora.scheduler.storage.log.EntrySerializer.EntrySerializerImpl;
 
 /**
  * Bindings for scheduler distributed log based storage.
@@ -84,11 +88,22 @@ public class LogStorageModule extends AbstractModule {
     bind(new TypeLiteral<Amount<Integer, Data>>() { }).annotatedWith(MaxEntrySize.class)
         .toInstance(MAX_LOG_ENTRY_SIZE.get());
     bind(LogManager.class).in(Singleton.class);
-    bind(Boolean.class).annotatedWith(SnapshotSetting.class).toInstance(DEFLATE_SNAPSHOTS.get());
+    bindConstant().annotatedWith(LogManager.DeflateSnapshots.class).to(DEFLATE_SNAPSHOTS.get());
     bind(LogStorage.class).in(Singleton.class);
 
     install(CallOrderEnforcingStorage.wrappingModule(LogStorage.class));
     bind(DistributedSnapshotStore.class).to(LogStorage.class);
+
+    bind(EntrySerializer.class).to(EntrySerializerImpl.class);
+    // TODO(ksweeney): We don't need a cryptographic checksum here - assess performance of MD5
+    // versus a faster error-detection checksum like CRC32 for large Snapshots.
+    bind(HashFunction.class).annotatedWith(LogManager.LogEntryHashFunction.class)
+        .toInstance(Hashing.md5());
+
+    install(new FactoryModuleBuilder()
+        .implement(StreamManager.class, StreamManagerImpl.class)
+        .build(StreamManagerFactory.class));
+
   }
 
   private void bindInterval(Class<? extends Annotation> key, Arg<Amount<Long, Time>> value) {

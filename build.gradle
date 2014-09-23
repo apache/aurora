@@ -141,6 +141,7 @@ jar {
 }
 
 dependencies {
+  def guiceRev = '3.0'
   def jerseyRev = '1.18.1'
   def log4jRev = '1.2.17'
   def slf4jRev = '1.6.1'
@@ -157,7 +158,8 @@ dependencies {
   compile 'com.google.code.findbugs:jsr305:2.0.1'
   compile gsonDep
   compile guavaDep
-  compile 'com.google.inject:guice:3.0'
+  compile "com.google.inject:guice:${guiceRev}"
+  compile "com.google.inject.extensions:guice-assistedinject:${guiceRev}"
   compile 'com.google.protobuf:protobuf-java:2.5.0'
   compile 'com.h2database:h2:1.4.177'
   compile "com.sun.jersey:jersey-core:${jerseyRev}"
