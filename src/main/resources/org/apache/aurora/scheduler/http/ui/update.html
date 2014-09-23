@@ -13,13 +13,11 @@
  -->
 <div class="container-fluid">
   <div ng-show='error'>
-    <error/>
+    <error></error>
   </div>
 
   <div ng-hide='error'>
-    <div>
-      <breadcrumb/>
-    </div>
+    <breadcrumb></breadcrumb>
 
     <div class="content-box">
       <div class="row">
@@ -37,13 +35,13 @@
 
           <div class="row">
             <div class="col-md-3 col-md-offset-2">
-              <time-display timestamp="update.update.summary.state.createdTimestampMs"/>
+              <time-display timestamp="update.update.summary.state.createdTimestampMs"></time-display>
             </div>
             <div class="col-md-2 time-divider">
               <span>~</span>
             </div>
             <div class="col-md-3">
-              <time-display timestamp="update.update.summary.state.lastModifiedTimestampMs"/>
+              <time-display timestamp="update.update.summary.state.lastModifiedTimestampMs"></time-display>
             </div>
           </div>
           <div class="row">

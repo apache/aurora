@@ -1,4 +1,4 @@
-<div>
+<div class='container-fluid'>
   <!--
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -13,15 +13,14 @@
    limitations under the License.
    -->
   <div ng-show='error'>
-    <error/>
+    <error></error>
   </div>
 
   <div ng-hide='error'>
-    <div class='container-fluid'>
-      <div>
-        <breadcrumb/>
-      </div>
+    <breadcrumb></breadcrumb>
 
+    <div class='row'>
+      <div class='col-md-12'>
         <div class='page-header'>
           <h2 class='text-center'>
             Job <em>{{job}}</em> in role <em>{{role}}</em> and environment <em>{{environment}}</em>
@@ -33,146 +32,143 @@
             </span>
           </h2>
         </div>
+      </div>
+    </div>
 
-      <!-- begin update progress preview -->
-      <div ng-if="updateInProgress" class="content-box in-progress-alert">
-        <div class="row">
-          <div class="col-md-4">
-            <a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{updateInProgress.update.summary.updateId}}">Update In Progress</a>
-          </div>
-          <div class="col-md-4">
-            <progressbar class="progress" max="updateStats.totalInstancesToBeUpdated" value="updateStats.instancesUpdatedSoFar" type="success"><i>{{updateStats.instancesUpdatedSoFar}} of {{updateStats.totalInstancesToBeUpdated}}</i></progressbar>
-          </div>
-          <div class="col-md-4">
-            <span>started by <strong>{{updateInProgress.update.summary.user}}</strong></span><br/>
-            <span>{{updateInProgress.update.summary.state.createdTimestampMs | toElapsedTime}} ago</span>
-          </div>
+    <!-- begin update progress preview -->
+    <div ng-if="updateInProgress" class="content-box in-progress-alert">
+      <div class="row">
+        <div class="col-md-4">
+          <a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{updateInProgress.update.summary.updateId}}">Update In Progress</a>
+        </div>
+        <div class="col-md-4">
+          <progressbar class="progress" max="updateStats.totalInstancesToBeUpdated" value="updateStats.instancesUpdatedSoFar" type="success"><i>{{updateStats.instancesUpdatedSoFar}} of {{updateStats.totalInstancesToBeUpdated}}</i></progressbar>
+        </div>
+        <div class="col-md-4">
+          <span>started by <strong>{{updateInProgress.update.summary.user}}</strong></span><br/>
+          <span>{{updateInProgress.update.summary.state.createdTimestampMs | toElapsedTime}} ago</span>
         </div>
       </div>
-      <!-- end update progress preview -->
+    </div>
+    <!-- end update progress preview -->
 
+    <div ng-controller='CronJobSummaryController'>
+      <div class='row'>
+        <div class='col-md-12'>
+          <div ng-if='cronJobSummary'>
+            <h3>Cron Job Summary</h3>
 
-      <div ng-controller='CronJobSummaryController'>
-        <div ng-show='error'>
-          <error/>
-        </div>
-
-        <div ng-hide='error'>
-            <div ng-if='cronJobSummary'>
-              <h3>Cron Job Summary</h3>
-
-              <div>
-                <smart-table config='cronJobSummaryTableConfig'
-                             columns='cronJobSummaryTableColumns'
-                             rows='cronJobSummary'
-                             class='table table-striped table-hover table-bordered table-condensed'>
-                </smart-table>
-              </div>
-            </div>
-        </div>
-      </div>
-
-      <div ng-if="!tasksReady">
-        <div class="row">
-          <div class="col-md-12">
-            Loading job information.
-          </div>
-        </div>
-      </div>
-
-      <tabset ng-if="tasksReady" justified='true'>
-        <tab heading='Active tasks ({{activeTasks.length}})' title='All Active tasks for this job.'>
-          <div class='task-tab'>
-            <div class='group-summary'>
-              <group-summary groups='groupSummary'></group-summary>
-            </div>
-            <div class='container-fluid'>
-              <smart-table config='activeTasksTableConfig'
-                           columns='activeTasksTableColumns'
-                           rows='activeTasks'
+            <div>
+              <smart-table config='cronJobSummaryTableConfig'
+                           columns='cronJobSummaryTableColumns'
+                           rows='cronJobSummary'
                            class='table table-striped table-hover table-bordered table-condensed'>
               </smart-table>
             </div>
           </div>
-        </tab>
+        </div>
+      </div>
+    </div>
 
-        <tab heading='Completed tasks ({{completedTasks.length}})'
-             title='All completed tasks for this job.'>
-          <div class='task-tab container-fluid completed-tasks-tab'>
+    <div ng-if="!tasksReady">
+      <div class="row">
+        <div class="col-md-12">
+          Loading job information.
+        </div>
+      </div>
+    </div>
+
+    <tabset ng-if="tasksReady" justified='true'>
+      <tab heading='Active tasks ({{activeTasks.length}})' title='All Active tasks for this job.'>
+        <div class='task-tab'>
+          <div class='group-summary'>
+            <group-summary groups='groupSummary'></group-summary>
+          </div>
+          <div class='container-fluid'>
+            <smart-table config='activeTasksTableConfig'
+                         columns='activeTasksTableColumns'
+                         rows='activeTasks'
+                         class='table table-striped table-hover table-bordered table-condensed'>
+            </smart-table>
+          </div>
+        </div>
+      </tab>
+
+      <tab heading='Completed tasks ({{completedTasks.length}})'
+           title='All completed tasks for this job.'>
+        <div class='task-tab container-fluid completed-tasks-tab'>
+          <smart-table config='completedTasksTableConfig'
+                       columns='completedTasksTableColumns'
+                       rows='completedTasks'
+                       class='table table-striped table-hover table-bordered table-condensed'>
+          </smart-table>
+        </div>
+      </tab>
+
+      <tab heading='All tasks' title='Both active and completed tasks for this job.'>
+        <div class='task-tab'>
+          <div class='group-summary'>
+            <group-summary groups='groupSummary'></group-summary>
+          </div>
+
+          <div class='container-fluid'>
+            <h3>Active Tasks</h3>
+            <smart-table config='activeTasksTableConfig'
+                         columns='activeTasksTableColumns'
+                         rows='activeTasks'
+                         class='table table-striped table-hover table-bordered table-condensed'>
+            </smart-table>
+          </div>
+
+          <div class='container-fluid'>
+            <h3>Completed Tasks</h3>
             <smart-table config='completedTasksTableConfig'
                          columns='completedTasksTableColumns'
                          rows='completedTasks'
                          class='table table-striped table-hover table-bordered table-condensed'>
             </smart-table>
           </div>
-        </tab>
+        </div>
+      </tab>
+    </tabset>
 
-        <tab heading='All tasks' title='Both active and completed tasks for this job.'>
-          <div class='task-tab'>
-            <div class='group-summary'>
-              <group-summary groups='groupSummary'></group-summary>
-            </div>
-
-            <div class='container-fluid'>
-              <h3>Active Tasks</h3>
-              <smart-table config='activeTasksTableConfig'
-                           columns='activeTasksTableColumns'
-                           rows='activeTasks'
-                           class='table table-striped table-hover table-bordered table-condensed'>
-              </smart-table>
-            </div>
-
-            <div class='container-fluid'>
-              <h3>Completed Tasks</h3>
-              <smart-table config='completedTasksTableConfig'
-                           columns='completedTasksTableColumns'
-                           rows='completedTasks'
-                           class='table table-striped table-hover table-bordered table-condensed'>
-              </smart-table>
-            </div>
-          </div>
-        </tab>
-      </tabset>
-
-      <div ng-if="updates" class="content-box">
-        <div class='row'>
-          <div class='col-md-12'>
-            <h3>Update History</h3>
-            <table class="table table-bordered table-striped table-hover">
-              <tr>
-                <th>id</th>
-                <th>status</th>
-                <th>started</th>
-                <th>ended</th>
-                <th>user</th>
-              </tr>
-              <tr ng-repeat="update in updates">
-                <td>
-                  <a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{update.updateId}}">  {{update.updateId}}
-                  </a>
-                </td>
-                <td>
-                  {{update.state.status | toNiceStatus}}
-                </td>
-                <td>
-                  {{update.state.createdTimestampMs | toElapsedTime}} ago
-                </td>
-                <td>
-                  {{update.state.lastModifiedTimestampMs | toElapsedTime}} ago
-                </td>
-                <td>
-                  {{update.user}}
-                </td>
-              </tr>
-            </table>
-          </div>
+    <div ng-if="updates" class="content-box">
+      <div class='row'>
+        <div class='col-md-12'>
+          <h3>Update History</h3>
+          <table class="table table-bordered table-striped table-hover">
+            <tr>
+              <th>id</th>
+              <th>status</th>
+              <th>started</th>
+              <th>ended</th>
+              <th>user</th>
+            </tr>
+            <tr ng-repeat="update in updates">
+              <td>
+                <a href="/scheduler/{{role}}/{{environment}}/{{job}}/{{update.updateId}}">  {{update.updateId}}
+                </a>
+              </td>
+              <td>
+                {{update.state.status | toNiceStatus}}
+              </td>
+              <td>
+                {{update.state.createdTimestampMs | toElapsedTime}} ago
+              </td>
+              <td>
+                {{update.state.lastModifiedTimestampMs | toElapsedTime}} ago
+              </td>
+              <td>
+                {{update.user}}
+              </td>
+            </tr>
+          </table>
         </div>
       </div>
+    </div>
 
-        <div class="container-fluid">
-          <a class='bottomRight' ng-click='toggleTaskInfoLinkVisibility()'>π</a>
-        </div>
-      </div>
+    <div class="container-fluid">
+      <a class='bottomRight' ng-click='toggleTaskInfoLinkVisibility()'>π</a>
     </div>
   </div>
 </div>
