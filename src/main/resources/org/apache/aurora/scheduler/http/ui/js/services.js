@@ -237,13 +237,23 @@
         return tmp;
       }
 
-      var UPDATE_TERMINAL = toSet([
+      // TODO(dmclaughlin): Make these constants in api.thrift.
+      var UPDATE_TERMINAL_STATUSES = [
         JobUpdateStatus.ROLLED_FORWARD,
         JobUpdateStatus.ROLLED_BACK,
         JobUpdateStatus.ABORTED,
         JobUpdateStatus.ERROR,
         JobUpdateStatus.FAILED
-      ]);
+      ];
+
+      var IN_PROGRESS_STATUSES = [
+        JobUpdateStatus.ROLLING_FORWARD,
+        JobUpdateStatus.ROLLING_BACK,
+        JobUpdateStatus.ROLL_FORWARD_PAUSED,
+        JobUpdateStatus.ROLL_BACK_PAUSED
+      ];
+
+      var UPDATE_TERMINAL = toSet(UPDATE_TERMINAL_STATUSES);
 
       var INSTANCE_SUCCESSFUL = toSet([
         JobUpdateAction.INSTANCE_UPDATED
@@ -282,6 +292,17 @@
           });
 
           return instanceCount;
+        },
+        getStatusQuery: function (statuses) {
+          var query = new JobUpdateQuery();
+          query.updateStatuses = statuses;
+          return query;
+        },
+        getTerminalQuery: function () {
+          return updateUtil.getStatusQuery(UPDATE_TERMINAL_STATUSES);
+        },
+        getInProgressQuery: function () {
+          return updateUtil.getStatusQuery(IN_PROGRESS_STATUSES);
         },
         instanceCountFromConfigs: function (instanceTaskConfigs) {
           var flattenedRanges = [];

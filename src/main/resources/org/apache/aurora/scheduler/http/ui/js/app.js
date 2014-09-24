@@ -35,6 +35,9 @@ var auroraUI;
     $routeProvider.when('/scheduler/:role/:environment/:job/:update',
       {templateUrl: '/update.html', controller: 'UpdateController'});
 
+    $routeProvider.when('/updates',
+      {templateUrl: '/updateList.html', controller: 'AllUpdatesController'});
+
     $routeProvider.otherwise({redirectTo: function (location, path) {
       window.location.href = path;
     }});

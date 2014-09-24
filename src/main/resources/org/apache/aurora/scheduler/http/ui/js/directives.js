@@ -182,9 +182,20 @@
           parent.append(title);
           parent.append(list);
           element.html(parent.html());
-          $compile(list)(scope);
+          $compile(element)(scope);
         });
       }
+    };
+  });
+
+  auroraUI.directive('latestUpdates', function () {
+    return {
+      restrict: 'E',
+      scope: {
+        'updates': '=',
+        'message': '@'
+      },
+      templateUrl: '/latestUpdates.html'
     };
   });
 })();

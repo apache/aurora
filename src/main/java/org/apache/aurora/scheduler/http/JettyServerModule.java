@@ -217,6 +217,9 @@ public class JettyServerModule extends AbstractModule {
     registerAsset("ui/index.html", "/scheduler", true);
     Registration.registerEndpoint(binder(), "/scheduler");
 
+    registerAsset("ui/index.html", "/updates", true);
+    Registration.registerEndpoint(binder(), "/updates");
+
     registerAsset("ui/roleLink.html", "/roleLink.html");
     registerAsset("ui/roleEnvLink.html", "/roleEnvLink.html");
     registerAsset("ui/jobLink.html", "/jobLink.html");
@@ -234,6 +237,8 @@ public class JettyServerModule extends AbstractModule {
     registerAsset("ui/update.html", "/update.html");
     registerAsset("ui/timeDisplay.html", "/timeDisplay.html");
     registerAsset("ui/updateSettings.html", "/updateSettings.html");
+    registerAsset("ui/updateList.html", "/updateList.html");
+    registerAsset("ui/latestUpdates.html", "/latestUpdates.html");
 
     registerAsset("ui/css/app.css", "/css/app.css");
 

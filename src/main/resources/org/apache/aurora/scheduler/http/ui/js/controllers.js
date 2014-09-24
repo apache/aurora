@@ -15,8 +15,6 @@
   /* global ScheduleStatus:false, JobUpdateQuery:false, JobKey:false */
   'use strict';
 
-  var AURORA_UPDATE_POLL_MS = 10000;
-
   /* Controllers */
 
   var auroraUIControllers = angular.module('auroraUI.controllers', []);
@@ -33,6 +31,11 @@
     isPaginationEnabled: false,
     isGlobalSearchActivated: false,
     selectionMode: 'none'
+  };
+
+  var REFRESH_RATES = {
+    IN_PROGRESS_UPDATE_MS: 15000,
+    COMPLETED_UPDATES_MS: 60000
   };
 
   auroraUIControllers.controller('RoleSummaryController',
@@ -234,6 +237,34 @@
     }
   );
 
+  auroraUIControllers.controller('AllUpdatesController',
+    function ($scope, $timeout, auroraClient, updateUtil) {
+
+      function inProgressUpdates() {
+        // fetch any in progress updates
+        auroraClient.getJobUpdateSummaries(updateUtil.getInProgressQuery())
+          .then(function (response) {
+            $scope.inProgressUpdates = response.summaries;
+            $timeout(function () { inProgressUpdates(); }, REFRESH_RATES.IN_PROGRESS_UPDATE_MS);
+          });
+      }
+
+      function completedUpdates() {
+        // fetch the latest 20 finished updates
+        var finishedQuery = updateUtil.getTerminalQuery();
+        finishedQuery.limit = 20;
+
+        auroraClient.getJobUpdateSummaries(finishedQuery).then(function (response) {
+          $scope.completedUpdates = response.summaries;
+          $timeout(function () { completedUpdates(); }, REFRESH_RATES.COMPLETED_UPDATES_MS);
+        });
+      }
+
+      inProgressUpdates();
+      completedUpdates();
+    }
+  );
+
   auroraUIControllers.controller('UpdateController',
     function ($scope, $routeParams, $timeout, auroraClient, updateUtil) {
       var updateId = $routeParams.update;
@@ -285,7 +316,7 @@
           if ($scope.inProgress) {
             $timeout(function () {
               getUpdateProgress();
-            }, AURORA_UPDATE_POLL_MS);
+            }, REFRESH_RATES.IN_PROGRESS_UPDATE_MS);
           }
         });
       };
@@ -427,7 +458,7 @@
               // Poll for updates as long as this update is in progress.
               $timeout(function () {
                 getUpdateInProgress();
-              }, AURORA_UPDATE_POLL_MS);
+              }, REFRESH_RATES.IN_PROGRESS_UPDATE_MS);
             }
           });
         }
