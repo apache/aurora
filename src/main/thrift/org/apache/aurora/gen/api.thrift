@@ -543,6 +543,12 @@ enum JobUpdateStatus {
   FAILED = 8
 }
 
+/** States the job update can be in while still considered active. */
+const set<JobUpdateStatus> ACTIVE_JOB_UPDATE_STATES = [JobUpdateStatus.ROLLING_FORWARD,
+                                                       JobUpdateStatus.ROLLING_BACK,
+                                                       JobUpdateStatus.ROLL_FORWARD_PAUSED,
+                                                       JobUpdateStatus.ROLL_BACK_PAUSED]
+
 /** Job update actions that can be applied to job instances. */
 enum JobUpdateAction {
   /**

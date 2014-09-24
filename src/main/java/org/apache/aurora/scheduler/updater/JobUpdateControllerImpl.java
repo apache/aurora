@@ -69,8 +69,6 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
-import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_PAUSED;
-import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
 import static org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.ACTIVE_QUERY;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.MonitorAction;
@@ -251,11 +249,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   static IJobUpdateQuery queryByJob(IJobKey job) {
     return IJobUpdateQuery.build(new JobUpdateQuery()
         .setJobKey(job.newBuilder())
-        .setUpdateStatuses(ImmutableSet.of(
-            ROLLING_FORWARD,
-            ROLLING_BACK,
-            ROLL_FORWARD_PAUSED,
-            ROLL_BACK_PAUSED)));
+        .setUpdateStatuses(ACTIVE_JOB_UPDATE_STATES));
   }
 
   @VisibleForTesting

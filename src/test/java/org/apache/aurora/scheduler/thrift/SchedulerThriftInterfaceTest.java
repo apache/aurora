@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -94,6 +95,7 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.gen.ValueConstraint;
+import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Query.Builder;
@@ -106,13 +108,13 @@ import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.metadata.NearestFit;
+import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.aurora.scheduler.state.TaskLimitValidator;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
@@ -158,6 +160,10 @@ import static org.apache.aurora.gen.ResponseCode.WARNING;
 import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASKS_PER_JOB;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASK_ID_LENGTH;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.killedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.restartedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
@@ -191,6 +197,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static final IResourceAggregate CONSUMED =
       IResourceAggregate.build(new ResourceAggregate(0.0, 0, 0));
+
+  private static final IResourceAggregate DEFAULT_CONSUMED =
+      IResourceAggregate.build(new ResourceAggregate(1, 1024, 1024));
+
+  private static final QuotaCheckResult ENOUGH_QUOTA = new QuotaCheckResult(SUFFICIENT_QUOTA);
+  private static final QuotaCheckResult NOT_ENOUGH_QUOTA = new QuotaCheckResult(INSUFFICIENT_QUOTA);
+
   private static final ServerInfo SERVER_INFO =
       new ServerInfo()
           .setClusterName("test")
@@ -212,7 +225,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private QuotaManager quotaManager;
   private NearestFit nearestFit;
   private StateManager stateManager;
-  private TaskLimitValidator taskValidator;
+  private TaskIdGenerator taskIdGenerator;
   private UUIDGenerator uuidGenerator;
   private JobUpdateController jobUpdateController;
 
@@ -232,7 +245,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     quotaManager = createMock(QuotaManager.class);
     nearestFit = createMock(NearestFit.class);
     stateManager = createMock(StateManager.class);
-    taskValidator = createMock(TaskLimitValidator.class);
+    taskIdGenerator = createMock(TaskIdGenerator.class);
     uuidGenerator = createMock(UUIDGenerator.class);
     jobUpdateController = createMock(JobUpdateController.class);
 
@@ -253,7 +266,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(CronPredictor.class).toInstance(cronPredictor);
         bind(NearestFit.class).toInstance(nearestFit);
         bind(StateManager.class).toInstance(stateManager);
-        bind(TaskLimitValidator.class).toInstance(taskValidator);
+        bind(TaskIdGenerator.class).toInstance(taskIdGenerator);
         bind(UUIDGenerator.class).toInstance(uuidGenerator);
         bind(JobUpdateController.class).toInstance(jobUpdateController);
         bind(Boolean.class).annotatedWith(EnableUpdater.class).toInstance(true);
@@ -320,15 +333,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testCreateJobNoLock() throws Exception {
-    IJobConfiguration job = IJobConfiguration.build(makeJob());
+    IJobConfiguration job = IJobConfiguration.build(makeProdJob());
     SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    taskValidator.validateTaskLimits(
-        sanitized.getJobConfig().getTaskConfig(),
-        sanitized.getInstanceIds().size());
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, DEFAULT_CONSUMED)).andStubReturn(ENOUGH_QUOTA);
 
     stateManager.insertPendingTasks(
         sanitized.getJobConfig().getTaskConfig(),
@@ -341,15 +354,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testCreateJobWithLock() throws Exception {
-    IJobConfiguration job = IJobConfiguration.build(makeJob());
+    IJobConfiguration job = IJobConfiguration.build(makeProdJob());
     SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    taskValidator.validateTaskLimits(
-        sanitized.getJobConfig().getTaskConfig(),
-        sanitized.getInstanceIds().size());
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, DEFAULT_CONSUMED)).andStubReturn(ENOUGH_QUOTA);
 
     stateManager.insertPendingTasks(
         sanitized.getJobConfig().getTaskConfig(),
@@ -362,15 +375,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testCreateCronJob() throws Exception {
-    IJobConfiguration job = IJobConfiguration.build(makeJob().setCronSchedule(CRON_SCHEDULE));
+    IJobConfiguration job = IJobConfiguration.build(makeProdJob().setCronSchedule(CRON_SCHEDULE));
     SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    taskValidator.validateTaskLimits(
-        sanitized.getJobConfig().getTaskConfig(),
-        sanitized.getInstanceIds().size());
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, DEFAULT_CONSUMED)).andStubReturn(ENOUGH_QUOTA);
 
     cronJobManager.createJob(anyObject(SanitizedCronJob.class));
 
@@ -382,15 +395,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testCreateCronJobEmptyCronSchedule() throws Exception {
     // TODO(maxim): Deprecate this as part of AURORA-423.
-    IJobConfiguration job = IJobConfiguration.build(makeJob().setCronSchedule(""));
+    IJobConfiguration job = IJobConfiguration.build(makeProdJob().setCronSchedule(""));
     SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    taskValidator.validateTaskLimits(
-        sanitized.getJobConfig().getTaskConfig(),
-        sanitized.getInstanceIds().size());
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, DEFAULT_CONSUMED)).andStubReturn(ENOUGH_QUOTA);
 
     stateManager.insertPendingTasks(
         sanitized.getJobConfig().getTaskConfig(),
@@ -461,6 +474,21 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testCreateJobFailsInstanceCheck() throws Exception {
+    IJobConfiguration job = IJobConfiguration.build(
+        makeJob(defaultTask(true), MAX_TASKS_PER_JOB.get() + 1));
+
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.createJob(job.newBuilder(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
   public void testCreateJobFailsTaskIdLength() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeJob());
     SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
@@ -468,10 +496,25 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    taskValidator.validateTaskLimits(
-        sanitized.getJobConfig().getTaskConfig(),
-        sanitized.getInstanceIds().size());
-    expectLastCall().andThrow(new TaskLimitValidator.TaskValidationException("failed"));
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(Strings.repeat("a", MAX_TASK_ID_LENGTH + 1));
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.createJob(job.newBuilder(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testCreateJobFailsQuotaCheck() throws Exception {
+    IJobConfiguration job = IJobConfiguration.build(makeProdJob());
+    SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, DEFAULT_CONSUMED)).andStubReturn(NOT_ENOUGH_QUOTA);
 
     control.replay();
 
@@ -606,10 +649,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    taskValidator.validateTaskLimits(
-        ITaskConfig.build(sanitized.getTaskConfig()),
-        sanitized.getInstanceCount());
-
+    expect(taskIdGenerator.generate(ITaskConfig.build(sanitized.getTaskConfig()), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, DEFAULT_CONSUMED)).andStubReturn(ENOUGH_QUOTA);
     stateManager.insertPendingTasks(
         ITaskConfig.build(sanitized.getTaskConfig()),
         ImmutableSet.of(0));
@@ -1744,7 +1786,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
-    taskValidator.validateTaskLimits(populatedTask, config.getInstanceIdsSize());
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
+    expect(taskIdGenerator.generate(populatedTask, 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, DEFAULT_CONSUMED)).andStubReturn(ENOUGH_QUOTA);
     stateManager.insertPendingTasks(populatedTask, ImmutableSet.of(0));
 
     control.replay();
@@ -1759,7 +1804,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
-    taskValidator.validateTaskLimits(populatedTask, config.getInstanceIdsSize());
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
+    expect(taskIdGenerator.generate(populatedTask, 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, DEFAULT_CONSUMED)).andStubReturn(ENOUGH_QUOTA);
     stateManager.insertPendingTasks(populatedTask, ImmutableSet.of(0));
 
     control.replay();
@@ -1812,14 +1860,32 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testAddInstancesTaskValidationFailure() throws Exception {
+  public void testAddInstancesFailsTaskIdLength() throws Exception {
     ITaskConfig populatedTask = ITaskConfig.build(populatedTask());
     AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
-    taskValidator.validateTaskLimits(populatedTask, config.getInstanceIdsSize());
-    expectLastCall().andThrow(new TaskLimitValidator.TaskValidationException("failed"));
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
+    expect(taskIdGenerator.generate(populatedTask, 1))
+        .andReturn(Strings.repeat("a", MAX_TASK_ID_LENGTH + 1));
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.addInstances(config, LOCK.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testAddInstancesFailsQuotaCheck() throws Exception {
+    ITaskConfig populatedTask = ITaskConfig.build(populatedTask());
+    AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
+    expect(taskIdGenerator.generate(populatedTask, 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, DEFAULT_CONSUMED)).andStubReturn(NOT_ENOUGH_QUOTA);
 
     control.replay();
 
@@ -1833,7 +1899,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
-    taskValidator.validateTaskLimits(populatedTask, config.getInstanceIdsSize());
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
+    expect(taskIdGenerator.generate(populatedTask, 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, DEFAULT_CONSUMED)).andStubReturn(ENOUGH_QUOTA);
     stateManager.insertPendingTasks(populatedTask, ImmutableSet.of(0));
     expectLastCall().andThrow(new IllegalArgumentException("instance collision"));
 
@@ -2012,6 +2081,13 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
 
+    ITaskConfig newTask = buildScheduledTask(0, 8).getAssignedTask().getTask();
+    expect(taskIdGenerator.generate(newTask, 6))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(
+        ROLE,
+        IResourceAggregate.build(new ResourceAggregate(7, 48, 7168)))).andStubReturn(ENOUGH_QUOTA);
+
     IScheduledTask oldTask1 = buildScheduledTask(0, 5);
     IScheduledTask oldTask2 = buildScheduledTask(1, 5);
     IScheduledTask oldTask3 = buildScheduledTask(2, 7);
@@ -2020,15 +2096,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     IScheduledTask oldTask6 = buildScheduledTask(5, 5);
     IScheduledTask oldTask7 = buildScheduledTask(6, 5);
 
-    ITaskConfig newTask = buildScheduledTask(0, 8).getAssignedTask().getTask();
-
     IJobUpdate update = buildJobUpdate(6, newTask, ImmutableMap.of(
         oldTask1.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 1), new Range(4, 6)),
         oldTask3.getAssignedTask().getTask(), ImmutableSet.of(new Range(2, 3))
     ));
-
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
-
     storageUtil.expectTaskFetch(
         Query.unscoped().byJob(JOB_KEY).active(),
         oldTask1,
@@ -2077,19 +2149,68 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testStartUpdateFailsInstanceCountCheck() throws Exception {
+    JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
+    request.setInstanceCount(-1);
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expect(uuidGenerator.createNew()).andReturn(UU_ID);
+    storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active());
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsTaskIdLength() throws Exception {
+    JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expect(uuidGenerator.createNew()).andReturn(UU_ID);
+    storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active());
+    expect(taskIdGenerator.generate(ITaskConfig.build(request.getTaskConfig()), 6))
+        .andReturn(Strings.repeat("a", MAX_TASK_ID_LENGTH + 1));
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsQuotaCheck() throws Exception {
+    JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expect(uuidGenerator.createNew()).andReturn(UU_ID);
+    storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active());
+    expect(taskIdGenerator.generate(ITaskConfig.build(request.getTaskConfig()), 6))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, IResourceAggregate.build(
+        new ResourceAggregate(6, 6144, 6144)))).andStubReturn(NOT_ENOUGH_QUOTA);
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+  }
+
+  @Test
   public void testStartUpdateFailsInController() throws Exception {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
 
     IScheduledTask oldTask = buildScheduledTask(0, 5);
-    ITaskConfig newTask = buildScheduledTask(0, 8).getAssignedTask().getTask();
+    ITaskConfig newTask = buildScheduledTask(0, 1024).getAssignedTask().getTask();
 
     IJobUpdate update = buildJobUpdate(1, newTask, ImmutableMap.of(
         oldTask.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 0))
     ));
 
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
-
+    expect(taskIdGenerator.generate(ITaskConfig.build(populatedTask()), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(ROLE, IResourceAggregate.build(
+        new ResourceAggregate(1, 1024, 1024)))).andStubReturn(ENOUGH_QUOTA);
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active(), oldTask);
     jobUpdateController.start(update, USER);
     expectLastCall().andThrow(new UpdateStateException("failed"));
@@ -2117,7 +2238,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         bind(CronPredictor.class).toInstance(createMock(CronPredictor.class));
         bind(NearestFit.class).toInstance(createMock(NearestFit.class));
         bind(StateManager.class).toInstance(createMock(StateManager.class));
-        bind(TaskLimitValidator.class).toInstance(createMock(TaskLimitValidator.class));
+        bind(TaskIdGenerator.class).toInstance(createMock(TaskIdGenerator.class));
         bind(UUIDGenerator.class).toInstance(createMock(UUIDGenerator.class));
         bind(JobUpdateController.class).toInstance(createMock(JobUpdateController.class));
         bind(Boolean.class)
@@ -2221,6 +2342,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertResponse(INVALID_REQUEST, thrift.abortJobUpdate(JOB_KEY.newBuilder(), SESSION));
+  }
+
+  private static JobConfiguration makeProdJob() {
+    return makeJob(productionTask(), 1);
   }
 
   private static JobConfiguration makeJob() {

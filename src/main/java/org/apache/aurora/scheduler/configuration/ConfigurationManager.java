@@ -232,11 +232,11 @@ public final class ConfigurationManager {
     }
 
     if (!job.isSetInstanceCount()) {
-      throw new TaskDescriptionException("Job configuration does not have shardCount set.");
+      throw new TaskDescriptionException("Job configuration does not have instanceCount set.");
     }
 
     if (job.getInstanceCount() <= 0) {
-      throw new TaskDescriptionException("Shard count must be positive.");
+      throw new TaskDescriptionException("Instance count must be positive.");
     }
 
     JobConfiguration builder = job.newBuilder();

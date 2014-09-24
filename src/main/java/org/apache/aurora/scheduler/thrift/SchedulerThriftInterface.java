@@ -47,6 +47,9 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
+import com.twitter.common.args.constraints.Positive;
 
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
@@ -104,10 +107,12 @@ import org.apache.aurora.gen.StartJobUpdateResult;
 import org.apache.aurora.gen.StartMaintenanceResult;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskQuery;
+import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Jobs;
 import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
@@ -119,14 +124,15 @@ import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.metadata.NearestFit;
+import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
+import org.apache.aurora.scheduler.quota.QuotaUtil;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.aurora.scheduler.state.TaskLimitValidator;
 import org.apache.aurora.scheduler.state.UUIDGenerator;
 import org.apache.aurora.scheduler.storage.JobStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -176,7 +182,7 @@ import static org.apache.aurora.gen.ResponseCode.OK;
 import static org.apache.aurora.gen.ResponseCode.WARNING;
 import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 import static org.apache.aurora.scheduler.base.Tasks.ACTIVE_STATES;
-import static org.apache.aurora.scheduler.state.TaskLimitValidator.TaskValidationException;
+import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.thrift.Util.addMessage;
 import static org.apache.aurora.scheduler.thrift.Util.emptyResponse;
 
@@ -188,6 +194,16 @@ import static org.apache.aurora.scheduler.thrift.Util.emptyResponse;
  */
 @DecoratedThrift
 class SchedulerThriftInterface implements AuroraAdmin.Iface {
+  @Positive
+  @CmdLine(name = "max_tasks_per_job", help = "Maximum number of allowed tasks in a single job.")
+  public static final Arg<Integer> MAX_TASKS_PER_JOB = Arg.create(4000);
+
+  // This number is derived from the maximum file name length limit on most UNIX systems, less
+  // the number of characters we've observed being added by mesos for the executor ID, prefix, and
+  // delimiters.
+  @VisibleForTesting
+  static final int MAX_TASK_ID_LENGTH = 255 - 90;
+
   private static final Logger LOG = Logger.getLogger(SchedulerThriftInterface.class.getName());
 
   private static final Function<IScheduledTask, String> GET_ROLE = Functions.compose(
@@ -210,7 +226,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private final QuotaManager quotaManager;
   private final NearestFit nearestFit;
   private final StateManager stateManager;
-  private final TaskLimitValidator taskLimitValidator;
+  private final TaskIdGenerator taskIdGenerator;
   private final UUIDGenerator uuidGenerator;
   private final JobUpdateController jobUpdateController;
   private final boolean isUpdaterEnabled;
@@ -232,7 +248,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       QuotaManager quotaManager,
       NearestFit nearestFit,
       StateManager stateManager,
-      TaskLimitValidator taskLimitValidator,
+      TaskIdGenerator taskIdGenerator,
       UUIDGenerator uuidGenerator,
       JobUpdateController jobUpdateController,
       @EnableUpdater boolean isUpdaterEnabled) {
@@ -248,7 +264,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     this.quotaManager = requireNonNull(quotaManager);
     this.nearestFit = requireNonNull(nearestFit);
     this.stateManager = requireNonNull(stateManager);
-    this.taskLimitValidator = requireNonNull(taskLimitValidator);
+    this.taskIdGenerator = requireNonNull(taskIdGenerator);
     this.uuidGenerator = requireNonNull(uuidGenerator);
     this.jobUpdateController = requireNonNull(jobUpdateController);
     this.isUpdaterEnabled = isUpdaterEnabled;
@@ -295,7 +311,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                 "Job already exists: " + JobKeys.canonicalString(job.getKey()));
           }
 
-          taskLimitValidator.validateTaskLimits(job.getTaskConfig(), job.getInstanceCount());
+          ITaskConfig taskConfig = sanitized.getJobConfig().getTaskConfig();
+          int instanceCount = sanitized.getInstanceIds().size();
+
+          validateTaskLimits(taskConfig, instanceCount, ResourceAggregates.scale(
+              QuotaUtil.prodResourcesFromTasks(ImmutableSet.of(taskConfig)),
+              instanceCount));
 
           // TODO(mchucarroll): deprecate cron as a part of create/kill job.(AURORA-454)
           if (sanitized.isCron()) {
@@ -303,10 +324,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                 + " with cron via createJob (AURORA_454)");
             cronJobManager.createJob(SanitizedCronJob.from(sanitized));
           } else {
-            LOG.info("Launching " + sanitized.getInstanceIds().size() + " tasks.");
-            stateManager.insertPendingTasks(
-                sanitized.getJobConfig().getTaskConfig(),
-                sanitized.getInstanceIds());
+            LOG.info("Launching " + instanceCount + " tasks.");
+            stateManager.insertPendingTasks(taskConfig, sanitized.getInstanceIds());
           }
           return response.setResponseCode(OK);
         } catch (LockException e) {
@@ -1220,11 +1239,17 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               ILockKey.build(LockKey.job(jobKey.newBuilder())),
               Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-          Set<Integer> instanceIds = ImmutableSet.copyOf(config.getInstanceIds());
-          taskLimitValidator.validateTaskLimits(task, instanceIds.size());
+          ImmutableSet<IScheduledTask> currentTasks = storeProvider.getTaskStore().fetchTasks(
+              Query.jobScoped(JobKeys.from(task)).active());
 
-          stateManager.insertPendingTasks(task, instanceIds);
+          validateTaskLimits(
+              task,
+              currentTasks.size() + config.getInstanceIdsSize(),
+              ResourceAggregates.scale(
+                  QuotaUtil.prodResourcesFromTasks(ImmutableSet.of(task)),
+                  config.getInstanceIdsSize()));
 
+          stateManager.insertPendingTasks(task, ImmutableSet.copyOf(config.getInstanceIds()));
           return resp.setResponseCode(OK);
         } catch (LockException e) {
           return addMessage(resp, LOCK_ERROR, e);
@@ -1299,6 +1324,39 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response getLocks() {
     return okResponse(Result.getLocksResult(
         new GetLocksResult().setLocks(ILock.toBuildersSet(lockManager.getLocks()))));
+  }
+
+  private static class TaskValidationException extends Exception {
+    public TaskValidationException(String message) {
+      super(message);
+    }
+  }
+
+  private void validateTaskLimits(
+      ITaskConfig task,
+      int totalInstances,
+      IResourceAggregate requestedProdResources) throws TaskValidationException {
+
+    if (totalInstances <= 0 || totalInstances > MAX_TASKS_PER_JOB.get()) {
+      throw new TaskValidationException(String.format(
+          "Instance count must be between 1 and %d inclusive.",
+          MAX_TASKS_PER_JOB.get()));
+    }
+
+    // TODO(maximk): This is a short-term hack to stop the bleeding from
+    //               https://issues.apache.org/jira/browse/MESOS-691
+    if (taskIdGenerator.generate(task, totalInstances).length() > MAX_TASK_ID_LENGTH) {
+      throw new TaskValidationException(
+          "Task ID is too long, please shorten your role or job name.");
+    }
+
+    QuotaCheckResult quotaCheck =
+        quotaManager.checkQuota(task.getOwner().getRole(), requestedProdResources);
+
+    if (quotaCheck.getResult() == INSUFFICIENT_QUOTA) {
+      throw new TaskValidationException("Insufficient resource quota: "
+          + quotaCheck.getDetails().or(""));
+    }
   }
 
   private static final Function<Collection<Integer>, Set<Range<Integer>>> TO_RANGES  =
@@ -1384,8 +1442,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return storage.write(new MutateWork.Quiet<Response>() {
       @Override
       public Response apply(MutableStoreProvider storeProvider) {
-        // TODO(maxim): Wire in task limits and quota checks from SchedulerCore.
-
         String updateId = uuidGenerator.createNew().toString();
 
         IJobUpdate update = IJobUpdate.build(new JobUpdate()
@@ -1403,9 +1459,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                         .setLast(request.getInstanceCount() - 1))))));
 
         try {
+          validateTaskLimits(
+              request.getTaskConfig(),
+              request.getInstanceCount(),
+              QuotaUtil.prodResourcesFromJobUpdate(update));
+
           jobUpdateController.start(update, context.getIdentity());
           return okResponse(Result.startJobUpdateResult(new StartJobUpdateResult(updateId)));
-        } catch (UpdateStateException | UpdateConfigurationException e) {
+        } catch (TaskValidationException | UpdateStateException | UpdateConfigurationException e) {
           return addMessage(response, INVALID_REQUEST, e);
         }
       }
