@@ -99,7 +99,9 @@ interface SlaAlgorithm {
    * <pre>
    *    MT =  MEDIAN(Wait_times)
    * where:
-   *    Wait_times - a collection of time intervals between PENDING and specified task state.
+   *    Wait_times - a collection of qualifying time intervals between PENDING and specified task
+   *                 state. An interval is qualified if its end point is contained by the sample
+   *                 time frame.
    *</pre>
    */
   final class MedianAlgorithm implements SlaAlgorithm {
@@ -121,7 +123,7 @@ interface SlaAlgorithm {
         for (ITaskEvent event : task.getTaskEvents()) {
           if (event.getStatus() == ScheduleStatus.PENDING) {
             pendingTs = event.getTimestamp();
-          } else if (event.getStatus() == status) {
+          } else if (event.getStatus() == status && timeFrame.contains(event.getTimestamp())) {
 
             if (pendingTs == 0) {
               throw new IllegalArgumentException("SLA: missing PENDING status for:"

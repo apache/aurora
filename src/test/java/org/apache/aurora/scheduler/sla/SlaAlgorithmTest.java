@@ -55,7 +55,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(50L, PENDING, 200L, ASSIGNED, 250L, KILLED)),
             makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED, 300L, RUNNING)),
             makeTask(ImmutableMap.of(200L, PENDING, 250L, ASSIGNED, 350L, STARTING))),
-        Range.<Long>all());
+        Range.closedOpen(0L, 300L));
     assertEquals(50L, actual);
   }
 
@@ -66,7 +66,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(50L, PENDING, 200L, ASSIGNED, 250L, RUNNING)),
             makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED, 300L, RUNNING)),
             makeTask(ImmutableMap.of(200L, PENDING, 250L, ASSIGNED, 350L, STARTING))),
-        Range.<Long>all());
+        Range.closedOpen(0L, 300L));
     assertEquals(100L, actual);
   }
 
@@ -76,7 +76,7 @@ public class SlaAlgorithmTest {
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING)),
             makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED, 300L, KILLED))),
-        Range.<Long>all());
+        Range.closedOpen(0L, 300L));
     assertEquals(0L, actual);
   }
 
@@ -86,7 +86,7 @@ public class SlaAlgorithmTest {
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING)),
             makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED))),
-        Range.<Long>all());
+        Range.closedOpen(0L, 300L));
     assertEquals(100L, actual);
   }
 
@@ -95,7 +95,7 @@ public class SlaAlgorithmTest {
     MEDIAN_TIME_TO_ASSIGNED.getAlgorithm().calculate(
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, ASSIGNED))),
-        Range.<Long>all());
+        Range.closedOpen(0L, 300L));
   }
 
   @Test
@@ -111,7 +111,7 @@ public class SlaAlgorithmTest {
                 150L, STARTING,
                 200L, RUNNING,
                 300L, KILLED))), // Ignored due to being terminal.
-        Range.<Long>all());
+        Range.closedOpen(0L, 500L));
     assertEquals(130L, actual);
   }
 
@@ -123,7 +123,7 @@ public class SlaAlgorithmTest {
             makeTask(ImmutableMap.of(50L, PENDING, 100L, ASSIGNED, 150L, STARTING, 180L, RUNNING)),
             makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED, 300L, STARTING, 400L, RUNNING)),
             makeTask(ImmutableMap.of(50L, PENDING, 100L, ASSIGNED, 150L, STARTING, 200L, RUNNING))),
-        Range.<Long>all());
+        Range.closedOpen(0L, 500L));
     assertEquals(150L, actual);
   }
 
@@ -133,8 +133,22 @@ public class SlaAlgorithmTest {
         ImmutableSet.of(
             makeTask(ImmutableMap.of(50L, PENDING)),
             makeTask(ImmutableMap.of(50L, PENDING, 100L, RUNNING, 200L, KILLED))),
-            Range.<Long>all());
+        Range.closedOpen(0L, 500L));
     assertEquals(0L, actual);
+  }
+
+  @Test
+  public void MedianTimeEventsOutsideTimeRangeIgnored() {
+    Number actual = MEDIAN_TIME_TO_ASSIGNED.getAlgorithm().calculate(
+        ImmutableSet.of(
+            makeTask(ImmutableMap.of(50L, PENDING)),
+            makeTask(ImmutableMap.of(100L, PENDING, 200L, ASSIGNED)),
+            makeTask(ImmutableMap.of(100L, PENDING, 300L, ASSIGNED)),
+            makeTask(ImmutableMap.of(100L, PENDING, 150L, ASSIGNED)),
+            makeTask(ImmutableMap.of(100L, PENDING, 260L, ASSIGNED)),
+            makeTask(ImmutableMap.of(100L, PENDING, 400L, ASSIGNED))),
+        Range.closedOpen(200L, 300L));
+    assertEquals(100L, actual);
   }
 
   @Test
