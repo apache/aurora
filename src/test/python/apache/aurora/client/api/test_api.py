@@ -84,7 +84,6 @@ class TestJobUpdateApis(unittest.TestCase):
   @classmethod
   def create_update_request(cls, task_config):
     return JobUpdateRequest(
-        jobKey=cls.JOB_KEY.to_thrift(),
         instanceCount=5,
         settings=cls.create_update_settings(),
         taskConfig=task_config)
