@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Ordering;
-import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.twitter.common.quantity.Amount;
@@ -30,6 +29,7 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.JobUpdateStatus;
+import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
@@ -42,6 +42,8 @@ import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
 import static java.util.Objects.requireNonNull;
 
 import static com.google.common.base.Preconditions.checkArgument;
+
+import static org.apache.aurora.scheduler.base.Numbers.toRange;
 
 /**
  * A factory that produces job updaters based on a job update configuration.
@@ -58,11 +60,10 @@ interface UpdateFactory {
    * @param rollingForward {@code true} if this is a job update, {@code false} if it is a rollback.
    * @return An updater that will execute the job update as specified in the
    *         {@code configuration}.
-   * @throws UpdateConfigurationException If the provided configuration cannot be used.
    */
   Update newUpdate(
       IJobUpdateInstructions configuration,
-      boolean rollingForward) throws UpdateConfigurationException;
+      boolean rollingForward);
 
   class UpdateFactoryImpl implements UpdateFactory {
     private final Clock clock;
@@ -73,10 +74,7 @@ interface UpdateFactory {
     }
 
     @Override
-    public Update newUpdate(
-        IJobUpdateInstructions instructions,
-        boolean rollingForward) throws UpdateConfigurationException {
-
+    public Update newUpdate(IJobUpdateInstructions instructions, boolean rollingForward) {
       requireNonNull(instructions);
       IJobUpdateSettings settings = instructions.getSettings();
       checkArgument(
@@ -101,15 +99,7 @@ interface UpdateFactory {
         instances =  ImmutableSet.copyOf(
             Sets.union(expandInstanceIds(instructions.getInitialState()), desiredInstances));
       } else {
-        instances = rangesToInstanceIds(settings.getUpdateOnlyTheseInstances());
-
-        // TODO(wfarner): Move this check out to SchedulerThriftInterface, and remove the
-        // UpdateConfigurationException from this method's signature.
-        if (!desiredInstances.containsAll(instances)) {
-          throw new UpdateConfigurationException(
-              "When updating specific instances, "
-                  + "all specified instances must be in the update configuration.");
-        }
+        instances = Numbers.rangesToInstanceIds(settings.getUpdateOnlyTheseInstances());
       }
 
       ImmutableMap.Builder<Integer, StateEvaluator<Optional<IScheduledTask>>> evaluators =
@@ -149,19 +139,6 @@ interface UpdateFactory {
               settings.getMaxFailedInstances(),
               evaluators.build()),
           rollingForward);
-    }
-
-    private static Range<Integer> toRange(IRange range) {
-      return Range.closed(range.getFirst(), range.getLast());
-    }
-
-    private static Set<Integer> rangesToInstanceIds(Set<IRange> ranges) {
-      ImmutableRangeSet.Builder<Integer> instanceIds = ImmutableRangeSet.builder();
-      for (IRange range : ranges) {
-        instanceIds.add(toRange(range));
-      }
-
-      return instanceIds.build().asSet(DiscreteDomain.integers());
     }
 
     @VisibleForTesting

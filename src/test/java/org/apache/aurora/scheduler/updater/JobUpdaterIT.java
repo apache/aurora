@@ -117,6 +117,7 @@ import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import static org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
+import static org.apache.aurora.scheduler.updater.JobUpdateController.NoopUpdateStateException;
 import static org.apache.aurora.scheduler.updater.UpdateFactory.UpdateFactoryImpl.expandInstanceIds;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -318,8 +319,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     // Instance 1 is added
     updater.start(update, USER);
-    actions.putAll(0, INSTANCE_UPDATING, INSTANCE_UPDATED)
-        .putAll(1, INSTANCE_UPDATING);
+    actions.putAll(1, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
 
@@ -333,10 +333,8 @@ public class JobUpdaterIT extends EasyMockTest {
     changeState(JOB, 2, FAILED, ASSIGNED, STARTING, RUNNING);
     clock.advance(WATCH_TIMEOUT);
     updater.resume(JOB);
-    // TODO(wfarner): Since the updater does not skip no-op work upfront, we end up with redundant
-    // states.
-    actions.putAll(0, INSTANCE_UPDATING, INSTANCE_UPDATED)
-        .putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED)
+
+    actions.putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED)
         .put(2, INSTANCE_UPDATING);
     assertState(ROLLING_FORWARD, actions.build());
 
@@ -418,10 +416,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     // Instance 2 is updated, but fails.
     changeState(JOB, 2, KILLED, ASSIGNED, STARTING, RUNNING);
-    // TODO(wfarner): Since the updater does not skip no-ops upfront, we don't touch instance 3,
-    // but record state transitions anyway.
-    actions.putAll(2, INSTANCE_UPDATING, INSTANCE_UPDATE_FAILED, INSTANCE_ROLLING_BACK)
-        .putAll(3, INSTANCE_ROLLING_BACK, INSTANCE_ROLLED_BACK);
+    actions.putAll(2, INSTANCE_UPDATING, INSTANCE_UPDATE_FAILED, INSTANCE_ROLLING_BACK);
     clock.advance(FLAPPING_THRESHOLD);
     changeState(JOB, 2, FAILED);
 
@@ -438,8 +433,7 @@ public class JobUpdaterIT extends EasyMockTest {
     clock.advance(ONE_DAY);
     updater.resume(JOB);
     actions.putAll(1, INSTANCE_ROLLING_BACK)
-        .putAll(2, INSTANCE_ROLLING_BACK, INSTANCE_ROLLED_BACK)
-        .putAll(3, INSTANCE_ROLLING_BACK, INSTANCE_ROLLED_BACK);
+        .putAll(2, INSTANCE_ROLLING_BACK, INSTANCE_ROLLED_BACK);
     assertState(ROLLING_BACK, actions.build());
 
     // Instance 1 is removed.
@@ -514,8 +508,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     // Instance 1 is rolled back, but fails.
     actions.putAll(0, INSTANCE_UPDATED)
-        .putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATE_FAILED, INSTANCE_ROLLING_BACK)
-        .putAll(2, INSTANCE_ROLLING_BACK, INSTANCE_ROLLED_BACK);
+        .putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATE_FAILED, INSTANCE_ROLLING_BACK);
     assertState(ROLLING_BACK, actions.build());
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
     clock.advance(FLAPPING_THRESHOLD);
@@ -583,15 +576,6 @@ public class JobUpdaterIT extends EasyMockTest {
     update.getInstructions().setDesiredState(
         new InstanceTaskConfig().setInstances(ImmutableSet.<Range>of()));
     expectInvalid(update);
-
-    update = makeJobUpdate().newBuilder();
-    update.getInstructions().getSettings().addToUpdateOnlyTheseInstances(new Range(0, 100));
-    try {
-      updater.start(IJobUpdate.build(update), USER);
-      fail();
-    } catch (UpdateConfigurationException e) {
-      // Expected.
-    }
   }
 
   @Test
@@ -725,7 +709,7 @@ public class JobUpdaterIT extends EasyMockTest {
     assertState(ERROR, ImmutableMultimap.<Integer, JobUpdateAction>of());
   }
 
-  @Test
+  @Test(expected = NoopUpdateStateException.class)
   public void testNoopUpdate() throws Exception {
     control.replay();
 
@@ -736,32 +720,6 @@ public class JobUpdaterIT extends EasyMockTest {
     changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
     clock.advance(ONE_DAY);
     updater.start(update, USER);
-    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
-    actions.putAll(0, INSTANCE_UPDATING, INSTANCE_UPDATED)
-        .putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED)
-        .putAll(2, INSTANCE_UPDATING, INSTANCE_UPDATED);
-    assertState(ROLLED_FORWARD, actions.build());
-  }
-
-  @Test
-  public void testImmediatelyFailedUpdate() throws Exception {
-    // An update where the new configuration is running, but entirely stuck in pending.
-    control.replay();
-
-    final IJobUpdate update = makeJobUpdate(makeInstanceConfig(0, 2, NEW_CONFIG));
-    insertInitialTasks(update);
-    clock.advance(ONE_DAY);
-    updater.start(update, USER);
-    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
-    Iterable<JobUpdateAction> states = ImmutableList.of(
-        INSTANCE_UPDATING,
-        INSTANCE_UPDATE_FAILED,
-        INSTANCE_ROLLING_BACK,
-        INSTANCE_ROLLBACK_FAILED);
-    actions.putAll(0, states)
-        .putAll(1, states)
-        .putAll(2, states);
-    assertState(JobUpdateStatus.FAILED, actions.build());
   }
 
   @Test
@@ -786,9 +744,11 @@ public class JobUpdaterIT extends EasyMockTest {
 
     // Instance 1 is stuck in PENDING.
     changeState(JOB, 1, KILLED);
-    clock.advance(RUNNING_TIMEOUT);
     actions.putAll(0, INSTANCE_UPDATED)
-        .putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATE_FAILED, INSTANCE_ROLLING_BACK);
+        .putAll(1, INSTANCE_UPDATING);
+    assertState(ROLLING_FORWARD, actions.build());
+    clock.advance(RUNNING_TIMEOUT);
+    actions.putAll(1, INSTANCE_UPDATE_FAILED, INSTANCE_ROLLING_BACK);
     assertState(ROLLING_BACK, actions.build());
 
     // Instance 1 is reverted.
@@ -803,6 +763,34 @@ public class JobUpdaterIT extends EasyMockTest {
         .putAll(1, INSTANCE_ROLLED_BACK);
     assertState(ROLLED_BACK, actions.build());
     assertJobState(JOB, ImmutableMap.of(0, OLD_CONFIG, 1, OLD_CONFIG));
+  }
+
+  @Test
+  public void testAddInstances() throws Exception {
+    control.replay();
+
+    IJobUpdate update = makeJobUpdate();
+    stateManager.insertPendingTasks(NEW_CONFIG, ImmutableSet.of(0, 1));
+
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+
+    // Instance 2 is added
+    updater.start(update, USER);
+    actions.putAll(2, INSTANCE_UPDATING);
+    assertState(ROLLING_FORWARD, actions.build());
+    changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
+
+    clock.advance(WATCH_TIMEOUT);
+    actions.putAll(2, INSTANCE_UPDATED);
+    assertState(ROLLED_FORWARD, actions.build());
+
+    assertJobState(
+        JOB,
+        ImmutableMap.of(0, NEW_CONFIG, 1, NEW_CONFIG, 2, NEW_CONFIG));
   }
 
   @Test

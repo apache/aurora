@@ -24,6 +24,7 @@ import org.apache.aurora.gen.storage.StoredJobUpdateDetails;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
@@ -170,5 +171,10 @@ public class ForwardingStore implements
   @Override
   public Optional<String> getLockToken(String updateId) {
     return jobUpdateStore.getLockToken(updateId);
+  }
+
+  @Override
+  public List<IJobInstanceUpdateEvent> fetchInstanceEvents(String updateId, int instanceId) {
+    return jobUpdateStore.fetchInstanceEvents(updateId, instanceId);
   }
 }

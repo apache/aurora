@@ -149,8 +149,10 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
 import org.apache.aurora.scheduler.storage.entities.ILockKey;
@@ -159,8 +161,8 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 import org.apache.aurora.scheduler.thrift.auth.Requires;
+import org.apache.aurora.scheduler.updater.JobDiff;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
-import org.apache.aurora.scheduler.updater.UpdateConfigurationException;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TException;
@@ -185,6 +187,7 @@ import static org.apache.aurora.scheduler.base.Tasks.ACTIVE_STATES;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.thrift.Util.addMessage;
 import static org.apache.aurora.scheduler.thrift.Util.emptyResponse;
+import static org.apache.aurora.scheduler.updater.JobUpdateController.NoopUpdateStateException;
 
 /**
  * Aurora scheduler thrift server implementation.
@@ -1359,7 +1362,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
   }
 
-  private static final Function<Collection<Integer>, Set<Range<Integer>>> TO_RANGES  =
+  private static final Function<Collection<Integer>, Set<Range<Integer>>> TO_RANGES =
       new Function<Collection<Integer>, Set<Range<Integer>>>() {
         @Override
         public Set<Range<Integer>> apply(Collection<Integer> numbers) {
@@ -1367,20 +1370,24 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         }
       };
 
-  private static Set<InstanceTaskConfig> buildInitialState(
-      IJobKey jobKey,
-      Storage.StoreProvider storeProvider) {
+  private static final Function<Range<Integer>, org.apache.aurora.gen.Range> TO_THRIFT_RANGE =
+      new Function<Range<Integer>, org.apache.aurora.gen.Range>() {
+        @Override
+        public org.apache.aurora.gen.Range apply(Range<Integer> range) {
+          return new org.apache.aurora.gen.Range(range.lowerEndpoint(), range.upperEndpoint());
+        }
+      };
 
-    Set<IScheduledTask> tasks =
-        storeProvider.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active());
+  private static Set<org.apache.aurora.gen.Range> convertRanges(Set<Range<Integer>> ranges) {
+    return FluentIterable.from(ranges)
+        .transform(TO_THRIFT_RANGE)
+        .toSet();
+  }
 
-    // Group tasks by their configurations.
-    Multimap<ITaskConfig, IScheduledTask> tasksByConfig =
-        Multimaps.index(tasks, Tasks.SCHEDULED_TO_INFO);
-
+  private static Set<InstanceTaskConfig> buildInitialState(Map<Integer, ITaskConfig> tasks) {
     // Translate tasks into instance IDs.
-    Multimap<ITaskConfig, Integer> instancesByConfig =
-        Multimaps.transformValues(tasksByConfig, Tasks.SCHEDULED_TO_INSTANCE_ID);
+    Multimap<ITaskConfig, Integer> instancesByConfig = HashMultimap.create();
+    Multimaps.invertFrom(Multimaps.forMap(tasks), instancesByConfig);
 
     // Reduce instance IDs into contiguous ranges.
     Map<ITaskConfig, Set<Range<Integer>>> rangesByConfig =
@@ -1388,14 +1395,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     ImmutableSet.Builder<InstanceTaskConfig> builder = ImmutableSet.builder();
     for (Map.Entry<ITaskConfig, Set<Range<Integer>>> entry : rangesByConfig.entrySet()) {
-      ImmutableSet.Builder<org.apache.aurora.gen.Range> ranges = ImmutableSet.builder();
-      for (Range<Integer> range : entry.getValue()) {
-        ranges.add(new org.apache.aurora.gen.Range(range.lowerEndpoint(), range.upperEndpoint()));
-      }
-
       builder.add(new InstanceTaskConfig()
           .setTask(entry.getKey().newBuilder())
-          .setInstances(ranges.build()));
+          .setInstances(convertRanges(entry.getValue())));
     }
 
     return builder.build();
@@ -1414,50 +1416,65 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(mutableRequest);
     requireNonNull(session);
 
-    final Response response = emptyResponse();
+    final IJobKey job = JobKeys.from(ITaskConfig.build(mutableRequest.getTaskConfig()));
 
     final SessionContext context;
     final IJobUpdateRequest request;
     try {
-      context = sessionValidator.checkAuthenticated(
-          session,
-          ImmutableSet.of(mutableRequest.getJobKey().getRole()));
-
+      context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getRole()));
       request = IJobUpdateRequest.build(new JobUpdateRequest(mutableRequest).setTaskConfig(
           ConfigurationManager.validateAndPopulate(
               ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
 
-      if (cronJobManager.hasJob(request.getJobKey())) {
+      if (cronJobManager.hasJob(job)) {
         return addMessage(
-            response,
+            emptyResponse(),
             INVALID_REQUEST,
             "Cron jobs may only be updated by calling replaceCronTemplate.");
       }
     } catch (AuthFailedException e) {
-      return addMessage(response, AUTH_FAILED, e);
+      return addMessage(emptyResponse(), AUTH_FAILED, e);
     } catch (TaskDescriptionException e) {
-      return addMessage(response, INVALID_REQUEST, e);
+      return addMessage(emptyResponse(), INVALID_REQUEST, e);
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {
       @Override
       public Response apply(MutableStoreProvider storeProvider) {
         String updateId = uuidGenerator.createNew().toString();
+        IJobUpdateSettings settings = request.getSettings();
+
+        JobDiff diff = JobDiff.compute(
+            storeProvider.getTaskStore(),
+            job,
+            JobDiff.asMap(request.getTaskConfig(), request.getInstanceCount()),
+            settings.getUpdateOnlyTheseInstances());
+
+        Set<Integer> invalidScope = diff.getOutOfScopeInstances(
+            Numbers.rangesToInstanceIds(settings.getUpdateOnlyTheseInstances()));
+        if (!invalidScope.isEmpty()) {
+          return addMessage(
+              emptyResponse(),
+              INVALID_REQUEST,
+              "updateOnlyTheseInstances contains instances irrelevant to the update: "
+                  + invalidScope);
+        }
+
+        IJobUpdateInstructions instructions =
+            IJobUpdateInstructions.build(new JobUpdateInstructions()
+                .setSettings(settings.newBuilder())
+                .setInitialState(buildInitialState(diff.getReplacedInstances()))
+                .setDesiredState(new InstanceTaskConfig()
+                    .setTask(request.getTaskConfig().newBuilder())
+                    .setInstances(convertRanges(
+                        Numbers.toRanges(diff.getReplacementInstances())))));
 
         IJobUpdate update = IJobUpdate.build(new JobUpdate()
             .setSummary(new JobUpdateSummary()
-                .setJobKey(request.getJobKey().newBuilder())
+                .setJobKey(job.newBuilder())
                 .setUpdateId(updateId)
                 .setUser(context.getIdentity()))
-            .setInstructions(new JobUpdateInstructions()
-                .setSettings(request.getSettings().newBuilder())
-                .setInitialState(buildInitialState(request.getJobKey(), storeProvider))
-                .setDesiredState(new InstanceTaskConfig()
-                    .setTask(request.getTaskConfig().newBuilder())
-                    .setInstances(ImmutableSet.of(new org.apache.aurora.gen.Range()
-                        .setFirst(0)
-                        .setLast(request.getInstanceCount() - 1))))));
-
+            .setInstructions(instructions.newBuilder()));
         try {
           validateTaskLimits(
               request.getTaskConfig(),
@@ -1466,8 +1483,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
           jobUpdateController.start(update, context.getIdentity());
           return okResponse(Result.startJobUpdateResult(new StartJobUpdateResult(updateId)));
-        } catch (TaskValidationException | UpdateStateException | UpdateConfigurationException e) {
-          return addMessage(response, INVALID_REQUEST, e);
+        } catch (NoopUpdateStateException e) {
+          return addMessage(emptyResponse(), OK, e.getMessage());
+        } catch (UpdateStateException | TaskValidationException e) {
+          return addMessage(emptyResponse(), INVALID_REQUEST, e);
         }
       }
     });

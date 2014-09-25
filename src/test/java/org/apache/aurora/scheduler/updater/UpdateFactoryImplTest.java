@@ -87,14 +87,6 @@ public class UpdateFactoryImplTest {
     assertEquals(ImmutableSet.of(1, 2), update.getUpdater().getInstances());
   }
 
-  @Test(expected = UpdateConfigurationException.class)
-  public void testInvalidConfiguration() throws Exception {
-    JobUpdateInstructions config = INSTRUCTIONS.newBuilder();
-    config.getSettings().setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(10, 10)));
-
-    factory.newUpdate(IJobUpdateInstructions.build(config), true);
-  }
-
   @Test
   public void testUpdateRemovesInstance() throws Exception {
     JobUpdateInstructions config = INSTRUCTIONS.newBuilder();

@@ -309,6 +309,8 @@ public class DBJobUpdateStoreTest {
     IJobUpdateDetails details2 =
         makeJobDetails(makeJobUpdate(JobKeys.from("role", "env", "name2"), updateId2));
 
+    assertEquals(ImmutableList.<IJobInstanceUpdateEvent>of(), getInstanceEvents(updateId2, 3));
+
     saveUpdate(details1.getUpdate(), Optional.of("lock1"));
     saveUpdate(details2.getUpdate(), Optional.of("lock2"));
 
@@ -324,8 +326,8 @@ public class DBJobUpdateStoreTest {
 
     IJobUpdateEvent jEvent21 = makeJobUpdateEvent(ROLL_FORWARD_PAUSED, 567L);
     IJobUpdateEvent jEvent22 = makeJobUpdateEvent(ABORTED, 568L);
-    IJobInstanceUpdateEvent iEvent21 = makeJobInstanceEvent(3, 561L, INSTANCE_UPDATED);
-    IJobInstanceUpdateEvent iEvent22 = makeJobInstanceEvent(4, 562L, INSTANCE_UPDATING);
+    IJobInstanceUpdateEvent iEvent21 = makeJobInstanceEvent(3, 561L, INSTANCE_UPDATING);
+    IJobInstanceUpdateEvent iEvent22 = makeJobInstanceEvent(3, 562L, INSTANCE_UPDATED);
 
     saveJobEvent(jEvent11, updateId1);
     saveJobEvent(jEvent12, updateId1);
@@ -334,8 +336,12 @@ public class DBJobUpdateStoreTest {
 
     saveJobEvent(jEvent21, updateId2);
     saveJobEvent(jEvent22, updateId2);
+    assertEquals(ImmutableList.<IJobInstanceUpdateEvent>of(), getInstanceEvents(updateId2, 3));
     saveJobInstanceEvent(iEvent21, updateId2);
+
+    assertEquals(ImmutableList.of(iEvent21), getInstanceEvents(updateId2, 3));
     saveJobInstanceEvent(iEvent22, updateId2);
+    assertEquals(ImmutableList.of(iEvent21, iEvent22), getInstanceEvents(updateId2, 3));
 
     details1 = updateJobDetails(
         populateExpected(details1.getUpdate(), ERROR, CREATED_MS, 457L),
@@ -549,6 +555,15 @@ public class DBJobUpdateStoreTest {
       @Override
       public Optional<IJobUpdate> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobUpdateStore().fetchJobUpdate(updateId);
+      }
+    });
+  }
+
+  private List<IJobInstanceUpdateEvent> getInstanceEvents(final String updateId, final int id) {
+    return storage.consistentRead(new Quiet<List<IJobInstanceUpdateEvent>>() {
+      @Override
+      public List<IJobInstanceUpdateEvent> apply(Storage.StoreProvider storeProvider) {
+        return storeProvider.getJobUpdateStore().fetchInstanceEvents(updateId, id);
       }
     });
   }

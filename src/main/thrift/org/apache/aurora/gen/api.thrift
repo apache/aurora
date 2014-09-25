@@ -695,19 +695,16 @@ struct JobUpdateDetails {
   3: list<JobInstanceUpdateEvent> instanceEvents
 }
 
-/** A request to update the following instances of the existing job. Used by startUpdate. */
+/** A request to update the following instances of an existing job. Used by startUpdate. */
 struct JobUpdateRequest {
-  /** Job key. */
-  1: JobKey jobKey
+  /** Desired TaskConfig to apply. */
+  1: TaskConfig taskConfig
 
-  /** Desired TaskConfig for the job. */
-  2: TaskConfig taskConfig
-
-  /** Desired job instance count. */
-  3: i32 instanceCount
+  /** Desired number of instances of the task config. */
+  2: i32 instanceCount
 
   /** Update settings and limits. */
-  4: JobUpdateSettings settings
+  3: JobUpdateSettings settings
 }
 
 /**

@@ -169,6 +169,13 @@
     <association property="instructions" resultMap="jobUpdateInstructionMap" columnPrefix="jui_"/>
   </resultMap>
 
+  <resultMap id="jobInstanceUpdateMap" type="org.apache.aurora.gen.JobInstanceUpdateEvent">
+    <id column="id" />
+    <result property="action"
+            column="action"
+            typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateActionTypeHandler"/>
+  </resultMap>
+
   <resultMap id="jobUpdateDetailsMap" type="org.apache.aurora.gen.storage.StoredJobUpdateDetails">
     <id column="u_id" />
     <association property="details.update" resultMap="jobUpdateMap" />
@@ -184,13 +191,9 @@
               typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler" />
     </collection>
     <collection property="details.instanceEvents"
-                ofType="org.apache.aurora.gen.JobInstanceUpdateEvent"
+                resultMap="jobInstanceUpdateMap"
                 columnPrefix="i_"
                 notNullColumn="id">
-      <id column="id" />
-      <result property="action"
-              column="action"
-              typeHandler="org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateActionTypeHandler"/>
     </collection>
   </resultMap>
 
@@ -402,6 +405,18 @@
     FROM job_update_locks AS l
     INNER JOIN job_updates u ON l.update_id = u.id
     WHERE u.update_id = #{id}
+  </select>
+
+  <select id="selectInstanceUpdateEvents" resultMap="jobInstanceUpdateMap">
+    SELECT
+      e.id,
+      instance_id,
+      timestamp_ms,
+      action
+    FROM job_instance_update_events as e
+    INNER JOIN job_updates as j ON j.id = e.update_id
+    WHERE j.update_id = #{updateId} AND e.instance_id = #{instanceId}
+    ORDER BY e.timestamp_ms
   </select>
 
   <delete id="truncate">

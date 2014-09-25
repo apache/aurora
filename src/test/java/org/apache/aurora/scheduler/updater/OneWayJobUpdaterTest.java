@@ -219,13 +219,6 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
     }
   }
 
-  @Test(expected = IllegalArgumentException.class)
-  public void testBadInput() {
-    control.replay();
-
-    new OneWayJobUpdater<>(strategy, 0, ImmutableMap.<Integer, StateEvaluator<String>>of());
-  }
-
   @Test
   public void testEvaluateCompletedInstance() {
     expect(strategy.getNextGroup(ImmutableSet.of(0, 1, 2, 3), EMPTY))
@@ -287,5 +280,19 @@ public class OneWayJobUpdaterTest extends EasyMockTest {
     assertNotEquals(a, b);
     assertNotEquals(b, c);
     assertNotEquals(a, "");
+  }
+
+  @Test
+  public void testSideEffectObjectOverrides() {
+    control.replay();
+
+    SideEffect a = sideEffect(KILL_TASK);
+    SideEffect b = sideEffect(KILL_TASK);
+    SideEffect c = sideEffect(KILL_TASK, InstanceUpdateStatus.FAILED);
+    SideEffect d = sideEffect(AWAIT_STATE_CHANGE, InstanceUpdateStatus.FAILED);
+    assertEquals(a, b);
+    assertNotEquals(a, c);
+    assertNotEquals(c, d);
+    assertNotEquals(a, "a string");
   }
 }

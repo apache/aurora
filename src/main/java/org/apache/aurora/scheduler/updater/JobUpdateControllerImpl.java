@@ -14,9 +14,11 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -121,13 +123,10 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
   @Override
   public void start(final IJobUpdate update, final String updatingUser)
-      throws UpdateStateException, UpdateConfigurationException {
+      throws UpdateStateException {
 
     requireNonNull(update);
     requireNonNull(updatingUser);
-
-    // Validate the update configuration by making sure we can create an updater for it.
-    updateFactory.newUpdate(update.getInstructions(), true);
 
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
       @Override
@@ -136,6 +135,15 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
         IJobUpdateSummary summary = update.getSummary();
         IJobKey job = summary.getJobKey();
+
+        // Validate the update configuration by making sure we can create an updater for it.
+        updateFactory.newUpdate(update.getInstructions(), true);
+
+        if (JobDiff.isNoopUpdate(storeProvider.getTaskStore(), job, update.getInstructions())) {
+          throw new NoopUpdateStateException();
+        }
+
+        LOG.info("Starting update for job " + job);
         ILock lock;
         try {
           lock =
@@ -161,11 +169,13 @@ class JobUpdateControllerImpl implements JobUpdateController {
   @Override
   public void pause(final IJobKey job) throws UpdateStateException {
     requireNonNull(job);
+    LOG.info("Attempting to pause update for " + job);
     unscopedChangeUpdateStatus(job, JobUpdateStateMachine.GET_PAUSE_STATE);
   }
 
   public void resume(IJobKey job) throws UpdateStateException {
     requireNonNull(job);
+    LOG.info("Attempting to resume update for " + job);
     unscopedChangeUpdateStatus(job, JobUpdateStateMachine.GET_RESUME_STATE);
   }
 
@@ -383,7 +393,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
       UpdateFactory.Update update;
       try {
         update = updateFactory.newUpdate(jobUpdate.getInstructions(), action == ROLL_FORWARD);
-      } catch (UpdateConfigurationException | RuntimeException e) {
+      } catch (RuntimeException e) {
+        LOG.log(Level.WARNING, "Uncaught exception: " + e, e);
         changeJobUpdateStatus(updateStore, taskStore, updateId, job, ERROR, true);
         return;
       }
@@ -405,6 +416,9 @@ class JobUpdateControllerImpl implements JobUpdateController {
     return Optional.fromNullable(Iterables.getOnlyElement(
         taskStore.fetchTasks(Query.instanceScoped(job, instanceId).active()), null));
   }
+
+  private static final Set<InstanceUpdateStatus> NOOP_INSTANCE_UPDATE =
+      ImmutableSet.of(InstanceUpdateStatus.WORKING, InstanceUpdateStatus.SUCCEEDED);
 
   private void evaluateUpdater(
       JobUpdateStore.Mutable updateStore,
@@ -438,7 +452,26 @@ class JobUpdateControllerImpl implements JobUpdateController {
     LOG.info(JobKeys.canonicalString(job) + " evaluation result: " + result);
 
     for (Map.Entry<Integer, SideEffect> entry : result.getSideEffects().entrySet()) {
-      for (InstanceUpdateStatus statusChange : entry.getValue().getStatusChanges()) {
+      Iterable<InstanceUpdateStatus> statusChanges;
+
+      // Don't bother persisting a sequence of status changes that represents an instance that
+      // was immediately recognized as being healthy and in the desired state.
+      if (entry.getValue().getStatusChanges().equals(NOOP_INSTANCE_UPDATE)) {
+        List<IJobInstanceUpdateEvent> savedEvents =
+            updateStore.fetchInstanceEvents(summary.getUpdateId(), entry.getKey());
+        if (savedEvents.isEmpty()) {
+          LOG.info("Suppressing no-op update for instance " + entry.getKey());
+          statusChanges = ImmutableSet.of();
+        } else {
+          // We choose to risk redundant events in corner cases here (after failing over while
+          // updates are in-flight) to simplify the implementation.
+          statusChanges = entry.getValue().getStatusChanges();
+        }
+      } else {
+        statusChanges = entry.getValue().getStatusChanges();
+      }
+
+      for (InstanceUpdateStatus statusChange : statusChanges) {
         JobUpdateAction action = STATE_MAP.get(Pair.of(statusChange, updaterStatus));
         requireNonNull(action);
 

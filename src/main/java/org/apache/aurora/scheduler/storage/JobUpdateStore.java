@@ -81,6 +81,15 @@ public interface JobUpdateStore {
    */
   Optional<String> getLockToken(String updateId);
 
+  /**
+   * Fetches the events that have affected an instance within a job update.
+   *
+   * @param updateId Update to fetch events from.
+   * @param instanceId Instance to fetch events for.
+   * @return Instance events in {@code updateId} that affected {@code instanceId}.
+   */
+  List<IJobInstanceUpdateEvent> fetchInstanceEvents(String updateId, int instanceId);
+
   interface Mutable extends JobUpdateStore {
 
     /**

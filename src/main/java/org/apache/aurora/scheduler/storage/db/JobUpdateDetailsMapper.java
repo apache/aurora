@@ -18,6 +18,7 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import org.apache.aurora.gen.JobInstanceUpdateEvent;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateQuery;
@@ -153,4 +154,15 @@ interface JobUpdateDetailsMapper {
    */
   @Nullable
   String selectLockToken(String updateId);
+
+  /**
+   * Gets job instance update events for a specific instance within an update.
+   *
+   * @param updateId Update identifier.
+   * @param instanceId Instance to fetch events for.
+   * @return Instance events affecting {@code instanceId} within {@code updateId}.
+   */
+  List<JobInstanceUpdateEvent> selectInstanceUpdateEvents(
+      @Param("updateId") String updateId,
+      @Param("instanceId") int instanceId);
 }

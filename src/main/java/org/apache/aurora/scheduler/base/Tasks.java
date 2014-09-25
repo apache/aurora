@@ -67,6 +67,7 @@ public final class Tasks {
         }
       };
 
+  // TODO(wfarner): Rename to SCHEDULED_TO_CONFIG.
   public static final Function<IScheduledTask, ITaskConfig> SCHEDULED_TO_INFO =
       Functions.compose(ASSIGNED_TO_INFO, SCHEDULED_TO_ASSIGNED);
 

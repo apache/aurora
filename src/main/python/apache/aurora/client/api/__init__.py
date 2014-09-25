@@ -161,7 +161,6 @@ class AuroraClientAPI(object):
 
     log.info("Starting update for: %s" % config.name())
     request = JobUpdateRequest(
-        jobKey=JobKey(role=config.role(), environment=config.environment(), name=config.name()),
         instanceCount=config.instances(),
         settings=settings,
         taskConfig=config.job().taskConfig

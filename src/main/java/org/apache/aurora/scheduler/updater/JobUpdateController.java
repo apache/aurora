@@ -38,12 +38,13 @@ public interface JobUpdateController {
    *
    * @param update Instructions for what job to update, and how to update it.
    * @param updatingUser User initiating the update.
+   * @throws NoopUpdateStateException If the update does not change the job.
    * @throws UpdateStateException If the update cannot be started, for example if the instructions
    *                              are invalid, or if there is already an in-progress update for the
    *                              job.
    */
   void start(IJobUpdate update, String updatingUser)
-      throws UpdateStateException, UpdateConfigurationException;
+      throws NoopUpdateStateException, UpdateStateException;
 
   /**
    * Pauses an in-progress update.
@@ -99,4 +100,13 @@ public interface JobUpdateController {
    * updates, but resumes after a restart of the scheduler process.
    */
   void systemResume();
+
+  /**
+   * Thrown when an update was started that requires no work.
+   */
+  class NoopUpdateStateException extends UpdateStateException {
+    public NoopUpdateStateException() {
+      super("Job is unchanged by proposed update.");
+    }
+  }
 }

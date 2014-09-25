@@ -32,8 +32,6 @@ import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
 
 import static java.util.Objects.requireNonNull;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatus.FAILED;
 import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatus.IDLE;
 import static org.apache.aurora.scheduler.updater.SideEffect.InstanceUpdateStatus.SUCCEEDED;
@@ -79,7 +77,7 @@ class OneWayJobUpdater<K, T> {
 
     this.strategy = requireNonNull(strategy);
     this.maxFailedInstances = maxFailedInstances;
-    checkArgument(!instanceEvaluators.isEmpty());
+    requireNonNull(instanceEvaluators);
 
     this.instances = ImmutableMap.copyOf(Maps.transformEntries(
         instanceEvaluators,

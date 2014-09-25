@@ -191,4 +191,11 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
     // is no longer valid.
     return Optional.fromNullable(detailsMapper.selectLockToken(updateId));
   }
+
+  @Timed("job_update_store_fetch_instance_events")
+  @Override
+  public List<IJobInstanceUpdateEvent> fetchInstanceEvents(String updateId, int instanceId) {
+    return IJobInstanceUpdateEvent.listFromBuilders(
+        detailsMapper.selectInstanceUpdateEvents(updateId, instanceId));
+  }
 }
