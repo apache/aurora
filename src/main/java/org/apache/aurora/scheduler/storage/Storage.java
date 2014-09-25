@@ -166,6 +166,15 @@ public interface Storage {
   }
 
   /**
+   * Indicates that stable storage is temporarily unavailable.
+   */
+  class TransientStorageException extends StorageException {
+    public TransientStorageException(String message) {
+      super(message);
+    }
+  }
+
+  /**
    * Executes the unit of read-only {@code work}.  All data in the stores may be expected to be
    * consistent, as the invocation is mutually exclusive of any writes.
    *

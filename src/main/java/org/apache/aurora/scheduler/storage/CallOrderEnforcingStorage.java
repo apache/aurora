@@ -75,7 +75,7 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
 
   private void checkInState(State state) throws StorageException {
     if (stateMachine.getState() != state) {
-      throw new StorageException("Storage is not " + state);
+      throw new TransientStorageException("Storage is not " + state);
     }
   }
 

@@ -343,3 +343,25 @@ def test_connect_scheduler(mock_client):
   assert mock_client.return_value.open.call_count == 2
   mock_time.sleep.assert_called_once_with(
       scheduler_client.SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
+
+
+@mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',
+            spec=scheduler_client.SchedulerClient)
+def test_transient_error(client):
+  mock_scheduler_client = mock.Mock(spec=scheduler_client.SchedulerClient)
+  mock_thrift_client = mock.Mock(spec=AuroraAdmin.Client)
+  mock_thrift_client.killTasks.side_effect = [
+      Response(responseCode=ResponseCode.ERROR_TRANSIENT, details=["message1", "message2"]),
+      Response(responseCode=ResponseCode.ERROR_TRANSIENT),
+      Response(responseCode=ResponseCode.OK)]
+
+  mock_thrift_client.killTasks.return_value = Response(
+      responseCode=ResponseCode.OK, messageDEPRECATED="ok")
+
+  mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
+  client.get.return_value = mock_scheduler_client
+
+  proxy = TestSchedulerProxy('local')
+  proxy.killTasks(TaskQuery())
+
+  assert mock_thrift_client.killTasks.call_count == 3

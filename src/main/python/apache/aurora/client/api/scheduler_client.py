@@ -31,6 +31,7 @@ from apache.aurora.common.transport import TRequestsTransport
 
 from gen.apache.aurora.api import AuroraAdmin, ReadOnlyScheduler
 from gen.apache.aurora.api.constants import CURRENT_API_VERSION
+from gen.apache.aurora.api.ttypes import ResponseCode
 
 try:
   from urlparse import urljoin
@@ -192,6 +193,7 @@ class SchedulerProxy(object):
 
   class Error(Exception): pass
   class TimeoutError(Error): pass
+  class TransientError(Error): pass
   class AuthenticationError(Error): pass
   class APIVersionError(Error): pass
   class ThriftInternalError(Error): pass
@@ -288,8 +290,13 @@ class SchedulerProxy(object):
             method = getattr(self.client(), method_name)
             if not callable(method):
               return method
-            return method(*(args + auth_args))
-          except (TTransport.TTransportException, self.TimeoutError) as e:
+
+            resp = method(*(args + auth_args))
+            if resp is not None and resp.responseCode == ResponseCode.ERROR_TRANSIENT:
+              raise self.TransientError(", ".join(
+                  [m for m in resp.details] if resp.details else []))
+            return resp
+          except (TTransport.TTransportException, self.TimeoutError, self.TransientError) as e:
             if not self._terminating:
               log.warning('Connection error with scheduler: %s, reconnecting...' % e)
               self.invalidate()

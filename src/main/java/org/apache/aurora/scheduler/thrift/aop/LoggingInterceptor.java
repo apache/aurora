@@ -32,6 +32,7 @@ import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.SessionKey;
+import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.thrift.Util;
 
 /**
@@ -85,6 +86,9 @@ class LoggingInterceptor implements MethodInterceptor {
     LOG.info(message);
     try {
       return invocation.proceed();
+    } catch (Storage.TransientStorageException e) {
+      LOG.log(Level.WARNING, "Uncaught transient exception while handling " + message, e);
+      return Util.addMessage(Util.emptyResponse(), ResponseCode.ERROR_TRANSIENT, e);
     } catch (RuntimeException e) {
       LOG.log(Level.WARNING, "Uncaught exception while handling " + message, e);
       return Util.addMessage(Util.emptyResponse(), ResponseCode.ERROR, e);

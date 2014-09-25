@@ -152,6 +152,7 @@ import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
 import static org.apache.aurora.gen.ResponseCode.AUTH_FAILED;
 import static org.apache.aurora.gen.ResponseCode.ERROR;
+import static org.apache.aurora.gen.ResponseCode.ERROR_TRANSIENT;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
@@ -1844,6 +1845,28 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertResponse(INVALID_REQUEST, thrift.addInstances(config, LOCK.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testAddInstancesFailsWithTransient() throws Exception {
+    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andThrow(new Storage.TransientStorageException("retry"));
+
+    control.replay();
+
+    assertResponse(ERROR_TRANSIENT, thrift.addInstances(config, LOCK.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testAddInstancesFailsWithNonTransient() throws Exception {
+    AddInstancesConfig config = createInstanceConfig(defaultTask(true));
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andThrow(new Storage.StorageException("no retry"));
+
+    control.replay();
+
+    assertResponse(ERROR, thrift.addInstances(config, LOCK.newBuilder(), SESSION));
   }
 
   @Test
