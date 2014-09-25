@@ -13,13 +13,18 @@
  */
 package org.apache.aurora.codec;
 
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.lang.reflect.InvocationTargetException;
+import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
 import javax.annotation.Nullable;
+
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 
 import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;
@@ -122,6 +127,10 @@ public final class ThriftBinaryCodec {
     }
   }
 
+  // See http://www.zlib.net/zlib_how.html
+  // "If the memory is available, buffers sizes on the order of 128K or 256K bytes should be used."
+  private static final int DEFLATER_BUFFER_SIZE = Amount.of(256, Data.KB).as(Data.BYTES);
+
   /**
    * Encodes a thrift object into a DEFLATE-compressed binary array.
    *
@@ -134,7 +143,16 @@ public final class ThriftBinaryCodec {
 
     ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
     try {
-      TTransport transport = new TIOStreamTransport(new DeflaterOutputStream(outBytes));
+      // NOTE: Buffering is needed here for performance.
+      // There are actually 2 buffers in play here - the BufferedOutputStream prevents thrift from
+      // causing a call to deflate() on every encoded primitive. The DeflaterOutputStream buffer
+      // allows the underlying Deflater to operate on a larger chunk at a time without stopping to
+      // copy the intermediate compressed output to outBytes.
+      // See http://bugs.java.com/bugdatabase/view_bug.do?bug_id=4986239
+      TTransport transport = new TIOStreamTransport(
+          new BufferedOutputStream(
+              new DeflaterOutputStream(outBytes, new Deflater(), DEFLATER_BUFFER_SIZE),
+              DEFLATER_BUFFER_SIZE));
       TProtocol protocol = PROTOCOL_FACTORY.getProtocol(transport);
       tBase.write(protocol);
       transport.close();
