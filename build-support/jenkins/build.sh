@@ -23,3 +23,5 @@ date
 # Run all Python tests
 ./pants src/test/python:all -vxs
 
+# Run Python style checks
+SKIP_AURORA_HOOKS='' ./build-support/hooks/pre-commit
