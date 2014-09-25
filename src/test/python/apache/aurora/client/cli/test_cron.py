@@ -156,3 +156,36 @@ class TestCronNoun(AuroraClientCommandTest):
       assert result == EXIT_OK
       mock_scheduler_proxy.getJobs.assert_called_once_with("bozo")
       mock_print.assert_called_with("west/bozo/test/hello\t * * * * *")
+
+  def test_cron_status_multiple_jobs(self):
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    with contextlib.nested(
+        patch('time.sleep'),
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.print_out')) as (
+            _, _, _, mock_print):
+      response = self.create_simple_success_response()
+      response.result = Mock()
+      response.result.getJobsResult = Mock()
+      mockjob1 = Mock()
+      mockjob1.cronSchedule = "* * * * *"
+      mockjob1.key = Mock()
+      mockjob1.key.environment = "test"
+      mockjob1.key.name = "hello2"
+      mockjob1.key.role = "bozo"
+      mockjob2 = Mock()
+      mockjob2.cronSchedule = "* * * * *"
+      mockjob2.key = Mock()
+      mockjob2.key.environment = "test"
+      mockjob2.key.name = "hello"
+      mockjob2.key.role = "bozo"
+      response.result.getJobsResult.configs = [mockjob1, mockjob2]
+      mock_scheduler_proxy.getJobs.return_value = response
+
+      cmd = AuroraCommandLine()
+      result = cmd.execute(['cron', 'show', 'west/bozo/test/hello'])
+
+      assert result == EXIT_OK
+      mock_scheduler_proxy.getJobs.assert_called_once_with("bozo")
+      mock_print.assert_called_with("west/bozo/test/hello\t * * * * *")

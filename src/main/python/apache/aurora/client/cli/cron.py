@@ -128,10 +128,8 @@ class Show(Verb):
         else:
           context.print_out('%s\t %s' % (jobkey, job.cronSchedule))
           return EXIT_OK
-      else:
-        context.print_err("No cron entry found for job %s" % jobkey)
-        return EXIT_INVALID_PARAMETER
-    return EXIT_OK
+    context.print_err("No cron entry found for job %s" % jobkey)
+    return EXIT_INVALID_PARAMETER
 
 
 class CronNoun(Noun):
