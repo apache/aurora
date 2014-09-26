@@ -83,6 +83,7 @@ import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.JobUpdateRequest;
+import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.ListBackupsResult;
 import org.apache.aurora.gen.Lock;
@@ -95,6 +96,7 @@ import org.apache.aurora.gen.PopulateJobResult;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
+import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.Result;
 import org.apache.aurora.gen.RewriteConfigsRequest;
 import org.apache.aurora.gen.RoleSummary;
@@ -280,7 +282,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       SessionKey session) {
 
     requireNonNull(session);
-    final Response response = emptyResponse();
 
     final SanitizedConfiguration sanitized;
     try {
@@ -289,9 +290,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ImmutableSet.of(mutableJob.getOwner().getRole()));
       sanitized = SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(mutableJob));
     } catch (AuthFailedException e) {
-      return addMessage(response, AUTH_FAILED, e);
+      return errorResponse(AUTH_FAILED, e);
     } catch (TaskDescriptionException e) {
-      return addMessage(response, INVALID_REQUEST, e);
+      return errorResponse(INVALID_REQUEST, e);
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {
@@ -308,10 +309,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               Query.jobScoped(job.getKey()).active()).isEmpty()
               || cronJobManager.hasJob(job.getKey())) {
 
-            return addMessage(
-                response,
-                INVALID_REQUEST,
-                "Job already exists: " + JobKeys.canonicalString(job.getKey()));
+            return invalidResponse("Job already exists: " + JobKeys.canonicalString(job.getKey()));
           }
 
           ITaskConfig taskConfig = sanitized.getJobConfig().getTaskConfig();
@@ -330,11 +328,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             LOG.info("Launching " + instanceCount + " tasks.");
             stateManager.insertPendingTasks(taskConfig, sanitized.getInstanceIds());
           }
-          return response.setResponseCode(OK);
+          return okEmptyResponse();
         } catch (LockException e) {
-          return addMessage(response, LOCK_ERROR, e);
+          return errorResponse(LOCK_ERROR, e);
         } catch (CronException | TaskValidationException e) {
-          return addMessage(response, INVALID_REQUEST, e);
+          return errorResponse(INVALID_REQUEST, e);
         }
       }
     });
@@ -350,12 +348,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     IJobKey jobKey = JobKeys.assertValid(job.getKey());
     requireNonNull(session);
 
-    Response response = Util.emptyResponse();
-
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
     } catch (AuthFailedException e) {
-      return addMessage(response, AUTH_FAILED, e);
+      return errorResponse(AUTH_FAILED, e);
     }
 
     try {
@@ -366,13 +362,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
       if (!sanitized.isCron()) {
-        LOG.info("Invalid attempt to schedule non-cron job "
-            + sanitized.getJobConfig().getKey()
-            + " with cron.");
-        response.setResponseCode(INVALID_REQUEST);
-        return addMessage(
-            response,
-            "Job " + sanitized.getJobConfig().getKey() + " has no cron schedule");
+        LOG.info("Invalid attempt to schedule non-cron job " + jobKey + " with cron.");
+        return invalidResponse("Job " + jobKey + " has no cron schedule");
       }
       try {
         // TODO(mchucarroll): Merge CronJobManager.createJob/updateJob
@@ -383,16 +374,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           cronJobManager.createJob(SanitizedCronJob.from(sanitized));
         }
       } catch (CronException e) {
-        addMessage(response, INVALID_REQUEST, e);
-        return response;
+        return errorResponse(INVALID_REQUEST, e);
       }
-      response.setResponseCode(OK);
+      return okEmptyResponse();
     } catch (LockException e) {
-      addMessage(response, LOCK_ERROR, e);
+      return errorResponse(LOCK_ERROR, e);
     } catch (TaskDescriptionException e) {
-      addMessage(response, INVALID_REQUEST, e);
+      return errorResponse(INVALID_REQUEST, e);
     }
-    return response;
   }
 
   @Override
@@ -401,7 +390,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       @Nullable Lock mutableLock,
       SessionKey session) {
 
-    Response response = Util.emptyResponse();
     try {
       IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
       lockManager.validateIfLocked(
@@ -409,16 +397,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
       if (!cronJobManager.deleteJob(jobKey)) {
-        return addMessage(
-            response,
-            INVALID_REQUEST,
-            "Job " + jobKey + " is not scheduled with cron");
+        return invalidResponse("Job " + jobKey + " is not scheduled with cron");
       }
-      response.setResponseCode(OK);
+      return okEmptyResponse();
     } catch (LockException e) {
-      addMessage(response, LOCK_ERROR, e);
+      return errorResponse(LOCK_ERROR, e);
     }
-    return response;
   }
 
   @Override
@@ -432,11 +416,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     IJobKey jobKey = JobKeys.assertValid(job.getKey());
     requireNonNull(session);
 
-    Response response = Util.emptyResponse();
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
     } catch (AuthFailedException e) {
-      return addMessage(response, AUTH_FAILED, e);
+      return errorResponse(AUTH_FAILED, e);
     }
 
     try {
@@ -445,11 +428,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
       cronJobManager.updateJob(SanitizedCronJob.fromUnsanitized(job));
-      return response.setResponseCode(OK);
+      return okEmptyResponse();
     } catch (LockException e) {
-      return addMessage(response, LOCK_ERROR, e);
+      return errorResponse(LOCK_ERROR, e);
     } catch (CronException | TaskDescriptionException e) {
-      return addMessage(response, INVALID_REQUEST, e);
+      return errorResponse(INVALID_REQUEST, e);
     }
   }
 
@@ -457,7 +440,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response populateJobConfig(JobConfiguration description) {
     requireNonNull(description);
 
-    Response response = Util.emptyResponse();
     try {
       ITaskConfig populatedTaskConfig = SanitizedConfiguration.fromUnsanitized(
           IJobConfiguration.build(description)).getJobConfig().getTaskConfig();
@@ -466,12 +448,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           .setPopulatedDEPRECATED(ImmutableSet.of(populatedTaskConfig.newBuilder()))
           .setTaskConfig(populatedTaskConfig.newBuilder());
 
-      response.setResult(Result.populateJobResult(result));
-      response.setResponseCode(OK);
+      return okResponse(Result.populateJobResult(result));
     } catch (TaskDescriptionException e) {
-      addMessage(response, INVALID_REQUEST, "Invalid configuration: " + e.getMessage());
+      return invalidResponse("Invalid configuration: " + e.getMessage());
     }
-    return response;
   }
 
   @Override
@@ -479,18 +459,17 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(session);
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
 
-    Response response = Util.emptyResponse();
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
     } catch (AuthFailedException e) {
-      return addMessage(response, AUTH_FAILED, e);
+      return errorResponse(AUTH_FAILED, e);
     }
 
     try {
       cronJobManager.startJobNow(jobKey);
-      return response.setResponseCode(OK);
+      return okEmptyResponse();
     } catch (CronException e) {
-      return addMessage(response, INVALID_REQUEST, "Failed to start cron job - " + e.getMessage());
+      return invalidResponse("Failed to start cron job - " + e.getMessage());
     }
   }
 
@@ -545,12 +524,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response getPendingReason(TaskQuery query) throws TException {
     requireNonNull(query);
 
-    Response response = Util.emptyResponse();
     if (query.isSetSlaveHosts() || query.isSetStatuses()) {
-      return addMessage(
-          response,
-          INVALID_REQUEST,
-          "Statuses or slaveHosts are not supported in " + query.toString());
+      return invalidResponse("Statuses or slaveHosts are not supported in " + query.toString());
     }
 
     // Only PENDING tasks should be considered.
@@ -576,9 +551,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           }
         }).toSet();
 
-    return response
-        .setResponseCode(OK)
-        .setResult(Result.getPendingReasonResult(new GetPendingReasonResult(reasons)));
+    return okResponse(Result.getPendingReasonResult(new GetPendingReasonResult(reasons)));
   }
 
   @Override
@@ -770,13 +743,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(mutableQuery);
     requireNonNull(session);
 
-    final Response response = emptyResponse();
-
     if (mutableQuery.getJobName() != null && StringUtils.isBlank(mutableQuery.getJobName())) {
-      return addMessage(
-          response,
-          INVALID_REQUEST,
-          String.format("Invalid job name: '%s'", mutableQuery.getJobName()));
+      return invalidResponse(String.format("Invalid job name: '%s'", mutableQuery.getJobName()));
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {
@@ -799,7 +767,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           try {
             context = Optional.of(validateSessionKeyForTasks(session, query, tasks));
           } catch (AuthFailedException e) {
-            return addMessage(response, AUTH_FAILED, e);
+            return errorResponse(AUTH_FAILED, e);
           }
         }
 
@@ -808,7 +776,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER),
               tasks);
         } catch (LockException e) {
-          return addMessage(response, LOCK_ERROR, e);
+          return errorResponse(LOCK_ERROR, e);
         }
 
         LOG.info("Killing tasks matching " + query);
@@ -832,7 +800,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               killedByMessage(context.get().getIdentity()));
         }
 
-        return tasksKilled ? okEmptyResponse() : addMessage(response, OK, NO_TASKS_TO_KILL_MESSAGE);
+        return tasksKilled
+            ? okEmptyResponse() : addMessage(emptyResponse(), OK, NO_TASKS_TO_KILL_MESSAGE);
       }
     });
   }
@@ -847,13 +816,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     final IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
     checkNotBlank(shardIds);
     requireNonNull(session);
-    final Response response = emptyResponse();
 
     final SessionContext context;
     try {
       context = sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
     } catch (AuthFailedException e) {
-      return addMessage(response, AUTH_FAILED, e);
+      return errorResponse(AUTH_FAILED, e);
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {
@@ -864,13 +832,13 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               ILockKey.build(LockKey.job(jobKey.newBuilder())),
               Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
         } catch (LockException e) {
-          return addMessage(response, LOCK_ERROR, e);
+          return errorResponse(LOCK_ERROR, e);
         }
 
         Query.Builder query = Query.instanceScoped(jobKey, shardIds).active();
         Set<IScheduledTask> matchingTasks = storeProvider.getTaskStore().fetchTasks(query);
         if (matchingTasks.size() != shardIds.size()) {
-          return addMessage(response, INVALID_REQUEST, "Not all requested shards are active.");
+          return invalidResponse("Not all requested shards are active.");
         }
 
         LOG.info("Restarting shards matching " + query);
@@ -881,7 +849,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               ScheduleStatus.RESTARTING,
               restartedByMessage(context.getIdentity()));
         }
-        return response.setResponseCode(OK);
+        return okEmptyResponse();
       }
     });
   }
@@ -909,12 +877,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(resourceAggregate);
     requireNonNull(session);
 
-    Response response = Util.emptyResponse();
     try {
       quotaManager.saveQuota(ownerRole, IResourceAggregate.build(resourceAggregate));
-      return response.setResponseCode(OK);
+      return okEmptyResponse();
     } catch (QuotaException e) {
-      return addMessage(response, INVALID_REQUEST, e);
+      return errorResponse(INVALID_REQUEST, e);
     }
   }
 
@@ -959,7 +926,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       // TODO(Sathya): Remove this after AOP-style session validation passes in a SessionContext.
       context = sessionValidator.checkAuthorized(session, Capability.ROOT, AuditCheck.REQUIRED);
     } catch (AuthFailedException e) {
-      return addMessage(emptyResponse(), AUTH_FAILED, e);
+      return errorResponse(AUTH_FAILED, e);
     }
 
     stateManager.changeState(
@@ -985,55 +952,45 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response stageRecovery(String backupId, SessionKey session) {
-    Response response = okEmptyResponse();
     try {
       recovery.stage(backupId);
+      return okEmptyResponse();
     } catch (RecoveryException e) {
-      addMessage(response, ERROR, e);
       LOG.log(Level.WARNING, "Failed to stage recovery: " + e, e);
+      return errorResponse(ERROR, e);
     }
-
-    return response;
   }
 
   @Override
   public Response queryRecovery(TaskQuery query, SessionKey session) {
-    Response response = Util.emptyResponse();
     try {
-      response.setResponseCode(OK)
-          .setResult(Result.queryRecoveryResult(new QueryRecoveryResult()
+      return okResponse(Result.queryRecoveryResult(new QueryRecoveryResult()
               .setTasks(IScheduledTask.toBuildersSet(recovery.query(Query.arbitrary(query))))));
     } catch (RecoveryException e) {
-      addMessage(response, ERROR, e);
       LOG.log(Level.WARNING, "Failed to query recovery: " + e, e);
+      return errorResponse(ERROR, e);
     }
-
-    return response;
   }
 
   @Override
   public Response deleteRecoveryTasks(TaskQuery query, SessionKey session) {
-    Response response = okEmptyResponse();
     try {
       recovery.deleteTasks(Query.arbitrary(query));
+      return okEmptyResponse();
     } catch (RecoveryException e) {
-      addMessage(response, ERROR, e);
       LOG.log(Level.WARNING, "Failed to delete recovery tasks: " + e, e);
+      return errorResponse(ERROR, e);
     }
-
-    return response;
   }
 
   @Override
   public Response commitRecovery(SessionKey session) {
-    Response response = okEmptyResponse();
     try {
       recovery.commit();
+      return okEmptyResponse();
     } catch (RecoveryException e) {
-      addMessage(response, ERROR, e);
+      return errorResponse(ERROR, e);
     }
-
-    return response;
   }
 
   @Override
@@ -1044,13 +1001,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response snapshot(SessionKey session) {
-    Response response = Util.emptyResponse();
     try {
       storage.snapshot();
-      return response.setResponseCode(OK);
+      return okEmptyResponse();
     } catch (Storage.StorageException e) {
       LOG.log(Level.WARNING, "Requested snapshot failed.", e);
-      return addMessage(response, ERROR, e);
+      return errorResponse(ERROR, e);
     }
   }
 
@@ -1217,7 +1173,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(session);
     checkNotBlank(config.getInstanceIds());
     final IJobKey jobKey = JobKeys.assertValid(IJobKey.build(config.getKey()));
-    final Response resp = emptyResponse();
 
     final ITaskConfig task;
     try {
@@ -1225,9 +1180,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       task = ConfigurationManager.validateAndPopulate(
           ITaskConfig.build(config.getTaskConfig()));
     } catch (AuthFailedException e) {
-      return addMessage(resp, AUTH_FAILED, e);
+      return errorResponse(AUTH_FAILED, e);
     } catch (TaskDescriptionException e) {
-      return addMessage(resp, INVALID_REQUEST, e);
+      return errorResponse(INVALID_REQUEST, e);
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {
@@ -1235,7 +1190,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       public Response apply(MutableStoreProvider storeProvider) {
         try {
           if (cronJobManager.hasJob(jobKey)) {
-            return addMessage(resp, INVALID_REQUEST, "Instances may not be added to cron jobs.");
+            return invalidResponse("Instances may not be added to cron jobs.");
           }
 
           lockManager.validateIfLocked(
@@ -1253,11 +1208,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                   config.getInstanceIdsSize()));
 
           stateManager.insertPendingTasks(task, ImmutableSet.copyOf(config.getInstanceIds()));
-          return resp.setResponseCode(OK);
+          return okEmptyResponse();
         } catch (LockException e) {
-          return addMessage(resp, LOCK_ERROR, e);
+          return errorResponse(LOCK_ERROR, e);
         } catch (TaskValidationException | IllegalArgumentException e) {
-          return addMessage(resp, INVALID_REQUEST, e);
+          return errorResponse(INVALID_REQUEST, e);
         }
       }
     });
@@ -1278,7 +1233,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(session);
 
     ILockKey lockKey = ILockKey.build(mutableLockKey);
-    Response response = Util.emptyResponse();
 
     try {
       SessionContext context = sessionValidator.checkAuthenticated(
@@ -1286,14 +1240,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ImmutableSet.of(getRoleFromLockKey(lockKey)));
 
       ILock lock = lockManager.acquireLock(lockKey, context.getIdentity());
-      response.setResult(Result.acquireLockResult(
+      return okResponse(Result.acquireLockResult(
           new AcquireLockResult().setLock(lock.newBuilder())));
-
-      return response.setResponseCode(OK);
     } catch (AuthFailedException e) {
-      return addMessage(response, AUTH_FAILED, e);
+      return errorResponse(AUTH_FAILED, e);
     } catch (LockException e) {
-      return addMessage(response, LOCK_ERROR, e);
+      return errorResponse(LOCK_ERROR, e);
     }
   }
 
@@ -1303,7 +1255,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(validation);
     requireNonNull(session);
 
-    Response response = Util.emptyResponse();
     ILock lock = ILock.build(mutableLock);
 
     try {
@@ -1315,11 +1266,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         lockManager.validateIfLocked(lock.getKey(), Optional.of(lock));
       }
       lockManager.releaseLock(lock);
-      return response.setResponseCode(OK);
+      return okEmptyResponse();
     } catch (AuthFailedException e) {
-      return addMessage(response, AUTH_FAILED, e);
+      return errorResponse(AUTH_FAILED, e);
     } catch (LockException e) {
-      return addMessage(response, LOCK_ERROR, e);
+      return errorResponse(LOCK_ERROR, e);
     }
   }
 
@@ -1406,17 +1357,35 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @Override
   public Response startJobUpdate(JobUpdateRequest mutableRequest, SessionKey session) {
     if (!isUpdaterEnabled) {
-      return addMessage(
-          emptyResponse(),
-          INVALID_REQUEST,
-          "Server-side updates are disabled on this cluster.");
+      return invalidResponse("Server-side updates are disabled on this cluster.");
     }
 
-    // TODO(maxim): validate JobUpdateRequest fields.
     requireNonNull(mutableRequest);
     requireNonNull(session);
 
-    final IJobKey job = JobKeys.from(ITaskConfig.build(mutableRequest.getTaskConfig()));
+    final IJobKey job =
+        JobKeys.assertValid(JobKeys.from(ITaskConfig.build(mutableRequest.getTaskConfig())));
+
+    JobUpdateSettings settings = requireNonNull(mutableRequest.getSettings());
+    if (settings.getUpdateGroupSize() <= 0) {
+      return invalidResponse("updateGroupSize must be positive.");
+    }
+
+    if (settings.getMaxPerInstanceFailures() < 0) {
+      return invalidResponse("maxPerInstanceFailures must be non-negative.");
+    }
+
+    if (settings.getMaxFailedInstances() < 0) {
+      return invalidResponse("maxFailedInstances must be non-negative.");
+    }
+
+    if (settings.getMaxWaitToInstanceRunningMs() < 0) {
+      return invalidResponse("maxWaitToInstanceRunningMs must be non-negative.");
+    }
+
+    if (settings.getMinWaitInInstanceRunningMs() < 0) {
+      return invalidResponse("minWaitInInstanceRunningMs must be non-negative.");
+    }
 
     final SessionContext context;
     final IJobUpdateRequest request;
@@ -1427,15 +1396,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
 
       if (cronJobManager.hasJob(job)) {
-        return addMessage(
-            emptyResponse(),
-            INVALID_REQUEST,
-            "Cron jobs may only be updated by calling replaceCronTemplate.");
+        return invalidResponse("Cron jobs may only be updated by calling replaceCronTemplate.");
       }
     } catch (AuthFailedException e) {
-      return addMessage(emptyResponse(), AUTH_FAILED, e);
+      return errorResponse(AUTH_FAILED, e);
     } catch (TaskDescriptionException e) {
-      return addMessage(emptyResponse(), INVALID_REQUEST, e);
+      return errorResponse(INVALID_REQUEST, e);
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {
@@ -1453,9 +1419,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         Set<Integer> invalidScope = diff.getOutOfScopeInstances(
             Numbers.rangesToInstanceIds(settings.getUpdateOnlyTheseInstances()));
         if (!invalidScope.isEmpty()) {
-          return addMessage(
-              emptyResponse(),
-              INVALID_REQUEST,
+          return invalidResponse(
               "updateOnlyTheseInstances contains instances irrelevant to the update: "
                   + invalidScope);
         }
@@ -1486,7 +1450,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         } catch (NoopUpdateStateException e) {
           return addMessage(emptyResponse(), OK, e.getMessage());
         } catch (UpdateStateException | TaskValidationException e) {
-          return addMessage(emptyResponse(), INVALID_REQUEST, e);
+          return errorResponse(INVALID_REQUEST, e);
         }
       }
     });
@@ -1503,9 +1467,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           jobUpdateController.pause(jobKey);
           return okEmptyResponse();
         } catch (AuthFailedException e) {
-          return addMessage(emptyResponse(), AUTH_FAILED, e);
+          return errorResponse(AUTH_FAILED, e);
         } catch (UpdateStateException e) {
-          return addMessage(emptyResponse(), INVALID_REQUEST, e);
+          return errorResponse(INVALID_REQUEST, e);
         }
       }
     });
@@ -1522,9 +1486,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           jobUpdateController.resume(jobKey);
           return okEmptyResponse();
         } catch (AuthFailedException e) {
-          return addMessage(emptyResponse(), AUTH_FAILED, e);
+          return errorResponse(AUTH_FAILED, e);
         } catch (UpdateStateException e) {
-          return addMessage(emptyResponse(), INVALID_REQUEST, e);
+          return errorResponse(INVALID_REQUEST, e);
         }
       }
     });
@@ -1541,9 +1505,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           jobUpdateController.abort(jobKey);
           return okEmptyResponse();
         } catch (AuthFailedException e) {
-          return addMessage(emptyResponse(), AUTH_FAILED, e);
+          return errorResponse(AUTH_FAILED, e);
         } catch (UpdateStateException e) {
-          return addMessage(emptyResponse(), INVALID_REQUEST, e);
+          return errorResponse(INVALID_REQUEST, e);
         }
       }
     });
@@ -1577,7 +1541,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return okResponse(Result.getJobUpdateDetailsResult(
           new GetJobUpdateDetailsResult().setDetails(details.get().newBuilder())));
     } else {
-      return addMessage(emptyResponse(), INVALID_REQUEST, "Invalid update ID:" + updateId);
+      return invalidResponse("Invalid update ID:" + updateId);
     }
   }
 
@@ -1601,6 +1565,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   private static Response okEmptyResponse()  {
     return emptyResponse().setResponseCode(OK);
+  }
+
+  private static Response invalidResponse(String message) {
+    return addMessage(emptyResponse(), INVALID_REQUEST, message);
+  }
+
+  private static Response errorResponse(ResponseCode code, Throwable error) {
+    return addMessage(emptyResponse(), code, error);
   }
 
   private static Response okResponse(Result result) {

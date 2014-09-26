@@ -2144,6 +2144,78 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testStartUpdateFailsNullRequest() throws Exception {
+    control.replay();
+    assertResponse(ERROR, thrift.startJobUpdate(null, SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsNullTaskConfig() throws Exception {
+    control.replay();
+    assertResponse(ERROR, thrift.startJobUpdate(new JobUpdateRequest(
+        null,
+        5,
+        buildJobUpdateSettings()), SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsInvalidJobKey() throws Exception {
+    control.replay();
+    assertResponse(ERROR, thrift.startJobUpdate(new JobUpdateRequest(
+        new TaskConfig()
+            .setJobName("&")
+            .setEnvironment(DEFAULT_ENVIRONMENT)
+            .setOwner(new Identity(ROLE, null)),
+        5,
+        buildJobUpdateSettings()), SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsInvalidGroupSize() throws Exception {
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(new JobUpdateRequest(
+        defaultTask(true),
+        5,
+        buildJobUpdateSettings().setUpdateGroupSize(0)), SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsInvalidMaxInstanceFailures() throws Exception {
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(new JobUpdateRequest(
+        defaultTask(true),
+        5,
+        buildJobUpdateSettings().setMaxPerInstanceFailures(-1)), SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsInvalidMaxFailedInstances() throws Exception {
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(new JobUpdateRequest(
+        defaultTask(true),
+        5,
+        buildJobUpdateSettings().setMaxFailedInstances(-1)), SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsInvalidMaxWaitToRunning() throws Exception {
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(new JobUpdateRequest(
+        defaultTask(true),
+        5,
+        buildJobUpdateSettings().setMaxWaitToInstanceRunningMs(-1)), SESSION));
+  }
+
+  @Test
+  public void testStartUpdateFailsInvalidMinWaitInRunning() throws Exception {
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(new JobUpdateRequest(
+        defaultTask(true),
+        5,
+        buildJobUpdateSettings().setMinWaitInInstanceRunningMs(-1)), SESSION));
+  }
+
+  @Test
   public void testStartUpdateFailsAuth() throws Exception {
     JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
     expectAuth(ROLE, false);
@@ -2524,8 +2596,18 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static JobUpdateRequest buildJobUpdateRequest(TaskConfig config) {
     return new JobUpdateRequest()
         .setInstanceCount(6)
-        .setSettings(new JobUpdateSettings())
+        .setSettings(buildJobUpdateSettings())
         .setTaskConfig(config);
+  }
+
+  private static JobUpdateSettings buildJobUpdateSettings() {
+    return new JobUpdateSettings()
+        .setUpdateGroupSize(10)
+        .setMaxFailedInstances(2)
+        .setMaxPerInstanceFailures(1)
+        .setMaxWaitToInstanceRunningMs(30000)
+        .setMinWaitInInstanceRunningMs(15000)
+        .setRollbackOnFailure(true);
   }
 
   private static Integer rangesToInstanceCount(Set<IRange> ranges) {
@@ -2561,7 +2643,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .setUpdateId(UPDATE_ID)
             .setUser(ROLE_IDENTITY.getUser()))
         .setInstructions(new JobUpdateInstructions()
-            .setSettings(new JobUpdateSettings())
+            .setSettings(buildJobUpdateSettings())
             .setDesiredState(new InstanceTaskConfig()
                 .setTask(newConfig.newBuilder())
                 .setInstances(ImmutableSet.of(new Range(0, instanceCount - 1))))
