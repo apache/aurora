@@ -143,7 +143,7 @@ class AbortUpdate(Verb):
 class Update(Noun):
   @property
   def name(self):
-    return "update"
+    return "beta-update"
 
   @property
   def help(self):

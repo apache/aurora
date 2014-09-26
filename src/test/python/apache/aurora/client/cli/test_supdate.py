@@ -35,7 +35,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['update', 'start', self.TEST_JOBSPEC, fp.name])
+        result = cmd.execute(['beta-update', 'start', self.TEST_JOBSPEC, fp.name])
         assert result == EXIT_OK
 
       assert mock_api.start_job_update.call_count == 1
@@ -57,7 +57,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['update', 'pause', self.TEST_JOBSPEC])
+        result = cmd.execute(['beta-update', 'pause', self.TEST_JOBSPEC])
         assert result == EXIT_OK
 
       mock_api.pause_job_update.assert_called_with(self.TEST_JOBKEY)
@@ -76,7 +76,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['update', 'abort', self.TEST_JOBSPEC])
+        result = cmd.execute(['beta-update', 'abort', self.TEST_JOBSPEC])
         assert result == EXIT_OK
 
       mock_api.abort_job_update.assert_called_with(self.TEST_JOBKEY)
@@ -95,7 +95,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['update', 'resume', self.TEST_JOBSPEC])
+        result = cmd.execute(['beta-update', 'resume', self.TEST_JOBSPEC])
         assert result == EXIT_OK
 
       mock_api.resume_job_update.assert_called_with(self.TEST_JOBKEY)
@@ -113,7 +113,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_invalid_config('invalid_field=False,'))
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['update', 'start', self.TEST_JOBSPEC, fp.name])
+        result = cmd.execute(['beta-update', 'start', self.TEST_JOBSPEC, fp.name])
         assert result == EXIT_INVALID_CONFIGURATION
         assert mock_api.start_job_update.call_count == 0
 
@@ -128,7 +128,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['update', 'resume', self.TEST_JOBSPEC])
+        result = cmd.execute(['beta-update', 'resume', self.TEST_JOBSPEC])
         assert result == EXIT_API_ERROR
 
       mock_api.resume_job_update.assert_called_with(self.TEST_JOBKEY)
@@ -147,7 +147,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['update', 'abort', self.TEST_JOBSPEC])
+        result = cmd.execute(['beta-update', 'abort', self.TEST_JOBSPEC])
         assert result == EXIT_API_ERROR
 
       mock_api.abort_job_update.assert_called_with(self.TEST_JOBKEY)
@@ -166,7 +166,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['update', 'pause', self.TEST_JOBSPEC])
+        result = cmd.execute(['beta-update', 'pause', self.TEST_JOBSPEC])
         assert result == EXIT_API_ERROR
 
       mock_api.pause_job_update.assert_called_with(self.TEST_JOBKEY)
