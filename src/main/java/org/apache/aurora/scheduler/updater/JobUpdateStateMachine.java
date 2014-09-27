@@ -57,6 +57,7 @@ final class JobUpdateStateMachine {
               ROLL_FORWARD_PAUSED,
               ROLLED_FORWARD,
               ABORTED,
+              FAILED,
               ERROR)
           .putAll(ROLLING_BACK, ROLL_BACK_PAUSED, ROLLED_BACK, ABORTED, ERROR, FAILED)
           .putAll(ROLL_FORWARD_PAUSED, ROLLING_FORWARD, ABORTED, ERROR)

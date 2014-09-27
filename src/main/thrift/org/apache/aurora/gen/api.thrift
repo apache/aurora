@@ -606,6 +606,12 @@ struct JobUpdateSettings {
 
   /** Instance IDs to act on. All instances will be affected if this is not set. */
   7: set<Range> updateOnlyTheseInstances
+
+  /**
+   * If true, use updateGroupSize as strict batching boundaries, and avoid proceeding to another
+   * batch until the preceding batch finishes updating.
+   */
+  8: bool waitForBatchCompletion
 }
 
 /** Event marking a state transition in job update lifecycle. */

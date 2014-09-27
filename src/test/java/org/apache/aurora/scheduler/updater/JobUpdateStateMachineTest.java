@@ -46,6 +46,7 @@ public class JobUpdateStateMachineTest {
           .put(Pair.of(ROLLING_FORWARD, ROLLED_FORWARD), STOP_WATCHING)
           .put(Pair.of(ROLLING_FORWARD, ABORTED), STOP_WATCHING)
           .put(Pair.of(ROLLING_FORWARD, ERROR), STOP_WATCHING)
+          .put(Pair.of(ROLLING_FORWARD, FAILED), STOP_WATCHING)
           .put(Pair.of(ROLLING_BACK, ROLL_BACK_PAUSED), STOP_WATCHING)
           .put(Pair.of(ROLLING_BACK, ROLLED_BACK), STOP_WATCHING)
           .put(Pair.of(ROLLING_BACK, ABORTED), STOP_WATCHING)

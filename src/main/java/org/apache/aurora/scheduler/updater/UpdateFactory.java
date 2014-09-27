@@ -36,6 +36,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.updater.strategy.BatchStrategy;
 import org.apache.aurora.scheduler.updater.strategy.QueueStrategy;
 import org.apache.aurora.scheduler.updater.strategy.UpdateStrategy;
 
@@ -128,17 +129,22 @@ interface UpdateFactory {
           ? Ordering.<Integer>natural()
           : Ordering.<Integer>natural().reverse();
 
-      // TODO(wfarner): Add the batch_completion flag to JobUpdateSettings and pick correct
-      // strategy.
-      UpdateStrategy<Integer> strategy =
-          new QueueStrategy<>(updateOrder, settings.getUpdateGroupSize());
+      UpdateStrategy<Integer> strategy = settings.isWaitForBatchCompletion()
+          ? new BatchStrategy<>(updateOrder, settings.getUpdateGroupSize())
+          : new QueueStrategy<>(updateOrder, settings.getUpdateGroupSize());
+      JobUpdateStatus successStatus =
+          rollingForward ? JobUpdateStatus.ROLLED_FORWARD : JobUpdateStatus.ROLLED_BACK;
+      JobUpdateStatus failureStatus = rollingForward && settings.isRollbackOnFailure()
+          ? JobUpdateStatus.ROLLING_BACK
+          : JobUpdateStatus.FAILED;
 
       return new Update(
           new OneWayJobUpdater<>(
               strategy,
               settings.getMaxFailedInstances(),
               evaluators.build()),
-          rollingForward);
+          successStatus,
+          failureStatus);
     }
 
     @VisibleForTesting
@@ -171,11 +177,17 @@ interface UpdateFactory {
 
   class Update {
     private final OneWayJobUpdater<Integer, Optional<IScheduledTask>> updater;
-    private final boolean rollingForward;
+    private final JobUpdateStatus successStatus;
+    private final JobUpdateStatus failureStatus;
 
-    Update(OneWayJobUpdater<Integer, Optional<IScheduledTask>> updater, boolean rollingForward) {
+    Update(
+        OneWayJobUpdater<Integer, Optional<IScheduledTask>> updater,
+        JobUpdateStatus successStatus,
+        JobUpdateStatus failureStatus) {
+
       this.updater = requireNonNull(updater);
-      this.rollingForward = rollingForward;
+      this.successStatus = requireNonNull(successStatus);
+      this.failureStatus = requireNonNull(failureStatus);
     }
 
     OneWayJobUpdater<Integer, Optional<IScheduledTask>> getUpdater() {
@@ -183,11 +195,11 @@ interface UpdateFactory {
     }
 
     JobUpdateStatus getSuccessStatus() {
-      return rollingForward ? JobUpdateStatus.ROLLED_FORWARD : JobUpdateStatus.ROLLED_BACK;
+      return successStatus;
     }
 
     JobUpdateStatus getFailureStatus() {
-      return rollingForward ? JobUpdateStatus.ROLLING_BACK : JobUpdateStatus.FAILED;
+      return failureStatus;
     }
   }
 }

@@ -112,6 +112,7 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_PAUSED;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
 import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
+import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
@@ -353,6 +354,54 @@ public class JobUpdaterIT extends EasyMockTest {
   }
 
   @Test
+  public void testSuccessfulBatchedUpdate() throws Exception {
+    expectTaskKilled().times(3);
+
+    control.replay();
+
+    JobUpdate builder = makeJobUpdate(makeInstanceConfig(0, 2, OLD_CONFIG)).newBuilder();
+    builder.getInstructions().getSettings()
+        .setWaitForBatchCompletion(true)
+        .setUpdateGroupSize(2);
+    IJobUpdate update = IJobUpdate.build(builder);
+    insertInitialTasks(update);
+
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+
+    // Instances 0 and 1 are updated.
+    updater.start(update, USER);
+    actions.putAll(0, INSTANCE_UPDATING)
+        .putAll(1, INSTANCE_UPDATING);
+    assertState(ROLLING_FORWARD, actions.build());
+    changeState(JOB, 1, FINISHED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(Amount.of(RUNNING_TIMEOUT.getValue() / 2, Time.MILLISECONDS));
+    changeState(JOB, 0, FINISHED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(
+        Amount.of(WATCH_TIMEOUT.getValue() - (RUNNING_TIMEOUT.getValue() / 2), Time.MILLISECONDS));
+
+    // Instance 1 finished first, but update does not yet proceed until 0 finishes.
+    actions.putAll(1, INSTANCE_UPDATED);
+    assertState(ROLLING_FORWARD, actions.build());
+    clock.advance(WATCH_TIMEOUT);
+    actions.putAll(0, INSTANCE_UPDATED);
+
+    // Instance 2 is updated.
+    changeState(JOB, 2, FINISHED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+    actions.putAll(2, INSTANCE_UPDATING, INSTANCE_UPDATED);
+    assertState(ROLLED_FORWARD, actions.build());
+
+    assertJobState(
+        JOB,
+        ImmutableMap.of(0, NEW_CONFIG, 1, NEW_CONFIG, 2, NEW_CONFIG));
+  }
+
+  @Test
   public void testUpdateSpecificInstances() throws Exception {
     expectTaskKilled();
 
@@ -448,6 +497,51 @@ public class JobUpdaterIT extends EasyMockTest {
 
     assertState(ROLLED_BACK, actions.build());
     assertJobState(JOB, ImmutableMap.of(0, OLD_CONFIG, 2, OLD_CONFIG, 3, OLD_CONFIG));
+  }
+
+  @Test
+  public void testRollbackDisabled() throws Exception {
+    expectTaskKilled().times(2);
+
+    control.replay();
+
+    JobUpdate builder = makeJobUpdate(
+        makeInstanceConfig(0, 0, OLD_CONFIG),
+        makeInstanceConfig(2, 3, OLD_CONFIG))
+        .newBuilder();
+    builder.getInstructions().getSettings().setRollbackOnFailure(false);
+    IJobUpdate update = IJobUpdate.build(builder);
+    insertInitialTasks(update);
+
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 2, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 3, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+
+    // Instance 0 is updated.
+    updater.start(update, USER);
+    actions.putAll(0, INSTANCE_UPDATING);
+    assertState(ROLLING_FORWARD, actions.build());
+    changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    // Instance 1 is added.
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    actions.putAll(0, INSTANCE_UPDATED)
+        .putAll(1, INSTANCE_UPDATING, INSTANCE_UPDATED);
+    clock.advance(WATCH_TIMEOUT);
+
+    // Instance 2 is updated, but fails.
+    changeState(JOB, 2, KILLED, ASSIGNED, STARTING, RUNNING);
+    actions.putAll(2, INSTANCE_UPDATING, INSTANCE_UPDATE_FAILED);
+    clock.advance(FLAPPING_THRESHOLD);
+    changeState(JOB, 2, FAILED);
+    clock.advance(WATCH_TIMEOUT);
+
+    // Rollback is disabled, update fails.
+    assertState(JobUpdateStatus.FAILED, actions.build());
   }
 
   @Test
@@ -824,6 +918,7 @@ public class JobUpdaterIT extends EasyMockTest {
                 .setInstances(ImmutableSet.of(new Range(0, 2))))
             .setSettings(new JobUpdateSettings()
                 .setUpdateGroupSize(1)
+                .setRollbackOnFailure(true)
                 .setMaxWaitToInstanceRunningMs(RUNNING_TIMEOUT.as(Time.MILLISECONDS).intValue())
                 .setMinWaitInInstanceRunningMs(WATCH_TIMEOUT.as(Time.MILLISECONDS).intValue())
                 .setUpdateOnlyTheseInstances(ImmutableSet.<Range>of())));

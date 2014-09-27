@@ -79,7 +79,8 @@ class TestJobUpdateApis(unittest.TestCase):
         maxFailedInstances=1,
         maxWaitToInstanceRunningMs=50 * 1000,
         minWaitInInstanceRunningMs=50 * 1000,
-        rollbackOnFailure=True)
+        rollbackOnFailure=True,
+        waitForBatchCompletion=False)
 
   @classmethod
   def create_update_request(cls, task_config):

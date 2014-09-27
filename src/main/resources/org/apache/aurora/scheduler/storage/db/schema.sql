@@ -105,6 +105,7 @@ CREATE TABLE job_updates(
   max_wait_to_instance_running_ms INT NOT NULL,
   min_wait_in_instance_running_ms INT NOT NULL,
   rollback_on_failure BOOLEAN NOT NULL,
+  wait_for_batch_completion BOOLEAN NOT NULL,
 
   UNIQUE(update_id)
 );
