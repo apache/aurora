@@ -77,9 +77,7 @@ class MemJobStore implements JobStore.Mutable {
       return ImmutableSet.of();
     }
 
-    synchronized (manager.jobs) {
-      return ImmutableSet.copyOf(manager.jobs.values());
-    }
+    return ImmutableSet.copyOf(manager.jobs.values());
   }
 
   @Override

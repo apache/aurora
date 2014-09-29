@@ -12,29 +12,21 @@
  * limitations under the License.
  */
 
+plugins {
+  id 'com.eriwen.gradle.js' version '1.12.1'
+  id 'com.github.ben-manes.versions' version '0.5'
+  id 'com.github.hierynomus.license' version '0.11.0'
+}
+
 apply plugin: 'application'
 apply plugin: 'checkstyle'
 apply plugin: 'findbugs'
 apply plugin: 'idea'
 apply plugin: 'jacoco'
 apply plugin: 'java'
-apply plugin: 'js'
-apply plugin: 'license'
 apply plugin: 'maven-publish'
 apply plugin: 'pmd'
 apply plugin: 'project-report'
-apply plugin: 'versions'
-
-buildscript {
-  repositories {
-    mavenCentral()
-  }
-  dependencies {
-    classpath 'com.github.ben-manes:gradle-versions-plugin:0.4'
-    classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.9.0'
-    classpath 'com.eriwen:gradle-js-plugin:1.11.1'
-  }
-}
 
 buildDir = 'dist'
 def generatedDir = "$buildDir/generated-src"
@@ -49,7 +41,7 @@ compileJava {
   targetCompatibility = 1.7
 }
 
-tasks.matching { it instanceof Compile && it.getName() != 'compileGeneratedJava' }.all {
+tasks.withType(JavaCompile).matching { it.name != 'compileGeneratedJava' }.all {
   options.compilerArgs << '-Werror'
   options.compilerArgs << '-Xlint:all'
   // Don't fail for annotations not claimed by annotation processors.
@@ -59,7 +51,7 @@ tasks.matching { it instanceof Compile && it.getName() != 'compileGeneratedJava'
 }
 
 task wrapper(type: Wrapper) {
-  gradleVersion = '1.12'
+  gradleVersion = '2.1'
 }
 
 task sourceJar(type: Jar) {
@@ -227,8 +219,6 @@ dependencies {
   generatedCompile guavaDep
   generatedCompile thriftLib
 
-  checkstyle 'com.puppycrawl.tools:checkstyle:5.6'
-
   configurations.compile {
     exclude module: 'junit-dep'
     resolutionStrategy {
@@ -298,7 +288,7 @@ pmd {
       'java-unnecessary',
       'java-unusedcode']
   ruleSetFiles = fileTree('config/pmd/')
-  toolVersion = '5.1.1'
+  consoleOutput = true
 }
 
 task checkPython() {

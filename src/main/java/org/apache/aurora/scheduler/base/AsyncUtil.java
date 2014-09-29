@@ -19,8 +19,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.annotation.Nullable;
-
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -54,7 +52,7 @@ public final class AsyncUtil {
         new ThreadFactoryBuilder().setDaemon(true).setNameFormat(nameFormat).build()) {
 
       @Override
-      protected void afterExecute(Runnable runnable, @Nullable Throwable throwable) {
+      protected void afterExecute(Runnable runnable, Throwable throwable) {
         // See java.util.concurrent.ThreadPoolExecutor#afterExecute(Runnable, Throwable)
         // for more details and an implementation example.
         super.afterExecute(runnable, throwable);
