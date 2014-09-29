@@ -35,6 +35,7 @@
       background: #000000;
     }
   </style>
+  <link rel="icon" href="/assets/favicon.ico">
 </head>
 
 <link rel="stylesheet"

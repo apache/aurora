@@ -12,7 +12,8 @@
  limitations under the License.
  -->
 
- <html>
+<html>
+<head>
 <title>thermos({{hostname}})</title>
 
 <link rel="stylesheet"
@@ -20,6 +21,8 @@
       href="assets/bootstrap.css"/>
 
 <script src="assets/jquery.js"></script>
+<link rel="icon" href="/assets/favicon.ico">
+</head>
 
 <body>
 
