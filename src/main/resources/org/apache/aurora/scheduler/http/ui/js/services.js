@@ -325,6 +325,35 @@
         displayClassForInstanceStatus: function (action) {
           return instanceActionLookup[action].toLowerCase().replace(/_/g, '-');
         },
+        processInstanceIdsFromRanges: function (ranges, cb) {
+          ranges.forEach(function (r) {
+            for (var i = r.first; i <= r.last; i++) {
+              cb(i);
+            }
+          });
+        },
+        getAllInstanceIds: function (update) {
+          var allIds = {}, newIds = {}, oldIds = {};
+
+          updateUtil.processInstanceIdsFromRanges(update.instructions.desiredState.instances,
+            function (instanceId) {
+              newIds[instanceId] = true;
+              allIds[instanceId] = true;
+            });
+
+          update.instructions.initialState.forEach(function (iTaskConfig) {
+            updateUtil.processInstanceIdsFromRanges(iTaskConfig.instances, function (instanceId) {
+              oldIds[instanceId] = true;
+              allIds[instanceId] = true;
+            });
+          });
+
+          return {
+            allIds: allIds,
+            newIds: newIds,
+            oldIds: oldIds
+          };
+        },
         getLatestInstanceEvents: function (instanceEvents, condition) {
           var events = _.sortBy(instanceEvents, 'timestampMs');
           var instanceMap = {};
@@ -342,87 +371,49 @@
           // get latest event for each instance
           var instanceMap = updateUtil.getLatestInstanceEvents(details.instanceEvents);
 
-          // total number of instances to show is the max between
-          // new instance count and old instance count
-          var totalInstances = Math.max(
-              stats.oldInstanceCount,
-              updateUtil.instanceCountFromRanges(details.update.instructions.desiredState.instances)
-            );
+          // instances to show is the union of old instances and new instances.
+          var allInstances = updateUtil.getAllInstanceIds(details.update);
 
-          var instances = [];
-          var instanceSubset = details.update.instructions.settings.updateOnlyTheseInstances;
+          var allIds = Object.keys(allInstances.allIds);
 
-          function inRanges(ranges, x) {
-            if (ranges && x) {
-              for (var i = 0; i < ranges.length; i++) {
-                if (x >= ranges[i].first && x <= ranges[i].last) {
-                  return true;
-                }
-              }
-            }
-            return false;
-          }
-
-          for (var i = 0; i < totalInstances; i++) {
+          return allIds.map(function (i) {
             if (instanceMap.hasOwnProperty(i)) {
               var event = instanceMap[i];
+
+              // If instance id is in initialState but not desiredState, and last
+              // action is a successful update - it means that this instance was removed.
+              if (updateUtil.isInstanceSuccessful(event.action) &&
+                  allInstances.oldIds.hasOwnProperty(i) &&
+                  !allInstances.newIds.hasOwnProperty(i)) {
+                return {
+                  instanceId: i,
+                  className: 'instance-removed'
+                };
+              }
+
+              // Normal case - just use the latest action from the instance events.
               var className = updateUtil.displayClassForInstanceStatus(event.action);
-              instances.push({
+              return {
                 instanceId: i,
                 className: className,
                 event: event
-              });
-            } else if (instanceSubset && !inRanges(instanceSubset, i)) {
-              // If they have declared a subset of instances to update
-              // AND this instance isn't part of that subset, it will be ignored.
-              instances.push({
-                instanceId: i,
-                className: 'ignore'
-              });
+              };
             } else {
               // Otherwise it is pending an update.
-              instances.push({
+              return {
                 instanceId: i,
                 className: 'pending'
-              });
+              };
             }
-          }
-          return instances;
+          });
         },
         getUpdateStats: function (details) {
           if (!details || !details.update) {
             return {};
           }
 
-          // find number of instances to be updated
-          var newInstanceCount = updateUtil.instanceCountFromRanges(
-            details.update.instructions.desiredState.instances
-          );
-          var updateSubset = false;
-
-          // find total number of existing instances
-          var oldInstanceCount = updateUtil.instanceCountFromConfigs(
-            details.update.instructions.initialState);
-
-          // max of those two numbers is the number of instances to be updated
-          var totalInstancesToBeUpdated = Math.max(oldInstanceCount, newInstanceCount);
-
-          if (details.update.instructions.settings.updateOnlyTheseInstances &&
-            details.update.instructions.settings.updateOnlyTheseInstances.length > 0) {
-            newInstanceCount = updateUtil.instanceCountFromRanges(
-              details.update.instructions.settings.updateOnlyTheseInstances
-            );
-            updateSubset = true;
-            totalInstancesToBeUpdated = newInstanceCount;
-          }
-
-          // if necessary, differentiate between number of instances updated
-          // and number of instances that will be discarded
-          var instancesToBeUpdated = newInstanceCount;
-          var instancesToBeDiscarded = 0;
-          if (!updateSubset && (oldInstanceCount > newInstanceCount)) {
-            instancesToBeDiscarded = oldInstanceCount - newInstanceCount;
-          }
+          var allInstances = Object.keys(updateUtil.getAllInstanceIds(details.update).allIds);
+          var totalInstancesToBeUpdated = allInstances.length;
 
           var instancesUpdated = updateUtil.progressFromEvents(details.instanceEvents);
 
@@ -430,11 +421,7 @@
           var progress = Math.round((instancesUpdated / totalInstancesToBeUpdated) * 100);
 
           return {
-            onlySubset: updateSubset,
-            oldInstanceCount: oldInstanceCount,
             totalInstancesToBeUpdated: totalInstancesToBeUpdated,
-            instancesToBeUpdated: instancesToBeUpdated,
-            instancesToBeDiscarded: instancesToBeDiscarded,
             instancesUpdatedSoFar: instancesUpdated,
             progress: progress
           };

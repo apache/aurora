@@ -167,7 +167,8 @@
           }
           var list = angular.element('<ul class="instance-grid ' + scope.size + '"></ul>');
 
-          scope.instances.forEach(function (i, n) {
+          scope.instances.forEach(function (i) {
+            var n = i.instanceId;
             list.append('<li class="' + i.className + '" tooltip="INSTANCE ' + n +
               ': ' + i.className.toUpperCase() + '"><span class="instance-id">' + n +
               '</span></li>');
