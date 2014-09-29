@@ -472,12 +472,112 @@ license {
   ext.year = Calendar.getInstance().get(Calendar.YEAR)
 }
 
+def legacyClassesWithoutCoverage = [
+    'org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$1',
+    'org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$2',
+    'org/apache/aurora/auth/UnsecureAuthModule$UnsecureSessionValidator$1',
+    'org/apache/aurora/auth/UnsecureAuthModule$UnsecureSessionValidator',
+    'org/apache/aurora/codec/ThriftBinaryCodec$CodingException',
+    'org/apache/aurora/scheduler/app/SchedulerMain$2',
+    'org/apache/aurora/scheduler/app/SchedulerMain$3',
+    'org/apache/aurora/scheduler/async/OfferQueue$OfferQueueImpl$2',
+    'org/apache/aurora/scheduler/base/Conversions$4',
+    'org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl$1',
+    'org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl',
+    'org/apache/aurora/scheduler/http/JerseyTemplateServlet',
+    'org/apache/aurora/scheduler/http/Maintenance$1',
+    'org/apache/aurora/scheduler/http/Maintenance$2',
+    'org/apache/aurora/scheduler/http/Maintenance$3',
+    'org/apache/aurora/scheduler/http/Maintenance',
+    'org/apache/aurora/scheduler/http/Offers$1',
+    'org/apache/aurora/scheduler/http/Offers$2',
+    'org/apache/aurora/scheduler/http/Offers$3',
+    'org/apache/aurora/scheduler/http/Offers$4',
+    'org/apache/aurora/scheduler/http/Offers$5',
+    'org/apache/aurora/scheduler/http/Offers',
+    'org/apache/aurora/scheduler/http/PendingTasks',
+    'org/apache/aurora/scheduler/http/Quotas$1',
+    'org/apache/aurora/scheduler/http/Quotas$2',
+    'org/apache/aurora/scheduler/http/Quotas$ResourceAggregateBean',
+    'org/apache/aurora/scheduler/http/Quotas',
+    'org/apache/aurora/scheduler/http/Slaves$1',
+    'org/apache/aurora/scheduler/http/Slaves$2',
+    'org/apache/aurora/scheduler/http/Slaves$3',
+    'org/apache/aurora/scheduler/http/Slaves$4',
+    'org/apache/aurora/scheduler/http/Slaves$Slave$1',
+    'org/apache/aurora/scheduler/http/Slaves$Slave',
+    'org/apache/aurora/scheduler/http/Slaves',
+    'org/apache/aurora/scheduler/http/StructDump$1',
+    'org/apache/aurora/scheduler/http/StructDump$2',
+    'org/apache/aurora/scheduler/http/StructDump$3',
+    'org/apache/aurora/scheduler/http/StructDump',
+    'org/apache/aurora/scheduler/http/Utilization$1',
+    'org/apache/aurora/scheduler/http/Utilization$2',
+    'org/apache/aurora/scheduler/http/Utilization$3',
+    'org/apache/aurora/scheduler/http/Utilization$4',
+    'org/apache/aurora/scheduler/http/Utilization$5',
+    'org/apache/aurora/scheduler/http/Utilization$Display',
+    'org/apache/aurora/scheduler/http/Utilization$DisplayMetric',
+    'org/apache/aurora/scheduler/http/Utilization',
+    'org/apache/aurora/scheduler/log/Log$Stream$InvalidPositionException',
+    'org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$1',
+    'org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$2',
+    'org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$3',
+    'org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$4',
+    'org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$5',
+    'org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule',
+    'org/apache/aurora/scheduler/state/MaintenanceController$MaintenanceControllerImpl$8',
+    'org/apache/aurora/scheduler/storage/log/LogStorage$RecoveryFailedException',
+    'org/apache/aurora/scheduler/storage/mem/Util$1',
+    'org/apache/aurora/scheduler/storage/mem/Util',
+    'org/apache/aurora/scheduler/updater/UpdateConfigurationException',
+]
+
+def computeCoverage(counterNodes, type) {
+  def node = counterNodes.find { it.@type == type }
+  def missed = node.@missed.toInteger()
+  def covered = node.@covered.toInteger()
+  return ((double) covered) / (missed + covered)
+}
+
+def final MIN_INSTRUCTION_COVERAGE = 0.87
+def final MIN_BRANCH_COVERAGE = 0.82
+
 jacocoTestReport {
   group = "Reporting"
   description = "Generate Jacoco coverage reports after running tests."
   additionalSourceDirs = files(sourceSets.main.allJava.srcDirs)
+  reports {
+    xml.enabled true
+  }
   doLast {
-    println "Coverage report generated: file://$buildDir/reports/jacoco/test/html/index.html"
+    ext.reportPath = "$buildDir/reports/jacoco/test"
+    println "Coverage report generated: file://$reportPath/html/index.html"
+    ext.parser = new XmlSlurper()
+    parser.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
+    // Avoid trying to load the DTD for the XML document, which does not exist.
+    parser.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+
+    ext.coverageReport = parser.parse("$reportPath/jacocoTestReport.xml")
+
+    // Check global thresholds.
+    ext.instructionCoverage = computeCoverage(coverageReport.counter, 'INSTRUCTION')
+    assert instructionCoverage > MIN_INSTRUCTION_COVERAGE, 'Test instruction coverage is too low'
+    ext.branchCoverage = computeCoverage(coverageReport.counter, 'BRANCH')
+    assert branchCoverage > MIN_BRANCH_COVERAGE, 'Test branch coverage is too low'
+
+    // Find classes missing coverage.
+    coverageReport.package.each { pkg ->
+      pkg.class.each { cls ->
+        ext.coverage = cls.counter.find { it.@type == 'INSTRUCTION' }.@covered
+        if (cls.@name in legacyClassesWithoutCoverage) {
+          assert coverage == 0, 'Thanks for adding the first test coverage to: ' + cls.@name \
+              + ' please remove it from the legacyClassesWithoutCoverage list'
+        } else {
+          assert coverage != 0, 'Test coverage missing for ' + cls.@name
+        }
+      }
+    }
   }
 }
 
