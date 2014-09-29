@@ -2144,6 +2144,46 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testStartUpdateEmptyDesired() throws Exception {
+    expectAuth(ROLE, true);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+
+    ITaskConfig newTask = buildScheduledTask(0, 5).getAssignedTask().getTask();
+    expect(taskIdGenerator.generate(newTask, 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkQuota(
+        ROLE,
+        IResourceAggregate.build(new ResourceAggregate(1, 5, 1024)))).andReturn(ENOUGH_QUOTA);
+
+    IScheduledTask oldTask1 = buildScheduledTask(0, 5);
+    IScheduledTask oldTask2 = buildScheduledTask(1, 5);
+
+    // Set instance count to 1 to generate empty desired state in diff.
+    IJobUpdate update = buildJobUpdate(1, newTask, ImmutableMap.of(
+        oldTask1.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 1))));
+
+    // Set diff-adjusted IJobUpdate expectations.
+    JobUpdate expected = update.newBuilder();
+    expected.getInstructions().setInitialState(ImmutableSet.of(
+        new InstanceTaskConfig(newTask.newBuilder(), ImmutableSet.of(new Range(1, 1)))));
+    expected.getInstructions().unsetDesiredState();
+
+    expect(uuidGenerator.createNew()).andReturn(UU_ID);
+    storageUtil.expectTaskFetch(
+        Query.unscoped().byJob(JOB_KEY).active(),
+        oldTask1,
+        oldTask2);
+
+    jobUpdateController.start(IJobUpdate.build(expected), USER);
+
+    control.replay();
+
+    Response response =
+        assertOkResponse(thrift.startJobUpdate(buildJobUpdateRequest(update), SESSION));
+    assertEquals(UPDATE_ID, response.getResult().getStartJobUpdateResult().getUpdateId());
+  }
+
+  @Test
   public void testStartUpdateFailsNullRequest() throws Exception {
     control.replay();
     assertResponse(ERROR, thrift.startJobUpdate(null, SESSION));

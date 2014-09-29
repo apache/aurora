@@ -54,6 +54,7 @@ interface InstanceActionHandler {
         int instanceId) {
 
       if (rollingForward) {
+        // Desired state is assumed to be non-null when AddTask is used.
         return instructions.getDesiredState().getTask();
       } else {
         for (IInstanceTaskConfig config : instructions.getInitialState()) {
@@ -76,8 +77,6 @@ interface InstanceActionHandler {
         StateManager stateManager,
         JobUpdateStatus status) {
 
-      // TODO(wfarner): This skips quota validation.  Either check quota here, or augment
-      // quota checking to take updates into consideration (AURORA-686).
       LOG.info("Adding instance " + instance + " while " + status);
       ITaskConfig replacement = getTargetConfig(
           instructions,

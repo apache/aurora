@@ -87,13 +87,11 @@ interface UpdateFactory {
       checkArgument(
           settings.getUpdateGroupSize() > 0,
           "Update group size must be positive.");
-      checkArgument(
-          !instructions.getDesiredState().getInstances().isEmpty(),
-          "Instance count must be positive.");
 
       Set<Integer> instances;
-      Set<Integer> desiredInstances =
-          expandInstanceIds(ImmutableSet.of(instructions.getDesiredState()));
+      Set<Integer> desiredInstances = instructions.isSetDesiredState()
+          ? expandInstanceIds(ImmutableSet.of(instructions.getDesiredState()))
+          : ImmutableSet.<Integer>of();
 
       if (settings.getUpdateOnlyTheseInstances().isEmpty()) {
         // In a full job update, the working set is the union of instance IDs before and after.
@@ -106,19 +104,19 @@ interface UpdateFactory {
       ImmutableMap.Builder<Integer, StateEvaluator<Optional<IScheduledTask>>> evaluators =
           ImmutableMap.builder();
       for (int instanceId : instances) {
-        Optional<ITaskConfig> desiredState;
+        Optional<ITaskConfig> desiredStateConfig;
         if (rollingForward) {
-          desiredState = desiredInstances.contains(instanceId)
+          desiredStateConfig = desiredInstances.contains(instanceId)
               ? Optional.of(instructions.getDesiredState().getTask())
               : Optional.<ITaskConfig>absent();
         } else {
-          desiredState = getConfig(instanceId, instructions.getInitialState());
+          desiredStateConfig = getConfig(instanceId, instructions.getInitialState());
         }
 
         evaluators.put(
             instanceId,
             new InstanceUpdater(
-                desiredState,
+                desiredStateConfig,
                 settings.getMaxPerInstanceFailures(),
                 Amount.of((long) settings.getMinWaitInInstanceRunningMs(), Time.MILLISECONDS),
                 Amount.of((long) settings.getMaxWaitToInstanceRunningMs(), Time.MILLISECONDS),

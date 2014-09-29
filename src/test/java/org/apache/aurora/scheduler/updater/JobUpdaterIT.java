@@ -665,11 +665,6 @@ public class JobUpdaterIT extends EasyMockTest {
     update = makeJobUpdate().newBuilder();
     update.getInstructions().getSettings().setMinWaitInInstanceRunningMs(0);
     expectInvalid(update);
-
-    update = makeJobUpdate().newBuilder();
-    update.getInstructions().setDesiredState(
-        new InstanceTaskConfig().setInstances(ImmutableSet.<Range>of()));
-    expectInvalid(update);
   }
 
   @Test
@@ -816,6 +811,17 @@ public class JobUpdaterIT extends EasyMockTest {
     updater.start(update, USER);
   }
 
+  @Test(expected = NoopUpdateStateException.class)
+  public void testNoopUpdateEmptyDiff() throws Exception {
+    control.replay();
+
+    final IJobUpdate update = makeJobUpdate();
+    JobUpdate builder = update.newBuilder();
+    builder.getInstructions().unsetDesiredState();
+
+    updater.start(IJobUpdate.build(builder), USER);
+  }
+
   @Test
   public void testStuckTask() throws Exception {
     expectTaskKilled().times(3);
@@ -885,6 +891,33 @@ public class JobUpdaterIT extends EasyMockTest {
     assertJobState(
         JOB,
         ImmutableMap.of(0, NEW_CONFIG, 1, NEW_CONFIG, 2, NEW_CONFIG));
+  }
+
+  @Test
+  public void testRemoveInstances() throws Exception {
+    expectTaskKilled();
+
+    control.replay();
+
+    // Set instance count such that instance 1 is removed.
+    IJobUpdate update = setInstanceCount(makeJobUpdate(makeInstanceConfig(0, 1, NEW_CONFIG)), 1);
+    insertInitialTasks(update);
+
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+
+    // Instance 1 is removed.
+    updater.start(update, USER);
+    actions.putAll(1, INSTANCE_UPDATING);
+    changeState(JOB, 1, KILLED);
+    clock.advance(WATCH_TIMEOUT);
+
+    actions.put(1, INSTANCE_UPDATED);
+    assertState(ROLLED_FORWARD, actions.build());
+    assertJobState(JOB, ImmutableMap.of(0, NEW_CONFIG));
   }
 
   @Test

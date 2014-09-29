@@ -1354,6 +1354,15 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return builder.build();
   }
 
+  private static Optional<InstanceTaskConfig> buildDesiredState(JobDiff diff, ITaskConfig config) {
+    Set<Integer> desiredInstances = diff.getReplacementInstances();
+    return desiredInstances.isEmpty()
+        ? Optional.<InstanceTaskConfig>absent()
+        : Optional.of(new InstanceTaskConfig()
+            .setTask(config.newBuilder())
+            .setInstances(convertRanges(Numbers.toRanges(desiredInstances))));
+  }
+
   @Override
   public Response startJobUpdate(JobUpdateRequest mutableRequest, SessionKey session) {
     if (!isUpdaterEnabled) {
@@ -1428,10 +1437,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             IJobUpdateInstructions.build(new JobUpdateInstructions()
                 .setSettings(settings.newBuilder())
                 .setInitialState(buildInitialState(diff.getReplacedInstances()))
-                .setDesiredState(new InstanceTaskConfig()
-                    .setTask(request.getTaskConfig().newBuilder())
-                    .setInstances(convertRanges(
-                        Numbers.toRanges(diff.getReplacementInstances())))));
+                .setDesiredState(buildDesiredState(diff, request.getTaskConfig()).orNull()));
 
         IJobUpdate update = IJobUpdate.build(new JobUpdate()
             .setSummary(new JobUpdateSummary()

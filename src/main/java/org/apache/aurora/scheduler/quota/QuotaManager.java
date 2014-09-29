@@ -200,7 +200,8 @@ public interface QuotaManager {
           Optional<IJobUpdate> update = Optional.fromNullable(
               roleJobUpdates.get(JobKeys.from(input.getAssignedTask().getTask())));
 
-          if (update.isPresent()) {
+          // TODO(maxim): Address AURORA-768 to avoid double counting.
+          if (update.isPresent() && update.get().getInstructions().isSetDesiredState()) {
             IInstanceTaskConfig configs =
                 update.get().getInstructions().getDesiredState();
             RangeSet<Integer> desiredInstances = rangesToRangeSet(configs.getInstances());

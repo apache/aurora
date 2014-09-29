@@ -193,7 +193,7 @@ public final class JobDiff {
    * @param config Instance task configuration to represent as an instance mapping.
    * @return An instance ID to task config mapping that is equivalent to {@code config}.
    */
-  public static Map<Integer, ITaskConfig> asMap(IInstanceTaskConfig config) {
+  private static Map<Integer, ITaskConfig> asMap(IInstanceTaskConfig config) {
     return Maps.asMap(
         Numbers.rangesToInstanceIds(config.getInstances()),
         Functions.constant(config.getTask()));
@@ -216,7 +216,9 @@ public final class JobDiff {
     JobDiff diff = JobDiff.compute(
         taskStore,
         job,
-        ImmutableMap.copyOf(asMap(instructions.getDesiredState())),
+        ImmutableMap.copyOf(instructions.isSetDesiredState()
+            ? asMap(instructions.getDesiredState())
+            : ImmutableMap.<Integer, ITaskConfig>of()),
         instructions.getSettings().getUpdateOnlyTheseInstances());
     return diff.getReplacedInstances().isEmpty() && diff.getReplacementInstances().isEmpty();
   }

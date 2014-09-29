@@ -15,6 +15,8 @@ package org.apache.aurora.scheduler.quota;
 
 import java.util.Set;
 
+import com.google.common.base.Function;
+import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 
@@ -81,12 +83,8 @@ public final class QuotaUtil {
     }
 
     // Calculate desired prod task consumption.
-    ITaskConfig desiredConfig = instructions.getDesiredState().getTask();
-    IResourceAggregate desired = desiredConfig.isProduction()
-        ? ResourceAggregates.scale(
-        prodResourcesFromTasks(ImmutableSet.of(desiredConfig)),
-        getUpdateInstanceCount(instructions.getDesiredState().getInstances()))
-        : ResourceAggregates.EMPTY;
+    IResourceAggregate desired = Optional.fromNullable(instructions.getDesiredState())
+        .transform(TO_PROD_RESOURCES).or(ResourceAggregates.EMPTY);
 
     // Calculate result as max(existing, desired) per resource.
     return IResourceAggregate.build(new ResourceAggregate()
@@ -116,6 +114,18 @@ public final class QuotaUtil {
         .setRamMb(ramMb)
         .setDiskMb(diskMb));
   }
+
+  private static final Function<IInstanceTaskConfig, IResourceAggregate> TO_PROD_RESOURCES =
+      new Function<IInstanceTaskConfig, IResourceAggregate>() {
+        @Override
+        public IResourceAggregate apply(IInstanceTaskConfig input) {
+          return input.getTask().isProduction()
+              ? ResourceAggregates.scale(
+                  prodResourcesFromTasks(ImmutableSet.of(input.getTask())),
+                  getUpdateInstanceCount(input.getInstances()))
+              : ResourceAggregates.EMPTY;
+        }
+      };
 
   private static int getUpdateInstanceCount(Set<IRange> ranges) {
     int instanceCount = 0;

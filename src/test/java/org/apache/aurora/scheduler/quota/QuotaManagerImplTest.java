@@ -38,6 +38,7 @@ import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaManagerImpl;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
@@ -373,6 +374,33 @@ public class QuotaManagerImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testCheckQuotaNoDesiredState() {
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectTasks(createProdTask("foo", 2, 2, 2), createProdTask("bar", 2, 2, 2)).times(2);
+
+    String updateId = "u1";
+    ITaskConfig config = createTaskConfig(2, 2, 2, true);
+    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, JobKeys.from(config));
+    IJobUpdate update = buildJobUpdate(summaries.get(0), config, 1, config, 1);
+    JobUpdate builder = update.newBuilder();
+    builder.getInstructions().unsetDesiredState();
+
+    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(config.getOwner().getRole())))
+        .andReturn(summaries).times(2);
+
+    expect(jobUpdateStore.fetchJobUpdate(updateId))
+        .andReturn(Optional.of(IJobUpdate.build(builder))).times(2);
+
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(ROLE, prodResource(1, 1, 1));
+    assertEquals(INSUFFICIENT_QUOTA, checkQuota.getResult());
+    assertEquals(
+        IResourceAggregate.build(new ResourceAggregate(6, 6, 6)),
+        quotaManager.getQuotaInfo(ROLE).getProdConsumption());
+  }
+
+  @Test
   public void testSaveQuotaPasses() throws Exception {
     storageUtil.quotaStore.saveQuota(ROLE, QUOTA);
 
@@ -412,20 +440,9 @@ public class QuotaManagerImplTest extends EasyMockTest {
       int times) {
 
     String updateId = "u1";
-    List<IJobUpdateSummary> summaries =
-        ImmutableList.of(IJobUpdateSummary.build(new JobUpdateSummary()
-            .setJobKey(JobKeys.from(initial).newBuilder())
-            .setUpdateId(updateId)));
-
-    IJobUpdate update = IJobUpdate.build(new JobUpdate()
-        .setSummary(summaries.get(0).newBuilder())
-        .setInstructions(new JobUpdateInstructions()
-            .setDesiredState(new InstanceTaskConfig()
-                .setTask(desired.newBuilder())
-                .setInstances(ImmutableSet.of(new Range(0, desiredInstances - 1))))
-            .setInitialState(ImmutableSet.of(new InstanceTaskConfig()
-                .setTask(initial.newBuilder())
-                .setInstances(ImmutableSet.of(new Range(0, intialInstances - 1)))))));
+    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, JobKeys.from(initial));
+    IJobUpdate update =
+        buildJobUpdate(summaries.get(0), initial, intialInstances, desired, desiredInstances);
 
     expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(initial.getOwner().getRole())))
         .andReturn(summaries)
@@ -433,6 +450,30 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     expect(jobUpdateStore.fetchJobUpdate(updateId)).andReturn(Optional.of(update)).times(times);
 
+  }
+
+  private List<IJobUpdateSummary> buildJobUpdateSummaries(String updateId, IJobKey jobKey) {
+    return ImmutableList.of(IJobUpdateSummary.build(new JobUpdateSummary()
+        .setJobKey(jobKey.newBuilder())
+        .setUpdateId(updateId)));
+  }
+
+  private IJobUpdate buildJobUpdate(
+      IJobUpdateSummary summary,
+      ITaskConfig initial,
+      int intialInstances,
+      ITaskConfig desired,
+      int desiredInstances) {
+
+    return IJobUpdate.build(new JobUpdate()
+        .setSummary(summary.newBuilder())
+        .setInstructions(new JobUpdateInstructions()
+            .setDesiredState(new InstanceTaskConfig()
+                .setTask(desired.newBuilder())
+                .setInstances(ImmutableSet.of(new Range(0, desiredInstances - 1))))
+            .setInitialState(ImmutableSet.of(new InstanceTaskConfig()
+                .setTask(initial.newBuilder())
+                .setInstances(ImmutableSet.of(new Range(0, intialInstances - 1)))))));
   }
 
   private void expectNoJobUpdates() {
