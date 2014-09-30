@@ -22,6 +22,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -35,7 +36,6 @@ import javax.ws.rs.ext.MessageBodyReader;
 import javax.ws.rs.ext.MessageBodyWriter;
 import javax.ws.rs.ext.Provider;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -87,7 +87,7 @@ public class GsonMessageBodyHandler
     // For some reason try-with-resources syntax trips a findbugs error here.
     InputStreamReader streamReader = null;
     try {
-      streamReader = new InputStreamReader(entityStream, Charsets.UTF_8);
+      streamReader = new InputStreamReader(entityStream, StandardCharsets.UTF_8);
       Type jsonType;
       if (type.equals(genericType)) {
         jsonType = type;
@@ -111,7 +111,7 @@ public class GsonMessageBodyHandler
       MultivaluedMap<String, Object> httpHeaders,
       OutputStream entityStream) throws IOException, WebApplicationException {
 
-    try (OutputStreamWriter writer = new OutputStreamWriter(entityStream, Charsets.UTF_8)) {
+    try (OutputStreamWriter writer = new OutputStreamWriter(entityStream, StandardCharsets.UTF_8)) {
       Type jsonType;
       if (type.equals(genericType)) {
         jsonType = type;

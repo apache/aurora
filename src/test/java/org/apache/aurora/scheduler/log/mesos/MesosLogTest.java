@@ -14,11 +14,11 @@
 package org.apache.aurora.scheduler.log.mesos;
 
 import java.lang.reflect.Constructor;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.TimeoutException;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
@@ -78,7 +78,7 @@ public class MesosLogTest extends EasyMockTest {
         bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(MesosLog.WriteTimeout.class)
             .toInstance(WRITE_TIMEOUT);
         bind(byte[].class).annotatedWith(MesosLog.NoopEntry.class)
-            .toInstance(DUMMY_CONTENT.getBytes(Charsets.UTF_8));
+            .toInstance(DUMMY_CONTENT.getBytes(StandardCharsets.UTF_8));
         bind(Lifecycle.class).toInstance(new Lifecycle(shutdownHooks, null));
       }
     });
@@ -117,12 +117,12 @@ public class MesosLogTest extends EasyMockTest {
     shutdownHooks.execute();
 
     control.replay();
-    logStream.append(data.getBytes(Charsets.UTF_8));
+    logStream.append(data.getBytes(StandardCharsets.UTF_8));
   }
 
   private void expectStreamUnusable() throws Exception {
     try {
-      logStream.append("nothing".getBytes(Charsets.UTF_8));
+      logStream.append("nothing".getBytes(StandardCharsets.UTF_8));
       fail();
     } catch (IllegalStateException e) {
       // Expected.
@@ -141,12 +141,12 @@ public class MesosLogTest extends EasyMockTest {
     Constructor<Log.Entry> entryConstructor =
         Log.Entry.class.getDeclaredConstructor(Position.class, byte[].class);
     entryConstructor.setAccessible(true);
-    return entryConstructor.newInstance(position, data.getBytes(Charsets.UTF_8));
+    return entryConstructor.newInstance(position, data.getBytes(StandardCharsets.UTF_8));
   }
 
   private IExpectationSetters<Position> expectWrite(String content) throws Exception {
     return expect(
-        logWriter.append(EasyMock.aryEq(content.getBytes(Charsets.UTF_8)),
+        logWriter.append(EasyMock.aryEq(content.getBytes(StandardCharsets.UTF_8)),
             // Cast is needed to prevent NullPointerException on unboxing.
             EasyMock.eq((long) WRITE_TIMEOUT.getValue()),
             EasyMock.eq(WRITE_TIMEOUT.getUnit().getTimeUnit())));
@@ -193,7 +193,7 @@ public class MesosLogTest extends EasyMockTest {
         .transform(new Function<byte[], String>() {
           @Override
           public String apply(byte[] data) {
-            return new String(data, Charsets.UTF_8);
+            return new String(data, StandardCharsets.UTF_8);
           }
         })
         .toList();

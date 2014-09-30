@@ -20,6 +20,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,7 +39,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.StreamingOutput;
 
-import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
 import com.google.common.io.ByteSource;
@@ -159,7 +159,7 @@ public class ApiBeta {
       public void write(OutputStream output) throws IOException {
         try {
           Object response = method.invoke(api, params);
-          try (OutputStreamWriter out = new OutputStreamWriter(output, Charsets.UTF_8)) {
+          try (OutputStreamWriter out = new OutputStreamWriter(output, StandardCharsets.UTF_8)) {
             GSON.toJson(response, out);
           }
         } catch (IllegalAccessException | InvocationTargetException e) {

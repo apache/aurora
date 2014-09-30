@@ -20,23 +20,17 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.GuiceUtils.AllowUnchecked;
-import org.apache.aurora.codec.ThriftBinaryCodec;
-import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.gen.comm.SchedulerMessage;
-import org.apache.aurora.gen.comm.SchedulerMessage._Fields;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
-import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -69,7 +63,6 @@ class MesosSchedulerImpl implements Scheduler {
   private final List<TaskLauncher> taskLaunchers;
 
   private final Storage storage;
-  private final StateManager stateManager;
   private final Lifecycle lifecycle;
   private final EventSink eventSink;
   private volatile boolean isRegistered = false;
@@ -77,24 +70,23 @@ class MesosSchedulerImpl implements Scheduler {
   /**
    * Creates a new scheduler.
    *
-   * @param stateManager Scheduler state manager.
+   * @param storage Store to save host attributes into.
    * @param lifecycle Application lifecycle manager.
    * @param taskLaunchers Task launchers, which will be used in order.  Calls to
    *                      {@link TaskLauncher#willUse(Offer)} and
    *                      {@link TaskLauncher#statusUpdate(TaskStatus)} are propagated to provided
    *                      launchers, ceasing after the first match (based on a return value of
    *                      {@code true}.
+   * @param eventSink Pubsub sink to send driver status changes to.
    */
   @Inject
   public MesosSchedulerImpl(
       Storage storage,
-      StateManager stateManager,
       final Lifecycle lifecycle,
       List<TaskLauncher> taskLaunchers,
       EventSink eventSink) {
 
     this.storage = requireNonNull(storage);
-    this.stateManager = requireNonNull(stateManager);
     this.lifecycle = requireNonNull(lifecycle);
     this.taskLaunchers = requireNonNull(taskLaunchers);
     this.eventSink = requireNonNull(eventSink);
@@ -224,34 +216,12 @@ class MesosSchedulerImpl implements Scheduler {
 
   @Timed("scheduler_framework_message")
   @Override
-  public void frameworkMessage(SchedulerDriver driver, ExecutorID executor, SlaveID slave,
+  public void frameworkMessage(
+      SchedulerDriver driver,
+      ExecutorID executor,
+      SlaveID slave,
       byte[] data) {
 
-    if (data == null) {
-      LOG.info("Received empty framework message.");
-      return;
-    }
-
-    try {
-      SchedulerMessage schedulerMsg = ThriftBinaryCodec.decode(SchedulerMessage.class, data);
-      if (schedulerMsg == null || !schedulerMsg.isSet()) {
-        LOG.warning("Received empty scheduler message.");
-        return;
-      }
-
-      if (schedulerMsg.getSetField() == _Fields.DELETED_TASKS) {
-        for (String taskId : schedulerMsg.getDeletedTasks().getTaskIds()) {
-          stateManager.changeState(
-              taskId,
-              Optional.<ScheduleStatus>absent(),
-              ScheduleStatus.SANDBOX_DELETED,
-              Optional.of("Sandbox disk space reclaimed."));
-        }
-      } else {
-        LOG.warning("Received unhandled scheduler message type: " + schedulerMsg.getSetField());
-      }
-    } catch (ThriftBinaryCodec.CodingException e) {
-      LOG.log(Level.SEVERE, "Failed to decode framework message.", e);
-    }
+    LOG.warning("Ignoring framework message.");
   }
 }

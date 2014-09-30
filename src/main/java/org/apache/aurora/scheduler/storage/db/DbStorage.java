@@ -15,8 +15,8 @@ package org.apache.aurora.scheduler.storage.db;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 
-import com.google.common.base.Charsets;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
@@ -178,7 +178,7 @@ class DbStorage extends AbstractIdleService implements Storage {
             CharStreams.toString(
                 new InputStreamReader(
                     DbStorage.class.getResourceAsStream("schema.sql"),
-                    Charsets.UTF_8))),
+                    StandardCharsets.UTF_8))),
         SqlCommandType.UPDATE)
         .build());
 

@@ -47,7 +47,7 @@ from .executor_detector import ExecutorDetector
 
 from gen.apache.aurora.api.constants import TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import ScheduleStatus
-from gen.apache.aurora.comm.ttypes import AdjustRetainedTasks, DeletedTasks, SchedulerMessage
+from gen.apache.aurora.comm.ttypes import AdjustRetainedTasks
 from gen.apache.thermos.ttypes import TaskState
 
 THERMOS_TO_TWITTER_STATES = {
@@ -436,11 +436,8 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
     self._task_id = task_id
     self.log('Launching garbage collection [task_id=%s]' % task_id)
     self._start_time = retain_start
-    local_gc, remote_gc, _ = self.reconcile_states(self._driver, retain_tasks)
-    deleted_tasks = set(retain_tasks).intersection(self.garbage_collect(local_gc)) | remote_gc
-    if deleted_tasks:
-      self._driver.sendFrameworkMessage(thrift_serialize(
-          SchedulerMessage(deletedTasks=DeletedTasks(taskIds=deleted_tasks))))
+    local_gc, _, _ = self.reconcile_states(self._driver, retain_tasks)
+    self.garbage_collect(local_gc)
     self.send_update(
         self._driver, task.task_id.value, mesos_pb2.TASK_FINISHED, 'Garbage collection finished.')
     self.log('Garbage collection complete [task_id=%s]' % task_id)

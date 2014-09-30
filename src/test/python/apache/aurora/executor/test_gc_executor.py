@@ -39,7 +39,7 @@ from apache.thermos.core.runner import TaskRunner
 
 from gen.apache.aurora.api.constants import LIVE_STATES, TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import ScheduleStatus
-from gen.apache.aurora.comm.ttypes import AdjustRetainedTasks, SchedulerMessage
+from gen.apache.aurora.comm.ttypes import AdjustRetainedTasks
 from gen.apache.thermos.ttypes import ProcessState, TaskState
 
 ACTIVE_TASKS = ('sleep60-lost',)
@@ -100,16 +100,12 @@ class ProxyDriver(object):
   def __init__(self):
     self.stopped = threading.Event()
     self.updates = []
-    self.messages = []
 
   def stop(self):
     self.stopped.set()
 
   def sendStatusUpdate(self, update):  # noqa
     self.updates.append(StatusUpdate(update.state, update.task_id.value))
-
-  def sendFrameworkMessage(self, message):  # noqa
-    self.messages.append(thrift_deserialize(SchedulerMessage(), message))
 
 
 def serialize_art(art, task_id=TASK_ID):
@@ -343,7 +339,6 @@ def test_gc_with_loss():
       lose=True)
   assert len(executor._kills) == len(ACTIVE_TASKS)
   assert len(executor.gcs) == len(FINISHED_TASKS)
-  assert len(proxy_driver.messages) == 0
   assert len(proxy_driver.updates) >= 1
   assert StatusUpdate(mesos_pb2.TASK_LOST, ACTIVE_TASKS[0]) in proxy_driver.updates
 
@@ -353,7 +348,6 @@ def test_gc_with_starting_task():
     active_executors=set(ACTIVE_TASKS), retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.STARTING})
   assert len(executor._kills) == 0
   assert len(executor.gcs) == len(FINISHED_TASKS)
-  assert len(proxy_driver.messages) == 0
 
 
 def test_gc_without_task_missing():
@@ -361,7 +355,6 @@ def test_gc_without_task_missing():
       lose=False)
   assert len(executor._kills) == len(ACTIVE_TASKS)
   assert len(executor.gcs) == len(FINISHED_TASKS)
-  assert len(proxy_driver.messages) == 0
 
 
 def test_gc_without_loss():
@@ -369,7 +362,6 @@ def test_gc_without_loss():
       retained_tasks={ACTIVE_TASKS[0]: ScheduleStatus.RUNNING})
   assert len(executor._kills) == 0
   assert len(executor.gcs) == len(FINISHED_TASKS)
-  assert len(proxy_driver.messages) == 0
 
 
 def test_gc_withheld():
@@ -378,7 +370,6 @@ def test_gc_withheld():
                       'failure': ScheduleStatus.FAILED})
   assert len(executor._kills) == 0
   assert len(executor.gcs) == len(FINISHED_TASKS) - 1
-  assert len(proxy_driver.messages) == 0
 
 
 def test_gc_withheld_and_executor_missing():
@@ -387,8 +378,6 @@ def test_gc_withheld_and_executor_missing():
                       'failure': ScheduleStatus.FAILED})
   assert len(executor._kills) == 0
   assert len(executor.gcs) == len(FINISHED_TASKS)
-  assert len(proxy_driver.messages) == 1
-  assert proxy_driver.messages[0].deletedTasks.taskIds == set(['failure'])
 
 
 def build_blocking_gc_executor(td, proxy_driver):

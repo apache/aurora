@@ -14,12 +14,12 @@
 package org.apache.aurora.scheduler.http.api;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
 
-import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -91,7 +91,7 @@ public class ApiBetaTest extends JettyServerModuleTest {
         .setKey(LockKey.job(new JobKey("role", "env", "name")))
         .setToken("token");
     SessionKey session = new SessionKey()
-        .setData("session data".getBytes(Charsets.UTF_8))
+        .setData("session data".getBytes(StandardCharsets.UTF_8))
         .setMechanism("fake");
     Response response = new Response()
         .setResponseCode(OK);
