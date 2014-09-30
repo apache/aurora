@@ -216,9 +216,9 @@ public final class JobDiff {
     JobDiff diff = JobDiff.compute(
         taskStore,
         job,
-        ImmutableMap.copyOf(instructions.isSetDesiredState()
-            ? asMap(instructions.getDesiredState())
-            : ImmutableMap.<Integer, ITaskConfig>of()),
+        instructions.isSetDesiredState()
+            ? ImmutableMap.copyOf(asMap(instructions.getDesiredState()))
+            : ImmutableMap.<Integer, ITaskConfig>of(),
         instructions.getSettings().getUpdateOnlyTheseInstances());
     return diff.getReplacedInstances().isEmpty() && diff.getReplacementInstances().isEmpty();
   }

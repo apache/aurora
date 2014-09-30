@@ -374,6 +374,60 @@ public class QuotaManagerImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testCheckQuotaUpdateInitialConfigsUsedForFiltering() {
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectTasks(createProdTask("foo", 2, 2, 2), createProdTask(JOB_NAME, 2, 2, 2)).times(2);
+
+    String updateId = "u1";
+    ITaskConfig config = createTaskConfig(2, 2, 2, true);
+    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, JobKeys.from(config));
+    IJobUpdate update = buildJobUpdate(summaries.get(0), config, 1, config, 1);
+    JobUpdate builder = update.newBuilder();
+    builder.getInstructions().unsetDesiredState();
+
+    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(config.getOwner().getRole())))
+        .andReturn(summaries).times(2);
+
+    expect(jobUpdateStore.fetchJobUpdate(updateId))
+        .andReturn(Optional.of(IJobUpdate.build(builder))).times(2);
+
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(ROLE, prodResource(1, 1, 1));
+    assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
+    assertEquals(
+        IResourceAggregate.build(new ResourceAggregate(4, 4, 4)),
+        quotaManager.getQuotaInfo(ROLE).getProdConsumption());
+  }
+
+  @Test
+  public void testCheckQuotaUpdateDesiredConfigsUsedForFiltering() {
+    expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
+    expectTasks(createProdTask("foo", 2, 2, 2), createProdTask(JOB_NAME, 2, 2, 2)).times(2);
+
+    String updateId = "u1";
+    ITaskConfig config = createTaskConfig(2, 2, 2, true);
+    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, JobKeys.from(config));
+    IJobUpdate update = buildJobUpdate(summaries.get(0), config, 1, config, 1);
+    JobUpdate builder = update.newBuilder();
+    builder.getInstructions().setInitialState(ImmutableSet.<InstanceTaskConfig>of());
+
+    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(config.getOwner().getRole())))
+        .andReturn(summaries).times(2);
+
+    expect(jobUpdateStore.fetchJobUpdate(updateId))
+        .andReturn(Optional.of(IJobUpdate.build(builder))).times(2);
+
+    control.replay();
+
+    QuotaCheckResult checkQuota = quotaManager.checkQuota(ROLE, prodResource(1, 1, 1));
+    assertEquals(SUFFICIENT_QUOTA, checkQuota.getResult());
+    assertEquals(
+        IResourceAggregate.build(new ResourceAggregate(4, 4, 4)),
+        quotaManager.getQuotaInfo(ROLE).getProdConsumption());
+  }
+
+  @Test
   public void testCheckQuotaNoDesiredState() {
     expectQuota(IResourceAggregate.build(new ResourceAggregate(6, 6, 6))).times(2);
     expectTasks(createProdTask("foo", 2, 2, 2), createProdTask("bar", 2, 2, 2)).times(2);

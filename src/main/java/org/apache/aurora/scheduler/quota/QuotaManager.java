@@ -24,6 +24,7 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableRangeSet;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeSet;
 import com.google.common.collect.Sets;
@@ -42,6 +43,7 @@ import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.IRange;
@@ -200,13 +202,15 @@ public interface QuotaManager {
           Optional<IJobUpdate> update = Optional.fromNullable(
               roleJobUpdates.get(JobKeys.from(input.getAssignedTask().getTask())));
 
-          // TODO(maxim): Address AURORA-768 to avoid double counting.
-          if (update.isPresent() && update.get().getInstructions().isSetDesiredState()) {
-            IInstanceTaskConfig configs =
-                update.get().getInstructions().getDesiredState();
-            RangeSet<Integer> desiredInstances = rangesToRangeSet(configs.getInstances());
+          if (update.isPresent()) {
+            IJobUpdateInstructions instructions = update.get().getInstructions();
+            RangeSet<Integer> initialInstances = instanceRangeSet(instructions.getInitialState());
+            RangeSet<Integer> desiredInstances = instanceRangeSet(instructions.isSetDesiredState()
+                ? ImmutableSet.of(instructions.getDesiredState())
+                : ImmutableSet.<IInstanceTaskConfig>of());
 
-            return !desiredInstances.contains(input.getAssignedTask().getInstanceId());
+            int instanceId = input.getAssignedTask().getInstanceId();
+            return !initialInstances.contains(instanceId) && !desiredInstances.contains(instanceId);
           }
           return true;
         }
@@ -242,10 +246,12 @@ public interface QuotaManager {
           .setUpdateStatuses(JobUpdateController.ACTIVE_JOB_UPDATE_STATES));
     }
 
-    private static RangeSet<Integer> rangesToRangeSet(Set<IRange> ranges) {
+    private static RangeSet<Integer> instanceRangeSet(Set<IInstanceTaskConfig> configs) {
       ImmutableRangeSet.Builder<Integer> builder = ImmutableRangeSet.builder();
-      for (IRange range : ranges) {
-        builder.add(Range.closed(range.getFirst(), range.getLast()));
+      for (IInstanceTaskConfig config : configs) {
+        for (IRange range : config.getInstances()) {
+          builder.add(Range.closed(range.getFirst(), range.getLast()));
+        }
       }
 
       return builder.build();
