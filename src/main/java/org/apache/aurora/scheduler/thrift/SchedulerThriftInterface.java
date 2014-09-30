@@ -151,7 +151,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateDetails;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateRequest;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSettings;
@@ -189,7 +188,6 @@ import static org.apache.aurora.scheduler.base.Tasks.ACTIVE_STATES;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.thrift.Util.addMessage;
 import static org.apache.aurora.scheduler.thrift.Util.emptyResponse;
-import static org.apache.aurora.scheduler.updater.JobUpdateController.NoopUpdateStateException;
 
 /**
  * Aurora scheduler thrift server implementation.
@@ -1354,15 +1352,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     return builder.build();
   }
 
-  private static Optional<InstanceTaskConfig> buildDesiredState(JobDiff diff, ITaskConfig config) {
-    Set<Integer> desiredInstances = diff.getReplacementInstances();
-    return desiredInstances.isEmpty()
-        ? Optional.<InstanceTaskConfig>absent()
-        : Optional.of(new InstanceTaskConfig()
-            .setTask(config.newBuilder())
-            .setInstances(convertRanges(Numbers.toRanges(desiredInstances))));
-  }
-
   @Override
   public Response startJobUpdate(JobUpdateRequest mutableRequest, SessionKey session) {
     if (!isUpdaterEnabled) {
@@ -1425,6 +1414,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             JobDiff.asMap(request.getTaskConfig(), request.getInstanceCount()),
             settings.getUpdateOnlyTheseInstances());
 
+        if (diff.isNoop()) {
+          return addMessage(emptyResponse(), OK, "Job is unchanged by proposed update.");
+        }
+
         Set<Integer> invalidScope = diff.getOutOfScopeInstances(
             Numbers.rangesToInstanceIds(settings.getUpdateOnlyTheseInstances()));
         if (!invalidScope.isEmpty()) {
@@ -1433,18 +1426,22 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                   + invalidScope);
         }
 
-        IJobUpdateInstructions instructions =
-            IJobUpdateInstructions.build(new JobUpdateInstructions()
-                .setSettings(settings.newBuilder())
-                .setInitialState(buildInitialState(diff.getReplacedInstances()))
-                .setDesiredState(buildDesiredState(diff, request.getTaskConfig()).orNull()));
+        JobUpdateInstructions instructions = new JobUpdateInstructions()
+            .setSettings(settings.newBuilder())
+            .setInitialState(buildInitialState(diff.getReplacedInstances()));
+        if (!diff.getReplacementInstances().isEmpty()) {
+          instructions.setDesiredState(
+              new InstanceTaskConfig()
+                  .setTask(request.getTaskConfig().newBuilder())
+                  .setInstances(convertRanges(Numbers.toRanges(diff.getReplacementInstances()))));
+        }
 
         IJobUpdate update = IJobUpdate.build(new JobUpdate()
             .setSummary(new JobUpdateSummary()
                 .setJobKey(job.newBuilder())
                 .setUpdateId(updateId)
                 .setUser(context.getIdentity()))
-            .setInstructions(instructions.newBuilder()));
+            .setInstructions(instructions));
         try {
           validateTaskLimits(
               request.getTaskConfig(),
@@ -1453,8 +1450,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
           jobUpdateController.start(update, context.getIdentity());
           return okResponse(Result.startJobUpdateResult(new StartJobUpdateResult(updateId)));
-        } catch (NoopUpdateStateException e) {
-          return addMessage(emptyResponse(), OK, e.getMessage());
         } catch (UpdateStateException | TaskValidationException e) {
           return errorResponse(INVALID_REQUEST, e);
         }

@@ -55,6 +55,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobInstanceUpdateEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateEvent;
+import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateQuery;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.ILock;
@@ -134,13 +135,14 @@ class JobUpdateControllerImpl implements JobUpdateController {
           throws UpdateStateException {
 
         IJobUpdateSummary summary = update.getSummary();
+        IJobUpdateInstructions instructions = update.getInstructions();
         IJobKey job = summary.getJobKey();
 
         // Validate the update configuration by making sure we can create an updater for it.
         updateFactory.newUpdate(update.getInstructions(), true);
 
-        if (JobDiff.isNoopUpdate(storeProvider.getTaskStore(), job, update.getInstructions())) {
-          throw new NoopUpdateStateException();
+        if (instructions.getInitialState().isEmpty() && !instructions.isSetDesiredState()) {
+          throw new IllegalArgumentException("Update instruction is a no-op.");
         }
 
         LOG.info("Starting update for job " + job);

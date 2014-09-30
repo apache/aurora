@@ -167,7 +167,6 @@ import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TA
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.killedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.restartedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
-import static org.apache.aurora.scheduler.updater.JobUpdateController.NoopUpdateStateException;
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -2288,10 +2287,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
-    ITaskConfig newTask = buildScheduledTask(0, 8).getAssignedTask().getTask();
-    expect(taskIdGenerator.generate(newTask, 1)).andReturn(TASK_ID);
-    expect(quotaManager.checkQuota(ROLE, IResourceAggregate.build(
-        new ResourceAggregate(1, 8, 1024)))).andReturn(ENOUGH_QUOTA);
+    ITaskConfig newTask = buildScheduledTask(0, 5).getAssignedTask().getTask();
 
     IScheduledTask oldTask = buildScheduledTask(0, 5);
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active(), oldTask);
@@ -2300,8 +2296,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         1,
         newTask,
         ImmutableMap.of(oldTask.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 0))));
-    jobUpdateController.start(update, USER);
-    expectLastCall().andThrow(new NoopUpdateStateException());
 
     control.replay();
     JobUpdateRequest request = buildJobUpdateRequest(update);
@@ -2328,7 +2322,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
     JobUpdateRequest request = buildJobUpdateRequest(IJobUpdate.build(builder));
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+    assertResponse(OK, thrift.startJobUpdate(request, SESSION));
   }
 
   @Test

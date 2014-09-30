@@ -33,9 +33,7 @@ import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.TaskStore;
-import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
-import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -79,6 +77,15 @@ public final class JobDiff {
     Set<Integer> allAlteredInstances = ImmutableSet.copyOf(
         Sets.union(getReplacedInstances().keySet(), getReplacementInstances()));
     return ImmutableSet.copyOf(Sets.difference(scope, allAlteredInstances));
+  }
+
+  /**
+   * Checks whether this diff contains no work to be done.
+   *
+   * @return {@code true} if this diff is a no-op, otherwise {@code false}.
+   */
+  public boolean isNoop() {
+    return replacedInstances.isEmpty() && replacementInstances.isEmpty();
   }
 
   @Override
@@ -185,41 +192,5 @@ public final class JobDiff {
         Range.closedOpen(0, instanceCount),
         DiscreteDomain.integers());
     return ImmutableMap.copyOf(Maps.asMap(desiredInstances, Functions.constant(config)));
-  }
-
-  /**
-   * Identical to {@link #asMap(ITaskConfig, int)}, extracting fields from {@code config}.
-   *
-   * @param config Instance task configuration to represent as an instance mapping.
-   * @return An instance ID to task config mapping that is equivalent to {@code config}.
-   */
-  private static Map<Integer, ITaskConfig> asMap(IInstanceTaskConfig config) {
-    return Maps.asMap(
-        Numbers.rangesToInstanceIds(config.getInstances()),
-        Functions.constant(config.getTask()));
-  }
-
-  /**
-   * Determines whether a job update has no work to do.
-   *
-   * @param taskStore Store to fetch job state from.
-   * @param job Job being updated.
-   * @param instructions Job update instructions.
-   * @return {@code true} if the update would result in zero instances being modified,
-   *         otherwise {@code false}.
-   */
-  public static boolean isNoopUpdate(
-      TaskStore taskStore,
-      IJobKey job,
-      IJobUpdateInstructions instructions) {
-
-    JobDiff diff = JobDiff.compute(
-        taskStore,
-        job,
-        instructions.isSetDesiredState()
-            ? ImmutableMap.copyOf(asMap(instructions.getDesiredState()))
-            : ImmutableMap.<Integer, ITaskConfig>of(),
-        instructions.getSettings().getUpdateOnlyTheseInstances());
-    return diff.getReplacedInstances().isEmpty() && diff.getReplacementInstances().isEmpty();
   }
 }

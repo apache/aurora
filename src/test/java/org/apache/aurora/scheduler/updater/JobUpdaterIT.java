@@ -118,7 +118,6 @@ import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import static org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
-import static org.apache.aurora.scheduler.updater.JobUpdateController.NoopUpdateStateException;
 import static org.apache.aurora.scheduler.updater.UpdateFactory.UpdateFactoryImpl.expandInstanceIds;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -798,8 +797,8 @@ public class JobUpdaterIT extends EasyMockTest {
     assertState(ERROR, ImmutableMultimap.<Integer, JobUpdateAction>of());
   }
 
-  @Test(expected = NoopUpdateStateException.class)
-  public void testNoopUpdate() throws Exception {
+  @Test
+  public void testImmediatelySuccessfulUpdate() throws Exception {
     control.replay();
 
     final IJobUpdate update = makeJobUpdate(makeInstanceConfig(0, 2, NEW_CONFIG));
@@ -811,7 +810,7 @@ public class JobUpdaterIT extends EasyMockTest {
     updater.start(update, USER);
   }
 
-  @Test(expected = NoopUpdateStateException.class)
+  @Test(expected = IllegalArgumentException.class)
   public void testNoopUpdateEmptyDiff() throws Exception {
     control.replay();
 
