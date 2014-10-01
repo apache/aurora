@@ -137,6 +137,4 @@ Maintaining an Aurora Installation
 
 Monitoring
 ----------
-Aurora exports performance metrics via its HTTP interface `/vars` and `/vars.json` contain lots of
-useful data to help debug performance and configuration problems. These are all made available via
-[twitter.common.http](https://github.com/twitter/commons/tree/master/src/java/com/twitter/commons/http).
+Please see our dedicated [monitoring guide](monitoring.md) for in-depth discussion on monitoring.
