@@ -21,6 +21,7 @@
     INSERT INTO job_update_events (
       update_id,
       status,
+      user,
       timestamp_ms
     ) VALUES (
       (
@@ -29,6 +30,7 @@
         WHERE update_id = #{updateId}
       ),
       #{event.status, typeHandler=org.apache.aurora.scheduler.storage.db.typehandlers.JobUpdateStatusTypeHandler},
+      #{event.user},
       #{event.timestampMs}
     )
   </insert>

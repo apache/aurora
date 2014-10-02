@@ -47,12 +47,13 @@ public interface JobUpdateController {
   /**
    * Pauses an in-progress update.
    * <p>
-   * A paused update may be resumed by invoking {@link #resume(IJobKey)}.
+   * A paused update may be resumed by invoking {@link #resume(IJobKey, String)}.
    *
    * @param job Job whose update should be paused.
+   * @param pausingUser The name of the user who is pausing the update.
    * @throws UpdateStateException If the job update is not in a state that may be paused.
    */
-  void pause(IJobKey job) throws UpdateStateException;
+  void pause(IJobKey job, String pausingUser) throws UpdateStateException;
 
   /**
    * Resumes a paused in-progress update.
@@ -62,9 +63,10 @@ public interface JobUpdateController {
    * resume rolling back.
    *
    * @param job Job whose update should be resumed.
+   * @param resumingUser The name of the user who is resuming the update.
    * @throws UpdateStateException If the job update is not in a state that may be resumed.
    */
-  void resume(IJobKey job) throws UpdateStateException;
+  void resume(IJobKey job, String resumingUser) throws UpdateStateException;
 
   /**
    * Aborts an in-progress update.
@@ -73,9 +75,10 @@ public interface JobUpdateController {
    * update. An aborted update may not be resumed.
    *
    * @param job Job whose update should be aborted.
+   * @param abortingUser The name of the user who is aborting the update.
    * @throws UpdateStateException If there is no active update for the job.
    */
-  void abort(IJobKey job) throws UpdateStateException;
+  void abort(IJobKey job, String abortingUser) throws UpdateStateException;
 
   /**
    * Notifies the updater that the state of an instance has changed. A state change could also mean
@@ -94,7 +97,7 @@ public interface JobUpdateController {
 
   /**
    * Restores active updates that have been halted due to the scheduler restarting.
-   * This is distinct from {@link #resume(IJobKey)} in that it does not change the state of
+   * This is distinct from {@link #resume(IJobKey, String)} in that it does not change the state of
    * updates, but resumes after a restart of the scheduler process.
    */
   void systemResume();

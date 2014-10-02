@@ -217,9 +217,10 @@ public class DBJobUpdateStoreTest {
   @Test
   public void testSaveJobEvents() {
     String updateId = "u3";
+    String user = "test";
     IJobUpdate update = makeJobUpdate(JOB, updateId);
-    IJobUpdateEvent event1 = makeJobUpdateEvent(ROLLING_FORWARD, 124L);
-    IJobUpdateEvent event2 = makeJobUpdateEvent(ROLL_FORWARD_PAUSED, 125L);
+    IJobUpdateEvent event1 = makeJobUpdateEvent(ROLLING_FORWARD, 124L, user);
+    IJobUpdateEvent event2 = makeJobUpdateEvent(ROLL_FORWARD_PAUSED, 125L, user);
 
     saveUpdate(update, Optional.of("lock1"));
     assertUpdate(update);
@@ -680,10 +681,20 @@ public class DBJobUpdateStoreTest {
         new JobUpdateEvent(status, timestampMs));
   }
 
+  private static IJobUpdateEvent makeJobUpdateEvent(
+      JobUpdateStatus status,
+      long timestampMs,
+      String user) {
+
+    return IJobUpdateEvent.build(
+        new JobUpdateEvent(status, timestampMs).setUser(user));
+  }
+
   private IJobInstanceUpdateEvent makeJobInstanceEvent(
       int instanceId,
       long timestampMs,
       JobUpdateAction action) {
+
     return IJobInstanceUpdateEvent.build(
         new JobInstanceUpdateEvent(instanceId, timestampMs, action));
   }

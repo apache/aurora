@@ -1464,8 +1464,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       public Response apply(MutableStoreProvider storeProvider) {
         try {
           IJobKey jobKey = JobKeys.assertValid(IJobKey.build(requireNonNull(mutableJobKey)));
-          sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
-          jobUpdateController.pause(jobKey);
+          SessionContext context = sessionValidator
+              .checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
+          jobUpdateController.pause(jobKey, context.getIdentity());
           return okEmptyResponse();
         } catch (AuthFailedException e) {
           return errorResponse(AUTH_FAILED, e);
@@ -1483,8 +1484,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       public Response apply(MutableStoreProvider storeProvider) {
         try {
           IJobKey jobKey = JobKeys.assertValid(IJobKey.build(requireNonNull(mutableJobKey)));
-          sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
-          jobUpdateController.resume(jobKey);
+          SessionContext context = sessionValidator
+              .checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
+          jobUpdateController.resume(jobKey, context.getIdentity());
           return okEmptyResponse();
         } catch (AuthFailedException e) {
           return errorResponse(AUTH_FAILED, e);
@@ -1502,8 +1504,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       public Response apply(MutableStoreProvider storeProvider) {
         try {
           IJobKey jobKey = JobKeys.assertValid(IJobKey.build(requireNonNull(mutableJobKey)));
-          sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
-          jobUpdateController.abort(jobKey);
+          SessionContext context = sessionValidator
+              .checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
+          jobUpdateController.abort(jobKey, context.getIdentity());
           return okEmptyResponse();
         } catch (AuthFailedException e) {
           return errorResponse(AUTH_FAILED, e);

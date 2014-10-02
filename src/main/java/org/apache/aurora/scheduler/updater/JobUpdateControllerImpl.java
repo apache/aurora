@@ -163,33 +163,34 @@ class JobUpdateControllerImpl implements JobUpdateController {
             storeProvider.getTaskStore(),
             summary.getUpdateId(),
             job,
-            ROLLING_FORWARD);
+            ROLLING_FORWARD,
+            Optional.of(updatingUser));
       }
     });
   }
 
   @Override
-  public void pause(final IJobKey job) throws UpdateStateException {
+  public void pause(final IJobKey job, String user) throws UpdateStateException {
     requireNonNull(job);
     LOG.info("Attempting to pause update for " + job);
-    unscopedChangeUpdateStatus(job, JobUpdateStateMachine.GET_PAUSE_STATE);
+    unscopedChangeUpdateStatus(job, JobUpdateStateMachine.GET_PAUSE_STATE, Optional.of(user));
   }
 
-  public void resume(IJobKey job) throws UpdateStateException {
+  public void resume(IJobKey job, String user) throws UpdateStateException {
     requireNonNull(job);
     LOG.info("Attempting to resume update for " + job);
-    unscopedChangeUpdateStatus(job, JobUpdateStateMachine.GET_RESUME_STATE);
+    unscopedChangeUpdateStatus(job, JobUpdateStateMachine.GET_RESUME_STATE, Optional.of(user));
   }
 
   @Override
-  public void abort(IJobKey job) throws UpdateStateException {
+  public void abort(IJobKey job, String user) throws UpdateStateException {
     requireNonNull(job);
     unscopedChangeUpdateStatus(job, new Function<JobUpdateStatus, JobUpdateStatus>() {
       @Override
       public JobUpdateStatus apply(JobUpdateStatus input) {
         return ABORTED;
       }
-    });
+    }, Optional.of(user));
   }
 
   @Override
@@ -207,6 +208,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
               summary.getUpdateId(),
               summary.getJobKey(),
               summary.getState().getStatus(),
+              Optional.<String>absent(),
               false);
         }
       }
@@ -277,12 +279,14 @@ class JobUpdateControllerImpl implements JobUpdateController {
    *
    * @param job Job whose update state should be changed.
    * @param stateChange State change computation, based on the current state of the update.
+   * @param user The user who is changing the state.
    * @throws UpdateStateException If no active update exists for the provided {@code job}, or
    *                              if the proposed state transition is not allowed.
    */
   private void unscopedChangeUpdateStatus(
       final IJobKey job,
-      final Function<JobUpdateStatus, JobUpdateStatus> stateChange)
+      final Function<JobUpdateStatus, JobUpdateStatus> stateChange,
+      final Optional<String> user)
       throws UpdateStateException {
 
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
@@ -302,7 +306,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
             storeProvider.getJobUpdateStore(),
             storeProvider.getTaskStore(),
             update,
-            newStatus);
+            newStatus,
+            user);
       }
     });
   }
@@ -311,7 +316,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
       JobUpdateStore.Mutable updateStore,
       TaskStore taskStore,
       IJobUpdateSummary updateSummary,
-      JobUpdateStatus newStatus) {
+      JobUpdateStatus newStatus,
+      Optional<String> user) {
 
     if (updateSummary.getState().getStatus() == newStatus) {
       return;
@@ -323,7 +329,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
         taskStore,
         updateSummary.getUpdateId(),
         updateSummary.getJobKey(),
-        newStatus);
+        newStatus,
+        user);
   }
 
   private void recordAndChangeJobUpdateStatus(
@@ -331,9 +338,10 @@ class JobUpdateControllerImpl implements JobUpdateController {
       TaskStore taskStore,
       String updateId,
       IJobKey job,
-      JobUpdateStatus status) {
+      JobUpdateStatus status,
+      Optional<String> user) {
 
-    changeJobUpdateStatus(updateStore, taskStore, updateId, job, status, true);
+    changeJobUpdateStatus(updateStore, taskStore, updateId, job, status, user, true);
   }
 
   private static final Set<JobUpdateStatus> UNLOCK_STATES = ImmutableSet.of(
@@ -350,6 +358,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       String updateId,
       IJobKey job,
       JobUpdateStatus newStatus,
+      Optional<String> user,
       boolean recordChange) {
 
     JobUpdateStatus status;
@@ -371,6 +380,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       updateStore.saveJobUpdateEvent(
           IJobUpdateEvent.build(new JobUpdateEvent()
               .setStatus(status)
+              .setUser(user.orNull())
               .setTimestampMs(clock.nowMillis())),
           updateId);
     }
@@ -397,7 +407,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
         update = updateFactory.newUpdate(jobUpdate.getInstructions(), action == ROLL_FORWARD);
       } catch (RuntimeException e) {
         LOG.log(Level.WARNING, "Uncaught exception: " + e, e);
-        changeJobUpdateStatus(updateStore, taskStore, updateId, job, ERROR, true);
+        changeJobUpdateStatus(updateStore, taskStore, updateId, job, ERROR, user, true);
         return;
       }
       updates.put(job, update);
@@ -438,7 +448,8 @@ class JobUpdateControllerImpl implements JobUpdateController {
           taskStore,
           summary.getUpdateId(),
           job,
-          ERROR);
+          ERROR,
+          Optional.<String>absent());
       return;
     }
 
@@ -494,9 +505,19 @@ class JobUpdateControllerImpl implements JobUpdateController {
       }
 
       if (status == SUCCEEDED) {
-        changeUpdateStatus(updateStore, taskStore, summary, update.getSuccessStatus());
+        changeUpdateStatus(
+            updateStore,
+            taskStore,
+            summary,
+            update.getSuccessStatus(),
+            Optional.<String>absent());
       } else {
-        changeUpdateStatus(updateStore, taskStore, summary, update.getFailureStatus());
+        changeUpdateStatus(
+            updateStore,
+            taskStore,
+            summary,
+            update.getFailureStatus(),
+            Optional.<String>absent());
       }
     } else {
       LOG.info("Executing side-effects for update of " + job + ": " + result.getSideEffects());

@@ -2434,7 +2434,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testPauseJobUpdate() throws Exception {
     expectAuth(ROLE, true);
-    jobUpdateController.pause(JOB_KEY);
+    jobUpdateController.pause(JOB_KEY, USER);
 
     control.replay();
 
@@ -2453,7 +2453,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testPauseJobUpdateFailsInController() throws Exception {
     expectAuth(ROLE, true);
-    jobUpdateController.pause(JOB_KEY);
+    jobUpdateController.pause(JOB_KEY, USER);
     expectLastCall().andThrow(new UpdateStateException("failed"));
 
     control.replay();
@@ -2464,7 +2464,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testResumeJobUpdate() throws Exception {
     expectAuth(ROLE, true);
-    jobUpdateController.resume(JOB_KEY);
+    jobUpdateController.resume(JOB_KEY, USER);
 
     control.replay();
 
@@ -2483,7 +2483,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testResumeJobUpdateFailsInController() throws Exception {
     expectAuth(ROLE, true);
-    jobUpdateController.resume(JOB_KEY);
+    jobUpdateController.resume(JOB_KEY, USER);
     expectLastCall().andThrow(new UpdateStateException("failed"));
 
     control.replay();
@@ -2494,7 +2494,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testAbortJobUpdate() throws Exception {
     expectAuth(ROLE, true);
-    jobUpdateController.abort(JOB_KEY);
+    jobUpdateController.abort(JOB_KEY, USER);
 
     control.replay();
 
@@ -2513,7 +2513,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testAbortJobUpdateFailsInController() throws Exception {
     expectAuth(ROLE, true);
-    jobUpdateController.abort(JOB_KEY);
+    jobUpdateController.abort(JOB_KEY, USER);
     expectLastCall().andThrow(new UpdateStateException("failed"));
 
     control.replay();

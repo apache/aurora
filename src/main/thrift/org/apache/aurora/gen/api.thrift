@@ -621,6 +621,9 @@ struct JobUpdateEvent {
 
   /** Epoch timestamp in milliseconds. */
   2: i64 timestampMs
+
+  /** User who performed this event (if user-initiated). */
+  3: optional string user
 }
 
 /** Event marking a state transition in job instance update lifecycle. */

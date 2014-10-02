@@ -87,10 +87,12 @@
             <tr>
               <th>event</th>
               <th>time</th>
+              <th>user</th>
             </tr>
             <tr ng-repeat="e in update.updateEvents">
               <td>{{e.status | toNiceStatus}}</td>
               <td>{{e.timestampMs | toElapsedTime }} ago</td>
+              <td>{{e.user}}</td>
             </tr>
           </table>
         </div>
