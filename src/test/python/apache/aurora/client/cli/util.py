@@ -211,7 +211,7 @@ jobs = [HELLO_WORLD]
         environment = '%(env)s',
         instances = '{{instances_binding}}',
         update_config = UpdateConfig(
-          batch_size = 1,
+          batch_size = "{{TEST_BATCH}}",
           restart_threshold = 60,
           watch_secs = 45,
           max_per_shard_failures = 2,
@@ -254,7 +254,6 @@ jobs = [HELLO_WORLD]
   def get_unbound_test_config(cls, role=None, env=None, job=None):
     result = cls.UNBOUND_CONFIG % {'job': job or cls.TEST_JOB, 'role': role or cls.TEST_ROLE,
         'env': env or cls.TEST_ENV}
-    print("CONFIG:===========================\n%s\n=============================" % result)
     return result
 
   @classmethod

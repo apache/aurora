@@ -63,7 +63,7 @@ def proxy_main():
   v2 = AuroraClientV2CommandProcessor()
   v1 = AuroraClientV1CommandProcessor()
   bridge = Bridge([v2, v1], default=v1)
-  bridge.execute(sys.argv)
+  sys.exit(bridge.execute(sys.argv))
 
 
 if __name__ == '__main__':

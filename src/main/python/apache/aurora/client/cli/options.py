@@ -186,8 +186,9 @@ BATCH_OPTION = CommandOption('--batch-size', type=int, default=5,
         help='Number of instances to be operate on in one iteration')
 
 
-BIND_OPTION = CommandOption('--bind', type=str, default=[], dest='bindings',
+BIND_OPTION = CommandOption('--bind', dest='bindings',
     action='append',
+    default=[],
     metavar="var=value",
     help='Bind a pystachio variable name to a value. '
     'Multiple flags may be used to specify multiple values.')
@@ -229,7 +230,12 @@ INSTANCES_SPEC_ARGUMENT = CommandOption('instance_spec', type=instance_specifier
         'If INSTANCES is omitted, then all instances will be operated on.'))
 
 
-JOBSPEC_ARGUMENT = CommandOption('jobspec', type=AuroraJobKey.from_path,
+def jobkeytype(v):
+  """wrapper for AuroraJobKey.from_path that improves error messages"""
+  return AuroraJobKey.from_path(v)
+
+
+JOBSPEC_ARGUMENT = CommandOption('jobspec', type=jobkeytype,
     metavar="CLUSTER/ROLE/ENV/NAME",
     help='Fully specified job key, in CLUSTER/ROLE/ENV/NAME format')
 
@@ -242,6 +248,7 @@ JSON_READ_OPTION = CommandOption('--read-json', default=False, dest='read_json',
 JSON_WRITE_OPTION = CommandOption('--write-json', default=False, dest='write_json',
     action='store_true',
     help='Generate command output in JSON format')
+
 
 MAX_TOTAL_FAILURES_OPTION = CommandOption('--max-total-failures', type=int, default=0,
      help='Maximum number of instance failures to be tolerated in total before aborting.')

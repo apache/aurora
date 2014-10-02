@@ -18,6 +18,8 @@ import logging
 from collections import namedtuple
 from fnmatch import fnmatch
 
+from pystachio import Ref
+
 from apache.aurora.client.base import synthesize_url
 from apache.aurora.client.cli import (
     Context,
@@ -41,7 +43,7 @@ PartialJobKey = namedtuple('PartialJobKey', ['cluster', 'role', 'env', 'name'])
 def bindings_to_list(bindings):
   """Pystachio takes bindings in the form of a list of dictionaries. Each pystachio binding
   becomes another dictionary in the list. So we need to convert the bindings specified by
-  the user from a list of "name=value" formatted strings to a list of the dictionaries 
+  the user from a list of "name=value" formatted strings to a list of the dictionaries
   expected by pystachio.
   """
   result = []
@@ -49,7 +51,11 @@ def bindings_to_list(bindings):
     binding_parts = b.split("=")
     if len(binding_parts) != 2:
       raise ValueError('Binding parameter must be formatted name=value')
-    result.append({binding_parts[0]: binding_parts[1]})
+    try:
+      ref = Ref.from_address(binding_parts[0])
+    except Ref.InvalidRefError as e:
+      raise ValueError("Could not parse binding parameter %s: %s" % (b, e))
+    result.append({ref: binding_parts[1]})
   return result
 
 
@@ -82,7 +88,7 @@ class AuroraCommandContext(Context):
       with open(config_file, "r") as fp:
         self.print_log(TRANSCRIPT, "Config: %s" % fp.readlines())
       bindings = bindings_to_list(self.options.bindings) if self.options.bindings else None
-      return get_config(
+      result = get_config(
         jobname,
         config_file,
         self.options.read_json,
@@ -90,6 +96,12 @@ class AuroraCommandContext(Context):
         select_cluster=jobkey.cluster,
         select_role=jobkey.role,
         select_env=jobkey.env)
+      check_result = result.raw().check()
+      if not check_result.ok():
+        self.print_err(str(check_result))
+        raise self.CommandError(EXIT_INVALID_CONFIGURATION,
+            "Error in configuration")
+      return result
     except Exception as e:
       raise self.CommandError(EXIT_INVALID_CONFIGURATION, 'Error loading configuration: %s' % e)
 

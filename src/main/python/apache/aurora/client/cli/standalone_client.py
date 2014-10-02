@@ -125,7 +125,7 @@ def proxy_main():
   client = AuroraCommandLine()
   if len(sys.argv) == 1:
     sys.argv.append("help")
-  client.execute(sys.argv[1:])
+  sys.exit(client.execute(sys.argv[1:]))
 
 if __name__ == '__main__':
   proxy_main()

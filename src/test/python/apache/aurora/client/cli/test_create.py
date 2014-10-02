@@ -290,10 +290,35 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'create', '--wait-until=RUNNING', '--bind', 'cluster_binding=west',
-            '--bind', 'instances_binding=20', 'west/bozo/test/hello',
+            '--bind', 'instances_binding=20', '--bind', 'TEST_BATCH=1',
+            'west/bozo/test/hello',
             fp.name])
 
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       self.assert_create_job_called(api)
       self.assert_scheduler_called(api, mock_query, 2)
+
+  def test_failed_create_job_with_incomplete_bindings(self):
+    """Run a test of the "create" command against a mocked-out API:
+    Verifies that the creation command sends the right API RPCs, and performs the correct
+    tests on the result."""
+
+    mock_context = FakeAuroraCommandContext()
+    with contextlib.nested(
+        patch('threading._Event.wait'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
+
+      # This is the real test: invoke create as if it had been called by the command line.
+      with temporary_file() as fp:
+        fp.write(self.get_unbound_test_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        result = cmd.execute(['job', 'create', '--wait-until=RUNNING',
+            '--bind', 'cluster_binding=west',
+           'west/bozo/test/hello',
+            fp.name])
+        assert result == EXIT_INVALID_CONFIGURATION
+      assert mock_context.get_err() == [
+          "TypeCheck(FAILED): MesosJob[update_config] failed: "
+          "UpdateConfig[batch_size] failed: u'{{TEST_BATCH}}' not an integer"]
