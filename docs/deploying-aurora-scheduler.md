@@ -1,14 +1,12 @@
 The Aurora scheduler is responsible for scheduling new jobs, rescheduling failed jobs, and killing
 old jobs.
 
-Installing Aurora
-=================
+# Installing Aurora
 Aurora is a standalone Java server. As part of the build process it creates a bundle of all its
 dependencies, with the notable exceptions of the JVM and libmesos. Each target server should have
 a JVM (Java 7 or higher) and libmesos (0.18.0) installed.
 
-Creating the Distribution .zip File (Optional)
-----------------------------------------------
+## Creating the Distribution .zip File (Optional)
 To create a distribution for installation you will need build tools installed. On Ubuntu this can be
 done with `sudo apt-get install build-essential default-jdk`.
 
@@ -18,19 +16,16 @@ done with `sudo apt-get install build-essential default-jdk`.
 
 Copy the generated `dist/distributions/aurora-scheduler-*.zip` to each node that will run a scheduler.
 
-Installing Aurora
------------------
+## Installing Aurora
 Extract the aurora-scheduler zip file. The example configurations assume it is extracted to
 `/usr/local/aurora-scheduler`.
 
     sudo unzip dist/distributions/aurora-scheduler-*.zip -d /usr/local
     sudo ln -nfs "$(ls -dt /usr/local/aurora-scheduler-* | head -1)" /usr/local/aurora-scheduler
 
-Configuring Aurora
-==================
+# Configuring Aurora
 
-A Note on Configuration
------------------------
+## A Note on Configuration
 Like Mesos, Aurora uses command-line flags for runtime configuration. As such the Aurora
 "configuration file" is typically a `scheduler.sh` shell script of the form.
 
@@ -64,8 +59,7 @@ documentation run
 
     /usr/local/aurora-scheduler/bin/aurora-scheduler -help
 
-Replicated Log Configuration
-----------------------------
+## Replicated Log Configuration
 All Aurora state is persisted to a replicated log. This includes all jobs Aurora is running
 including where in the cluster they are being run and the configuration for running them, as
 well as other information such as metadata needed to reconnect to the Mesos master, resource
@@ -89,9 +83,7 @@ should be set to `2`, and in a cluster of 5 it should be set to `3`.
 
 *Incorrectly setting this flag will cause data corruption to occur!*
 
-Initializing the Replicated Log
--------------------------------
-
+## Initializing the Replicated Log
 Before you start Aurora you will also need to initialize the log on the first master.
 
     mesos-log initialize --path="$AURORA_HOME/scheduler/db"
@@ -100,8 +92,7 @@ Failing to do this will result the following message when you try to start the s
 
     Replica in EMPTY status received a broadcasted recover request
 
-Network considerations
-----------------------
+## Network considerations
 The Aurora scheduler listens on 2 ports - an HTTP port used for client RPCs and a web UI,
 and a libprocess (HTTP+Protobuf) port used to communicate with the Mesos master and for the log
 replication protocol. These can be left unconfigured (the scheduler publishes all selected ports
@@ -117,8 +108,7 @@ to ZooKeeper) or explicitly set in the startup script as follows:
     export LIBPROCESS_PORT=8083
     # ...
 
-Running Aurora
-==============
+# Running Aurora
 Configure a supervisor like [Monit](http://mmonit.com/monit/) or
 [supervisord](http://supervisord.org/) to run the created `scheduler.sh` file and restart it
 whenever it fails. Aurora expects to be restarted by an external process when it fails. Aurora
@@ -132,9 +122,48 @@ For example, monit can be configured with
 
 assuming you set `-http_port=8081`.
 
-Maintaining an Aurora Installation
-==================================
+## Maintaining an Aurora Installation
 
-Monitoring
-----------
+## Monitoring
 Please see our dedicated [monitoring guide](monitoring.md) for in-depth discussion on monitoring.
+
+## Running stateful services
+Aurora is best suited to run stateless applications, but it also accommodates for stateful services
+like databases, or services that otherwise need to always run on the same machines.
+
+### Dedicated attribute
+The Mesos slave has the `--attributes` command line argument which can be used to mark a slave with
+static attributes (not to be confused with `--resources`, which are dynamic and accounted).
+
+Aurora makes these attributes available for matching with scheduling
+[constraints](configuration-reference.md#specifying-scheduling-constraints).  Most of these
+constraints are arbitrary and available for custom use.  There is one exception, though: the
+`dedicated` attribute.  Aurora treats this specially, and only allows matching jobs to run on these
+machines, and will only schedule matching jobs on these machines.
+
+#### Syntax
+The dedicated attribute has semantic meaning. The format is `$role(/.*)?`. When a job is created,
+the scheduler requires that the `$role` component matches the `role` field in the job
+configuration, and will reject the job creation otherwise.  The remainder of the attribute is
+free-form. We've developed the idiom of formatting this attribute as `$role/$job`, but do not
+enforce this.
+
+#### Example
+Consider the following slave command line:
+
+    mesos-slave --attributes="host:$HOST;rack:$RACK;dedicated:db_team/redis" ...
+
+And this job configuration:
+
+    Service(
+      name = 'redis',
+      role = 'db_team',
+      constraints = {
+        'dedicated': 'db_team/redis'
+      }
+      ...
+    )
+
+The job configuration is indicating that it should only be scheduled on slaves with the attribute
+`dedicated:dba_team/redis`.  Additionally, Aurora will prevent any tasks that do _not_ have that
+constraint from running on those slaves.
