@@ -209,7 +209,7 @@
           },
 
           getPageTitle: function (info) {
-            var title = 'Aurora UI';
+            var title = 'Aurora';
             if (_.isNull(info) || info.error || typeof info.clusterName === 'undefined') {
               return title;
             } else {
