@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.updater;
+package org.apache.aurora.scheduler.testing;
 
 import java.util.Iterator;
 import java.util.List;
@@ -37,26 +37,55 @@ import static org.junit.Assert.assertEquals;
  * A simulated scheduled executor that records scheduled work and executes it when the clock is
  * advanced past their execution time.
  */
-class FakeScheduledExecutor extends FakeClock {
+public final class FakeScheduledExecutor extends FakeClock {
 
   private final List<Pair<Long, Runnable>> deferredWork = Lists.newArrayList();
 
-  FakeScheduledExecutor(ScheduledExecutorService mock) {
+  private FakeScheduledExecutor() { }
+
+  public static FakeScheduledExecutor scheduleExecutor(ScheduledExecutorService mock) {
+    FakeScheduledExecutor executor = new FakeScheduledExecutor();
     mock.schedule(
         EasyMock.<Runnable>anyObject(),
         EasyMock.anyLong(),
         EasyMock.eq(TimeUnit.MILLISECONDS));
-    expectLastCall().andAnswer(new IAnswer<ScheduledFuture<?>>() {
+    expectLastCall().andAnswer(addExpectations(executor, 1)).anyTimes();
+
+    return executor;
+  }
+
+  public static FakeScheduledExecutor scheduleAtFixedRateExecutor(
+      ScheduledExecutorService mock,
+      int maxInvocations) {
+
+    FakeScheduledExecutor executor = new FakeScheduledExecutor();
+    mock.scheduleAtFixedRate(
+        EasyMock.<Runnable>anyObject(),
+        EasyMock.anyLong(),
+        EasyMock.anyLong(),
+        EasyMock.eq(TimeUnit.MILLISECONDS));
+    expectLastCall().andAnswer(addExpectations(executor, maxInvocations)).once();
+
+    return executor;
+  }
+
+  private static IAnswer<ScheduledFuture<?>> addExpectations(
+      final FakeScheduledExecutor executor,
+      final int workCount) {
+
+    return new IAnswer<ScheduledFuture<?>>() {
       @Override
       public ScheduledFuture<?> answer() {
         Object[] args = EasyMock.getCurrentArguments();
         Runnable work = (Runnable) args[0];
         long millis = (Long) args[1];
         Preconditions.checkArgument(millis > 0);
-        deferredWork.add(Pair.of(nowMillis() + millis, work));
+        for (int i = 1; i <= workCount; i++) {
+          executor.deferredWork.add(Pair.of(executor.nowMillis() + i * millis, work));
+        }
         return null;
       }
-    }).anyTimes();
+    };
   }
 
   @Override
@@ -81,7 +110,7 @@ class FakeScheduledExecutor extends FakeClock {
     }
   }
 
-  void assertEmpty() {
+  public void assertEmpty() {
     assertEquals(ImmutableList.<Pair<Long, Runnable>>of(), deferredWork);
   }
 }

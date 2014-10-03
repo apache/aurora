@@ -48,8 +48,8 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
  * Prunes tasks in a job based on per-job history and an inactive time threshold by observing tasks
  * transitioning into one of the inactive states.
  */
-public class HistoryPruner implements EventSubscriber {
-  private static final Logger LOG = Logger.getLogger(HistoryPruner.class.getName());
+public class TaskHistoryPruner implements EventSubscriber {
+  private static final Logger LOG = Logger.getLogger(TaskHistoryPruner.class.getName());
 
   private final ScheduledExecutorService executor;
   private final StateManager stateManager;
@@ -82,7 +82,7 @@ public class HistoryPruner implements EventSubscriber {
   }
 
   @Inject
-  HistoryPruner(
+  TaskHistoryPruner(
       final ScheduledExecutorService executor,
       final StateManager stateManager,
       final Clock clock,

@@ -90,6 +90,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.mem.MemStorage.Delegated;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
+import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
 import org.junit.After;
@@ -151,7 +152,7 @@ public class JobUpdaterIT extends EasyMockTest {
     // Avoid console spam due to stats registered multiple times.
     Stats.flush();
     final ScheduledExecutorService executor = createMock(ScheduledExecutorService.class);
-    clock = new FakeScheduledExecutor(executor);
+    clock = FakeScheduledExecutor.scheduleExecutor(executor);
     driver = createMock(Driver.class);
     eventBus = new EventBus();
 

@@ -89,6 +89,11 @@ struct SaveJobInstanceUpdateEvent {
   2: string updateId
 }
 
+struct PruneJobUpdateHistory {
+  1: i32 perJobRetainCount
+  2: i64 historyPruneThresholdMs
+}
+
 union Op {
   1: SaveFrameworkId saveFrameworkId
   2: SaveAcceptedJob saveAcceptedJob
@@ -104,6 +109,7 @@ union Op {
   14: SaveJobUpdate saveJobUpdate
   15: SaveJobUpdateEvent saveJobUpdateEvent
   16: SaveJobInstanceUpdateEvent saveJobInstanceUpdateEvent
+  17: PruneJobUpdateHistory pruneJobUpdateHistory
 }
 
 // The current schema version ID.  This should be incremented each time the

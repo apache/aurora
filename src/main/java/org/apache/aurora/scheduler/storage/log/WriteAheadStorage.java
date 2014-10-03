@@ -28,6 +28,7 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.storage.Op;
+import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.RemoveJob;
 import org.apache.aurora.gen.storage.RemoveLock;
 import org.apache.aurora.gen.storage.RemoveQuota;
@@ -305,6 +306,24 @@ class WriteAheadStorage extends ForwardingStore implements
         event.newBuilder(),
         updateId)));
     jobUpdateStore.saveJobInstanceUpdateEvent(event, updateId);
+  }
+
+  @Override
+  public Set<String> pruneHistory(int perJobRetainCount, long historyPruneThresholdMs) {
+    Set<String> prunedUpdates = jobUpdateStore.pruneHistory(
+        perJobRetainCount,
+        historyPruneThresholdMs);
+
+    if (!prunedUpdates.isEmpty()) {
+      // Pruned updates will eventually go away from persisted storage when a new snapshot is cut.
+      // So, persisting pruning attempts is not strictly necessary as the periodic pruner will
+      // provide eventual consistency between volatile and persistent storage upon scheduler
+      // restart. By generating an out of band pruning during log replay the consistency is
+      // achieved sooner without potentially exposing pruned but not yet persisted data.
+      write(Op.pruneJobUpdateHistory(
+          new PruneJobUpdateHistory(perJobRetainCount, historyPruneThresholdMs)));
+    }
+    return prunedUpdates;
   }
 
   @Override

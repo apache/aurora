@@ -135,6 +135,27 @@ public class DBJobUpdateStore implements JobUpdateStore.Mutable {
     detailsMapper.truncate();
   }
 
+  @Timed("job_update_store_prune_history")
+  @Override
+  public Set<String> pruneHistory(int perJobRetainCount, long historyPruneThresholdMs) {
+    ImmutableSet.Builder<String> pruned = ImmutableSet.builder();
+
+    Set<Long> jobKeyIdsToPrune = detailsMapper.selectJobKeysForPruning(
+        perJobRetainCount,
+        historyPruneThresholdMs);
+
+    for (Long jobKeyId : jobKeyIdsToPrune) {
+      Set<String> pruneVictims = detailsMapper.selectPruneVictims(
+          jobKeyId,
+          perJobRetainCount,
+          historyPruneThresholdMs);
+
+      detailsMapper.deleteCompletedUpdates(pruneVictims);
+      pruned.addAll(pruneVictims);
+    }
+    return pruned.build();
+  }
+
   @Timed("job_update_store_fetch_summaries")
   @Override
   public List<IJobUpdateSummary> fetchJobUpdateSummaries(IJobUpdateQuery query) {

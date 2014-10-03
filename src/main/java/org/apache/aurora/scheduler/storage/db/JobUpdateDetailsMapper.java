@@ -104,6 +104,40 @@ interface JobUpdateDetailsMapper {
   void truncate();
 
   /**
+   * Deletes all updates and events with update ID in {@code updateIds}.
+   *
+   * @param updateIds Update IDs to delete.
+   */
+  void deleteCompletedUpdates(@Param("updateIds") Set<String> updateIds);
+
+  /**
+   * Selects all distinct job key IDs associated with at least {@code perJobRetainCount} completed
+   * updates or updates completed before {@code historyPruneThresholdMs}.
+   *
+   * @param perJobRetainCount Number of updates to keep per job.
+   * @param historyPruneThresholdMs History pruning timestamp threshold.
+   * @return Job key IDs.
+   */
+  Set<Long> selectJobKeysForPruning(
+      @Param("retainCount") int perJobRetainCount,
+      @Param("pruneThresholdMs") long historyPruneThresholdMs);
+
+  /**
+   * Groups all updates without a job lock in reverse chronological order of their created times
+   * and deletes anything in excess of {@code perJobRetainCount} or older than
+   * {@code historyPruneThresholdMs}.
+   *
+   * @param jobKeyId Job key ID to select pruning victims for.
+   * @param perJobRetainCount Number of updates to keep per job.
+   * @param historyPruneThresholdMs History pruning timestamp threshold.
+   * @return Update IDs to prune.
+   */
+  Set<String> selectPruneVictims(
+      @Param("keyId") long jobKeyId,
+      @Param("retainCount") int perJobRetainCount,
+      @Param("pruneThresholdMs") long historyPruneThresholdMs);
+
+  /**
    * Gets all job update summaries matching the provided {@code query}.
    * All {@code query} fields are ANDed together.
    *
@@ -116,7 +150,7 @@ interface JobUpdateDetailsMapper {
    * Gets details for the provided {@code updateId}.
    *
    * @param updateId Update ID to get.
-   * @return job update details for the provided update ID, if it exists.
+   * @return Job update details for the provided update ID, if it exists.
    */
   @Nullable
   StoredJobUpdateDetails selectDetails(String updateId);
@@ -125,7 +159,7 @@ interface JobUpdateDetailsMapper {
    * Gets job update for the provided {@code updateId}.
    *
    * @param updateId Update ID to select by.
-   * @return job update for the provided update ID, if it exists.
+   * @return Job update for the provided update ID, if it exists.
    */
   @Nullable
   JobUpdate selectUpdate(String updateId);
@@ -134,7 +168,7 @@ interface JobUpdateDetailsMapper {
    * Gets job update instructions for the provided {@code updateId}.
    *
    * @param updateId Update ID to select by.
-   * @return job update instructions for the provided update ID, if it exists.
+   * @return Job update instructions for the provided update ID, if it exists.
    */
   @Nullable
   JobUpdateInstructions selectInstructions(String updateId);

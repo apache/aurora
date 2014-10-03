@@ -199,7 +199,7 @@
     </collection>
   </resultMap>
 
-  <sql id="timestamps_inner_joins">
+  <sql id="status_inner_join">
     INNER JOIN
     (
       SELECT
@@ -215,6 +215,9 @@
         GROUP BY update_id
       ) AS e_t ON e_t.update_id = e_s.update_id AND e_t.timestamp_ms = e_s.timestamp_ms
     ) AS max_status ON max_status.update_id = u.id
+  </sql>
+
+  <sql id="created_timestamp_inner_join">
     INNER JOIN
     (
       SELECT
@@ -223,6 +226,9 @@
       FROM job_update_events
       GROUP BY update_id
     ) AS min_ts ON min_ts.update_id = u.id
+  </sql>
+
+  <sql id="last_updated_timestamp_inner_join">
     INNER JOIN
     (
       SELECT
@@ -242,6 +248,12 @@
       )
       GROUP BY update_id
     ) AS max_ts ON max_ts.update_id = u.id
+  </sql>
+
+  <sql id="timestamps_inner_joins">
+    <include refid="status_inner_join" />
+    <include refid="created_timestamp_inner_join" />
+    <include refid="last_updated_timestamp_inner_join" />
   </sql>
 
   <select id="selectSummaries" resultMap="jobUpdateSummaryMap">
@@ -320,8 +332,7 @@
       io.last AS jui_juse_r_last
   </sql>
 
-  <sql id="job_update_inner_joins">
-    FROM job_updates AS u
+  <sql id="job_key_inner_join">
     INNER JOIN job_keys AS j ON j.id = u.job_key_id
   </sql>
 
@@ -331,6 +342,10 @@
     LEFT OUTER JOIN job_update_configs_to_instances AS ci ON ci.config_id = co.id
     LEFT OUTER JOIN job_updates_to_desired_instances AS di ON di.update_id = u.id
     LEFT OUTER JOIN job_updates_to_instance_overrides AS io ON io.update_id = u.id
+  </sql>
+
+  <sql id="lock_outer_join">
+    LEFT OUTER JOIN job_update_locks AS l on l.update_id = u.id
   </sql>
 
   <sql id="unscoped_details_select">
@@ -345,12 +360,13 @@
       i.instance_id AS i_instance_id,
       i.timestamp_ms AS i_timestamp_ms,
       l.lock_token AS lock_token
-    <include refid="job_update_inner_joins" />
+    FROM job_updates AS u
+    <include refid="job_key_inner_join" />
     <include refid="timestamps_inner_joins" />
     <include refid="job_update_outer_joins" />
     LEFT OUTER JOIN job_update_events AS e ON e.update_id = u.id
     LEFT OUTER JOIN job_instance_update_events AS i ON i.update_id = u.id
-    LEFT OUTER JOIN job_update_locks AS l on l.update_id = u.id
+    <include refid="lock_outer_join" />
   </sql>
 
   <!--Ideally, update instruction columns could be derived from job_update_columns above but that
@@ -380,7 +396,8 @@
       io.id AS juse_r_id,
       io.first AS juse_r_first,
       io.last AS juse_r_last
-    <include refid="job_update_inner_joins" />
+    FROM job_updates AS u
+    <include refid="job_key_inner_join" />
     <include refid="job_update_outer_joins" />
     WHERE u.update_id = #{id}
   </select>
@@ -388,7 +405,8 @@
   <select id="selectUpdate" resultMap="jobUpdateMap">
     SELECT
       <include refid="job_update_columns" />
-    <include refid="job_update_inner_joins" />
+    FROM job_updates AS u
+    <include refid="job_key_inner_join" />
     <include refid="timestamps_inner_joins" />
     <include refid="job_update_outer_joins" />
     WHERE u.update_id = #{id}
@@ -426,5 +444,56 @@
 
   <delete id="truncate">
     DELETE FROM job_updates;
+  </delete>
+
+  <select id="selectJobKeysForPruning" resultType="long">
+    SELECT DISTINCT
+      u.job_key_id
+    FROM job_updates as u
+    <include refid="created_timestamp_inner_join" />
+    <include refid="lock_outer_join" />
+    WHERE l.id IS NULL
+    GROUP BY u.job_key_id
+    HAVING COUNT(u.job_key_id) > #{retainCount}
+    UNION
+    SELECT DISTINCT
+      u.job_key_id
+    FROM job_updates as u
+    <include refid="created_timestamp_inner_join" />
+    <include refid="lock_outer_join" />
+    WHERE min_ts.timestamp_ms &lt; #{pruneThresholdMs} AND l.id IS NULL
+  </select>
+
+  <select id="selectPruneVictims" resultType="String">
+    SELECT id FROM
+    (
+      SELECT
+        u.update_id as id
+      FROM job_updates as u
+      <include refid="created_timestamp_inner_join" />
+      <include refid="lock_outer_join" />
+      WHERE u.job_key_id = #{keyId}
+        AND l.id IS NULL
+      ORDER BY min_ts.timestamp_ms DESC
+      LIMIT NULL
+      OFFSET #{retainCount}
+    )
+    UNION
+    SELECT
+      u.update_id as id
+    FROM job_updates as u
+    <include refid="created_timestamp_inner_join" />
+    <include refid="lock_outer_join" />
+    WHERE u.job_key_id = #{keyId}
+      AND min_ts.timestamp_ms &lt;= #{pruneThresholdMs}
+      AND l.id IS NULL
+  </select>
+
+  <delete id="deleteCompletedUpdates">
+    DELETE FROM job_updates
+    WHERE update_id IN
+    <foreach item="element" collection="updateIds" open="(" separator="," close=")">
+      #{element}
+    </foreach>
   </delete>
 </mapper>

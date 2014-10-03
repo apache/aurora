@@ -133,5 +133,19 @@ public interface JobUpdateStore {
      * Deletes all updates and update events from the store.
      */
     void deleteAllUpdatesAndEvents();
+
+    /**
+     * Prunes (deletes) old completed updates and events from the store.
+     * <p>
+     * At least {@code perJobRetainCount} last completed updates that completed less than
+     * {@code historyPruneThreshold} ago will be kept for every job.
+     *
+     * @param perJobRetainCount Number of completed updates to retain per job.
+     * @param historyPruneThresholdMs Earliest timestamp in the past to retain history.
+     *                                Any completed updates created before this timestamp
+     *                                will be pruned.
+     * @return Set of pruned update IDs.
+     */
+    Set<String> pruneHistory(int perJobRetainCount, long historyPruneThresholdMs);
   }
 }

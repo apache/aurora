@@ -65,7 +65,9 @@ import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_UPDATED;
 import static org.apache.aurora.gen.JobUpdateAction.INSTANCE_UPDATING;
 import static org.apache.aurora.gen.JobUpdateStatus.ABORTED;
 import static org.apache.aurora.gen.JobUpdateStatus.ERROR;
+import static org.apache.aurora.gen.JobUpdateStatus.FAILED;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
+import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_BACK_PAUSED;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLL_FORWARD_PAUSED;
@@ -383,6 +385,116 @@ public class DBJobUpdateStoreTest {
     assertEquals(Optional.<IJobUpdateDetails>absent(), getUpdateDetails(updateId));
   }
 
+  @Test
+  public void testPruneHistory() {
+    String updateId1 = "u11";
+    String updateId2 = "u12";
+    String updateId3 = "u13";
+    String updateId4 = "u14";
+    String updateId5 = "u15";
+    String updateId6 = "u16";
+    String updateId7 = "u17";
+
+    IJobKey job2 = JobKeys.from("testRole2", "testEnv2", "job2");
+    IJobUpdate update1 = makeJobUpdate(JOB, updateId1);
+    IJobUpdate update2 = makeJobUpdate(JOB, updateId2);
+    IJobUpdate update3 = makeJobUpdate(JOB, updateId3);
+    IJobUpdate update4 = makeJobUpdate(JOB, updateId4);
+    IJobUpdate update5 = makeJobUpdate(job2, updateId5);
+    IJobUpdate update6 = makeJobUpdate(job2, updateId6);
+    IJobUpdate update7 = makeJobUpdate(job2, updateId7);
+
+    IJobUpdateEvent updateEvent1 = IJobUpdateEvent.build(new JobUpdateEvent(ROLLING_BACK, 123L));
+    IJobUpdateEvent updateEvent2 = IJobUpdateEvent.build(new JobUpdateEvent(ABORTED, 124L));
+    IJobUpdateEvent updateEvent3 = IJobUpdateEvent.build(new JobUpdateEvent(ROLLED_BACK, 125L));
+    IJobUpdateEvent updateEvent4 = IJobUpdateEvent.build(new JobUpdateEvent(FAILED, 126L));
+    IJobUpdateEvent updateEvent5 = IJobUpdateEvent.build(new JobUpdateEvent(ERROR, 123L));
+    IJobUpdateEvent updateEvent6 = IJobUpdateEvent.build(new JobUpdateEvent(FAILED, 125L));
+    IJobUpdateEvent updateEvent7 = IJobUpdateEvent.build(new JobUpdateEvent(ROLLING_FORWARD, 126L));
+
+    update1 = populateExpected(
+        saveUpdateNoEvent(update1, Optional.of("lock1")), ROLLING_BACK, 123L, 123L);
+    update2 = populateExpected(
+        saveUpdateNoEvent(update2, Optional.<String>absent()), ABORTED, 124L, 124L);
+    update3 = populateExpected(
+        saveUpdateNoEvent(update3, Optional.<String>absent()), ROLLED_BACK, 125L, 125L);
+    update4 = populateExpected(
+        saveUpdateNoEvent(update4, Optional.<String>absent()), FAILED, 126L, 126L);
+    update5 = populateExpected(
+        saveUpdateNoEvent(update5, Optional.<String>absent()), ERROR, 123L, 123L);
+    update6 = populateExpected(
+        saveUpdateNoEvent(update6, Optional.<String>absent()), FAILED, 125L, 125L);
+    update7 = populateExpected(
+        saveUpdateNoEvent(update7, Optional.of("lock2")), ROLLING_FORWARD, 126L, 126L);
+
+    saveJobEvent(updateEvent1, updateId1);
+    saveJobEvent(updateEvent2, updateId2);
+    saveJobEvent(updateEvent3, updateId3);
+    saveJobEvent(updateEvent4, updateId4);
+    saveJobEvent(updateEvent5, updateId5);
+    saveJobEvent(updateEvent6, updateId6);
+    saveJobEvent(updateEvent7, updateId7);
+
+    assertEquals(update1, getUpdate(updateId1).get());
+    assertEquals(update2, getUpdate(updateId2).get());
+    assertEquals(update3, getUpdate(updateId3).get());
+    assertEquals(update4, getUpdate(updateId4).get());
+    assertEquals(update5, getUpdate(updateId5).get());
+    assertEquals(update6, getUpdate(updateId6).get());
+    assertEquals(update7, getUpdate(updateId7).get());
+
+    long pruningThreshold = 120L;
+
+    // No updates pruned.
+    assertEquals(ImmutableSet.<String>of(), pruneHistory(3, pruningThreshold));
+    assertEquals(Optional.of(update7), getUpdate(updateId7)); // active update
+    assertEquals(Optional.of(update6), getUpdate(updateId6));
+    assertEquals(Optional.of(update5), getUpdate(updateId5));
+
+    assertEquals(Optional.of(update4), getUpdate(updateId4));
+    assertEquals(Optional.of(update3), getUpdate(updateId3));
+    assertEquals(Optional.of(update2), getUpdate(updateId2));
+    assertEquals(Optional.of(update1), getUpdate(updateId1)); // active update
+
+    assertEquals(ImmutableSet.of(updateId2), pruneHistory(2, pruningThreshold));
+    // No updates pruned.
+    assertEquals(Optional.of(update7), getUpdate(updateId7)); // active update
+    assertEquals(Optional.of(update6), getUpdate(updateId6));
+    assertEquals(Optional.of(update5), getUpdate(updateId5));
+
+    // 1 update pruned.
+    assertEquals(Optional.of(update4), getUpdate(updateId4));
+    assertEquals(Optional.of(update3), getUpdate(updateId3));
+    assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId2));
+    assertEquals(Optional.of(update1), getUpdate(updateId1)); // active update
+
+    assertEquals(ImmutableSet.of(updateId5, updateId3), pruneHistory(1, pruningThreshold));
+    // 1 update pruned.
+    assertEquals(Optional.of(update7), getUpdate(updateId7)); // active update
+    assertEquals(Optional.of(update6), getUpdate(updateId6));
+    assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId5));
+
+    // 2 updates pruned.
+    assertEquals(Optional.of(update4), getUpdate(updateId4));
+    assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId3));
+    assertEquals(Optional.of(update1), getUpdate(updateId1)); // active update
+
+    // The oldest update is pruned.
+    assertEquals(ImmutableSet.of(updateId6), pruneHistory(1, 126L));
+    assertEquals(Optional.of(update7), getUpdate(updateId7)); // active update
+    assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId6));
+
+    assertEquals(Optional.of(update4), getUpdate(updateId4));
+    assertEquals(Optional.of(update1), getUpdate(updateId1)); // active update
+
+    // Nothing survives the 0 per job count.
+    assertEquals(ImmutableSet.of(updateId4), pruneHistory(0, pruningThreshold));
+    assertEquals(Optional.of(update7), getUpdate(updateId7)); // active update
+
+    assertEquals(Optional.<IJobUpdate>absent(), getUpdate(updateId4));
+    assertEquals(Optional.of(update1), getUpdate(updateId1)); // active update
+  }
+
   @Test(expected = StorageException.class)
   public void testSaveUpdateWithoutLock() {
     final IJobUpdate update = makeJobUpdate(JOB, "updateId");
@@ -414,13 +526,7 @@ public class DBJobUpdateStoreTest {
     final IJobUpdate update = makeJobUpdate(JOB, "update1");
     saveUpdate(update, Optional.of("lock1"));
 
-    storage.write(new MutateWork.NoResult.Quiet() {
-      @Override
-      public void execute(MutableStoreProvider storeProvider) {
-        storeProvider.getLockStore().removeLock(
-            makeLock(update.getSummary().getJobKey(), "lock1").getKey());
-      }
-    });
+    removeLock(update, "lock1");
 
     assertEquals(
         Optional.of(updateJobDetails(populateExpected(update), FIRST_EVENT)),
@@ -614,7 +720,7 @@ public class DBJobUpdateStoreTest {
         .setUser("fake user"));
   }
 
-  private void saveUpdate(final IJobUpdate update, final Optional<String> lockToken) {
+  private IJobUpdate saveUpdate(final IJobUpdate update, final Optional<String> lockToken) {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
@@ -628,6 +734,23 @@ public class DBJobUpdateStoreTest {
             update.getSummary().getUpdateId());
       }
     });
+
+    return update;
+  }
+
+  private IJobUpdate saveUpdateNoEvent(final IJobUpdate update, final Optional<String> lockToken) {
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override
+      public void execute(MutableStoreProvider storeProvider) {
+        if (lockToken.isPresent()) {
+          storeProvider.getLockStore().saveLock(
+              makeLock(update.getSummary().getJobKey(), lockToken.get()));
+        }
+        storeProvider.getJobUpdateStore().saveJobUpdate(update, lockToken);
+      }
+    });
+
+    return update;
   }
 
   private void saveJobEvent(final IJobUpdateEvent event, final String updateId) {
@@ -653,6 +776,25 @@ public class DBJobUpdateStoreTest {
       @Override
       public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getJobUpdateStore().deleteAllUpdatesAndEvents();
+      }
+    });
+  }
+
+  private Set<String> pruneHistory(final int retainCount, final long pruningThresholdMs) {
+    return storage.write(new MutateWork.Quiet<Set<String>>() {
+      @Override
+      public Set<String> apply(MutableStoreProvider storeProvider) {
+        return storeProvider.getJobUpdateStore().pruneHistory(retainCount, pruningThresholdMs);
+      }
+    });
+  }
+
+  private void removeLock(final IJobUpdate update, final String lockToken) {
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override
+      public void execute(MutableStoreProvider storeProvider) {
+        storeProvider.getLockStore().removeLock(
+            makeLock(update.getSummary().getJobKey(), lockToken).getKey());
       }
     });
   }

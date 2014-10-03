@@ -31,6 +31,8 @@ import com.google.inject.Binder;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
+
+import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNegative;
@@ -45,11 +47,11 @@ import com.twitter.common.util.TruncatedBinaryBackoff;
 
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.GcExecutorSettings;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.RandomGcExecutorSettings;
-import org.apache.aurora.scheduler.async.HistoryPruner.HistoryPrunnerSettings;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import org.apache.aurora.scheduler.async.RescheduleCalculator.RescheduleCalculatorImpl;
 import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
+import org.apache.aurora.scheduler.async.TaskHistoryPruner.HistoryPrunnerSettings;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
@@ -149,6 +151,20 @@ public class AsyncModule extends AbstractModule {
   @CmdLine(name = "enable_preemptor",
       help = "Enable the preemptor and preemption")
   private static final Arg<Boolean> ENABLE_PREEMPTOR = Arg.create(true);
+
+  @CmdLine(name = "job_update_history_per_job_threshold",
+      help = "Maximum number of completed job updates to retain in a job update history.")
+  private static final Arg<Integer> JOB_UPDATE_HISTORY_PER_JOB_THRESHOLD = Arg.create(10);
+
+  @CmdLine(name = "job_update_history_pruning_interval",
+      help = "Job update history pruning interval.")
+  private static final Arg<Amount<Long, Time>> JOB_UPDATE_HISTORY_PRUNING_INTERVAL =
+      Arg.create(Amount.of(15L, Time.MINUTES));
+
+  @CmdLine(name = "job_update_history_pruning_threshold",
+      help = "Time after which the scheduler will prune completed job update history.")
+  private static final Arg<Amount<Long, Time>> JOB_UPDATE_HISTORY_PRUNING_THRESHOLD =
+      Arg.create(Amount.of(30L, Time.DAYS));
 
   private static final Preemptor NULL_PREEMPTOR = new Preemptor() {
     @Override
@@ -271,11 +287,11 @@ public class AsyncModule extends AbstractModule {
         ));
         bind(ScheduledExecutorService.class).toInstance(executor);
 
-        bind(HistoryPruner.class).in(Singleton.class);
-        expose(HistoryPruner.class);
+        bind(TaskHistoryPruner.class).in(Singleton.class);
+        expose(TaskHistoryPruner.class);
       }
     });
-    PubsubEventModule.bindSubscriber(binder(), HistoryPruner.class);
+    PubsubEventModule.bindSubscriber(binder(), TaskHistoryPruner.class);
 
     install(new PrivateModule() {
       @Override
@@ -299,6 +315,24 @@ public class AsyncModule extends AbstractModule {
         expose(GcExecutorLauncher.class);
       }
     });
+
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(JobUpdateHistoryPruner.HistoryPrunerSettings.class).toInstance(
+            new JobUpdateHistoryPruner.HistoryPrunerSettings(
+                JOB_UPDATE_HISTORY_PRUNING_INTERVAL.get(),
+                JOB_UPDATE_HISTORY_PRUNING_THRESHOLD.get(),
+                JOB_UPDATE_HISTORY_PER_JOB_THRESHOLD.get()));
+
+        bind(ScheduledExecutorService.class).toInstance(
+            AsyncUtil.singleThreadLoggingScheduledExecutor("JobUpdatePruner-%d", LOG));
+
+        bind(JobUpdateHistoryPruner.class).in(Singleton.class);
+        expose(JobUpdateHistoryPruner.class);
+      }
+    });
+    LifecycleModule.bindStartupAction(binder(), JobUpdateHistoryPruner.class);
   }
 
   /**

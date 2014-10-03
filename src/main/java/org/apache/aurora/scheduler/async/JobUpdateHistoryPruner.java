@@ -1,0 +1,100 @@
+/**
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.aurora.scheduler.async;
+
+import java.util.Set;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
+
+import javax.inject.Inject;
+
+import com.google.common.base.Joiner;
+
+import com.twitter.common.base.Command;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
+import com.twitter.common.util.Clock;
+
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+
+import static java.util.Objects.requireNonNull;
+
+/**
+ * Prunes per-job update history on a periodic basis.
+ */
+class JobUpdateHistoryPruner implements Command {
+  private static final Logger LOG = Logger.getLogger(JobUpdateHistoryPruner.class.getName());
+
+  private final Clock clock;
+  private final ScheduledExecutorService executor;
+  private final Storage storage;
+  private final HistoryPrunerSettings settings;
+
+  static class HistoryPrunerSettings {
+    private final Amount<Long, Time> pruneInterval;
+    private final Amount<Long, Time> maxHistorySize;
+    private final int maxUpdatesPerJob;
+
+    HistoryPrunerSettings(
+        Amount<Long, Time> pruneInterval,
+        Amount<Long, Time> maxHistorySize,
+        int maxUpdatesPerJob) {
+
+      this.pruneInterval = requireNonNull(pruneInterval);
+      this.maxHistorySize = requireNonNull(maxHistorySize);
+      this.maxUpdatesPerJob = maxUpdatesPerJob;
+    }
+  }
+
+  @Inject
+  JobUpdateHistoryPruner(
+      Clock clock,
+      ScheduledExecutorService executor,
+      Storage storage,
+      HistoryPrunerSettings settings) {
+
+    this.clock = requireNonNull(clock);
+    this.executor = requireNonNull(executor);
+    this.storage = requireNonNull(storage);
+    this.settings = requireNonNull(settings);
+  }
+
+  @Override
+  public void execute() throws RuntimeException {
+    executor.scheduleAtFixedRate(
+        new Runnable() {
+          @Override
+          public void run() {
+            storage.write(new MutateWork.NoResult.Quiet() {
+              @Override
+              public void execute(MutableStoreProvider storeProvider) {
+                Set<String> prunedUpdates = storeProvider.getJobUpdateStore().pruneHistory(
+                    settings.maxUpdatesPerJob,
+                    clock.nowMillis() - settings.maxHistorySize.as(Time.MILLISECONDS));
+
+                LOG.info(prunedUpdates.isEmpty()
+                    ? "No job update history to prune."
+                    : "Pruned job update history: " + Joiner.on(",").join(prunedUpdates));
+              }
+            });
+          }
+        },
+        settings.pruneInterval.as(Time.MILLISECONDS),
+        settings.pruneInterval.as(Time.MILLISECONDS),
+        TimeUnit.MILLISECONDS);
+  }
+}

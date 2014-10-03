@@ -55,6 +55,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.storage.LogEntry;
 import org.apache.aurora.gen.storage.Op;
+import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.RemoveJob;
 import org.apache.aurora.gen.storage.RemoveLock;
 import org.apache.aurora.gen.storage.RemoveQuota;
@@ -850,6 +851,32 @@ public class LogStorageTest extends EasyMockTest {
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
         storeProvider.getJobUpdateStore().saveJobInstanceUpdateEvent(event, UPDATE_ID);
+      }
+    }.run();
+  }
+
+  @Test
+  public void testPruneHistory() throws Exception {
+    final PruneJobUpdateHistory pruneHistory = new PruneJobUpdateHistory()
+        .setHistoryPruneThresholdMs(1L)
+        .setPerJobRetainCount(1);
+
+    new MutationFixture() {
+      @Override
+      protected void setupExpectations() throws Exception {
+        storageUtil.expectWriteOperation();
+        expect(storageUtil.jobUpdateStore.pruneHistory(
+            pruneHistory.getPerJobRetainCount(),
+            pruneHistory.getHistoryPruneThresholdMs())).andReturn(ImmutableSet.of("id1"));
+
+        streamMatcher.expectTransaction(Op.pruneJobUpdateHistory(pruneHistory)).andReturn(position);
+      }
+
+      @Override
+      protected void performMutations(MutableStoreProvider storeProvider) {
+        storeProvider.getJobUpdateStore().pruneHistory(
+            pruneHistory.getPerJobRetainCount(),
+            pruneHistory.getHistoryPruneThresholdMs());
       }
     }.run();
   }

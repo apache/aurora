@@ -38,7 +38,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
-import org.apache.aurora.scheduler.async.HistoryPruner.HistoryPrunnerSettings;
+import org.apache.aurora.scheduler.async.TaskHistoryPruner.HistoryPrunnerSettings;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -62,7 +62,7 @@ import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.fail;
 
-public class HistoryPrunerTest extends EasyMockTest {
+public class TaskHistoryPrunerTest extends EasyMockTest {
   private static final String JOB_A = "job-a";
   private static final String TASK_ID = "task_id";
   private static final String SLAVE_HOST = "HOST_A";
@@ -77,7 +77,7 @@ public class HistoryPrunerTest extends EasyMockTest {
   private FakeClock clock;
   private StateManager stateManager;
   private StorageTestUtil storageUtil;
-  private HistoryPruner pruner;
+  private TaskHistoryPruner pruner;
 
   @Before
   public void setUp() {
@@ -87,7 +87,7 @@ public class HistoryPrunerTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
-    pruner = new HistoryPruner(
+    pruner = new TaskHistoryPruner(
         executor,
         stateManager,
         clock,
@@ -251,13 +251,13 @@ public class HistoryPrunerTest extends EasyMockTest {
     taskDeleted.await();
   }
 
-  private HistoryPruner prunerWithRealExecutor() {
+  private TaskHistoryPruner prunerWithRealExecutor() {
     ScheduledExecutorService realExecutor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder()
             .setDaemon(true)
             .setNameFormat("testThreadSafeEvents-executor")
             .build());
-    return new HistoryPruner(
+    return new TaskHistoryPruner(
         realExecutor,
         stateManager,
         clock,
@@ -340,7 +340,7 @@ public class HistoryPrunerTest extends EasyMockTest {
 
     IJobKey jobKey = Iterables.getOnlyElement(
         FluentIterable.from(tasksInJob).transform(Tasks.SCHEDULED_TO_JOB_KEY).toSet());
-    storageUtil.expectTaskFetch(HistoryPruner.jobHistoryQuery(jobKey), tasksInJob);
+    storageUtil.expectTaskFetch(TaskHistoryPruner.jobHistoryQuery(jobKey), tasksInJob);
     if (pruned.length > 0) {
       stateManager.deleteTasks(Tasks.ids(pruned));
     }
