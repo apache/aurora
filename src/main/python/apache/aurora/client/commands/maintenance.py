@@ -12,8 +12,6 @@
 # limitations under the License.
 #
 
-import logging
-
 from twitter.common import app, log
 
 from apache.aurora.admin.admin_util import (
@@ -29,7 +27,7 @@ from apache.aurora.admin.admin_util import (
     UNSAFE_SLA_HOSTS_FILE_OPTION
 )
 from apache.aurora.admin.host_maintenance import HostMaintenance
-from apache.aurora.client.base import die, get_grouping_or_die, GROUPING_OPTION, requires
+from apache.aurora.client.base import get_grouping_or_die, GROUPING_OPTION, requires
 from apache.aurora.common.clusters import CLUSTERS
 
 

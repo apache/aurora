@@ -30,7 +30,6 @@ from thrift.TSerialization import serialize
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.cli import (
-    EXIT_API_ERROR,
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER,
@@ -70,6 +69,7 @@ def arg_type_jobkey(key):
 WILDCARD_JOBKEY_OPTION = CommandOption('jobspec', type=arg_type_jobkey,
         metavar="cluster[/role[/env[/name]]]",
         help="A jobkey, optionally containing wildcards")
+
 
 class CancelUpdateCommand(Verb):
   @property
@@ -126,7 +126,8 @@ class CreateJobCommand(Verb):
       raise context.CommandError(EXIT_INVALID_PARAMETER, "Job not found")
     elif resp.responseCode == ResponseCode.ERROR:
       context.print_err("job create failed because of scheduler error")
-      raise context.CommandError(EXIT_COMMAND_FAILURE, "Error reported by scheduler; see log for details")
+      raise context.CommandError(EXIT_COMMAND_FAILURE,
+          "Error reported by scheduler; see log for details")
     if context.options.open_browser:
       context.open_job_page(api, config)
     if context.options.wait_until == "RUNNING":
@@ -625,6 +626,7 @@ class StatusCommand(Verb):
     else:
       return EXIT_INVALID_PARAMETER
 
+
 class UpdateCommand(Verb):
   @property
   def name(self):
@@ -693,7 +695,6 @@ class UpdateCommand(Verb):
         err_msg="Update failed; see log for details.")
     context.print_out("Update completed successfully")
     return EXIT_OK
-
 
 
 class Job(Noun):

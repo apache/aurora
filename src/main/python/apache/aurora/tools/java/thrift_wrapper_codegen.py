@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# checkstyle: noqa
 from __future__ import print_function
 
 import os
@@ -136,7 +137,6 @@ STRUCT_COLLECTION_FIELD_ASSIGNMENT = '''this.%(field)s = !wrapped.%(isset)s()
               .to%(collection)s();'''
 
 PACKAGE_NAME = 'org.apache.aurora.scheduler.storage.entities'
-
 
 
 CLASS_TEMPLATE = '''package %(package)s;

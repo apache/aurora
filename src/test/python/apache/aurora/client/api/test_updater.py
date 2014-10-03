@@ -39,7 +39,6 @@ from gen.apache.aurora.api.ttypes import (
     JobConfiguration,
     JobKey,
     LimitConstraint,
-    Lock,
     LockKey,
     LockValidation,
     Metadata,
@@ -130,7 +129,6 @@ class UpdaterTest(TestCase):
     'rollback_on_failure': True,
     'wait_for_batch_completion': False,
   }
-
 
   def setUp(self):
     self._role = 'mesos'
@@ -529,7 +527,6 @@ class UpdaterTest(TestCase):
 
     self.update_and_expect_ok(instances=[2, 3, 4])
     self.verify_mocks()
-
 
   def test_patch_hole_with_instance_option(self):
     """Patching an instance ID gap created by a terminated update."""

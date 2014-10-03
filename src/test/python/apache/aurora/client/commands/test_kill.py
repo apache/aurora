@@ -199,7 +199,6 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
     CoreCommandHook.register_hook(HappyHook())
 
-
     mock_options = self.setup_mock_options()
     mock_config = Mock()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
@@ -235,8 +234,6 @@ class TestClientKillCommand(AuroraClientCommandTest):
       self.assert_scheduler_called(mock_api, self.get_expected_task_query(), 3)
       CoreCommandHook.clear_hooks()
 
-
-
   def test_hook_aborts_kill(self):
     """Test that a command hook that returns non-zero does block command execution."""
     class FailingKillHook(CoreCommandHook):
@@ -270,12 +267,11 @@ class TestClientKillCommand(AuroraClientCommandTest):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        self.assertRaises(SystemExit, killall, ['west/mchucarroll/test/hello', fp.name], mock_options)
+        self.assertRaises(
+            SystemExit, killall, ['west/mchucarroll/test/hello', fp.name], mock_options)
 
       CoreCommandHook.clear_hooks()
       mock_api.kill_job.call_count == 0
-
-
 
   def create_status_call_result(cls):
     """Set up the mock status call that will be used to get a task list for

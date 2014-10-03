@@ -19,7 +19,7 @@ import traceback
 
 from pystachio import Default, Integer, String
 from thrift.protocol import TJSONProtocol
-from thrift.transport import THttpClient, TTransport
+from thrift.transport import TTransport
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient

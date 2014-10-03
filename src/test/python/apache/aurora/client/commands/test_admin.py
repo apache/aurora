@@ -27,7 +27,6 @@ from apache.aurora.client.commands.admin import (
 )
 from apache.aurora.client.commands.util import AuroraClientCommandTest
 
-from gen.apache.aurora.api.constants import ACTIVE_STATES, TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     GetLocksResult,

@@ -81,7 +81,6 @@ def ssh(args, options):
 
   ssh_command = ['ssh', '-t']
 
-
   role = first_task.assignedTask.task.owner.role
   slave_host = first_task.assignedTask.slaveHost
 

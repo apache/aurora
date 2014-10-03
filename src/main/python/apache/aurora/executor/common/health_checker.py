@@ -134,6 +134,7 @@ class HealthChecker(StatusChecker):
   def stop(self):
     self.threaded_health_checker.stop()
 
+
 class HealthCheckerProvider(StatusCheckerProvider):
   def from_assigned_task(self, assigned_task, _):
     mesos_task = mesos_task_instance_from_assigned_task(assigned_task)

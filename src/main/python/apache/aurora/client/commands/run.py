@@ -49,8 +49,7 @@ def run(args, options):
   if not args:
     die('job path is required')
   job_path = args.pop(0)
-  new_cmd = ["task", "run" ]
-  instances_spec = job_path
+  new_cmd = ["task", "run"]
   if options.num_threads != 1:
     new_cmd.append("--threads=%s" % options.num_threads)
   if options.ssh_user is not None:

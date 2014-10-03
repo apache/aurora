@@ -172,6 +172,7 @@ def maybe_disable_hooks(options):
     GlobalHookRegistry.disable_hooks()
     log.info('Client hooks disabled; reason given by user: %s' % options.disable_all_hooks_reason)
 
+
 def v1_deprecation_warning(old, new):
   print("WARNING: %s is an aurora clientv1 command which will be deprecated soon" % old)
   print("To run this command using clientv2, use 'aurora %s'" % " ".join(new))
@@ -223,7 +224,6 @@ def create(job_spec, config_file):
 
   v1_deprecation_warning("create", newcmd)
   return really_create(job_spec, config_file, options)
-
 
 
 @app.command

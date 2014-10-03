@@ -29,12 +29,9 @@ from .updater_util import UpdaterConfig
 from gen.apache.aurora.api.constants import LIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     Identity,
-    JobKey,
     JobUpdateQuery,
     JobUpdateRequest,
     Lock,
-    LockKey,
-    LockValidation,
     ResourceAggregate,
     ResponseCode,
     TaskQuery

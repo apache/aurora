@@ -51,7 +51,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
     def terminate(self):
       pass
 
-
   # First, we pretend that the updater isn't really client-side, and test
   # that the client makes the right API call to the updated.
   def test_update_command_line_succeeds(self):

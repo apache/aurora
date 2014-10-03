@@ -24,7 +24,6 @@ from itertools import product
 
 import mock
 from mesos.interface import mesos_pb2
-from thrift.TSerialization import deserialize as thrift_deserialize
 from thrift.TSerialization import serialize as thrift_serialize
 from twitter.common.concurrent import deadline, Timeout
 from twitter.common.contextutil import temporary_dir

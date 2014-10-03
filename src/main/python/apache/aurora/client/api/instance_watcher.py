@@ -20,7 +20,7 @@ from twitter.common import log
 from .health_check import StatusHealthCheck
 from .task_util import StatusMuxHelper
 
-from gen.apache.aurora.api.ttypes import Identity, ResponseCode, ScheduleStatus, TaskQuery
+from gen.apache.aurora.api.ttypes import Identity, ScheduleStatus, TaskQuery
 
 
 class Instance(object):

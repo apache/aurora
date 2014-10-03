@@ -305,7 +305,6 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
         patch('twitter.common.app.get_options', return_value=mock_options)):
       self.assertRaises(SystemExit, host_drain, [self.TEST_CLUSTER])
 
-
   def test_host_maintenance_status(self):
     mock_options = self.make_mock_options()
     mock_api, mock_scheduler_proxy = self.create_mock_api()

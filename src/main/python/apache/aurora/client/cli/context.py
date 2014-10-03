@@ -59,7 +59,6 @@ def bindings_to_list(bindings):
   return result
 
 
-
 class AuroraCommandContext(Context):
   """A context object used by Aurora commands to manage command processing state
   and common operations.

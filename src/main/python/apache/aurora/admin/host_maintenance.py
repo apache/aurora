@@ -13,7 +13,7 @@
 #
 
 from twitter.common import log
-from twitter.common.quantity import Amount, Time
+from twitter.common.quantity import Time
 
 from apache.aurora.admin.admin_util import format_sla_results, print_results
 from apache.aurora.client.api import AuroraClientAPI
@@ -36,7 +36,6 @@ class HostMaintenance(object):
   """
 
   SLA_MIN_JOB_INSTANCE_COUNT = 20
-
 
   @classmethod
   def iter_batches(cls, hostnames, grouping_function=DEFAULT_GROUPING):

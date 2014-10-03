@@ -27,7 +27,6 @@ import time
 import psutil
 from mesos.interface import mesos_pb2
 from thrift.TSerialization import deserialize as thrift_deserialize
-from thrift.TSerialization import serialize as thrift_serialize
 from twitter.common.collections import OrderedDict
 from twitter.common.exceptions import ExceptionalThread
 from twitter.common.metrics import Observable

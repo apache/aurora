@@ -16,13 +16,7 @@
 
 from __future__ import print_function
 
-from apache.aurora.client.cli import (
-    EXIT_COMMAND_FAILURE,
-    EXIT_INVALID_PARAMETER,
-    EXIT_OK,
-    Noun,
-    Verb
-)
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK, Noun, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
     BIND_OPTION,
@@ -32,8 +26,6 @@ from apache.aurora.client.cli.options import (
     JOBSPEC_ARGUMENT,
     JSON_READ_OPTION
 )
-
-from gen.apache.aurora.api.ttypes import ResponseCode
 
 
 class Schedule(Verb):

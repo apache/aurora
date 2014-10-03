@@ -14,8 +14,6 @@
 
 from threading import Event
 
-from thrift.transport import TTransport
-from twitter.common import log
 from twitter.common.quantity import Amount, Time
 
 from .task_util import StatusMuxHelper

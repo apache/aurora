@@ -19,7 +19,7 @@ import unittest
 import mock
 import pytest
 from mox import IgnoreArg, IsA, Mox
-from thrift.transport import THttpClient, TTransport
+from thrift.transport import TTransport
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset.endpoint import ServiceInstance

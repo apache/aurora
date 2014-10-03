@@ -21,7 +21,6 @@ from apache.aurora.common.cluster import Cluster
 from apache.aurora.config import AuroraConfig
 
 from gen.apache.aurora.api.ttypes import (
-    JobKey,
     JobUpdateQuery,
     JobUpdateRequest,
     JobUpdateSettings,

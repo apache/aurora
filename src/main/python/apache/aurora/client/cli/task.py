@@ -23,16 +23,7 @@ from apache.aurora.client.api.command_runner import (
     DistributedCommandRunner,
     InstanceDistributedCommandRunner
 )
-from apache.aurora.client.api.updater_util import UpdaterConfig
-from apache.aurora.client.cli import (
-    EXIT_COMMAND_FAILURE,
-    EXIT_INVALID_CONFIGURATION,
-    EXIT_INVALID_PARAMETER,
-    EXIT_OK,
-    Noun,
-    print_aurora_log,
-    Verb
-)
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, Noun, print_aurora_log, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
     CommandOption,
@@ -42,8 +33,6 @@ from apache.aurora.client.cli.options import (
     TASK_INSTANCE_ARGUMENT
 )
 from apache.aurora.common.clusters import CLUSTERS
-
-from gen.apache.aurora.api.ttypes import ResponseCode
 
 
 class RunCommand(Verb):
