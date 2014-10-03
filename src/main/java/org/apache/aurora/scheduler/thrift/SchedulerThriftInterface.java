@@ -389,6 +389,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       SessionKey session) {
 
     try {
+      sessionValidator.checkAuthenticated(session, ImmutableSet.of(mutableJobKey.getRole()));
+
       IJobKey jobKey = JobKeys.assertValid(IJobKey.build(mutableJobKey));
       lockManager.validateIfLocked(
           ILockKey.build(LockKey.job(jobKey.newBuilder())),
@@ -398,6 +400,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         return invalidResponse("Job " + jobKey + " is not scheduled with cron");
       }
       return okEmptyResponse();
+    } catch (AuthFailedException e) {
+      return errorResponse(AUTH_FAILED, e);
     } catch (LockException e) {
       return errorResponse(LOCK_ERROR, e);
     }

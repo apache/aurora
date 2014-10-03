@@ -1084,6 +1084,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testDescheduleCronJob() throws Exception {
+    expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     expect(cronJobManager.deleteJob(JOB_KEY)).andReturn(true);
     control.replay();
@@ -1091,7 +1092,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testDescheduleCronJobFailsAuth() throws Exception {
+    expectAuth(ROLE, false);
+    control.replay();
+    assertResponse(AUTH_FAILED,
+        thrift.descheduleCronJob(CRON_JOB.getKey(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
   public void testDescheduleCronJobWithError() throws Exception {
+    expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     expect(cronJobManager.deleteJob(JOB_KEY)).andReturn(false);
     control.replay();
