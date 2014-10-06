@@ -80,6 +80,9 @@ class FakeAuroraCommandContext(AuroraCommandContext):
   def get_out(self):
     return self.out
 
+  def get_out_str(self):
+    return '\n'.join(self.out)
+
   def get_err(self):
     return self.err
 
@@ -88,6 +91,11 @@ class FakeAuroraCommandContext(AuroraCommandContext):
 
   def handle_open(self, api):
     pass
+
+  def timestamp_to_string(self, ts):
+    """To fuzz around timezone issues with timestamps, just return fixed strings."""
+    return "YYYY-MM-DD HH:MM:SS"
+
 
   def add_expected_status_query_result(self, expected_result):
     self.task_status.append(expected_result)

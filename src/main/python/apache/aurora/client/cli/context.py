@@ -15,6 +15,7 @@
 from __future__ import print_function
 
 import logging
+import time
 from collections import namedtuple
 from fnmatch import fnmatch
 
@@ -214,3 +215,6 @@ class AuroraCommandContext(Context):
     if max(active_instances) < max(instances):
       raise self.CommandError(EXIT_INVALID_PARAMETER,
           "Invalid shards parameter: %s only has %s shards" % (jobkey, max(active_instances)))
+
+  def timestamp_to_string(self, timestamp):
+    return time.ctime(timestamp)

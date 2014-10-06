@@ -240,6 +240,12 @@ JOBSPEC_ARGUMENT = CommandOption('jobspec', type=jobkeytype,
     help='Fully specified job key, in CLUSTER/ROLE/ENV/NAME format')
 
 
+JOBSPEC_OPTION = CommandOption('--job', type=AuroraJobKey.from_path,
+    metavar="CLUSTER/ROLE/ENV/NAME",
+    dest="jobspec",
+    help='Fully specified job key, in CLUSTER/ROLE/ENV/NAME format')
+
+
 JSON_READ_OPTION = CommandOption('--read-json', default=False, dest='read_json',
     action='store_true',
     help='Read job configuration in json format')
@@ -261,6 +267,8 @@ NO_BATCHING_OPTION = CommandOption('--no-batching', default=False, action='store
 ROLE_ARGUMENT = CommandOption('role', type=parse_qualified_role, metavar='CLUSTER/NAME',
     help='Rolename to retrieve information about')
 
+ROLE_OPTION = CommandOption('--role', metavar='ROLENAME', default=None,
+    help='Name of the user/role')
 
 SSH_USER_OPTION = CommandOption('--ssh-user', '-l', default=None, metavar="ssh_username",
     help='ssh as this username instead of the job\'s role')

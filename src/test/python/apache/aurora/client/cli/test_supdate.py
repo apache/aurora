@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 import contextlib
+import textwrap
 
 from mock import patch
 from twitter.common.contextutil import temporary_file
@@ -19,7 +20,24 @@ from twitter.common.contextutil import temporary_file
 from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_CONFIGURATION, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
+
+from gen.apache.aurora.api.ttypes import (
+    GetJobUpdateDetailsResult,
+    GetJobUpdateSummariesResult,
+    JobInstanceUpdateEvent,
+    JobUpdate,
+    JobUpdateAction,
+    JobUpdateDetails,
+    JobUpdateEvent,
+    JobUpdateState,
+    JobUpdateStatus,
+    JobUpdateSummary,
+    Response,
+    ResponseCode,
+    Result
+)
 
 
 class TestUpdateCommand(AuroraClientCommandTest):
@@ -103,7 +121,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
           "Scheduler-driven update of job west/bozo/test/hello has been resumed."]
 
   def test_update_invalid_config(self):
-    return True
     mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
@@ -173,3 +190,215 @@ class TestUpdateCommand(AuroraClientCommandTest):
       assert mock_context.get_out() == []
       assert mock_context.get_err() == [
           "Error: Failed to pause scheduler-driven update; see log for details"]
+
+  @classmethod
+  def get_status_query_response(cls):
+    query_response = Response()
+    query_response.responseCode = ResponseCode.OK
+    query_response.result = Result()
+    summaries = GetJobUpdateSummariesResult()
+    query_response.result.getJobUpdateSummariesResult = summaries
+    summaries.updateSummaries = [
+        JobUpdateSummary(
+            updateId="hello",
+            jobKey=AuroraJobKey('west', 'mcc', 'test', 'hello'), user="me",
+            state=JobUpdateState(status=JobUpdateStatus.ROLLING_FORWARD,
+                createdTimestampMs=1411404927, lastModifiedTimestampMs=14114056030)),
+        JobUpdateSummary(
+            updateId="goodbye",
+            jobKey=AuroraJobKey('west', 'mch', 'prod', 'goodbye'), user="me",
+            state=JobUpdateState(status=JobUpdateStatus.ROLLING_BACK,
+                createdTimestampMs=1411300632, lastModifiedTimestampMs=14114092632)),
+        JobUpdateSummary(
+            updateId="gasp",
+            jobKey=AuroraJobKey('west', 'mcq', 'devel', 'gasp'), user="me",
+            state=JobUpdateState(status=JobUpdateStatus.ROLL_FORWARD_PAUSED,
+                createdTimestampMs=1411600891, lastModifiedTimestampMs=1411800891))]
+    return query_response
+
+  def test_list_updates_command(self):
+    mock_context = FakeAuroraCommandContext()
+    mock_context.get_api('west').query_job_updates.return_value = self.get_status_query_response()
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      cmd = AuroraCommandLine()
+      result = cmd.execute(["beta-update", "list", "west", "--user=me"])
+      assert result == EXIT_OK
+      print("============\n%s\n============" % mock_context.get_out())
+      assert mock_context.get_out_str() == textwrap.dedent("""\
+          Job: west/mcc/test/hello, Id: hello, User: me, Status: ROLLING_FORWARD
+            Created: 1411404927, Last Modified 14114056030
+          Job: west/mch/prod/goodbye, Id: goodbye, User: me, Status: ROLLING_BACK
+            Created: 1411300632, Last Modified 14114092632
+          Job: west/mcq/devel/gasp, Id: gasp, User: me, Status: ROLL_FORWARD_PAUSED
+            Created: 1411600891, Last Modified 1411800891""")
+
+  def test_list_updates_command_json(self):
+    mock_context = FakeAuroraCommandContext()
+    mock_context.get_api('west').query_job_updates.return_value = self.get_status_query_response()
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      cmd = AuroraCommandLine()
+      result = cmd.execute(["beta-update", "list", "west", "--user=me", '--write-json'])
+      assert result == EXIT_OK
+      assert mock_context.get_out_str() == textwrap.dedent("""\
+          [
+            {
+              "status": "ROLLING_FORWARD",
+              "started": 1411404927,
+              "lastModified": 14114056030,
+              "user": "me",
+              "jobkey": "west/mcc/test/hello",
+              "id": "hello"
+            },
+            {
+              "status": "ROLLING_BACK",
+              "started": 1411300632,
+              "lastModified": 14114092632,
+              "user": "me",
+              "jobkey": "west/mch/prod/goodbye",
+              "id": "goodbye"
+            },
+            {
+              "status": "ROLL_FORWARD_PAUSED",
+              "started": 1411600891,
+              "lastModified": 1411800891,
+              "user": "me",
+              "jobkey": "west/mcq/devel/gasp",
+              "id": "gasp"
+            }
+          ]""")
+
+  @classmethod
+  def get_update_details_response(cls):
+    query_response = Response()
+    query_response.responseCode = ResponseCode.OK
+    query_response.result = Result()
+    details = JobUpdateDetails()
+    query_response.result.getJobUpdateDetailsResult = GetJobUpdateDetailsResult(details=details)
+    details.update = JobUpdate()
+    details.update.summary = JobUpdateSummary(
+        jobKey=AuroraJobKey('west', 'mcc', 'test', 'hello'),
+        updateId="fake-update-identifier",
+        user="me",
+        state=JobUpdateState(status=JobUpdateStatus.ROLLING_FORWARD,
+            createdTimestampMs=1411404927, lastModifiedTimestampMs=14114056030))
+    details.updateEvents = [
+      JobUpdateEvent(status=JobUpdateStatus.ROLLING_FORWARD,
+         timestampMs=1411404927),
+      JobUpdateEvent(status=JobUpdateStatus.ROLL_FORWARD_PAUSED,
+         timestampMs=1411405000),
+      JobUpdateEvent(status=JobUpdateStatus.ROLLING_FORWARD,
+         timestampMs=1411405100)
+    ]
+    details.instanceEvents = [
+      JobInstanceUpdateEvent(
+          instanceId=1,
+          timestampMs=1411404930,
+          action=JobUpdateAction.INSTANCE_UPDATING),
+      JobInstanceUpdateEvent(
+          instanceId=2,
+          timestampMs=1411404940,
+          action=JobUpdateAction.INSTANCE_UPDATING),
+      JobInstanceUpdateEvent(
+          instanceId=1,
+          timestampMs=1411404950,
+          action=JobUpdateAction.INSTANCE_UPDATED),
+      JobInstanceUpdateEvent(
+          instanceId=2,
+          timestampMs=1411404960,
+          action=JobUpdateAction.INSTANCE_UPDATED)
+    ]
+    return query_response
+
+  def test_update_status(self):
+    mock_context = FakeAuroraCommandContext()
+    api = mock_context.get_api('west')
+    api.query_job_updates.return_value = self.get_status_query_response()
+    api.get_job_update_details.return_value = self.get_update_details_response()
+
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      cmd = AuroraCommandLine()
+      result = cmd.execute(["beta-update", "status", "west/mcc/test/hello"])
+      assert result == EXIT_OK
+      print("============\n%s\n============" % mock_context.get_out())
+      assert mock_context.get_out() == [
+          "Job: west/mcc/test/hello, UpdateID: fake-update-identifier",
+          "Started YYYY-MM-DD HH:MM:SS, last updated: YYYY-MM-DD HH:MM:SS",
+          "Current status: ROLLING_FORWARD",
+          "Update events:",
+          "  Status: ROLLING_FORWARD at YYYY-MM-DD HH:MM:SS",
+          "  Status: ROLL_FORWARD_PAUSED at YYYY-MM-DD HH:MM:SS",
+          "  Status: ROLLING_FORWARD at YYYY-MM-DD HH:MM:SS",
+          "Instance events:",
+          "  Instance 1 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATING",
+          "  Instance 2 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATING",
+          "  Instance 1 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATED",
+          "  Instance 2 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATED"]
+      mock_context.get_api("west").query_job_updates.assert_called_with(jobKey=AuroraJobKey(
+          'west', 'mcc', 'test', 'hello'))
+
+  def test_update_status_json(self):
+    mock_context = FakeAuroraCommandContext()
+    api = mock_context.get_api('west')
+    api.query_job_updates.return_value = self.get_status_query_response()
+    api.get_job_update_details.return_value = self.get_update_details_response()
+
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      cmd = AuroraCommandLine()
+      result = cmd.execute(["beta-update", "status", "--write-json", "west/mcc/test/hello"])
+      assert result == EXIT_OK
+      mock_context.get_api("west").query_job_updates.assert_called_with(jobKey=AuroraJobKey(
+          'west', 'mcc', 'test', 'hello'))
+      mock_context.get_api("west").get_job_update_details.assert_called_with('hello')
+      print("============\n%s\n============" % mock_context.get_out_str())
+      assert mock_context.get_out_str() == textwrap.dedent("""\
+        {
+          "status": "ROLLING_FORWARD",
+          "last_updated": 14114056030,
+          "started": 1411404927,
+          "update_events": [
+            {
+              "status": "ROLLING_FORWARD",
+              "timestampMs": 1411404927
+            },
+            {
+              "status": "ROLL_FORWARD_PAUSED",
+              "timestampMs": 1411405000
+            },
+            {
+              "status": "ROLLING_FORWARD",
+              "timestampMs": 1411405100
+            }
+          ],
+          "job": "west/mcc/test/hello",
+          "updateId": "fake-update-identifier",
+          "instance_update_events": [
+            {
+              "action": "INSTANCE_UPDATING",
+              "instance": 1,
+              "timestamp": 1411404930
+            },
+            {
+              "action": "INSTANCE_UPDATING",
+              "instance": 2,
+              "timestamp": 1411404940
+            },
+            {
+              "action": "INSTANCE_UPDATED",
+              "instance": 1,
+              "timestamp": 1411404950
+            },
+            {
+              "action": "INSTANCE_UPDATED",
+              "instance": 2,
+              "timestamp": 1411404960
+            }
+          ]
+        }""")
