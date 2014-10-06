@@ -23,36 +23,57 @@ from apache.thermos.core.helper import TaskRunnerHelper as TRH
 from gen.apache.thermos.ttypes import ProcessStatus, RunnerHeader, RunnerState
 
 USER1 = 'user1'
+UID = 567
 PID = 12345
 CREATE_TIME = time.time()
 PROCESS_NAME = 'my_process'
 COORDINATOR_PID = 13337
 
 
-def test_this_is_really_our_pid():
-  process = mock.Mock(spec=psutil.Process, pid=PID)
-  process.username.return_value = USER1
+def set_side_effect(mock_obj, value):
+  if isinstance(value, Exception):
+    mock_obj.side_effect = value
+  else:
+    mock_obj.return_value = value
+
+
+def mock_process(pid, username, uid=None):
+  process = mock.Mock(spec=psutil.Process, pid=pid)
+  set_side_effect(process.uids, uid)
+  set_side_effect(process.username, username)
   process.create_time.return_value = CREATE_TIME
-  assert TRH.this_is_really_our_pid(
-      process,
-      process.username(),
-      process.create_time())
-  assert TRH.this_is_really_our_pid(
-      process,
-      process.username(),
+  return process
+
+
+def test_this_is_really_our_pid():
+  process = mock_process(PID, USER1, uid=UID)
+  assert TRH.this_is_really_our_pid(process, UID, USER1, process.create_time())
+  assert TRH.this_is_really_our_pid(process, UID, USER1,
       process.create_time() + TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) - 1)
-  assert not TRH.this_is_really_our_pid(
-      process,
-      'user2',
-      process.create_time())
-  assert not TRH.this_is_really_our_pid(
-      process,
-      process.username(),
-      process.create_time() + TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) + 1)
-  assert not TRH.this_is_really_our_pid(
-      process,
-      process.username(),
-      process.create_time() - (TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) + 1))
+  assert TRH.this_is_really_our_pid(process, UID, 'user2', process.create_time()), (
+      'An equivalent UID is considered the same user.')
+  assert not TRH.this_is_really_our_pid(process, UID + 1, USER1, process.create_time()), (
+      'UIDs should not match.')
+  assert not TRH.this_is_really_our_pid(process, UID, USER1,
+      process.create_time() + TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) + 1), (
+          'Process is outside of start time drift.')
+  assert not TRH.this_is_really_our_pid(process, UID, USER1,
+      process.create_time() - (TRH.MAX_START_TIME_DRIFT.as_(Time.SECONDS) + 1)), (
+          'Process is outside of start time drift.')
+  assert not TRH.this_is_really_our_pid(process, None, 'user2', process.create_time()), (
+      "If no uid is checkpointed but the username is different, we can't know it's ours.")
+
+  process = mock_process(PID, USER1)
+  assert not TRH.this_is_really_our_pid(process, UID, USER1, process.create_time()), (
+      'We cannot validate whether this is our process without a process UID.')
+  assert TRH.this_is_really_our_pid(process, None, USER1, process.create_time()), (
+      'Previous behavior is preserved.')
+
+  process = mock_process(PID, username=KeyError('Unknown user'), uid=UID)
+  assert TRH.this_is_really_our_pid(process, UID, USER1, process.create_time())
+  assert not TRH.this_is_really_our_pid(process, None, USER1, process.create_time())
+  assert TRH.this_is_really_our_pid(process, UID, 'user2', process.create_time()), (
+      'If the user has been renamed but the UID is the same, this is still our process.')
 
 
 TRH_PATH = 'apache.thermos.core.helper.TaskRunnerHelper'

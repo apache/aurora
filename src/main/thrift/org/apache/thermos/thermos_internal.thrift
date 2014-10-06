@@ -82,6 +82,7 @@ struct RunnerHeader {
   7: string log_dir
   4: string hostname        // kill this
   5: string user
+  8: i32    uid             // added as a check in case user disappears
   6: map<string, i64> ports
 }
 

@@ -86,33 +86,58 @@ class TaskRunnerHelper(object):
     return None
 
   @classmethod
-  def this_is_really_our_pid(cls, process, current_user, start_time):
+  def this_is_really_our_pid(cls, process, uid, user, start_time):
     """
       A heuristic to make sure that this is likely the pid that we own/forked.  Necessary
       because of pid-space wrapping.  We don't want to go and kill processes we don't own,
       especially if the killer is running as root.
 
       process: psutil.Process representing the process to check
-      current_user: user expected to own the process
+      uid: uid expected to own the process (or None if not available)
+      user: username expected to own the process
       start_time: time at which it's expected the process has started
 
       Raises:
         psutil.NoSuchProcess - if the Process supplied no longer exists
     """
-    process_username = process.username()
     process_create_time = process.create_time()
-
-    if process_username != current_user:
-      log.info("Expected pid %s to be ours but the pid user is %s and we're %s" % (
-        process.pid, process_username, current_user))
-      return False
 
     if abs(start_time - process_create_time) >= cls.MAX_START_TIME_DRIFT.as_(Time.SECONDS):
       log.info("Expected pid %s start time to be %s but it's %s" % (
-        process.pid, start_time, process_create_time))
+          process.pid, start_time, process_create_time))
       return False
 
-    return True
+    if uid is not None:
+      # If the uid was provided, it is gospel, so do not consider user.
+      try:
+        uids = process.uids()
+        if uids is None:
+          return False
+        process_uid = uids.real
+      except psutil.Error:
+        return False
+
+      if process_uid == uid:
+        return True
+      else:
+        log.info("Expected pid %s to be ours but the pid uid is %s and we're %s" % (
+            process.pid, process_uid, uid))
+        return False
+
+    try:
+      process_user = process.username()
+    except KeyError:
+      return False
+
+    if process_user == user:
+      # If the uid was not provided, we must use user -- which is possibly flaky if the
+      # user gets deleted from the system, so process_user will be None and we must
+      # return False.
+      log.info("Expected pid %s to be ours but the pid user is %s and we're %s" % (
+          process.pid, process_user, user))
+      return True
+
+    return False
 
   @classmethod
   def scan_process(cls, state, process_name):
@@ -123,14 +148,17 @@ class TaskRunnerHelper(object):
 
     """
     process_run = state.processes[process_name][-1]
-    process_owner = state.header.user
+    user, uid = state.header.user, state.header.uid
 
     coordinator_pid, pid, tree = None, None, set()
+
+    if uid is None:
+      log.debug('Legacy thermos checkpoint stream detected, user = %s' % user)
 
     if process_run.coordinator_pid:
       try:
         coordinator_process = psutil.Process(process_run.coordinator_pid)
-        if cls.this_is_really_our_pid(coordinator_process, process_owner, process_run.fork_time):
+        if cls.this_is_really_our_pid(coordinator_process, uid, user, process_run.fork_time):
           coordinator_pid = process_run.coordinator_pid
       except psutil.NoSuchProcess:
         log.info('  Coordinator %s [pid: %s] completed.' % (process_run.process,
@@ -142,7 +170,7 @@ class TaskRunnerHelper(object):
     if process_run.pid:
       try:
         process = psutil.Process(process_run.pid)
-        if cls.this_is_really_our_pid(process, process_owner, process_run.start_time):
+        if cls.this_is_really_our_pid(process, uid, user, process_run.start_time):
           pid = process.pid
       except psutil.NoSuchProcess:
         log.info('  Process %s [pid: %s] completed.' % (process_run.process, process_run.pid))
@@ -158,7 +186,7 @@ class TaskRunnerHelper(object):
     return (coordinator_pid, pid, tree)
 
   @classmethod
-  def scantree(cls, state):
+  def scan_tree(cls, state):
     """
       Scan the process tree associated with the provided task state.
 

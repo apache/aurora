@@ -40,6 +40,7 @@ terminal state.
 """
 
 import os
+import pwd
 import socket
 import sys
 import time
@@ -366,8 +367,8 @@ class TaskRunner(object):
     synthesised from an existing task's checkpoint root
   """
   class Error(Exception): pass
-  class InvalidTask(Error): pass
   class InternalError(Error): pass
+  class InvalidTask(Error): pass
   class PermissionError(Error): pass
   class StateError(Error): pass
 
@@ -613,14 +614,22 @@ class TaskRunner(object):
       been constructed.
     """
     if self._state.header is None:
+      try:
+        uid = pwd.getpwnam(self._user).pw_uid
+      except KeyError:
+        # This will cause failures downstream, but they will at least be correctly
+        # reflected in the process state.
+        log.error('Unknown user %s.' % self._user)
+        uid = None
       header = RunnerHeader(
-        task_id=self._task_id,
-        launch_time_ms=int(self._launch_time * 1000),
-        sandbox=self._sandbox,
-        log_dir=self._log_dir,
-        hostname=socket.gethostname(),
-        user=self._user,
-        ports=self._portmap)
+          task_id=self._task_id,
+          launch_time_ms=int(self._launch_time * 1000),
+          sandbox=self._sandbox,
+          log_dir=self._log_dir,
+          hostname=socket.gethostname(),
+          user=self._user,
+          uid=uid,
+          ports=self._portmap)
       runner_ckpt = RunnerCkpt(runner_header=header)
       self._dispatcher.dispatch(self._state, runner_ckpt)
 
@@ -658,7 +667,7 @@ class TaskRunner(object):
       log.debug('_set_process_status(%s <= %s, seq=%s[auto])' % (process_name,
         ProcessState._VALUES_TO_NAMES.get(process_state), sequence_number))
     runner_ckpt = RunnerCkpt(process_status=ProcessStatus(
-      process=process_name, state=process_state, seq=sequence_number, **kw))
+        process=process_name, state=process_state, seq=sequence_number, **kw))
     self._dispatcher.dispatch(self._state, runner_ckpt, self._recovery)
 
   def _task_process_from_process_name(self, process_name, sequence_number):
@@ -776,8 +785,12 @@ class TaskRunner(object):
         self._set_process_status(process_name, ProcessState.WAITING)
         tp = self._task_processes[process_name]
       log.info('Forking Process(%s)' % process_name)
-      tp.start()
-      launched.append(tp)
+      try:
+        tp.start()
+        launched.append(tp)
+      except Process.Error as e:
+        log.error('Failed to launch process: %s' % e)
+        self._set_process_status(process_name, ProcessState.FAILED)
 
     return len(launched) > 0
 
@@ -791,7 +804,7 @@ class TaskRunner(object):
     """
       Returns True if any processes associated with this task have active pids.
     """
-    process_tree = TaskRunnerHelper.scantree(self.state)
+    process_tree = TaskRunnerHelper.scan_tree(self.state)
     return any(any(process_set) for process_set in process_tree.values())
 
   def has_active_processes(self):
@@ -896,7 +909,7 @@ class TaskRunner(object):
     self.kill(force, preemption_wait=Amount(0, Time.SECONDS), terminal_status=TaskState.LOST)
 
   def _kill(self):
-    processes = TaskRunnerHelper.scantree(self._state)
+    processes = TaskRunnerHelper.scan_tree(self._state)
     for process, pid_tuple in processes.items():
       current_run = self._current_process_run(process)
       coordinator_pid, pid, tree = pid_tuple

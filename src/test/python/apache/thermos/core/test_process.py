@@ -107,10 +107,15 @@ def test_other_user_fails_nonroot():
   with temporary_dir() as td:
     taskpath = TaskPath(root=td, task_id='task', process='process', run=0)
     sandbox = setup_sandbox(td, taskpath)
-
+    process = TestProcess(
+        'process',
+        'echo hello world',
+        0,
+        taskpath,
+        sandbox,
+        user=get_other_nonroot_user().pw_name)
     with pytest.raises(Process.PermissionError):
-      TestProcess('process', 'echo hello world', 0, taskpath, sandbox,
-            user=get_other_nonroot_user().pw_name)
+      process.start()
 
 
 def test_log_permissions():
