@@ -169,6 +169,7 @@ class ListUpdates(Verb):
       CommandOption("cluster", metavar="clustername",
           help="Cluster to search for matching updates")]
 
+  @property
   def help(self):
     return """List all jobs updates, with summary info, about active updates that match a query."""
 
@@ -214,6 +215,7 @@ class UpdateStatus(Verb):
   def get_options(self):
     return [JSON_WRITE_OPTION, JOBSPEC_ARGUMENT]
 
+  @property
   def help(self):
     return """Display detailed status information about an in-progress update."""
 
