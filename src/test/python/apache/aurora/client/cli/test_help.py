@@ -37,6 +37,20 @@ class TestHelp(unittest.TestCase):
     for str in str.split('\n'):
       self.err_transcript.append(str)
 
+  def test_all_help(self):
+    for noun in self.cmd.registered_nouns:
+      with patch('apache.aurora.client.cli.client.AuroraCommandLine.print_out',
+          side_effect=self.mock_print):
+        self.cmd.execute(['help', noun])
+        assert 'Usage for noun "%s":' % noun in self.transcript
+        assert self.err_transcript == []
+        self.transcript = []
+        for verb in self.cmd.nouns.get(noun).verbs.keys():
+          self.cmd.execute(['help', noun, verb])
+          assert 'Usage for verb "%s %s":' % (noun, verb) in self.transcript
+          assert self.err_transcript == []
+          self.transcript = []
+
   def test_help(self):
     with patch('apache.aurora.client.cli.client.AuroraCommandLine.print_out',
         side_effect=self.mock_print):

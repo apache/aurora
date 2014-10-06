@@ -42,6 +42,7 @@ class StartUpdate(Verb):
       INSTANCES_SPEC_ARGUMENT, CONFIG_ARGUMENT
     ]
 
+  @property
   def help(self):
     return textwrap.dedent("""\
         Start a scheduler-driven rolling upgrade on a running job, using the update
@@ -81,6 +82,7 @@ class PauseUpdate(Verb):
       JOBSPEC_ARGUMENT
     ]
 
+  @property
   def help(self):
     return """Pause a scheduler-driven rolling update."""
 
@@ -104,6 +106,7 @@ class ResumeUpdate(Verb):
       JOBSPEC_ARGUMENT
     ]
 
+  @property
   def help(self):
     return """Resume a paused scheduler-driven rolling update."""
 
@@ -127,6 +130,7 @@ class AbortUpdate(Verb):
       JOBSPEC_ARGUMENT
     ]
 
+  @property
   def help(self):
     return """Abort an in-pregress scheduler-driven rolling update."""
 
