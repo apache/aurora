@@ -57,12 +57,12 @@ python_tests(
   name='supdate',
   sources = [ 'test_supdate.py' ],
   dependencies = [
-    pants(':util'),
-    pants('3rdparty/python:mock'),
-    pants('3rdparty/python:twitter.common.contextutil'),
-    pants('src/main/python/apache/aurora/client/cli'),
-    pants('src/main/python/apache/aurora/client/cli:client_lib'),
-    pants('src/test/python/apache/aurora/client/commands:util')
+    ':util',
+    '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.contextutil',
+    'src/main/python/apache/aurora/client/cli',
+    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 

@@ -18,7 +18,7 @@ import textwrap
 
 from mock import Mock, patch
 
-from apache.aurora.client.cli import EXIT_INVALID_PARAMETER
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -175,6 +175,13 @@ class TestJobStatus(AuroraClientCommandTest):
   @classmethod
   def create_failed_status_response(cls):
     return cls.create_blank_response(ResponseCode.INVALID_REQUEST, 'No tasks found for query')
+
+  @classmethod
+  def create_nojobs_status_response(cls):
+    resp = cls.create_simple_success_response()
+    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
+    resp.result.scheduleStatusResult.tasks = set()
+    return resp
 
   def test_successful_status_shallow(self):
     """Test the status command at the shallowest level: calling status should end up invoking
@@ -352,6 +359,20 @@ class TestJobStatus(AuroraClientCommandTest):
       result = cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       assert result == EXIT_INVALID_PARAMETER
 
+  def test_no_jobs_found_status_shallow(self):
+    # Calls api.check_status, which calls scheduler_proxy.getJobs
+    mock_context = FakeAuroraCommandContext()
+    mock_api = mock_context.get_api('west')
+    mock_api.check_status.return_value = self.create_nojobs_status_response()
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
+      cmd = AuroraCommandLine()
+      result = cmd.execute(['job', 'status', '--write-json', 'west/bozo/test/hello'])
+      assert mock_context.get_out() == [
+        '{"jobspec":"west/bozo/test/hello","error":"No matching jobs found"}']
+      assert result == EXIT_OK
+
+
   def test_successful_status_json_output_no_metadata(self):
     """Test the status command more deeply: in a request with a fully specified
     job, it should end up doing a query using getTasksWithoutConfigs."""
@@ -481,4 +502,4 @@ class TestJobStatus(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       result = cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       assert result == EXIT_INVALID_PARAMETER
-      assert mock_context.get_err() == ["No matching jobs found"]
+      assert mock_context.get_err() == ["Found no jobs matching west/bozo/test/hello"]

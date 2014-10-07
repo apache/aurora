@@ -151,6 +151,10 @@ class AuroraCommandContext(Context):
       parts.append('*')
     return PartialJobKey(*parts)
 
+  @classmethod
+  def render_partial_jobkey(cls, jobkey):
+    return "%s/%s/%s/%s" % jobkey
+
   def get_job_list(self, clusters, role=None):
     """Get a list of jobs from a group of clusters.
     :param clusters: the clusters to query for jobs

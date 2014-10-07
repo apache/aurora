@@ -606,25 +606,38 @@ class StatusCommand(Verb):
       else:
         result.append(self.render_tasks_pretty(jk, active_tasks, inactive_tasks))
     if result == []:
-      context.print_err("No matching jobs found")
       return None
     if context.options.write_json:
       return json.dumps(result, indent=2, separators=[',', ': '], sort_keys=False)
     else:
       return ''.join(result)
 
+  def _print_jobs_not_found(self, context):
+    if context.options.write_json:
+      context.print_out(json.dumps(
+        {"jobspec": context.render_partial_jobkey(context.options.jobspec),
+         "error": "No matching jobs found"},
+        separators=[",", ":"],
+        sort_keys=False))
+      # If users are scripting, they don't want an error code if they were returned
+      # a valid json answer.
+      return EXIT_OK
+    else:
+      context.print_err("Found no jobs matching %s" %
+          context.render_partial_jobkey(context.options.jobspec))
+      return EXIT_INVALID_PARAMETER
+
   def execute(self, context):
     jobs = context.get_jobs_matching_key(context.options.jobspec)
     if jobs is None or jobs == []:
-      context.print_err("Found no jobs matching %s" % context.options.jobspec)
-      return EXIT_INVALID_PARAMETER
+      return self._print_jobs_not_found()
 
     result = self.get_status_for_jobs(jobs, context)
     if result is not None:
       context.print_out(result)
       return EXIT_OK
     else:
-      return EXIT_INVALID_PARAMETER
+      return self._print_jobs_not_found(context)
 
 
 class UpdateCommand(Verb):
