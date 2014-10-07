@@ -22,6 +22,7 @@ from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
 from twitter.common.zookeeper.serverset import Endpoint, ServerSet
 
+from apache.aurora.config.schema.base import HealthCheckConfig
 from apache.aurora.executor.common.announcer import (
     Announcer,
     DefaultAnnouncerCheckerProvider,
@@ -235,6 +236,34 @@ def test_make_empty_endpoints():
 
 @mock.patch('apache.aurora.executor.common.announcer.ServerSet')
 @mock.patch('apache.aurora.executor.common.announcer.KazooClient')
+def test_announcer_provider_with_timeout(mock_client_provider, mock_serverset_provider):
+  mock_client = mock.MagicMock(spec=KazooClient)
+  mock_client_provider.return_value = mock_client
+  client_connect_event = threading.Event()
+  mock_client.start_async.return_value = client_connect_event
+
+  mock_serverset = mock.MagicMock(spec=ServerSet)
+  mock_serverset_provider.return_value = mock_serverset
+
+  dap = DefaultAnnouncerCheckerProvider('zookeeper.example.com', root='/aurora')
+  job = make_job('aurora', 'prod', 'proxy', 'primary', portmap={'http': 80, 'admin': 'primary'})
+
+  health_check_config = HealthCheckConfig(initial_interval_secs=0.1, interval_secs=0.1)
+  job = job(health_check_config=health_check_config)
+  assigned_task = make_assigned_task(job, assigned_ports={'primary': 12345})
+  checker = dap.from_assigned_task(assigned_task, None)
+
+  mock_client.start_async.assert_called_once_with()
+  mock_serverset_provider.assert_called_once_with(mock_client, '/aurora/aurora/prod/proxy')
+
+  checker.start()
+  checker.start_event.wait()
+
+  assert checker.status is not None
+
+
+@mock.patch('apache.aurora.executor.common.announcer.ServerSet')
+@mock.patch('apache.aurora.executor.common.announcer.KazooClient')
 def test_default_announcer_provider(mock_client_provider, mock_serverset_provider):
   mock_client = mock.MagicMock(spec=KazooClient)
   mock_client_provider.return_value = mock_client
@@ -246,7 +275,7 @@ def test_default_announcer_provider(mock_client_provider, mock_serverset_provide
   assigned_task = make_assigned_task(job, assigned_ports={'primary': 12345})
   checker = dap.from_assigned_task(assigned_task, None)
 
-  mock_client.start.assert_called_once_with()
+  mock_client.start_async.assert_called_once_with()
   mock_serverset_provider.assert_called_once_with(mock_client, '/aurora/aurora/prod/proxy')
   assert checker.name() == 'announcer'
   assert checker.status is None
