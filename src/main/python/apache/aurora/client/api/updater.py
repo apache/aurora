@@ -42,6 +42,7 @@ from gen.apache.aurora.api.ttypes import (
     LockValidation,
     Response,
     ResponseCode,
+    ResponseDetail,
     TaskQuery
 )
 
@@ -649,7 +650,7 @@ class Updater(object):
         instanceIds=instanceIds)
 
   def _failed_response(self, message):
-    return Response(responseCode=ResponseCode.ERROR, messageDEPRECATED=message)
+    return Response(responseCode=ResponseCode.ERROR, details=[ResponseDetail(message=message)])
 
   def update(self, instances=None):
     """Performs the job update, blocking until it completes.

@@ -329,10 +329,18 @@ class UpdaterTest(TestCase):
   def update_and_expect_ok(self, instances=None):
     self.update_and_expect_response(ResponseCode.OK, instances)
 
-  def update_and_expect_response(self, expected_code, instances=None):
+  def update_and_expect_response(self, expected_code, instances=None, message=None):
     resp = self._updater.update(instances)
     assert expected_code == resp.responseCode, (
       'Expected response:%s Actual response:%s' % (expected_code, resp.responseCode))
+
+    if message:
+      assert len(resp.details) == 1, (
+        'Unexpected error count:%s' % len(resp.details))
+
+      assert message in resp.details[0].message, (
+        "Expected %s message not found in: %s" % (message, resp.details[0].message))
+
 
   def test_grow(self):
     """Adds instances to the existing job."""
@@ -707,6 +715,24 @@ class UpdaterTest(TestCase):
     self.replay_mocks()
 
     self.update_and_expect_response(ResponseCode.ERROR)
+    self.verify_mocks()
+
+  def test_failed_update_populates_error_details(self):
+    """Test failed update populates Response.details."""
+    old_configs = self.make_task_configs(5)
+    new_config = deepcopy(old_configs[0])
+    new_config.priority = 5
+    job_config = self.make_job_config(new_config, 5)
+    self._config.job_config = job_config
+    self.expect_start()
+    self.expect_get_tasks(old_configs)
+    self.expect_populate(job_config)
+    self.expect_quota_check(5, 5)
+    self.expect_kill([0], monitor_result=False)
+    self.expect_terminate()
+    self.replay_mocks()
+
+    self.update_and_expect_response(ResponseCode.ERROR, message="Aborting update without rollback")
     self.verify_mocks()
 
   def test_job_does_not_exist(self):
