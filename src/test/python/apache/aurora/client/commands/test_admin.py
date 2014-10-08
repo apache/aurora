@@ -78,9 +78,7 @@ class TestQueryCommand(AuroraClientCommandTest):
   @classmethod
   def task_query(cls):
     return TaskQuery(
-        owner=Identity(role=None),
-        environment=None,
-        jobName=None,
+        jobKeys=[JobKey(role=None, environment=None, name=None)],
         instanceIds=set(),
         statuses=set([ScheduleStatus.RUNNING]))
 

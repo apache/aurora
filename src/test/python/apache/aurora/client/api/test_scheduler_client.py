@@ -98,7 +98,7 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.mox.VerifyAll()
 
   def make_scheduler_proxy(self):
-    return TestSchedulerProxy('local')
+    return TestSchedulerProxy(Cluster(name='local'))
 
   def test_startCronJob(self):
     self.mock_thrift_client.startCronJob(IsA(JobKey), IsA(SessionKey))
@@ -350,6 +350,9 @@ def test_connect_scheduler(mock_client):
 def test_transient_error(client):
   mock_scheduler_client = mock.Mock(spec=scheduler_client.SchedulerClient)
   mock_thrift_client = mock.Mock(spec=AuroraAdmin.Client)
+  version_resp = Response(responseCode=ResponseCode.OK)
+  version_resp.result = Result(getVersionResult=CURRENT_API_VERSION)
+  mock_thrift_client.getVersion.return_value = version_resp
   mock_thrift_client.killTasks.side_effect = [
       Response(responseCode=ResponseCode.ERROR_TRANSIENT, details=["message1", "message2"]),
       Response(responseCode=ResponseCode.ERROR_TRANSIENT),
@@ -361,7 +364,7 @@ def test_transient_error(client):
   mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
   client.get.return_value = mock_scheduler_client
 
-  proxy = TestSchedulerProxy('local')
+  proxy = TestSchedulerProxy(Cluster(name='local'))
   proxy.killTasks(TaskQuery())
 
   assert mock_thrift_client.killTasks.call_count == 3

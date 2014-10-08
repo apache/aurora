@@ -116,9 +116,10 @@ class TestSshCommand(AuroraClientCommandTest):
 
       # The status command sends a getTasksStatus query to the scheduler,
       # and then prints the result.
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
-          environment='test', owner=Identity(role='mchucarroll'), instanceIds=set([1]),
-          statuses=LIVE_STATES))
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(
+          TaskQuery(jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')],
+                    instanceIds=set([1]),
+                    statuses=LIVE_STATES))
       mock_subprocess.assert_called_with(['ssh', '-t', 'mchucarroll@slavehost',
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])

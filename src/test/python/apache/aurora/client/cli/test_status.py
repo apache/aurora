@@ -218,8 +218,8 @@ class TestJobStatus(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
-      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
-          environment='test', owner=Identity(role='bozo')))
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(
+          TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]))
 
   def test_successful_status_output_no_metadata(self):
     """Test the status command more deeply: in a request with a fully specified
@@ -297,8 +297,8 @@ class TestJobStatus(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
-      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
-          environment='test', owner=Identity(role='bozo')))
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(
+          TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]))
 
   def test_status_wildcard(self):
     """Test status using a wildcard. It should first call api.get_jobs, and then do a

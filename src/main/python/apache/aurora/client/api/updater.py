@@ -35,7 +35,6 @@ from .updater_util import FailureThreshold, UpdaterConfig
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     AddInstancesConfig,
-    Identity,
     JobKey,
     Lock,
     LockKey,
@@ -642,12 +641,7 @@ class Updater(object):
       return False
 
   def _create_task_query(self, instanceIds=None):
-    return TaskQuery(
-        owner=Identity(role=self._job_key.role),
-        environment=self._job_key.environment,
-        jobName=self._job_key.name,
-        statuses=ACTIVE_STATES,
-        instanceIds=instanceIds)
+    return TaskQuery(jobKeys=[self._job_key], statuses=ACTIVE_STATES, instanceIds=instanceIds)
 
   def _failed_response(self, message):
     return Response(responseCode=ResponseCode.ERROR, details=[ResponseDetail(message=message)])

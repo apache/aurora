@@ -24,12 +24,10 @@ from apache.aurora.config import AuroraConfig
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
-    Identity,
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
-    TaskEvent,
-    TaskQuery
+    TaskEvent
 )
 
 
@@ -68,11 +66,6 @@ class TestLogging(AuroraClientCommandTest):
       mock_task_two = cls.create_mock_task('hello', 1, 1004, scheduleStatus)
       mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]
     return mock_query_result
-
-  @classmethod
-  def create_mock_query(cls):
-    return TaskQuery(owner=Identity(role=cls.TEST_ROLE), environment=cls.TEST_ENV,
-        jobName=cls.TEST_JOB)
 
   @classmethod
   def get_createjob_response(cls):

@@ -17,7 +17,7 @@ import re
 from twitter.common.lang import Compatibility, total_ordering
 
 from gen.apache.aurora.api.constants import GOOD_IDENTIFIER_PATTERN_PYTHON
-from gen.apache.aurora.api.ttypes import Identity, JobKey, TaskQuery
+from gen.apache.aurora.api.ttypes import JobKey, TaskQuery
 
 
 # TODO(ksweeney): This can just probably just extend namedtuple.
@@ -86,7 +86,7 @@ class AuroraJobKey(object):
     return JobKey(role=self.role, environment=self.env, name=self.name)
 
   def to_thrift_query(self):
-    return TaskQuery(owner=Identity(role=self.role), environment=self.env, jobName=self.name)
+    return TaskQuery(jobKeys=[JobKey(role=self.role, environment=self.env, name=self.name)])
 
   def __iter__(self):
     """Support 'cluster, role, env, name = job_key' assignment."""

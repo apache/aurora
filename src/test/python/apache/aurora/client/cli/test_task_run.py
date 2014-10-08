@@ -129,8 +129,8 @@ class TestRunCommand(AuroraClientCommandTest):
       # The status command sends a getTasksStatus query to the scheduler,
       # and then prints the result. The use of shards, above, should change
       # this query - that's the focus of the instances test.
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
-          environment='test', owner=Identity(role='bozo'),
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(
+          jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
               ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING]),
           instanceIds=instances))
@@ -215,8 +215,9 @@ class TestSshCommand(AuroraClientCommandTest):
 
       # The status command sends a getTasksStatus query to the scheduler,
       # and then prints the result.
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
-          environment='test', owner=Identity(role='bozo'), instanceIds=set([1]),
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(
+          jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
+          instanceIds=set([1]),
           statuses=set([ScheduleStatus.RUNNING, ScheduleStatus.KILLING, ScheduleStatus.RESTARTING,
               ScheduleStatus.PREEMPTING, ScheduleStatus.DRAINING
               ])))

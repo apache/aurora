@@ -25,7 +25,7 @@ from apache.aurora.config import AuroraConfig
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
-    Identity,
+    JobKey,
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
@@ -123,8 +123,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
   @classmethod
   def create_mock_query(cls):
-    return TaskQuery(owner=Identity(role=cls.TEST_ROLE), environment=cls.TEST_ENV,
-        jobName=cls.TEST_JOB)
+    return TaskQuery(
+        jobKeys=[JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=cls.TEST_JOB)])
 
   @classmethod
   def get_createjob_response(cls):

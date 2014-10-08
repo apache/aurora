@@ -21,13 +21,7 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.api.ttypes import (
-    Identity,
-    JobKey,
-    ScheduleStatus,
-    ScheduleStatusResult,
-    TaskQuery
-)
+from gen.apache.aurora.api.ttypes import JobKey, ScheduleStatus, ScheduleStatusResult, TaskQuery
 
 
 class TestClientCancelUpdateCommand(AuroraClientCommandTest):
@@ -50,11 +44,6 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
       mock_task_two = cls.create_mock_task('hello', 1, 1004, scheduleStatus)
       mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]
     return mock_query_result
-
-  @classmethod
-  def create_mock_query(cls):
-    return TaskQuery(owner=Identity(role=cls.TEST_ROLE), environment=cls.TEST_ENV,
-        jobName=cls.TEST_JOB)
 
   @classmethod
   def get_cancel_update_response(cls):
@@ -85,8 +74,10 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
   def get_expected_task_query(cls, shards=None):
     instance_ids = frozenset(shards) if shards is not None else None
     # Helper to create the query that will be a parameter to job kill.
-    return TaskQuery(taskIds=None, jobName=cls.TEST_JOB, environment=cls.TEST_ENV,
-        instanceIds=instance_ids, owner=Identity(role=cls.TEST_ROLE, user=None))
+    return TaskQuery(
+        taskIds=None,
+        instanceIds=instance_ids,
+        jobKeys=[JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=cls.TEST_JOB)])
 
   @classmethod
   def get_release_lock_response(cls):

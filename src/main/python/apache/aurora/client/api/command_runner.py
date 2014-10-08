@@ -28,7 +28,7 @@ from apache.aurora.config.schema.base import MesosContext
 from apache.thermos.config.schema import ThermosContext
 
 from gen.apache.aurora.api.constants import LIVE_STATES
-from gen.apache.aurora.api.ttypes import Identity, ResponseCode, TaskQuery
+from gen.apache.aurora.api.ttypes import JobKey, ResponseCode, TaskQuery
 
 
 class CommandRunnerTrait(Cluster.Trait):
@@ -95,7 +95,7 @@ class DistributedCommandRunner(object):
 
   @classmethod
   def query_from(cls, role, env, job):
-    return TaskQuery(statuses=LIVE_STATES, owner=Identity(role), jobName=job, environment=env)
+    return TaskQuery(statuses=LIVE_STATES, jobKeys=[JobKey(role=role, environment=env, name=job)])
 
   def __init__(self, cluster, role, env, jobs, ssh_user=None,
       log_fn=log.log):
@@ -142,9 +142,7 @@ class InstanceDistributedCommandRunner(DistributedCommandRunner):
   def query_from(cls, role, env, job, instances=None):
     return TaskQuery(
         statuses=LIVE_STATES,
-        owner=Identity(role),
-        jobName=job,
-        environment=env,
+        jobKeys=[JobKey(role=role, environment=env, name=job)],
         instanceIds=instances)
 
   def __init__(self, cluster, role, env, job, ssh_user=None, instances=None, log_fn=logging.log):

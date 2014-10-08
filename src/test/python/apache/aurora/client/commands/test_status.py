@@ -110,8 +110,8 @@ class TestListJobs(AuroraClientCommandTest):
       status(['west/mchucarroll/test/hello'], mock_options)
       # The status command sends a getTasksWithoutConfigs query to the scheduler,
       # and then prints the result.
-      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
-          environment='test', owner=Identity(role='mchucarroll')))
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(
+          TaskQuery(jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')]))
 
   def test_unsuccessful_status(self):
     """Test the status command when the user asks the status of a job that doesn't exist."""
@@ -125,8 +125,8 @@ class TestListJobs(AuroraClientCommandTest):
         patch('twitter.common.app.get_options', return_value=mock_options)):
 
       self.assertRaises(SystemExit, status, ['west/mchucarroll/test/hello'], mock_options)
-      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
-          environment='test', owner=Identity(role='mchucarroll')))
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(
+          TaskQuery(jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')]))
 
   def test_successful_status_nometadata(self):
     """Test the status command with no metadata."""
@@ -140,5 +140,5 @@ class TestListJobs(AuroraClientCommandTest):
         patch('twitter.common.app.get_options', return_value=mock_options)):
 
       status(['west/mchucarroll/test/hello'], mock_options)
-      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(TaskQuery(jobName='hello',
-          environment='test', owner=Identity(role='mchucarroll')))
+      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(
+          TaskQuery(jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')]))

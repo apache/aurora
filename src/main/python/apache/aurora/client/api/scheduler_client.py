@@ -297,17 +297,17 @@ class SchedulerProxy(object):
                   [m for m in resp.details] if resp.details else []))
             return resp
           except (TTransport.TTransportException, self.TimeoutError, self.TransientError) as e:
-            if not self._terminating:
+            if not self._terminating.is_set():
               log.warning('Connection error with scheduler: %s, reconnecting...' % e)
               self.invalidate()
               self._terminating.wait(self.RPC_RETRY_INTERVAL.as_(Time.SECONDS))
           except Exception as e:
             # Take any error that occurs during the RPC call, and transform it
             # into something clients can handle.
-            if not self._terminating:
+            if not self._terminating.is_set():
               raise self.ThriftInternalError("Error during thrift call %s to %s: %s" %
                                             (method_name, self.cluster.name, e))
-        if not self._terminating:
+        if not self._terminating.is_set():
           raise self.TimeoutError('Timed out attempting to issue %s to %s' % (
               method_name, self.cluster.name))
 

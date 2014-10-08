@@ -19,7 +19,7 @@ from twitter.common.quantity import Amount, Time
 from .task_util import StatusMuxHelper
 
 from gen.apache.aurora.api.constants import LIVE_STATES, TERMINAL_STATES
-from gen.apache.aurora.api.ttypes import Identity, TaskQuery
+from gen.apache.aurora.api.ttypes import JobKey, TaskQuery
 
 
 class JobMonitor(object):
@@ -60,9 +60,9 @@ class JobMonitor(object):
 
   def create_query(self, instances=None):
     return TaskQuery(
-        owner=Identity(role=self._job_key.role),
-        environment=self._job_key.env,
-        jobName=self._job_key.name,
+        jobKeys=[JobKey(role=self._job_key.role,
+                        environment=self._job_key.env,
+                        name=self._job_key.name)],
         instanceIds=frozenset([int(s) for s in instances]) if instances else None)
 
   def wait_until(self, predicate, instances=None, with_timeout=False):

@@ -128,7 +128,8 @@ class TestDiffCommand(AuroraClientCommandTest):
 
         # Diff should get the task status, populate a config, and run diff.
         mock_scheduler_proxy.getTasksStatus.assert_called_with(
-            TaskQuery(jobName='hello', environment='test', owner=Identity(role='mchucarroll'),
+            TaskQuery(
+                jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')],
                 statuses=ACTIVE_STATES))
         assert mock_scheduler_proxy.populateJobConfig.call_count == 1
         assert isinstance(mock_scheduler_proxy.populateJobConfig.call_args[0][0], JobConfiguration)
@@ -190,7 +191,8 @@ class TestDiffCommand(AuroraClientCommandTest):
         # In this error case, we should have called the server getTasksStatus;
         # but since it fails, we shouldn't call populateJobConfig or subprocess.
         mock_scheduler_proxy.getTasksStatus.assert_called_with(
-            TaskQuery(jobName='hello', environment='test', owner=Identity(role='mchucarroll'),
+            TaskQuery(
+                jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')],
                 statuses=ACTIVE_STATES))
         assert mock_scheduler_proxy.populateJobConfig.call_count == 0
         assert subprocess_patch.call_count == 0

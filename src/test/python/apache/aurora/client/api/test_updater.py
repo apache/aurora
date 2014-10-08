@@ -195,11 +195,7 @@ class UpdaterTest(TestCase):
       if not ignore_ids or index not in ignore_ids:
         scheduled.append(ScheduledTask(assignedTask=AssignedTask(task=task, instanceId=index)))
     response.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=scheduled))
-    query = TaskQuery(
-        owner=Identity(role=self._job_key.role),
-        environment=self._job_key.environment,
-        jobName=self._job_key.name,
-        statuses=ACTIVE_STATES)
+    query = TaskQuery(jobKeys=[self._job_key], statuses=ACTIVE_STATES)
     self._scheduler.getTasksStatus(query).AndReturn(response)
 
   def expect_cron_replace(self, job_config, response_code=None):
@@ -221,12 +217,9 @@ class UpdaterTest(TestCase):
     for i in instance_ids:
       response_code = ResponseCode.OK if response_code is None else response_code
       response = Response(responseCode=response_code, messageDEPRECATED='test')
-      query = TaskQuery(
-          owner=Identity(role=self._job_key.role),
-          environment=self._job_key.environment,
-          jobName=self._job_key.name,
-          statuses=ACTIVE_STATES,
-          instanceIds=frozenset([int(i)]))
+      query = TaskQuery(jobKeys=[self._job_key],
+                        statuses=ACTIVE_STATES,
+                        instanceIds=frozenset([int(i)]))
       self._scheduler.killTasks(
           query,
           self._lock,

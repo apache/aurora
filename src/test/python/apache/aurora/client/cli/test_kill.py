@@ -24,7 +24,7 @@ from apache.aurora.client.cli.options import parse_instances
 from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from gen.apache.aurora.api.ttypes import Identity, ScheduleStatus, ScheduleStatusResult, TaskQuery
+from gen.apache.aurora.api.ttypes import JobKey, ScheduleStatus, ScheduleStatusResult, TaskQuery
 
 
 class TestInstancesParser(unittest.TestCase):
@@ -55,8 +55,11 @@ class TestClientKillCommand(AuroraClientCommandTest):
   @classmethod
   def get_expected_task_query(cls, instances=None):
     instance_ids = frozenset(instances) if instances is not None else None
-    return TaskQuery(taskIds=None, jobName=cls.TEST_JOB, environment=cls.TEST_ENV,
-                     instanceIds=instance_ids, owner=Identity(role=cls.TEST_ROLE, user=None))
+    return TaskQuery(taskIds=None,
+                     instanceIds=instance_ids,
+                     jobKeys=[JobKey(role=cls.TEST_ROLE,
+                                     environment=cls.TEST_ENV,
+                                     name=cls.TEST_JOB)])
 
   def test_killall_job(self):
     """Test kill client-side API logic."""
@@ -330,8 +333,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
       # Now check that the right API calls got made.
       assert mock_scheduler_proxy.killTasks.call_count == 1
       mock_scheduler_proxy.killTasks.assert_called_with(
-        TaskQuery(jobName='hello', environment='test', instanceIds=frozenset([0, 2, 4, 5, 6]),
-            owner=Identity(role='bozo')), None)
+          TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')],
+                    instanceIds=frozenset([0, 2, 4, 5, 6])), None)
 
   def test_killall_job_output(self):
     """Test kill output."""

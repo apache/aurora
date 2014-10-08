@@ -20,7 +20,7 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
-    Identity,
+    JobKey,
     Response,
     ResponseCode,
     Result,
@@ -71,10 +71,8 @@ class JobMonitorTest(unittest.TestCase):
     self._scheduler.getTasksWithoutConfigs.return_value = resp
 
   def expect_task_status(self, once=False, instances=None):
-    query = TaskQuery(
-        owner=Identity(role=self._job_key.role),
-        environment=self._job_key.env,
-        jobName=self._job_key.name)
+    query = TaskQuery(jobKeys=[
+        JobKey(role=self._job_key.role, environment=self._job_key.env, name=self._job_key.name)])
     if instances is not None:
       query.instanceIds = frozenset([int(s) for s in instances])
 

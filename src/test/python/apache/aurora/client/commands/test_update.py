@@ -32,7 +32,6 @@ from gen.apache.aurora.api.ttypes import (
     AcquireLockResult,
     AddInstancesConfig,
     AssignedTask,
-    Identity,
     JobConfiguration,
     JobKey,
     PopulateJobResult,
@@ -272,10 +271,10 @@ class TestUpdateCommand(AuroraClientCommandTest):
     assert api.killTasks.call_count == 20
     # Check the last call's parameters.
     api.killTasks.assert_called_with(
-        TaskQuery(taskIds=None, jobName='hello', environment='test',
+        TaskQuery(taskIds=None,
+            jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')],
             instanceIds=frozenset([19]),
-            owner=Identity(role=u'mchucarroll', user=None),
-           statuses=ACTIVE_STATES),
+            statuses=ACTIVE_STATES),
         'foo')
 
   @classmethod
@@ -291,9 +290,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     for status_call in status_calls:
       status_call[0][0] == TaskQuery(
         taskIds=None,
-        jobName='hello',
-        environment='test',
-        owner=Identity(role='mchucarroll', user=None),
+        jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')],
         statuses=set([ScheduleStatus.RUNNING]))
 
     # getTasksStatus is called only once to build an generate update instructions
@@ -301,7 +298,5 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
     api.getTasksStatus.assert_called_once_with(TaskQuery(
       taskIds=None,
-      jobName='hello',
-      environment='test',
-      owner=Identity(role=u'mchucarroll', user=None),
+      jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')],
       statuses=ACTIVE_STATES))

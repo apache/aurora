@@ -28,7 +28,7 @@ from .updater_util import UpdaterConfig
 
 from gen.apache.aurora.api.constants import LIVE_STATES
 from gen.apache.aurora.api.ttypes import (
-    Identity,
+    JobKey,
     JobUpdateQuery,
     JobUpdateRequest,
     Lock,
@@ -98,7 +98,6 @@ class AuroraClientAPI(object):
 
     # Leave query.owner.user unset so the query doesn't filter jobs only submitted by a particular
     # user.
-    # TODO(wfarner): Refactor this when Identity is removed from TaskQuery.
     query = job_key.to_thrift_query()
     if instances is not None:
       log.info("Instances to be killed: %s" % instances)
@@ -113,11 +112,9 @@ class AuroraClientAPI(object):
 
   @classmethod
   def build_query(cls, role, job, instances=None, statuses=LIVE_STATES, env=None):
-    return TaskQuery(owner=Identity(role=role),
-                     jobName=job,
+    return TaskQuery(jobKeys=[JobKey(role=role, environment=env, name=job)],
                      statuses=statuses,
-                     instanceIds=instances,
-                     environment=env)
+                     instanceIds=instances)
 
   def query(self, query):
     try:

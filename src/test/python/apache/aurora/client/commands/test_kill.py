@@ -23,7 +23,7 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
-    Identity,
+    JobKey,
     Response,
     ResponseCode,
     Result,
@@ -330,8 +330,11 @@ class TestClientKillCommand(AuroraClientCommandTest):
   def get_expected_task_query(cls, shards=None):
     """Helper to create the query that will be a parameter to job kill."""
     instance_ids = frozenset(shards) if shards is not None else None
-    return TaskQuery(taskIds=None, jobName=cls.TEST_JOB, environment=cls.TEST_ENV,
-        instanceIds=instance_ids, owner=Identity(role=cls.TEST_ROLE, user=None))
+    return TaskQuery(taskIds=None,
+                     instanceIds=instance_ids,
+                     jobKeys=[JobKey(role=cls.TEST_ROLE,
+                                     environment=cls.TEST_ENV,
+                                     name=cls.TEST_JOB)])
 
   def test_kill_job_api_level(self):
     """Test kill client-side API logic."""

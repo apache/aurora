@@ -119,9 +119,9 @@ class TestRunCommand(AuroraClientCommandTest):
 
       # The status command sends a getTasksStatus query to the scheduler,
       # and then prints the result.
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(TaskQuery(jobName='hello',
-          environment='test', owner=Identity(role='mchucarroll'),
-          statuses=LIVE_STATES))
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(
+          TaskQuery(jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')],
+                    statuses=LIVE_STATES))
 
       # The mock status call returns 3 three ScheduledTasks, so three commands should have been run
       assert mock_subprocess.call_count == 3
