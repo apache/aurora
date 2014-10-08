@@ -58,7 +58,8 @@ def ssh(args, options):
 
   newcmd = ["task", "ssh", "%s/%s" % (job_path, shard)]
   if len(options.tunnels) > 0:
-    newcmd.append("--tunnels=%s" % options.tunnels)
+    for t in options.tunnels:
+      newcmd.append("--tunnels=%s" % t)
   if options.ssh_user is not None:
     newcmd.append("--ssh-user=%s" % options.ssh_user)
   if options.executor_sandbox:

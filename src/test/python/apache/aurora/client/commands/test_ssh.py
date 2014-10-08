@@ -123,6 +123,39 @@ class TestSshCommand(AuroraClientCommandTest):
           'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
           'slaverun/sandbox;ls'])
 
+  def test_ssh_deprecation_message(self):
+    """Test the ssh command."""
+    mock_options = self.setup_mock_options()
+    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
+    sandbox_args = {'slave_root': '/slaveroot', 'slave_run_directory': 'slaverun'}
+    with contextlib.nested(
+        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('apache.aurora.client.api.command_runner.DistributedCommandRunner.sandbox_args',
+            return_value=sandbox_args),
+        patch('subprocess.call', return_value=0),
+        patch('apache.aurora.client.commands.ssh.v1_deprecation_warning')) as (
+            mock_scheduler_proxy_class,
+            mock_clusters,
+            options,
+            mock_runner_args_patch,
+            mock_subprocess,
+            mock_dep_warn):
+      mock_options.tunnels = ['100:hundred', '1000:thousand']
+      try:
+        ssh(['west/mchucarroll/test/hello', '1', 'ls'], mock_options)
+      except SystemExit:
+        # It's going to fail with an error about unknown ports, but we don't
+        # care: we just want to verify that it generated a deprecation warning
+        # with the correct --tunnels parameters.
+        pass
+      mock_dep_warn.assert_called_with('ssh',
+          ['task', 'ssh', 'west/mchucarroll/test/hello/1',
+           '--tunnels=100:hundred', '--tunnels=1000:thousand',
+           '--command="ls"'])
+
   def test_ssh_job_not_found(self):
     """Test the ssh command when the query returns no tasks."""
     mock_options = self.setup_mock_options()
