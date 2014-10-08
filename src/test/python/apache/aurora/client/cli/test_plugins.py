@@ -202,7 +202,7 @@ class TestPlugins(AuroraClientCommandTest):
 
     # We'll patch out create_context, which will give us a fake context
     # object, and everything can be stubbed through that.
-    mock_context = FakeAuroraCommandContext(reveal=False)
+    mock_context = FakeAuroraCommandContext()
     with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
       # After making the client, create sets up a job monitor.
       # The monitor uses TaskQuery to get the tasks. It's called at least twice:once before

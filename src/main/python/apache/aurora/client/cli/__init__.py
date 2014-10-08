@@ -33,6 +33,8 @@ from __future__ import print_function
 import argparse
 import getpass
 import logging
+import os
+import os.path
 import sys
 import time
 import traceback
@@ -105,23 +107,19 @@ class Context(object):
       self.msg = msg
       self.code = code
 
-  REVEAL_ERRORS = False
+  ERROR_LOG_DIR = None
+
+  @staticmethod
+  def set_error_log_dir(dir):
+    Context.ERROR_LOG_DIR = dir  # noqa
+
+  @staticmethod
+  def get_error_log_dir():
+    return Context.ERROR_LOG_DIR # noqa
 
   def __init__(self):
     self.options = None
     self.logging_level = None
-
-  @classmethod
-  def reveal_errors(cls):
-    return cls.REVEAL_ERRORS
-
-  @classmethod
-  def enable_reveal_errors(cls):
-    cls.REVEAL_ERRORS = True
-
-  @classmethod
-  def disable_reveal_errors(cls):
-    cls.REVEAL_ERRORS = False
 
   @classmethod
   def exit(cls, code, msg):
@@ -432,9 +430,13 @@ class CommandLine(object):
     :param exc_traceback: the exc_traceback value for the error returnen by sys.exc_info()
     """
     now = str(int(time.time()))
-    path = "%s-%s.error-log" % (self.name, now)
+    dir = os.path.expanduser(Context.get_error_log_dir())
+    if not os.path.isdir(dir):
+      os.makedirs(dir)
+    path = os.path.join(dir, "%s-%s.error-log" % (self.name, now))
     print("Fatal error running command; traceback can be found in %s" % path,
         file=sys.stderr)
+
     with open(path, "w") as out:
       print("ERROR LOG: command arguments = %s" % cmd_args, file=out)
       traceback.print_exception(exc_type, exc_value, exc_traceback, file=out)

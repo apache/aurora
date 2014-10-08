@@ -59,7 +59,6 @@ class TestInspectCommand(AuroraClientCommandTest):
 
   def test_inspect_job(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    AuroraCommandContext.enable_reveal_errors()
     mock_transcript = []
     def mock_print_out(msg, indent=0):
       indent_str = " " * indent
@@ -75,7 +74,7 @@ class TestInspectCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['job', 'inspect', '--reveal-errors', 'west/bozo/test/hello', fp.name])
+        result = cmd.execute(['job', 'inspect', 'west/bozo/test/hello', fp.name])
         # inspect command should run without errors, and return 0.
         assert result == 0
         # The command output for the mock should look right.

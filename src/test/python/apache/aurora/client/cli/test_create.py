@@ -14,6 +14,7 @@
 
 import contextlib
 import os
+import shutil
 
 from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
@@ -145,16 +146,19 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        result = cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
+        result = cmd.execute(['job', 'create', '--wait-until=RUNNING',
+           '--error-log-dir=./logged-errors', 'west/bozo/test/hello',
             fp.name])
         assert result == EXIT_UNKNOWN_ERROR
-        with open("aurora-23.error-log", "r") as logfile:
+        with open("./logged-errors/aurora-23.error-log", "r") as logfile:
           error_log = logfile.read()
           assert error_log.startswith("ERROR LOG: command arguments = %s" %
-              ['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
+              ['job', 'create', '--wait-until=RUNNING', '--error-log-dir=./logged-errors',
+               'west/bozo/test/hello',
               fp.name])
           assert "Traceback" in error_log
-        os.remove('aurora-23.error-log')
+        if os.path.exists("./logged-errors"):
+          shutil.rmtree("./logged-errors")
 
   def test_create_job_delayed(self):
     """Run a test of the "create" command against a mocked-out API:
@@ -237,7 +241,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         assert api.create_job.call_count == 0
 
   def test_interrupt_error(self):
-    mock_context = FakeAuroraCommandContext(reveal=False)
+    mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
         patch('time.sleep'),
         patch('time.time', return_value=23),
@@ -250,10 +254,12 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         result = cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
+            '--error-log-dir=./error-logs',
             fp.name])
         assert result == EXIT_UNKNOWN_ERROR
         assert api.create_job.call_count == 0
-        os.remove('aurora-23.error-log')
+        if os.path.exists("./error-logs"):
+          shutil.rmtree("./error-logs")
 
   def test_simple_successful_create_job_output(self):
     """Run a test of the "create" command against a mocked-out API:
@@ -317,7 +323,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
-      mock_context.enable_reveal_errors()
 
       # This is the real test: invoke create as if it had been called by the command line.
       with temporary_file() as fp:

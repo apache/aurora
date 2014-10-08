@@ -37,7 +37,7 @@ from gen.apache.aurora.api.ttypes import (
 
 
 class FakeAuroraCommandContext(AuroraCommandContext):
-  def __init__(self, reveal=True):
+  def __init__(self):
     super(FakeAuroraCommandContext, self).__init__()
     self.options = None
     self.status = []
@@ -46,8 +46,6 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     self.showed_urls = []
     self.out = []
     self.err = []
-    if reveal:
-      self.enable_reveal_errors()
 
   def get_api(self, cluster):
     return self.fake_api
