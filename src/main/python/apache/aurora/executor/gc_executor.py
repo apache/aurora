@@ -493,7 +493,12 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
       self._slave_id = task.slave_id.value
     task_id = task.task_id.value
     self.log('launchTask() got task_id: %s' % task_id)
-    if task_id == self._task_id:
+    if self._stop_event.is_set():
+      self.log('=> Executor is shutting down - ignoring task %s' % task_id)
+      self.send_update(
+          self._driver, task_id, mesos_pb2.TASK_FAILED, 'GC Executor is shutting down.')
+      return
+    elif task_id == self._task_id:
       self.log('=> GC with task_id %s currently running - ignoring' % task_id)
       return
     elif task_id in self._gc_task_queue:

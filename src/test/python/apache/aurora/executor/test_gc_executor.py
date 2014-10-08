@@ -489,6 +489,17 @@ def test_gc_shutdown_queued():
   assert proxy_driver.updates[-1][1] == TASK2_ID
 
 
+def test_ignores_launch_task_when_shutting_down():
+  """Newly launched tasks should be rejected if shutdown was already called."""
+  TASK_ID = "task"
+  proxy_driver = ProxyDriver()
+  with temporary_dir() as td:
+    executor = build_blocking_gc_executor(td, proxy_driver)
+    executor.shutdown(proxy_driver)
+    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(), task_id=TASK_ID))
+    assert (mesos_pb2.TASK_FAILED, TASK_ID) == proxy_driver.updates[-1]
+
+
 def make_gc_executor_with_timeouts(
     maximum_executor_wait=Amount(15, Time.MINUTES),
     maximum_executor_lifetime=Amount(1, Time.DAYS)):
