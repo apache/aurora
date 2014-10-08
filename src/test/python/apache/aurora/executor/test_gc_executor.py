@@ -500,11 +500,8 @@ def test_ignores_launch_task_when_shutting_down():
     assert (mesos_pb2.TASK_FAILED, TASK_ID) == proxy_driver.updates[-1]
 
 
-def make_gc_executor_with_timeouts(
-    maximum_executor_wait=Amount(15, Time.MINUTES),
-    maximum_executor_lifetime=Amount(1, Time.DAYS)):
+def make_gc_executor_with_timeouts(maximum_executor_lifetime=Amount(1, Time.DAYS)):
   class TimeoutGCExecutor(ThinTestThermosGCExecutor):
-    MAXIMUM_EXECUTOR_WAIT = maximum_executor_wait
     MAXIMUM_EXECUTOR_LIFETIME = maximum_executor_lifetime
   return TimeoutGCExecutor
 
@@ -518,34 +515,6 @@ def run_gc_with_timeout(**kw):
     executor.registered(proxy_driver, None, None, None)
     executor.start()
     yield (proxy_driver, executor)
-
-
-def test_gc_wait():
-  # run w/ no tasks
-  with run_gc_with_timeout(maximum_executor_wait=Amount(15, Time.SECONDS)) as (
-      proxy_driver, executor):
-    executor._clock.tick(10)
-    proxy_driver.stopped.wait(timeout=0.1)
-    assert not proxy_driver.stopped.is_set()
-    executor._clock.tick(5.1)
-    proxy_driver.stopped.wait(timeout=0.1)
-    assert proxy_driver.stopped.is_set()
-    assert not executor._stop_event.is_set()
-
-  # ensure launchTask restarts executor wait
-  with run_gc_with_timeout(maximum_executor_wait=Amount(15, Time.SECONDS)) as (
-      proxy_driver, executor):
-    executor._clock.tick(10)
-    proxy_driver.stopped.wait(timeout=0.1)
-    assert not proxy_driver.stopped.is_set()
-    executor.launchTask(proxy_driver, serialize_art(AdjustRetainedTasks(retainedTasks={})))
-    executor._clock.tick(5.1)
-    proxy_driver.stopped.wait(timeout=0.1)
-    assert not proxy_driver.stopped.is_set()
-    executor._clock.tick(15.1)
-    proxy_driver.stopped.wait(timeout=0.1)
-    assert proxy_driver.stopped.is_set()
-    assert not executor._stop_event.is_set()
 
 
 def test_gc_lifetime():

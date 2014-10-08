@@ -88,9 +88,6 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
   # wait time between checking for new GC events from the slave and/or cleaning orphaned tasks
   POLL_WAIT = Amount(5, Time.MINUTES)
 
-  # maximum amount of time the executor will wait with no tasks before it exits.
-  MAXIMUM_EXECUTOR_WAIT = Amount(15, Time.MINUTES)
-
   # maximum lifetime of this executor.  this is to prevent older GC executor binaries from
   # running forever
   MAXIMUM_EXECUTOR_LIFETIME = Amount(1, Time.DAYS)
@@ -454,8 +451,6 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
     def should_terminate():
       now = self._clock.time()
       if now > run_start + self.MAXIMUM_EXECUTOR_LIFETIME.as_(Time.SECONDS):
-        return True
-      if now > last_gc_run + self.MAXIMUM_EXECUTOR_WAIT.as_(Time.SECONDS):
         return True
       return self._stop_event.is_set()
 
