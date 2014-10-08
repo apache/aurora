@@ -48,7 +48,7 @@
         $scope.roleSummaries = parseResponse(roleSummaries);
 
         $scope.roleSummaryColumns = [
-          {label: 'Role', map: 'role', cellTemplateUrl: 'roleLink.html'},
+          {label: 'Role', map: 'role', cellTemplateUrl: '/assets/roleLink.html'},
           {label: 'Jobs', map: 'jobCount'},
           {label: 'Cron Jobs', map: 'cronJobCount'}
         ];
@@ -87,8 +87,8 @@
 
       $scope.jobsTableColumns = [
         {label: 'Job Type', map: 'jobType'},
-        {label: 'Environment', map: 'environment', cellTemplateUrl: '/roleEnvLink.html'},
-        {label: 'Job', map: 'jobName', cellTemplateUrl: '/jobLink.html'},
+        {label: 'Environment', map: 'environment', cellTemplateUrl: '/assets/roleEnvLink.html'},
+        {label: 'Job', map: 'jobName', cellTemplateUrl: '/assets/jobLink.html'},
         {label: 'production', map: 'isProduction'},
         {label: 'Pending Tasks', map: 'pendingTasks'},
         {label: 'Active Tasks', map: 'activeTasks'},
@@ -346,8 +346,8 @@
 
       var taskColumns = [
         {label: 'Instance', map: 'instanceId'},
-        {label: 'Status', map: 'status', cellTemplateUrl: '/taskStatus.html'},
-        {label: 'Host', map: 'host', cellTemplateUrl: '/taskSandbox.html'}
+        {label: 'Status', map: 'status', cellTemplateUrl: '/assets/taskStatus.html'},
+        {label: 'Host', map: 'host', cellTemplateUrl: '/assets/taskSandbox.html'}
       ];
 
       var completedTaskColumns = addColumn(2,
@@ -359,7 +359,11 @@
           }
         });
 
-      var taskIdColumn = {label: 'Task ID', map: 'taskId', cellTemplateUrl: '/taskLink.html'};
+      var taskIdColumn = {
+        label: 'Task ID',
+        map: 'taskId',
+        cellTemplateUrl: '/assets/taskLink.html'
+      };
 
       $scope.activeTasksTableColumns = taskColumns;
 

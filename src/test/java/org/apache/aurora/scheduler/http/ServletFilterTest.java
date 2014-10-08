@@ -62,7 +62,7 @@ public class ServletFilterTest extends JettyServerModuleTest {
     expect(thrift.getJobSummary("www-data")).andReturn(new Response()).times(2);
     replayAndStart();
 
-    assertContentEncoding(get("/"), Optional.<String>absent());
+    assertGzipEncodedGet("/");
     assertGzipEncodedGet("/scheduler");
     assertGzipEncodedGet("/scheduler/");
     assertGzipEncodedGet("/scheduler/role");
@@ -70,6 +70,11 @@ public class ServletFilterTest extends JettyServerModuleTest {
     assertGzipEncodedGet("/scheduler/role/env/");
     assertGzipEncodedGet("/scheduler/role/env/job");
     assertGzipEncodedGet("/scheduler/role/env/job/");
+
+    assertGzipEncodedGet("/updates");
+    assertGzipEncodedGet("/updates/");
+
+    assertGzipEncodedGet("/assets/bower_components/angular/angular.js");
 
     assertGzipEncodedPost("/api", "[1,\"getJobSummary\",1,0,{\"1\":{\"str\":\"www-data\"}}]");
     assertGzipEncodedPost("/apibeta/getJobSummary", "{\"role\":\"www-data\"}");
@@ -92,6 +97,9 @@ public class ServletFilterTest extends JettyServerModuleTest {
     assertResponseStatus("/scheduler/role", expectedStatus);
     assertResponseStatus("/scheduler/role/env", expectedStatus);
     assertResponseStatus("/scheduler/role/env/job", expectedStatus);
+
+    assertResponseStatus("/updates", expectedStatus);
+    assertResponseStatus("/updates/", expectedStatus);
   }
 
   @Test

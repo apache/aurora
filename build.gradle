@@ -33,6 +33,7 @@ def generatedDir = "$buildDir/generated-src"
 def generatedJavaDir = "$generatedDir/gen-java"
 def generatedJSDir = "$generatedDir/gen-js"
 def generatedResourceDir = "$generatedDir/resources"
+def httpAssetsPath = 'scheduler/assets'
 
 def thriftVersion = '0.9.1'
 
@@ -97,6 +98,9 @@ sourceSets {
     resources {
       srcDir 'src/main/resources'
       srcDir 'src/test/resources'
+      srcDir '3rdparty/javascript'
+      srcDir generatedJSDir
+      srcDir generatedResourceDir
     }
   }
   generated {
@@ -164,6 +168,7 @@ dependencies {
   compile 'org.apache.mesos:mesos:0.20.0'
   compile thriftLib
   compile 'org.apache.zookeeper:zookeeper:3.3.4'
+  compile "org.eclipse.jetty:jetty-rewrite:${jettyDep}"
   compile "org.eclipse.jetty:jetty-server:${jettyDep}"
   compile "org.eclipse.jetty:jetty-servlet:${jettyDep}"
   compile "org.eclipse.jetty:jetty-servlets:${jettyDep}"
@@ -328,7 +333,7 @@ task checkPython() {
  * https://github.com/eriwen/gradle-js-plugin/issues/73
  */
 task jsHint(type:com.eriwen.gradle.js.tasks.JsHintTask) {
-  source = fileTree('src/main/resources/org/apache/aurora/scheduler/http/ui/js/')
+  source = fileTree("src/main/resources/$httpAssetsPath/js/")
   dest file("${buildDir}/jshint.out")
   // Set this to false once JS code complies with JSHint.
   ignoreExitCode false
@@ -393,10 +398,12 @@ task bootstrapThrift {
 }
 
 task generateSources(dependsOn: ['bootstrapThrift', 'checkPython']) {
+  ext.thriftDir = 'src/main/thrift/org/apache/aurora/gen'
+  def thriftFiles = fileTree(dir: thriftDir).matching { include '**/*.thrift' }
   def codeGenerator = 'src/main/python/apache/aurora/tools/java/thrift_wrapper_codegen.py';
-  def thriftFiles = fileTree(dir: 'src/main/thrift').matching { include '**/*.thrift' }
   ext.inputFiles = thriftFiles + files(codeGenerator)
   ext.outputDir = file(generatedDir)
+  ext.jsOutputDir = file("$generatedJSDir/$httpAssetsPath/js")
   inputs.file inputFiles
   outputs.dir outputDir
   doLast {
@@ -404,9 +411,7 @@ task generateSources(dependsOn: ['bootstrapThrift', 'checkPython']) {
     thriftFiles.each { File file ->
       exec {
         executable = project.thrift
-        args = ['--gen', 'java:hashcode,private-members',
-                '--gen', 'js:jquery',
-                '-o', outputDir, file]
+        args = ['--gen', 'java:hashcode,private-members', '-o', outputDir, file]
       }
     }
     exec {
@@ -414,7 +419,15 @@ task generateSources(dependsOn: ['bootstrapThrift', 'checkPython']) {
       args = [codeGenerator,
               'src/main/thrift/org/apache/aurora/gen/api.thrift',
               generatedJavaDir,
-              generatedResourceDir]
+              "$generatedResourceDir/$httpAssetsPath"]
+    }
+
+    // Generate thrift javascript separately since we don't need all IDLs, and we want to place
+    // sources in the layout for assets served by the scheduler.
+    jsOutputDir.exists() || jsOutputDir.mkdirs()
+    exec {
+      executable = project.thrift
+      args = ['--gen', 'js:jquery', '-out', jsOutputDir, "$thriftDir/api.thrift"]
     }
   }
 }
@@ -447,13 +460,18 @@ idea {
     // [project.buildDir, project.file('.gradle')]
     // This has the side-effect of also excluding our generated sources [2].  Due to the way
     // directory exclusion works in idea, you can't exclude a directory and include a child of that
-    // directory.  Clearing the excludes seems to have no ill side-effects, making it preferable to
+    // directory. Clearing the excludes seems to have no ill side-effects, making it preferable to
     // other possible approaches.
     //
     // [1] http://www.gradle.org/docs/current/dsl/org.gradle.plugins.ide.idea.model.IdeaModule.html
     // [2] http://issues.gradle.org/browse/GRADLE-1174
     excludeDirs = [file("$buildDir/reports"), file("$buildDir/test-results")]
     sourceDirs += codegenDirs
+
+    // For some reason src/main/resources is marked as both a production source and a test source
+    // directory. In order to run the local scheduler from IntelliJ the resources directory must not
+    // be marked as test sources, so we make it explicit that it's only a production source.
+    testSourceDirs -= file("src/main/resources")
   }
 }
 

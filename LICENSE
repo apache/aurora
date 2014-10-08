@@ -210,7 +210,7 @@ of the following licenses.
 -------------------------------------------------------------------------------
 
 Angular.js (http://angularjs.org/)
-  Location: 3rdparty/javascript/bower_components/angular
+  Location: 3rdparty/javascript/scheduler/assets/bower_components/angular/angular.js
   From: 'Google, Inc.' (http://www.google.com/)
   License: MIT License
 
@@ -240,7 +240,7 @@ THE SOFTWARE.
 
 
 Twitter Bootstrap (http://twitter.github.com/bootstrap)
-  Location: 3rdparty/javascript/bower_components/bootstrap.css
+  Location: 3rdparty/javascript/scheduler/assets/bower_components/bootstrap/dist/css/bootstrap.css
   From: 'Twitter, Inc.' (http://www.twitter.com/)
   License: MIT License
 
@@ -267,7 +267,7 @@ THE SOFTWARE.
 
 
 jQuery (http://jquery.com/)
-  Location: 3rdparty/javascript/bower_components/jquery
+  Location: javascript/scheduler/assets/bower_components/jquery
             src/main/python/apache/thermos/observer/http/assets/jquery.js
   From: 'The jQuery Foundation' (http://www.jquery.com/)
   License:  MIT License
@@ -297,7 +297,7 @@ THE SOFTWARE.
 
 
 Moment.js (http://momentjs.com/)
-  Location: 3rdparty/javascript/bower_components/momentjs
+  Location: 3rdparty/javascript/scheduler/assets/bower_components/momentjs
   From: 'Tim Wood, Iskren Chernev' (http://momentjs.com/)
   License:  MIT License
 
@@ -325,7 +325,7 @@ THE SOFTWARE.
 
 
 smart-table (http://lorenzofox3.github.io/smart-table-website/)
-  Location: 3rdparty/javascript/bower_components/smart-table
+  Location: 3rdparty/javascript/scheduler/assets/bower_components/smart-table
   From: 'Laurent Renard' (http://lorenzofox3.github.io/smart-table-website/)
   License:  MIT License
 
@@ -353,7 +353,7 @@ THE SOFTWARE.
 
 
 Underscore.js (http://underscorejs.org)
-  Location: 3rdparty/javascript/bower_components/underscore
+  Location: 3rdparty/javascript/scheduler/assets/bower_components/underscore
   From: 'Jeremy Ashkenas' (http://underscorejs.org)
   License:  MIT License
 
@@ -377,3 +377,58 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+-------------------------------------------------------------------------------
+
+
+dygraphs (http://dygraphs.com/)
+  Location: src/main/resources/scheduler/assets/graphview/dygraph-combined.js
+  From: 'Dan Vanderkam' (danvdk@gmail.com)
+  License: MIT License
+
+Copyright (c) 2011 Dan Vanderkam
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+-------------------------------------------------------------------------------
+
+
+dygraphs-extra (http://cavorite.com/labs/js/dygraphs-export/)
+  Location: src/main/resources/scheduler/assets/graphview/dygraph-extra.js
+  From: 'Juan Manuel Caicedo Carvajal' (juan@cavorite.com)
+  License: MIT License
+
+Copyright (c) 2011 Juan Manuel Caicedo Carvajal
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

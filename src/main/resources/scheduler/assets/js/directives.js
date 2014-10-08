@@ -41,21 +41,21 @@
   auroraUI.directive('breadcrumb', function () {
     return {
       restrict: 'E',
-      templateUrl: '/breadcrumb.html'
+      templateUrl: '/assets/breadcrumb.html'
     };
   });
 
   auroraUI.directive('error', function () {
     return {
       restrict: 'E',
-      templateUrl: '/error.html'
+      templateUrl: '/assets/error.html'
     };
   });
 
   auroraUI.directive('taskSandboxLink', function () {
     return {
       restrict: 'E',
-      templateUrl: '/taskSandbox.html'
+      templateUrl: '/assets/taskSandbox.html'
     };
   });
 
@@ -88,7 +88,7 @@
   auroraUI.directive('groupSummary', function () {
     return {
       restrict: 'E',
-      templateUrl: '/groupSummary.html',
+      templateUrl: '/assets/groupSummary.html',
       scope: {
         'groups': '=',
         'visibleGroups': '=?'
@@ -126,7 +126,7 @@
       scope: {
         'group': '='
       },
-      templateUrl: '/configSummary.html',
+      templateUrl: '/assets/configSummary.html',
       replace: true
     };
   });
@@ -137,7 +137,7 @@
       scope: {
         'timestamp': '='
       },
-      templateUrl: '/timeDisplay.html'
+      templateUrl: '/assets/timeDisplay.html'
     };
   });
 
@@ -147,7 +147,7 @@
       scope: {
         'update': '='
       },
-      templateUrl: '/updateSettings.html'
+      templateUrl: '/assets/updateSettings.html'
     };
   });
 
@@ -196,7 +196,7 @@
         'updates': '=',
         'message': '@'
       },
-      templateUrl: '/latestUpdates.html'
+      templateUrl: '/assets/latestUpdates.html'
     };
   });
 })();

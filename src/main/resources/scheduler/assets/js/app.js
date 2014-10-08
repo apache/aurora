@@ -21,22 +21,22 @@ var auroraUI;
 
   auroraUI.config(function ($routeProvider, $locationProvider) {
     $routeProvider.when('/scheduler',
-      {templateUrl: '/home.html', controller: 'RoleSummaryController'});
+      {templateUrl: '/assets/home.html', controller: 'RoleSummaryController'});
 
     $routeProvider.when('/scheduler/:role',
-      {templateUrl: '/role.html', controller: 'JobSummaryController'});
+      {templateUrl: '/assets/role.html', controller: 'JobSummaryController'});
 
     $routeProvider.when('/scheduler/:role/:environment',
-      {templateUrl: '/role.html', controller: 'JobSummaryController'});
+      {templateUrl: '/assets/role.html', controller: 'JobSummaryController'});
 
     $routeProvider.when('/scheduler/:role/:environment/:job',
-      {templateUrl: '/job.html', controller: 'JobController'});
+      {templateUrl: '/assets/job.html', controller: 'JobController'});
 
     $routeProvider.when('/scheduler/:role/:environment/:job/:update',
-      {templateUrl: '/update.html', controller: 'UpdateController'});
+      {templateUrl: '/assets/update.html', controller: 'UpdateController'});
 
     $routeProvider.when('/updates',
-      {templateUrl: '/updateList.html', controller: 'AllUpdatesController'});
+      {templateUrl: '/assets/updateList.html', controller: 'AllUpdatesController'});
 
     $routeProvider.otherwise({redirectTo: function (location, path) {
       window.location.href = path;
