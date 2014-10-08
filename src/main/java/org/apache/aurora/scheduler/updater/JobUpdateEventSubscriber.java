@@ -50,7 +50,7 @@ class JobUpdateEventSubscriber implements PubsubEvent.EventSubscriber {
   }
 
   @Subscribe
-  public synchronized void taskChangedState(TaskStateChange change) {
+  public void taskChangedState(TaskStateChange change) {
     try {
       controller.instanceChangedState(change.getTask());
     } catch (RuntimeException e) {
@@ -60,7 +60,7 @@ class JobUpdateEventSubscriber implements PubsubEvent.EventSubscriber {
   }
 
   @Subscribe
-  public synchronized void tasksDeleted(TasksDeleted event) {
+  public void tasksDeleted(TasksDeleted event) {
     for (IScheduledTask task : event.getTasks()) {
       // Ignore pruned tasks, since they are irrelevant to updates.
       try {
@@ -78,7 +78,7 @@ class JobUpdateEventSubscriber implements PubsubEvent.EventSubscriber {
   }
 
   @Subscribe
-  public synchronized void schedulerActive(PubsubEvent.SchedulerActive event) {
+  public void schedulerActive(PubsubEvent.SchedulerActive event) {
     try {
       controller.systemResume();
     } catch (RuntimeException e) {
