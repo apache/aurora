@@ -98,6 +98,10 @@ class AuroraCommandLine(CommandLine):
     self.register_plugin(AuroraLogConfigurationPlugin())
     self.register_plugin(AuroraErrorHandlingPlugin())
 
+  @property
+  def name(self):
+    return 'aurora'
+
   @classmethod
   def get_description(cls):
     return 'Aurora client command line'

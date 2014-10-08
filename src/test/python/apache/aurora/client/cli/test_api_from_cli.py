@@ -16,7 +16,7 @@ import contextlib
 
 from mock import Mock, patch
 
-from apache.aurora.client.cli import EXIT_API_ERROR
+from apache.aurora.client.cli import EXIT_UNKNOWN_ERROR
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
 
@@ -139,5 +139,5 @@ class TestApiFromCLI(AuroraClientCommandTest):
       # getTasksWithoutConfigs call against the mock_scheduler_client. That should raise an
       # exception, which results in the command failing with an error code.
       result = cmd.execute(['job', 'status', 'west/bozo/test/hello'])
-      assert result == EXIT_API_ERROR
+      assert result == EXIT_UNKNOWN_ERROR
       mock_scheduler_client.getTasksWithoutConfigs.assert_call_count == 1

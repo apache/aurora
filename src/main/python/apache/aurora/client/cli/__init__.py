@@ -34,6 +34,8 @@ import argparse
 import getpass
 import logging
 import sys
+import time
+import traceback
 from abc import abstractmethod
 from uuid import uuid1
 
@@ -416,9 +418,26 @@ class CommandLine(object):
       print_aurora_log(logging.INFO, "Error executing command: %s", c.msg)
       self.print_err("Error executing command: %s" % c.msg)
       return c.code
-    except Exception as e:
-      print_aurora_log(logging.ERROR, "Internal error executing command: %s", e)
-      return EXIT_API_ERROR
+    except Exception:
+      exc_type, exc_value, exc_traceback = sys.exc_info()
+      self.dump_error_log(args, exc_type, exc_value, exc_traceback)
+      return EXIT_UNKNOWN_ERROR
+
+  def dump_error_log(self, cmd_args, exc_type, exc_value, exc_traceback):
+    """Create an error log file in the directly where a command was executed,
+    and print detailed information about the error into the file.
+    :param cmd_args: the command-line arguments passed to the command that resulted in an error.
+    :param exc_type: the exc_type value for the error returnen by sys.exc_info()
+    :param exc_value: the exc_value value for the error returnen by sys.exc_info()
+    :param exc_traceback: the exc_traceback value for the error returnen by sys.exc_info()
+    """
+    now = str(int(time.time()))
+    path = "%s-%s.error-log" % (self.name, now)
+    print("Fatal error running command; traceback can be found in %s" % path,
+        file=sys.stderr)
+    with open(path, "w") as out:
+      print("ERROR LOG: command arguments = %s" % cmd_args, file=out)
+      traceback.print_exception(exc_type, exc_value, exc_traceback, file=out)
 
   def execute(self, args):
     try:
@@ -428,8 +447,8 @@ class CommandLine(object):
       return EXIT_INTERRUPTED
     except Exception as e:
       print_aurora_log(logging.ERROR, "Unknown error: %s" % e)
-      if Context.reveal_errors():
-        raise
+      exc_type, exc_value, exc_traceback = sys.exc_info()
+      self.dump_error_log(args, exc_type, exc_value, exc_traceback)
       return EXIT_UNKNOWN_ERROR
 
 
