@@ -372,7 +372,6 @@ class TestJobStatus(AuroraClientCommandTest):
         '{"jobspec":"west/bozo/test/hello","error":"No matching jobs found"}']
       assert result == EXIT_OK
 
-
   def test_successful_status_json_output_no_metadata(self):
     """Test the status command more deeply: in a request with a fully specified
     job, it should end up doing a query using getTasksWithoutConfigs."""

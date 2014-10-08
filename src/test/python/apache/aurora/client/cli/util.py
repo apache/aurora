@@ -94,7 +94,6 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     """To fuzz around timezone issues with timestamps, just return fixed strings."""
     return "YYYY-MM-DD HH:MM:SS"
 
-
   def add_expected_status_query_result(self, expected_result):
     self.task_status.append(expected_result)
     # each call adds an expected query result, in order.

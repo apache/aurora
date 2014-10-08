@@ -446,7 +446,6 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
       by the slave, and garbage collect orphaned tasks on the system.
     """
     run_start = self._clock.time()
-    last_gc_run = self._clock.time()
 
     def should_terminate():
       now = self._clock.time()
@@ -457,7 +456,6 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
     while not should_terminate():
       try:
         _, (task, retain_tasks, retain_start) = self._gc_task_queue.popitem(0)
-        last_gc_run = retain_start
         self._run_gc(task, retain_tasks, retain_start)
       except KeyError:  # no enqueued GC tasks
         pass

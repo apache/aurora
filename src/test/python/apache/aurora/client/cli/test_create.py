@@ -23,7 +23,6 @@ from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
     EXIT_INTERRUPTED,
     EXIT_INVALID_CONFIGURATION,
-    EXIT_OK,
     EXIT_UNKNOWN_ERROR
 )
 from apache.aurora.client.cli.client import AuroraCommandLine
@@ -43,6 +42,7 @@ from gen.apache.aurora.api.ttypes import (
 
 class UnknownException(Exception):
   pass
+
 
 class TestClientCreateCommand(AuroraClientCommandTest):
 

@@ -341,7 +341,6 @@ class UpdaterTest(TestCase):
       assert message in resp.details[0].message, (
         "Expected %s message not found in: %s" % (message, resp.details[0].message))
 
-
   def test_grow(self):
     """Adds instances to the existing job."""
     old_configs = self.make_task_configs(3)
