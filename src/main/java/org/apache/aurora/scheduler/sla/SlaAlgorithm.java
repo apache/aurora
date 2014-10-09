@@ -41,6 +41,10 @@ import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.gen.ScheduleStatus.ASSIGNED;
+import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+
 /**
  * Defines an SLA algorithm to be applied to a {@link IScheduledTask}
  * set for calculating a specific SLA metric.
@@ -68,8 +72,10 @@ interface SlaAlgorithm {
     JOB_UPTIME_75(new JobUptime(75f), String.format(JobUptime.NAME_FORMAT, 75f)),
     JOB_UPTIME_50(new JobUptime(50f), String.format(JobUptime.NAME_FORMAT, 50f)),
     AGGREGATE_PLATFORM_UPTIME(new AggregatePlatformUptime(), "platform_uptime_percent"),
-    MEDIAN_TIME_TO_ASSIGNED(new MedianAlgorithm(ScheduleStatus.ASSIGNED), "mtta_ms"),
-    MEDIAN_TIME_TO_RUNNING(new MedianAlgorithm(ScheduleStatus.RUNNING), "mttr_ms");
+    MEDIAN_TIME_TO_ASSIGNED(new MedianAlgorithm(ASSIGNED), "mtta_ms"),
+    MEDIAN_TIME_TO_RUNNING(new MedianAlgorithm(RUNNING), "mttr_ms"),
+    MEDIAN_TIME_TO_ASSIGNED_NON_PROD(new MedianAlgorithm(ASSIGNED), "mtta_nonprod_ms"),
+    MEDIAN_TIME_TO_RUNNING_NON_PROD(new MedianAlgorithm(RUNNING), "mttr_nonprod_ms");
 
     private final SlaAlgorithm algorithm;
     private final String name;
@@ -121,7 +127,7 @@ interface SlaAlgorithm {
       for (IScheduledTask task : activeTasks) {
         long pendingTs = 0;
         for (ITaskEvent event : task.getTaskEvents()) {
-          if (event.getStatus() == ScheduleStatus.PENDING) {
+          if (event.getStatus() == PENDING) {
             pendingTs = event.getTimestamp();
           } else if (event.getStatus() == status && timeFrame.contains(event.getTimestamp())) {
 
@@ -152,7 +158,7 @@ interface SlaAlgorithm {
 
     private static final Predicate<IScheduledTask> IS_RUNNING =
         Predicates.compose(
-            Predicates.in(ImmutableSet.of(ScheduleStatus.RUNNING)),
+            Predicates.in(ImmutableSet.of(RUNNING)),
             Tasks.GET_STATUS);
 
     private static final Function<IScheduledTask, ITaskEvent> TASK_TO_EVENT =

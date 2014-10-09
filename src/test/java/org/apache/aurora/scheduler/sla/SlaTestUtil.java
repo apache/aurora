@@ -28,14 +28,17 @@ import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 
-public final class SlaTestUtil {
+final class SlaTestUtil {
 
   private SlaTestUtil() {
     // Utility class.
   }
 
-  public static IScheduledTask makeTask(
-      Map<Long, ScheduleStatus> events, int instanceId) {
+  static IScheduledTask makeTask(Map<Long, ScheduleStatus> events, int instanceId) {
+    return makeTask(events, instanceId, true);
+  }
+
+  static IScheduledTask makeTask(Map<Long, ScheduleStatus> events, int instanceId, boolean isProd) {
     List<ITaskEvent> taskEvents = makeEvents(events);
     return IScheduledTask.build(new ScheduledTask()
         .setStatus(Iterables.getLast(taskEvents).getStatus())
@@ -47,12 +50,12 @@ public final class SlaTestUtil {
             .setTask(new TaskConfig()
                 .setJobName("job")
                 .setIsService(true)
-                .setProduction(true)
+                .setProduction(isProd)
                 .setEnvironment("env")
                 .setOwner(new Identity("role", "role-user")))));
   }
 
-  public static List<ITaskEvent> makeEvents(Map<Long, ScheduleStatus> events) {
+  static List<ITaskEvent> makeEvents(Map<Long, ScheduleStatus> events) {
     ImmutableList.Builder<ITaskEvent> taskEvents = ImmutableList.builder();
     for (Map.Entry<Long, ScheduleStatus> entry : events.entrySet()) {
       taskEvents.add(ITaskEvent.build(new TaskEvent(entry.getKey(), entry.getValue())));

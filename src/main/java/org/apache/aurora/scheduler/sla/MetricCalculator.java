@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.inject.Inject;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
@@ -63,7 +64,8 @@ import static org.apache.aurora.scheduler.sla.SlaGroup.GroupType.RESOURCE_RAM;
  */
 class MetricCalculator implements Runnable {
 
-  private static final Multimap<AlgorithmType, GroupType> METRICS =
+  @VisibleForTesting
+  static final Multimap<AlgorithmType, GroupType> PROD_METRICS =
       ImmutableMultimap.<AlgorithmType, GroupType>builder()
           .put(JOB_UPTIME_50, JOB)
           .put(JOB_UPTIME_75, JOB)
@@ -73,6 +75,25 @@ class MetricCalculator implements Runnable {
           .putAll(AGGREGATE_PLATFORM_UPTIME, JOB, CLUSTER)
           .putAll(MEDIAN_TIME_TO_ASSIGNED, JOB, CLUSTER, RESOURCE_CPU, RESOURCE_RAM, RESOURCE_DISK)
           .putAll(MEDIAN_TIME_TO_RUNNING, JOB, CLUSTER, RESOURCE_CPU, RESOURCE_RAM, RESOURCE_DISK)
+          .build();
+
+  @VisibleForTesting
+  static final Multimap<AlgorithmType, GroupType> NON_PROD_METRICS =
+      ImmutableMultimap.<AlgorithmType, GroupType>builder()
+          .putAll(
+              AlgorithmType.MEDIAN_TIME_TO_ASSIGNED_NON_PROD,
+              JOB,
+              CLUSTER,
+              RESOURCE_CPU,
+              RESOURCE_RAM,
+              RESOURCE_DISK)
+          .putAll(
+              AlgorithmType.MEDIAN_TIME_TO_RUNNING_NON_PROD,
+              JOB,
+              CLUSTER,
+              RESOURCE_CPU,
+              RESOURCE_RAM,
+              RESOURCE_DISK)
           .build();
 
   private static final Predicate<ITaskConfig> IS_SERVICE =
@@ -146,25 +167,37 @@ class MetricCalculator implements Runnable {
   @Timed("sla_stats_computation")
   @Override
   public void run() {
-    List<IScheduledTask> tasks =
-        FluentIterable.from(Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped()))
-            .filter(Predicates.compose(
-                Predicates.and(Tasks.IS_PRODUCTION, IS_SERVICE),
-                Tasks.SCHEDULED_TO_INFO)).toList();
+    FluentIterable<IScheduledTask> tasks =
+        FluentIterable.from(Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped()));
+
+    List<IScheduledTask> prodTasks = tasks.filter(Predicates.compose(
+        Predicates.and(Tasks.IS_PRODUCTION, IS_SERVICE),
+        Tasks.SCHEDULED_TO_INFO)).toList();
+
+    List<IScheduledTask> nonProdTasks = tasks.filter(Predicates.compose(
+        Predicates.and(Predicates.not(Tasks.IS_PRODUCTION), IS_SERVICE),
+        Tasks.SCHEDULED_TO_INFO)).toList();
 
     long nowMs = clock.nowMillis();
-    long intervalStartMs = nowMs - settings.getRefreshRateMs();
+    Range<Long> timeRange = Range.closedOpen(nowMs - settings.getRefreshRateMs(), nowMs);
 
-    for (Entry<AlgorithmType, GroupType> slaMetric : METRICS.entries()) {
+    runAlgorithms(prodTasks, PROD_METRICS, timeRange);
+    runAlgorithms(nonProdTasks, NON_PROD_METRICS, timeRange);
+  }
+
+  private void runAlgorithms(
+      List<IScheduledTask> tasks,
+      Multimap<AlgorithmType, GroupType> metrics,
+      Range<Long> timeRange) {
+
+    for (Entry<AlgorithmType, GroupType> slaMetric : metrics.entries()) {
       for (Entry<String, Collection<IScheduledTask>> namedGroup
           : slaMetric.getValue().getSlaGroup().createNamedGroups(tasks).asMap().entrySet()) {
 
         AlgorithmType algoType = slaMetric.getKey();
         String metricName = namedGroup.getKey() + algoType.getAlgorithmName();
         metricCache.getUnchecked(metricName)
-            .set(metricName, algoType.getAlgorithm().calculate(
-                namedGroup.getValue(),
-                Range.closedOpen(intervalStartMs, nowMs)));
+            .set(metricName, algoType.getAlgorithm().calculate(namedGroup.getValue(), timeRange));
       }
     }
   }
