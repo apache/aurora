@@ -114,7 +114,6 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Jobs;
 import org.apache.aurora.scheduler.base.Numbers;
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
@@ -130,7 +129,6 @@ import org.apache.aurora.scheduler.quota.QuotaCheckResult;
 import org.apache.aurora.scheduler.quota.QuotaInfo;
 import org.apache.aurora.scheduler.quota.QuotaManager;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
-import org.apache.aurora.scheduler.quota.QuotaUtil;
 import org.apache.aurora.scheduler.state.LockManager;
 import org.apache.aurora.scheduler.state.LockManager.LockException;
 import org.apache.aurora.scheduler.state.MaintenanceController;
@@ -313,9 +311,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           ITaskConfig taskConfig = sanitized.getJobConfig().getTaskConfig();
           int instanceCount = sanitized.getInstanceIds().size();
 
-          validateTaskLimits(taskConfig, instanceCount, ResourceAggregates.scale(
-              QuotaUtil.prodResourcesFromTasks(ImmutableSet.of(taskConfig)),
-              instanceCount));
+          validateTaskLimits(
+              taskConfig,
+              instanceCount,
+              quotaManager.checkInstanceAddition(taskConfig, instanceCount));
 
           // TODO(mchucarroll): deprecate cron as a part of create/kill job.(AURORA-454)
           if (sanitized.isCron()) {
@@ -1205,9 +1204,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           validateTaskLimits(
               task,
               currentTasks.size() + config.getInstanceIdsSize(),
-              ResourceAggregates.scale(
-                  QuotaUtil.prodResourcesFromTasks(ImmutableSet.of(task)),
-                  config.getInstanceIdsSize()));
+              quotaManager.checkInstanceAddition(task, config.getInstanceIdsSize()));
 
           stateManager.insertPendingTasks(task, ImmutableSet.copyOf(config.getInstanceIds()));
           return okEmptyResponse();
@@ -1291,7 +1288,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private void validateTaskLimits(
       ITaskConfig task,
       int totalInstances,
-      IResourceAggregate requestedProdResources) throws TaskValidationException {
+      QuotaCheckResult quotaCheck) throws TaskValidationException {
 
     if (totalInstances <= 0 || totalInstances > MAX_TASKS_PER_JOB.get()) {
       throw new TaskValidationException(String.format(
@@ -1305,9 +1302,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       throw new TaskValidationException(
           "Task ID is too long, please shorten your role or job name.");
     }
-
-    QuotaCheckResult quotaCheck =
-        quotaManager.checkQuota(task.getOwner().getRole(), requestedProdResources);
 
     if (quotaCheck.getResult() == INSUFFICIENT_QUOTA) {
       throw new TaskValidationException("Insufficient resource quota: "
@@ -1450,7 +1444,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           validateTaskLimits(
               request.getTaskConfig(),
               request.getInstanceCount(),
-              QuotaUtil.prodResourcesFromJobUpdate(update));
+              quotaManager.checkJobUpdate(update));
 
           jobUpdateController.start(update, context.getIdentity());
           return okResponse(Result.startJobUpdateResult(new StartJobUpdateResult(updateId)));

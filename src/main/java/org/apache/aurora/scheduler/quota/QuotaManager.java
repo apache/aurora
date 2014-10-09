@@ -20,11 +20,13 @@ import java.util.Set;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeSet;
 import com.google.common.collect.Sets;
@@ -49,6 +51,7 @@ import org.apache.aurora.scheduler.storage.entities.IJobUpdateSummary;
 import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
 
 import static java.util.Objects.requireNonNull;
@@ -77,14 +80,24 @@ public interface QuotaManager {
   QuotaInfo getQuotaInfo(String role);
 
   /**
-   * Checks if there is enough resource quota available for adding production resources specified
-   * in {@code requestedProdResources}. The quota is defined at the task owner (role) level.
+   * Checks if there is enough resource quota available for adding {@code instances} of
+   * {@code template} tasks provided resources consumed by {@code releasedTemplates} tasks
+   * are released. The quota is defined at the task owner (role) level.
    *
-   * @param role Role to check quota for.
-   * @param requestedProdResources Additional production resources requested.
+   * @param template Task resource requirement.
+   * @param instances Number of additional instances requested.
    * @return {@code QuotaComparisonResult} instance with quota check result details.
    */
-  QuotaCheckResult checkQuota(String role, IResourceAggregate requestedProdResources);
+  QuotaCheckResult checkInstanceAddition(ITaskConfig template, int instances);
+
+  /**
+   * Checks if there is enough resource quota available for performing a job update represented
+   * by the {@code jobUpdate}. The quota is defined at the task owner (role) level.
+   *
+   * @param jobUpdate Job update to check quota for.
+   * @return {@code QuotaComparisonResult} instance with quota check result details.
+   */
+  QuotaCheckResult checkJobUpdate(IJobUpdate jobUpdate);
 
   /**
    * Thrown when quota related operation failed.
@@ -128,6 +141,51 @@ public interface QuotaManager {
 
     @Override
     public QuotaInfo getQuotaInfo(final String role) {
+      return getQuotaInfo(role, Optional.<IJobUpdate>absent());
+    }
+
+    @Override
+    public QuotaCheckResult checkInstanceAddition(ITaskConfig template, int instances) {
+      Preconditions.checkArgument(instances >= 0);
+      if (!template.isProduction()) {
+        return new QuotaCheckResult(SUFFICIENT_QUOTA);
+      }
+
+      QuotaInfo quotaInfo = getQuotaInfo(template.getOwner().getRole());
+
+      return QuotaCheckResult.greaterOrEqual(
+          quotaInfo.getQuota(),
+          add(quotaInfo.getProdConsumption(), ResourceAggregates.scale(
+              prodResourcesFromTasks(ImmutableSet.of(template)), instances)));
+    }
+
+    @Override
+    public QuotaCheckResult checkJobUpdate(IJobUpdate jobUpdate) {
+      requireNonNull(jobUpdate);
+      if (!jobUpdate.getInstructions().isSetDesiredState()
+          || !jobUpdate.getInstructions().getDesiredState().getTask().isProduction()) {
+
+        return new QuotaCheckResult(SUFFICIENT_QUOTA);
+      }
+
+      QuotaInfo quotaInfo = getQuotaInfo(
+          jobUpdate.getSummary().getJobKey().getRole(),
+          Optional.of(jobUpdate));
+
+      return QuotaCheckResult.greaterOrEqual(quotaInfo.getQuota(), quotaInfo.getProdConsumption());
+    }
+
+    /**
+     * Gets QuotaInfo with currently allocated quota and actual consumption data.
+     * <p>
+     * In case an optional {@code requestedUpdate} is specified, the production consumption returned
+     * also includes an estimated resources share of that update as if it was already in progress.
+     *
+     * @param role Role to get quota info for.
+     * @param requestedUpdate An optional {@code IJobUpdate} to forecast the prod consumption.
+     * @return {@code QuotaInfo} with quota and consumption details.
+     */
+    private QuotaInfo getQuotaInfo(final String role, final Optional<IJobUpdate> requestedUpdate) {
       return storage.consistentRead(new Work.Quiet<QuotaInfo>() {
         @Override
         public QuotaInfo apply(StoreProvider storeProvider) {
@@ -135,9 +193,10 @@ public interface QuotaManager {
               storeProvider.getTaskStore().fetchTasks(Query.roleScoped(role).active()));
 
           IResourceAggregate prodConsumed =
-              getProdConsumption(storeProvider.getJobUpdateStore(), role, tasks);
+              getProdConsumption(storeProvider.getJobUpdateStore(), role, tasks, requestedUpdate);
 
-          IResourceAggregate nonProdConsumed = QuotaUtil.fromTasks(
+          // TODO(maxim): Consider a similar update-aware approach for computing nonProdConsumed.
+          IResourceAggregate nonProdConsumed = fromTasks(
               tasks.transform(Tasks.SCHEDULED_TO_INFO).filter(Predicates.not(Tasks.IS_PRODUCTION)));
 
           IResourceAggregate quota =
@@ -148,23 +207,11 @@ public interface QuotaManager {
       });
     }
 
-    @Override
-    public QuotaCheckResult checkQuota(String role, IResourceAggregate requestedProdResources) {
-      if (ResourceAggregates.EMPTY.equals(requestedProdResources)) {
-        return new QuotaCheckResult(SUFFICIENT_QUOTA);
-      }
-
-      QuotaInfo quotaInfo = getQuotaInfo(role);
-
-      return QuotaCheckResult.greaterOrEqual(
-          quotaInfo.getQuota(),
-          add(quotaInfo.getProdConsumption(), requestedProdResources));
-    }
-
     private IResourceAggregate getProdConsumption(
         JobUpdateStore jobUpdateStore,
         String role,
-        FluentIterable<IScheduledTask> tasks) {
+        FluentIterable<IScheduledTask> tasks,
+        Optional<IJobUpdate> requestedUpdate) {
 
       // The algorithm here is as follows:
       // 1. Load all production active tasks that belong to jobs without active updates OR
@@ -173,21 +220,29 @@ public interface QuotaManager {
       //    range (e.g. not in JobUpdateInstructions.updateOnlyTheseInstances).
       //    Calculate consumed resources as "nonUpdateConsumption".
       //
-      // 2. Calculate consumed resources from instances affected by the active job updates as
+      // 2. Mix in a requested job update (if present) to correctly calculate prod consumption.
+      //    This would be an update that is not saved in the store yet (i.e. the one quota is
+      //    checked for).
+      //
+      // 3. Calculate consumed resources from instances affected by the active job updates as
       //    "updateConsumption".
       //
-      // 3. Add up the two to yield total prod consumption.
+      // 4. Add up the two to yield total prod consumption.
 
-      final Map<IJobKey, IJobUpdate> roleJobUpdates =
-          fetchActiveJobUpdates(jobUpdateStore, role).uniqueIndex(UPDATE_TO_JOB_KEY);
+      Map<IJobKey, IJobUpdate> updatesByKey = Maps.newHashMap(
+          fetchActiveJobUpdates(jobUpdateStore, role).uniqueIndex(UPDATE_TO_JOB_KEY));
 
-      IResourceAggregate nonUpdateConsumption = QuotaUtil.prodResourcesFromTasks(tasks
-          .filter(buildNonUpdatingTasksFilter(roleJobUpdates))
+      if (requestedUpdate.isPresent()) {
+        updatesByKey.put(requestedUpdate.get().getSummary().getJobKey(), requestedUpdate.get());
+      }
+
+      IResourceAggregate nonUpdateConsumption = prodResourcesFromTasks(tasks
+          .filter(buildNonUpdatingTasksFilter(updatesByKey))
           .transform(Tasks.SCHEDULED_TO_INFO));
 
       IResourceAggregate updateConsumption = ResourceAggregates.EMPTY;
-      for (IJobUpdate update : roleJobUpdates.values()) {
-        updateConsumption = add(updateConsumption, QuotaUtil.prodResourcesFromJobUpdate(update));
+      for (IJobUpdate update : updatesByKey.values()) {
+        updateConsumption = add(updateConsumption, toProdResources(update.getInstructions()));
       }
 
       return add(nonUpdateConsumption, updateConsumption);
@@ -216,14 +271,6 @@ public interface QuotaManager {
         }
       };
     }
-
-    private static final Function<IJobUpdate, IJobKey> UPDATE_TO_JOB_KEY =
-        new Function<IJobUpdate, IJobKey>() {
-          @Override
-          public IJobKey apply(IJobUpdate input) {
-            return input.getSummary().getJobKey();
-          }
-        };
 
     private static FluentIterable<IJobUpdate> fetchActiveJobUpdates(
         JobUpdateStore jobUpdateStore,
@@ -262,6 +309,93 @@ public interface QuotaManager {
           .setNumCpus(a.getNumCpus() + b.getNumCpus())
           .setRamMb(a.getRamMb() + b.getRamMb())
           .setDiskMb(a.getDiskMb() + b.getDiskMb()));
+    }
+
+    /**
+     * This function calculates max aggregate production resources consumed by the job update
+     * {@code instructions}. The max is calculated between existing and desired task configs on per
+     * resource basis. This means max CPU, RAM and DISK values are computed individually and may
+     * come from different task configurations. While it may not be the most accurate
+     * representation of job update resources during the update, it does guarantee none of the
+     * individual resource values is exceeded during the forward/back roll.
+     *
+     * @param instructions Update instructions with resource definitions.
+     * @return Resources consumed by the update.
+     */
+    private static IResourceAggregate toProdResources(IJobUpdateInstructions instructions) {
+      double existingCpu = 0;
+      int existingRamMb = 0;
+      int existingDiskMb = 0;
+      for (IInstanceTaskConfig group : instructions.getInitialState()) {
+        ITaskConfig task = group.getTask();
+        if (task.isProduction()) {
+          for (IRange range : group.getInstances()) {
+            int numInstances = range.getLast() - range.getFirst() + 1;
+            existingCpu += task.getNumCpus() * numInstances;
+            existingRamMb += task.getRamMb() * numInstances;
+            existingDiskMb += task.getDiskMb() * numInstances;
+          }
+        }
+      }
+
+      // Calculate desired prod task consumption.
+      IResourceAggregate desired = Optional.fromNullable(instructions.getDesiredState())
+          .transform(TO_PROD_RESOURCES).or(ResourceAggregates.EMPTY);
+
+      // Calculate result as max(existing, desired) per resource.
+      return IResourceAggregate.build(new ResourceAggregate()
+          .setNumCpus(Math.max(existingCpu, desired.getNumCpus()))
+          .setRamMb(Math.max(existingRamMb, desired.getRamMb()))
+          .setDiskMb(Math.max(existingDiskMb, desired.getDiskMb())));
+    }
+
+    private static IResourceAggregate prodResourcesFromTasks(Iterable<ITaskConfig> tasks) {
+      return fromTasks(FluentIterable.from(tasks).filter(Tasks.IS_PRODUCTION));
+    }
+
+    private static IResourceAggregate fromTasks(Iterable<ITaskConfig> tasks) {
+      double cpu = 0;
+      int ramMb = 0;
+      int diskMb = 0;
+      for (ITaskConfig task : tasks) {
+        cpu += task.getNumCpus();
+        ramMb += task.getRamMb();
+        diskMb += task.getDiskMb();
+      }
+
+      return IResourceAggregate.build(new ResourceAggregate()
+          .setNumCpus(cpu)
+          .setRamMb(ramMb)
+          .setDiskMb(diskMb));
+    }
+
+    private static final Function<IInstanceTaskConfig, IResourceAggregate> TO_PROD_RESOURCES =
+        new Function<IInstanceTaskConfig, IResourceAggregate>() {
+          @Override
+          public IResourceAggregate apply(IInstanceTaskConfig input) {
+            return input.getTask().isProduction()
+                ? ResourceAggregates.scale(
+                prodResourcesFromTasks(ImmutableSet.of(input.getTask())),
+                getUpdateInstanceCount(input.getInstances()))
+                : ResourceAggregates.EMPTY;
+          }
+        };
+
+    private static final Function<IJobUpdate, IJobKey> UPDATE_TO_JOB_KEY =
+        new Function<IJobUpdate, IJobKey>() {
+          @Override
+          public IJobKey apply(IJobUpdate input) {
+            return input.getSummary().getJobKey();
+          }
+        };
+
+    private static int getUpdateInstanceCount(Set<IRange> ranges) {
+      int instanceCount = 0;
+      for (IRange range : ranges) {
+        instanceCount += range.getLast() - range.getFirst() + 1;
+      }
+
+      return instanceCount;
     }
   }
 }
