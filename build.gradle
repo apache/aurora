@@ -491,6 +491,7 @@ license {
 }
 
 def legacyClassesWithoutCoverage = [
+    'org/apache/aurora/Protobufs$1',
     'org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$1',
     'org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$2',
     'org/apache/aurora/auth/UnsecureAuthModule$UnsecureSessionValidator$1',
@@ -498,12 +499,22 @@ def legacyClassesWithoutCoverage = [
     'org/apache/aurora/codec/ThriftBinaryCodec$CodingException',
     'org/apache/aurora/scheduler/app/SchedulerMain$2',
     'org/apache/aurora/scheduler/app/SchedulerMain$3',
+    'org/apache/aurora/scheduler/async/AsyncModule$4$1',
+    'org/apache/aurora/scheduler/async/AsyncModule$3$1',
+    'org/apache/aurora/scheduler/async/AsyncModule$10$1',
+    'org/apache/aurora/scheduler/async/AsyncModule$1',
+    'org/apache/aurora/scheduler/stats/AsyncStatsModule$OfferAdapter$1',
+    'org/apache/aurora/scheduler/async/GcExecutorLauncher$1',
     'org/apache/aurora/scheduler/async/OfferQueue$OfferQueueImpl$2',
+    'org/apache/aurora/scheduler/base/Conversions$1',
+    'org/apache/aurora/scheduler/base/Conversions$2',
+    'org/apache/aurora/scheduler/base/Conversions$3',
     'org/apache/aurora/scheduler/base/Conversions$4',
     'org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl$1',
     'org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl',
     'org/apache/aurora/scheduler/http/api/ApiBeta$2',
     'org/apache/aurora/scheduler/http/JerseyTemplateServlet',
+    'org/apache/aurora/scheduler/http/JettyServerModule$1',
     'org/apache/aurora/scheduler/http/Maintenance$1',
     'org/apache/aurora/scheduler/http/Maintenance$2',
     'org/apache/aurora/scheduler/http/Maintenance$3',
@@ -545,10 +556,18 @@ def legacyClassesWithoutCoverage = [
     'org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$4',
     'org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule$5',
     'org/apache/aurora/scheduler/log/mesos/MesosLogStreamModule',
+    'org/apache/aurora/scheduler/state/MaintenanceController$MaintenanceControllerImpl$4',
     'org/apache/aurora/scheduler/state/MaintenanceController$MaintenanceControllerImpl$8',
+    'org/apache/aurora/scheduler/storage/backup/BackupModule$1',
+    'org/apache/aurora/scheduler/storage/backup/BackupModule$2',
     'org/apache/aurora/scheduler/storage/log/LogStorage$RecoveryFailedException',
+    'org/apache/aurora/scheduler/storage/log/LogStorageModule$1',
+    'org/apache/aurora/scheduler/storage/log/LogStorageModule$2',
     'org/apache/aurora/scheduler/storage/mem/Util$1',
     'org/apache/aurora/scheduler/storage/mem/Util',
+    'org/apache/aurora/scheduler/thrift/aop/AopModule$2$1',
+    'org/apache/aurora/scheduler/thrift/aop/AopModule$2$2',
+    'org/apache/aurora/scheduler/thrift/auth/ThriftAuthModule$1',
     'org/apache/aurora/scheduler/updater/UpdateConfigurationException',
 ]
 
@@ -569,34 +588,48 @@ jacocoTestReport {
   reports {
     xml.enabled true
   }
+
+  // TODO(wfarner): Move this and other non-trivial tasks out into custom/external tasks.
+  //                http://www.gradle.org/docs/current/userguide/custom_tasks.html
   doLast {
-    ext.reportPath = "$buildDir/reports/jacoco/test"
+    def reportPath = "$buildDir/reports/jacoco/test"
     println "Coverage report generated: file://$reportPath/html/index.html"
-    ext.parser = new XmlSlurper()
+    def parser = new XmlSlurper()
     parser.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
     // Avoid trying to load the DTD for the XML document, which does not exist.
     parser.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
 
-    ext.coverageReport = parser.parse("$reportPath/jacocoTestReport.xml")
+    def coverageReport = parser.parse("$reportPath/jacocoTestReport.xml")
 
     // Check global thresholds.
-    ext.instructionCoverage = computeCoverage(coverageReport.counter, 'INSTRUCTION')
+    def instructionCoverage = computeCoverage(coverageReport.counter, 'INSTRUCTION')
     assert instructionCoverage > MIN_INSTRUCTION_COVERAGE, 'Test instruction coverage is too low'
-    ext.branchCoverage = computeCoverage(coverageReport.counter, 'BRANCH')
+    def branchCoverage = computeCoverage(coverageReport.counter, 'BRANCH')
     assert branchCoverage > MIN_BRANCH_COVERAGE, 'Test branch coverage is too low'
 
-    // Find classes missing coverage.
-    coverageReport.package.each { pkg ->
-      pkg.class.each { cls ->
-        ext.coverage = cls.counter.find { it.@type == 'INSTRUCTION' }.@covered
+    def coverageErrors = coverageReport.package.class.collect { cls ->
+        // javac inserts a synthetic constructor for anonymous classes, and jacoco tends to mark
+        // these as covered in some cases, leading to flaky behavior.  We work around that by
+        // collecting the coverage count for each method in each class, omitting the default
+        // constructor for anonyous classes.  Anonymous classes are identified by their name,
+        // which we expect to be of the form 'Something$1'.  Jacoco names default constructors
+        // '<init>', so we filter based on that.
+        def methodFilter = cls.@name ==~ /.*\$\d+/ ? { m -> m.@name != '<init>' } : { true }
+
+        def covered = cls.method.findAll(methodFilter).collect { m ->
+          m.counter.find({ c -> c.@type == 'INSTRUCTION' }).@covered.toInteger()}.sum(0)
+
         if (cls.@name in legacyClassesWithoutCoverage) {
-          assert coverage == 0, 'Thanks for adding the first test coverage to: ' + cls.@name \
+          if (covered != 0) {
+            return 'Thanks for adding the first test coverage to: ' + cls.@name \
               + ' please remove it from the legacyClassesWithoutCoverage list'
-        } else {
-          assert coverage != 0, 'Test coverage missing for ' + cls.@name
+          }
+        } else if (covered == 0) {
+          return 'Test coverage missing for ' + cls.@name
         }
-      }
-    }
+        return null
+    }.findAll()  // Filter nulls.
+    assert coverageErrors.isEmpty(), coverageErrors.join('\n')
   }
 }
 
