@@ -41,9 +41,6 @@ import javax.ws.rs.core.StreamingOutput;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
-import com.google.common.io.ByteSource;
-import com.google.common.io.ByteStreams;
-import com.google.common.io.Resources;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
@@ -53,7 +50,6 @@ import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraAdmin.Iface;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.scheduler.storage.entities.AuroraAdminMetadata;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.thrift.Util;
 
 import static org.apache.aurora.scheduler.http.api.GsonMessageBodyHandler.GSON;
@@ -173,28 +169,5 @@ public class ApiBeta {
   @Produces(MediaType.TEXT_HTML)
   public Response getIndex() {
     return Response.seeOther(URI.create("/apibeta/help/index.html")).build();
-  }
-
-  @GET
-  @Path("help/{resourcePath: .*\\.html}")
-  @Produces(MediaType.TEXT_HTML)
-  public Response getApiHelp(@PathParam("resourcePath") final String resourcePath) {
-    final ByteSource data;
-    try {
-      data = Resources.asByteSource(Resources.getResource(ITaskConfig.class, resourcePath));
-    } catch (IllegalArgumentException e) {
-      return Response.status(Status.NOT_FOUND).entity("Page does not exist.").build();
-    }
-
-    return Response.ok(new StreamingOutput() {
-      @Override
-      public void write(OutputStream output) throws IOException {
-        try {
-          ByteStreams.copy(data.openStream(), output);
-        } finally {
-          output.close();
-        }
-      }
-    }).build();
   }
 }

@@ -512,7 +512,6 @@ def legacyClassesWithoutCoverage = [
     'org/apache/aurora/scheduler/base/Conversions$4',
     'org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl$1',
     'org/apache/aurora/scheduler/cron/quartz/CronSchedulerImpl',
-    'org/apache/aurora/scheduler/http/api/ApiBeta$2',
     'org/apache/aurora/scheduler/http/JerseyTemplateServlet',
     'org/apache/aurora/scheduler/http/JettyServerModule$1',
     'org/apache/aurora/scheduler/http/Maintenance$1',

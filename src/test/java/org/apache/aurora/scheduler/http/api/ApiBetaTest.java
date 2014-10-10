@@ -13,10 +13,8 @@
  */
 package org.apache.aurora.scheduler.http.api;
 
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
-import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
 
@@ -59,7 +57,6 @@ import static org.apache.aurora.gen.ResponseCode.OK;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 public class ApiBetaTest extends JettyServerModuleTest {
 
@@ -180,17 +177,6 @@ public class ApiBetaTest extends JettyServerModuleTest {
         .accept(MediaType.TEXT_HTML)
         .get(ClientResponse.class);
     assertEquals(Status.SEE_OTHER.getStatusCode(), response.getStatus());
-
-    String redirect = URI.create(response.getHeaders().getFirst(HttpHeaders.LOCATION)).getPath();
-    String helpPage = getRequestBuilder(redirect)
-        .accept(MediaType.TEXT_HTML)
-        .get(String.class);
-    assertNotNull(helpPage);
-
-    ClientResponse notFound = getRequestBuilder("/apibeta/help/notHere.html")
-        .accept(MediaType.TEXT_HTML)
-        .get(ClientResponse.class);
-    assertEquals(Status.NOT_FOUND.getStatusCode(), notFound.getStatus());
   }
 
   @Test
