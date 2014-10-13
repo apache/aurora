@@ -15,12 +15,13 @@
 import contextlib
 import getpass
 import os
+import signal
 import subprocess
 import sys
 import tempfile
 import time
 
-from mesos.interface.mesos_pb2 import TaskState
+from mesos.interface import mesos_pb2
 from twitter.common import log
 from twitter.common.contextutil import temporary_dir
 from twitter.common.dirutil import safe_rmtree
@@ -29,7 +30,16 @@ from twitter.common.quantity import Amount, Time
 
 from apache.aurora.config.schema.base import MB, MesosTaskInstance, Process, Resources, Task
 from apache.aurora.executor.common.sandbox import DirectorySandbox
+from apache.aurora.executor.thermos_statuses import (
+    INTERNAL_ERROR,
+    INVALID_TASK,
+    TERMINAL_TASK,
+    UNKNOWN_ERROR,
+    UNKNOWN_USER
+)
 from apache.aurora.executor.thermos_task_runner import ThermosTaskRunner
+
+from gen.apache.thermos.ttypes import TaskState
 
 TASK = MesosTaskInstance(
     instance=0,
@@ -91,6 +101,29 @@ class TestThermosTaskRunnerIntegration(object):
         __sleep=sleep,
         __exit_code=exit_code)
 
+  def yield_command(self, fake_runner_command, exit_state=TaskState.SUCCESS):
+    class SkipWaitStartThermosTaskRunner(ThermosTaskRunner):
+      def wait_start(_, timeout=None):
+        pass
+
+      def _cmdline(_):
+        return ['bash', '-c', fake_runner_command]
+
+      def task_state(_):
+        return exit_state
+
+    return self.yield_runner(SkipWaitStartThermosTaskRunner, command='ignore')
+
+  @contextlib.contextmanager
+  def exit_with_status(self, exit_code, exit_state=TaskState.SUCCESS):
+    with self.yield_command('exit %d' % exit_code, exit_state=exit_state) as task_runner:
+      task_runner.start()
+
+      while task_runner.is_alive:
+        task_runner._dead.wait(timeout=0.1)
+
+      yield task_runner
+
   def run_to_completion(self, runner, max_wait=Amount(10, Time.SECONDS)):
     poll_interval = Amount(100, Time.MILLISECONDS)
     total_time = Amount(0, Time.SECONDS)
@@ -106,13 +139,13 @@ class TestThermosTaskRunnerIntegration(object):
       self.run_to_completion(task_runner)
 
       assert task_runner.status is not None
-      assert TaskState.Name(task_runner.status.status) == 'TASK_FINISHED'
+      assert task_runner.status.status == mesos_pb2.TASK_FINISHED
 
       # no-op
       task_runner.stop()
 
       assert task_runner.status is not None
-      assert TaskState.Name(task_runner.status.status) == 'TASK_FINISHED'
+      assert task_runner.status.status == mesos_pb2.TASK_FINISHED
 
   def test_integration_failed(self):
     with self.yield_sleepy(ThermosTaskRunner, sleep=0, exit_code=1) as task_runner:
@@ -122,13 +155,13 @@ class TestThermosTaskRunnerIntegration(object):
       self.run_to_completion(task_runner)
 
       assert task_runner.status is not None
-      assert TaskState.Name(task_runner.status.status) == 'TASK_FAILED'
+      assert task_runner.status.status == mesos_pb2.TASK_FAILED
 
       # no-op
       task_runner.stop()
 
       assert task_runner.status is not None
-      assert TaskState.Name(task_runner.status.status) == 'TASK_FAILED'
+      assert task_runner.status.status == mesos_pb2.TASK_FAILED
 
   def test_integration_stop(self):
     with self.yield_sleepy(ThermosTaskRunner, sleep=1000, exit_code=0) as task_runner:
@@ -140,7 +173,7 @@ class TestThermosTaskRunnerIntegration(object):
       task_runner.stop()
 
       assert task_runner.status is not None
-      assert TaskState.Name(task_runner.status.status) == 'TASK_KILLED'
+      assert task_runner.status.status == mesos_pb2.TASK_KILLED
 
   def test_integration_lose(self):
     with self.yield_sleepy(ThermosTaskRunner, sleep=1000, exit_code=0) as task_runner:
@@ -153,7 +186,7 @@ class TestThermosTaskRunnerIntegration(object):
       task_runner.stop()
 
       assert task_runner.status is not None
-      assert TaskState.Name(task_runner.status.status) == 'TASK_LOST'
+      assert task_runner.status.status == mesos_pb2.TASK_LOST
 
   def test_integration_quitquitquit(self):
     ignorant_script = ';'.join([
@@ -173,4 +206,77 @@ class TestThermosTaskRunnerIntegration(object):
       task_runner.forked.wait()
       task_runner.stop(timeout=Amount(5, Time.SECONDS))
       assert task_runner.status is not None
-      assert TaskState.Name(task_runner.status.status) == 'TASK_KILLED'
+      assert task_runner.status.status == mesos_pb2.TASK_KILLED
+
+  def test_thermos_normal_exit_status(self):
+    with self.exit_with_status(0, TaskState.SUCCESS) as task_runner:
+      assert task_runner._popen_signal == 0
+      assert task_runner._popen_rc == 0
+      status = task_runner.compute_status()
+      assert status.reason == 'Task finished.'
+      assert status.status is mesos_pb2.TASK_FINISHED
+
+    with self.exit_with_status(0, None) as task_runner:
+      assert task_runner._popen_signal == 0
+      assert task_runner._popen_rc == 0
+      status = task_runner.compute_status()
+      assert status.status is mesos_pb2.TASK_LOST
+
+  def test_thermos_abnormal_exit_statuses(self):
+    with self.exit_with_status(UNKNOWN_USER) as task_runner:
+      assert task_runner._popen_signal == 0
+      assert task_runner._popen_rc == UNKNOWN_USER
+      status = task_runner.compute_status()
+      assert 'unknown user' in status.reason
+      assert status.status is mesos_pb2.TASK_FAILED
+
+    with self.exit_with_status(INTERNAL_ERROR) as task_runner:
+      assert task_runner._popen_signal == 0
+      assert task_runner._popen_rc == INTERNAL_ERROR
+      status = task_runner.compute_status()
+      assert 'internal error' in status.reason
+      assert status.status is mesos_pb2.TASK_LOST
+
+    with self.exit_with_status(INVALID_TASK) as task_runner:
+      assert task_runner._popen_signal == 0
+      assert task_runner._popen_rc == INVALID_TASK
+      status = task_runner.compute_status()
+      assert 'invalid task' in status.reason
+      assert status.status is mesos_pb2.TASK_FAILED
+
+    with self.exit_with_status(TERMINAL_TASK, exit_state=TaskState.FAILED) as task_runner:
+      assert task_runner._popen_signal == 0
+      assert task_runner._popen_rc == TERMINAL_TASK
+      status = task_runner.compute_status()
+      assert 'Task failed' in status.reason
+      assert status.status is mesos_pb2.TASK_FAILED
+
+    with self.exit_with_status(UNKNOWN_ERROR) as task_runner:
+      assert task_runner._popen_signal == 0
+      assert task_runner._popen_rc == UNKNOWN_ERROR
+      status = task_runner.compute_status()
+      assert 'unknown error' in status.reason
+      assert status.status is mesos_pb2.TASK_LOST
+
+    with self.exit_with_status(13) as task_runner:
+      assert task_runner._popen_signal == 0
+      assert task_runner._popen_rc == 13
+      status = task_runner.compute_status()
+      assert 'unknown reason' in status.reason
+      assert 'exit status: 13' in status.reason
+      assert status.status is mesos_pb2.TASK_LOST
+
+  def test_thermos_runner_killed(self):
+    with self.yield_command('sleep 1000') as task_runner:
+      task_runner.start()
+
+      os.kill(task_runner._popen.pid, signal.SIGKILL)
+
+      while task_runner.is_alive:
+        task_runner._dead.wait(timeout=0.1)
+
+      assert task_runner._popen_signal == 9
+      assert task_runner._popen_rc == 0  # ??
+      status = task_runner.compute_status()
+      assert 'killed by signal 9' in status.reason
+      assert status.status is mesos_pb2.TASK_KILLED

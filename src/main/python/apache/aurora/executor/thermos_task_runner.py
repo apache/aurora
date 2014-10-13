@@ -16,6 +16,7 @@ import errno
 import getpass
 import os
 import signal
+import struct
 import subprocess
 import threading
 import time
@@ -35,6 +36,13 @@ from apache.thermos.monitoring.monitor import TaskMonitor
 from .common.status_checker import StatusResult
 from .common.task_info import mesos_task_instance_from_assigned_task, resolve_ports
 from .common.task_runner import TaskError, TaskRunner, TaskRunnerProvider
+from .thermos_statuses import (
+    INTERNAL_ERROR,
+    INVALID_TASK,
+    TERMINAL_TASK,
+    UNKNOWN_ERROR,
+    UNKNOWN_USER
+)
 
 from gen.apache.thermos.ttypes import TaskState
 
@@ -77,7 +85,7 @@ class ThermosTaskRunner(TaskRunner):
     self._runner_pex = runner_pex
     self._task_id = task_id
     self._task = task
-    self._popen = None
+    self._popen, self._popen_signal, self._popen_rc = None, None, None
     self._monitor = None
     self._status = None
     self._ports = portmap
@@ -126,6 +134,16 @@ class ThermosTaskRunner(TaskRunner):
   def task_state(self):
     return self._monitor.task_state() if self._monitor else None
 
+  @classmethod
+  def _decode_status(cls, status):
+    # Per os.waitpid documentation, status is:
+    #   a 16-bit number, whose low byte is the signal number that killed the
+    #   process, and whose high byte is the exit status (if the signal
+    #   number is zero); the high bit of the low byte is set if a core file
+    #   was produced.
+    exit_signal, exit_status = struct.unpack('bb', struct.pack('H', status))
+    return exit_signal & 0x7F, exit_status  # strip the signal high bit
+
   @property
   def is_alive(self):
     """
@@ -133,6 +151,7 @@ class ThermosTaskRunner(TaskRunner):
     """
     if not self._popen:
       return False
+
     if self._dead.is_set():
       return False
 
@@ -142,11 +161,13 @@ class ThermosTaskRunner(TaskRunner):
     # should not mix a Thermos task runner in the same process as this
     # thread.
     try:
-      pid, _ = os.waitpid(self._popen.pid, os.WNOHANG)
+      pid, status = os.waitpid(self._popen.pid, os.WNOHANG)
       if pid == 0:
         return True
       else:
-        log.info('Detected runner termination: pid=%s' % pid)
+        self._popen_signal, self._popen_rc = self._decode_status(status)
+        log.info('Detected runner termination: pid=%s, signal=%s, rc=%s' % (
+            pid, self._popen_signal, self._popen_rc))
     except OSError as e:
       log.error('is_alive got OSError: %s' % e)
       if e.errno != errno.ECHILD:
@@ -158,10 +179,26 @@ class ThermosTaskRunner(TaskRunner):
   def compute_status(self):
     if self.is_alive:
       return None
-    exit_state = self.EXIT_STATE_MAP.get(self.task_state())
-    if exit_state is None:
-      log.error('Received unexpected exit state from TaskMonitor.')
-    return exit_state
+    if self._popen_signal != 0:
+      return StatusResult('Task killed by signal %s.' % self._popen_signal, mesos_pb2.TASK_KILLED)
+    if self._popen_rc == 0 or self._popen_rc == TERMINAL_TASK:
+      exit_state = self.EXIT_STATE_MAP.get(self.task_state())
+      if exit_state is None:
+        log.error('Received unexpected exit state from TaskMonitor.')
+        return StatusResult('Task checkpoint could not be read.', mesos_pb2.TASK_LOST)
+      else:
+        return exit_state
+    elif self._popen_rc == UNKNOWN_USER:
+      return StatusResult('Task started with unknown user.', mesos_pb2.TASK_FAILED)
+    elif self._popen_rc == INTERNAL_ERROR:
+      return StatusResult('Thermos failed with internal error.', mesos_pb2.TASK_LOST)
+    elif self._popen_rc == INVALID_TASK:
+      return StatusResult('Thermos received an invalid task.', mesos_pb2.TASK_FAILED)
+    elif self._popen_rc == UNKNOWN_ERROR:
+      return StatusResult('Thermos failed with an unknown error.', mesos_pb2.TASK_LOST)
+    else:
+      return StatusResult('Thermos exited for unknown reason (exit status: %s)' % self._popen_rc,
+          mesos_pb2.TASK_LOST)
 
   def terminate_runner(self, as_loss=False):
     """
@@ -242,16 +279,30 @@ class ThermosTaskRunner(TaskRunner):
 
     self.forked.set()
 
+    self.wait_start(timeout=timeout)
+
+  def wait_start(self, timeout=MAX_WAIT):
     log.debug('Waiting for task to start.')
 
     def is_started():
       return self._monitor and (self._monitor.active or self._monitor.finished)
 
     waited = Amount(0, Time.SECONDS)
-    while not is_started() and waited < timeout:
-      log.debug('  - sleeping...')
-      self._clock.sleep(self.POLL_INTERVAL.as_(Time.SECONDS))
-      waited += self.POLL_INTERVAL
+
+    while waited < timeout:
+      if not is_started():
+        log.debug('  - sleeping...')
+        self._clock.sleep(self.POLL_INTERVAL.as_(Time.SECONDS))
+        waited += self.POLL_INTERVAL
+      else:
+        break
+
+      if not self.is_alive:
+        if self._popen_rc != 0:
+          raise TaskError('Task failed: %s' % self._popen_reason())
+        else:
+          log.info('Task runner exited: %s' % self._popen_reason())
+          break
 
     if not is_started():
       log.error('Task did not start with in deadline, forcing loss.')

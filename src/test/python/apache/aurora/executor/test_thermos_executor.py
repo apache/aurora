@@ -339,7 +339,7 @@ class TestThermosExecutor(object):
 
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
-    assert updates[-1][0][0].state == mesos_pb2.TASK_LOST
+    assert updates[-1][0][0].state == mesos_pb2.TASK_KILLED
 
   def test_task_killed(self):
     proxy_driver = ProxyDriver()
@@ -378,18 +378,6 @@ class TestThermosExecutor(object):
     updates = proxy_driver.method_calls['sendStatusUpdate']
     assert len(updates) == 3
     assert updates[-1][0][0].state == mesos_pb2.TASK_KILLED
-
-  def test_task_lost(self):
-    proxy_driver = ProxyDriver()
-
-    with temporary_dir() as checkpoint_root:
-      runner, executor = make_executor(proxy_driver, checkpoint_root, SLEEP60_MTI)
-      runner.lose(force=True)
-      executor.terminated.wait()
-
-    updates = proxy_driver.method_calls['sendStatusUpdate']
-    assert len(updates) == 3
-    assert updates[-1][0][0].state == mesos_pb2.TASK_LOST
 
   def test_task_health_failed(self):
     proxy_driver = ProxyDriver()

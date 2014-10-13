@@ -13,7 +13,9 @@
 #
 
 import functools
+import getpass
 import os
+import pwd
 import signal
 import sys
 import traceback
@@ -23,7 +25,16 @@ from twitter.common import app, log
 from apache.thermos.common.options import add_port_to
 from apache.thermos.common.planner import TaskPlanner
 from apache.thermos.config.loader import ThermosConfigLoader
+from apache.thermos.core.process import Process
 from apache.thermos.core.runner import TaskRunner
+
+from .thermos_statuses import (
+    INTERNAL_ERROR,
+    INVALID_TASK,
+    TERMINAL_TASK,
+    UNKNOWN_ERROR,
+    UNKNOWN_USER
+)
 
 app.add_option(
     "--thermos_json",
@@ -124,7 +135,20 @@ def proxy_main(args, opts):
   missing_ports = set(thermos_task.ports()) - set(prebound_ports)
 
   if missing_ports:
-    app.error('ERROR!  Unbound ports: %s' % ' '.join(port for port in missing_ports))
+    log.error('ERROR!  Unbound ports: %s' % ' '.join(port for port in missing_ports))
+    sys.exit(INTERNAL_ERROR)
+
+  if opts.setuid:
+    user = opts.setuid
+  else:
+    user = getpass.getuser()
+
+  # if we cannot get the uid, this is an unknown user and we should fail
+  try:
+    pwd.getpwnam(user).pw_uid
+  except KeyError:
+    log.error('Unknown user: %s' % user)
+    sys.exit(UNKNOWN_USER)
 
   task_runner = TaskRunner(
       thermos_task.task,
@@ -143,10 +167,22 @@ def proxy_main(args, opts):
   try:
     task_runner.run()
   except TaskRunner.InternalError as err:
-    app.error('Internal error: %s' % err)
+    log.error('Internal error: %s' % err)
+    sys.exit(INTERNAL_ERROR)
   except TaskRunner.InvalidTask as err:
-    app.error(str(err))
-  except TaskRunner.StateError:
-    app.error('Task appears to already be in a terminal state.')
+    log.error('Invalid task: %s' % err)
+    sys.exit(INVALID_TASK)
+  except TaskRunner.StateError as err:
+    log.error('Checkpoint error: %s' % err)
+    sys.exit(TERMINAL_TASK)
+  except Process.UnknownUserError as err:
+    log.error('User ceased to exist: %s' % err)
+    sys.exit(UNKNOWN_USER)
   except KeyboardInterrupt:
+    log.info('Caught ^C, tearing down runner.')
     runner_teardown(task_runner)
+  except Exception as e:
+    log.error('Unknown exception: %s' % e)
+    for line in traceback.format_exc().splitlines():
+      log.error(line)
+    sys.exit(UNKNOWN_ERROR)
