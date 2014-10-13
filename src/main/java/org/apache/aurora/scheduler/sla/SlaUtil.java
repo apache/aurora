@@ -43,6 +43,6 @@ final class SlaUtil {
     int total = sorted.size();
     int percentileElements = (int) Math.floor(percentile / 100 * total);
     int index = total - percentileElements - 1;
-    return index >= 0 && index < total ? sorted.get(index) : 0;
+    return index >= 0 && index < total ? sorted.get(index) : 0L;
   }
 }
