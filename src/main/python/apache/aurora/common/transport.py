@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import logging
 from io import BytesIO
 
 import requests
@@ -59,6 +60,9 @@ class TRequestsTransport(TTransportBase):
       raise TTransportException('Failed to parse uri %r' % (uri,))
     self.__timeout = None
     self.__auth = auth
+
+    # Silence requests logs so we don't get messages for every HTTP connection.
+    logging.getLogger('requests').setLevel(logging.WARNING)
 
   def isOpen(self):
     return self.__session is not None

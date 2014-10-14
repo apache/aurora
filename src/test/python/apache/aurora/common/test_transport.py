@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import logging
 from threading import Thread
 
 import mock
@@ -96,3 +97,13 @@ def test_request_any_other_exception():
     assert False, 'Only expected TTransportException, got %s' % e
 
   transport.close()
+
+
+def test_requests_transports_lowers_logging_level():
+  logging.getLogger('requests').setLevel(logging.NOTSET)
+
+  TRequestsTransport(
+      'http://localhost:12345',
+      session_factory=lambda: mock.MagicMock(spec=requests.Session))
+
+  assert logging.getLogger('requests').level == logging.WARNING
