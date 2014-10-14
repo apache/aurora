@@ -299,9 +299,11 @@ class ThermosTaskRunner(TaskRunner):
 
       if not self.is_alive:
         if self._popen_rc != 0:
-          raise TaskError('Task failed: %s' % self._popen_reason())
+          raise TaskError('Task failed: %s' % self.compute_status().reason)
         else:
-          log.info('Task runner exited: %s' % self._popen_reason())
+          # We can end up here if the process exited between the call to Popen and
+          # waitpid (in is_alive), which is fine.
+          log.info('Task runner exited: %s' % self.compute_status().reason)
           break
 
     if not is_started():
