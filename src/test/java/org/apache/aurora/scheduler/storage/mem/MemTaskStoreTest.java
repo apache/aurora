@@ -136,20 +136,19 @@ public class MemTaskStoreTest {
             JobKeys.from("role-c", "env-c", "job-c"))),
         TASK_A, TASK_B, TASK_C);
 
-    // Conflicting jobs will produce empty result as TaskQuery fields are ANDed.
-    assertEquals(
-        0,
-        store.fetchTasks(
-            Query.jobScoped(JobKeys.from("role-a", "env-a", "job-a"))
-                .byJobKeys(ImmutableSet.of(JobKeys.from("role-b", "env-b", "job-b")))).size());
+    // Conflicting jobs will produce the result from the last added JobKey
+    assertQueryResults(
+          Query.jobScoped(JobKeys.from("role-a", "env-a", "job-a"))
+              .byJobKeys(ImmutableSet.of(JobKeys.from("role-b", "env-b", "job-b"))),
+        TASK_B);
 
-    // Matching jobs would return successfully.
+    // The .byJobKeys will override the previous scoping and OR all of the keys.
     assertQueryResults(
         Query.jobScoped(JobKeys.from("role-a", "env-a", "job-a"))
             .byJobKeys(ImmutableSet.of(
                 JobKeys.from("role-b", "env-b", "job-b"),
                 JobKeys.from("role-a", "env-a", "job-a"))),
-        TASK_A);
+        TASK_A, TASK_B);
 
     // Combination of individual field and jobKeys is allowed.
     assertQueryResults(

@@ -720,6 +720,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     // authenticated this way.
     ImmutableSet.Builder<String> targetRoles = ImmutableSet.<String>builder()
         .addAll(FluentIterable.from(tasks).transform(GET_ROLE));
+    Set<IJobKey> keys = JobKeys.from(taskQuery).or(ImmutableSet.<IJobKey>of());
+    targetRoles.addAll(FluentIterable.from(keys).transform(JobKeys.TO_ROLE));
+
     if (taskQuery.get().isSetOwner()) {
       targetRoles.add(taskQuery.get().getOwner().getRole());
     }

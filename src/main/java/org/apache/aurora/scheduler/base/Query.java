@@ -260,9 +260,7 @@ public final class Query {
 
       return new Builder(
           query.deepCopy()
-              .setOwner(new Identity().setRole(jobKey.getRole()))
-              .setEnvironment(jobKey.getEnvironment())
-              .setJobName(jobKey.getName()));
+              .setJobKeys(ImmutableSet.of(jobKey.newBuilder())));
     }
 
     /**

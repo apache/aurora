@@ -855,6 +855,22 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testKillCronAuthenticatesQueryJobKeyRole() throws Exception {
+    expectAuth(ROOT, false);
+    IJobKey key = JobKeys.from("role", "env", "job");
+
+    Query.Builder query = Query.arbitrary(new TaskQuery().setJobKeys(
+        ImmutableSet.of(key.newBuilder())));
+
+    storageUtil.expectTaskFetch(query.active());
+    expectAuth(ImmutableSet.of("role"), true);
+    expect(cronJobManager.deleteJob(key)).andReturn(true);
+
+    control.replay();
+    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
   public void testSetQuota() throws Exception {
     ResourceAggregate resourceAggregate = new ResourceAggregate()
         .setNumCpus(10)
