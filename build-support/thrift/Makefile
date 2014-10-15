@@ -17,15 +17,30 @@ THRIFT_URL = http://www.us.apache.org/dist/thrift/$(THRIFT_VERSION)/$(THRIFT_DIS
 
 THRIFT = ./thrift-$(THRIFT_VERSION)/compiler/cpp/thrift
 
+CONFIGURE_FLAGS = --disable-dependency-tracking \
+  --disable-shared \
+  --without-c_glib \
+  --without-cpp \
+  --without-csharp \
+  --without-d \
+  --without-erlang \
+  --without-go \
+  --without-java \
+  --without-haskell \
+  --without-perl \
+  --without-php \
+  --without-php_extension \
+  --without-pic \
+  --without-python \
+  --without-qt4 \
+  --without-ruby \
+  --without-tests
+
 all: $(THRIFT)
 
 $(THRIFT):
 	curl -s $(THRIFT_URL) | tar zxv
-	(cd $(THRIFT_DISTNAME) && ./configure --without-tests --without-php --without-php_extension \
-		--without-ruby --without-haskell --without-d --without-go --without-perl --without-python \
-		--without-erlang --without-java --without-c_glib)
-	(cd $(THRIFT_DISTNAME) && make -j4)
+	(cd $(THRIFT_DISTNAME) && ./configure $(CONFIGURE_FLAGS) && make -j4)
 
 clean:
-	$(MVN) clean
 	rm -fr $(THRIFT_DISTNAME)
