@@ -130,7 +130,12 @@ public class LeaderRedirect {
           .append(target.getHostText())
           .append(':')
           .append(target.getPort())
-          .append(req.getRequestURI());
+          .append(
+              // If Jetty rewrote the path, we want to be sure to redirect to the original path
+              // rather than the rewritten path to be sure it's a route the UI code recognizes.
+              Optional.fromNullable(
+                  req.getAttribute(JettyServerModule.ORIGINAL_PATH_ATTRIBUTE_NAME))
+                  .or(req.getRequestURI()));
 
       String queryString = req.getQueryString();
       if (queryString != null) {

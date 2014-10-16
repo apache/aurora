@@ -86,8 +86,11 @@ import static com.twitter.common.application.modules.LocalServiceRegistry.LocalS
  * requests (for static assets) similar to what we currently do with path specs.
  */
 public class JettyServerModule extends AbstractModule {
-
   private static final Logger LOG = Logger.getLogger(JettyServerModule.class.getName());
+
+  // The name of the request attribute where the path for the current request before it was
+  // rewritten is stored.
+  static final String ORIGINAL_PATH_ATTRIBUTE_NAME = "originalPath";
 
   @Nonnegative
   @CmdLine(name = "http_port",
@@ -163,6 +166,7 @@ public class JettyServerModule extends AbstractModule {
 
     private RewriteHandler getRewriteHandler(HandlerCollection rootHandler) {
       RewriteHandler rewrites = new RewriteHandler();
+      rewrites.setOriginalPathAttribute(ORIGINAL_PATH_ATTRIBUTE_NAME);
       rewrites.setRewriteRequestURI(true);
       rewrites.setRewritePathInfo(true);
 
