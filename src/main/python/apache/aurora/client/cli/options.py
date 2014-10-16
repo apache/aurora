@@ -82,7 +82,10 @@ class CommandOption(object):
     elif self.type is None and "choices" in self.kwargs:
       result = "%s=%s" % (self.name, self.kwargs["choices"])
     else:
-      result = "%s" % (self.get_displayname())
+      if self.name.startswith("--"):
+        result = "%s=%s" % (self.name, self.get_displayname())
+      else:
+        result = "%s" % self.get_displayname()
     return [result, "\t" + self.help]
 
   def add_to_parser(self, parser):

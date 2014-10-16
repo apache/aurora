@@ -529,7 +529,10 @@ class Verb(AuroraCommand):
     users may want to specify usage themselves.
     """
     result = [self.name]
+    for plugin in self.noun.commandline.plugins:
+      result += ["  " + opt.render_usage() for opt in plugin.get_options()]
     result += [opt.render_usage() for opt in self.get_options()]
+
     return " ".join(result)
 
   @abstractmethod

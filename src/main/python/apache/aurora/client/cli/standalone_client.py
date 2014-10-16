@@ -58,8 +58,8 @@ class AuroraLogConfigurationPlugin(ConfigurationPlugin):
         CommandOption("--verbose-logging", "-v", default=False, action="store_true",
           help=("Show verbose logging, including all logs up to level INFO (equivalent to "
               "--logging-level=20)")),
-        CommandOption("--logging-level", default=None, type=int,
-          help="Set logging to a specific numeric level.")
+        CommandOption("--logging-level", default=None, type=int, metavar="numeric_level",
+          help="Set logging to a specific numeric level, using the standard python log-levels.")
     ]
 
   def before_dispatch(self, raw_args):

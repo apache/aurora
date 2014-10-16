@@ -60,6 +60,35 @@ class TestHelp(unittest.TestCase):
       assert '==Commands for jobs' in self.transcript
       assert '==Commands for quotas' in self.transcript
 
+  def test_usage_string_includes_plugin_options(self):
+    plugin_options = []
+    for plugin in self.cmd.plugins:
+      if plugin.get_options() is not None:
+        plugin_options += [p for p in plugin.get_options()]
+    with patch('apache.aurora.client.cli.client.AuroraCommandLine.print_out',
+        side_effect=self.mock_print):
+      for noun in self.cmd.registered_nouns:
+        for verb in self.cmd.nouns.get(noun).verbs.keys():
+          self.transcript = []
+          self.cmd.execute(['help', noun, verb])
+          for opt in plugin_options:
+            assert any(opt.name in line for line in self.transcript)
+
+  def test_command_help_does_not_have_unset_str_metavars(self):
+    plugin_options = []
+    for plugin in self.cmd.plugins:
+      if plugin.get_options() is not None:
+        plugin_options += [p for p in plugin.get_options()]
+    with patch('apache.aurora.client.cli.client.AuroraCommandLine.print_out',
+               side_effect=self.mock_print):
+      for noun in self.cmd.registered_nouns:
+        for verb in self.cmd.nouns.get(noun).verbs.keys():
+          self.transcript = []
+          self.cmd.execute(['help', noun, verb])
+          print(self.transcript)
+          for opt in plugin_options:
+            assert not any(line.endswith('=str') for line in self.transcript)
+
   def test_help_noun(self):
     with patch('apache.aurora.client.cli.client.AuroraCommandLine.print_out',
         side_effect=self.mock_print):
