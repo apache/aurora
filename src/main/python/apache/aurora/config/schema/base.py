@@ -17,37 +17,11 @@
 
 from apache.thermos.config.schema import *
 
-from gen.apache.aurora.api.constants import DEFAULT_ENVIRONMENT
-
 
 # TODO(wickman) Bind {{mesos.instance}} to %shard_id%
 class MesosContext(Struct):
   # The instance id (i.e. replica id, shard id) in the context of a task
   instance    = Required(Integer)
-
-
-# The object bound into the {{packer}} namespace.
-# Referenced by
-#  {{packer[role][name][version]}}
-#
-# Where version =
-#    number (integer)
-#    'live' (live package)
-#    'latest' (highest version number)
-#
-# For example if you'd like to create a copy process for a particular
-# package,
-#   copy_latest = Process(
-#     name = 'copy-{{package_name}}',
-#     cmdline = '{{packer[{{role}}][{{package_name}}][latest].copy_command}}')
-#   processes = [
-#     copy_latest.bind(package_name = 'labrat'),
-#     copy_latest.bind(package_name = 'packer')
-#   ]
-class PackerObject(Struct):
-  package = String
-  package_uri = String
-  copy_command = String
 
 
 class UpdateConfig(Struct):
@@ -87,8 +61,7 @@ class MesosTaskInstance(Struct):
   instance                   = Required(Integer)
   role                       = Required(String)
   announce                   = Announcer
-  environment                = Default(String, DEFAULT_ENVIRONMENT)
-  health_check_interval_secs = Default(Integer, 10) # DEPRECATED (MESOS-2649)
+  environment                = Required(String)
   health_check_config        = Default(HealthCheckConfig, HealthCheckConfig())
 
 
@@ -100,25 +73,18 @@ class MesosJob(Struct):
   environment   = Required(String)
   instances     = Default(Integer, 1)
   task          = Required(Task)
-  recipes       = List(String)
   announce      = Announcer
 
   cron_schedule = String
-  cron_policy   = String          # these two are aliases of each other.  default is KILL_EXISTING
-  cron_collision_policy = String  # if unspecified.
-                                  # cron_policy is DEPRECATED (MESOS-2491) in favor of
-                                  # cron_collision_policy.
+  cron_collision_policy = Default(String, "KILL_EXISTING")
 
   update_config = Default(UpdateConfig, UpdateConfig())
 
   constraints                = Map(String, String)
-  daemon                     = Boolean  # daemon and service are aliased together.
-  service                    = Boolean  # daemon is DEPRECATED (MESOS-2492) in favor of
-                                        # service.  by default, service is False.
+  service                    = Default(Boolean, False)
   max_task_failures          = Default(Integer, 1)
   production                 = Default(Boolean, False)
   priority                   = Default(Integer, 0)
-  health_check_interval_secs = Integer # DEPRECATED in favor of health_check_config (MESOS-2649).
   health_check_config        = Default(HealthCheckConfig, HealthCheckConfig())
   task_links                 = Map(String, String)
 

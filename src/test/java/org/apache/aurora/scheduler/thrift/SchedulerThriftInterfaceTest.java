@@ -157,7 +157,6 @@ import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
 import static org.apache.aurora.gen.ResponseCode.WARNING;
-import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
@@ -183,7 +182,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static final String JOB_NAME = "job_foo";
   private static final Identity ROLE_IDENTITY = new Identity(ROLE, USER);
   private static final SessionKey SESSION = new SessionKey();
-  private static final IJobKey JOB_KEY = JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, JOB_NAME);
+  private static final IJobKey JOB_KEY = JobKeys.from(ROLE, "devel", JOB_NAME);
   private static final ILockKey LOCK_KEY = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
   private static final ILock LOCK =
       ILock.build(new Lock().setKey(LOCK_KEY.newBuilder()).setToken("token"));
@@ -631,7 +630,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setIsService(true)
         .setProduction(true)
         .setOwner(ROLE_IDENTITY)
-        .setEnvironment(DEFAULT_ENVIRONMENT)
+        .setEnvironment("devel")
         .setJobName(JOB_NAME);
     JobConfiguration job = makeJob(task);
 
@@ -651,7 +650,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             ConfigurationManager.hostLimitConstraint(1),
             ConfigurationManager.rackLimitConstraint(1)))
         .setMaxTaskFailures(1)
-        .setEnvironment(DEFAULT_ENVIRONMENT);
+        .setEnvironment("devel");
 
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
@@ -719,7 +718,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
             .setTaskId(taskId)
             .setTask(new TaskConfig()
                 .setOwner(ROLE_IDENTITY)
-                .setEnvironment(DEFAULT_ENVIRONMENT)
+                .setEnvironment("devel")
                 .setJobName(jobName))));
   }
 
@@ -789,7 +788,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
     IScheduledTask task2 = buildScheduledTask("job_bar", TASK_ID);
     ILockKey key2 = ILockKey.build(LockKey.job(
-        JobKeys.from(ROLE, DEFAULT_ENVIRONMENT, "job_bar").newBuilder()));
+        JobKeys.from(ROLE, "devel", "job_bar").newBuilder()));
     expectAuth(ROOT, false);
     expectAuth(ROLE, true);
     storageUtil.expectTaskFetch(query, buildScheduledTask(), task2);
@@ -2237,7 +2236,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertResponse(ERROR, thrift.startJobUpdate(new JobUpdateRequest(
         new TaskConfig()
             .setJobName("&")
-            .setEnvironment(DEFAULT_ENVIRONMENT)
+            .setEnvironment("devel")
             .setOwner(new Identity(ROLE, null)),
         5,
         buildJobUpdateSettings()), SESSION));
@@ -2633,7 +2632,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private static TaskConfig defaultTask(boolean production) {
     return new TaskConfig()
         .setOwner(new Identity(ROLE, USER))
-        .setEnvironment(DEFAULT_ENVIRONMENT)
+        .setEnvironment("devel")
         .setJobName(JOB_NAME)
         .setContactEmail("testing@twitter.com")
         .setExecutorConfig(new ExecutorConfig("aurora", "data"))

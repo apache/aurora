@@ -22,51 +22,9 @@ import math
 import re
 import sys
 
-from pystachio import Empty
-
 from apache.aurora.client import binding_helper
-from apache.aurora.client.base import deprecation_warning, die
+from apache.aurora.client.base import die
 from apache.aurora.config import AuroraConfig
-
-from gen.apache.aurora.api.constants import DEFAULT_ENVIRONMENT
-
-
-CRON_DEPRECATION_WARNING = """
-The "cron_policy" parameter to Jobs has been renamed to "cron_collision_policy".
-Please update your Jobs accordingly.
-"""
-
-
-def _warn_on_deprecated_cron_policy(config):
-  if config.raw().cron_policy() is not Empty:
-    deprecation_warning(CRON_DEPRECATION_WARNING)
-
-
-DAEMON_DEPRECATION_WARNING = """
-The "daemon" parameter to Jobs is deprecated in favor of the "service" parameter.
-Please update your Job to set "service = True" instead of "daemon = True", or use
-the top-level Service() instead of Job().
-"""
-
-
-def _warn_on_deprecated_daemon_job(config):
-  if config.raw().daemon() is not Empty:
-    deprecation_warning(DAEMON_DEPRECATION_WARNING)
-
-
-HEALTH_CHECK_INTERVAL_SECS_DEPRECATION_WARNING = """
-The "health_check_interval_secs" parameter to Jobs is deprecated in favor of the
-"health_check_config" parameter. Please update your Job to set the parameter by creating a new
-HealthCheckConfig.
-
-See the HealthCheckConfig section of the Configuration Reference page for more information:
-http://go/auroraconfig/#Aurora%2BThermosConfigurationReference-HealthCheckConfig
-"""
-
-
-def _warn_on_deprecated_health_check_interval_secs(config):
-  if config.raw().health_check_interval_secs() is not Empty:
-    deprecation_warning(HEALTH_CHECK_INTERVAL_SECS_DEPRECATION_WARNING)
 
 
 ANNOUNCE_WARNING = """
@@ -109,8 +67,6 @@ def _validate_environment_name(config):
 UPDATE_CONFIG_MAX_FAILURES_ERROR = '''
 max_total_failures in update_config must be lesser than the job size.
 Based on your job size (%s) you should use max_total_failures <= %s.
-
-See http://go/auroraconfig for details.
 '''
 
 
@@ -118,8 +74,6 @@ UPDATE_CONFIG_DEDICATED_THRESHOLD_ERROR = '''
 Since this is a dedicated job, you must set your max_total_failures in
 your update configuration to no less than 2%% of your job size.
 Based on your job size (%s) you should use max_total_failures >= %s.
-
-See http://go/auroraconfig for details.
 '''
 
 
@@ -156,44 +110,10 @@ def _validate_update_config(config):
         (watch_secs, target_watch, initial_interval_secs, max_consecutive_failures, interval_secs))
 
 
-HEALTH_CHECK_INTERVAL_SECS_ERROR = '''
-health_check_interval_secs paramater to Job has been deprecated. Please specify health_check_config
-only.
-
-See http://go/auroraconfig/#Aurora%2BThermosConfigurationReference-HealthCheckConfig
-'''
-
-
-def _validate_health_check_config(config):
-  # TODO(Sathya): Remove this check after health_check_interval_secs deprecation cycle is complete.
-  if config.raw().has_health_check_interval_secs() and config.raw().has_health_check_config():
-    die(HEALTH_CHECK_INTERVAL_SECS_ERROR)
-
-
-DEFAULT_ENVIRONMENT_WARNING = '''
-Job did not specify environment, auto-populating to "%s".
-'''
-
-
-def _inject_default_environment(config):
-  if not config.raw().has_environment():
-    print(DEFAULT_ENVIRONMENT_WARNING % DEFAULT_ENVIRONMENT, file=sys.stderr)
-    config.update_job(config.raw()(environment=DEFAULT_ENVIRONMENT))
-
-
 def validate_config(config, env=None):
-  _validate_health_check_config(config)
   _validate_update_config(config)
   _validate_announce_configuration(config)
   _validate_environment_name(config)
-
-
-def populate_namespaces(config, env=None):
-  _inject_default_environment(config)
-  _warn_on_deprecated_cron_policy(config)
-  _warn_on_deprecated_daemon_job(config)
-  _warn_on_deprecated_health_check_interval_secs(config)
-  return config
 
 
 class GlobalHookRegistry(object):
@@ -240,7 +160,6 @@ class AnnotatedAuroraConfig(AuroraConfig):
   def plugins(cls):
     return (inject_hooks,
             functools.partial(binding_helper.apply_all),
-            functools.partial(populate_namespaces),
             validate_config)
 
 

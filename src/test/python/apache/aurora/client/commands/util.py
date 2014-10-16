@@ -110,7 +110,6 @@ jobs = [HELLO_WORLD]
 
   TEST_CLUSTERS = Clusters([Cluster(
       name='west',
-      packer_copy_command='copying {{package}}',
       zk='zookeeper.example.com',
       scheduler_zk_path='/foo/bar',
       auth_mechanism='UNAUTHENTICATED')])

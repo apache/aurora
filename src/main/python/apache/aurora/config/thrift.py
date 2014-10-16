@@ -76,15 +76,12 @@ def constraints_to_thrift(constraints):
 
 def task_instance_from_job(job, instance):
   instance_context = MesosContext(instance=instance)
-  # TODO(Sathya): Remove health_check_interval_secs references after deprecation cycle is complete.
   health_check_config = HealthCheckConfig()
-  if job.has_health_check_interval_secs():
-    health_check_config = HealthCheckConfig(interval_secs=job.health_check_interval_secs().get())
-  elif job.has_health_check_config():
+  if job.has_health_check_config():
     health_check_config = job.health_check_config()
+
   ti = MesosTaskInstance(task=job.task(),
                          role=job.role(),
-                         health_check_interval_secs=health_check_config.interval_secs().get(),
                          health_check_config=health_check_config,
                          instance=instance)
   if job.has_announce():
@@ -92,13 +89,6 @@ def task_instance_from_job(job, instance):
   if job.has_environment():
     ti = ti(environment=job.environment())
   return ti.bind(mesos=instance_context).interpolate()
-
-
-def translate_cron_policy(policy):
-  cron_policy = CronCollisionPolicy._NAMES_TO_VALUES.get(policy.get())
-  if cron_policy is None:
-    raise InvalidConfig('Invalid cron policy: %s' % policy.get())
-  return cron_policy
 
 
 def fully_interpolated(pystachio_object, coerce_fn=lambda i: i):
@@ -116,29 +106,18 @@ def fully_interpolated(pystachio_object, coerce_fn=lambda i: i):
   return coerce_fn(value.get())
 
 
-def select_cron_policy(cron_policy, cron_collision_policy):
-  if cron_policy is Empty and cron_collision_policy is Empty:
-    return CronCollisionPolicy.KILL_EXISTING
-  elif cron_policy is not Empty and cron_collision_policy is Empty:
-    return translate_cron_policy(cron_policy)
-  elif cron_policy is Empty and cron_collision_policy is not Empty:
-    return translate_cron_policy(cron_collision_policy)
-  else:
-    raise InvalidConfig('Specified both cron_policy and cron_collision_policy!')
+def select_cron_policy(cron_policy):
+  policy = CronCollisionPolicy._NAMES_TO_VALUES.get(cron_policy.get())
+  if policy is None:
+    raise InvalidConfig('Invalid cron policy: %s' % cron_policy.get())
+  return policy
 
 
 def select_service_bit(job):
-  if not job.has_daemon() and not job.has_service():
-    return False
-  elif job.has_daemon() and not job.has_service():
-    return fully_interpolated(job.daemon(), bool)
-  elif not job.has_daemon() and job.has_service():
-    return fully_interpolated(job.service(), bool)
-  else:
-    raise InvalidConfig('Specified both daemon and service bits!')
+  return fully_interpolated(job.service(), bool)
 
 
-# TODO(wickman) Due to MESOS-2718 we should revert to using the MesosTaskInstance.
+# TODO(wickman): We should revert to using the MesosTaskInstance.
 #
 # Using the MesosJob instead of the MesosTaskInstance was to allow for
 # planned future use of fields such as 'cluster' and to allow for conversion
@@ -147,13 +126,8 @@ def select_service_bit(job):
 #
 # In the meantime, we are erasing fields of the Job that are controversial.
 # This achieves roughly the same effect as using the MesosTaskInstance.
-# The future work is tracked at MESOS-2727.
 ALIASED_FIELDS = (
-  'cron_policy',
-  'cron_collision_policy',
   'update_config',
-  'daemon',
-  'service',
   'instances'
 )
 
@@ -256,6 +230,6 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
       key=key,
       owner=owner,
       cronSchedule=not_empty_or(job.cron_schedule(), None),
-      cronCollisionPolicy=select_cron_policy(job.cron_policy(), job.cron_collision_policy()),
+      cronCollisionPolicy=select_cron_policy(job.cron_collision_policy()),
       taskConfig=task,
       instanceCount=fully_interpolated(job.instances()))

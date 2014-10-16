@@ -66,7 +66,6 @@ import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
-import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -78,7 +77,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final String HOST_A = "host_a";
   private static final Identity JIM = new Identity("jim", "jim-user");
   private static final String MY_JOB = "myJob";
-  private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
+  private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), "devel", MY_JOB);
 
   private Driver driver;
   private TaskIdGenerator taskIdGenerator;
@@ -527,7 +526,7 @@ public class StateManagerImplTest extends EasyMockTest {
   private static ITaskConfig makeTask(Identity owner, String job) {
     return ITaskConfig.build(new TaskConfig()
         .setOwner(owner)
-        .setEnvironment(DEFAULT_ENVIRONMENT)
+        .setEnvironment("devel")
         .setJobName(job)
         .setRequestedPorts(ImmutableSet.<String>of()));
   }

@@ -394,9 +394,6 @@ const set<ScheduleStatus> TERMINAL_STATES = [ScheduleStatus.FAILED,
                                              ScheduleStatus.LOST,
                                              ScheduleStatus.SANDBOX_DELETED]
 
-// Environment assigned to a job when unspecified
-const string DEFAULT_ENVIRONMENT = "devel"
-
 // Regular expressions for matching valid identifiers for job path components. All expressions
 // below should accept and reject the same set of inputs.
 const string GOOD_IDENTIFIER_PATTERN = "^[\\w\\-\\.]+$"

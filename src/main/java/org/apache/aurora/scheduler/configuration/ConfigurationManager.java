@@ -44,7 +44,6 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
 import org.apache.commons.lang.StringUtils;
 
-import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.apache.aurora.gen.apiConstants.GOOD_IDENTIFIER_PATTERN_JVM;
 
 /**
@@ -130,7 +129,6 @@ public final class ConfigurationManager {
           new DefaultField(_Fields.TASK_LINKS, Maps.<String, String>newHashMap()),
           new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()),
           new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()),
-          new DefaultField(_Fields.ENVIRONMENT, DEFAULT_ENVIRONMENT),
           new Closure<TaskConfig>() {
             @Override
             public void execute(TaskConfig task) {

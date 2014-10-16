@@ -35,12 +35,11 @@ class BindingHelper(Interface):
 
   Many bindings are too complex to resolve with bindings using the standard mechanisms,
   because they require some python computation to determine how to bind them. For example,
-  for references like {{packer[role][pkg][version]}}, we need to talk to the packer to figure
-  out the correct packer call for the desired cluster.
+  for references like {{jenkins[build]}}, we need to talk to Jenkins to get the build artifact URL.
 
   A BindingHelper is responsible for resolving one of these types of pseudo-bindings.
-  PackerBindingHelper will resolve "packer" bindings; BuildBindingHelper will resolve "build"
-  bindings, JenkinsBindingHelper will resolve "jenkins" bindings, etc.
+  BuildBindingHelper will resolve "build" bindings, JenkinsBindingHelper will resolve "jenkins"
+  bindings, etc.
 
   A BindingHelper can be registered by calling "BindingHelper.register(Helper)". Instead of
   explicitly calling "inject" methods in populate_namespaces, it will compute the set of open
@@ -54,11 +53,6 @@ class BindingHelper(Interface):
   meet two requirements: it should be enough data to allow it to produce exactly the same
   result as the scratch binding, and the data should provide information that makes the
   binding comprehensible for a human debugging a job.
-
-  For example, a packer helper's binding dict should provide enough information to identify
-  the HDFS file that should be used, but also the version number of the binary in packer,
-  (because a human reader wants to know the version of the package, not the meaningless
-  HDFS URL.
   """
 
   @classmethod

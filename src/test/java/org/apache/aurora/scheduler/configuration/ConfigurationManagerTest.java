@@ -28,19 +28,17 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 import org.junit.Test;
 
-import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.apache.aurora.gen.test.testConstants.INVALID_IDENTIFIERS;
 import static org.apache.aurora.gen.test.testConstants.VALID_IDENTIFIERS;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.isGoodIdentifier;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 // TODO(kevints): Improve test coverage for this class.
 public class ConfigurationManagerTest {
   private static final JobConfiguration UNSANITIZED_JOB_CONFIGURATION = new JobConfiguration()
-      .setKey(new JobKey("owner-role", DEFAULT_ENVIRONMENT, "email_stats"))
+      .setKey(new JobKey("owner-role", "devel", "email_stats"))
       .setCronSchedule("0 2 * * *")
       .setCronCollisionPolicy(CronCollisionPolicy.KILL_EXISTING)
       .setInstanceCount(1)
@@ -49,7 +47,7 @@ public class ConfigurationManagerTest {
               .setIsService(false)
               .setTaskLinks(ImmutableMap.<String, String>of())
               .setExecutorConfig(new ExecutorConfig("aurora", "config"))
-              .setEnvironment(DEFAULT_ENVIRONMENT)
+              .setEnvironment("devel")
               .setRequestedPorts(ImmutableSet.<String>of())
               .setJobName(null)
               .setPriority(0)
@@ -97,6 +95,5 @@ public class ConfigurationManagerTest {
 
     ConfigurationManager.applyDefaultsIfUnset(copy);
     assertTrue(copy.isSetKey());
-    assertEquals(DEFAULT_ENVIRONMENT, copy.getKey().getEnvironment());
   }
 }

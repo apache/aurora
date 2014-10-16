@@ -30,8 +30,6 @@ from apache.aurora.config.schema.base import (
     UpdateConfig
 )
 
-from gen.apache.aurora.api.constants import DEFAULT_ENVIRONMENT
-
 MESOS_CONFIG_BASE = """
 HELLO_WORLD = Job(
   name = 'hello_world',
@@ -131,21 +129,6 @@ def test_environment_names():
   for env_name in BAD:
     with pytest.raises(ValueError):
       config._validate_environment_name(AuroraConfig(base_job(environment=env_name)))
-
-
-def test_inject_default_environment():
-  base_job = Job(
-      name='hello_world', role='john_doe', cluster='test-cluster',
-      task=Task(name='main', processes=[],
-                resources=Resources(cpu=0.1, ram=64 * MB, disk=64 * MB)))
-
-  no_env_config = AuroraConfig(base_job)
-  config._inject_default_environment(no_env_config)
-  assert no_env_config.environment() == DEFAULT_ENVIRONMENT
-
-  test_env_config = AuroraConfig(base_job(environment='test'))
-  config._inject_default_environment(test_env_config)
-  assert test_env_config.environment() == 'test'
 
 
 def test_dedicated_portmap():

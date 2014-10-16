@@ -43,7 +43,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import static org.apache.aurora.gen.apiConstants.DEFAULT_ENVIRONMENT;
 import static org.apache.aurora.scheduler.storage.Storage.Work;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -52,7 +51,7 @@ public class LockManagerImplTest extends EasyMockTest {
   private static final String USER = "jim-user";
   private static final Identity JIM = new Identity("jim", USER);
   private static final String MY_JOB = "myJob";
-  private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), DEFAULT_ENVIRONMENT, MY_JOB);
+  private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), "devel", MY_JOB);
   private static final ILockKey LOCK_KEY = ILockKey.build(LockKey.job(JOB_KEY.newBuilder()));
   private static final UUID TOKEN = UUID.fromString("79d6d790-3212-11e3-aa6e-0800200c9a66");
 
