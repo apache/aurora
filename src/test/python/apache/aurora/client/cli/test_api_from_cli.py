@@ -22,7 +22,6 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
 
 from gen.apache.aurora.api import AuroraAdmin
-from gen.apache.aurora.api.constants import CURRENT_API_VERSION
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     GetJobsResult,
@@ -138,9 +137,6 @@ class TestApiFromCLI(AuroraClientCommandTest):
     mock_thrift_client = Mock(spec=AuroraAdmin.Client)
     mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
 
-    version_resp = Response(responseCode=ResponseCode.OK)
-    version_resp.result = Result(getVersionResult=CURRENT_API_VERSION)
-    mock_thrift_client.getVersion.return_value = version_resp
     mock_thrift_client.getTasksWithoutConfigs.side_effect = IOError("Uh-Oh")
     with contextlib.nested(
         patch('apache.aurora.client.api.scheduler_client.SchedulerClient.get',
@@ -153,6 +149,5 @@ class TestApiFromCLI(AuroraClientCommandTest):
       # exception, which results in the command failing with an error code.
       result = cmd.execute(['job', 'status', 'west/bozo/test/hello'])
       assert result == EXIT_UNKNOWN_ERROR
-      mock_thrift_client.getVersion.assert_called_once_with()
       mock_thrift_client.getTasksWithoutConfigs.assert_called_with(
         TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]))

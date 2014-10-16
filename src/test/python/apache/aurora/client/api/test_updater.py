@@ -26,9 +26,10 @@ from apache.aurora.client.api.scheduler_mux import SchedulerMux
 from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
 from apache.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.common.cluster import Cluster
 
 from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
-from gen.apache.aurora.api.constants import ACTIVE_STATES
+from gen.apache.aurora.api.constants import ACTIVE_STATES, THRIFT_API_VERSION
 from gen.apache.aurora.api.ttypes import (
     AcquireLockResult,
     AddInstancesConfig,
@@ -49,6 +50,7 @@ from gen.apache.aurora.api.ttypes import (
     Result,
     ScheduledTask,
     ScheduleStatusResult,
+    ServerInfo,
     TaskConfig,
     TaskConstraint,
     TaskQuery,
@@ -62,6 +64,8 @@ if 'UPDATER_DEBUG' in environ:
   LogOptions.set_disk_log_level('NONE')
   LogOptions.set_stderr_log_level('DEBUG')
   log.init('test_updater')
+
+SERVER_INFO = ServerInfo(thriftAPIVersion=THRIFT_API_VERSION)
 
 
 class FakeConfig(object):
@@ -141,7 +145,9 @@ class UpdaterTest(TestCase):
     self._job_monitor = MockObject(JobMonitor)
     self._scheduler_mux = FakeSchedulerMux()
     self._scheduler = MockObject(scheduler_client)
-    self._scheduler_proxy = FakeSchedulerProxy('test-cluster', self._scheduler, self._session_key)
+    self._scheduler_proxy = FakeSchedulerProxy(Cluster(name='test-cluster'),
+                                               self._scheduler,
+                                               self._session_key)
     self._quota_check = MockObject(QuotaCheck)
     self.init_updater(deepcopy(self.UPDATE_CONFIG))
     self._num_cpus = 1.0
@@ -182,14 +188,16 @@ class UpdaterTest(TestCase):
 
   def expect_populate(self, job_config, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, messageDEPRECATED='test')
+    resp = Response(responseCode=response_code, messageDEPRECATED='test', serverInfo=SERVER_INFO)
     result = set([deepcopy(job_config.taskConfig)])
     resp.result = Result(populateJobResult=PopulateJobResult(populatedDEPRECATED=result))
     self._scheduler.populateJobConfig(job_config).AndReturn(resp)
 
   def expect_get_tasks(self, tasks, ignore_ids=None, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, messageDEPRECATED='test')
+    response = Response(responseCode=response_code,
+                        messageDEPRECATED='test',
+                        serverInfo=SERVER_INFO)
     scheduled = []
     for index, task in enumerate(tasks):
       if not ignore_ids or index not in ignore_ids:
@@ -200,13 +208,15 @@ class UpdaterTest(TestCase):
 
   def expect_cron_replace(self, job_config, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, messageDEPRECATED='test')
+    resp = Response(responseCode=response_code, messageDEPRECATED='test', serverInfo=SERVER_INFO)
     self._scheduler.replaceCronTemplate(job_config, self._lock, self._session_key).AndReturn(resp)
 
   def expect_restart(self, instance_ids, response_code=None):
     for i in instance_ids:
       response_code = ResponseCode.OK if response_code is None else response_code
-      response = Response(responseCode=response_code, messageDEPRECATED='test')
+      response = Response(responseCode=response_code,
+                          messageDEPRECATED='test',
+                          serverInfo=SERVER_INFO)
       self._scheduler.restartShards(
           self._job_key,
           [i],
@@ -216,7 +226,9 @@ class UpdaterTest(TestCase):
   def expect_kill(self, instance_ids, response_code=None, monitor_result=True, skip_monitor=False):
     for i in instance_ids:
       response_code = ResponseCode.OK if response_code is None else response_code
-      response = Response(responseCode=response_code, messageDEPRECATED='test')
+      response = Response(responseCode=response_code,
+                          messageDEPRECATED='test',
+                          serverInfo=SERVER_INFO)
       query = TaskQuery(jobKeys=[self._job_key],
                         statuses=ACTIVE_STATES,
                         instanceIds=frozenset([int(i)]))
@@ -239,7 +251,9 @@ class UpdaterTest(TestCase):
   def expect_add(self, instance_ids, task_config, response_code=None):
     for i in instance_ids:
       response_code = ResponseCode.OK if response_code is None else response_code
-      response = Response(responseCode=response_code, messageDEPRECATED='test')
+      response = Response(responseCode=response_code,
+                          messageDEPRECATED='test',
+                          serverInfo=SERVER_INFO)
       add_config = AddInstancesConfig(
           key=self._job_key,
           taskConfig=task_config,
@@ -266,13 +280,17 @@ class UpdaterTest(TestCase):
 
   def expect_start(self, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, messageDEPRECATED='test')
+    response = Response(responseCode=response_code,
+                        messageDEPRECATED='test',
+                        serverInfo=SERVER_INFO)
     response.result = Result(acquireLockResult=AcquireLockResult(lock=self._lock))
     self._scheduler.acquireLock(LockKey(job=self._job_key), self._session_key).AndReturn(response)
 
   def expect_finish(self, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, messageDEPRECATED='test')
+    response = Response(responseCode=response_code,
+                        messageDEPRECATED='test',
+                        serverInfo=SERVER_INFO)
     self._scheduler.releaseLock(
         self._lock,
         LockValidation.CHECKED,
@@ -280,7 +298,9 @@ class UpdaterTest(TestCase):
 
   def expect_quota_check(self, num_released, num_acquired, response_code=None, prod=True):
     response_code = ResponseCode.OK if response_code is None else response_code
-    response = Response(responseCode=response_code, messageDEPRECATED='test')
+    response = Response(responseCode=response_code,
+                        messageDEPRECATED='test',
+                        serverInfo=SERVER_INFO)
     released = CapacityRequest(ResourceAggregate(
         numCpus=num_released * self._num_cpus,
         ramMb=num_released * self._num_ram,

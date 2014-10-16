@@ -19,7 +19,7 @@ from apache.aurora.client.api.scheduler_client import SchedulerProxy
 
 class FakeSchedulerProxy(SchedulerProxy):
   def __init__(self, cluster, scheduler, session_key):
-    self._cluster = cluster
+    SchedulerProxy.__init__(self, cluster, verbose=True)
     self._scheduler = scheduler
     self._session_key = session_key
     self._lock = RLock()

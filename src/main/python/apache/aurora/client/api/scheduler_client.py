@@ -30,7 +30,7 @@ from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.transport import TRequestsTransport
 
 from gen.apache.aurora.api import AuroraAdmin, ReadOnlyScheduler
-from gen.apache.aurora.api.constants import CURRENT_API_VERSION
+from gen.apache.aurora.api.constants import THRIFT_API_VERSION
 from gen.apache.aurora.api.ttypes import ResponseCode
 
 try:
@@ -264,11 +264,6 @@ class SchedulerProxy(object):
     if not self._client:
       raise self.TimeoutError('Timed out trying to connect to scheduler at %s' % self.cluster.name)
 
-    server_version = self._client.getVersion().result.getVersionResult
-    if server_version != CURRENT_API_VERSION:
-      raise self.APIVersionError("Client Version: %s, Server Version: %s" %
-                                 (CURRENT_API_VERSION, server_version))
-
   def __getattr__(self, method_name):
     # If the method does not exist, getattr will return AttributeError for us.
     method = getattr(AuroraAdmin.Client, method_name)
@@ -279,8 +274,6 @@ class SchedulerProxy(object):
     def method_wrapper(*args):
       with self._lock:
         start = time.time()
-        # TODO(wfarner): The while loop causes failed unit tests to spin for the retry
-        # period (currently 10 minutes).  Figure out a better approach.
         while not self._terminating.is_set() and (
             time.time() - start) < self.RPC_MAXIMUM_WAIT.as_(Time.SECONDS):
 
@@ -295,6 +288,9 @@ class SchedulerProxy(object):
             if resp is not None and resp.responseCode == ResponseCode.ERROR_TRANSIENT:
               raise self.TransientError(", ".join(
                   [m for m in resp.details] if resp.details else []))
+            if resp.serverInfo.thriftAPIVersion != THRIFT_API_VERSION:
+              raise self.APIVersionError("Client Version: %s, Server Version: %s" %
+                  (THRIFT_API_VERSION, resp.serverInfo.thriftAPIVersion))
             return resp
           except (TTransport.TTransportException, self.TimeoutError, self.TransientError) as e:
             if not self._terminating.is_set():
