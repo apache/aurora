@@ -198,16 +198,43 @@ union Frame {
   2: FrameChunk chunk
 }
 
+// A ScheduledTask with its assignedTask.task field set to null. Deserializers must fill in
+// assignedTask.task with the TaskConfig identified by taskConfigId (which is an index into the
+// DeduplicatedSnapshot's taskConfigs list).
+struct DeduplicatedScheduledTask {
+  1: api.ScheduledTask partialScheduledTask
+  2: i32 taskConfigId
+}
+
+// A Snapshot that has had duplicate TaskConfig structs removed to save space. The
+// partialSnapshot field is a normal Snapshot with the tasks field set to null. To create the
+// full Snapshot deserializers must fill in this field with the result of recreating each
+// partial task using the referenced entry in taskConfigs.
+struct DeduplicatedSnapshot {
+   // Snapshot with its tasks field unset.
+   1: Snapshot partialSnapshot
+   // ScheduledTasks that have had their assignedTask.task field replaced with an ID to save space.
+   2: list<DeduplicatedScheduledTask> partialTasks
+   // Ordered list of taskConfigs. The taskConfigId field of DeduplicatedScheduledTask is an index
+   // into this.
+   3: list<api.TaskConfig> taskConfigs
+}
+
 // A scheduler storage write-ahead log entry consisting of no-ops to skip over or else snapshots or
 // transactions to apply.  Any entry type can also be chopped up into frames if the entry is too big
 // for whatever reason.
 union LogEntry {
+  // The full state of the scheduler at some point-in-time. Transactions appearing before this
+  // entry in the log can be ignored.
   1: Snapshot snapshot
+
+  // An incremental update to apply to the scheduler storage.
   2: Transaction transaction
 
   // The value should be ignored - both true and false signal an equivalent no operation marker.
   3: bool noop;
 
+  // A frame that can be reassembled with others to form a complete LogEntry.
   4: Frame frame
 
   // A LogEntry that is first serialized in the thrift binary format,
@@ -215,5 +242,9 @@ union LogEntry {
   // Deflated entries are expected to be un-framed.  They may be pieced together by multiple frames,
   // but the contents of the deflated entry should not be a Frame.
   5: binary deflatedEntry
+
+  // The full state of the scheduler at some point-in-time, in a compact layout. Transactions
+  // appearing before this entry in the log can be ignored.
+  6: DeduplicatedSnapshot deduplicatedSnapshot
 }
 

@@ -131,6 +131,11 @@ public final class ThriftBinaryCodec {
   // "If the memory is available, buffers sizes on the order of 128K or 256K bytes should be used."
   private static final int DEFLATER_BUFFER_SIZE = Amount.of(256, Data.KB).as(Data.BYTES);
 
+  // Empirical from microbenchmarks (assuming 20MiB/s writes to the replicated log and a large
+  // de-duplicated Snapshot from a production environment).
+  // TODO(ksweeney): Consider making this configurable.
+  private static final int DEFLATE_LEVEL = 3;
+
   /**
    * Encodes a thrift object into a DEFLATE-compressed binary array.
    *
@@ -151,7 +156,7 @@ public final class ThriftBinaryCodec {
       // See http://bugs.java.com/bugdatabase/view_bug.do?bug_id=4986239
       TTransport transport = new TIOStreamTransport(
           new BufferedOutputStream(
-              new DeflaterOutputStream(outBytes, new Deflater(), DEFLATER_BUFFER_SIZE),
+              new DeflaterOutputStream(outBytes, new Deflater(DEFLATE_LEVEL), DEFLATER_BUFFER_SIZE),
               DEFLATER_BUFFER_SIZE));
       TProtocol protocol = PROTOCOL_FACTORY.getProtocol(transport);
       tBase.write(protocol);

@@ -23,7 +23,6 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -47,6 +46,7 @@ import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.log.Log;
+import org.apache.aurora.scheduler.log.Log.Stream;
 
 import static java.util.Objects.requireNonNull;
 
@@ -55,10 +55,10 @@ import static com.twitter.common.inject.TimedInterceptor.Timed;
 import static org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import static org.apache.aurora.scheduler.log.Log.Stream.InvalidPositionException;
 import static org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
+import static org.apache.aurora.scheduler.storage.log.LogManager.DeduplicateSnapshots;
 import static org.apache.aurora.scheduler.storage.log.LogManager.DeflateSnapshots;
 import static org.apache.aurora.scheduler.storage.log.LogManager.LogEntryHashFunction;
 
-@VisibleForTesting
 class StreamManagerImpl implements StreamManager {
   private static final Logger LOG = Logger.getLogger(StreamManagerImpl.class.getName());
 
@@ -81,18 +81,24 @@ class StreamManagerImpl implements StreamManager {
   private final EntrySerializer entrySerializer;
   private final boolean deflateSnapshots;
   private final HashFunction hashFunction;
+  private final SnapshotDeduplicator snapshotDeduplicator;
+  private final boolean deduplicateSnapshots;
 
   @Inject
   StreamManagerImpl(
-      @Assisted Log.Stream stream,
+      @Assisted Stream stream,
       EntrySerializer entrySerializer,
       @DeflateSnapshots boolean deflateSnapshots,
-      @LogEntryHashFunction HashFunction hashFunction) {
+      @LogEntryHashFunction HashFunction hashFunction,
+      SnapshotDeduplicator snapshotDeduplicator,
+      @DeduplicateSnapshots boolean deduplicateSnapshots) {
 
     this.stream = requireNonNull(stream);
     this.entrySerializer = requireNonNull(entrySerializer);
     this.deflateSnapshots = deflateSnapshots;
     this.hashFunction = requireNonNull(hashFunction);
+    this.snapshotDeduplicator = requireNonNull(snapshotDeduplicator);
+    this.deduplicateSnapshots = deduplicateSnapshots;
   }
 
   @Override
@@ -110,6 +116,11 @@ class StreamManagerImpl implements StreamManager {
         if (logEntry.isSet(LogEntry._Fields.DEFLATED_ENTRY)) {
           logEntry = Entries.inflate(logEntry);
           vars.deflatedEntriesRead.incrementAndGet();
+        }
+
+        if (logEntry.isSetDeduplicatedSnapshot()) {
+          logEntry = LogEntry.snapshot(
+              snapshotDeduplicator.reduplicate(logEntry.getDeduplicatedSnapshot()));
         }
 
         reader.execute(logEntry);
@@ -186,16 +197,21 @@ class StreamManagerImpl implements StreamManager {
   public StreamTransactionImpl startTransaction() {
     return new StreamTransactionImpl();
   }
+
   @Override
   @Timed("log_manager_snapshot")
   public void snapshot(Snapshot snapshot)
       throws CodingException, InvalidPositionException, StreamAccessException {
 
     LogEntry entry;
-    if (deflateSnapshots) {
-      entry = deflate(snapshot);
+    if (deduplicateSnapshots) {
+      entry = LogEntry.deduplicatedSnapshot(snapshotDeduplicator.deduplicate(snapshot));
     } else {
       entry = LogEntry.snapshot(snapshot);
+    }
+
+    if (deflateSnapshots) {
+      entry = deflate(entry);
     }
 
     Log.Position position = appendAndGetPosition(entry);
@@ -206,17 +222,15 @@ class StreamManagerImpl implements StreamManager {
 
   // Not meant to be subclassed, but timed methods must be non-private.
   // See https://github.com/google/guice/wiki/AOP#limitations
-  @VisibleForTesting
   @Timed("log_manager_deflate")
-  LogEntry deflate(Snapshot snapshot) throws CodingException {
-    return Entries.deflate(LogEntry.snapshot(snapshot));
+  protected LogEntry deflate(LogEntry entry) throws CodingException {
+    return Entries.deflate(entry);
   }
 
   // Not meant to be subclassed, but timed methods must be non-private.
   // See https://github.com/google/guice/wiki/AOP#limitations
-  @VisibleForTesting
   @Timed("log_manager_append")
-  Log.Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
+  protected Log.Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
     Log.Position firstPosition = null;
     byte[][] entries = entrySerializer.serialize(logEntry);
     synchronized (writeMutex) { // ensure all sub-entries are written as a unit

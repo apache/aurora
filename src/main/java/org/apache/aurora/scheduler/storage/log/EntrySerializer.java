@@ -82,12 +82,14 @@ public interface EntrySerializer {
       return frames;
     }
 
-    private byte[] checksum(byte[] data) {
+    @Timed("log_entry_checksum")
+    protected byte[] checksum(byte[] data) {
       // TODO(ksweeney): Use the streaming API here.
       return hashFunction.hashBytes(data).asBytes();
     }
 
-    private static byte[] encode(Frame frame) throws CodingException {
+    @Timed("log_entry_encode")
+    protected byte[] encode(Frame frame) throws CodingException {
       return Entries.thriftBinaryEncode(LogEntry.frame(frame));
     }
   }

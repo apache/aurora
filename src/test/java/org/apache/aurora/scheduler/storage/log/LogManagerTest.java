@@ -64,6 +64,7 @@ import org.easymock.IArgumentMatcher;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.storage.log.SnapshotDeduplicator.SnapshotDeduplicatorImpl;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -107,7 +108,9 @@ public class LogManagerTest extends EasyMockTest {
         stream,
         new EntrySerializer.EntrySerializerImpl(maxEntrySize, Hashing.md5()),
         false,
-        Hashing.md5());
+        Hashing.md5(),
+        new SnapshotDeduplicatorImpl(),
+        false);
   }
 
   @Test
@@ -400,7 +403,9 @@ public class LogManagerTest extends EasyMockTest {
         mockStream,
         new EntrySerializer.EntrySerializerImpl(message1.chunkSize, Hashing.md5()),
         false,
-        Hashing.md5());
+        Hashing.md5(),
+        new SnapshotDeduplicatorImpl(),
+        false);
     StreamTransaction tr1 = streamManager.startTransaction();
     tr1.add(op1);
 
@@ -509,7 +514,9 @@ public class LogManagerTest extends EasyMockTest {
         stream,
         new EntrySerializer.EntrySerializerImpl(NO_FRAMES_EVER_SIZE, md5),
         true,
-        md5);
+        md5,
+        new SnapshotDeduplicatorImpl(),
+        false);
     streamManager.snapshot(snapshot);
     streamManager.readFromBeginning(reader);
   }

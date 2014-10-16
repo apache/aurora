@@ -92,6 +92,10 @@ Failing to do this will result the following message when you try to start the s
 
     Replica in EMPTY status received a broadcasted recover request
 
+## Storage Performance Considerations
+
+See [this document](scheduler-storage.md) for scheduler storage performance considerations.
+
 ## Network considerations
 The Aurora scheduler listens on 2 ports - an HTTP port used for client RPCs and a web UI,
 and a libprocess (HTTP+Protobuf) port used to communicate with the Mesos master and for the log

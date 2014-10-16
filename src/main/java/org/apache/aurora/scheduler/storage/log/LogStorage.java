@@ -389,6 +389,9 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       case FRAME:
         throw new IllegalArgumentException("Framed entries are not handled at this layer.");
 
+      case DEDUPLICATED_SNAPSHOT:
+        throw new IllegalArgumentException("Deduplicated snapshots are not handled at this layer.");
+
       default:
         throw new IllegalStateException("Unknown log entry type: " + logEntry);
     }

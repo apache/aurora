@@ -129,10 +129,12 @@ public class LogStorageTest extends EasyMockTest {
   private SchedulingService schedulingService;
   private SnapshotStore<Snapshot> snapshotStore;
   private StorageTestUtil storageUtil;
+  private SnapshotDeduplicator snapshotDeduplicator;
 
   @Before
   public void setUp() {
     log = createMock(Log.class);
+    snapshotDeduplicator = createMock(SnapshotDeduplicator.class);
 
     StreamManagerFactory streamManagerFactory = new StreamManagerFactory() {
       @Override
@@ -144,7 +146,9 @@ public class LogStorageTest extends EasyMockTest {
                 Amount.of(1, Data.GB),
                 md5),
             false,
-            md5);
+            md5,
+            snapshotDeduplicator,
+            false);
       }
     };
     LogManager logManager = new LogManager(log, streamManagerFactory);

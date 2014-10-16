@@ -34,23 +34,31 @@ public class LogManager {
    * Identifies the maximum log entry size to permit before chunking entries into frames.
    */
   @Retention(RetentionPolicy.RUNTIME)
-  @Target({ ElementType.PARAMETER, ElementType.METHOD })
+  @Target({ElementType.METHOD, ElementType.PARAMETER})
   @Qualifier
   public @interface MaxEntrySize { }
 
   /**
-   * Binding annotation for settings regarding the way snapshots are written.
+   * When true, enable snapshot deflation.
    */
   @Retention(RetentionPolicy.RUNTIME)
-  @Target({ ElementType.PARAMETER, ElementType.METHOD })
+  @Target({ElementType.METHOD, ElementType.PARAMETER})
   @Qualifier
   public @interface DeflateSnapshots { }
+
+  /**
+   * When true, enable snapshot deduplication.
+   */
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ElementType.METHOD, ElementType.PARAMETER})
+  @Qualifier
+  public @interface DeduplicateSnapshots { }
 
   /**
    * Hash function used to verify log entries.
    */
   @Retention(RetentionPolicy.RUNTIME)
-  @Target({ElementType.PARAMETER, ElementType.METHOD})
+  @Target({ElementType.METHOD, ElementType.PARAMETER})
   @Qualifier
   public @interface LogEntryHashFunction { }
 

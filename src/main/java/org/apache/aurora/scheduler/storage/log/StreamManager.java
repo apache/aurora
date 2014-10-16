@@ -30,7 +30,7 @@ import static org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
  * operations can be committed atomically, or the log can be compacted by
  * {@link #snapshot(org.apache.aurora.gen.storage.Snapshot) snapshotting}.
  */
-interface StreamManager {
+public interface StreamManager {
   /**
    * Reads all entries in the log stream after the given position.  If the position
    * supplied is {@code null} then all log entries in the stream will be read.
