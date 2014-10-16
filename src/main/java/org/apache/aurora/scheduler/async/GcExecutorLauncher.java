@@ -89,6 +89,8 @@ public class GcExecutorLauncher implements TaskLauncher {
   static final String SYSTEM_TASK_PREFIX = "system-gc-";
   @VisibleForTesting
   static final String LOST_TASKS_STAT_NAME = "gc_executor_tasks_lost";
+  @VisibleForTesting
+  static final String INSUFFICIENT_OFFERS_STAT_NAME = "scheduler_gc_insufficient_offers";
   private static final String EXECUTOR_NAME = "aurora.gc";
 
   private final GcExecutorSettings settings;
@@ -99,6 +101,7 @@ public class GcExecutorLauncher implements TaskLauncher {
   private final Supplier<String> uuidGenerator;
   private final Map<String, Long> pulses;
   private final AtomicLong lostTasks;
+  private final AtomicLong insufficientOffers;
 
   @Inject
   GcExecutorLauncher(
@@ -142,6 +145,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     this.uuidGenerator = requireNonNull(uuidGenerator);
     this.pulses = Collections.synchronizedMap(Maps.<String, Long>newHashMap());
     this.lostTasks = statsProvider.makeCounter(LOST_TASKS_STAT_NAME);
+    this.insufficientOffers = statsProvider.makeCounter(INSUFFICIENT_OFFERS_STAT_NAME);
   }
 
   @VisibleForTesting
@@ -196,6 +200,7 @@ public class GcExecutorLauncher implements TaskLauncher {
     boolean sufficient = Resources.from(offer).greaterThanOrEqual(TOTAL_GC_EXECUTOR_RESOURCES);
     if (!sufficient) {
       LOG.warning("Offer for host " + offer.getHostname() + " is too small for a GC executor");
+      insufficientOffers.incrementAndGet();
     }
     return sufficient;
   }

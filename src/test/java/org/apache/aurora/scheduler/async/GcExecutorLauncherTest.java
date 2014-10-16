@@ -56,6 +56,7 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
+import static org.apache.aurora.scheduler.async.GcExecutorLauncher.INSUFFICIENT_OFFERS_STAT_NAME;
 import static org.apache.aurora.scheduler.async.GcExecutorLauncher.LOST_TASKS_STAT_NAME;
 import static org.apache.aurora.scheduler.async.GcExecutorLauncher.SYSTEM_TASK_PREFIX;
 import static org.easymock.EasyMock.expect;
@@ -89,6 +90,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
   private StatsProvider statsProvider;
   private GcExecutorLauncher gcExecutorLauncher;
   private AtomicLong lostTasks;
+  private AtomicLong insufficientOffers;
 
   @Before
   public void setUp() {
@@ -98,10 +100,12 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     driver = createMock(Driver.class);
     statsProvider = createMock(StatsProvider.class);
     lostTasks = new AtomicLong();
+    insufficientOffers = new AtomicLong();
   }
 
   private void replayAndConstruct() {
     expect(statsProvider.makeCounter(LOST_TASKS_STAT_NAME)).andReturn(lostTasks);
+    expect(statsProvider.makeCounter(INSUFFICIENT_OFFERS_STAT_NAME)).andReturn(insufficientOffers);
     control.replay();
     gcExecutorLauncher = new GcExecutorLauncher(
         SETTINGS,
@@ -151,6 +155,8 @@ public class GcExecutorLauncherTest extends EasyMockTest {
     // Fifth call - host item expires (regular delay), one task collected
     clock.advance(Amount.of(1L, Time.HOURS));
     assertTrue(gcExecutorLauncher.willUse(OFFER));
+
+    assertEquals(0, insufficientOffers.get());
   }
 
   @Test
@@ -165,7 +171,9 @@ public class GcExecutorLauncherTest extends EasyMockTest {
         .clearResources()
         .addAllResources(resources)
         .build();
+    assertEquals(0, insufficientOffers.get());
     assertFalse(gcExecutorLauncher.willUse(smallOffer));
+    assertEquals(1, insufficientOffers.get());
   }
 
   private static TaskStatus makeStatus(String taskId) {
@@ -193,6 +201,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
   @Test
   public void testGcExecutorDisabled() {
     expect(statsProvider.makeCounter(LOST_TASKS_STAT_NAME)).andReturn(lostTasks);
+    expect(statsProvider.makeCounter(INSUFFICIENT_OFFERS_STAT_NAME)).andReturn(insufficientOffers);
     control.replay();
 
     gcExecutorLauncher = new GcExecutorLauncher(
@@ -204,6 +213,7 @@ public class GcExecutorLauncherTest extends EasyMockTest {
         statsProvider,
         Suppliers.ofInstance("gc"));
     assertFalse(gcExecutorLauncher.willUse(OFFER));
+    assertEquals(0, insufficientOffers.get());
   }
 
   @Test
