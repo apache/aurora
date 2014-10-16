@@ -13,12 +13,16 @@
  */
 package org.apache.aurora.scheduler;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.base.Preconditions;
 import com.twitter.common.application.Lifecycle;
@@ -44,6 +48,10 @@ import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -65,7 +73,15 @@ class MesosSchedulerImpl implements Scheduler {
   private final Storage storage;
   private final Lifecycle lifecycle;
   private final EventSink eventSink;
+  private final Executor executor;
   private volatile boolean isRegistered = false;
+
+  /**
+   * Binding annotation for the executor the incoming Mesos message handler uses.
+   */
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  @interface SchedulerExecutor { }
 
   /**
    * Creates a new scheduler.
@@ -78,18 +94,21 @@ class MesosSchedulerImpl implements Scheduler {
    *                      launchers, ceasing after the first match (based on a return value of
    *                      {@code true}.
    * @param eventSink Pubsub sink to send driver status changes to.
+   * @param executor Executor for async work
    */
   @Inject
   public MesosSchedulerImpl(
       Storage storage,
       final Lifecycle lifecycle,
       List<TaskLauncher> taskLaunchers,
-      EventSink eventSink) {
+      EventSink eventSink,
+      @SchedulerExecutor Executor executor) {
 
     this.storage = requireNonNull(storage);
     this.lifecycle = requireNonNull(lifecycle);
     this.taskLaunchers = requireNonNull(taskLaunchers);
     this.eventSink = requireNonNull(eventSink);
+    this.executor = requireNonNull(executor);
   }
 
   @Override
@@ -137,29 +156,35 @@ class MesosSchedulerImpl implements Scheduler {
     // securing the storage lock between saves.  We also save the host attributes before passing
     // offers elsewhere to ensure that host attributes are available before attempting to
     // schedule tasks associated with offers.
-    // TODO(wfarner): Reconsider the requirements here, we might be able to save host offers
-    //                asynchronously and augment the task scheduler to skip over offers when the
-    //                host attributes cannot be found. (AURORA-116)
-    storage.write(new MutateWork.NoResult.Quiet() {
+    // TODO(wfarner): Reconsider the requirements here, augment the task scheduler to skip over
+    //                offers when the host attributes cannot be found. (AURORA-137)
+
+    executor.execute(new Runnable() {
       @Override
-      protected void execute(MutableStoreProvider storeProvider) {
-        for (final Offer offer : offers) {
-          storeProvider.getAttributeStore().saveHostAttributes(Conversions.getAttributes(offer));
+      public void run() {
+        storage.write(new MutateWork.NoResult.Quiet() {
+          @Override
+          protected void execute(MutableStoreProvider storeProvider) {
+            for (final Offer offer : offers) {
+              storeProvider.getAttributeStore()
+                  .saveHostAttributes(Conversions.getAttributes(offer));
+            }
+          }
+        });
+
+        for (Offer offer : offers) {
+          if (LOG.isLoggable(Level.FINE)) {
+            LOG.log(Level.FINE, String.format("Received offer: %s", offer));
+          }
+          totalResourceOffers.incrementAndGet();
+          for (TaskLauncher launcher : taskLaunchers) {
+            if (launcher.willUse(offer)) {
+              break;
+            }
+          }
         }
       }
     });
-
-    for (Offer offer : offers) {
-      if (LOG.isLoggable(Level.FINE)) {
-        LOG.log(Level.FINE, String.format("Received offer: %s", offer));
-      }
-      totalResourceOffers.incrementAndGet();
-      for (TaskLauncher launcher : taskLaunchers) {
-        if (launcher.willUse(offer)) {
-          break;
-        }
-      }
-    }
   }
 
   @Override
@@ -218,7 +243,7 @@ class MesosSchedulerImpl implements Scheduler {
   @Override
   public void frameworkMessage(
       SchedulerDriver driver,
-      ExecutorID executor,
+      ExecutorID executorID,
       SlaveID slave,
       byte[] data) {
 

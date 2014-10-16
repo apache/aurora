@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler;
 
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.logging.Logger;
 
@@ -66,6 +67,10 @@ public class SchedulerModule extends AbstractModule {
     bind(TaskIdGenerator.class).to(TaskIdGeneratorImpl.class);
 
     bind(UserTaskLauncher.class).in(Singleton.class);
+
+    // TODO(zmanji): Create singleThreadedExecutor (non-scheduled) variant.
+    bind(Executor.class).annotatedWith(MesosSchedulerImpl.SchedulerExecutor.class)
+        .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SchedulerImpl-%d", LOG));
 
     install(new PrivateModule() {
       @Override

@@ -17,10 +17,12 @@ import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.testing.TearDown;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -110,6 +112,8 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         bind(new TypeLiteral<List<TaskLauncher>>() { })
             .toInstance(Arrays.asList(systemLauncher, userLauncher));
         bind(EventSink.class).toInstance(eventSink);
+        bind(Executor.class).annotatedWith(MesosSchedulerImpl.SchedulerExecutor.class)
+            .toInstance(MoreExecutors.sameThreadExecutor());
       }
     });
     scheduler = injector.getInstance(MesosSchedulerImpl.class);
