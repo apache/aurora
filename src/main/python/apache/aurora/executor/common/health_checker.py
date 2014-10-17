@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import os.path
 import threading
 import time
 
@@ -35,6 +36,7 @@ class ThreadedHealthChecker(ExceptionalThread):
 
   def __init__(self,
       health_checker,
+      sandbox,
       interval_secs,
       initial_interval_secs,
       max_consecutive_failures,
@@ -42,6 +44,8 @@ class ThreadedHealthChecker(ExceptionalThread):
     """
     :param health_checker: health checker to confirm service health
     :type health_checker: function that returns (boolean, <string>)
+    :param sandbox: Sandbox of the task corresponding to this health check.
+    :type sandbox: DirectorySandbox
     :param interval_secs: delay between checks
     :type interval_secs: int
     :param initial_interval_secs: seconds to wait before starting checks
@@ -52,11 +56,16 @@ class ThreadedHealthChecker(ExceptionalThread):
     :type clock: time module
     """
     self.checker = health_checker
+    self.sandbox = sandbox
     self.clock = clock
     self.current_consecutive_failures = 0
     self.dead = threading.Event()
     self.interval = interval_secs
     self.max_consecutive_failures = max_consecutive_failures
+    self.snooze_file = None
+
+    if self.sandbox and self.sandbox.exists():
+      self.snooze_file = os.path.join(self.sandbox.root, '.healthchecksnooze')
 
     if initial_interval_secs is not None:
       self.initial_interval = initial_interval_secs
@@ -66,9 +75,17 @@ class ThreadedHealthChecker(ExceptionalThread):
     if self.initial_interval > 0:
       self.healthy, self.reason = True, None
     else:
-      self.healthy, self.reason = self.checker()
+      self.healthy, self.reason = self._perform_check_if_not_disabled()
     super(ThreadedHealthChecker, self).__init__()
     self.daemon = True
+
+  def _perform_check_if_not_disabled(self):
+    if self.snooze_file and os.path.isfile(self.snooze_file):
+      log.info("Health check snooze file found at %s. Health checks disabled.", self.snooze_file)
+      return True, None
+
+    log.debug("Health checks enabled. Performing health check.")
+    return self.checker()
 
   def _maybe_update_failure_count(self, is_healthy, reason):
     if not is_healthy:
@@ -88,7 +105,7 @@ class ThreadedHealthChecker(ExceptionalThread):
     self.clock.sleep(self.initial_interval)
     log.debug('Initial interval expired.')
     while not self.dead.is_set():
-      is_healthy, reason = self.checker()
+      is_healthy, reason = self._perform_check_if_not_disabled()
       self._maybe_update_failure_count(is_healthy, reason)
       self.clock.sleep(self.interval)
 
@@ -110,12 +127,14 @@ class HealthChecker(StatusChecker):
 
   def __init__(self,
                health_checker,
+               sandbox=None,
                interval_secs=10,
                initial_interval_secs=None,
                max_consecutive_failures=0,
                clock=time):
     self.threaded_health_checker = ThreadedHealthChecker(
         health_checker,
+        sandbox,
         interval_secs,
         initial_interval_secs,
         max_consecutive_failures,
@@ -136,7 +155,7 @@ class HealthChecker(StatusChecker):
 
 
 class HealthCheckerProvider(StatusCheckerProvider):
-  def from_assigned_task(self, assigned_task, _):
+  def from_assigned_task(self, assigned_task, sandbox):
     mesos_task = mesos_task_instance_from_assigned_task(assigned_task)
     portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)
 
@@ -149,6 +168,7 @@ class HealthCheckerProvider(StatusCheckerProvider):
         timeout_secs=health_check_config.get('timeout_secs'))
     health_checker = HealthChecker(
         http_signaler.health,
+        sandbox,
         interval_secs=health_check_config.get('interval_secs'),
         initial_interval_secs=health_check_config.get('initial_interval_secs'),
         max_consecutive_failures=health_check_config.get('max_consecutive_failures'))

@@ -64,6 +64,7 @@ python_tests(
     '3rdparty/python:twitter.common.testing',
     'src/main/python/apache/aurora/common:http_signaler',
     'src/main/python/apache/aurora/executor/common:health_checker',
+    'src/main/python/apache/aurora/executor/common:sandbox',
     'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )

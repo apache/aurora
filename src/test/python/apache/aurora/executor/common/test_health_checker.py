@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import os.path
 import threading
 import time
 import unittest
@@ -29,6 +30,7 @@ from apache.aurora.executor.common.health_checker import (
     HealthCheckerProvider,
     ThreadedHealthChecker
 )
+from apache.aurora.executor.common.sandbox import SandboxInterface
 
 from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, TaskConfig
 
@@ -146,16 +148,54 @@ class TestThreadedHealthChecker(unittest.TestCase):
   def setUp(self):
     self.signaler = mock.Mock(spec=HttpSignaler)
     self.signaler.health.return_value = (True, 'Fake')
+
+    self.sandbox = mock.Mock(spec_set=SandboxInterface)
+    self.sandbox.exists.return_value = True
+    self.sandbox.root = '/root'
+
     self.initial_interval_secs = 1
     self.interval_secs = 5
     self.max_consecutive_failures = 2
     self.clock = mock.Mock(spec=time)
     self.threaded_health_checker = ThreadedHealthChecker(
         self.signaler.health,
+        None,
         self.interval_secs,
         self.initial_interval_secs,
         self.max_consecutive_failures,
         self.clock)
+
+    self.threaded_health_checker_sandbox_exists = ThreadedHealthChecker(
+        self.signaler.health,
+        self.sandbox,
+        self.interval_secs,
+        self.initial_interval_secs,
+        self.max_consecutive_failures,
+        self.clock)
+
+  def test_perform_check_if_not_disabled_snooze_file_is_none(self):
+    self.threaded_health_checker.snooze_file = None
+
+    assert self.signaler.health.call_count == 0
+    self.threaded_health_checker._perform_check_if_not_disabled()
+    assert self.signaler.health.call_count == 1
+
+  @mock.patch('os.path', spec_set=os.path)
+  def test_perform_check_if_not_disabled_no_snooze_file(self, mock_os_path):
+    mock_os_path.isfile.return_value = False
+
+    assert self.signaler.health.call_count == 0
+    self.threaded_health_checker_sandbox_exists._perform_check_if_not_disabled()
+    assert self.signaler.health.call_count == 1
+
+  @mock.patch('os.path', spec_set=os.path)
+  def test_perform_check_if_not_disabled_snooze_file_exists(self, mock_os_path):
+    mock_os_path.isfile.return_value = True
+
+    assert self.signaler.health.call_count == 0
+    result = self.threaded_health_checker_sandbox_exists._perform_check_if_not_disabled()
+    assert self.signaler.health.call_count == 0
+    assert result == (True, None)
 
   def test_maybe_update_failure_count(self):
     assert self.threaded_health_checker.current_consecutive_failures == 0

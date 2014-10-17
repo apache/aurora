@@ -215,6 +215,18 @@ Please see the
 [configuration reference](configuration-reference.md#user-content-healthcheckconfig-objects) for
 configuration options for this feature.
 
+#### Snoozing Health Checks
+
+If you need to pause your health check, you can do so by touching a file inside of your sandbox,
+named `.healthchecksnooze`
+
+As long as that file is present, health checks will be disabled, enabling users to gather core dumps
+or other performance measurements without worrying about Aurora's health check killing their
+process.
+
+WARNING: Remember to remove this when you are done, otherwise your instance will have permanently
+disabled health checks.
+
 #### Tearing a task down
 
 The Executor follows an escalation sequence when killing a running task:
