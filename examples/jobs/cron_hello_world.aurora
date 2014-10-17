@@ -1,0 +1,14 @@
+# cron_hello_world.aurora
+# A cron job that runs every 5 minutes.
+jobs = [
+  Job(
+    cluster = 'devcluster',
+    role = 'www-data',
+    environment = 'test',
+    name = 'cron_hello_world',
+    cron_schedule = '*/5 * * * *',
+    task = SimpleTask(
+      'cron_hello_world',
+      'echo "Hello world from cron, the time is now $(date --rfc-822)"'),
+  ),
+]

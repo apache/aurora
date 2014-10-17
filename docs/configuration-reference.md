@@ -313,8 +313,8 @@ Job Schema
    ```environment``` | String | Job environment, default ```devel```. Must be one of ```prod```, ```devel```, ```test``` or ```staging<number>```.
   ```contact``` | String | Best email address to reach the owner of the job. For production jobs, this is usually a team mailing list.
   ```instances```| Integer | Number of instances (sometimes referred to as replicas or shards) of the task to create. (Default: 1)
-   ```cron_schedule``` **(Present, but not supported and a no-op)** | String | UTC Cron schedule in cron format. May only be used with non-service jobs. Default: None (not a cron job.)
-  ```cron_collision_policy``` **(Present, but not supported and a no-op)** | String | Policy to use when a cron job is triggered while a previous run is still active. KILL_EXISTING Kill the previous run, and schedule the new run CANCEL_NEW Let the previous run continue, and cancel the new run. RUN_OVERLAP Let the previous run continue, and schedule the new run. (Default: KILL_EXISTING)
+   ```cron_schedule``` | String | Cron schedule in cron format. May only be used with non-service jobs. See [Cron Jobs](cron-jobs.md) for more information. Default: None (not a cron job.)
+  ```cron_collision_policy``` | String | Policy to use when a cron job is triggered while a previous run is still active. KILL_EXISTING Kill the previous run, and schedule the new run CANCEL_NEW Let the previous run continue, and cancel the new run. (Default: KILL_EXISTING)
   ```update_config``` | ```update_config``` object | Parameters for controlling the rate and policy of rolling updates.
   ```constraints``` | dict | Scheduling constraints for the tasks. See the section on the [constraint specification language](#Specifying-Scheduling-Constraints)
   ```service``` | Boolean | If True, restart tasks regardless of success or failure. (Default: False)
