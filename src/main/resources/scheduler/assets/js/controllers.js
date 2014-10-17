@@ -509,11 +509,7 @@
           return taskEvent.timestamp;
         });
 
-        // Since all task sandboxes are eventually garbage collected SANDBOX_DELETED doesn't
-        // indicate the state of the task, so use the previous task event to determine task status.
-        var latestTaskEvent = task.status === ScheduleStatus.SANDBOX_DELETED ?
-          _.chain(sortedTaskEvents).last(2).first().value() :
-          _.last(sortedTaskEvents);
+        var latestTaskEvent = _.last(sortedTaskEvents);
 
         return {
           instanceId: task.assignedTask.instanceId,
@@ -526,7 +522,8 @@
           taskId: task.assignedTask.taskId,
           taskEvents: summarizeTaskEvents(sortedTaskEvents),
           showDetails: false,
-          sandboxExists: task.status !== ScheduleStatus.SANDBOX_DELETED
+          // TODO(maxim): Revisit this approach when the UI fix in AURORA-715 is finalized.
+          sandboxExists: true
         };
       }
 

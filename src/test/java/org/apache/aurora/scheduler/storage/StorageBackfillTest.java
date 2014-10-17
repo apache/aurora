@@ -41,13 +41,16 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.aurora.scheduler.storage.entities.ITaskEvent;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
 import static org.junit.Assert.assertEquals;
 
 public class StorageBackfillTest {
@@ -69,6 +72,33 @@ public class StorageBackfillTest {
   public void setUp() {
     storage = MemStorage.newEmptyStorage();
     clock = new FakeClock();
+  }
+
+  @Test
+  public void testRewriteSandboxDeleted() throws Exception {
+    final TaskConfig storedTask = defaultTask();
+    final TaskEvent expectedEvent = new TaskEvent(100, FINISHED);
+
+    storage.write(new Storage.MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
+            IScheduledTask.build(new ScheduledTask()
+                .setStatus(SANDBOX_DELETED)
+                .setTaskEvents(ImmutableList.of(expectedEvent, new TaskEvent(200, SANDBOX_DELETED)))
+                .setAssignedTask(new AssignedTask()
+                    .setTaskId(TASK_ID)
+                    .setInstanceId(0)
+                    .setTask(storedTask)))));
+      }
+    });
+
+    backfill();
+
+    assertEquals(FINISHED, getTask(TASK_ID).getStatus());
+    assertEquals(
+        ImmutableList.of(ITaskEvent.build(expectedEvent)),
+        getTask(TASK_ID).getTaskEvents());
   }
 
   @Test

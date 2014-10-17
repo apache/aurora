@@ -14,10 +14,12 @@
 package org.apache.aurora.scheduler.base;
 
 import java.util.Arrays;
+import java.util.Set;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
 import org.apache.aurora.gen.JobStats;
@@ -34,28 +36,24 @@ public class JobsTest {
 
   @Test
   public void testGetJobStats() {
+    // TODO(maxim): Drop when AURORA-832 is fixed.
+    Set<ScheduleStatus> statusValues = Sets.difference(
+        Sets.immutableEnumSet(Arrays.asList(ScheduleStatus.values())),
+        ImmutableSet.of(ScheduleStatus.SANDBOX_DELETED));
+
     ImmutableList<IScheduledTask> tasks =
         FluentIterable
-            .from(Sets.immutableEnumSet(Arrays.asList(ScheduleStatus.values())))
+            .from(statusValues)
             .transform(new Function<ScheduleStatus, IScheduledTask>() {
               @Override
               public IScheduledTask apply(ScheduleStatus status) {
-                int startTime = 100;
-                if (status == ScheduleStatus.SANDBOX_DELETED) {
-                  return makeTask(
-                      status,
-                      makeTaskEvents(
-                          startTime,
-                          ScheduleStatus.FAILED,
-                          ScheduleStatus.SANDBOX_DELETED));
-                }
-                return makeTask(status, makeTaskEvents(startTime, status));
+                return makeTask(status, makeTaskEvents(100, status));
               }
             }).toList();
 
     IJobStats expectedStats = IJobStats.build(new JobStats()
         .setActiveTaskCount(7)
-        .setFailedTaskCount(3)
+        .setFailedTaskCount(2)
         .setFinishedTaskCount(2)
         .setPendingTaskCount(3));
 

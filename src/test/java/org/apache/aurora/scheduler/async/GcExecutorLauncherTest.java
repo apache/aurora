@@ -55,7 +55,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
-import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
 import static org.apache.aurora.scheduler.async.GcExecutorLauncher.INSUFFICIENT_OFFERS_STAT_NAME;
 import static org.apache.aurora.scheduler.async.GcExecutorLauncher.LOST_TASKS_STAT_NAME;
 import static org.apache.aurora.scheduler.async.GcExecutorLauncher.SYSTEM_TASK_PREFIX;
@@ -214,24 +213,6 @@ public class GcExecutorLauncherTest extends EasyMockTest {
         Suppliers.ofInstance("gc"));
     assertFalse(gcExecutorLauncher.willUse(OFFER));
     assertEquals(0, insufficientOffers.get());
-  }
-
-  @Test
-  public void testFiltersSandboxDeleted() {
-    IScheduledTask a = makeTask(JOB_A, FAILED);
-    IScheduledTask b = makeTask(JOB_A, SANDBOX_DELETED);
-
-    expectGetTasksByHost(HOST, a, b);
-    expectAdjustRetainedTasks(a);
-
-    replayAndConstruct();
-
-    // First call - no items in the cache, no tasks collected.
-    assertFalse(gcExecutorLauncher.willUse(OFFER));
-
-    // Second call - host item expires initial delay, one task collected.
-    clock.advance(Amount.of(1L, Time.HOURS));
-    assertTrue(gcExecutorLauncher.willUse(OFFER));
   }
 
   private void expectAdjustRetainedTasks(IScheduledTask... tasks) {

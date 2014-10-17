@@ -25,7 +25,6 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
@@ -41,7 +40,6 @@ import com.twitter.common.util.Random;
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
-import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.comm.AdjustRetainedTasks;
 import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.TaskLauncher;
@@ -184,16 +182,14 @@ public class GcExecutorLauncher implements TaskLauncher {
     Set<IScheduledTask> tasksOnHost =
         Storage.Util.weaklyConsistentFetchTasks(storage, Query.slaveScoped(hostName));
 
-    Map<String, ScheduleStatus> tasks = Maps.filterValues(
-        Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS),
-        Predicates.not(Predicates.equalTo(ScheduleStatus.SANDBOX_DELETED)));
     tasksCreated.incrementAndGet();
     return makeGcTask(
         hostName,
         slaveId,
         settings.getGcExecutorPath().get(),
         uuidGenerator.get(),
-        new AdjustRetainedTasks().setRetainedTasks(tasks));
+        new AdjustRetainedTasks().setRetainedTasks(
+            Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS)));
   }
 
   private boolean sufficientResources(Offer offer) {

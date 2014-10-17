@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage;
 
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
@@ -36,7 +37,6 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-
 /**
  * Utility class to contain and perform storage backfill operations.
  */
@@ -99,6 +99,19 @@ public final class StorageBackfill {
     }
   }
 
+  private static void rewriteSandboxDeletedState(ScheduledTask task) {
+    if (task.getStatus() == ScheduleStatus.SANDBOX_DELETED) {
+      List<TaskEvent> events = task.getTaskEvents();
+      ScheduleStatus previousStatus = events.get(events.size() - 2).getStatus();
+
+      // Set the status to the previous event and drop the last event.
+      task.setStatus(previousStatus);
+      events.remove(events.size() - 1);
+
+      LOG.info("Rewriting SANDBOX_DELETED status to " + previousStatus + " for " + Tasks.id(task));
+    }
+  }
+
   /**
    * Backfills the storage to make it match any assumptions that may have changed since
    * the structs were first written.
@@ -118,6 +131,7 @@ public final class StorageBackfill {
         // TODO(ksweeney): Guarantee tasks pass current validation code here and quarantine if they
         // don't.
         guaranteeShardUniqueness(builder, storeProvider.getUnsafeTaskStore(), clock);
+        rewriteSandboxDeletedState(builder);
         return IScheduledTask.build(builder);
       }
     });

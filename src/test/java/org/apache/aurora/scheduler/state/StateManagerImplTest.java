@@ -64,7 +64,6 @@ import static org.apache.aurora.gen.ScheduleStatus.KILLING;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
@@ -228,7 +227,7 @@ public class StateManagerImplTest extends EasyMockTest {
     ITaskConfig task = makeTask(JIM, MY_JOB);
     String taskId = "a";
     expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
-    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING, SANDBOX_DELETED);
+    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, KILLING, LOST);
 
     driver.killTask(EasyMock.<String>anyObject());
 
@@ -239,7 +238,7 @@ public class StateManagerImplTest extends EasyMockTest {
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
     changeState(taskId, KILLING);
-    changeState(taskId, SANDBOX_DELETED);
+    changeState(taskId, LOST);
   }
 
   @Test
@@ -339,29 +338,6 @@ public class StateManagerImplTest extends EasyMockTest {
         Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId2)));
     assertEquals(taskId, rescheduledTask.getAncestorId());
     assertEquals(1, rescheduledTask.getFailureCount());
-  }
-
-  @Test
-  public void testDoubleTransition() {
-    // Tests that a transition inducing another transition (STATE_CHANGE action) is performed.
-
-    ITaskConfig task = makeTask(JIM, MY_JOB);
-    String taskId = "a";
-    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
-    expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, LOST);
-
-    String taskId2 = "a2";
-    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId2);
-    noFlappingPenalty();
-    expectStateTransitions(taskId2, INIT, PENDING);
-
-    control.replay();
-
-    insertTask(task, 0);
-
-    assignTask(taskId, HOST_A);
-    changeState(taskId, RUNNING);
-    changeState(taskId, SANDBOX_DELETED);
   }
 
   @Test

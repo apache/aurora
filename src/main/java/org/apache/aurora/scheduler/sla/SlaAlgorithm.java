@@ -365,7 +365,6 @@ interface SlaAlgorithm {
                   break;
 
                 case INIT:
-                case SANDBOX_DELETED:
                   // Ignore.
                   break;
 

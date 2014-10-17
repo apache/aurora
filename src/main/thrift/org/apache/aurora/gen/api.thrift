@@ -356,6 +356,7 @@ enum ScheduleStatus {
    * This can happen, for example, when a slave process disappears.
    */
   LOST             = 7,
+  // TODO(maxim): Remove SANDBOX_DELETED in 0.7.0. (AURORA-832)
   /** The task sandbox has been deleted by the executor. */
   SANDBOX_DELETED  = 10
 }

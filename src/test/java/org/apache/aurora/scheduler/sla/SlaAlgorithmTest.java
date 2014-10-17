@@ -34,7 +34,6 @@ import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RESTARTING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.gen.ScheduleStatus.SANDBOX_DELETED;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.AGGREGATE_PLATFORM_UPTIME;
 import static org.apache.aurora.scheduler.sla.SlaAlgorithm.AlgorithmType.JOB_UPTIME_50;
@@ -263,15 +262,6 @@ public class SlaAlgorithmTest {
   public void AggregatePlatformUptimeKilledByPlatformTest() {
     Number actual = AGGREGATE_PLATFORM_UPTIME.getAlgorithm().calculate(
         ImmutableSet.of(makeTask(ImmutableMap.of(50L, RUNNING, 300L, KILLED), 0)),
-        Range.closedOpen(100L, 500L));
-    assertEquals(50.0, actual);
-  }
-
-  @Test
-  public void AggregatePlatformUptimeSandboxDeletedIgnoredTest() {
-    Number actual = AGGREGATE_PLATFORM_UPTIME.getAlgorithm().calculate(
-        ImmutableSet.of(
-            makeTask(ImmutableMap.of(50L, RUNNING, 300L, LOST, 400L, SANDBOX_DELETED), 0)),
         Range.closedOpen(100L, 500L));
     assertEquals(50.0, actual);
   }

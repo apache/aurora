@@ -48,7 +48,6 @@ import static org.apache.aurora.scheduler.state.SideEffect.Action.INCREMENT_FAIL
 import static org.apache.aurora.scheduler.state.SideEffect.Action.KILL;
 import static org.apache.aurora.scheduler.state.SideEffect.Action.RESCHEDULE;
 import static org.apache.aurora.scheduler.state.SideEffect.Action.SAVE_STATE;
-import static org.apache.aurora.scheduler.state.SideEffect.Action.STATE_CHANGE;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.ASSIGNED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.DELETED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.DRAINING;
@@ -62,7 +61,6 @@ import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PENDI
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PREEMPTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.RESTARTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.RUNNING;
-import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.SANDBOX_DELETED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.STARTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.THROTTLED;
 
@@ -119,7 +117,6 @@ class TaskStateMachine {
     KILLED(Optional.of(ScheduleStatus.KILLED)),
     KILLING(Optional.of(ScheduleStatus.KILLING)),
     LOST(Optional.of(ScheduleStatus.LOST)),
-    SANDBOX_DELETED(Optional.of(ScheduleStatus.SANDBOX_DELETED)),
     /**
      * The task does not have an associated state as it has been deleted from the store.
      */
@@ -213,10 +210,6 @@ class TaskStateMachine {
 
               case KILLED:
                 addFollowup(RESCHEDULE);
-                break;
-
-              case SANDBOX_DELETED:
-                addFollowupTransition(LOST);
                 break;
 
               default:
@@ -362,12 +355,6 @@ class TaskStateMachine {
                             addFollowup(RESCHEDULE);
                             break;
 
-                          case SANDBOX_DELETED:
-                            // The slave previously acknowledged that it had the task, and now
-                            // stopped reporting it.
-                            addFollowupTransition(LOST);
-                            break;
-
                           default:
                             // No-op.
                         }
@@ -414,10 +401,6 @@ class TaskStateMachine {
                             addFollowup(RESCHEDULE);
                             break;
 
-                          case SANDBOX_DELETED:
-                            addFollowupTransition(LOST);
-                            break;
-
                            default:
                              // No-op.
                         }
@@ -426,7 +409,7 @@ class TaskStateMachine {
                 ))
         .addState(
             Rule.from(FINISHED)
-                .to(SANDBOX_DELETED, DELETED)
+                .to(DELETED)
                 .withCallback(manageTerminatedTasks))
         .addState(
             Rule.from(PREEMPTING)
@@ -442,23 +425,19 @@ class TaskStateMachine {
                 .withCallback(manageRestartingTask))
         .addState(
             Rule.from(FAILED)
-                .to(SANDBOX_DELETED, DELETED)
+                .to(DELETED)
                 .withCallback(manageTerminatedTasks))
         .addState(
             Rule.from(KILLED)
-                .to(SANDBOX_DELETED, DELETED)
+                .to(DELETED)
                 .withCallback(manageTerminatedTasks))
         // TODO(maxim): Re-evaluate if *DELETED states are valid transitions here.
         .addState(
             Rule.from(KILLING)
-                .to(FINISHED, FAILED, KILLED, LOST, SANDBOX_DELETED, DELETED)
+                .to(FINISHED, FAILED, KILLED, LOST, DELETED)
                 .withCallback(manageTerminatedTasks))
         .addState(
             Rule.from(LOST)
-                .to(SANDBOX_DELETED, DELETED)
-                .withCallback(manageTerminatedTasks))
-        .addState(
-            Rule.from(SANDBOX_DELETED)
                 .to(DELETED)
                 .withCallback(manageTerminatedTasks))
         .addState(
@@ -504,10 +483,6 @@ class TaskStateMachine {
 
   private void addFollowup(Action action) {
     addFollowup(new SideEffect(action, Optional.<ScheduleStatus>absent()));
-  }
-
-  private void addFollowupTransition(TaskState state) {
-    addFollowup(new SideEffect(STATE_CHANGE, state.getStatus()));
   }
 
   private void addFollowup(SideEffect sideEffect) {

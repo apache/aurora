@@ -50,7 +50,6 @@ import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PENDI
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.PREEMPTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.RESTARTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.RUNNING;
-import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.SANDBOX_DELETED;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.STARTING;
 import static org.apache.aurora.scheduler.state.TaskStateMachine.TaskState.THROTTLED;
 import static org.junit.Assert.assertEquals;
@@ -77,7 +76,7 @@ public class TaskStateMachineTest {
   @Test
   public void testSimpleTransition() {
     expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING, FINISHED);
-    legalTransition(SANDBOX_DELETED, Action.SAVE_STATE);
+    legalTransition(DELETED, Action.DELETE);
   }
 
   @Test
@@ -127,50 +126,10 @@ public class TaskStateMachineTest {
   }
 
   @Test
-  public void testTerminalToSandboxDeleted() {
-    Set<ScheduleStatus> terminalStates =
-        Sets.difference(Tasks.TERMINAL_STATES, ImmutableSet.of(ScheduleStatus.SANDBOX_DELETED));
-    System.out.print(terminalStates);
-    for (ScheduleStatus endState : terminalStates) {
-      stateMachine = makeStateMachine(makeTask(false));
-      Set<SideEffect.Action> finalActions = Sets.newHashSet(Action.SAVE_STATE);
-
-      switch (endState) {
-        case FAILED:
-          finalActions.add(Action.INCREMENT_FAILURES);
-          break;
-
-        case FINISHED:
-          break;
-
-        case KILLED:
-        case LOST:
-          finalActions.add(Action.RESCHEDULE);
-          break;
-
-        case KILLING:
-          finalActions.add(Action.KILL);
-          break;
-
-        default:
-          fail("Unknown state " + endState);
-      }
-
-      expectUpdateStateOnTransitionTo(
-          PENDING,
-          ASSIGNED,
-          STARTING,
-          RUNNING);
-      legalTransition(TaskState.valueOf(endState.name()), finalActions);
-      legalTransition(SANDBOX_DELETED, Action.SAVE_STATE);
-    }
-  }
-
-  @Test
   public void testTerminalToDeleted() {
     Set<ScheduleStatus> terminalStates =
         Sets.difference(Tasks.TERMINAL_STATES, ImmutableSet.of(ScheduleStatus.SANDBOX_DELETED));
-    System.out.print(terminalStates);
+
     for (ScheduleStatus endState : terminalStates) {
       stateMachine = makeStateMachine(makeTask(false));
       Set<SideEffect.Action> finalActions = Sets.newHashSet(Action.SAVE_STATE);
@@ -207,19 +166,6 @@ public class TaskStateMachineTest {
   }
 
   @Test
-  public void testSandboxDeletedToDeleted() {
-    stateMachine = makeStateMachine(makeTask(false));
-    expectUpdateStateOnTransitionTo(
-        PENDING,
-        ASSIGNED,
-        STARTING,
-        RUNNING,
-        FINISHED,
-        SANDBOX_DELETED);
-    legalTransition(DELETED, Action.DELETE);
-  }
-
-  @Test
   public void testUnknownTask() {
     stateMachine = new TaskStateMachine("id");
 
@@ -236,20 +182,6 @@ public class TaskStateMachineTest {
   public void testKilledPending() {
     expectUpdateStateOnTransitionTo(PENDING);
     legalTransition(KILLING, Action.DELETE);
-  }
-
-  @Test
-  public void testMissingStartingRescheduledImmediately() {
-    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING);
-    illegalTransition(SANDBOX_DELETED,
-        ImmutableSet.of(new SideEffect(Action.STATE_CHANGE, Optional.of(LOST.getStatus().get()))));
-  }
-
-  @Test
-  public void testMissingRunningRescheduledImmediately() {
-    expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
-    illegalTransition(SANDBOX_DELETED,
-        ImmutableSet.of(new SideEffect(Action.STATE_CHANGE, Optional.of(LOST.getStatus().get()))));
   }
 
   @Test
@@ -511,7 +443,6 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, STARTING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, STARTING, KILLING), SAVE_AND_KILL)
           .put(new TestCase(true, STARTING, LOST), SAVE_AND_RESCHEDULE)
-          .put(new TestCase(true, STARTING, SANDBOX_DELETED), MARK_LOST)
           .put(new TestCase(false, RUNNING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, RUNNING, STARTING), ILLEGAL_KILL)
           .put(new TestCase(false, RUNNING, RUNNING), ILLEGAL_KILL)
@@ -523,14 +454,12 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, RUNNING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, RUNNING, KILLING), SAVE_AND_KILL)
           .put(new TestCase(true, RUNNING, LOST), SAVE_AND_RESCHEDULE)
-          .put(new TestCase(true, RUNNING, SANDBOX_DELETED), MARK_LOST)
           .put(new TestCase(true, FINISHED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, FINISHED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, FINISHED, STARTING), ILLEGAL_KILL)
           .put(new TestCase(false, FINISHED, STARTING), ILLEGAL_KILL)
           .put(new TestCase(true, FINISHED, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(false, FINISHED, RUNNING), ILLEGAL_KILL)
-          .put(new TestCase(true, FINISHED, SANDBOX_DELETED), SAVE)
           .put(new TestCase(true, FINISHED, DELETED), DELETE_TASK)
           .put(new TestCase(true, PREEMPTING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, PREEMPTING, ASSIGNED), ILLEGAL_KILL)
@@ -543,7 +472,6 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, PREEMPTING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, PREEMPTING, KILLING), SAVE)
           .put(new TestCase(true, PREEMPTING, LOST), SAVE_KILL_AND_RESCHEDULE)
-          .put(new TestCase(true, PREEMPTING, SANDBOX_DELETED), MARK_LOST)
           .put(new TestCase(true, RESTARTING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, RESTARTING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, RESTARTING, STARTING), ILLEGAL_KILL)
@@ -555,7 +483,6 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, RESTARTING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, RESTARTING, KILLING), SAVE)
           .put(new TestCase(true, RESTARTING, LOST), SAVE_KILL_AND_RESCHEDULE)
-          .put(new TestCase(true, RESTARTING, SANDBOX_DELETED), MARK_LOST)
           .put(new TestCase(true, DRAINING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, DRAINING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, DRAINING, STARTING), ILLEGAL_KILL)
@@ -567,14 +494,12 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, DRAINING, KILLED), SAVE_AND_RESCHEDULE)
           .put(new TestCase(true, DRAINING, KILLING), SAVE)
           .put(new TestCase(true, DRAINING, LOST), SAVE_KILL_AND_RESCHEDULE)
-          .put(new TestCase(true, DRAINING, SANDBOX_DELETED), MARK_LOST)
           .put(new TestCase(true, FAILED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, FAILED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(true, FAILED, STARTING), ILLEGAL_KILL)
           .put(new TestCase(false, FAILED, STARTING), ILLEGAL_KILL)
           .put(new TestCase(true, FAILED, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(false, FAILED, RUNNING), ILLEGAL_KILL)
-          .put(new TestCase(true, FAILED, SANDBOX_DELETED), SAVE)
           .put(new TestCase(true, FAILED, DELETED), DELETE_TASK)
           .put(new TestCase(true, KILLED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, KILLED, ASSIGNED), ILLEGAL_KILL)
@@ -582,7 +507,6 @@ public class TaskStateMachineTest {
           .put(new TestCase(false, KILLED, STARTING), ILLEGAL_KILL)
           .put(new TestCase(true, KILLED, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(false, KILLED, RUNNING), ILLEGAL_KILL)
-          .put(new TestCase(true, KILLED, SANDBOX_DELETED), SAVE)
           .put(new TestCase(true, KILLED, DELETED), DELETE_TASK)
           .put(new TestCase(true, KILLING, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, KILLING, ASSIGNED), ILLEGAL_KILL)
@@ -594,7 +518,6 @@ public class TaskStateMachineTest {
           .put(new TestCase(true, KILLING, FAILED), SAVE)
           .put(new TestCase(true, KILLING, KILLED), SAVE)
           .put(new TestCase(true, KILLING, LOST), SAVE)
-          .put(new TestCase(true, KILLING, SANDBOX_DELETED), SAVE)
           .put(new TestCase(true, KILLING, DELETED), DELETE_TASK)
           .put(new TestCase(true, LOST, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, LOST, ASSIGNED), ILLEGAL_KILL)
@@ -602,15 +525,7 @@ public class TaskStateMachineTest {
           .put(new TestCase(false, LOST, STARTING), ILLEGAL_KILL)
           .put(new TestCase(true, LOST, RUNNING), ILLEGAL_KILL)
           .put(new TestCase(false, LOST, RUNNING), ILLEGAL_KILL)
-          .put(new TestCase(true, LOST, SANDBOX_DELETED), SAVE)
           .put(new TestCase(true, LOST, DELETED), DELETE_TASK)
-          .put(new TestCase(true, SANDBOX_DELETED, ASSIGNED), ILLEGAL_KILL)
-          .put(new TestCase(false, SANDBOX_DELETED, ASSIGNED), ILLEGAL_KILL)
-          .put(new TestCase(true, SANDBOX_DELETED, STARTING), ILLEGAL_KILL)
-          .put(new TestCase(false, SANDBOX_DELETED, STARTING), ILLEGAL_KILL)
-          .put(new TestCase(true, SANDBOX_DELETED, RUNNING), ILLEGAL_KILL)
-          .put(new TestCase(false, SANDBOX_DELETED, RUNNING), ILLEGAL_KILL)
-          .put(new TestCase(true, SANDBOX_DELETED, DELETED), DELETE_TASK)
           .put(new TestCase(false, DELETED, ASSIGNED), ILLEGAL_KILL)
           .put(new TestCase(false, DELETED, STARTING), ILLEGAL_KILL)
           .put(new TestCase(false, DELETED, RUNNING), ILLEGAL_KILL)

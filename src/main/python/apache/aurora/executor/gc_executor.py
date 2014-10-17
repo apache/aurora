@@ -278,6 +278,9 @@ class ThermosGCExecutor(ExecutorBase, ExceptionalThread, Observable):
         states = self.get_states(task_id)
         if states:
           _, last_state = states[-1]
+          # TODO(maxim): The SANDBOX_DELETED below is used as a safety fallback in case an unknown
+          # status is encountered during reconciliation. Unless GC executor is removed first
+          # (AURORA-715), consider a different fallback when removing the state
           updates[task_id] = THERMOS_TO_TWITTER_STATES.get(
               last_state,
               ScheduleStatus.SANDBOX_DELETED)
