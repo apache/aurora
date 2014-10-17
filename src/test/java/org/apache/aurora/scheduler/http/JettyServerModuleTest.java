@@ -33,7 +33,6 @@ import com.twitter.common.application.ShutdownRegistry.ShutdownRegistryImpl;
 import com.twitter.common.application.StartupRegistry;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.application.modules.LocalServiceRegistry;
-import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.base.Command;
 import com.twitter.common.net.pool.DynamicHostSet;
@@ -85,7 +84,6 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
 
     injector = Guice.createInjector(
         new JettyServerModule(),
-        new LogModule(),
         new StatsModule(),
         new LifecycleModule(),
         new AbstractModule() {

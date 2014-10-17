@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.app;
 
 import java.net.InetSocketAddress;
 import java.util.List;
-import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -30,7 +29,6 @@ import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.AppLauncher;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.modules.LocalServiceRegistry;
-import com.twitter.common.application.modules.LogModule;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -65,12 +63,12 @@ import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.thrift.ThriftModule;
 import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 
+import static com.twitter.common.logging.RootLogConfig.Configuration;
+
 /**
  * Launcher for the aurora scheduler.
  */
 public class SchedulerMain extends AbstractApplication {
-
-  private static final Logger LOG = Logger.getLogger(SchedulerMain.class.getName());
 
   @NotNull
   @CmdLine(name = "cluster_name", help = "Name to identify the cluster being served.")
@@ -109,7 +107,6 @@ public class SchedulerMain extends AbstractApplication {
   @Inject private LocalServiceRegistry serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
   @Inject private Lifecycle appLifecycle;
-  @Inject private Optional<RootLogConfig.Configuration> glogConfig;
 
   private static Iterable<? extends Module> getExtraModules() {
     Builder<Module> modules = ImmutableList.builder();
@@ -130,7 +127,6 @@ public class SchedulerMain extends AbstractApplication {
       String statsURLPrefix) {
 
     return ImmutableList.<Module>builder()
-        .add(new LogModule())
         .add(new StatsModule())
         .add(new AppModule(clusterName, serverSetPath, zkClientConfig, statsURLPrefix))
         .addAll(getExtraModules())
@@ -192,12 +188,10 @@ public class SchedulerMain extends AbstractApplication {
 
   @Override
   public void run() {
-    if (glogConfig.isPresent()) {
-      // Setup log4j to match our jul glog config in order to pick up zookeeper logging.
-      Log4jConfigurator.configureConsole(glogConfig.get());
-    } else {
-      LOG.warning("Running without expected glog configuration.");
-    }
+    // Setup log4j to match our jul glog config in order to pick up zookeeper logging.
+    Configuration logConfiguration = RootLogConfig.configurationFromFlags();
+    logConfiguration.apply();
+    Log4jConfigurator.configureConsole(logConfiguration);
 
     LeadershipListener leaderListener = schedulerLifecycle.prepare();
 

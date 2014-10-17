@@ -192,7 +192,6 @@ dependencies {
   }
   compile 'com.twitter.common:application-module-applauncher:0.0.51'
   compile 'com.twitter.common:application-module-lifecycle:0.0.48'
-  compile 'com.twitter.common:application-module-log:0.0.56'
   compile 'com.twitter.common:application-module-stats:0.0.44'
   compile 'com.twitter.common:application:0.0.73'
   compile 'com.twitter.common:args:0.2.9'
