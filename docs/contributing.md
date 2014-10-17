@@ -1,3 +1,9 @@
+Get the Source Code
+-------------------
+First things first, you'll need the source! The Aurora source is available from Apache git:
+
+    git clone https://git-wip-us.apache.org/repos/asf/incubator-aurora
+
 Find Something to Do
 --------------------
 There are issues in [Jira](https://issues.apache.org/jira/browse/AURORA) with the
