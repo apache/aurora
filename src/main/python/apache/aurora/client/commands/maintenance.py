@@ -111,16 +111,13 @@ def host_drain(cluster):
 
   post_drain_callback = parse_script(options.post_drain_script)
 
-  drained_hostnames = HostMaintenance(CLUSTERS[cluster], options.verbosity).perform_maintenance(
+  HostMaintenance(CLUSTERS[cluster], options.verbosity).perform_maintenance(
       drainable_hosts,
       grouping_function=options.grouping,
       percentage=override_percentage,
       duration=override_duration,
-      output_file=options.unsafe_hosts_filename)
-
-  if post_drain_callback:
-    for hostname in drained_hostnames:
-      post_drain_callback(hostname)
+      output_file=options.unsafe_hosts_filename,
+      callback=post_drain_callback)
 
 
 @app.command

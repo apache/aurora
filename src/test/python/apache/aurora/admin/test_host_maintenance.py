@@ -168,22 +168,36 @@ class TestHostMaintenance(unittest.TestCase):
     maintenance.start_maintenance(TEST_HOSTNAMES)
     mock_api.assert_called_once_with(Hosts(set(TEST_HOSTNAMES)))
 
+  def test_operate_on_hosts(self):
+    mock_callback = mock.Mock()
+    test_hosts = Hosts(TEST_HOSTNAMES)
+    maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
+    maintenance._operate_on_hosts(test_hosts, mock_callback)
+    assert mock_callback.call_count == 3
+
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._drain_hosts",
     spec=HostMaintenance._drain_hosts)
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance.start_maintenance",
     spec=HostMaintenance.start_maintenance)
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._check_sla",
     spec=HostMaintenance._check_sla)
-  def test_perform_maintenance(self, mock_check_sla, mock_start_maintenance, mock_drain_hosts):
+  @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._operate_on_hosts",
+    spec=HostMaintenance._operate_on_hosts)
+  def test_perform_maintenance(self, mock_operate_on_hosts, mock_check_sla, mock_start_maintenance,
+                               mock_drain_hosts):
+    mock_callback = mock.Mock()
     mock_check_sla.return_value = set()
     mock_start_maintenance.return_value = TEST_HOSTNAMES
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
-    maintenance.perform_maintenance(TEST_HOSTNAMES)
+    maintenance.perform_maintenance(TEST_HOSTNAMES, callback=mock_callback)
     mock_start_maintenance.assert_called_once_with(TEST_HOSTNAMES)
     assert mock_check_sla.call_count == 3
     assert mock_drain_hosts.call_count == 3
     assert mock_drain_hosts.call_args_list == [
         mock.call(Hosts(set([hostname]))) for hostname in TEST_HOSTNAMES]
+    assert mock_operate_on_hosts.call_count == 3
+    assert mock_operate_on_hosts.call_args_list == [
+        mock.call(Hosts(set([hostname])), mock_callback) for hostname in TEST_HOSTNAMES]
 
   @mock.patch("apache.aurora.admin.host_maintenance.HostMaintenance._drain_hosts",
               spec=HostMaintenance._drain_hosts)

@@ -165,8 +165,19 @@ class HostMaintenance(object):
 
     return result
 
+  def _operate_on_hosts(self, drained_hosts, callback):
+    """Perform a given operation on a list of hosts that are ready for maintenance.
+
+    :param drained_hosts: Hosts that have been drained (via _drain_hosts)
+    :type drained_hosts: gen.apache.aurora.ttypes.Hosts
+    :param callback: Function to call one hostname at a time
+    :type callback: function
+    """
+    for hostname in drained_hosts.hostNames:
+      callback(hostname)
+
   def perform_maintenance(self, hostnames, grouping_function=DEFAULT_GROUPING,
-                          percentage=None, duration=None, output_file=None):
+                          percentage=None, duration=None, output_file=None, callback=None):
     """Put hosts into maintenance mode and drain them.
 
     Walk through the process of putting hosts into maintenance and draining them of tasks. The hosts
@@ -183,6 +194,8 @@ class HostMaintenance(object):
     :type duration: twitter.common.quantity.Time
     :param output_file: file to write hosts that were not drained due to failed SLA check
     :type output_file: string
+    :param callback: Function to call once hosts are drained
+    :type callback: function
     :rtype: set of host names that were successfully drained
     """
     hostnames = self.start_maintenance(hostnames)
@@ -208,6 +221,9 @@ class HostMaintenance(object):
         log.info('All hosts passed SLA check.')
 
       not_drained_hostnames |= self._drain_hosts(hosts)
+
+      if callback:
+        self._operate_on_hosts(hosts, callback)
 
     if not_drained_hostnames:
       output = '\n'.join(list(not_drained_hostnames))
