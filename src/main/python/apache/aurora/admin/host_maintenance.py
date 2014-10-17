@@ -11,9 +11,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from threading import Event
 
 from twitter.common import log
-from twitter.common.quantity import Time
+from twitter.common.quantity import Amount, Time
 
 from apache.aurora.admin.admin_util import format_sla_results, print_results
 from apache.aurora.client.api import AuroraClientAPI
@@ -36,6 +37,8 @@ class HostMaintenance(object):
   """
 
   SLA_MIN_JOB_INSTANCE_COUNT = 20
+  STATUS_POLL_INTERVAL = Amount(5, Time.SECONDS)
+  MAX_STATUS_WAIT = Amount(5, Time.MINUTES)
 
   @classmethod
   def iter_batches(cls, hostnames, grouping_function=DEFAULT_GROUPING):
@@ -44,8 +47,21 @@ class HostMaintenance(object):
     for group in groups:
       yield Hosts(group[1])
 
-  def __init__(self, cluster, verbosity):
+  def __init__(self, cluster, verbosity, wait_event=None):
     self._client = AuroraClientAPI(cluster, verbosity == 'verbose')
+    self._wait_event = wait_event or Event()
+
+  def check_if_drained(self, hostnames):
+    """Checks if host names reached DRAINED status.
+
+    :param hostnames: Host names to check for DRAINED status
+    :type hostnames: list of strings
+    :rtype: set of host names not in DRAINED state
+    """
+    statuses = self.check_status(hostnames)
+    not_ready_hostnames = [h[0] for h in statuses if h[1] != 'DRAINED']
+    log.info('Waiting for hosts to be in DRAINED: %s' % not_ready_hostnames)
+    return set(not_ready_hostnames)
 
   def _drain_hosts(self, drainable_hosts):
     """"Drains tasks from the specified hosts.
@@ -55,19 +71,24 @@ class HostMaintenance(object):
 
     :param drainable_hosts: Hosts that are in maintenance mode and ready to be drained
     :type drainable_hosts: gen.apache.aurora.ttypes.Hosts
+    :rtype: set of host names failed to drain
     """
     check_and_log_response(self._client.drain_hosts(drainable_hosts))
-    not_ready_hostnames = [hostname for hostname in drainable_hosts.hostNames]
-    while not_ready_hostnames:
-      resp = self._client.maintenance_status(Hosts(set(not_ready_hostnames)))
-      if not resp.result.maintenanceStatusResult.statuses:
-        not_ready_hostnames = None
-      for host_status in resp.result.maintenanceStatusResult.statuses:
-        if host_status.mode != MaintenanceMode.DRAINED:
-          log.warning('%s is currently in status %s' %
-              (host_status.host, MaintenanceMode._VALUES_TO_NAMES[host_status.mode]))
-        else:
-          not_ready_hostnames.remove(host_status.host)
+    drainable_hostnames = [hostname for hostname in drainable_hosts.hostNames]
+
+    total_wait = self.STATUS_POLL_INTERVAL
+    not_drained_hostnames = set(drainable_hostnames)
+    while not self._wait_event.is_set() and not_drained_hostnames:
+      self._wait_event.wait(self.STATUS_POLL_INTERVAL.as_(Time.SECONDS))
+
+      not_drained_hostnames = self.check_if_drained(drainable_hostnames)
+
+      total_wait += self.STATUS_POLL_INTERVAL
+      if not_drained_hostnames and total_wait > self.MAX_STATUS_WAIT:
+        log.warning('Failed to move all hosts into DRAINED within %s' % self.MAX_STATUS_WAIT)
+        break
+
+    return not_drained_hostnames
 
   def _complete_maintenance(self, drained_hosts):
     """End the maintenance status for a given set of hosts.
@@ -186,11 +207,11 @@ class HostMaintenance(object):
       else:
         log.info('All hosts passed SLA check.')
 
-      self._drain_hosts(hosts)
+      not_drained_hostnames |= self._drain_hosts(hosts)
 
     if not_drained_hostnames:
       output = '\n'.join(list(not_drained_hostnames))
-      log.info('The following hosts did not pass SLA check and were not drained:')
+      log.info('The following hosts WERE NOT DRAINED due to failed SLA check or external failures:')
       print(output)
       if output_file:
         try:

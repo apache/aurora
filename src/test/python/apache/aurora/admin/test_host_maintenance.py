@@ -19,6 +19,7 @@ from contextlib import contextmanager
 import mock
 from twitter.common import log
 from twitter.common.contextutil import temporary_file
+from twitter.common.quantity import Amount, Time
 
 from apache.aurora.admin.host_maintenance import HostMaintenance
 from apache.aurora.client.api import AuroraClientAPI
@@ -51,27 +52,38 @@ class TestHostMaintenance(unittest.TestCase):
       spec=AuroraClientAPI.maintenance_status)
   @mock.patch("apache.aurora.client.api.AuroraClientAPI.drain_hosts",
       spec=AuroraClientAPI.drain_hosts)
-  def test_drain_hosts(self, mock_drain_hosts, mock_maintenance_status):
+  @mock.patch("threading._Event.wait")
+  def test_drain_hosts(self, mock_event_wait, mock_drain_hosts, mock_maintenance_status):
     fake_maintenance_status_response = [
-        Response(result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
-            HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.SCHEDULED),
-            HostStatus(host=TEST_HOSTNAMES[1], mode=MaintenanceMode.SCHEDULED),
-            HostStatus(host=TEST_HOSTNAMES[2], mode=MaintenanceMode.SCHEDULED)
-        ])))),
-        Response(result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
-            HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.DRAINING),
-            HostStatus(host=TEST_HOSTNAMES[1], mode=MaintenanceMode.DRAINING),
-            HostStatus(host=TEST_HOSTNAMES[2], mode=MaintenanceMode.DRAINING)
-        ])))),
-        Response(result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
-            HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.DRAINING),
-            HostStatus(host=TEST_HOSTNAMES[1], mode=MaintenanceMode.DRAINED),
-            HostStatus(host=TEST_HOSTNAMES[2], mode=MaintenanceMode.DRAINED)
-        ])))),
-        Response(result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
-            HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.DRAINED)
-        ]))))
-    ]
+        Response(
+            responseCode=ResponseCode.OK,
+            result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
+                HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.SCHEDULED),
+                HostStatus(host=TEST_HOSTNAMES[1], mode=MaintenanceMode.SCHEDULED),
+                HostStatus(host=TEST_HOSTNAMES[2], mode=MaintenanceMode.SCHEDULED)
+            ])))),
+        Response(
+            responseCode=ResponseCode.OK,
+            result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
+                HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.DRAINING),
+                HostStatus(host=TEST_HOSTNAMES[1], mode=MaintenanceMode.DRAINING),
+                HostStatus(host=TEST_HOSTNAMES[2], mode=MaintenanceMode.DRAINING)
+            ])))),
+        Response(
+            responseCode=ResponseCode.OK,
+            result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
+                HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.DRAINING),
+                HostStatus(host=TEST_HOSTNAMES[1], mode=MaintenanceMode.DRAINED),
+                HostStatus(host=TEST_HOSTNAMES[2], mode=MaintenanceMode.DRAINED)
+            ])))),
+        Response(
+            responseCode=ResponseCode.OK,
+            result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
+                HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.DRAINED),
+                HostStatus(host=TEST_HOSTNAMES[1], mode=MaintenanceMode.DRAINED),
+                HostStatus(host=TEST_HOSTNAMES[2], mode=MaintenanceMode.DRAINED)
+            ]))))]
+
     fake_maintenance_status_call_args = []
     def fake_maintenance_status_side_effect(hosts):
       fake_maintenance_status_call_args.append(copy.deepcopy(hosts))
@@ -81,14 +93,43 @@ class TestHostMaintenance(unittest.TestCase):
     mock_maintenance_status.side_effect = fake_maintenance_status_side_effect
     test_hosts = Hosts(set(TEST_HOSTNAMES))
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
-    maintenance._drain_hosts(test_hosts)
+
+    not_drained_hostnames = maintenance._drain_hosts(test_hosts)
+    assert len(not_drained_hostnames) == 0
     mock_drain_hosts.assert_called_once_with(test_hosts)
     assert mock_maintenance_status.call_count == 4
+    assert mock_event_wait.call_count == 4
     assert fake_maintenance_status_call_args == [
         (Hosts(set(TEST_HOSTNAMES))),
         (Hosts(set(TEST_HOSTNAMES))),
         (Hosts(set(TEST_HOSTNAMES))),
-        (Hosts(set([TEST_HOSTNAMES[0]])))]
+        (Hosts(set(TEST_HOSTNAMES)))]
+
+  @mock.patch("apache.aurora.client.api.AuroraClientAPI.maintenance_status",
+              spec=AuroraClientAPI.maintenance_status)
+  @mock.patch("apache.aurora.client.api.AuroraClientAPI.drain_hosts",
+              spec=AuroraClientAPI.drain_hosts)
+  @mock.patch("threading._Event.wait")
+  def test_drain_hosts_timed_out_wait(self, _, mock_drain_hosts, mock_maintenance_status):
+    fake_maintenance_status_response = Response(
+        responseCode=ResponseCode.OK,
+        result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
+          HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.SCHEDULED),
+          HostStatus(host=TEST_HOSTNAMES[1], mode=MaintenanceMode.SCHEDULED),
+          HostStatus(host=TEST_HOSTNAMES[2], mode=MaintenanceMode.SCHEDULED)
+        ]))))
+
+    mock_drain_hosts.return_value = Response(responseCode=ResponseCode.OK)
+    mock_maintenance_status.return_value = fake_maintenance_status_response
+    test_hosts = Hosts(set(TEST_HOSTNAMES))
+    maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
+    maintenance.MAX_STATUS_WAIT = Amount(1, Time.MILLISECONDS)
+
+    not_drained_hostnames = maintenance._drain_hosts(test_hosts)
+    assert TEST_HOSTNAMES == sorted(not_drained_hostnames)
+    assert mock_maintenance_status.call_count == 1
+    mock_drain_hosts.assert_called_once_with(test_hosts)
+    mock_maintenance_status.assert_called_once_with((Hosts(set(TEST_HOSTNAMES))))
 
   @mock.patch("twitter.common.log.warning", spec=log.warning)
   @mock.patch("apache.aurora.client.api.AuroraClientAPI.maintenance_status",
@@ -156,6 +197,7 @@ class TestHostMaintenance(unittest.TestCase):
     mock_check_sla.return_value = set([failed_host])
     mock_start_maintenance.return_value = TEST_HOSTNAMES
     drained_hosts = set(TEST_HOSTNAMES) - set([failed_host])
+    mock_drain_hosts.return_value = set()
     maintenance = HostMaintenance(DEFAULT_CLUSTER, 'quiet')
 
     with temporary_file() as fp:
