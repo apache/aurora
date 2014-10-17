@@ -57,7 +57,7 @@ Aurora Jobs.
 Cluster Configuration
 ---------------------
 
-The client must be able to find a configuration file that speciies available clusters. This file
+The client must be able to find a configuration file that specifies available clusters. This file
 declares shorthand names for clusters, which are in turn referenced by job configuration files
 and client commands.
 
@@ -86,6 +86,9 @@ A configuration for a leader-elected scheduler would contain something like:
   "scheduler_zk_path": "/aurora/scheduler"
 }]
 ```
+
+For more details on cluster configuration see the
+[Client Cluster Configuration](client-cluster-configuration.md) documentation.
 
 Job Keys
 --------

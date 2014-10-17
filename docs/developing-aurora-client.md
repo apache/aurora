@@ -1,6 +1,5 @@
-
 Getting Started
-=================
+===============
 
 Aurora consists of four main pieces: the scheduler (which finds resources in the cluster that can be used to run a job), the executor (which uses the resources assigned by the scheduler to run a job), the command-line client, and the web-ui. For information about working on the scheduler or the webUI, see the file "developing-aurora-scheduler.md" in this directory.
 
@@ -23,8 +22,17 @@ To run all of the client tests:
     $ ./pasts src/test/python/apache/aurora/client/:all
 
 
+Client Configuration
+====================
+
+The client uses a configuration file that specifies available clusters. More information about the
+contents of this file can be found in the
+[Client Cluster Configuration](client-cluster-configuration.md) documentation. Information about
+how the client locates this file can be found in the
+[Client Commands](client-commands.md#cluster-configuration) documentation.
+
 Client Versions
-==================
+===============
 
 There are currently two versions of the aurora client, imaginatively known as v1 and v2. All new development is done entirely in v2, but we continue to support and fix bugs in v1, until we get to the point where v2 is feature-complete and tested, and aurora users have had some time at adapt and switch their processes to use v2.
 
@@ -38,7 +46,7 @@ found in the `__init__.py` file in that directory.
 
 
 Building and Testing the Client
-=================================
+===============================
 
 Building and testing the client code are both done using Pants. The relevant targets to know about are:
 
@@ -50,7 +58,7 @@ Building and testing the client code are both done using Pants. The relevant tar
 
 
 Overview of the Client Architecture
-=====================================
+===================================
 
 The client is built on a stacked architecture:
 
@@ -80,7 +88,7 @@ The client is built on a stacked architecture:
        * `client.py` contains the code that binds the client v2 nouns and verbs into an executable.
 
 Running/Debugging the Client
-=============================
+============================
 
 For manually testing client changes against a cluster, we use vagrant. To start a virtual cluster,
 you need to install a working vagrant environment, and then run "vagrant up" for the root of
