@@ -37,6 +37,8 @@ import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.base.Command;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.thrift.ServiceInstance;
@@ -101,7 +103,10 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
                 .setThriftAPIVersion(100)
                 .setStatsUrlPrefix("none")));
             bind(TaskGroupsSettings.class).toInstance(
-                new TaskGroupsSettings(bindMock(BackoffStrategy.class), RateLimiter.create(1000)));
+                new TaskGroupsSettings(
+                    Amount.of(1L, Time.MILLISECONDS),
+                    bindMock(BackoffStrategy.class),
+                    RateLimiter.create(1000)));
 
             bind(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }).toInstance(schedulers);
             thrift = bindMock(AuroraAdmin.Iface.class);

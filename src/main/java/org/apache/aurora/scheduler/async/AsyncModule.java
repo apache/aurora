@@ -83,15 +83,22 @@ public class AsyncModule extends AbstractModule {
       Arg.create(Amount.of(5L, Time.MINUTES));
 
   @Positive
-  @CmdLine(name = "initial_schedule_delay",
-      help = "Initial amount of time to wait before attempting to schedule a PENDING task.")
-  private static final Arg<Amount<Long, Time>> INITIAL_SCHEDULE_DELAY =
+  @CmdLine(name = "first_schedule_delay",
+      help = "Initial amount of time to wait before first attempting to schedule a PENDING task.")
+  private static final Arg<Amount<Long, Time>> FIRST_SCHEDULE_DELAY =
       Arg.create(Amount.of(1L, Time.MILLISECONDS));
 
-  @CmdLine(name = "max_schedule_delay",
+  @Positive
+  @CmdLine(name = "initial_schedule_penalty",
+      help = "Initial amount of time to wait before attempting to schedule a task that has failed"
+          + " to schedule.")
+  private static final Arg<Amount<Long, Time>> INITIAL_SCHEDULE_PENALTY =
+      Arg.create(Amount.of(1L, Time.SECONDS));
+
+  @CmdLine(name = "max_schedule_penalty",
       help = "Maximum delay between attempts to schedule a PENDING tasks.")
-  private static final Arg<Amount<Long, Time>> MAX_SCHEDULE_DELAY =
-      Arg.create(Amount.of(30L, Time.SECONDS));
+  private static final Arg<Amount<Long, Time>> MAX_SCHEDULE_PENALTY =
+      Arg.create(Amount.of(1L, Time.MINUTES));
 
   @CmdLine(name = "min_offer_hold_time",
       help = "Minimum amount of time to hold a resource offer before declining.")
@@ -230,7 +237,10 @@ public class AsyncModule extends AbstractModule {
       @Override
       protected void configure() {
         bind(TaskGroupsSettings.class).toInstance(new TaskGroupsSettings(
-            new TruncatedBinaryBackoff(INITIAL_SCHEDULE_DELAY.get(), MAX_SCHEDULE_DELAY.get()),
+            FIRST_SCHEDULE_DELAY.get(),
+            new TruncatedBinaryBackoff(
+                INITIAL_SCHEDULE_PENALTY.get(),
+                MAX_SCHEDULE_PENALTY.get()),
             RateLimiter.create(MAX_SCHEDULE_ATTEMPTS_PER_SEC.get())));
 
         bind(RescheduleCalculatorImpl.RescheduleCalculatorSettings.class)

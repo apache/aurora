@@ -23,6 +23,7 @@ import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -68,6 +69,7 @@ public class TaskGroups implements EventSubscriber {
   private final ConcurrentMap<GroupKey, TaskGroup> groups = Maps.newConcurrentMap();
   private final ScheduledExecutorService executor;
   private final TaskScheduler taskScheduler;
+  private final long firstScheduleDelay;
   private final BackoffStrategy backoff;
   private final RescheduleCalculator rescheduleCalculator;
 
@@ -77,10 +79,16 @@ public class TaskGroups implements EventSubscriber {
       new SlidingStats("scheduled_task_penalty", "ms");
 
   public static class TaskGroupsSettings {
+    private final Amount<Long, Time> firstScheduleDelay;
     private final BackoffStrategy taskGroupBackoff;
     private final RateLimiter rateLimiter;
 
-    public TaskGroupsSettings(BackoffStrategy taskGroupBackoff, RateLimiter rateLimiter) {
+    public TaskGroupsSettings(
+        Amount<Long, Time> firstScheduleDelay,
+        BackoffStrategy taskGroupBackoff,
+        RateLimiter rateLimiter) {
+
+      this.firstScheduleDelay = requireNonNull(firstScheduleDelay);
       this.taskGroupBackoff = requireNonNull(taskGroupBackoff);
       this.rateLimiter = requireNonNull(rateLimiter);
     }
@@ -95,6 +103,7 @@ public class TaskGroups implements EventSubscriber {
 
     this(
         createThreadPool(shutdownRegistry),
+        settings.firstScheduleDelay,
         settings.taskGroupBackoff,
         settings.rateLimiter,
         taskScheduler,
@@ -104,14 +113,19 @@ public class TaskGroups implements EventSubscriber {
   @VisibleForTesting
   TaskGroups(
       final ScheduledExecutorService executor,
+      final Amount<Long, Time> firstScheduleDelay,
       final BackoffStrategy backoff,
       final RateLimiter rateLimiter,
       final TaskScheduler taskScheduler,
       final RescheduleCalculator rescheduleCalculator) {
 
+    requireNonNull(firstScheduleDelay);
+    Preconditions.checkArgument(firstScheduleDelay.getValue() > 0);
+
     this.executor = requireNonNull(executor);
     requireNonNull(rateLimiter);
     requireNonNull(taskScheduler);
+    this.firstScheduleDelay = firstScheduleDelay.as(Time.MILLISECONDS);
     this.backoff = requireNonNull(backoff);
     this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
 
@@ -145,7 +159,7 @@ public class TaskGroups implements EventSubscriber {
             scheduledTaskPenalties.accumulate(group.getPenaltyMs());
             group.remove(taskId.get());
             if (group.hasMore()) {
-              penaltyMs = backoff.calculateBackoffMs(0);
+              penaltyMs = firstScheduleDelay;
             }
           } else {
             penaltyMs = backoff.calculateBackoffMs(group.getPenaltyMs());
@@ -191,7 +205,7 @@ public class TaskGroups implements EventSubscriber {
       if (existing == null) {
         long penaltyMs;
         if (stateChange.isTransition()) {
-          penaltyMs = backoff.calculateBackoffMs(0);
+          penaltyMs = firstScheduleDelay;
         } else {
           penaltyMs = rescheduleCalculator.getStartupScheduleDelayMs(task);
         }

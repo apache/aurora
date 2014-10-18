@@ -18,6 +18,9 @@ import java.util.concurrent.ScheduledFuture;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
+
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
 
@@ -44,11 +47,12 @@ import static org.easymock.EasyMock.expectLastCall;
 
 public class TaskGroupsTest extends EasyMockTest {
 
+  private static final long FIRST_SCHEDULE_DELAY_MS = 1L;
+
   private ScheduledExecutorService executor;
   private BackoffStrategy backoffStrategy;
   private TaskScheduler taskScheduler;
   private RateLimiter rateLimiter;
-  private RescheduleCalculator rescheduleCalculator;
 
   private TaskGroups taskGroups;
 
@@ -58,19 +62,21 @@ public class TaskGroupsTest extends EasyMockTest {
     backoffStrategy = createMock(BackoffStrategy.class);
     taskScheduler = createMock(TaskScheduler.class);
     rateLimiter = createMock(RateLimiter.class);
-    rescheduleCalculator = createMock(RescheduleCalculator.class);
     taskGroups = new TaskGroups(
         executor,
+        Amount.of(FIRST_SCHEDULE_DELAY_MS, Time.MILLISECONDS),
         backoffStrategy,
         rateLimiter,
         taskScheduler,
-        rescheduleCalculator);
+        createMock(RescheduleCalculator.class));
   }
 
   @Test
-  public void testEvaluatedImmediately() {
-    expect(backoffStrategy.calculateBackoffMs(0)).andReturn(0L);
-    executor.schedule(EasyMock.<Runnable>anyObject(), EasyMock.eq(0L), EasyMock.eq(MILLISECONDS));
+  public void testEvaluatedAfterFirstSchedulePenalty() {
+    executor.schedule(
+        EasyMock.<Runnable>anyObject(),
+        EasyMock.eq(FIRST_SCHEDULE_DELAY_MS),
+        EasyMock.eq(MILLISECONDS));
     expectLastCall().andAnswer(new IAnswer<ScheduledFuture<Void>>() {
       @Override
       public ScheduledFuture<Void> answer() {
@@ -88,7 +94,10 @@ public class TaskGroupsTest extends EasyMockTest {
 
   private Capture<Runnable> expectEvaluate() {
     Capture<Runnable> capture = createCapture();
-    executor.schedule(EasyMock.capture(capture), EasyMock.eq(0L), EasyMock.eq(MILLISECONDS));
+    executor.schedule(
+        EasyMock.capture(capture),
+        EasyMock.eq(FIRST_SCHEDULE_DELAY_MS),
+        EasyMock.eq(MILLISECONDS));
     expectLastCall().andReturn(null);
     return capture;
   }
@@ -97,7 +106,6 @@ public class TaskGroupsTest extends EasyMockTest {
   public void testTaskDeletedBeforeEvaluating() {
     final IScheduledTask task = makeTask("a");
 
-    expect(backoffStrategy.calculateBackoffMs(0)).andReturn(0L).atLeastOnce();
     Capture<Runnable> evaluate = expectEvaluate();
 
     expect(rateLimiter.acquire()).andReturn(0D);
@@ -112,6 +120,7 @@ public class TaskGroupsTest extends EasyMockTest {
         return false;
       }
     });
+    expect(backoffStrategy.calculateBackoffMs(FIRST_SCHEDULE_DELAY_MS)).andReturn(0L);
 
     control.replay();
 

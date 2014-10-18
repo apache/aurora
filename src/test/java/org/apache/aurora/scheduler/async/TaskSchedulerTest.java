@@ -85,6 +85,8 @@ import static org.junit.Assert.assertEquals;
  */
 public class TaskSchedulerTest extends EasyMockTest {
 
+  private static final long FIRST_SCHEDULE_DELAY_MS = 1L;
+
   private static final Offer OFFER_A = Offers.makeOffer("OFFER_A", "HOST_A");
   private static final Offer OFFER_B = Offers.makeOffer("OFFER_B", "HOST_B");
   private static final Offer OFFER_C = Offers.makeOffer("OFFER_C", "HOST_C");
@@ -140,6 +142,7 @@ public class TaskSchedulerTest extends EasyMockTest {
         clock);
     taskGroups = new TaskGroups(
         executor,
+        Amount.of(FIRST_SCHEDULE_DELAY_MS, Time.MILLISECONDS),
         retryStrategy,
         RateLimiter.create(100),
         scheduler,
@@ -192,10 +195,6 @@ public class TaskSchedulerTest extends EasyMockTest {
     return expectTaskRetryIn(nextPenaltyMs);
   }
 
-  private Capture<Runnable> expectTaskGroupBackoff(long nextPenaltyMs) {
-    return expectTaskGroupBackoff(0, nextPenaltyMs);
-  }
-
   @Test
   public void testNoTasks() {
     expectAnyMaintenanceCalls();
@@ -210,8 +209,8 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testNoOffers() {
-    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
-    expectTaskGroupBackoff(10, 20);
+    Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
+    expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
     expect(preemptor.findPreemptionSlotFor("a", emptyJob)).andReturn(Optional.<String>absent());
 
     replayAndCreateScheduler();
@@ -260,7 +259,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   @Test
   public void testTaskMissing() {
-    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
     replayAndCreateScheduler();
 
@@ -276,16 +275,16 @@ public class TaskSchedulerTest extends EasyMockTest {
     IScheduledTask task = makeTask("a", PENDING);
     TaskInfo mesosTask = makeTaskInfo(task);
 
-    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expect(assigner.maybeAssign(OFFER_A, task, emptyJob)).andReturn(Optional.<TaskInfo>absent());
     expect(preemptor.findPreemptionSlotFor("a", emptyJob)).andReturn(Optional.<String>absent());
 
-    Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(10, 20);
+    Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
     expect(assigner.maybeAssign(OFFER_A, task, emptyJob)).andReturn(Optional.of(mesosTask));
     driver.launchTask(OFFER_A.getId(), mesosTask);
 
-    Capture<Runnable> timeoutCapture3 = expectTaskGroupBackoff(10);
-    expectTaskGroupBackoff(10, 20);
+    Capture<Runnable> timeoutCapture3 = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
+    expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
     expect(preemptor.findPreemptionSlotFor("b", emptyJob)).andReturn(Optional.<String>absent());
 
     replayAndCreateScheduler();
@@ -309,7 +308,7 @@ public class TaskSchedulerTest extends EasyMockTest {
         .setSlaveId(SlaveID.newBuilder().setValue("slaveId"))
         .build();
 
-    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expectAnyMaintenanceCalls();
     expectOfferDeclineIn(10);
     expect(assigner.maybeAssign(OFFER_A, task, emptyJob)).andReturn(Optional.of(mesosTask));
@@ -338,13 +337,13 @@ public class TaskSchedulerTest extends EasyMockTest {
         .setSlaveId(SlaveID.newBuilder().setValue("slaveId"))
         .build();
 
-    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expectAnyMaintenanceCalls();
     expectOfferDeclineIn(10);
     expect(assigner.maybeAssign(OFFER_A, task, emptyJob))
         .andThrow(new StorageException("Injected failure."));
 
-    Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(10, 20);
+    Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
     expect(assigner.maybeAssign(OFFER_A, task, emptyJob)).andReturn(Optional.of(mesosTask));
     driver.launchTask(OFFER_A.getId(), mesosTask);
     expectLastCall();
@@ -361,14 +360,14 @@ public class TaskSchedulerTest extends EasyMockTest {
   public void testExpiration() {
     IScheduledTask task = makeTask("a", PENDING);
 
-    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     Capture<Runnable> offerExpirationCapture = expectOfferDeclineIn(10);
     expectAnyMaintenanceCalls();
     expect(assigner.maybeAssign(OFFER_A, task, emptyJob)).andReturn(Optional.<TaskInfo>absent());
-    Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(10, 20);
+    Capture<Runnable> timeoutCapture2 = expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 10);
     expect(preemptor.findPreemptionSlotFor("a", emptyJob)).andReturn(Optional.<String>absent());
     driver.declineOffer(OFFER_A.getId());
-    expectTaskGroupBackoff(20, 30);
+    expectTaskGroupBackoff(10, 20);
     expect(preemptor.findPreemptionSlotFor("a", emptyJob)).andReturn(Optional.<String>absent());
 
     replayAndCreateScheduler();
@@ -431,13 +430,13 @@ public class TaskSchedulerTest extends EasyMockTest {
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
     expect(assigner.maybeAssign(OFFER_A, taskA, emptyJob)).andReturn(Optional.of(mesosTaskA));
     driver.launchTask(OFFER_A.getId(), mesosTaskA);
-    Capture<Runnable> captureA = expectTaskGroupBackoff(10);
+    Capture<Runnable> captureA = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
     IScheduledTask taskB = makeTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
     expect(assigner.maybeAssign(OFFER_B, taskB, emptyJob)).andReturn(Optional.of(mesosTaskB));
     driver.launchTask(OFFER_B.getId(), mesosTaskB);
-    Capture<Runnable> captureB = expectTaskGroupBackoff(10);
+    Capture<Runnable> captureB = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
     replayAndCreateScheduler();
 
@@ -466,13 +465,13 @@ public class TaskSchedulerTest extends EasyMockTest {
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
     expect(assigner.maybeAssign(OFFER_B, taskA, emptyJob)).andReturn(Optional.of(mesosTaskA));
     driver.launchTask(OFFER_B.getId(), mesosTaskA);
-    Capture<Runnable> captureA = expectTaskGroupBackoff(10);
+    Capture<Runnable> captureA = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
     IScheduledTask taskB = makeTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
     expect(assigner.maybeAssign(OFFER_C, taskB, emptyJob)).andReturn(Optional.of(mesosTaskB));
     driver.launchTask(OFFER_C.getId(), mesosTaskB);
-    Capture<Runnable> captureB = expectTaskGroupBackoff(10);
+    Capture<Runnable> captureB = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
     replayAndCreateScheduler();
 
@@ -531,14 +530,14 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectOfferDeclineIn(10);
     expectOfferDeclineIn(10);
 
-    Capture<Runnable> timeoutA = expectTaskGroupBackoff(10);
-    Capture<Runnable> timeoutB = expectTaskGroupBackoff(10);
+    Capture<Runnable> timeoutA = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
+    Capture<Runnable> timeoutB = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
     Capture<IScheduledTask> firstScheduled = expectTaskScheduled(jobA0);
     Capture<IScheduledTask> secondScheduled = expectTaskScheduled(jobB0);
 
     // Expect another watch of the task group for job A.
-    expectTaskGroupBackoff(10);
+    expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
     replayAndCreateScheduler();
 
@@ -564,9 +563,9 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     final IScheduledTask task = makeTask("a", PENDING);
 
-    Capture<Runnable> timeoutCapture = expectTaskGroupBackoff(10);
+    Capture<Runnable> timeoutCapture = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     expect(assigner.maybeAssign(OFFER_A, task, emptyJob)).andReturn(Optional.<TaskInfo>absent());
-    expectTaskGroupBackoff(10, 20);
+    expectTaskGroupBackoff(FIRST_SCHEDULE_DELAY_MS, 20);
     expect(preemptor.findPreemptionSlotFor("a", emptyJob)).andReturn(Optional.<String>absent());
 
     replayAndCreateScheduler();
