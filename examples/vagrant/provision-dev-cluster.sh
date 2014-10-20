@@ -37,8 +37,7 @@ function prepare_extras() {
     # Fetch the mesos egg, needed to build python components.
     mkdir -p third_party
     pushd third_party
-      wget -c http://downloads.mesosphere.io/master/ubuntu/14.04/mesos-${MESOS_VERSION}-py2.7-linux-x86_64.egg \
-        -O mesos-${MESOS_VERSION}-py2.7-linux-x86_64.egg
+      wget -c https://svn.apache.org/repos/asf/incubator/aurora/3rdparty/ubuntu/trusty64/python/mesos.native-${MESOS_VERSION}-py2.7-linux-x86_64.egg
     popd
 
     # Install thrift, needed for code generation in the scheduler build.
