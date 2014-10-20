@@ -40,6 +40,59 @@ class CoverageReportCheck extends DefaultTask {
     return ((double) covered) / (missed + covered)
   }
 
+  def checkThresholds(coverage, minCoverage, type) {
+    if (coverage < minCoverage) {
+      return "$type coverage must be greater than $minCoverage"
+    } else {
+      def floored = Math.floor(coverage * 100) / 100
+      if (floored > minCoverage) {
+        return("$type coverage of $floored exceeds min instruction coverage of $minCoverage,"
+            + " please raise the threshold!")
+      }
+    }
+  }
+
+  def checkGlobalCoverage(coverageCounts) {
+    def coverageErrors = [
+        [computeCoverage(coverageCounts, 'INSTRUCTION'), minInstructionCoverage, 'Instruction'],
+        [computeCoverage(coverageCounts, 'BRANCH'), minBranchCoverage, 'Branch']
+    ].collect() {
+      return checkThresholds(*it)
+    }.findAll()
+
+    if (!coverageErrors.isEmpty()) {
+      throw new GradleException(coverageErrors.join('\n'))
+    }
+  }
+
+  def checkClassCoverage(coverageReport) {
+    def coverageErrors = coverageReport.package.class.collect { cls ->
+      // javac inserts a synthetic constructor for anonymous classes, and jacoco tends to mark
+      // these as covered in some cases, leading to flaky behavior.  We work around that by
+      // collecting the coverage count for each method in each class, omitting the default
+      // constructor for anonymous classes.  Anonymous classes are identified by their name,
+      // which we expect to be of the form 'Something$1'.  Jacoco names default constructors
+      // '<init>', so we filter based on that.
+      def methodFilter = cls.@name ==~ /.*\$\d+/ ? { m -> m.@name != '<init>' } : { true }
+
+      def covered = cls.method.findAll(methodFilter).collect { m ->
+        m.counter.find({ c -> c.@type == 'INSTRUCTION' }).@covered.toInteger()}.sum(0)
+
+      if (cls.@name in legacyClassesWithoutCoverage) {
+        if (covered != 0) {
+          return 'Thanks for adding the first test coverage to: ' + cls.@name \
+              + ' please remove it from the legacyClassesWithoutCoverage list'
+        }
+      } else if (covered == 0) {
+        return 'Test coverage missing for ' + cls.@name
+      }
+      return null
+    }.findAll()  // Filter nulls.
+    if (!coverageErrors.isEmpty()) {
+      throw new GradleException(coverageErrors.join('\n'))
+    }
+  }
+
   @TaskAction
   def analyze() {
     def parser = new XmlSlurper()
@@ -49,40 +102,7 @@ class CoverageReportCheck extends DefaultTask {
 
     def coverageReport = parser.parse(coverageReportFile)
 
-    // Check global thresholds.
-    if (computeCoverage(coverageReport.counter, 'INSTRUCTION') < minInstructionCoverage) {
-      throw new GradleException(
-          'Instruction coverage must be greater than ' + minInstructionCoverage)
-    }
-
-    if (computeCoverage(coverageReport.counter, 'BRANCH') < minBranchCoverage) {
-      throw new GradleException('Branch coverage must be greater than ' + minBranchCoverage)
-    }
-
-    def coverageErrors = coverageReport.package.class.collect { cls ->
-        // javac inserts a synthetic constructor for anonymous classes, and jacoco tends to mark
-        // these as covered in some cases, leading to flaky behavior.  We work around that by
-        // collecting the coverage count for each method in each class, omitting the default
-        // constructor for anonymous classes.  Anonymous classes are identified by their name,
-        // which we expect to be of the form 'Something$1'.  Jacoco names default constructors
-        // '<init>', so we filter based on that.
-        def methodFilter = cls.@name ==~ /.*\$\d+/ ? { m -> m.@name != '<init>' } : { true }
-
-        def covered = cls.method.findAll(methodFilter).collect { m ->
-          m.counter.find({ c -> c.@type == 'INSTRUCTION' }).@covered.toInteger()}.sum(0)
-
-        if (cls.@name in legacyClassesWithoutCoverage) {
-          if (covered != 0) {
-            return 'Thanks for adding the first test coverage to: ' + cls.@name \
-              + ' please remove it from the legacyClassesWithoutCoverage list'
-          }
-        } else if (covered == 0) {
-          return 'Test coverage missing for ' + cls.@name
-        }
-        return null
-    }.findAll()  // Filter nulls.
-    if (!coverageErrors.isEmpty()) {
-      throw new GradleException(coverageErrors.join('\n'))
-    }
+    checkGlobalCoverage(coverageReport.counter)
+    checkClassCoverage(coverageReport)
   }
 }
