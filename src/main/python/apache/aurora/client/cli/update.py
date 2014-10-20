@@ -74,7 +74,7 @@ class StartUpdate(Verb):
     api = context.get_api(config.cluster())
     resp = api.start_job_update(config, instances)
     context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
-        err_msg="Failed to start scheduler-driven update; see log for details.")
+        err_msg="Failed to start scheduler-driven update due to error:")
     context.print_out("Scheduler-driven update of job %s has started." % job)
     return EXIT_OK
 
@@ -98,7 +98,7 @@ class PauseUpdate(Verb):
     api = context.get_api(jobkey.cluster)
     resp = api.pause_job_update(jobkey)
     context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
-      err_msg="Failed to pause scheduler-driven update; see log for details")
+      err_msg="Failed to pause scheduler-driven update due to error:")
     context.print_out("Scheduler-driven update of job %s has been paused." % jobkey)
     return EXIT_OK
 
@@ -122,7 +122,7 @@ class ResumeUpdate(Verb):
     api = context.get_api(jobkey.cluster)
     resp = api.resume_job_update(jobkey)
     context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
-      err_msg="Failed to resume scheduler-driven update; see log for details")
+      err_msg="Failed to resume scheduler-driven update due to error:")
     context.print_out("Scheduler-driven update of job %s has been resumed." % jobkey)
     return EXIT_OK
 
@@ -146,7 +146,7 @@ class AbortUpdate(Verb):
     api = context.get_api(jobkey.cluster)
     resp = api.abort_job_update(jobkey)
     context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
-      err_msg="Failed to abort scheduler-driven update; see log for details")
+      err_msg="Failed to abort scheduler-driven update due to error:")
     context.print_out("Scheduler-driven update of job %s has been aborted." % jobkey)
     return EXIT_OK
 

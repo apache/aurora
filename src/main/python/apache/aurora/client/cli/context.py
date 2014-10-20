@@ -124,18 +124,24 @@ class AuroraCommandContext(Context):
     self.open_page(synthesize_url(api.scheduler_proxy.scheduler_client().url,
         role, env, name))
 
-  def log_response(self, resp):
+  def display_response_to_user(self, resp):
+    if resp.responseCode != ResponseCode.OK:
+      for m in resp.details:
+        self.print_err("\t%s" % m.message)
+        self.print_log(TRANSCRIPT, "Message from scheduler: %s" % m.message)
     if resp.details is not None:
       for m in resp.details:
         self.print_log(logging.INFO, "Message from scheduler: %s" % m.message)
 
   def check_and_log_response(self, resp, err_code=EXIT_API_ERROR, err_msg=None):
-    if err_msg is None:
-      err_msg = resp.messageDEPRECATED
-    self.log_response(resp)
     if resp.responseCode != ResponseCode.OK:
-      self.print_err("Error: %s" % err_msg)
+      if err_msg is None:
+        err_msg = resp.messageDEPRECATED
+      self.print_err(err_msg)
+    self.display_response_to_user(resp)
+    if resp.responseCode != ResponseCode.OK:
       raise self.CommandError(err_code, err_msg)
+
 
   @classmethod
   def parse_partial_jobkey(cls, key):

@@ -35,7 +35,7 @@ test_http_example() {
   jobkey="$_cluster/$_role/$_env/$_job"
 
   joblist=$(vagrant ssh -c "aurora2 config list $_base_config")
-  test "$joblist" = "jobs=[$jobkey]"
+#  test "$joblist" = "jobs=[$jobkey]"
 
   vagrant ssh -c "aurora2 job inspect $jobkey $_base_config"
 

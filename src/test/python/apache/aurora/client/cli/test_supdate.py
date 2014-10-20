@@ -151,7 +151,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
       mock_api.resume_job_update.assert_called_with(self.TEST_JOBKEY)
       assert mock_context.get_out() == []
       assert mock_context.get_err() == [
-          "Error: Failed to resume scheduler-driven update; see log for details"]
+         "Failed to resume scheduler-driven update due to error:", "\tDamn"]
 
   def test_abort_update_command_line_error(self):
     mock_context = FakeAuroraCommandContext()
@@ -170,7 +170,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
       mock_api.abort_job_update.assert_called_with(self.TEST_JOBKEY)
       assert mock_context.get_out() == []
       assert mock_context.get_err() == [
-          "Error: Failed to abort scheduler-driven update; see log for details"]
+        "Failed to abort scheduler-driven update due to error:", "\tDamn"]
 
   def test_pause_update_command_line_error(self):
     mock_context = FakeAuroraCommandContext()
@@ -189,7 +189,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
       mock_api.pause_job_update.assert_called_with(self.TEST_JOBKEY)
       assert mock_context.get_out() == []
       assert mock_context.get_err() == [
-          "Error: Failed to pause scheduler-driven update; see log for details"]
+        "Failed to pause scheduler-driven update due to error:", "\tDamn"]
 
   @classmethod
   def get_status_query_response(cls):
@@ -225,7 +225,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       result = cmd.execute(["beta-update", "list", "west", "--user=me"])
       assert result == EXIT_OK
-      print("============\n%s\n============" % mock_context.get_out())
       assert mock_context.get_out_str() == textwrap.dedent("""\
           Job: west/mcc/test/hello, Id: hello, User: me, Status: ROLLING_FORWARD
             Created: 1411404927, Last Modified 14114056030
@@ -325,7 +324,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       result = cmd.execute(["beta-update", "status", "west/mcc/test/hello"])
       assert result == EXIT_OK
-      print("============\n%s\n============" % mock_context.get_out())
       assert mock_context.get_out() == [
           "Job: west/mcc/test/hello, UpdateID: fake-update-identifier",
           "Started YYYY-MM-DD HH:MM:SS, last updated: YYYY-MM-DD HH:MM:SS",
@@ -357,7 +355,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
       mock_context.get_api("west").query_job_updates.assert_called_with(jobKey=AuroraJobKey(
           'west', 'mcc', 'test', 'hello'))
       mock_context.get_api("west").get_job_update_details.assert_called_with('hello')
-      print("============\n%s\n============" % mock_context.get_out_str())
       assert mock_context.get_out_str() == textwrap.dedent("""\
         {
           "status": "ROLLING_FORWARD",

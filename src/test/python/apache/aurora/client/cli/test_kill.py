@@ -403,8 +403,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
             'west/bozo/test/hello/0,2,4-13'])
 
       assert mock_context.get_out() == []
-      print(mock_context.get_err())
       assert mock_context.get_err() == [
-          'Kill of shards [0, 2, 4, 5, 6] failed with error; see log for details',
-          'Kill of shards [7, 8, 9, 10, 11] failed with error; see log for details',
-          'Exceeded maximum number of errors while killing instances']
+         'Kill of shards [0, 2, 4, 5, 6] failed with error:', '\tDamn',
+         'Kill of shards [7, 8, 9, 10, 11] failed with error:', '\tDamn',
+         'Exceeded maximum number of errors while killing instances']

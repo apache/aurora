@@ -303,9 +303,9 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         assert result == EXIT_COMMAND_FAILURE
 
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
-      print("Out=%s\nErr=%s" % (mock_context.get_out(), mock_context.get_err()))
       assert mock_context.get_out() == []
-      assert mock_context.get_err() == ["job create failed because of scheduler error"]
+      assert mock_context.get_err() == [
+        'Job creation failed due to error:', '\tDamn']
 
   def test_simple_successful_create_job_with_bindings(self):
     """Run a test of the "create" command against a mocked-out API:

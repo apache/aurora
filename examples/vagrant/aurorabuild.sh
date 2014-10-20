@@ -81,6 +81,7 @@ EOF
 exec /home/vagrant/aurora/dist/thermos_executor.pex --announcer-enable --announcer-ensemble localhost:2181
 EOF
   chmod +x $DIST_DIR/thermos_executor.sh
+  chmod +x /home/vagrant/aurora/dist/thermos_executor.pex
 }
 
 function build_observer {

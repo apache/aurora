@@ -45,7 +45,7 @@ class Schedule(Verb):
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
     resp = api.schedule_cron(config)
     context.check_and_log_response(resp,
-        err_msg=("Error scheduling job %s; see log for details" % context.options.jobspec))
+        err_msg=("Error scheduling cron job %s:" % context.options.jobspec))
     return EXIT_OK
 
 
@@ -65,7 +65,7 @@ class Deschedule(Verb):
     api = context.get_api(context.options.jobspec.cluster)
     resp = api.deschedule_cron(context.options.jobspec)
     context.check_and_log_response(resp,
-        err_msg=("Error descheduling job %s; see log for details" % context.options.jobspec))
+        err_msg=("Error descheduling cron job %s:" % context.options.jobspec))
     return EXIT_OK
 
 
@@ -87,7 +87,7 @@ class Start(Verb):
         if context.options.config else None)
     resp = api.start_cronjob(context.options.jobspec, config=config)
     context.check_and_log_response(resp,
-        err_msg=("Error starting cron job %s; see log for details" % context.options.jobspec))
+        err_msg=("Error starting cron job %s:" % context.options.jobspec))
     if context.options.open_browser:
       context.open_job_page(api, context.options.job_spec)
     return EXIT_OK
@@ -111,7 +111,7 @@ class Show(Verb):
     api = context.get_api(jobkey.cluster)
     resp = api.get_jobs(jobkey.role)
     context.check_and_log_response(resp, err_code=EXIT_INVALID_PARAMETER,
-        err_msg=("Error getting cron status for %s; see log for details" % jobkey))
+        err_msg=("Error getting cron status for %self from server" % jobkey))
     for job in resp.result.getJobsResult.configs:
       if job.key.environment == jobkey.env and job.key.name == jobkey.name:
         if job.cronSchedule is None or job.cronSchedule == "":

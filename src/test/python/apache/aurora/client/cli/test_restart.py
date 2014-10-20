@@ -20,7 +20,7 @@ from twitter.common.contextutil import temporary_file
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
 from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest
+from apache.aurora.client.cli.util import AuroraClientCommandTest, IOMock
 
 from gen.apache.aurora.api.ttypes import JobKey, PopulateJobResult, TaskConfig
 
@@ -150,17 +150,19 @@ class TestRestartCommand(AuroraClientCommandTest):
   def test_restart_no_such_job_with_instances(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
+    mock_io = IOMock()
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     # Make getTasksWithoutConfigs return an error, which is what happens when a job is not found.
     mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_error_response()
     with contextlib.nested(
-        patch('apache.aurora.client.cli.print_aurora_log'),
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.print_err',
+              side_effect=mock_io.put),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('threading._Event.wait')) as (mock_log, _, _, _, _, _):
+        patch('threading._Event.wait')):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -176,7 +178,9 @@ class TestRestartCommand(AuroraClientCommandTest):
         assert result == EXIT_API_ERROR
         # Error message should be written to log, and it should be what was returned
         # by the getTasksWithoutConfigs call.
-        mock_log.assert_called_with(20, 'Error executing command: %s', 'Damn')
+        assert mock_io.get() == ["Error restarting job west/bozo/test/hello:",
+                                 "\tDamn"]
+
 
   def test_restart_failed_restart(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
@@ -244,7 +248,6 @@ class TestRestartCommand(AuroraClientCommandTest):
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello',
             '--config', fp.name])
-        print(self.MOCK_OUT)
         assert self.MOCK_OUT == ['Job west/bozo/test/hello restarted successfully']
         assert self.MOCK_ERR == []
 
@@ -272,4 +275,4 @@ class TestRestartCommand(AuroraClientCommandTest):
         cmd.execute(['job', 'restart', '--batch-size=5', 'west/bozo/test/hello',
             '--config', fp.name])
       assert self.MOCK_OUT == []
-      assert 'Error restarting job west/bozo/test/hello; see log for details' in self.MOCK_ERR
+      assert "Error restarting job west/bozo/test/hello:" in self.MOCK_ERR
