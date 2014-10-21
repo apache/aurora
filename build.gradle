@@ -490,6 +490,7 @@ license {
   ext.year = Calendar.getInstance().get(Calendar.YEAR)
 }
 
+def reportPath = "$buildDir/reports/jacoco/test"
 jacocoTestReport {
   group = "Reporting"
   description = "Generate Jacoco coverage reports after running tests."
@@ -497,18 +498,17 @@ jacocoTestReport {
   reports {
     xml.enabled true
   }
+  doLast {
+    println "Coverage report generated: file://$reportPath/html/index.html"
+  }
 }
 test.finalizedBy jacocoTestReport
 
 task analyzeReport(type: CoverageReportCheck) {
-  def reportPath = "$buildDir/reports/jacoco/test"
   coverageReportFile = "$reportPath/jacocoTestReport.xml"
   minInstructionCoverage = 0.87
   minBranchCoverage = 0.82
   legacyClassesWithoutCoverage = file('config/legacy_untested_classes.txt').readLines()
-  doLast {
-    println "Coverage report generated: file://$reportPath/html/index.html"
-  }
 }
 jacocoTestReport.finalizedBy analyzeReport
 
