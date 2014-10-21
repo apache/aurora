@@ -546,7 +546,7 @@
       function summarizeTaskEvents(taskEvents) {
         return _.map(taskEvents, function (taskEvent) {
           return {
-            date: moment(taskEvent.timestamp).format('MM/DD h:mm:ss'),
+            timestamp: taskEvent.timestamp,
             status: _.invert(ScheduleStatus)[taskEvent.status],
             message: taskEvent.message
           };

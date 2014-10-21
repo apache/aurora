@@ -29,11 +29,11 @@
 
     <ul ng-if='showDetails'>
       <li ng-repeat='taskEvent in dataRow.taskEvents'>
-        {{taskEvent.date}} local -
+        {{taskEvent.timestamp | toLocalTime}} &bull;
         <span title='{{taskEvent.status | scheduleStatusTooltip}}'>
           <span class='schedulingStatus'>{{taskEvent.status}}</span>
         </span>
-        <span ng-if='taskEvent.message'> - {{taskEvent.message}}</span>
+        <span ng-if='taskEvent.message'> &bull; {{taskEvent.message}}</span>
       </li>
     </ul>
   </div>
