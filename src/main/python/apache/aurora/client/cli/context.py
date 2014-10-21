@@ -226,3 +226,8 @@ class AuroraCommandContext(Context):
 
   def timestamp_to_string(self, timestamp):
     return time.ctime(timestamp)
+
+  def warn_and_pause(self, warning):
+    self.print_out(warning)
+    self.print_out("Press ^c within five seconds to abort.")
+    time.sleep(5)

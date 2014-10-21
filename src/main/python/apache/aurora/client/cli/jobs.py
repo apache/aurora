@@ -676,17 +676,26 @@ class UpdateCommand(Verb):
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     resp = api.populate_job_config(config)
     context.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE,
-        err_msg="Server could not populate job config for comparison.")
-    local_task_count = len(resp.result.populateJobResult.populatedDEPRECATED)
-    remote_task_count = len(remote_tasks)
+        err_msg="Server could not populate job config for comparison:")
+    # for determining if an update is dangerous, we estimate the scope of the change
+    # by comparing number of instances to be updated, with the number of
+    # instances running in the cluster.
+    # If the user passed an instance count, then we select the *smaller* of the
+    # number of instances being updated, and the total number running on the server.
+    # So updating 20 instances out of 500 isn't a large change: even though 20 < 500/4;
+    # but updating 20 instances when there are only 4 running is a large change.
+    if context.options.instance_spec.instance == ALL_INSTANCES:
+      local_task_count = len(resp.result.populateJobResult.populatedDEPRECATED)
+      remote_task_count = len(remote_tasks)
+    else:
+      local_task_count = len(context.options.instance_spec.instance)
+      remote_task_count = min(len(remote_tasks), local_task_count)
 
     # Dangerous if it's more than a factor-of-four change in number of instances.
     if (local_task_count >= 4 * remote_task_count or
         4 * local_task_count <= remote_task_count or
         local_task_count == 0):
-      context.print_out("Warning: this update is a large change. "
-          "Press ^C within 5 seconds to abort")
-      time.sleep(5)
+      context.warn_and_pause("Warning: this update is a large change. ")
 
   def execute(self, context):
     job = context.options.instance_spec.jobkey

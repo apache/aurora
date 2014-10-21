@@ -29,6 +29,7 @@ python_test_suite(
     ':sla',
     ':task',
     ':supdate',
+    ':update'
   ]
 )
 
@@ -138,6 +139,19 @@ python_tests(
 )
 
 python_tests(
+  name='update',
+  sources=['test_update.py'],
+  dependencies = [
+    ':util',
+    '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.contextutil',
+    'src/main/python/apache/aurora/client/cli',
+    'src/main/python/apache/aurora/client/cli:client_lib',
+    'src/test/python/apache/aurora/client/commands:util'
+  ]
+)
+
+python_tests(
   name = 'job',
   sources = [
     'test_cancel_update.py',
@@ -147,7 +161,6 @@ python_tests(
     'test_open.py',
     'test_restart.py',
     'test_status.py',
-    'test_update.py',
   ],
   dependencies = [
     ':util',
