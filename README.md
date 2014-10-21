@@ -79,24 +79,25 @@ We're also often available in IRC: #aurora on
 
 You can also file issues in our [JIRA queue](http://issues.apache.org/jira/browse/AURORA).
 
-## Requiremensts
-* Python 2.6 or higher
+## Requirements
+* Python 2.7 or higher
 * JDK 1.7 or higher
 
 * Source distribution requirements
        * [Gradle](http://gradle.org)
 
 ## How to build
+
 Gradle and Bower are not shipped with the source distribution of Apache Aurora.
 The following instructions apply for the source release downloads only. When
 using Apache Aurora checked out from the source repository or the binary
-distribution the gradle wrapper and javascript dependencies are provided.
+distribution the Gradle wrapper and JavaScript dependencies are provided.
 
 1. Install Gradle following the instructions on the [Gradle web site](http://gradle.org)
 2. From the root directory of the Apache Aurora project generate the gradle
 wrapper by running
 
-		gradle wrapper
+    gradle wrapper
 
 ### Testing
 To run the same tests that are run in the Apache Aurora continuous integration
@@ -104,7 +105,7 @@ environment
 
 * From the root directory of the Apache Aurora project run:
 
-		./build-support/jenkins/build.sh
+    ./build-support/jenkins/build.sh
 
 * In addition, there is an end-to-end test that runs a suite of aurora commands
 using a virtual cluster. To run the end-to-end tests:
@@ -117,8 +118,8 @@ To compile the source packages into binary distributions
 
 * From the root directory of the Apache Aurora project run:
 
-		./gradlew distTar
-		./build-support/release/make-python-sdists
+    ./gradlew distTar
+    ./build-support/release/make-python-sdists
 
 For additional information see the [Developing Aurora](docs/developing-aurora-scheduler.md)
 guide.
