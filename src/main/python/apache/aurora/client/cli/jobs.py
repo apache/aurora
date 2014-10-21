@@ -455,7 +455,7 @@ class RestartCommand(Verb):
              help='Maximum number of restarts per instance during restart. Increments total '
                   'failure count when this limit is exceeded.'),
         CommandOption('--restart-threshold', type=int, default=60,
-             help='Maximum number of seconds before a shard must move into the RUNNING state '
+             help='Maximum number of seconds before an instance must move into the RUNNING state '
                   'before considered a failure.'),
         CONFIG_OPTION,
         MAX_TOTAL_FAILURES_OPTION,
@@ -467,12 +467,12 @@ class RestartCommand(Verb):
   @property
   def help(self):
     return textwrap.dedent("""\
-        Perform a rolling restart of shards within a job.
+        Perform a rolling restart of instances within a job.
         Restarts are fully controlled client-side, so aborting halts the restart.""")
 
   def execute(self, context):
     # Check for negative max_total_failures option - negative is an error.
-    # for per-shard failures, negative means "no limit", so it's allowed.
+    # for per-instance failures, negative means "no limit", so it's allowed.
     if context.options.max_total_failures < 0:
       context.print_err("max_total_failures option must be >0, but you specified %s" %
           context.options.max_total_failures)
@@ -552,7 +552,15 @@ class StatusCommand(Verb):
     def render_task_pretty(scheduled_task):
       assigned_task = scheduled_task.assignedTask
       task_info = assigned_task.task
-      task_strings = ["\tTask:"]
+      task_strings = []
+      task_strings.append("\tTask role: %s, env: %s, name: %s, instance: %s, status: %s on %s" %
+             (scheduled_task.assignedTask.task.owner.role,
+              scheduled_task.assignedTask.task.environment,
+              scheduled_task.assignedTask.task.jobName,
+              scheduled_task.assignedTask.instanceId,
+              ScheduleStatus._VALUES_TO_NAMES[scheduled_task.status],
+              scheduled_task.assignedTask.slaveHost))
+
       if task_info:
         task_strings.append("""\t  cpus: %s, ram: %s MB, disk: %s MB""" % (
             task_info.numCpus, task_info.ramMb, task_info.diskMb))

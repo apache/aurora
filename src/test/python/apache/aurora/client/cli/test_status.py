@@ -43,6 +43,9 @@ class TestJobStatus(AuroraClientCommandTest):
   def create_mock_scheduled_tasks(cls):
     jobs = []
     for name in ['foo', 'bar', 'baz']:
+      instance = 7734  # use a fake instance number; the order in which the status request
+      # returns the shards isn't really deterministic - it's up to python sorting.
+      # so for testing, just use the same one for all shards.
       job = Mock()
       job.key = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
       job.failure_count = 0
@@ -57,7 +60,7 @@ class TestJobStatus(AuroraClientCommandTest):
       job.assignedTask.task.numCpus = 2
       job.assignedTask.task.ramMb = 2
       job.assignedTask.task.diskMb = 2
-      job.assignedTask.instanceId = 4237894
+      job.assignedTask.instanceId = instance
       job.assignedTask.assignedPorts = None
       job.status = ScheduleStatus.RUNNING
       mockEvent = Mock(spec=TaskEvent)
@@ -149,7 +152,7 @@ class TestJobStatus(AuroraClientCommandTest):
       task.assignedTask.task.production = False
       task.assignedTask.task.requestedPorts = ["http"]
       task.assignedTask.assignedPorts = {"http": 1001}
-      task.assignedTask.instanceId = 0
+      task.assignedTask.instanceId = instance
       task.status = 2
       task.failureCount = instance + 4
       task.taskEvents = create_task_events(start_time)
@@ -234,15 +237,15 @@ class TestJobStatus(AuroraClientCommandTest):
       actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
       expected = textwrap.dedent("""\
           Active tasks (3):
-          \tTask:
+          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
-          \tTask:
+          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
-          \tTask:
+          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
@@ -263,21 +266,21 @@ class TestJobStatus(AuroraClientCommandTest):
       actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
       expected = textwrap.dedent("""\
           Active tasks (3):
-          \tTask:
+          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \t  metadata:
           \t\t  (key: 'meta', value: 'data')
           \t\t  (key: 'data', value: 'meta')
-          \tTask:
+          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \t  metadata:
           \t\t  (key: 'meta', value: 'data')
           \t\t  (key: 'data', value: 'meta')
-          \tTask:
+          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
@@ -286,6 +289,7 @@ class TestJobStatus(AuroraClientCommandTest):
           \t\t  (key: 'data', value: 'meta')
           Inactive tasks (0):
           """)
+      print("=======actual======\n%s\n==================" % actual)
       assert actual == expected
 
   def test_successful_status_deep_null_metadata(self):
@@ -456,7 +460,7 @@ class TestJobStatus(AuroraClientCommandTest):
                     "numCpus": 2
                   },
                   "taskId": "task_1",
-                  "instanceId": 0,
+                  "instanceId": 1,
                   "assignedPorts": {
                     "http": 1001
                   },
