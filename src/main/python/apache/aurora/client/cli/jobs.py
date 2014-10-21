@@ -20,7 +20,6 @@ import os
 import pprint
 import subprocess
 import textwrap
-import time
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 

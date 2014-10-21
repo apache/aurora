@@ -287,8 +287,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
       assert mock_err.get() == []
 
   def test_updater_simple_large_does_warn(self):
-    mock_out = IOMock()
-    mock_err = IOMock()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
     mock_quota_check = self.setup_quota_check()
@@ -370,7 +368,6 @@ class TestUpdateCommand(AuroraClientCommandTest):
           cmd = AuroraCommandLine()
           cmd.execute(['job', 'update', 'west/bozo/test/hello/1,3', fp.name])
           assert pause.call_count == 0
-
 
   @classmethod
   def assert_correct_addinstance_calls(cls, api):
