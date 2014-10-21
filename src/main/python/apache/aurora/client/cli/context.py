@@ -142,7 +142,6 @@ class AuroraCommandContext(Context):
     if resp.responseCode != ResponseCode.OK:
       raise self.CommandError(err_code, err_msg)
 
-
   @classmethod
   def parse_partial_jobkey(cls, key):
     """Given a partial jobkey, where parts can be wildcards, parse it.
@@ -182,7 +181,6 @@ class AuroraCommandContext(Context):
     This is potentially slow!
     TODO(mchucarroll): insert a warning to users about slowness if the key contains wildcards!
     """
-
     def is_fully_bound(key):
       """Helper that checks if a key contains wildcards."""
       return not any('*' in component for component in [key.cluster, key.role, key.env, key.name])

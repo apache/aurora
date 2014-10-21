@@ -181,7 +181,6 @@ class TestRestartCommand(AuroraClientCommandTest):
         assert mock_io.get() == ["Error restarting job west/bozo/test/hello:",
                                  "\tDamn"]
 
-
   def test_restart_failed_restart(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
