@@ -12,7 +12,7 @@
 
 THRIFT_VERSION = 0.9.1
 THRIFT_DISTNAME = thrift-$(THRIFT_VERSION)
-THRIFT_URL = http://www.us.apache.org/dist/thrift/$(THRIFT_VERSION)/$(THRIFT_DISTNAME).tar.gz
+THRIFT_URL = https://archive.apache.org/dist/thrift/$(THRIFT_VERSION)/$(THRIFT_DISTNAME).tar.gz
 #TODO(zmanji): Verify the MD5 of the downloaded file.
 
 THRIFT = ./thrift-$(THRIFT_VERSION)/compiler/cpp/thrift
