@@ -89,8 +89,17 @@ function build_observer {
   upstart_update aurora-thermos-observer
 }
 
+function build_all {
+  build_admin_client
+  build_client
+  build_client2
+  build_executor
+  build_observer
+  build_scheduler
+}
+
 function print_components {
-  echo 'Please select from: client, client2, admin_client, scheduler, executor, observer.'
+  echo 'Please select from: admin_client, client, client2, executor, observer, scheduler or all.'
 }
 
 if [ "$#" -eq 0 ]

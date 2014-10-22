@@ -36,6 +36,7 @@ collect_result() {
       echo "with your code. Either way, this script DNR merging to master. Note you may need to"
       echo "reconcile state manually."
       echo "!!!"
+      vagrant ssh -c "aurora cancel_update devcluster/vagrant/test/http_example"
       vagrant ssh -c "aurora killall devcluster/vagrant/test/http_example"
     fi
     exit $RETCODE

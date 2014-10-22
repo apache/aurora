@@ -91,6 +91,8 @@ TEST_ADMIN_ARGS=(
 
 trap collect_result EXIT
 vagrant up
+vagrant ssh -c "aurorabuild all"
+
 # wipe the pseudo-deploy dir, and then create it fresh, to guarantee that the
 # test runs clean.
 test_http_example "${TEST_ARGS[@]}"

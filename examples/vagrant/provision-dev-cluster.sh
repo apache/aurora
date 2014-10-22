@@ -109,4 +109,4 @@ prepare_extras
 install_cluster_config
 install_ssh_config
 start_services
-su vagrant -c "aurorabuild client client2 admin_client executor observer scheduler"
+su vagrant -c "aurorabuild all"
