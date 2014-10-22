@@ -33,6 +33,9 @@ class CoverageReportCheck extends DefaultTask {
   // Classes that may be allowed to have zero test coverage.
   def legacyClassesWithoutCoverage
 
+  // The amount of wiggle room when requiring min coverage be raised.
+  def epsilon = 0.5
+
   private def computeCoverage(counterNodes, type) {
     def node = counterNodes.find { it.@type == type }
     def missed = node.@missed.toInteger()
@@ -42,12 +45,14 @@ class CoverageReportCheck extends DefaultTask {
 
   def checkThresholds(coverage, minCoverage, type) {
     if (coverage < minCoverage) {
-      return "$type coverage must be greater than $minCoverage"
+      return "$type coverage is $coverage, but must be greater than $minCoverage"
     } else {
       def floored = Math.floor(coverage * 100) / 100
-      if (floored > minCoverage) {
+      if (floored > (minCoverage + epsilon)) {
         return("$type coverage of $floored exceeds min instruction coverage of $minCoverage,"
-            + " please raise the threshold!")
+            + " by more than $epsilon, please raise the threshold!")
+      } else {
+        println("$type coverage of $coverage exceeds minimum coverage of $minCoverage.")
       }
     }
   }
