@@ -506,7 +506,7 @@ test.finalizedBy jacocoTestReport
 
 task analyzeReport(type: CoverageReportCheck) {
   coverageReportFile = "$reportPath/jacocoTestReport.xml"
-  minInstructionCoverage = 0.87
+  minInstructionCoverage = 0.88
   minBranchCoverage = 0.82
   legacyClassesWithoutCoverage = file('config/legacy_untested_classes.txt').readLines()
 }

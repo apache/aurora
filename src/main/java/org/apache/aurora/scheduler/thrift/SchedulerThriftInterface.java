@@ -308,13 +308,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             return invalidResponse("Job already exists: " + JobKeys.canonicalString(job.getKey()));
           }
 
-          ITaskConfig taskConfig = sanitized.getJobConfig().getTaskConfig();
-          int instanceCount = sanitized.getInstanceIds().size();
+          ITaskConfig template = sanitized.getJobConfig().getTaskConfig();
+          int count = sanitized.getJobConfig().getInstanceCount();
 
-          validateTaskLimits(
-              taskConfig,
-              instanceCount,
-              quotaManager.checkInstanceAddition(taskConfig, instanceCount));
+          validateTaskLimits(template, count, quotaManager.checkInstanceAddition(template, count));
 
           // TODO(mchucarroll): deprecate cron as a part of create/kill job.(AURORA-454)
           if (sanitized.isCron()) {
@@ -322,8 +319,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
                 + " with cron via createJob (AURORA_454)");
             cronJobManager.createJob(SanitizedCronJob.from(sanitized));
           } else {
-            LOG.info("Launching " + instanceCount + " tasks.");
-            stateManager.insertPendingTasks(taskConfig, sanitized.getInstanceIds());
+            LOG.info("Launching " + count + " tasks.");
+            stateManager.insertPendingTasks(template, sanitized.getInstanceIds());
           }
           return okEmptyResponse();
         } catch (LockException e) {
@@ -362,21 +359,24 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         LOG.info("Invalid attempt to schedule non-cron job " + jobKey + " with cron.");
         return invalidResponse("Job " + jobKey + " has no cron schedule");
       }
-      try {
-        // TODO(mchucarroll): Merge CronJobManager.createJob/updateJob
-        if (cronJobManager.hasJob(sanitized.getJobConfig().getKey())) {
-          // The job already has a schedule: so update it.
-          cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
-        } else {
-          cronJobManager.createJob(SanitizedCronJob.from(sanitized));
-        }
-      } catch (CronException e) {
-        return errorResponse(INVALID_REQUEST, e);
+
+      ITaskConfig template = sanitized.getJobConfig().getTaskConfig();
+      int count = sanitized.getJobConfig().getInstanceCount();
+
+      validateTaskLimits(template, count, quotaManager.checkInstanceAddition(template, count));
+
+      // TODO(mchucarroll): Merge CronJobManager.createJob/updateJob
+      if (cronJobManager.hasJob(sanitized.getJobConfig().getKey())) {
+        // The job already has a schedule: so update it.
+        cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
+      } else {
+        cronJobManager.createJob(SanitizedCronJob.from(sanitized));
       }
+
       return okEmptyResponse();
     } catch (LockException e) {
       return errorResponse(LOCK_ERROR, e);
-    } catch (TaskDescriptionException e) {
+    } catch (TaskDescriptionException | TaskValidationException | CronException e) {
       return errorResponse(INVALID_REQUEST, e);
     }
   }

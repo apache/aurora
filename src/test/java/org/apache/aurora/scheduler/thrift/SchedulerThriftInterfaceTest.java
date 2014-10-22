@@ -1084,6 +1084,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testReplaceCronTemplateFailedLockValidation() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expectLastCall().andThrow(new LockException("Failed lock."));
+    control.replay();
+
+    assertResponse(LOCK_ERROR, thrift.replaceCronTemplate(CRON_JOB, DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
   public void testReplaceCronTemplateDoesNotExist() throws Exception {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
@@ -1096,13 +1106,103 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testUpdateScheduledCronJob() throws Exception {
+  public void testStartCronJob() throws Exception {
+    expectAuth(ROLE, true);
+    cronJobManager.startJobNow(JOB_KEY);
+    control.replay();
+    assertResponse(OK, thrift.startCronJob(JOB_KEY.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testStartCronJobFailsAuth() throws Exception {
+    expectAuth(ROLE, false);
+    control.replay();
+    assertResponse(AUTH_FAILED, thrift.startCronJob(JOB_KEY.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testStartCronJobFailsInCronManager() throws Exception {
+    expectAuth(ROLE, true);
+    cronJobManager.startJobNow(JOB_KEY);
+    expectLastCall().andThrow(new CronException("failed"));
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.startCronJob(JOB_KEY.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testScheduleCronCreatesJob() throws Exception {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
-    cronJobManager.updateJob(anyObject(SanitizedCronJob.class));
+    SanitizedConfiguration sanitized =
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(ENOUGH_QUOTA);
+
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    cronJobManager.createJob(SanitizedCronJob.from(sanitized));
     control.replay();
     assertResponse(OK, thrift.scheduleCronJob(CRON_JOB, DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testScheduleCronUpdatesJob() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    SanitizedConfiguration sanitized =
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(ENOUGH_QUOTA);
+
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
+    cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
+    control.replay();
+    assertResponse(OK, thrift.scheduleCronJob(CRON_JOB, DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testUpdateScheduledCronJobFailedAuth() throws Exception {
+    expectAuth(ROLE, false);
+    control.replay();
+    assertResponse(AUTH_FAILED, thrift.scheduleCronJob(CRON_JOB, DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testScheduleCronJobFailsLockValidation() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
+    expectLastCall().andThrow(new LockException("Failed lock"));
+    control.replay();
+    assertResponse(LOCK_ERROR, thrift.scheduleCronJob(CRON_JOB, LOCK.newBuilder(), SESSION));
+  }
+
+  @Test
+  public void testScheduleCronJobFailsWithNoCronSchedule() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.scheduleCronJob(makeJob(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testScheduleCronFailsQuotaCheck() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    SanitizedConfiguration sanitized =
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(NOT_ENOUGH_QUOTA);
+
+    control.replay();
+    assertResponse(INVALID_REQUEST, thrift.scheduleCronJob(CRON_JOB, DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -1120,6 +1220,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
     assertResponse(AUTH_FAILED,
         thrift.descheduleCronJob(CRON_JOB.getKey(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testDescheduleCronJobFailsLockValidation() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expectLastCall().andThrow(new LockException("Failed lock"));
+    control.replay();
+    assertResponse(LOCK_ERROR, thrift.descheduleCronJob(CRON_JOB.getKey(), DEFAULT_LOCK, SESSION));
   }
 
   @Test

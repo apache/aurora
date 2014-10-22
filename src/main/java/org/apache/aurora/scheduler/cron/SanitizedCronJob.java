@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.cron;
 
 import javax.annotation.Nullable;
 
+import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 
 import org.apache.aurora.gen.CronCollisionPolicy;
@@ -125,5 +126,29 @@ public final class SanitizedCronJob {
    */
   public SanitizedConfiguration getSanitizedConfig() {
     return config;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof SanitizedCronJob)) {
+      return false;
+    }
+
+    SanitizedCronJob other = (SanitizedCronJob) o;
+
+    return Objects.equal(config, other.config) && Objects.equal(crontabEntry, other.crontabEntry);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(config, crontabEntry);
+  }
+
+  @Override
+  public String toString() {
+    return Objects.toStringHelper(this)
+        .add("config", config)
+        .add("crontabEntry", crontabEntry)
+        .toString();
   }
 }
