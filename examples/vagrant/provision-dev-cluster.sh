@@ -30,7 +30,7 @@ update-alternatives --set java /usr/lib/jvm/java-7-openjdk-amd64/jre/bin/java
 # that want to advertise the hostname to the user, or other components.
 hostname 192.168.33.7
 
-MESOS_VERSION=0.20.0
+MESOS_VERSION=0.20.1
 
 function prepare_extras() {
   pushd aurora

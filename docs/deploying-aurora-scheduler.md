@@ -33,7 +33,7 @@ machines.  This guide helps you get the scheduler set up and troubleshoot some c
 ## Installing Aurora
 The Aurora scheduler is a standalone Java server. As part of the build process it creates a bundle
 of all its dependencies, with the notable exceptions of the JVM and libmesos. Each target server
-should have a JVM (Java 7 or higher) and libmesos (0.20.0) installed.
+should have a JVM (Java 7 or higher) and libmesos (0.20.1) installed.
 
 ### Creating the Distribution .zip File (Optional)
 To create a distribution for installation you will need build tools installed. On Ubuntu this can be
