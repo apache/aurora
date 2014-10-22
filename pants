@@ -12,21 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-set -o errexit
-set -o nounset
+# Wrapper script for self-bootstrapping pants.
+set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-
 PANTS_VERSION=0.0.24
-if ! [[ -e "$HERE/build-support/pantsbuild.pants-$PANTS_VERSION.pex" ]]; then
-  echo "Building pants.pex @ $PANTS_VERSION"
-  "$HERE/build-support/pex" \
-    -v \
-    --requirement "pantsbuild.pants==$PANTS_VERSION" \
-    --entry-point pants.bin.pants_exe:main \
-    -p "$HERE/build-support/pantsbuild.pants-$PANTS_VERSION.pex.tmp"
-  mv "$HERE/build-support/pantsbuild.pants-$PANTS_VERSION.pex.tmp" "$HERE/build-support/pantsbuild.pants-$PANTS_VERSION.pex"  # 2PC
-  echo "Built pantsbuild.pants-$PANTS_VERSION.pex"
-fi
+if ! [ -f "$HERE/build-support/pants.venv/BOOTSTRAPPED" ] || \
+    [[ $(< "$HERE/build-support/pants.venv/BOOTSTRAPPED") != $PANTS_VERSION ]]; then
 
-exec "$HERE/build-support/pantsbuild.pants-$PANTS_VERSION.pex" "$@"
+  echo Bootstrapping pants @ $PANTS_VERSION
+  rm -fr "$HERE/build-support/pants.venv"
+  "$HERE/build-support/virtualenv" "$HERE/build-support/pants.venv"
+  source "$HERE/build-support/pants.venv/bin/activate"
+  pip install "pantsbuild.pants==$PANTS_VERSION"
+  echo $PANTS_VERSION > "$HERE/build-support/pants.venv/BOOTSTRAPPED"
+fi
+source "$HERE/build-support/pants.venv/bin/activate"
+exec pants "$@"
