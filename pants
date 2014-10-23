@@ -16,7 +16,8 @@
 set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-PANTS_VERSION=0.0.24
+# Pinned pants requirements - to upgrade pants change this file.
+PANTS_REQUIREMENTS="$HERE/build-support/pants_requirements.txt"
 if ! [ -f "$HERE/build-support/pants.venv/BOOTSTRAPPED" ] || \
     [[ $(< "$HERE/build-support/pants.venv/BOOTSTRAPPED") != $PANTS_VERSION ]]; then
 
@@ -26,7 +27,7 @@ if ! [ -f "$HERE/build-support/pants.venv/BOOTSTRAPPED" ] || \
   # TODO(ksweeney): remove this hack when https://github.com/pantsbuild/pex/issues/21 is fixed.
   rm -fr "$HERE/build-support/pants.venv/local"
   source "$HERE/build-support/pants.venv/bin/activate"
-  pip install "pantsbuild.pants==$PANTS_VERSION"
+  pip install -r "$PANTS_REQUIREMENTS"
   echo $PANTS_VERSION > "$HERE/build-support/pants.venv/BOOTSTRAPPED"
 fi
 source "$HERE/build-support/pants.venv/bin/activate"
