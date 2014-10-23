@@ -27,6 +27,7 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -127,6 +128,7 @@ public class TaskVarsTest extends EasyMockTest {
         .setAssignedTask(new AssignedTask()
             .setTaskId(TASK_ID)
             .setTask(new TaskConfig()
+                .setJob(new JobKey(ROLE_A, ENV, job))
                 .setJobName(job)
                 .setEnvironment(ENV)
                 .setOwner(new Identity(ROLE_A, ROLE_A + "-user"))));

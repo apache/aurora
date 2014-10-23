@@ -28,6 +28,7 @@ import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
@@ -306,6 +307,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
             .setInstanceId(0)
             .setTaskId(taskId)
             .setTask(new TaskConfig()
+                .setJob(new JobKey("role-" + taskId, "env-" + taskId, "job-" + taskId))
                 .setJobName("job-" + taskId)
                 .setOwner(new Identity().setRole("role-" + taskId).setUser("user-" + taskId))
                 .setEnvironment("env-" + taskId))));

@@ -219,7 +219,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   public void instanceChangedState(final IScheduledTask updatedTask) {
     instanceChanged(
         InstanceKeys.from(
-            JobKeys.from(updatedTask.getAssignedTask().getTask()),
+            updatedTask.getAssignedTask().getTask().getJob(),
             updatedTask.getAssignedTask().getInstanceId()),
         Optional.of(updatedTask));
   }

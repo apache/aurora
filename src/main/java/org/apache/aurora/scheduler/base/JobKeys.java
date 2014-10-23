@@ -30,7 +30,6 @@ import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -123,17 +122,6 @@ public final class JobKeys {
   }
 
   /**
-   * Attempts to create a valid JobKey from the given task.
-   *
-   * @param task The task to create job key from.
-   * @return A valid JobKey if it can be created.
-   * @throws IllegalArgumentException if the key fails to validate.
-   */
-  public static IJobKey from(ITaskConfig task) throws IllegalArgumentException {
-    return from(task.getOwner().getRole(), task.getEnvironment(), task.getJobName());
-  }
-
-  /**
    * Create a "/"-delimited representation of job key usable as a unique identifier in this cluster.
    *
    * It is guaranteed that {@code k.equals(JobKeys.parse(JobKeys.canonicalString(k))}.
@@ -175,7 +163,7 @@ public final class JobKeys {
 
       if (taskQuery.isSetJobName()) {
         builder.add(from(
-            taskQuery.getOwner().getRole(),
+            taskQuery.getRole(),
             taskQuery.getEnvironment(),
             taskQuery.getJobName()));
       }

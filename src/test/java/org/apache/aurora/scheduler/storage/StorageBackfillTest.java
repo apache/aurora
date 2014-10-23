@@ -123,6 +123,7 @@ public class StorageBackfillTest {
 
     // Since task fields are backfilled with defaults, additional flags should be filled.
     ITaskConfig expected = ITaskConfig.build(new TaskConfig(storedTask)
+        .setJob(JOB_KEY.newBuilder())
         .setProduction(false)
         .setMaxTaskFailures(1)
         .setExecutorConfig(EXECUTOR_CONFIG)

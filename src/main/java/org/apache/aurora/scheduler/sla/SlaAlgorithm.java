@@ -33,7 +33,6 @@ import com.google.common.collect.Range;
 import com.twitter.common.collections.Pair;
 
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -284,7 +283,7 @@ interface SlaAlgorithm {
           @Override
           public InstanceId apply(IScheduledTask task) {
             return new InstanceId(
-                JobKeys.from(task.getAssignedTask().getTask()),
+                task.getAssignedTask().getTask().getJob(),
                 task.getAssignedTask().getInstanceId());
           }
         };

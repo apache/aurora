@@ -34,6 +34,7 @@ import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -456,6 +457,7 @@ public class MemTaskStoreTest {
             .setInstanceId(0)
             .setTaskId(id)
             .setTask(new TaskConfig()
+                .setJob(new JobKey(role, env, jobName))
                 .setJobName(jobName)
                 .setEnvironment(env)
                 .setOwner(new Identity(role, role))

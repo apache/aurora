@@ -24,6 +24,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceTaskConfig;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateInstructions;
 import org.apache.aurora.gen.JobUpdateSummary;
@@ -32,7 +33,6 @@ import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.quota.QuotaManager.QuotaException;
@@ -380,12 +380,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     String updateId = "u1";
     ITaskConfig config = taskConfig(2, 2, 2, true);
-    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, JobKeys.from(config));
+    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, config.getJob());
     IJobUpdate update = buildJobUpdate(summaries.get(0), config, 1, config, 1);
     JobUpdate builder = update.newBuilder();
     builder.getInstructions().unsetDesiredState();
 
-    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(config.getOwner().getRole())))
+    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(config.getJob().getRole())))
         .andReturn(summaries).times(2);
 
     expect(jobUpdateStore.fetchJobUpdate(updateId))
@@ -407,12 +407,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     String updateId = "u1";
     ITaskConfig config = taskConfig(2, 2, 2, true);
-    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, JobKeys.from(config));
+    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, config.getJob());
     IJobUpdate update = buildJobUpdate(summaries.get(0), config, 1, config, 1);
     JobUpdate builder = update.newBuilder();
     builder.getInstructions().setInitialState(ImmutableSet.<InstanceTaskConfig>of());
 
-    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(config.getOwner().getRole())))
+    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(config.getJob().getRole())))
         .andReturn(summaries).times(2);
 
     expect(jobUpdateStore.fetchJobUpdate(updateId))
@@ -434,12 +434,12 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     String updateId = "u1";
     ITaskConfig config = taskConfig(2, 2, 2, true);
-    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, JobKeys.from(config));
+    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, config.getJob());
     IJobUpdate update = buildJobUpdate(summaries.get(0), config, 1, config, 1);
     JobUpdate builder = update.newBuilder();
     builder.getInstructions().unsetDesiredState();
 
-    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(config.getOwner().getRole())))
+    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(config.getJob().getRole())))
         .andReturn(summaries).times(2);
 
     expect(jobUpdateStore.fetchJobUpdate(updateId))
@@ -465,7 +465,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     ITaskConfig config = taskConfig(1, 1, 1, true);
     IJobUpdate update = buildJobUpdate(
-        buildJobUpdateSummaries("u1", JobKeys.from(config)).get(0),
+        buildJobUpdateSummaries("u1", config.getJob()).get(0),
         taskConfig(2, 2, 2, true),
         1,
         config,
@@ -488,7 +488,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     ITaskConfig config = taskConfig(2, 2, 2, true);
     IJobUpdate update = buildJobUpdate(
-        buildJobUpdateSummaries("u1", JobKeys.from(config)).get(0),
+        buildJobUpdateSummaries("u1", config.getJob()).get(0),
         config,
         1,
         config,
@@ -514,7 +514,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
 
     ITaskConfig config = taskConfig(2, 2, 2, true);
     IJobUpdate update = buildJobUpdate(
-        buildJobUpdateSummaries("u1", JobKeys.from(config)).get(0),
+        buildJobUpdateSummaries("u1", config.getJob()).get(0),
         config,
         1,
         config,
@@ -533,7 +533,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testCheckQuotaNewUpdateSkippedForNonProdDesiredState() {
     ITaskConfig config = taskConfig(2, 2, 2, false);
     IJobUpdate update = buildJobUpdate(
-        buildJobUpdateSummaries("u1", JobKeys.from(config)).get(0),
+        buildJobUpdateSummaries("u1", config.getJob()).get(0),
         taskConfig(2, 2, 2, true),
         1,
         config,
@@ -549,7 +549,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
   public void testCheckQuotaNewUpdateSkippedForEmptyDesiredState() {
     ITaskConfig config = taskConfig(2, 2, 2, true);
     IJobUpdate update = buildJobUpdate(
-        buildJobUpdateSummaries("u1", JobKeys.from(config)).get(0),
+        buildJobUpdateSummaries("u1", config.getJob()).get(0),
         config,
         1,
         config,
@@ -603,11 +603,11 @@ public class QuotaManagerImplTest extends EasyMockTest {
       int times) {
 
     String updateId = "u1";
-    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, JobKeys.from(initial));
+    List<IJobUpdateSummary> summaries = buildJobUpdateSummaries(updateId, initial.getJob());
     IJobUpdate update =
         buildJobUpdate(summaries.get(0), initial, intialInstances, desired, desiredInstances);
 
-    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(initial.getOwner().getRole())))
+    expect(jobUpdateStore.fetchJobUpdateSummaries(updateQuery(initial.getJob().getRole())))
         .andReturn(summaries)
         .times(times);
 
@@ -679,6 +679,7 @@ public class QuotaManagerImplTest extends EasyMockTest {
                 .setTaskId(taskId)
                 .setInstanceId(instanceId)
                 .setTask(new TaskConfig()
+                    .setJob(new JobKey(ROLE, ENV, jobName))
                     .setOwner(new Identity(ROLE, ROLE))
                     .setEnvironment(ENV)
                     .setJobName(jobName)

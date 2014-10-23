@@ -63,6 +63,7 @@ import com.twitter.thrift.ServiceInstance;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -284,6 +285,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         .setAssignedTask(new AssignedTask()
             .setTaskId(id)
             .setTask(new TaskConfig()
+                .setJob(new JobKey("role-" + id, "test", "job-" + id))
                 .setJobName("job-" + id)
                 .setEnvironment("test")
                 .setExecutorConfig(new org.apache.aurora.gen.ExecutorConfig("AuroraExecutor", ""))

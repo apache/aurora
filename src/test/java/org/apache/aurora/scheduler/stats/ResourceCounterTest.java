@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableSet;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
@@ -167,6 +168,7 @@ public class ResourceCounterTest {
       Optional<String> dedicated) {
 
     TaskConfig task = new TaskConfig()
+        .setJob(new JobKey(role, "test", job))
         .setOwner(new Identity().setRole(role))
         .setEnvironment("test")
         .setJobName(job)

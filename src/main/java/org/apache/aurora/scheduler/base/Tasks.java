@@ -97,7 +97,7 @@ public final class Tasks {
       new Function<ITaskConfig, IJobKey>() {
         @Override
         public IJobKey apply(ITaskConfig task) {
-          return JobKeys.from(task);
+          return task.getJob();
         }
       };
 

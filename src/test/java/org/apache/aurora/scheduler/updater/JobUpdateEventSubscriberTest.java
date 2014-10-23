@@ -37,22 +37,23 @@ import static org.easymock.EasyMock.expectLastCall;
 
 public class JobUpdateEventSubscriberTest extends EasyMockTest {
 
-  private static final IJobKey JOB_A = JobKeys.from("role", "env", "name");
+  private static final IJobKey JOB = JobKeys.from("role", "env", "name");
 
-  private static final IScheduledTask TASK_A = IScheduledTask.build(
+  private static final IScheduledTask TASK = IScheduledTask.build(
       new ScheduledTask()
           .setStatus(ScheduleStatus.PENDING)
           .setAssignedTask(
               new AssignedTask()
                   .setInstanceId(5)
                   .setTask(new TaskConfig()
-                      .setOwner(new Identity().setRole(JOB_A.getRole()))
-                      .setEnvironment(JOB_A.getEnvironment())
-                      .setJobName(JOB_A.getName()))));
+                      .setJob(JOB.newBuilder())
+                      .setOwner(new Identity().setRole(JOB.getRole()))
+                      .setEnvironment(JOB.getEnvironment())
+                      .setJobName(JOB.getName()))));
   private static final IInstanceKey INSTANCE_A = IInstanceKey.build(
       new InstanceKey()
-          .setJobKey(JOB_A.newBuilder())
-          .setInstanceId(TASK_A.getAssignedTask().getInstanceId()));
+          .setJobKey(JOB.newBuilder())
+          .setInstanceId(TASK.getAssignedTask().getInstanceId()));
 
   private JobUpdateController updater;
 
@@ -68,11 +69,11 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
 
   @Test
   public void testStateChange() throws Exception {
-    updater.instanceChangedState(TASK_A);
+    updater.instanceChangedState(TASK);
 
     control.replay();
 
-    eventBus.post(TaskStateChange.initialized(TASK_A));
+    eventBus.post(TaskStateChange.initialized(TASK));
   }
 
   @Test
@@ -81,7 +82,7 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
 
     control.replay();
 
-    eventBus.post(new TasksDeleted(ImmutableSet.of(TASK_A)));
+    eventBus.post(new TasksDeleted(ImmutableSet.of(TASK)));
   }
 
   @Test
@@ -97,7 +98,7 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
   public void testHandlesExceptions() throws Exception {
     updater.systemResume();
     expectLastCall().andThrow(new RuntimeException());
-    updater.instanceChangedState(TASK_A);
+    updater.instanceChangedState(TASK);
     expectLastCall().andThrow(new RuntimeException());
     updater.instanceDeleted(INSTANCE_A);
     expectLastCall().andThrow(new RuntimeException());
@@ -105,8 +106,8 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
     control.replay();
 
     eventBus.post(new SchedulerActive());
-    eventBus.post(TaskStateChange.initialized(TASK_A));
-    eventBus.post(new TasksDeleted(ImmutableSet.of(TASK_A)));
+    eventBus.post(TaskStateChange.initialized(TASK));
+    eventBus.post(new TasksDeleted(ImmutableSet.of(TASK)));
   }
 
   @Test
@@ -114,7 +115,7 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
     control.replay();
 
     IScheduledTask task =
-        IScheduledTask.build(TASK_A.newBuilder().setStatus(ScheduleStatus.FAILED));
+        IScheduledTask.build(TASK.newBuilder().setStatus(ScheduleStatus.FAILED));
     eventBus.post(new TasksDeleted(ImmutableSet.of(task)));
   }
 }

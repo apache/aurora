@@ -29,6 +29,7 @@ import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -501,6 +502,7 @@ public class StateManagerImplTest extends EasyMockTest {
 
   private static ITaskConfig makeTask(Identity owner, String job) {
     return ITaskConfig.build(new TaskConfig()
+        .setJob(new JobKey(owner.getRole(), "devel", job))
         .setOwner(owner)
         .setEnvironment("devel")
         .setJobName(job)

@@ -231,15 +231,10 @@ class MemTaskStore implements TaskStore.Mutable {
       public boolean apply(Task canonicalTask) {
         IScheduledTask task = canonicalTask.storedTask;
         ITaskConfig config = task.getAssignedTask().getTask();
-        if (query.getOwner() != null) {
-          if (!StringUtils.isBlank(query.getOwner().getRole())
-              && !query.getOwner().getRole().equals(config.getOwner().getRole())) {
-            return false;
-          }
-          if (!StringUtils.isBlank(query.getOwner().getUser())
-              && !query.getOwner().getUser().equals(config.getOwner().getUser())) {
-            return false;
-          }
+        if (query.getRole() != null
+            && !StringUtils.isBlank(query.getRole())
+            && !query.getRole().equals(config.getJob().getRole())) {
+          return false;
         }
         if (query.getEnvironment() != null
             && !query.getEnvironment().equals(config.getEnvironment())) {
@@ -250,7 +245,7 @@ class MemTaskStore implements TaskStore.Mutable {
         }
 
         if (query.getJobKeysSize() > 0
-            && !query.getJobKeys().contains(JobKeys.from(config).newBuilder())) {
+            && !query.getJobKeys().contains(config.getJob().newBuilder())) {
           return false;
         }
         if (query.getTaskIds() != null && !query.getTaskIds().contains(Tasks.id(task))) {

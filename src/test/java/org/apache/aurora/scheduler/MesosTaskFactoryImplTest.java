@@ -19,6 +19,7 @@ import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
 import org.apache.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
@@ -42,6 +43,7 @@ public class MesosTaskFactoryImplTest {
       .setTaskId("task-id")
       .setAssignedPorts(ImmutableMap.of("http", 80))
       .setTask(new TaskConfig()
+          .setJob(new JobKey("role", "environment", "job-name"))
           .setOwner(new Identity("role", "user"))
           .setEnvironment("environment")
           .setJobName("job-name")

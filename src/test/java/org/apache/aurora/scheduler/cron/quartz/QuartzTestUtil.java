@@ -40,6 +40,7 @@ final class QuartzTestUtil {
           .setOwner(new Identity("role", "user"))
           .setKey(AURORA_JOB_KEY.newBuilder())
           .setTaskConfig(new TaskConfig()
+              .setJob(AURORA_JOB_KEY.newBuilder())
               .setOwner(new Identity("role", "user"))
               .setJobName(AURORA_JOB_KEY.getName())
               .setEnvironment(AURORA_JOB_KEY.getEnvironment())

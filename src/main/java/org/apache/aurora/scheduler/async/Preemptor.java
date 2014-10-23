@@ -392,7 +392,7 @@ public interface Preemptor {
     }
 
     private static String getRole(IAssignedTask task) {
-      return task.getTask().getOwner().getRole();
+      return task.getTask().getJob().getRole();
     }
 
     private static Predicate<Integer> greaterThan(final int value) {

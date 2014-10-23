@@ -211,7 +211,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       new Function<ITaskConfig, String>() {
         @Override
         public String apply(ITaskConfig task) {
-          return task.getOwner().getRole();
+          return task.getJob().getRole();
         }
       },
       Tasks.SCHEDULED_TO_INFO);
@@ -283,7 +283,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     try {
       sessionValidator.checkAuthenticated(
           session,
-          ImmutableSet.of(mutableJob.getOwner().getRole()));
+          ImmutableSet.of(mutableJob.getKey().getRole()));
       sanitized = SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(mutableJob));
     } catch (AuthFailedException e) {
       return errorResponse(AUTH_FAILED, e);
@@ -343,7 +343,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(session);
 
     try {
-      sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
+      sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
     } catch (AuthFailedException e) {
       return errorResponse(AUTH_FAILED, e);
     }
@@ -418,7 +418,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(session);
 
     try {
-      sessionValidator.checkAuthenticated(session, ImmutableSet.of(job.getOwner().getRole()));
+      sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
     } catch (AuthFailedException e) {
       return errorResponse(AUTH_FAILED, e);
     }
@@ -723,8 +723,8 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     Set<IJobKey> keys = JobKeys.from(taskQuery).or(ImmutableSet.<IJobKey>of());
     targetRoles.addAll(FluentIterable.from(keys).transform(JobKeys.TO_ROLE));
 
-    if (taskQuery.get().isSetOwner()) {
-      targetRoles.add(taskQuery.get().getOwner().getRole());
+    if (taskQuery.get().isSetRole()) {
+      targetRoles.add(taskQuery.get().getRole());
     }
     return sessionValidator.checkAuthenticated(session, targetRoles.build());
   }
@@ -1074,32 +1074,28 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     if (existingJob.getKey().equals(rewrittenJob.getKey())) {
-      if (existingJob.getOwner().equals(rewrittenJob.getOwner())) {
-        Multimap<String, IJobConfiguration> matches = jobsByKey(jobStore, existingJob.getKey());
-        switch (matches.size()) {
-          case 0:
+      Multimap<String, IJobConfiguration> matches = jobsByKey(jobStore, existingJob.getKey());
+      switch (matches.size()) {
+        case 0:
+          error = Optional.of(
+              "No jobs found for key " + JobKeys.canonicalString(existingJob.getKey()));
+          break;
+
+        case 1:
+          Map.Entry<String, IJobConfiguration> match =
+              Iterables.getOnlyElement(matches.entries());
+          IJobConfiguration storedJob = match.getValue();
+          if (storedJob.equals(existingJob)) {
+            jobStore.saveAcceptedJob(match.getKey(), rewrittenJob);
+          } else {
             error = Optional.of(
-                "No jobs found for key " + JobKeys.canonicalString(existingJob.getKey()));
-            break;
+                "CAS compare failed for " + JobKeys.canonicalString(storedJob.getKey()));
+          }
+          break;
 
-          case 1:
-            Map.Entry<String, IJobConfiguration> match =
-                Iterables.getOnlyElement(matches.entries());
-            IJobConfiguration storedJob = match.getValue();
-            if (storedJob.equals(existingJob)) {
-              jobStore.saveAcceptedJob(match.getKey(), rewrittenJob);
-            } else {
-              error = Optional.of(
-                  "CAS compare failed for " + JobKeys.canonicalString(storedJob.getKey()));
-            }
-            break;
-
-          default:
-            error = Optional.of("Multiple jobs found for key "
-                + JobKeys.canonicalString(existingJob.getKey()));
-        }
-      } else {
-        error = Optional.of("Disallowing rewrite attempting to change job owner.");
+        default:
+          error = Optional.of("Multiple jobs found for key "
+              + JobKeys.canonicalString(existingJob.getKey()));
       }
     } else {
       error = Optional.of("Disallowing rewrite attempting to change job key.");
@@ -1202,7 +1198,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
           ImmutableSet<IScheduledTask> currentTasks = storeProvider.getTaskStore().fetchTasks(
-              Query.jobScoped(JobKeys.from(task)).active());
+              Query.jobScoped(task.getJob()).active());
 
           validateTaskLimits(
               task,
@@ -1362,8 +1358,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(mutableRequest);
     requireNonNull(session);
 
-    final IJobKey job =
-        JobKeys.assertValid(JobKeys.from(ITaskConfig.build(mutableRequest.getTaskConfig())));
+    // TODO(maxim): Switch to key field instead when AURORA-749 is fixed.
+    final IJobKey job = JobKeys.assertValid(IJobKey.build(new JobKey()
+        .setRole(mutableRequest.getTaskConfig().getOwner().getRole())
+        .setEnvironment(mutableRequest.getTaskConfig().getEnvironment())
+        .setName(mutableRequest.getTaskConfig().getJobName())));
 
     JobUpdateSettings settings = requireNonNull(mutableRequest.getSettings());
     if (settings.getUpdateGroupSize() <= 0) {

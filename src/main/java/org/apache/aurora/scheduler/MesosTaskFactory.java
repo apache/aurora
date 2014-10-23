@@ -100,7 +100,7 @@ public interface MesosTaskFactory {
     }
 
     public static String getJobSourceName(ITaskConfig task) {
-      return getJobSourceName(JobKeys.from(task));
+      return getJobSourceName(task.getJob());
     }
 
     public static String getInstanceSourceName(ITaskConfig task, int instanceId) {

@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
 
-import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.TaskQuery;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
@@ -54,8 +53,7 @@ public final class Query {
    */
   public static boolean isJobScoped(Builder taskQuery) {
     TaskQuery q = taskQuery.get();
-    return q.isSetOwner() && q.getOwner().isSetRole() && q.isSetEnvironment() && q.isSetJobName()
-        || q.isSetJobKeys();
+    return q.isSetRole() && q.isSetEnvironment() && q.isSetJobName() || q.isSetJobKeys();
   }
 
   /**
@@ -153,7 +151,15 @@ public final class Query {
     }
 
     Builder(final TaskQuery query) {
-      this.query = requireNonNull(query); // It is expected that the caller calls deepCopy.
+      // It is expected that the caller calls deepCopy.
+      // TODO(maxim): Safe to keep only Role here as TaskQuery is not returned back to the client.
+      // Remove in 0.7.0. (AURORA-749)
+      if (query.isSetOwner()) {
+        query.setRole(query.getOwner().getRole());
+        query.unsetOwner();
+      }
+
+      this.query = query;
     }
 
     /**
@@ -226,8 +232,7 @@ public final class Query {
     public Builder byRole(String role) {
       requireNonNull(role);
 
-      return new Builder(
-          query.deepCopy().setOwner(new Identity().setRole(role)));
+      return new Builder(query.deepCopy().setRole(role));
     }
 
     /**
@@ -243,9 +248,7 @@ public final class Query {
       requireNonNull(environment);
 
       return new Builder(
-          query.deepCopy()
-              .setOwner(new Identity().setRole(role))
-              .setEnvironment(environment));
+          query.deepCopy().setRole(role).setEnvironment(environment));
     }
 
     /**
@@ -335,7 +338,7 @@ public final class Query {
 
       return new Builder(
           query.deepCopy()
-              .setOwner(new Identity().setRole(jobKey.getRole()))
+              .setRole(jobKey.getRole())
               .setEnvironment(jobKey.getEnvironment())
               .setJobName(jobKey.getName())
               .setInstanceIds(ImmutableSet.<Integer>builder()
@@ -359,7 +362,7 @@ public final class Query {
 
       return new Builder(
           query.deepCopy()
-              .setOwner(new Identity().setRole(jobKey.getRole()))
+              .setRole(jobKey.getRole())
               .setEnvironment(jobKey.getEnvironment())
               .setJobName(jobKey.getName())
               .setInstanceIds(ImmutableSet.copyOf(instanceIds)));

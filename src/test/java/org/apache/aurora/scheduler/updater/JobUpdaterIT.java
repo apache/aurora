@@ -44,6 +44,7 @@ import com.twitter.common.util.TruncatedBinaryBackoff;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.InstanceTaskConfig;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.JobUpdate;
 import org.apache.aurora.gen.JobUpdateAction;
 import org.apache.aurora.gen.JobUpdateEvent;
@@ -978,6 +979,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
   private static TaskConfig makeTaskConfig() {
     return new TaskConfig()
+        .setJob(new JobKey(JOB.newBuilder()))
         .setJobName(JOB.getName())
         .setEnvironment(JOB.getEnvironment())
         .setOwner(new Identity(JOB.getRole(), "user"))

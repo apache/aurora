@@ -35,6 +35,7 @@ import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -581,6 +582,7 @@ public class PreemptorImplTest extends EasyMockTest {
     AssignedTask assignedTask = new AssignedTask()
         .setTaskId(taskId)
         .setTask(new TaskConfig()
+            .setJob(new JobKey(role, env, job))
             .setOwner(new Identity(role, role))
             .setPriority(priority)
             .setProduction(production)

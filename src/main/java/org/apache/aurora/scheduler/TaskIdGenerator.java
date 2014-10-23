@@ -51,11 +51,11 @@ public interface TaskIdGenerator {
       return new StringBuilder()
           .append(clock.nowMillis())               // Allows chronological sorting.
           .append(sep)
-          .append(task.getOwner().getRole())       // Identification and collision prevention.
+          .append(task.getJob().getRole())       // Identification and collision prevention.
           .append(sep)
-          .append(task.getEnvironment())
+          .append(task.getJob().getEnvironment())
           .append(sep)
-          .append(task.getJobName())
+          .append(task.getJob().getName())
           .append(sep)
           .append(instanceId)                      // Collision prevention within job.
           .append(sep)

@@ -200,7 +200,7 @@ public class Utilization {
     Function<ITaskConfig, Display> toKey = new Function<ITaskConfig, Display>() {
       @Override
       public Display apply(ITaskConfig task) {
-        String role = task.getOwner().getRole();
+        String role = task.getJob().getRole();
         return new Display(role, metric + "/" + role);
       }
     };

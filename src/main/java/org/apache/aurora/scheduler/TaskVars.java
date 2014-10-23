@@ -98,7 +98,7 @@ class TaskVars implements EventSubscriber {
     return String.format(
         "tasks_%s_%s",
         status,
-        JobKeys.canonicalString(JobKeys.from(task.getAssignedTask().getTask())));
+        JobKeys.canonicalString(task.getAssignedTask().getTask().getJob()));
   }
 
   private static final Predicate<IAttribute> IS_RACK = new Predicate<IAttribute>() {

@@ -45,6 +45,7 @@ const APIVersion CURRENT_API_VERSION = {'major': THRIFT_API_VERSION}
 // Aurora executor framework name.
 const string AURORA_EXECUTOR_NAME = 'AuroraExecutor'
 
+// TODO(maxim): Remove in 0.7.0. (AURORA-749)
 struct Identity {
   1: string role
   2: string user
@@ -187,11 +188,15 @@ struct ExecutorConfig {
 
 /** Description of the tasks contained within a job. */
 struct TaskConfig {
- // TODO(William Farner): Store a JobKey instead.
+ /** Job task belongs to. */
+ 28: JobKey job
+ // TODO(maxim): Remove in 0.7.0. (AURORA-749)
  /** contains the role component of JobKey */
  17: Identity owner
+ // TODO(maxim): Remove in 0.7.0. (AURORA-749)
  /** contains the environment component of JobKey */
  26: string environment
+ // TODO(maxim): Remove in 0.7.0. (AURORA-749)
  /** contains the name component of JobKey */
   3: string jobName
   7: bool isService
@@ -242,8 +247,7 @@ struct JobConfiguration {
    * used to construct it server-side.
    */
   9: JobKey key
-  // TODO(William Farner): Deprecate Identity and
-  // use JobKey instead (MESOS-4006).
+  // TODO(maxim): Remove in 0.7.0. (AURORA-749)
   /** Owner of this job. */
   7: Identity owner
   /**
@@ -477,7 +481,9 @@ struct GetJobsResult {
  * (terms are AND'ed together).
  */
 struct TaskQuery {
-  8: Identity owner               // TODO(wfarner): Deprecate Identity
+  // TODO(maxim): Remove in 0.7.0. (AURORA-749)
+  8: Identity owner
+  14: string role
   9: string environment
   2: string jobName
   4: set<string> taskIds

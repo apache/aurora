@@ -25,17 +25,18 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
-import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.TaskStore.Mutable.TaskMutation;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
+import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 /**
  * Utility class to contain and perform storage backfill operations.
@@ -46,6 +47,9 @@ public final class StorageBackfill {
 
   private static final AtomicLong SHARD_SANITY_CHECK_FAILS =
       Stats.exportLong("shard_sanity_check_failures");
+
+  private static final AtomicLong BACKFILLED_TASK_CONFIG_KEYS =
+      Stats.exportLong("task_config_keys_backfilled");
 
   private StorageBackfill() {
     // Utility class.
@@ -67,9 +71,8 @@ public final class StorageBackfill {
 
     if (Tasks.isActive(task.getStatus())) {
       // Perform a sanity check on the number of active shards.
-      TaskConfig config = task.getAssignedTask().getTask();
       Query.Builder query = Query.instanceScoped(
-          JobKeys.from(config.getOwner().getRole(), config.getEnvironment(), config.getJobName()),
+          IJobKey.build(task.getAssignedTask().getTask().getJob()),
           task.getAssignedTask().getInstanceId())
           .active();
       Set<String> activeTasksInShard = FluentIterable.from(taskStore.fetchTasks(query))
@@ -121,6 +124,28 @@ public final class StorageBackfill {
    */
   public static void backfill(final MutableStoreProvider storeProvider, final Clock clock) {
     backfillJobDefaults(storeProvider.getJobStore());
+
+    // Backfilling job keys has to be done in a separate transaction to ensure follow up scoped
+    // Query calls work against upgraded MemTaskStore, which does not support deprecated fields.
+    LOG.info("Backfilling task config job keys.");
+    storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {
+      @Override
+      public IScheduledTask apply(final IScheduledTask task) {
+        if (!task.getAssignedTask().getTask().isSetJob()) {
+          ScheduledTask builder = task.newBuilder();
+          TaskConfig config = builder.getAssignedTask().getTask();
+          config.setJob(new JobKey()
+              .setRole(config.getOwner().getRole())
+              .setEnvironment(config.getEnvironment())
+              .setName(config.getJobName()));
+
+          BACKFILLED_TASK_CONFIG_KEYS.incrementAndGet();
+          return IScheduledTask.build(builder);
+        }
+
+        return task;
+      }
+    });
 
     LOG.info("Performing shard uniqueness sanity check.");
     storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {

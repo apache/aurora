@@ -239,25 +239,16 @@ public final class ConfigurationManager {
 
     JobConfiguration builder = job.newBuilder();
 
-    assertOwnerValidity(job.getOwner());
-
     if (!JobKeys.isValid(job.getKey())) {
       throw new TaskDescriptionException("Job key " + job.getKey() + " is invalid.");
     }
-    if (!job.getKey().getRole().equals(job.getOwner().getRole())) {
-      throw new TaskDescriptionException("Role in job key must match job owner.");
-    }
-    if (!isGoodIdentifier(job.getKey().getRole())) {
-      throw new TaskDescriptionException(
-          "Job role contains illegal characters: " + job.getKey().getRole());
-    }
-    if (!isGoodIdentifier(job.getKey().getEnvironment())) {
-      throw new TaskDescriptionException(
-          "Job environment contains illegal characters: " + job.getKey().getEnvironment());
-    }
-    if (!isGoodIdentifier(job.getKey().getName())) {
-      throw new TaskDescriptionException(
-          "Job name contains illegal characters: " + job.getKey().getName());
+
+    if (job.isSetOwner()) {
+      assertOwnerValidity(job.getOwner());
+
+      if (!job.getKey().getRole().equals(job.getOwner().getRole())) {
+        throw new TaskDescriptionException("Role in job key must match job owner.");
+      }
     }
 
     builder.setTaskConfig(
@@ -293,8 +284,6 @@ public final class ConfigurationManager {
 
     maybeFillLinks(builder);
 
-    assertOwnerValidity(config.getOwner());
-
     if (!isGoodIdentifier(config.getJobName())) {
       throw new TaskDescriptionException(
           "Job name contains illegal characters: " + config.getJobName());
@@ -303,6 +292,27 @@ public final class ConfigurationManager {
     if (!isGoodIdentifier(config.getEnvironment())) {
       throw new TaskDescriptionException(
           "Environment contains illegal characters: " + config.getEnvironment());
+    }
+
+    if (config.isSetJob()) {
+      if (!JobKeys.isValid(config.getJob())) {
+        // Job key is set but invalid
+        throw new TaskDescriptionException("Job key " + config.getJob() + " is invalid.");
+      }
+
+      if (!config.getJob().getRole().equals(config.getOwner().getRole())) {
+        // Both owner and job key are set but don't match
+        throw new TaskDescriptionException("Role must match job owner.");
+      }
+    } else {
+      // TODO(maxim): Make sure both key and owner are populated to support older clients.
+      // Remove in 0.7.0. (AURORA-749).
+      // Job key is not set -> populate from owner, environment and name
+      assertOwnerValidity(config.getOwner());
+      builder.setJob(JobKeys.from(
+          config.getOwner().getRole(),
+          config.getEnvironment(),
+          config.getJobName()).newBuilder());
     }
 
     if (!builder.isSetExecutorConfig()) {

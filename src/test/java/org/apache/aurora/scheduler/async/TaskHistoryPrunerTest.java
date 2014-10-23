@@ -34,6 +34,7 @@ import com.twitter.common.util.testing.FakeClock;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -388,6 +389,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
         .setSlaveHost(SLAVE_HOST)
         .setTaskId(taskId)
         .setTask(new TaskConfig()
+            .setJob(new JobKey("role", "staging45", job))
             .setOwner(new Identity().setRole("role").setUser("user"))
             .setEnvironment("staging45")
             .setJobName(job)

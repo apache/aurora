@@ -48,7 +48,6 @@ import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
-import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -132,7 +131,7 @@ public class StateManagerImpl implements StateManager {
       @Override
       protected void execute(MutableStoreProvider storeProvider) {
           ImmutableSet<IScheduledTask> existingTasks = storeProvider.getTaskStore().fetchTasks(
-            Query.jobScoped(JobKeys.from(task)).active());
+            Query.jobScoped(task.getJob()).active());
 
         Set<Integer> existingInstanceIds =
             FluentIterable.from(existingTasks).transform(Tasks.SCHEDULED_TO_INSTANCE_ID).toSet();

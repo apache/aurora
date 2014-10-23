@@ -34,7 +34,6 @@ import com.google.inject.Inject;
 
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.ResourceAggregate;
-import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ResourceAggregates;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -151,7 +150,7 @@ public interface QuotaManager {
         return new QuotaCheckResult(SUFFICIENT_QUOTA);
       }
 
-      QuotaInfo quotaInfo = getQuotaInfo(template.getOwner().getRole());
+      QuotaInfo quotaInfo = getQuotaInfo(template.getJob().getRole());
 
       return QuotaCheckResult.greaterOrEqual(
           quotaInfo.getQuota(),
@@ -255,7 +254,7 @@ public interface QuotaManager {
         @Override
         public boolean apply(IScheduledTask input) {
           Optional<IJobUpdate> update = Optional.fromNullable(
-              roleJobUpdates.get(JobKeys.from(input.getAssignedTask().getTask())));
+              roleJobUpdates.get(input.getAssignedTask().getTask().getJob()));
 
           if (update.isPresent()) {
             IJobUpdateInstructions instructions = update.get().getInstructions();

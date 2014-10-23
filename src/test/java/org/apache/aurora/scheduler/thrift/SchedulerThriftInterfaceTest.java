@@ -330,6 +330,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testCreateJobNoLock() throws Exception {
+    // Validate key is populated during sanitizing.
+    JobConfiguration jobConfig = makeProdJob();
+    jobConfig.getTaskConfig().unsetJob();
+
     IJobConfiguration job = IJobConfiguration.build(makeProdJob());
     SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
     expectAuth(ROLE, true);
@@ -347,7 +351,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    assertOkResponse(thrift.createJob(job.newBuilder(), DEFAULT_LOCK, SESSION));
+    assertOkResponse(thrift.createJob(jobConfig, DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -638,6 +642,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     JobConfiguration sanitized = job.deepCopy();
     sanitized.getTaskConfig()
+        .setJob(JOB_KEY.newBuilder())
         .setNumCpus(1.0)
         .setPriority(0)
         .setRamMb(1024)
@@ -717,6 +722,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setAssignedTask(new AssignedTask()
             .setTaskId(taskId)
             .setTask(new TaskConfig()
+                .setJob(JOB_KEY.newBuilder().setName(jobName))
                 .setOwner(ROLE_IDENTITY)
                 .setEnvironment("devel")
                 .setJobName(jobName))));
@@ -1071,7 +1077,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     cronJobManager.updateJob(anyObject(SanitizedCronJob.class));
     control.replay();
 
-    assertOkResponse(thrift.replaceCronTemplate(CRON_JOB, DEFAULT_LOCK, SESSION));
+    // Validate key is populated during sanitizing.
+    JobConfiguration jobConfig = CRON_JOB;
+    jobConfig.getTaskConfig().unsetJob();
+    assertOkResponse(thrift.replaceCronTemplate(jobConfig, DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -1162,7 +1171,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
     cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
     control.replay();
-    assertResponse(OK, thrift.scheduleCronJob(CRON_JOB, DEFAULT_LOCK, SESSION));
+
+    // Validate key is populated during sanitizing.
+    JobConfiguration jobConfig = CRON_JOB;
+    jobConfig.getTaskConfig().unsetJob();
+    assertResponse(OK, thrift.scheduleCronJob(jobConfig, DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -1390,6 +1403,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
+    // Validate key is populated during sanitizing.
+    JobConfiguration requestConfig = oldJob.deepCopy();
+    requestConfig.getTaskConfig().unsetJob();
+
     RewriteConfigsRequest request = new RewriteConfigsRequest(
         ImmutableList.of(ConfigRewrite.jobRewrite(
             new JobConfigRewrite(oldJob, newJob))));
@@ -1454,6 +1471,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testGetJobSummary() throws Exception {
     long nextCronRunMs = 100;
     TaskConfig ownedCronJobTask = nonProductionTask()
+        .setJob(JOB_KEY.newBuilder())
         .setJobName(JobKeys.TO_JOB_NAME.apply(JOB_KEY))
         .setOwner(ROLE_IDENTITY)
         .setEnvironment(JobKeys.TO_ENVIRONMENT.apply(JOB_KEY));
@@ -1470,6 +1488,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setKey(JOB_KEY.newBuilder().setRole("other"))
         .setTaskConfig(ownedCronJobTask.deepCopy().setOwner(otherOwner));
     TaskConfig ownedImmediateTaskInfo = defaultTask(false)
+        .setJob(JOB_KEY.newBuilder().setName("immediate"))
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
     Set<JobConfiguration> ownedCronJobOnly = ImmutableSet.of(ownedCronJob);
@@ -1572,6 +1591,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setKey(JOB_KEY.newBuilder().setRole("other"))
         .setTaskConfig(ownedCronJobTask.deepCopy().setOwner(otherOwner));
     TaskConfig ownedImmediateTaskInfo = defaultTask(false)
+        .setJob(JOB_KEY.newBuilder().setName("immediate"))
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
     Set<JobConfiguration> ownedCronJobOnly = ImmutableSet.of(ownedCronJob);
@@ -1637,6 +1657,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setKey(jobKey2)
         .setTaskConfig(nonProductionTask());
     TaskConfig immediateTaskConfig = defaultTask(false)
+        .setJob(JOB_KEY.newBuilder().setName("immediate"))
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
     IScheduledTask immediateTask = IScheduledTask.build(new ScheduledTask()
@@ -1853,6 +1874,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Set<JobConfiguration> crons = ImmutableSet.of(cronJobOne, cronJobTwo, cronJobThree);
 
     TaskConfig immediateTaskConfig = defaultTask(false)
+        .setJob(JOB_KEY.newBuilder().setName("immediate"))
         .setJobName("immediate")
         .setOwner(ROLE_IDENTITY);
     IScheduledTask task1 = IScheduledTask.build(new ScheduledTask()
@@ -1861,12 +1883,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfig.setNumCpus(2))));
 
     TaskConfig immediateTaskConfigTwo = defaultTask(false)
+        .setJob(JOB_KEY.newBuilder().setRole(BAZ_ROLE_IDENTITY.getRole()).setName("immediateTwo"))
         .setJobName("immediateTwo")
         .setOwner(BAZ_ROLE_IDENTITY);
     IScheduledTask task3 = IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask().setTask(immediateTaskConfigTwo)));
 
     TaskConfig immediateTaskConfigThree = defaultTask(false)
+        .setJob(JOB_KEY.newBuilder().setRole(BAZ_ROLE_IDENTITY.getRole()).setName("immediateThree"))
         .setJobName("immediateThree")
         .setOwner(BAZ_ROLE_IDENTITY);
     IScheduledTask task4 = IScheduledTask.build(new ScheduledTask()
@@ -1924,7 +1948,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testAddInstances() throws Exception {
     ITaskConfig populatedTask = ITaskConfig.build(populatedTask());
-    AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
@@ -1936,6 +1959,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
+    // Validate key is populated during sanitizing.
+    AddInstancesConfig config = createInstanceConfig(populatedTask.newBuilder());
+    config.getTaskConfig().unsetJob();
     assertOkResponse(thrift.addInstances(config, LOCK.newBuilder(), SESSION));
   }
 
@@ -2280,8 +2306,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
 
-    Response response =
-        assertOkResponse(thrift.startJobUpdate(buildJobUpdateRequest(update), SESSION));
+    // Validate key is populated during sanitizing.
+    JobUpdateRequest request = buildJobUpdateRequest(update);
+    request.getTaskConfig().unsetJob();
+
+    Response response = assertOkResponse(thrift.startJobUpdate(request, SESSION));
     assertEquals(UPDATE_ID, response.getResult().getStartJobUpdateResult().getUpdateId());
   }
 
@@ -2740,6 +2769,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private static TaskConfig defaultTask(boolean production) {
     return new TaskConfig()
+        .setJob(JOB_KEY.newBuilder())
         .setOwner(new Identity(ROLE, USER))
         .setEnvironment("devel")
         .setJobName(JOB_NAME)
