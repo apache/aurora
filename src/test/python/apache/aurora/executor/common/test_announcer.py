@@ -188,11 +188,21 @@ def test_announcer_under_abnormal_circumstances():
 
 def make_assigned_task(thermos_config, assigned_ports=None):
   from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME
-  from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, Identity, TaskConfig
+  from gen.apache.aurora.api.ttypes import (
+      AssignedTask,
+      ExecutorConfig,
+      Identity,
+      JobKey,
+      TaskConfig
+  )
 
   assigned_ports = assigned_ports or {}
   executor_config = ExecutorConfig(name=AURORA_EXECUTOR_NAME, data=thermos_config.json_dumps())
   task_config = TaskConfig(
+      job=JobKey(
+          role=thermos_config.role().get(),
+          environment="prod",
+          name=thermos_config.name().get()),
       owner=Identity(role=thermos_config.role().get(), user=thermos_config.role().get()),
       environment=thermos_config.environment().get(),
       jobName=thermos_config.name().get(),

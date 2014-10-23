@@ -46,17 +46,19 @@ class TestListJobs(AuroraClientCommandTest):
   def create_mock_scheduled_tasks(cls):
     jobs = []
     for name in ['foo', 'bar', 'baz']:
+      job_key = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
       job = Mock()
-      job.key = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
+      job.key = job_key
       job.failure_count = 0
       job.assignedTask = Mock(spec=AssignedTask)
       job.assignedTask.slaveHost = 'slavehost'
       job.assignedTask.task = Mock(spec=TaskConfig)
       job.assignedTask.task.maxTaskFailures = 1
       job.assignedTask.task.metadata = []
-      job.assignedTask.task.owner = Identity(role='mchucarroll')
-      job.assignedTask.task.environment = 'test'
-      job.assignedTask.task.jobName = 'woops'
+      job.assignedTask.task.job = job_key
+      job.assignedTask.task.owner = Identity(role=cls.TEST_ROLE)
+      job.assignedTask.task.environment = cls.TEST_ENV
+      job.assignedTask.task.jobName = name
       job.assignedTask.task.numCpus = 2
       job.assignedTask.task.ramMb = 2
       job.assignedTask.task.diskMb = 2

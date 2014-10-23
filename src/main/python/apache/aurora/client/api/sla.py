@@ -22,7 +22,7 @@ from apache.aurora.client.base import DEFAULT_GROUPING, format_response, group_h
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.constants import LIVE_STATES
-from gen.apache.aurora.api.ttypes import Identity, ResponseCode, ScheduleStatus, TaskQuery
+from gen.apache.aurora.api.ttypes import ResponseCode, ScheduleStatus, TaskQuery
 
 
 def job_key_from_scheduled(task, cluster):
@@ -32,28 +32,25 @@ def job_key_from_scheduled(task, cluster):
   task -- ScheduledTask to get job key from.
   cluster -- Cluster the task belongs to.
   """
+  config = task.assignedTask.task
   return AuroraJobKey(
       cluster=cluster.name,
-      role=task.assignedTask.task.owner.role,
-      env=task.assignedTask.task.environment,
-      name=task.assignedTask.task.jobName
+      role=config.job.role if config.job else config.owner.role,
+      env=config.job.environment if config.job else config.environment,
+      name=config.job.name if config.job else config.jobName
   )
 
 
-def task_query(job_key=None, hosts=None, job_keys=None):
+def task_query(hosts=None, job_keys=None):
   """Creates TaskQuery optionally scoped by a job(s) or hosts.
 
   Arguments:
-  job_key -- AuroraJobKey to scope the query by.
   hosts -- list of hostnames to scope the query by.
   job_keys -- list of AuroraJobKeys to scope the query by.
   """
   return TaskQuery(
-      owner=Identity(role=job_key.role) if job_key else None,
-      environment=job_key.env if job_key else None,
-      jobName=job_key.name if job_key else None,
       slaveHosts=set(hosts) if hosts else None,
-      jobKeys=set(k.to_thrift() for k in job_keys) if job_keys else None,
+      jobKeys=[k.to_thrift() for k in job_keys] if job_keys else None,
       statuses=LIVE_STATES)
 
 
@@ -302,7 +299,7 @@ class Sla(object):
     Arguments:
     job_key -- job to create a task uptime vector for.
     """
-    return JobUpTimeSlaVector(self._get_tasks(task_query(job_key=job_key)))
+    return JobUpTimeSlaVector(self._get_tasks(task_query(job_keys=[job_key])))
 
   def get_domain_uptime_vector(self, cluster, min_instance_count, hosts=None):
     """Returns a DomainUpTimeSlaVector object with all available job uptimes.

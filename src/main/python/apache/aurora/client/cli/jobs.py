@@ -562,12 +562,12 @@ class StatusCommand(Verb):
       task_info = assigned_task.task
       task_strings = []
       task_strings.append("\tTask role: %s, env: %s, name: %s, instance: %s, status: %s on %s" %
-             (scheduled_task.assignedTask.task.owner.role,
-              scheduled_task.assignedTask.task.environment,
-              scheduled_task.assignedTask.task.jobName,
-              scheduled_task.assignedTask.instanceId,
+             (task_info.job.role if task_info.job else task_info.owner.role,
+              task_info.job.environment if task_info.job else task_info.environment,
+              task_info.job.name if task_info.job else task_info.jobName,
+              assigned_task.instanceId,
               ScheduleStatus._VALUES_TO_NAMES[scheduled_task.status],
-              scheduled_task.assignedTask.slaveHost))
+              assigned_task.slaveHost))
 
       if task_info:
         task_strings.append("""\t  cpus: %s, ram: %s MB, disk: %s MB""" % (

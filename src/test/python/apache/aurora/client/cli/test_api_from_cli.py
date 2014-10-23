@@ -23,19 +23,13 @@ from apache.aurora.client.cli.util import AuroraClientCommandTest
 
 from gen.apache.aurora.api import AuroraAdmin
 from gen.apache.aurora.api.ttypes import (
-    AssignedTask,
     GetJobsResult,
-    Identity,
     JobConfiguration,
     JobKey,
     Response,
     ResponseCode,
     Result,
-    ScheduledTask,
-    ScheduleStatus,
     ScheduleStatusResult,
-    TaskConfig,
-    TaskEvent,
     TaskQuery
 )
 
@@ -44,35 +38,6 @@ class TestApiFromCLI(AuroraClientCommandTest):
   """A container for tests that are probing at API functionality,
   to see if the CLI can handle API-level errors.
   """
-
-  @classmethod
-  def create_mock_scheduled_tasks(cls):
-    tasks = []
-    for name in ['foo', 'bar', 'baz']:
-      task = Mock(spec=ScheduledTask)
-      task.key = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
-      task.failure_count = 0
-      task.assignedTask = Mock(spec=AssignedTask)
-      task.assignedTask.slaveHost = 'slavehost'
-      task.assignedTask.task = Mock(spec=TaskConfig)
-      task.assignedTask.task.maxTaskFailures = 1
-      task.assignedTask.task.metadata = []
-      task.assignedTask.task.owner = Identity(role='bozo')
-      task.assignedTask.task.environment = 'test'
-      task.assignedTask.task.jobName = 'woops'
-      task.assignedTask.task.numCpus = 2
-      task.assignedTask.task.ramMb = 2
-      task.assignedTask.task.diskMb = 2
-      task.assignedTask.instanceId = 4237894
-      task.assignedTask.assignedPorts = None
-      task.status = ScheduleStatus.RUNNING
-      mockEvent = Mock(spec=TaskEvent)
-      mockEvent.timestamp = 28234726395
-      mockEvent.status = ScheduleStatus.RUNNING
-      mockEvent.message = "Hi there"
-      task.taskEvents = [mockEvent]
-      tasks.append(task)
-    return tasks
 
   @classmethod
   def create_mock_scheduled_task_no_metadata(cls):
@@ -104,7 +69,7 @@ class TestApiFromCLI(AuroraClientCommandTest):
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_tasks())
+    resp.result.scheduleStatusResult.tasks = set(cls.create_scheduled_tasks())
     return resp
 
   @classmethod

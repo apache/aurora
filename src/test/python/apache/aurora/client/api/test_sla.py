@@ -27,6 +27,7 @@ from gen.apache.aurora.api.constants import LIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Identity,
+    JobKey,
     Response,
     ResponseCode,
     Result,
@@ -67,6 +68,7 @@ class SlaTest(unittest.TestCase):
             slaveHost=host,
             task=TaskConfig(
                 production=prod if prod is not None else True,
+                job=JobKey(role=self._role, environment=self._env, name=name or self._name),
                 jobName=name or self._name,
                 owner=Identity(role=self._role),
                 environment=self._env)),
@@ -162,13 +164,9 @@ class SlaTest(unittest.TestCase):
     )
 
   def expect_task_status_call_job_scoped(self):
-    self._scheduler.getTasksWithoutConfigs.assert_called_once_with(
-        TaskQuery(
-            owner=Identity(role=self._role),
-            environment=self._env,
-            jobName=self._name,
-            statuses=LIVE_STATES)
-    )
+    self._scheduler.getTasksWithoutConfigs.assert_called_once_with(TaskQuery(
+        jobKeys=[self._job_key.to_thrift()],
+        statuses=LIVE_STATES))
 
   def expect_task_status_call_cluster_scoped(self):
     self._scheduler.getTasksWithoutConfigs.assert_called_with(TaskQuery(statuses=LIVE_STATES))

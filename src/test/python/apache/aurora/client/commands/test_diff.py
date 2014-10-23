@@ -31,6 +31,7 @@ from gen.apache.aurora.api.ttypes import (
     JobKey,
     PopulateJobResult,
     ResponseCode,
+    ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
     TaskConfig,
@@ -43,7 +44,6 @@ class TestDiffCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_options(cls):
     """set up to get a mock options object."""
-    mock_options = Mock()
     mock_options = Mock()
     mock_options.env = None
     mock_options.json = False
@@ -58,8 +58,7 @@ class TestDiffCommand(AuroraClientCommandTest):
   def create_mock_scheduled_tasks(cls):
     jobs = []
     for name in ['foo', 'bar', 'baz']:
-      job = Mock()
-      job.key = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
+      job = Mock(spec=ScheduledTask)
       job.failure_count = 0
       job.assignedTask = Mock(spec=AssignedTask)
       job.assignedTask.slaveHost = 'slavehost'
@@ -68,6 +67,7 @@ class TestDiffCommand(AuroraClientCommandTest):
       job.assignedTask.task.executorConfig = Mock(spec=ExecutorConfig)
       job.assignedTask.task.executorConfig.data = Mock()
       job.assignedTask.task.metadata = []
+      job.assignedTask.task.job = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
       job.assignedTask.task.owner = Identity(role='mchucarroll')
       job.assignedTask.task.environment = 'test'
       job.assignedTask.task.jobName = 'woops'
@@ -101,7 +101,8 @@ class TestDiffCommand(AuroraClientCommandTest):
     populate = cls.create_simple_success_response()
     populate.result.populateJobResult = Mock(spec=PopulateJobResult)
     api.populateJobConfig.return_value = populate
-    populate.result.populateJobResult.populatedDEPRECATED = cls.create_mock_scheduled_tasks()
+    tasks = set(task.assignedTask.task for task in cls.create_mock_scheduled_tasks())
+    populate.result.populateJobResult.populatedDEPRECATED = tasks
     return populate
 
   def test_successful_diff(self):

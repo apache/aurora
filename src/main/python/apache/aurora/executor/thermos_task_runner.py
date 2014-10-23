@@ -367,7 +367,7 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
 
   def from_assigned_task(self, assigned_task, sandbox):
     task_id = assigned_task.taskId
-    role = assigned_task.task.owner.role
+    role = assigned_task.task.job.role if assigned_task.task.job else assigned_task.task.owner.role
     try:
       mesos_task = mesos_task_instance_from_assigned_task(assigned_task)
     except ValueError as e:

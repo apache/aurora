@@ -21,14 +21,10 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
-    AssignedTask,
-    Identity,
     JobKey,
     ResponseCode,
     ScheduleStatus,
     ScheduleStatusResult,
-    TaskConfig,
-    TaskEvent,
     TaskQuery
 )
 
@@ -42,41 +38,10 @@ def mock_log(level, msg):
 class TestRunCommand(AuroraClientCommandTest):
 
   @classmethod
-  def create_mock_scheduled_tasks(cls):
-    jobs = []
-    for name in ['foo', 'bar', 'baz']:
-      job = Mock()
-      job.key = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
-      job.failure_count = 0
-      job.assignedTask = Mock(spec=AssignedTask)
-      job.assignedTask.taskId = 1287391823
-      job.assignedTask.slaveHost = 'slavehost'
-      job.assignedTask.task = Mock(spec=TaskConfig)
-      job.assignedTask.task.executorConfig = Mock()
-      job.assignedTask.task.maxTaskFailures = 1
-      job.assignedTask.task.metadata = []
-      job.assignedTask.task.owner = Identity(role='bozo')
-      job.assignedTask.task.environment = 'test'
-      job.assignedTask.task.jobName = 'woops'
-      job.assignedTask.task.numCpus = 2
-      job.assignedTask.task.ramMb = 2
-      job.assignedTask.task.diskMb = 2
-      job.assignedTask.instanceId = 4237894
-      job.assignedTask.assignedPorts = {}
-      job.status = ScheduleStatus.RUNNING
-      mockEvent = Mock(spec=TaskEvent)
-      mockEvent.timestamp = 28234726395
-      mockEvent.status = ScheduleStatus.RUNNING
-      mockEvent.message = "Hi there"
-      job.taskEvents = [mockEvent]
-      jobs.append(job)
-    return jobs
-
-  @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = cls.create_mock_scheduled_tasks()
+    resp.result.scheduleStatusResult.tasks = cls.create_scheduled_tasks()
     return resp
 
   @classmethod
@@ -146,42 +111,12 @@ class TestRunCommand(AuroraClientCommandTest):
 
 
 class TestSshCommand(AuroraClientCommandTest):
-  @classmethod
-  def create_mock_scheduled_tasks(cls):
-    jobs = []
-    for name in ['foo', 'bar', 'baz']:
-      job = Mock()
-      job.key = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
-      job.failure_count = 0
-      job.assignedTask = Mock(spec=AssignedTask)
-      job.assignedTask.taskId = 1287391823
-      job.assignedTask.slaveHost = 'slavehost'
-      job.assignedTask.task = Mock(spec=TaskConfig)
-      job.assignedTask.task.executorConfig = Mock()
-      job.assignedTask.task.maxTaskFailures = 1
-      job.assignedTask.task.metadata = []
-      job.assignedTask.task.owner = Identity(role='bozo')
-      job.assignedTask.task.environment = 'test'
-      job.assignedTask.task.jobName = 'woops'
-      job.assignedTask.task.numCpus = 2
-      job.assignedTask.task.ramMb = 2
-      job.assignedTask.task.diskMb = 2
-      job.assignedTask.instanceId = 4237894
-      job.assignedTask.assignedPorts = {}
-      job.status = ScheduleStatus.RUNNING
-      mockEvent = Mock(spec=TaskEvent)
-      mockEvent.timestamp = 28234726395
-      mockEvent.status = ScheduleStatus.RUNNING
-      mockEvent.message = "Hi there"
-      job.taskEvents = [mockEvent]
-      jobs.append(job)
-    return jobs
 
   @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = cls.create_mock_scheduled_tasks()
+    resp.result.scheduleStatusResult.tasks = cls.create_scheduled_tasks()
     return resp
 
   @classmethod

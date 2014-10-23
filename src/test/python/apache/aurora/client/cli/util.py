@@ -25,6 +25,9 @@ from apache.aurora.common.clusters import Clusters
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
+    ExecutorConfig,
+    Identity,
+    JobKey,
     Response,
     ResponseCode,
     Result,
@@ -126,7 +129,6 @@ class AuroraClientCommandTest(unittest.TestCase):
   @classmethod
   def create_mock_api(cls):
     """Builds up a mock API object, with a mock SchedulerProxy"""
-    mock_api = Mock(spec=HookedAuroraClientAPI)
     mock_scheduler = Mock()
     mock_scheduler.url = "http://something_or_other"
     mock_scheduler_client = Mock()
@@ -173,6 +175,38 @@ class AuroraClientCommandTest(unittest.TestCase):
     mock_task_event.timestamp = 1000
     mock_task.taskEvents = [mock_task_event]
     return mock_task
+
+  @classmethod
+  def create_scheduled_tasks(cls):
+    tasks = []
+    for name in ['foo', 'bar', 'baz']:
+      task = ScheduledTask()
+      task.failure_count = 0
+      task.assignedTask = AssignedTask()
+      task.assignedTask.taskId = 1287391823
+      task.assignedTask.slaveHost = 'slavehost'
+      task.assignedTask.task = TaskConfig()
+      task.assignedTask.task.maxTaskFailures = 1
+      task.assignedTask.task.executorConfig = ExecutorConfig()
+      task.assignedTask.task.executorConfig.data = Mock()
+      task.assignedTask.task.metadata = []
+      task.assignedTask.task.job = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
+      task.assignedTask.task.owner = Identity(role=cls.TEST_ROLE)
+      task.assignedTask.task.environment = cls.TEST_ENV
+      task.assignedTask.task.jobName = name
+      task.assignedTask.task.numCpus = 2
+      task.assignedTask.task.ramMb = 2
+      task.assignedTask.task.diskMb = 2
+      task.assignedTask.instanceId = 4237894
+      task.assignedTask.assignedPorts = {}
+      task.status = ScheduleStatus.RUNNING
+      event = TaskEvent()
+      event.timestamp = 28234726395
+      event.status = ScheduleStatus.RUNNING
+      event.message = "Hi there"
+      task.taskEvents = [event]
+      tasks.append(task)
+    return tasks
 
   @classmethod
   def setup_get_tasks_status_calls(cls, scheduler):

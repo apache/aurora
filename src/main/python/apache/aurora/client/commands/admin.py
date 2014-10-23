@@ -268,8 +268,8 @@ def scheduler_print_recovery_tasks(cluster):
   for task in resp.result.queryRecoveryResult.tasks:
     assigned = task.assignedTask
     conf = assigned.task
-    log.info('\t'.join((conf.owner.role,
-                        conf.jobName,
+    log.info('\t'.join((conf.job.role if conf.job else conf.owner.role,
+                        conf.job.name if conf.job else conf.jobName,
                         str(assigned.instanceId),
                         ScheduleStatus._VALUES_TO_NAMES[task.status],
                         assigned.taskId)))

@@ -82,8 +82,9 @@ def ssh(args, options):
 
   ssh_command = ['ssh', '-t']
 
-  role = first_task.assignedTask.task.owner.role
-  slave_host = first_task.assignedTask.slaveHost
+  assigned = first_task.assignedTask
+  role = assigned.task.job.role if assigned.task.job else assigned.task.owner.role
+  slave_host = assigned.slaveHost
 
   for tunnel in options.tunnels:
     try:
@@ -91,10 +92,10 @@ def ssh(args, options):
       port = int(port)
     except ValueError:
       die('Could not parse tunnel: %s.  Must be of form PORT:NAME' % tunnel)
-    if name not in first_task.assignedTask.assignedPorts:
-      die('Task %s has no port named %s' % (first_task.assignedTask.taskId, name))
+    if name not in assigned.assignedPorts:
+      die('Task %s has no port named %s' % (assigned.taskId, name))
     ssh_command += [
-        '-L', '%d:%s:%d' % (port, slave_host, first_task.assignedTask.assignedPorts[name])]
+        '-L', '%d:%s:%d' % (port, slave_host, assigned.assignedPorts[name])]
 
   ssh_command += ['%s@%s' % (options.ssh_user or role, slave_host), command]
   return subprocess.call(ssh_command)

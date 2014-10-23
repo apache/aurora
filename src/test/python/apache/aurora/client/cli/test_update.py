@@ -120,7 +120,11 @@ class TestUpdateCommand(AuroraClientCommandTest):
     populate = cls.create_simple_success_response()
     populate.result.populateJobResult = Mock(spec=PopulateJobResult)
     api.populateJobConfig.return_value = populate
-    configs = [TaskConfig(numCpus=1.0, ramMb=1, diskMb=1) for i in range(count)]
+    configs = [TaskConfig(
+        numCpus=1.0,
+        ramMb=1,
+        diskMb=1,
+        job=JobKey(role='bozo', environment='test', name='hello')) for i in range(count)]
     populate.result.populateJobResult.populatedDEPRECATED = set(configs)
     return populate
 
@@ -147,7 +151,12 @@ class TestUpdateCommand(AuroraClientCommandTest):
     scheduler.getTasksWithoutConfigs.return_value = status_response
     schedule_status = Mock(spec=ScheduleStatusResult)
     status_response.result.scheduleStatusResult = schedule_status
-    task_config = TaskConfig(numCpus=1.0, ramMb=10, diskMb=1)
+    task_config = TaskConfig(
+        numCpus=1.0,
+        ramMb=10,
+        diskMb=1,
+        job=JobKey(role='bozo', environment='test', name='hello'))
+
     # This should be a list of ScheduledTask's.
     schedule_status.tasks = []
     for i in range(20):

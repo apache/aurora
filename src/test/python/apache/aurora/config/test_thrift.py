@@ -44,14 +44,16 @@ HELLO_WORLD = Job(
 
 def test_simple_config():
   job = convert_pystachio_to_thrift(HELLO_WORLD)
+  expected_key = JobKey(
+      role=HELLO_WORLD.role().get(),
+      environment=HELLO_WORLD.environment().get(),
+      name=HELLO_WORLD.name().get())
   assert job.instanceCount == 1
   tti = job.taskConfig
-  assert job.key == JobKey(
-    role=HELLO_WORLD.role().get(),
-    environment=HELLO_WORLD.environment().get(),
-    name=HELLO_WORLD.name().get())
+  assert job.key == expected_key
   assert job.owner == Identity(role=HELLO_WORLD.role().get(), user=getpass.getuser())
   assert job.cronSchedule is None
+  assert tti.job == expected_key
   assert tti.jobName == 'hello_world'
   assert tti.isService is False
   assert tti.numCpus == 0.1

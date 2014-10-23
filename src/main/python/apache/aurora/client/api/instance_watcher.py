@@ -20,7 +20,7 @@ from twitter.common import log
 from .health_check import StatusHealthCheck
 from .task_util import StatusMuxHelper
 
-from gen.apache.aurora.api.ttypes import Identity, ScheduleStatus, TaskQuery
+from gen.apache.aurora.api.ttypes import ScheduleStatus, TaskQuery
 
 
 class Instance(object):
@@ -133,9 +133,7 @@ class InstanceWatcher(object):
 
   def _create_query(self, instance_ids):
     query = TaskQuery()
-    query.owner = Identity(role=self._job_key.role)
-    query.environment = self._job_key.environment
-    query.jobName = self._job_key.name
+    query.jobKeys = set([self._job_key])
     query.statuses = set([ScheduleStatus.RUNNING])
     query.instanceIds = instance_ids
     return query

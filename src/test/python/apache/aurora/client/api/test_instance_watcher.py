@@ -23,7 +23,6 @@ from apache.aurora.client.api.instance_watcher import InstanceWatcher
 from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
-    Identity,
     JobKey,
     Response,
     ResponseCode,
@@ -72,16 +71,13 @@ class InstanceWatcherTest(unittest.TestCase):
   EXPECTED_CYCLES = find_expected_cycles(WATCH_SECS, 3.0)
 
   def setUp(self):
-    self._role = 'mesos'
-    self._env = 'test'
-    self._name = 'jimbob'
     self._clock = FakeClock()
     self._event = FakeEvent(self._clock)
     self._scheduler = mox.MockObject(scheduler_client)
-    job_key = JobKey(name=self._name, environment=self._env, role=self._role)
+    self._job_key = JobKey(role='mesos', name='jimbob', environment='test')
     self._health_check = mox.MockObject(HealthCheck)
     self._watcher = InstanceWatcher(self._scheduler,
-                                 job_key,
+                                 self._job_key,
                                  self.RESTART_THRESHOLD,
                                  self.WATCH_SECS,
                                  health_check_interval_seconds=3,
@@ -90,9 +86,7 @@ class InstanceWatcherTest(unittest.TestCase):
 
   def get_tasks_status_query(self, instance_ids):
     query = TaskQuery()
-    query.owner = Identity(role=self._role)
-    query.environment = self._env
-    query.jobName = self._name
+    query.jobKeys = set([self._job_key])
     query.statuses = set([ScheduleStatus.RUNNING])
     query.instanceIds = set(instance_ids)
     return query
@@ -108,7 +102,7 @@ class InstanceWatcherTest(unittest.TestCase):
     response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
 
     query = self.get_tasks_status_query(instance_ids)
-    for x in range(int(num_calls)):
+    for _ in range(int(num_calls)):
       self._scheduler.getTasksWithoutConfigs(query).AndReturn(response)
 
   def expect_io_error_in_get_statuses(self, instance_ids=WATCH_INSTANCES,
@@ -119,14 +113,14 @@ class InstanceWatcherTest(unittest.TestCase):
     response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
 
     query = self.get_tasks_status_query(instance_ids)
-    for x in range(int(num_calls)):
+    for _ in range(int(num_calls)):
       self._scheduler.getTasksWithoutConfigs(query).AndRaise(IOError('oops'))
 
   def mock_health_check(self, task, status, retry):
     self._health_check.health(task).InAnyOrder().AndReturn((status, retry))
 
   def expect_health_check(self, instance, status, retry=True, num_calls=EXPECTED_CYCLES):
-    for x in range(int(num_calls)):
+    for _ in range(int(num_calls)):
       self.mock_health_check(self.create_task(instance), status, retry)
 
   def assert_watch_result(self, expected_failed_instances, instances_to_watch=WATCH_INSTANCES):

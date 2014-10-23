@@ -110,10 +110,11 @@ class DefaultAnnouncerCheckerProvider(AnnouncerCheckerProvider):
     return KazooClient(self.__ensemble, connection_retry=self.DEFAULT_RETRY_POLICY)
 
   def make_zk_path(self, assigned_task):
+    config = assigned_task.task
     role, environment, name = (
-        assigned_task.task.owner.role,
-        assigned_task.task.environment,
-        assigned_task.task.jobName)
+        config.job.role if config.job else config.owner.role,
+        config.job.environment if config.job else config.environment,
+        config.job.name if config.job else config.jobName)
     return posixpath.join(self.__root, role, environment, name)
 
 

@@ -267,11 +267,12 @@ def diff(job_spec, config_file):
 
   pp = pprint.PrettyPrinter(indent=2)
   def pretty_print_task(task):
-    # The raw configuration is not interesting - we only care about what gets parsed.
+  # The raw configuration is not interesting - we only care about what gets parsed.
     task.configuration = None
     task.executorConfig = ExecutorConfig(
         name=AURORA_EXECUTOR_NAME,
         data=json.loads(task.executorConfig.data))
+
     return pp.pformat(vars(task))
 
   def pretty_print_tasks(tasks):
@@ -648,16 +649,17 @@ def status(args, options):
     return taskString
 
   def print_tasks(tasks):
-    for task in tasks:
-      taskString = print_task(task)
+    for scheduled in tasks:
+      taskString = print_task(scheduled)
 
+      assigned = scheduled.assignedTask
       log.info('role: %s, env: %s, name: %s, shard: %s, status: %s on %s\n%s' %
-             (task.assignedTask.task.owner.role,
-              task.assignedTask.task.environment,
-              task.assignedTask.task.jobName,
-              task.assignedTask.instanceId,
-              ScheduleStatus._VALUES_TO_NAMES[task.status],
-              task.assignedTask.slaveHost,
+             (assigned.task.job.role if assigned.task.job else assigned.task.owner.role,
+              assigned.task.job.environment if assigned.task.job else assigned.task.environment,
+              assigned.task.job.name if assigned.task.job else assigned.task.jobName,
+              assigned.instanceId,
+              ScheduleStatus._VALUES_TO_NAMES[scheduled.status],
+              assigned.slaveHost,
               taskString))
 
   api, job_key, _ = LiveJobDisambiguator.disambiguate_args_or_die(

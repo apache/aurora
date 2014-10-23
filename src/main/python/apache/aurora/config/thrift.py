@@ -196,6 +196,7 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
     raise InvalidConfig('Task has invalid resources.  cpu/ramMb/diskMb must all be positive: '
         'cpu:%r ramMb:%r diskMb:%r' % (task.numCpus, task.ramMb, task.diskMb))
 
+  task.job = key
   task.owner = owner
   task.requestedPorts = ports
   task.taskLinks = not_empty_or(job.task_links(), {})

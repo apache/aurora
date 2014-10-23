@@ -43,45 +43,22 @@ from gen.apache.aurora.api.ttypes import (
 
 class TestJobStatus(AuroraClientCommandTest):
   @classmethod
-  def create_mock_scheduled_tasks(cls):
-    tasks = []
+  def create_scheduled_tasks(cls):
+    tasks = AuroraClientCommandTest.create_scheduled_tasks()
     instance = 0
-    for name in ['foo', 'bar', 'baz']:
+    for task in tasks:
       instance += 1
-      event = TaskEvent(
-        timestamp=28234726395,
-        status=ScheduleStatus.RUNNING,
-        message="Hi there"
-      )
-      task = ScheduledTask(
-        failureCount=0,
-        assignedTask=AssignedTask(
-          slaveHost='slavehost',
-          task=TaskConfig(
-            maxTaskFailures=1,
-            metadata=[],
-            owner=Identity(role='bozo'),
-            environment='test',
-            jobName='woops',
-            numCpus=2,
-            ramMb=2,
-            diskMb=2
-          ),
-          instanceId=instance,
-          assignedPorts=None,
-        ),
-        status=ScheduleStatus.RUNNING,
-        taskEvents=[event]
-      )
-      tasks.append(task)
+      task.assignedTask.instanceId = instance
+      task.assignedTask.task.job = JobKey(role='bozo', environment='test', name='woops')
+      task.assignedTask.task.jobName = 'woops'
     return tasks
 
   @classmethod
-  def create_mock_inactive_tasks(cls):
-    jobs = []
+  def create_inactive_tasks(cls):
     instance = 0
     INACTIVE_STATUSES = [ScheduleStatus.KILLED, ScheduleStatus.FINISHED, ScheduleStatus.FAILED]
-    for instance in range(3):
+    tasks = cls.create_scheduled_tasks()
+    for task in tasks:
       events = []
       for i in range(3):
         event = TaskEvent(
@@ -89,36 +66,22 @@ class TestJobStatus(AuroraClientCommandTest):
           status=INACTIVE_STATUSES[i],
           message="Hi there")
         events.append(event)
-      job = ScheduledTask(
-        failureCount=3,
-        assignedTask=AssignedTask(
-          slaveHost='slavehost',
-          task=TaskConfig(
-            maxTaskFailures=1,
-            metadata=[],
-            owner=Identity(role='bozo'),
-            environment='test',
-            jobName='woops',
-            numCpus=2,
-            ramMb=2,
-            diskMb=2),
-          instanceId=instance,
-          assignedPorts=None),
-        status=INACTIVE_STATUSES[instance],
-        taskEvents=events)
-      jobs.append(job)
-    return set(jobs)
+      task.taskEvents = events
+      task.status = INACTIVE_STATUSES[instance]
+      task.assignedTask.instanceId = instance
+      instance += 1
+    return set(tasks)
 
   @classmethod
   def create_mock_scheduled_task_no_metadata(cls):
-    result = cls.create_mock_scheduled_tasks()
+    result = cls.create_scheduled_tasks()
     for job in result:
       job.assignedTask.task.metadata = None
     return result
 
   @classmethod
   def create_mock_scheduled_task_with_metadata(cls):
-    result = cls.create_mock_scheduled_tasks()
+    result = cls.create_scheduled_tasks()
     for job in result:
       job.assignedTask.task.metadata = [Metadata("meta", "data"), Metadata("data", "meta")]
     return result
@@ -144,7 +107,7 @@ class TestJobStatus(AuroraClientCommandTest):
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
     resp.result.scheduleStatusResult = ScheduleStatusResult(
-      tasks=set(cls.create_mock_scheduled_tasks()))
+      tasks=set(cls.create_scheduled_tasks()))
     return resp
 
   @classmethod
@@ -157,7 +120,7 @@ class TestJobStatus(AuroraClientCommandTest):
   @classmethod
   def create_status_with_inactives(cls):
     resp = cls.create_status_null_metadata()
-    resp.result.scheduleStatusResult.tasks |= cls.create_mock_inactive_tasks()
+    resp.result.scheduleStatusResult.tasks |= cls.create_inactive_tasks()
     return resp
 
   @classmethod
@@ -182,6 +145,7 @@ class TestJobStatus(AuroraClientCommandTest):
           slaveId="random_machine_id",
           slaveHost="junk.nothing",
           task=TaskConfig(
+            job=JobKey(role="nobody", environment="prod", name='flibber'),
             owner=Identity(role="nobody"),
             environment="prod",
             jobName="flibber",
@@ -496,6 +460,11 @@ class TestJobStatus(AuroraClientCommandTest):
                     "owner": {
                       "role": "nobody"
                     },
+                    "job": {
+                      "environment": "prod",
+                      "role": "nobody",
+                      "name": "flibber"
+                    },
                     "production": false,
                     "diskMb": 4096,
                     "ramMb": 2048,
@@ -543,6 +512,11 @@ class TestJobStatus(AuroraClientCommandTest):
                     "priority": 7,
                     "owner": {
                       "role": "nobody"
+                    },
+                    "job": {
+                      "environment": "prod",
+                      "role": "nobody",
+                      "name": "flibber"
                     },
                     "production": false,
                     "diskMb": 4096,

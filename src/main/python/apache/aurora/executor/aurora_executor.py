@@ -38,7 +38,7 @@ class DefaultSandboxProvider(SandboxProvider):
   def from_assigned_task(self, assigned_task):
     return DirectorySandbox(
         os.path.realpath(self.SANDBOX_NAME),
-        assigned_task.task.owner.role)
+        assigned_task.task.job.role if assigned_task.task.job else assigned_task.task.owner.role)
 
 
 class AuroraExecutor(ExecutorBase, Observable):
