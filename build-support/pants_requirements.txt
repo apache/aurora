@@ -1,7 +1,10 @@
+#
+# This file is generated automatically. Do not modify it manually! Instead it
+# can be updated by running ./build-support/python/update-pants-requirements.
+#
 Markdown==2.1.1
 Pygments==1.4
 ansicolors==1.0.2
-argparse==1.2.1
 cov-core==1.14.0
 coverage==3.7.1
 lockfile==0.10.2
@@ -27,4 +30,3 @@ twitter.common.process==0.3.1
 twitter.common.string==0.3.1
 twitter.common.threading==0.3.1
 twitter.common.util==0.3.1
-wsgiref==0.1.2
