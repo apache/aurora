@@ -290,6 +290,11 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
+  public Response pulseJobUpdate(String updateId, SessionKey session) throws TException {
+    return delegate.pulseJobUpdate(updateId, session);
+  }
+
+  @Override
   public Response getJobUpdateSummaries(JobUpdateQuery updateQuery) throws TException {
     return delegate.getJobUpdateSummaries(updateQuery);
   }

@@ -1519,6 +1519,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
+  public Response pulseJobUpdate(String updateId, SessionKey session) {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
   public Response getJobUpdateSummaries(final JobUpdateQuery mutableQuery) {
     final IJobUpdateQuery query = IJobUpdateQuery.build(requireNonNull(mutableQuery));
     return okResponse(Result.getJobUpdateSummariesResult(

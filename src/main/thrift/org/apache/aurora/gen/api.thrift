@@ -582,6 +582,24 @@ enum JobUpdateAction {
   INSTANCE_ROLLBACK_FAILED = 6
 }
 
+/** Status of the coordinated update. Intended as a response to pulseJobUpdate RPC. */
+enum JobUpdatePulseStatus {
+  /**
+   *  Update is active (ACK).
+   */
+  OK = 1,
+
+  /**
+   * Update is paused and will not progress unless explicitly resumed (NACK).
+   */
+  PAUSED = 2,
+
+  /**
+   * Update has reached terminal state.
+   */
+  FINISHED = 3
+}
+
 /** Job update thresholds and limits. */
 struct JobUpdateSettings {
   /** Max number of instances being updated at any given moment. */
@@ -610,6 +628,14 @@ struct JobUpdateSettings {
    * batch until the preceding batch finishes updating.
    */
   8: bool waitForBatchCompletion
+
+ /**
+  * If set, requires external calls to pulseJobUpdate RPC within the specified rate for the
+  * update to make progress. If no pulses received within specified interval the update will
+  * block. A blocked update is unable to continue but retains its current status. It may only get
+  * unblocked by a fresh pulseJobUpdate call.
+  */
+  9: i32 blockIfNoPulsesAfterMs
 }
 
 /** Event marking a state transition in job update lifecycle. */
@@ -803,6 +829,11 @@ struct GetJobUpdateDetailsResult {
   1: JobUpdateDetails details
 }
 
+/** Result of the pulseJobUpdate call. */
+struct PulseJobUpdateResult {
+  1: JobUpdatePulseStatus status
+}
+
 /** Information about the scheduler. */
 struct ServerInfo {
   1: string clusterName
@@ -832,6 +863,7 @@ union Result {
   22: StartJobUpdateResult startJobUpdateResult
   23: GetJobUpdateSummariesResult getJobUpdateSummariesResult
   24: GetJobUpdateDetailsResult getJobUpdateDetailsResult
+  25: PulseJobUpdateResult pulseJobUpdateResult
 }
 
 struct ResponseDetail {
@@ -982,6 +1014,13 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
 
   /** Permanently aborts the job update. Does not remove the update history. Not implemented yet. */
   Response abortJobUpdate(1: JobKey jobKey, 2: SessionKey session)
+
+  /**
+   * Allows progress of the job update in case blockIfNoPulsesAfterMs is specified in
+   * JobUpdateSettings. Unblocks progress if the update was previously blocked.
+   * Responds with ResponseCode.INVALID_REQUEST in case an unknown updateId is specified.
+   */
+  Response pulseJobUpdate(1: string updateId, 2: SessionKey session)
 }
 
 struct InstanceConfigRewrite {

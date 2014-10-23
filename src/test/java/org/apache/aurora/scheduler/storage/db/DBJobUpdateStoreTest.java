@@ -919,6 +919,7 @@ public class DBJobUpdateStoreTest {
                 .setInstances(ImmutableSet.of(new Range(4, 5), new Range(6, 7)))
                 .setTask(makeTaskConfig())))
         .setSettings(new JobUpdateSettings()
+            .setBlockIfNoPulsesAfterMs(500)
             .setUpdateOnlyTheseInstances(ImmutableSet.of(new Range(0, 0), new Range(3, 5)))));
   }
 

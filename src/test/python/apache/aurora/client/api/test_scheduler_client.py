@@ -227,6 +227,11 @@ class TestSchedulerProxyInjection(unittest.TestCase):
     self.mox.ReplayAll()
     self.make_scheduler_proxy().abortJobUpdate('update_id')
 
+  def test_pulseJobUpdate(self):
+    self.mock_thrift_client.pulseJobUpdate('update_id', IsA(SessionKey)).AndReturn(DEFAULT_RESPONSE)
+    self.mox.ReplayAll()
+    self.make_scheduler_proxy().pulseJobUpdate('update_id')
+
 
 class TestSchedulerProxyAdminInjection(TestSchedulerProxyInjection):
   def test_startMaintenance(self):

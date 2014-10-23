@@ -36,7 +36,8 @@
       max_wait_to_instance_running_ms,
       min_wait_in_instance_running_ms,
       rollback_on_failure,
-      wait_for_batch_completion
+      wait_for_batch_completion,
+      block_if_no_pulses_after_ms
     ) VALUES (
       (
         SELECT ID
@@ -54,6 +55,7 @@
       #{instructions.settings.minWaitInInstanceRunningMs},
       #{instructions.settings.rollbackOnFailure},
       #{instructions.settings.waitForBatchCompletion},
+      #{instructions.settings.blockIfNoPulsesAfterMs},
     )
   </insert>
 
@@ -316,6 +318,7 @@
       u.min_wait_in_instance_running_ms AS jui_juse_min_wait_in_instance_running_ms,
       u.rollback_on_failure AS jui_juse_rollback_on_failure,
       u.wait_for_batch_completion AS jui_juse_wait_for_batch_completion,
+      u.block_if_no_pulses_after_ms AS jui_juse_block_if_no_pulses_after_ms,
       u.id AS jui_id,
       cn.id AS jui_ditc_id,
       cn.task_config AS jui_ditc_task,
@@ -382,6 +385,7 @@
       u.min_wait_in_instance_running_ms AS juse_min_wait_in_instance_running_ms,
       u.rollback_on_failure AS juse_rollback_on_failure,
       u.wait_for_batch_completion AS juse_wait_for_batch_completion,
+      u.block_if_no_pulses_after_ms AS juse_block_if_no_pulses_after_ms,
       u.id AS id,
       cn.id AS ditc_id,
       cn.task_config AS ditc_task,
