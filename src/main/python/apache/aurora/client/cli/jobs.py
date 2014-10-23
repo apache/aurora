@@ -532,7 +532,8 @@ class StatusCommand(Verb):
       # Now, clean it up: take all fields that are actually enums, and convert
       # their values to strings.
       task['status'] = ScheduleStatus._VALUES_TO_NAMES[task['status']]
-      for event in task['taskEvents']:
+      events = sorted(task['taskEvents'], key=lambda event: event['timestamp'])
+      for event in events:
         event['status'] = ScheduleStatus._VALUES_TO_NAMES[event['status']]
       # convert boolean fields to boolean value names.
       assigned = task['assignedTask']
@@ -569,7 +570,8 @@ class StatusCommand(Verb):
         task_strings.append("\t  failure count: %s (max %s)" % (scheduled_task.failureCount,
             task_info.maxTaskFailures))
       task_strings.append("\t  events:")
-      for event in scheduled_task.taskEvents:
+      events = sorted(scheduled_task.taskEvents, key=lambda event: event.timestamp)
+      for event in events:
         task_strings.append("\t   %s %s: %s" % (datetime.fromtimestamp(event.timestamp / 1000),
             ScheduleStatus._VALUES_TO_NAMES[event.status], event.message))
       if assigned_task.task.metadata is not None and len(assigned_task.task.metadata) > 0:
@@ -598,8 +600,10 @@ class StatusCommand(Verb):
       if job_tasks is None or job_tasks is []:
         context.print_log(logging.INFO, "No tasks were found for jobkey %s" % jk)
         continue
-      active_tasks = [t for t in job_tasks if is_active(t)]
-      inactive_tasks = [t for t in job_tasks if not is_active(t)]
+      active_tasks = sorted([t for t in job_tasks if is_active(t)],
+                            key=lambda task: task.assignedTask.instanceId)
+      inactive_tasks = sorted([t for t in job_tasks if not is_active(t)],
+                              key=lambda task: task.assignedTask.instanceId)
       if context.options.write_json:
         result.append(self.render_tasks_json(jk, active_tasks, inactive_tasks))
       else:

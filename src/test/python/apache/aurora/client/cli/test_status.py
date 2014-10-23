@@ -16,7 +16,7 @@ import contextlib
 import re
 import textwrap
 
-from mock import Mock, patch
+from mock import patch
 
 from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
@@ -25,10 +25,13 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
+    GetJobsResult,
     Identity,
+    JobConfiguration,
     JobKey,
     Metadata,
     ResponseCode,
+    Result,
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
@@ -41,35 +44,70 @@ from gen.apache.aurora.api.ttypes import (
 class TestJobStatus(AuroraClientCommandTest):
   @classmethod
   def create_mock_scheduled_tasks(cls):
-    jobs = []
+    tasks = []
+    instance = 0
     for name in ['foo', 'bar', 'baz']:
-      instance = 7734  # use a fake instance number; the order in which the status request
-      # returns the shards isn't really deterministic - it's up to python sorting.
-      # so for testing, just use the same one for all shards.
-      job = Mock()
-      job.key = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
-      job.failure_count = 0
-      job.assignedTask = Mock(spec=AssignedTask)
-      job.assignedTask.slaveHost = 'slavehost'
-      job.assignedTask.task = Mock(spec=TaskConfig)
-      job.assignedTask.task.maxTaskFailures = 1
-      job.assignedTask.task.metadata = []
-      job.assignedTask.task.owner = Identity(role='bozo')
-      job.assignedTask.task.environment = 'test'
-      job.assignedTask.task.jobName = 'woops'
-      job.assignedTask.task.numCpus = 2
-      job.assignedTask.task.ramMb = 2
-      job.assignedTask.task.diskMb = 2
-      job.assignedTask.instanceId = instance
-      job.assignedTask.assignedPorts = None
-      job.status = ScheduleStatus.RUNNING
-      mockEvent = Mock(spec=TaskEvent)
-      mockEvent.timestamp = 28234726395
-      mockEvent.status = ScheduleStatus.RUNNING
-      mockEvent.message = "Hi there"
-      job.taskEvents = [mockEvent]
+      instance += 1
+      event = TaskEvent(
+        timestamp=28234726395,
+        status=ScheduleStatus.RUNNING,
+        message="Hi there"
+      )
+      task = ScheduledTask(
+        failureCount=0,
+        assignedTask=AssignedTask(
+          slaveHost='slavehost',
+          task=TaskConfig(
+            maxTaskFailures=1,
+            metadata=[],
+            owner=Identity(role='bozo'),
+            environment='test',
+            jobName='woops',
+            numCpus=2,
+            ramMb=2,
+            diskMb=2
+          ),
+          instanceId=instance,
+          assignedPorts=None,
+        ),
+        status=ScheduleStatus.RUNNING,
+        taskEvents=[event]
+      )
+      tasks.append(task)
+    return tasks
+
+  @classmethod
+  def create_mock_inactive_tasks(cls):
+    jobs = []
+    instance = 0
+    INACTIVE_STATUSES = [ScheduleStatus.KILLED, ScheduleStatus.FINISHED, ScheduleStatus.FAILED]
+    for instance in range(3):
+      events = []
+      for i in range(3):
+        event = TaskEvent(
+          timestamp=28234726395 + (273 * i),
+          status=INACTIVE_STATUSES[i],
+          message="Hi there")
+        events.append(event)
+      job = ScheduledTask(
+        failureCount=3,
+        assignedTask=AssignedTask(
+          slaveHost='slavehost',
+          task=TaskConfig(
+            maxTaskFailures=1,
+            metadata=[],
+            owner=Identity(role='bozo'),
+            environment='test',
+            jobName='woops',
+            numCpus=2,
+            ramMb=2,
+            diskMb=2),
+          instanceId=instance,
+          assignedPorts=None),
+        status=INACTIVE_STATUSES[instance],
+        taskEvents=events)
       jobs.append(job)
-    return jobs
+    return set(jobs)
 
   @classmethod
   def create_mock_scheduled_task_no_metadata(cls):
@@ -87,41 +125,45 @@ class TestJobStatus(AuroraClientCommandTest):
 
   @classmethod
   def create_getjobs_response(cls):
+    mock_job_one = JobConfiguration(
+      key=JobKey(
+        role='RoleA',
+        environment='test',
+        name='hithere'))
+    mock_job_two = JobConfiguration(
+      key=JobKey(
+        role='bozo',
+        environment='test',
+        name='hello'))
     result = cls.create_simple_success_response()
-    result.result = Mock()
-    result.result.getJobsResult = Mock()
-    mock_job_one = Mock()
-    mock_job_one.key = Mock()
-    mock_job_one.key.role = 'RoleA'
-    mock_job_one.key.environment = 'test'
-    mock_job_one.key.name = 'hithere'
-    mock_job_two = Mock()
-    mock_job_two.key = Mock()
-    mock_job_two.key.role = 'bozo'
-    mock_job_two.key.environment = 'test'
-    mock_job_two.key.name = 'hello'
-    result.result.getJobsResult.configs = [mock_job_one, mock_job_two]
+    result.result = Result(
+        getJobsResult=GetJobsResult(configs=[mock_job_one, mock_job_two]))
     return result
 
   @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_tasks())
+    resp.result.scheduleStatusResult = ScheduleStatusResult(
+      tasks=set(cls.create_mock_scheduled_tasks()))
     return resp
 
   @classmethod
   def create_status_null_metadata(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_no_metadata())
+    resp.result.scheduleStatusResult = ScheduleStatusResult(
+      tasks=set(cls.create_mock_scheduled_task_no_metadata()))
+    return resp
+
+  @classmethod
+  def create_status_with_inactives(cls):
+    resp = cls.create_status_null_metadata()
+    resp.result.scheduleStatusResult.tasks |= cls.create_mock_inactive_tasks()
     return resp
 
   @classmethod
   def create_empty_status(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = None
+    resp.result.scheduleStatusResult = ScheduleStatusResult(tasks=None)
     return resp
 
   def get_task_status_json(cls):
@@ -134,29 +176,29 @@ class TestJobStatus(AuroraClientCommandTest):
       ]
 
     def create_scheduled_task(instance, start_time):
-      task = ScheduledTask()
-      task.assignedTask = AssignedTask()
-      task.assignedTask.taskId = "task_%s" % instance
-      task.assignedTask.slaveId = "random_machine_id"
-      task.assignedTask.slaveHost = "junk.nothing"
-      task.assignedTask.task = TaskConfig()
-      task.assignedTask.task.owner = Identity(role="nobody")
-      task.assignedTask.task.environment = "prod"
-      task.assignedTask.task.jobName = "flibber"
-      task.assignedTask.task.isService = False
-      task.assignedTask.task.numCpus = 2
-      task.assignedTask.task.ramMb = 2048
-      task.assignedTask.task.diskMb = 4096
-      task.assignedTask.task.priority = 7
-      task.assignedTask.task.maxTaskFailures = 3
-      task.assignedTask.task.production = False
-      task.assignedTask.task.requestedPorts = ["http"]
-      task.assignedTask.assignedPorts = {"http": 1001}
-      task.assignedTask.instanceId = instance
-      task.status = 2
-      task.failureCount = instance + 4
-      task.taskEvents = create_task_events(start_time)
-      task.ancestorId = "random_task_ancestor%s" % instance
+      task = ScheduledTask(
+        assignedTask=AssignedTask(
+          taskId="task_%s" % instance,
+          slaveId="random_machine_id",
+          slaveHost="junk.nothing",
+          task=TaskConfig(
+            owner=Identity(role="nobody"),
+            environment="prod",
+            jobName="flibber",
+            isService=False,
+            numCpus=2,
+            ramMb=2048,
+            diskMb=4096,
+            priority=7,
+            maxTaskFailures=3,
+            production=False,
+            requestedPorts=["http"]),
+          assignedPorts={"http": 1001},
+          instanceId=instance),
+        status=2,
+        failureCount=instance + 4,
+        taskEvents=create_task_events(start_time),
+        ancestorId="random_task_ancestor%s" % instance)
       return task
 
     resp = cls.create_simple_success_response()
@@ -171,8 +213,8 @@ class TestJobStatus(AuroraClientCommandTest):
   @classmethod
   def create_status_with_metadata(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_with_metadata())
+    resp.result.scheduleStatusResult = ScheduleStatusResult(
+      tasks=set(cls.create_mock_scheduled_task_with_metadata()))
     return resp
 
   @classmethod
@@ -182,8 +224,7 @@ class TestJobStatus(AuroraClientCommandTest):
   @classmethod
   def create_nojobs_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set()
+    resp.result.scheduleStatusResult = ScheduleStatusResult(tasks=set())
     return resp
 
   def test_successful_status_shallow(self):
@@ -237,20 +278,69 @@ class TestJobStatus(AuroraClientCommandTest):
       actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
       expected = textwrap.dedent("""\
           Active tasks (3):
-          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
+          \tTask role: bozo, env: test, name: woops, instance: 1, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
-          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
+          \tTask role: bozo, env: test, name: woops, instance: 2, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
-          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
+          \tTask role: bozo, env: test, name: woops, instance: 3, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           Inactive tasks (0):
           """)
+      assert actual == expected
+
+  def test_successful_status_output_with_inactives(self):
+    """Test the status command more deeply: in a request with a fully specified
+    job, it should end up doing a query using getTasksWithoutConfigs."""
+    mock_context = FakeAuroraCommandContext()
+    mock_context.add_expected_status_query_result(self.create_status_with_inactives())
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      cmd = AuroraCommandLine()
+      cmd.execute(['job', 'status', 'west/bozo/test/hello'])
+      actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
+      print("==actual======================\n%s\n========================" % actual)
+      expected = textwrap.dedent("""\
+          Active tasks (3):
+          \tTask role: bozo, env: test, name: woops, instance: 1, status: RUNNING on slavehost
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 ##:##:## RUNNING: Hi there
+          \tTask role: bozo, env: test, name: woops, instance: 2, status: RUNNING on slavehost
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 ##:##:## RUNNING: Hi there
+          \tTask role: bozo, env: test, name: woops, instance: 3, status: RUNNING on slavehost
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 ##:##:## RUNNING: Hi there
+          Inactive tasks (3):
+          \tTask role: bozo, env: test, name: woops, instance: 0, status: KILLED on slavehost
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 ##:##:## KILLED: Hi there
+          \t   1970-11-23 ##:##:## FINISHED: Hi there
+          \t   1970-11-23 ##:##:## FAILED: Hi there
+          \tTask role: bozo, env: test, name: woops, instance: 1, status: FINISHED on slavehost
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 ##:##:## KILLED: Hi there
+          \t   1970-11-23 ##:##:## FINISHED: Hi there
+          \t   1970-11-23 ##:##:## FAILED: Hi there
+          \tTask role: bozo, env: test, name: woops, instance: 2, status: FAILED on slavehost
+          \t  cpus: 2, ram: 2 MB, disk: 2 MB
+          \t  events:
+          \t   1970-11-23 ##:##:## KILLED: Hi there
+          \t   1970-11-23 ##:##:## FINISHED: Hi there
+          \t   1970-11-23 ##:##:## FAILED: Hi there
+          """)
+      print("==expected======================\n%s\n========================" % expected)
       assert actual == expected
 
   def test_successful_status_output_with_metadata(self):
@@ -266,21 +356,21 @@ class TestJobStatus(AuroraClientCommandTest):
       actual = re.sub("\\d\\d:\\d\\d:\\d\\d", "##:##:##", '\n'.join(mock_context.get_out()))
       expected = textwrap.dedent("""\
           Active tasks (3):
-          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
+          \tTask role: bozo, env: test, name: woops, instance: 1, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \t  metadata:
           \t\t  (key: 'meta', value: 'data')
           \t\t  (key: 'data', value: 'meta')
-          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
+          \tTask role: bozo, env: test, name: woops, instance: 2, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
           \t  metadata:
           \t\t  (key: 'meta', value: 'data')
           \t\t  (key: 'data', value: 'meta')
-          \tTask role: bozo, env: test, name: woops, instance: 7734, status: RUNNING on slavehost
+          \tTask role: bozo, env: test, name: woops, instance: 3, status: RUNNING on slavehost
           \t  cpus: 2, ram: 2 MB, disk: 2 MB
           \t  events:
           \t   1970-11-23 ##:##:## RUNNING: Hi there
@@ -290,6 +380,7 @@ class TestJobStatus(AuroraClientCommandTest):
           Inactive tasks (0):
           """)
       print("=======actual======\n%s\n==================" % actual)
+      print("==expected======================\n%s\n========================" % expected)
       assert actual == expected
 
   def test_successful_status_deep_null_metadata(self):
