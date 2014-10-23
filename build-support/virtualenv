@@ -14,14 +14,12 @@
 #
 # Wrapper for self-bootstrapping virtualenv
 set -ex
-VIRTUALENV_VERSION=1.10.1
+VIRTUALENV_VERSION=1.11.6
 
 if which python2.7 >/dev/null; then
   PY=`which python2.7`
-elif which python2.6 >/dev/null; then
-  PY=`which python2.6`
 else
-  echo 'No python interpreter found on the path.  Python will not work!' 1>&2
+  echo 'No python2.7 interpreter found on the path.  Python will not work!' 1>&2
   exit 1
 fi
 
