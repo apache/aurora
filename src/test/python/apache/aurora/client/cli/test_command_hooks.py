@@ -160,6 +160,10 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.INIT))
       mock_context.add_expected_status_query_result(
         self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+      mock_context.get_api("west").check_status.side_effect = (
+        lambda x: self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api("west")
       api.create_job.return_value = self.get_createjob_response()
 
@@ -318,6 +322,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.INIT))
       mock_context.add_expected_status_query_result(
         self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+      mock_context.get_api("west").check_status.side_effect = (
+        lambda x: self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api("west")
       api.create_job.return_value = self.get_createjob_response()
       GlobalCommandHookRegistry.setup("http://foo.bar")

@@ -23,6 +23,7 @@ from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
     EXIT_INTERRUPTED,
     EXIT_INVALID_CONFIGURATION,
+    EXIT_OK,
     EXIT_UNKNOWN_ERROR
 )
 from apache.aurora.client.cli.client import AuroraCommandLine
@@ -273,6 +274,8 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.PENDING))
       mock_context.add_expected_status_query_result(
         self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api('west')
       api.create_job.return_value = self.get_createjob_response()
 
@@ -280,11 +283,41 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
+        result = cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
             fp.name])
+        assert result == EXIT_OK
       assert mock_context.get_out() == [
           "job create succeeded: job url=http://something_or_other/scheduler/bozo/test/hello"]
       assert mock_context.get_err() == []
+
+  def test_create_job_startup_fails(self):
+    mock_context = FakeAuroraCommandContext()
+    with contextlib.nested(
+        patch('threading._Event.wait'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.PENDING))
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+
+      # We need to override the side_effect behavior of check_status in the context.
+      def check_status_side_effect(*args):
+        return self.create_error_response()
+
+      mock_context.get_api("west").check_status.side_effect = check_status_side_effect
+
+      api = mock_context.get_api('west')
+      api.create_job.return_value = self.get_createjob_response()
+
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        result = cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
+            fp.name])
+        assert result == EXIT_COMMAND_FAILURE
+      assert mock_context.get_out() == []
+      assert mock_context.get_err() == ["Error occurred while creating job west/bozo/test/hello"]
 
   def test_create_job_failed_output(self):
     """Test that a failed create generates the correct error messages"""

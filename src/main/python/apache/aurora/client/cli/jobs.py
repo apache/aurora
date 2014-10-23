@@ -127,8 +127,16 @@ class CreateJobCommand(Verb):
       JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.running_or_finished)
     elif context.options.wait_until == "FINISHED":
       JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.terminal)
-    context.print_out("job create succeeded: job url=%s" %
-        context.get_job_page(api, context.options.jobspec))
+    # Check to make sure the job was created successfully.
+    status_response = api.check_status(config.job_key())
+    if (status_response.responseCode is not ResponseCode.OK or
+        status_response.result.scheduleStatusResult.tasks is None or
+        status_response.result.scheduleStatusResult.tasks == []):
+      context.print_err("Error occurred while creating job %s" % context.options.jobspec)
+      return EXIT_COMMAND_FAILURE
+    else:
+      context.print_out("job create succeeded: job url=%s" %
+                        context.get_job_page(api, context.options.jobspec))
     return EXIT_OK
 
 
