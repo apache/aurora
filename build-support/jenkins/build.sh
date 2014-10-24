@@ -18,7 +18,7 @@ set -eux
 date
 
 # Run all Java tests
-./gradlew -Pq clean build --stacktrace
+./gradlew -Pq clean build
 
 # Run all Python tests
 # Setting the timeout value to 1 minute ensures package fetches from PyPI do not
