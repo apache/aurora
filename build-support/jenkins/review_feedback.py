@@ -56,8 +56,8 @@ class PatchApplyError(Exception):
   pass
 
 
-def _apply_patch(patch_data):
-  subprocess.check_call(['git', 'clean', '-fdx'])
+def _apply_patch(patch_data, clean_excludes):
+  subprocess.check_call(['git', 'clean', '-fdx'] + ['--exclude=%s' % e for e in clean_excludes])
   subprocess.check_call(['git', 'reset', '--hard', 'origin/master'])
 
   patch_file = 'diff.patch'
@@ -86,28 +86,28 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--server', dest='server', help='Review Board server.', required=True)
   parser.add_argument(
-      '--reviewboard_credentials_file',
+      '--reviewboard-credentials-file',
       type=argparse.FileType(),
-      dest='reviewboard_credentials_file',
       help='Review Board credentials file, formatted as <user>\\n<password>',
       required=True)
   parser.add_argument(
       '--repository',
-      dest='repository',
       help='Inspect reviews posted for this repository.',
       required=True)
   parser.add_argument(
       '--command',
-      dest='command',
       help='Build verification command.',
       required=True)
   parser.add_argument(
-      '--tail_lines',
-      dest='tail_lines',
+      '--tail-lines',
       type=int,
       default=20,
       help='Number of lines of command output to include in red build reviews.',
       required=True)
+  parser.add_argument(
+    '--git-clean-exclude',
+    help='Patterns to pass to git-clean --exclude.',
+    nargs='*')
   args = parser.parse_args()
 
   credentials = args.reviewboard_credentials_file.readlines()
@@ -142,7 +142,7 @@ def main():
         accept='text/x-patch')
     sha = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip()
     try:
-      _apply_patch(patch_data)
+      _apply_patch(patch_data, args.git_clean_exclude)
       print('Running build command.')
       build_output = 'build_output'
       command = args.command
