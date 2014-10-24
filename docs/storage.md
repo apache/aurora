@@ -1,7 +1,7 @@
 #Aurora Scheduler Storage
 
 - [Overview](#overview)
-- [Reads, writes, modifications...](#reads-writes-modifications)
+- [Reads, writes, modifications](#reads-writes-modifications)
   - [Read lifecycle](#read-lifecycle)
   - [Write lifecycle](#write-lifecycle)
 - [Atomicity, consistency and isolation](#atomicity-consistency-and-isolation)
@@ -33,11 +33,12 @@ is [thrift](https://github.com/apache/thrift). Data is stored in serialized bina
 This helps establishing periodic recovery checkpoints and speeds up volatile storage recovery on
 restart.
 * Backup manager: as a precaution, snapshots are periodically written out into backup files.
-This solves a disaster recovery problem in case of a complete loss or corruption of Mesos log files.
+This solves a [disaster recovery problem](storage-config.md#recovering-from-a-scheduler-backup)
+in case of a complete loss or corruption of Mesos log files.
 
 ![Storage hierarchy](images/storage_hierarchy.png)
 
-## Reads, writes, modifications...
+## Reads, writes, modifications
 
 All services in Aurora access data via a set of predefined store interfaces (aka stores) logically
 grouped by the type of data they serve. Every interface defines a specific set of operations allowed
