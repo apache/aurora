@@ -54,7 +54,6 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskInfo;
 
@@ -66,6 +65,7 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
+import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
 
 /**
  * Enables scheduling and preemption of tasks.
@@ -126,26 +126,27 @@ public interface TaskScheduler extends EventSubscriber {
       this.reservations = new Reservations(reservationDuration, clock);
     }
 
-    private Function<Offer, Optional<TaskInfo>> getAssignerFunction(
+    private Function<HostOffer, Optional<TaskInfo>> getAssignerFunction(
         final AttributeAggregate attributeAggregate,
         final String taskId,
         final IScheduledTask task) {
 
-      return new Function<Offer, Optional<TaskInfo>>() {
+      return new Function<HostOffer, Optional<TaskInfo>>() {
         @Override
-        public Optional<TaskInfo> apply(Offer offer) {
-          Optional<String> reservedTaskId = reservations.getSlaveReservation(offer.getSlaveId());
+        public Optional<TaskInfo> apply(HostOffer hostOffer) {
+          Optional<String> reservedTaskId =
+              reservations.getSlaveReservation(hostOffer.getOffer().getSlaveId());
           if (reservedTaskId.isPresent()) {
             if (taskId.equals(reservedTaskId.get())) {
               // Slave is reserved to satisfy this task.
-              return assigner.maybeAssign(offer, task, attributeAggregate);
+              return assigner.maybeAssign(hostOffer, task, attributeAggregate);
             } else {
               // Slave is reserved for another task.
               return Optional.absent();
             }
           } else {
             // Slave is not reserved.
-            return assigner.maybeAssign(offer, task, attributeAggregate);
+            return assigner.maybeAssign(hostOffer, task, attributeAggregate);
           }
         }
       };

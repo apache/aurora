@@ -33,7 +33,6 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
-import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
@@ -67,18 +66,15 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private static final Set<MaintenanceMode> VETO_MODES = EnumSet.of(DRAINING, DRAINED);
 
   private final Storage storage;
-  private final MaintenanceController maintenance;
 
   /**
    * Creates a new scheduling filter.
    *
    * @param storage Interface to accessing the task store.
-   * @param maintenance Interface to accessing the maintenance controller
    */
   @Inject
-  public SchedulingFilterImpl(Storage storage, MaintenanceController maintenance) {
+  public SchedulingFilterImpl(Storage storage) {
     this.storage = requireNonNull(storage);
-    this.maintenance = requireNonNull(maintenance);
   }
 
   /**
@@ -230,8 +226,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     };
   }
 
-  private Optional<Veto> getMaintenanceVeto(String slaveHost) {
-    MaintenanceMode mode = maintenance.getMode(slaveHost);
+  private Optional<Veto> getMaintenanceVeto(MaintenanceMode mode) {
     return VETO_MODES.contains(mode)
         ? Optional.of(ConstraintFilter.maintenanceVeto(mode.toString().toLowerCase()))
         : NO_VETO;
@@ -261,6 +256,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   public Set<Veto> filter(
       ResourceSlot offer,
       String slaveHost,
+      MaintenanceMode mode,
       ITaskConfig task,
       String taskId,
       AttributeAggregate attributeAggregate) {
@@ -268,10 +264,15 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
       return ImmutableSet.of(DEDICATED_HOST_VETO);
     }
+
+    Optional<Veto> maintenanceVeto = getMaintenanceVeto(mode);
+    if (maintenanceVeto.isPresent()) {
+      return maintenanceVeto.asSet();
+    }
+
     return ImmutableSet.<Veto>builder()
         .addAll(getConstraintFilter(attributeAggregate, slaveHost).apply(task))
         .addAll(getResourceVetoes(offer, task))
-        .addAll(getMaintenanceVeto(slaveHost).asSet())
         .build();
   }
 }

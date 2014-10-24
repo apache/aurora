@@ -34,6 +34,8 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.Value.Range;
 
+import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
+
 /**
  * Servlet that exposes resource offers that the scheduler is currently retaining.
  */
@@ -119,10 +121,11 @@ public class Offers {
     return FluentIterable.from(iterable).transform(transform).toList();
   }
 
-  private static final Function<Offer, Map<String, ?>> TO_BEAN =
-      new Function<Offer, Map<String, ?>>() {
+  private static final Function<HostOffer, Map<String, ?>> TO_BEAN =
+      new Function<HostOffer, Map<String, ?>>() {
         @Override
-        public Map<String, ?> apply(Offer offer) {
+        public Map<String, ?> apply(HostOffer hostOffer) {
+          Offer offer = hostOffer.getOffer();
           return ImmutableMap.<String, Object>builder()
               .put("id", offer.getId().getValue())
               .put("framework_id", offer.getFrameworkId().getValue())

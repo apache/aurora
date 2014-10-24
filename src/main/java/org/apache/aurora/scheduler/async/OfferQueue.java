@@ -28,7 +28,6 @@ import javax.inject.Inject;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
@@ -47,6 +46,8 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskInfo;
+
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
@@ -82,7 +83,7 @@ public interface OfferQueue extends EventSubscriber {
    * @throws LaunchException If the acceptor accepted an offer, but there was an error launching the
    *                         task.
    */
-  boolean launchFirst(Function<Offer, Optional<TaskInfo>> acceptor) throws LaunchException;
+  boolean launchFirst(Function<HostOffer, Optional<TaskInfo>> acceptor) throws LaunchException;
 
   /**
    * Notifies the offer queue that a host has changed state.
@@ -96,7 +97,7 @@ public interface OfferQueue extends EventSubscriber {
    *
    * @return A snapshot of the offers that the scheduler is currently holding.
    */
-  Iterable<Offer> getOffers();
+  Iterable<HostOffer> getOffers();
 
   /**
    * Calculates the amount of time before an offer should be 'returned' by declining it.
@@ -116,6 +117,51 @@ public interface OfferQueue extends EventSubscriber {
 
     LaunchException(String msg, Throwable cause) {
       super(msg, cause);
+    }
+  }
+
+  /**
+   * Encapsulate an offer from a host, and the host's maintenance mode.
+   */
+  class HostOffer {
+    private final Offer offer;
+
+    // TODO(wfarner): Replace this with HostAttributes for more use of this caching.
+    private final MaintenanceMode mode;
+
+    public HostOffer(Offer offer, MaintenanceMode mode) {
+      this.offer = requireNonNull(offer);
+      this.mode = requireNonNull(mode);
+    }
+
+    public Offer getOffer() {
+      return offer;
+    }
+
+    public MaintenanceMode getMode() {
+      return mode;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof HostOffer)) {
+        return false;
+      }
+      HostOffer other = (HostOffer) o;
+      return Objects.equals(offer, other.offer) && mode == other.mode;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(offer, mode);
+    }
+
+    @Override
+    public String toString() {
+      return com.google.common.base.Objects.toStringHelper(this)
+          .add("offer", offer)
+          .add("mode", mode)
+          .toString();
     }
   }
 
@@ -187,7 +233,7 @@ public interface OfferQueue extends EventSubscriber {
     }
 
     private boolean removeFromHostOffers(final OfferID offerId) {
-      Objects.requireNonNull(offerId);
+      requireNonNull(offerId);
 
       // The small risk of inconsistency is acceptable here - if we have an accept/remove race
       // on an offer, the master will mark the task as LOST and it will be retried.
@@ -195,14 +241,8 @@ public interface OfferQueue extends EventSubscriber {
     }
 
     @Override
-    public Iterable<Offer> getOffers() {
-      return FluentIterable.from(hostOffers.getWeaklyConsistentOffers())
-          .transform(new Function<HostOffer, Offer>() {
-            @Override
-            public Offer apply(HostOffer offer) {
-              return offer.offer;
-            }
-          });
+    public Iterable<HostOffer> getOffers() {
+      return hostOffers.getWeaklyConsistentOffers();
     }
 
     /**
@@ -227,33 +267,6 @@ public interface OfferQueue extends EventSubscriber {
     public void driverDisconnected(DriverDisconnected event) {
       LOG.info("Clearing stale offers since the driver is disconnected.");
       hostOffers.clear();
-    }
-
-    /**
-     * Encapsulate an offer from a host, and the host's maintenance mode.
-     */
-    private static class HostOffer {
-      private final Offer offer;
-      private final MaintenanceMode mode;
-
-      HostOffer(Offer offer, MaintenanceMode mode) {
-        this.offer = offer;
-        this.mode = mode;
-      }
-
-      @Override
-      public boolean equals(Object o) {
-        if (!(o instanceof HostOffer)) {
-          return false;
-        }
-        HostOffer other = (HostOffer) o;
-        return Objects.equals(offer, other.offer) && mode == other.mode;
-      }
-
-      @Override
-      public int hashCode() {
-        return Objects.hash(offer, mode);
-      }
     }
 
     /**
@@ -326,14 +339,14 @@ public interface OfferQueue extends EventSubscriber {
     }
 
     @Override
-    public boolean launchFirst(Function<Offer, Optional<TaskInfo>> acceptor)
+    public boolean launchFirst(Function<HostOffer, Optional<TaskInfo>> acceptor)
         throws LaunchException {
 
       // It's important that this method is not called concurrently - doing so would open up the
       // possibility of a race between the same offers being accepted by different threads.
 
       for (HostOffer hostOffer : hostOffers.getWeaklyConsistentOffers()) {
-        Optional<TaskInfo> assignment = acceptor.apply(hostOffer.offer);
+        Optional<TaskInfo> assignment = acceptor.apply(hostOffer);
         if (assignment.isPresent()) {
           // Guard against an offer being removed after we grabbed it from the iterator.
           // If that happens, the offer will not exist in hostOffers, and we can immediately

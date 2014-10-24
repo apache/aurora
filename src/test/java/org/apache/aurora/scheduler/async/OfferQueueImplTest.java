@@ -42,6 +42,7 @@ import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;
 
@@ -59,7 +60,7 @@ public class OfferQueueImplTest extends EasyMockTest {
   private ScheduledExecutorService executor;
   private ExecutorService testExecutor;
   private MaintenanceController maintenanceController;
-  private Function<Offer, Optional<TaskInfo>> offerAcceptor;
+  private Function<HostOffer, Optional<TaskInfo>> offerAcceptor;
   private OfferQueueImpl offerQueue;
 
   @Before
@@ -76,7 +77,7 @@ public class OfferQueueImplTest extends EasyMockTest {
       }
     });
     maintenanceController = createMock(MaintenanceController.class);
-    offerAcceptor = createMock(new Clazz<Function<Offer, Optional<TaskInfo>>>() { });
+    offerAcceptor = createMock(new Clazz<Function<HostOffer, Optional<TaskInfo>>>() { });
     OfferReturnDelay returnDelay = new OfferReturnDelay() {
       @Override
       public Amount<Integer, Time> get() {
@@ -127,12 +128,20 @@ public class OfferQueueImplTest extends EasyMockTest {
 
   @Test
   public void testOffersSorted() throws Exception {
-    expect(maintenanceController.getMode(HOST_A)).andReturn(MaintenanceMode.NONE);
-    expect(maintenanceController.getMode(HOST_B)).andReturn(MaintenanceMode.DRAINING);
-    expect(maintenanceController.getMode(HOST_C)).andReturn(MaintenanceMode.NONE);
-    expect(offerAcceptor.apply(OFFER_A)).andReturn(Optional.<TaskInfo>absent());
-    expect(offerAcceptor.apply(OFFER_C)).andReturn(Optional.<TaskInfo>absent());
-    expect(offerAcceptor.apply(OFFER_B)).andReturn(Optional.<TaskInfo>absent());
+    MaintenanceMode modeA = MaintenanceMode.NONE;
+    MaintenanceMode modeB = MaintenanceMode.DRAINING;
+    MaintenanceMode modeC = MaintenanceMode.NONE;
+
+    HostOffer hostOfferA = new HostOffer(OFFER_A, modeA);
+    HostOffer hostOfferB = new HostOffer(OFFER_B, modeB);
+    HostOffer hostOfferC = new HostOffer(OFFER_C, modeC);
+
+    expect(maintenanceController.getMode(HOST_A)).andReturn(modeA);
+    expect(maintenanceController.getMode(HOST_B)).andReturn(modeB);
+    expect(maintenanceController.getMode(HOST_C)).andReturn(modeC);
+    expect(offerAcceptor.apply(hostOfferA)).andReturn(Optional.<TaskInfo>absent());
+    expect(offerAcceptor.apply(hostOfferB)).andReturn(Optional.<TaskInfo>absent());
+    expect(offerAcceptor.apply(hostOfferC)).andReturn(Optional.<TaskInfo>absent());
 
     control.replay();
 

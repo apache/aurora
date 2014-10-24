@@ -42,13 +42,14 @@ import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResource;
 import org.apache.aurora.scheduler.stats.SlotSizeCounter.MachineResourceProvider;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
-import org.apache.mesos.Protos.Offer;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
+
+import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
 
 /**
  * Module to configure export of cluster-wide resource allocation and consumption statistics.
@@ -111,16 +112,16 @@ public class AsyncStatsModule extends AbstractModule {
   }
 
   static class OfferAdapter implements MachineResourceProvider {
-    private static final Function<Offer, MachineResource> TO_RESOURCE =
-        new Function<Offer, MachineResource>() {
+    private static final Function<HostOffer, MachineResource> TO_RESOURCE =
+        new Function<HostOffer, MachineResource>() {
           @Override
-          public MachineResource apply(Offer offer) {
-            Resources resources = Resources.from(offer);
+          public MachineResource apply(HostOffer hostOffer) {
+            Resources resources = Resources.from(hostOffer.getOffer());
             IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate()
                 .setNumCpus(resources.getNumCpus())
                 .setRamMb(resources.getRam().as(Data.MB))
                 .setDiskMb(resources.getDisk().as(Data.MB)));
-            return new MachineResource(quota, Conversions.isDedicated(offer));
+            return new MachineResource(quota, Conversions.isDedicated(hostOffer.getOffer()));
           }
         };
 
@@ -133,7 +134,7 @@ public class AsyncStatsModule extends AbstractModule {
 
     @Override
     public Iterable<MachineResource> get() {
-      Iterable<Offer> offers = offerQueue.getOffers();
+      Iterable<HostOffer> offers = offerQueue.getOffers();
       return FluentIterable.from(offers).transform(TO_RESOURCE);
     }
   }

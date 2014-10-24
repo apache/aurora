@@ -29,6 +29,7 @@ import com.twitter.common.util.testing.FakeClock;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
@@ -47,7 +48,6 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.TaskInfo;
 import org.easymock.Capture;
 import org.junit.Before;
@@ -55,6 +55,7 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
+import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -65,7 +66,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
   private static final IScheduledTask TASK_A = makeTask("a");
   private static final IScheduledTask TASK_B = makeTask("b");
-  private static final Offer OFFER = Offers.makeOffer("OFFER_A", "HOST_A");
+  private static final HostOffer OFFER =
+      new HostOffer(Offers.makeOffer("OFFER_A", "HOST_A"), MaintenanceMode.NONE);
 
   private StorageTestUtil storageUtil;
   private StateManager stateManager;
@@ -135,16 +137,16 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
     expect(preemptor.findPreemptionSlotFor("a", emptyJob))
-        .andReturn(Optional.of(OFFER.getSlaveId().getValue()));
+        .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
-    Capture<Function<Offer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(false);
+    Capture<Function<HostOffer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(false);
     expect(preemptor.findPreemptionSlotFor("b", emptyJob)).andReturn(Optional.<String>absent());
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
-    Capture<Function<Offer, Optional<TaskInfo>>> secondAssignment = expectLaunchAttempt(true);
+    Capture<Function<HostOffer, Optional<TaskInfo>>> secondAssignment = expectLaunchAttempt(true);
     expectAssigned(TASK_B);
 
     control.replay();
@@ -170,17 +172,17 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
     expect(preemptor.findPreemptionSlotFor("a", emptyJob))
-        .andReturn(Optional.of(OFFER.getSlaveId().getValue()));
+        .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    Capture<Function<Offer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(true);
+    Capture<Function<HostOffer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(true);
     expectAssigned(TASK_A);
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
 
-    Capture<Function<Offer, Optional<TaskInfo>>> secondAssignment = expectLaunchAttempt(true);
+    Capture<Function<HostOffer, Optional<TaskInfo>>> secondAssignment = expectLaunchAttempt(true);
 
     expect(assigner.maybeAssign(OFFER, TASK_B, emptyJob))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
@@ -203,11 +205,11 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectLaunchAttempt(false);
     // Reserve "a" with offerA
     expect(preemptor.findPreemptionSlotFor("a", emptyJob))
-        .andReturn(Optional.of(OFFER.getSlaveId().getValue()));
+        .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    Capture<Function<Offer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(true);
+    Capture<Function<HostOffer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(true);
     expectAssigned(TASK_A);
 
     control.replay();
@@ -228,11 +230,11 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     // Reserve "a" with offerA
     expect(preemptor.findPreemptionSlotFor("a", emptyJob))
-        .andReturn(Optional.of(OFFER.getSlaveId().getValue()));
+        .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_B);
     expectActiveJobFetch(TASK_B);
-    Capture<Function<Offer, Optional<TaskInfo>>> assignment = expectLaunchAttempt(true);
+    Capture<Function<HostOffer, Optional<TaskInfo>>> assignment = expectLaunchAttempt(true);
     expectAssigned(TASK_B);
 
     control.replay();
@@ -253,11 +255,11 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expectLaunchAttempt(false);
     // Reserve "b" with offer1
     expect(preemptor.findPreemptionSlotFor("b", emptyJob))
-        .andReturn(Optional.of(OFFER.getSlaveId().getValue()));
+        .andReturn(Optional.of(OFFER.getOffer().getSlaveId().getValue()));
 
     expectTaskStillPendingQuery(TASK_A);
     expectActiveJobFetch(TASK_A);
-    Capture<Function<Offer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(true);
+    Capture<Function<HostOffer, Optional<TaskInfo>>> firstAssignment = expectLaunchAttempt(true);
     expectAssigned(TASK_A);
 
     control.replay();
@@ -291,7 +293,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
       }
     });
 
-    Capture<Function<Offer, Optional<TaskInfo>>> assignment = expectLaunchAttempt(true);
+    Capture<Function<HostOffer, Optional<TaskInfo>>> assignment = expectLaunchAttempt(true);
     expect(assigner.maybeAssign(OFFER, taskA, emptyJob))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
 
@@ -313,9 +315,9 @@ public class TaskSchedulerImplTest extends EasyMockTest {
                 .setEnvironment("env-" + taskId))));
   }
 
-  private Capture<Function<Offer, Optional<TaskInfo>>> expectLaunchAttempt(boolean taskLaunched)
+  private Capture<Function<HostOffer, Optional<TaskInfo>>> expectLaunchAttempt(boolean taskLaunched)
       throws OfferQueue.LaunchException {
-        Capture<Function<Offer, Optional<TaskInfo>>> assignment = createCapture();
+        Capture<Function<HostOffer, Optional<TaskInfo>>> assignment = createCapture();
         expect(offerQueue.launchFirst(capture(assignment))).andReturn(taskLaunched);
         return assignment;
   }

@@ -18,6 +18,7 @@ import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -105,6 +106,7 @@ public interface SchedulingFilter {
    *
    * @param offer Resources offered.
    * @param slaveHost Host that the resources are associated with.
+   * @param mode Maintenance mode of the host that the resources are associated with.
    * @param task Task.
    * @param taskId Canonical ID of the task.
    * @param attributeAggregate Attribute information for tasks in the job containing {@code task}.
@@ -114,6 +116,7 @@ public interface SchedulingFilter {
   Set<Veto> filter(
       ResourceSlot offer,
       String slaveHost,
+      MaintenanceMode mode,
       ITaskConfig task,
       String taskId,
       AttributeAggregate attributeAggregate);

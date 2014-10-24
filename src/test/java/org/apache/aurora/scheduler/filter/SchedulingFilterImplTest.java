@@ -40,7 +40,6 @@ import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
-import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
@@ -99,13 +98,13 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       Amount.of(DEFAULT_RAM, Data.MB),
       Amount.of(DEFAULT_DISK, Data.MB),
       0);
+  private static final MaintenanceMode DEFAULT_MODE = MaintenanceMode.NONE;
 
   private AttributeAggregate emptyJob;
 
   private final AtomicLong taskIdCounter = new AtomicLong();
 
   private SchedulingFilter defaultFilter;
-  private MaintenanceController maintenance;
   private Storage storage;
   private StoreProvider storeProvider;
   private AttributeStore.Mutable attributeStore;
@@ -113,8 +112,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Before
   public void setUp() throws Exception {
     storage = createMock(Storage.class);
-    maintenance = createMock(MaintenanceController.class);
-    defaultFilter = new SchedulingFilterImpl(storage, maintenance);
+    defaultFilter = new SchedulingFilterImpl(storage);
     storeProvider = createMock(StoreProvider.class);
     attributeStore = createMock(AttributeStore.Mutable.class);
     emptyJob = new AttributeAggregate(
@@ -141,7 +139,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testMeetsOffer() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_A).times(2);
 
     control.replay();
 
@@ -152,7 +149,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testSufficientPorts() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_A).times(4);
 
     control.replay();
 
@@ -176,33 +172,35 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         .setRequestedPorts(ImmutableSet.of("one", "two", "three")));
 
     Set<Veto> none = ImmutableSet.of();
-    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, noPortTask, TASK_ID, emptyJob));
-    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, onePortTask, TASK_ID, emptyJob));
-    assertEquals(none, defaultFilter.filter(twoPorts, HOST_A, twoPortTask, TASK_ID, emptyJob));
+    assertEquals(none,
+        defaultFilter.filter(twoPorts, HOST_A, DEFAULT_MODE, noPortTask, TASK_ID, emptyJob));
+    assertEquals(none,
+        defaultFilter.filter(twoPorts, HOST_A, DEFAULT_MODE, onePortTask, TASK_ID, emptyJob));
+    assertEquals(none,
+        defaultFilter.filter(twoPorts, HOST_A, DEFAULT_MODE, twoPortTask, TASK_ID, emptyJob));
     assertEquals(
         ImmutableSet.of(PORTS.veto(1)),
-        defaultFilter.filter(twoPorts, HOST_A, threePortTask, TASK_ID, emptyJob));
+        defaultFilter.filter(twoPorts, HOST_A, DEFAULT_MODE, threePortTask, TASK_ID, emptyJob));
   }
 
   @Test
   public void testInsufficientResources() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_A).times(4);
 
     control.replay();
 
     assertVetoes(
         makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM + 1, DEFAULT_DISK + 1),
+        DEFAULT_MODE,
         CPU.veto(1), DISK.veto(1), RAM.veto(1));
-    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK), CPU.veto(1));
-    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK), RAM.veto(1));
-    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1), DISK.veto(1));
+    assertVetoes(makeTask(DEFAULT_CPUS + 1, DEFAULT_RAM, DEFAULT_DISK), DEFAULT_MODE, CPU.veto(1));
+    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM + 1, DEFAULT_DISK), DEFAULT_MODE, RAM.veto(1));
+    assertVetoes(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK + 1), DEFAULT_MODE, DISK.veto(1));
   }
 
   @Test
   public void testDedicatedRole() throws Exception {
     expectGetHostAttributes(HOST_A, dedicated(ROLE_A)).anyTimes();
-    expectGetHostMaintenanceStatus(HOST_A).times(2);
 
     control.replay();
 
@@ -216,7 +214,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     String dedicated2 = "kestrel/kestrel";
 
     expectGetHostAttributes(HOST_A, dedicated(dedicated1, dedicated2)).anyTimes();
-    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
 
     control.replay();
 
@@ -240,8 +237,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testMultiValuedAttributes() throws Exception {
     expectGetHostAttributes(HOST_A, valueAttribute("jvm", "1.0", "2.0", "3.0")).anyTimes();
     expectGetHostAttributes(HOST_B, valueAttribute("jvm", "1.0")).anyTimes();
-    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_B).atLeastOnce();
 
     control.replay();
 
@@ -255,39 +250,36 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   @Test
   public void testHostScheduledForMaintenance() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_A, MaintenanceMode.SCHEDULED);
 
     control.replay();
 
-    assertNoVetoes(makeTask(), HOST_A);
+    assertNoVetoes(makeTask(), HOST_A, MaintenanceMode.SCHEDULED);
   }
 
   @Test
   public void testHostDrainingForMaintenance() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_A, MaintenanceMode.DRAINING);
 
     control.replay();
 
-    assertVetoes(makeTask(), ConstraintFilter.maintenanceVeto("draining"));
+    assertVetoes(makeTask(),
+        MaintenanceMode.DRAINING,
+        ConstraintFilter.maintenanceVeto("draining"));
   }
 
   @Test
   public void testHostDrainedForMaintenance() throws Exception {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_A, MaintenanceMode.DRAINED);
 
     control.replay();
 
-    assertVetoes(makeTask(), ConstraintFilter.maintenanceVeto("drained"));
+    assertVetoes(makeTask(), MaintenanceMode.DRAINED, ConstraintFilter.maintenanceVeto("drained"));
   }
 
   @Test
   public void testMultipleTaskConstraints() throws Exception {
     expectGetHostAttributes(HOST_A, dedicated(HOST_A), host(HOST_A));
     expectGetHostAttributes(HOST_B, dedicated("xxx"), host(HOST_A));
-    expectGetHostMaintenanceStatus(HOST_A);
-    expectGetHostMaintenanceStatus(HOST_B);
 
     control.replay();
 
@@ -298,7 +290,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         makeTask(OWNER_A, JOB_A, constraint1, constraint2),
         HOST_A,
         mismatchVeto(DEDICATED_ATTRIBUTE));
-    assertNoVetoes(makeTask(OWNER_B, JOB_B, constraint1, constraint2), HOST_B);
+    assertNoVetoes(makeTask(OWNER_B, JOB_B, constraint1, constraint2), HOST_B, DEFAULT_MODE);
   }
 
   @Test
@@ -308,8 +300,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     expectGetHostAttributes(HOST_A, host(HOST_A));
     expectGetHostAttributes(HOST_B, dedicated(OWNER_B.getRole() + "/" + JOB_B), host(HOST_B));
-    expectGetHostMaintenanceStatus(HOST_A);
-    expectGetHostMaintenanceStatus(HOST_B);
 
     control.replay();
 
@@ -328,11 +318,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testUnderLimitNoTasks() throws Exception {
     expectGetHostAttributes(HOST_A);
     expectGetHostAttributes(HOST_A, host(HOST_A));
-    expectGetHostMaintenanceStatus(HOST_A);
 
     control.replay();
 
-    assertNoVetoes(hostLimitTask(2), HOST_A);
+    assertNoVetoes(hostLimitTask(2), HOST_A, DEFAULT_MODE);
   }
 
   private Attribute host(String host) {
@@ -352,9 +341,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     expectGetHostAttributes(HOST_A, host(HOST_A), rack(RACK_A)).atLeastOnce();
     expectGetHostAttributes(HOST_B, host(HOST_B), rack(RACK_A)).atLeastOnce();
     expectGetHostAttributes(HOST_C, host(HOST_C), rack(RACK_B)).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_B).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_C).atLeastOnce();
 
     AttributeAggregate stateA = new AttributeAggregate(Suppliers.ofInstance(ImmutableSet.of(
         makeScheduledTask(OWNER_A, JOB_A, HOST_A),
@@ -371,24 +357,48 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     control.replay();
 
     assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 2), HOST_A, stateA);
-    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 1), HOST_B, stateA, limitVeto(HOST_ATTRIBUTE));
-    assertVetoes(hostLimitTask(OWNER_A, JOB_A, 2), HOST_B, stateA, limitVeto(HOST_ATTRIBUTE));
+    assertVetoes(
+        hostLimitTask(OWNER_A, JOB_A, 1),
+        HOST_B,
+        stateA,
+        DEFAULT_MODE,
+        limitVeto(HOST_ATTRIBUTE));
+    assertVetoes(
+        hostLimitTask(OWNER_A, JOB_A, 2),
+        HOST_B,
+        stateA,
+        DEFAULT_MODE,
+        limitVeto(HOST_ATTRIBUTE));
     assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 3), HOST_B, stateA);
 
-    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 2), HOST_B, stateB, limitVeto(RACK_ATTRIBUTE));
-    assertVetoes(rackLimitTask(OWNER_B, JOB_A, 3), HOST_B, stateB, limitVeto(RACK_ATTRIBUTE));
+    assertVetoes(
+        rackLimitTask(OWNER_B, JOB_A, 2),
+        HOST_B,
+        stateB,
+        DEFAULT_MODE,
+        limitVeto(RACK_ATTRIBUTE));
+    assertVetoes(
+        rackLimitTask(OWNER_B, JOB_A, 3),
+        HOST_B,
+        stateB,
+        DEFAULT_MODE,
+        limitVeto(RACK_ATTRIBUTE));
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 4), HOST_B, stateB);
 
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 1), HOST_C, stateB);
 
-    assertVetoes(rackLimitTask(OWNER_A, JOB_A, 1), HOST_C, stateA, limitVeto(RACK_ATTRIBUTE));
+    assertVetoes(
+        rackLimitTask(OWNER_A, JOB_A, 1),
+        HOST_C,
+        stateA,
+        DEFAULT_MODE,
+        limitVeto(RACK_ATTRIBUTE));
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 2), HOST_C, stateB);
   }
 
   @Test
   public void testAttribute() throws Exception {
     expectGetHostAttributes(HOST_A, valueAttribute("jvm", "1.0")).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
 
     control.replay();
 
@@ -413,7 +423,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     expectGetHostAttributes(HOST_A,
         valueAttribute("jvm", "1.4", "1.6", "1.7"),
         valueAttribute("zone", "a", "b", "c")).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
 
     control.replay();
 
@@ -437,7 +446,13 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint zoneConstraint = makeConstraint("zone", "c");
 
     ITaskConfig task = makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint);
-    assertTrue(defaultFilter.filter(DEFAULT_OFFER, HOST_A, task, TASK_ID, emptyJob).isEmpty());
+    assertTrue(
+        defaultFilter.filter(
+            DEFAULT_OFFER,
+            HOST_A,
+            DEFAULT_MODE,
+            task, TASK_ID,
+            emptyJob).isEmpty());
 
     Constraint jvmNegated = jvmConstraint.deepCopy();
     jvmNegated.getConstraint().getValue().setNegated(true);
@@ -464,7 +479,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     expectGetHostAttributes(HOST_A,
         valueAttribute("jvm", "1.4"),
         valueAttribute("jvm", "1.6", "1.7")).atLeastOnce();
-    expectGetHostMaintenanceStatus(HOST_A).atLeastOnce();
 
     control.replay();
 
@@ -519,14 +533,26 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     ITaskConfig task = makeTask(owner, jobName, constraint);
     assertEquals(
         expected,
-        defaultFilter.filter(DEFAULT_OFFER, host, task, TASK_ID, aggregate).isEmpty());
+        defaultFilter.filter(
+            DEFAULT_OFFER,
+            host,
+            DEFAULT_MODE,
+            task,
+            TASK_ID,
+            aggregate).isEmpty());
 
     Constraint negated = constraint.deepCopy();
     negated.getConstraint().getValue().setNegated(!value.isNegated());
     ITaskConfig negatedTask = makeTask(owner, jobName, negated);
     assertEquals(
         !expected,
-        defaultFilter.filter(DEFAULT_OFFER, host, negatedTask, TASK_ID, aggregate).isEmpty());
+        defaultFilter.filter(
+            DEFAULT_OFFER,
+            host,
+            DEFAULT_MODE,
+            negatedTask,
+            TASK_ID,
+            aggregate).isEmpty());
     return task;
   }
 
@@ -538,20 +564,27 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertNoVetoes(task, HOST_A, jobState);
   }
 
-  private void assertNoVetoes(ITaskConfig task, String host) {
-    assertVetoes(task, host, emptyJob);
+  private void assertNoVetoes(ITaskConfig task, String host, MaintenanceMode mode) {
+    assertVetoes(task, host, emptyJob, mode);
   }
 
-  private void assertNoVetoes(ITaskConfig task, String host, AttributeAggregate jobState) {
-    assertVetoes(task, host, jobState);
+  private void assertNoVetoes(
+      ITaskConfig task,
+      String host,
+      AttributeAggregate jobState) {
+    assertVetoes(task, host, jobState, DEFAULT_MODE);
   }
 
-  private void assertVetoes(ITaskConfig task, Veto... vetos) {
-    assertVetoes(task, emptyJob, vetos);
+  private void assertVetoes(ITaskConfig task, MaintenanceMode mode, Veto... vetos) {
+    assertVetoes(task, emptyJob, mode, vetos);
   }
 
-  private void assertVetoes(ITaskConfig task, AttributeAggregate jobState, Veto... vetos) {
-    assertVetoes(task, HOST_A, jobState, vetos);
+  private void assertVetoes(
+      ITaskConfig task,
+      AttributeAggregate jobState,
+      MaintenanceMode mode,
+      Veto... vetos) {
+    assertVetoes(task, HOST_A, jobState, mode, vetos);
   }
 
   private void assertVetoes(
@@ -559,18 +592,19 @@ public class SchedulingFilterImplTest extends EasyMockTest {
       String host,
       Veto... vetoes) {
 
-    assertVetoes(task, host, emptyJob, vetoes);
+    assertVetoes(task, host, emptyJob, DEFAULT_MODE, vetoes);
   }
 
   private void assertVetoes(
       ITaskConfig task,
       String host,
       AttributeAggregate jobState,
+      MaintenanceMode mode,
       Veto... vetoes) {
 
     assertEquals(
         ImmutableSet.copyOf(vetoes),
-        defaultFilter.filter(DEFAULT_OFFER, host, task, TASK_ID, jobState));
+        defaultFilter.filter(DEFAULT_OFFER, host, mode, task, TASK_ID, jobState));
   }
 
   private Attribute valueAttribute(String name, String string, String... strings) {
@@ -581,15 +615,6 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static Constraint makeConstraint(String name, String... values) {
     return new Constraint(name,
         TaskConstraint.value(new ValueConstraint(false, ImmutableSet.copyOf(values))));
-  }
-
-  private IExpectationSetters<MaintenanceMode> expectGetHostMaintenanceStatus(String host) {
-    return expectGetHostMaintenanceStatus(host, MaintenanceMode.NONE);
-  }
-
-  private IExpectationSetters<MaintenanceMode> expectGetHostMaintenanceStatus(
-      String host, MaintenanceMode mode) {
-    return expect(maintenance.getMode(host)).andReturn(mode);
   }
 
   private IExpectationSetters<Optional<IHostAttributes>> expectGetHostAttributes(

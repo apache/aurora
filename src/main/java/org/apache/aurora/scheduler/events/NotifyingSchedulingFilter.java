@@ -20,6 +20,7 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
@@ -60,11 +61,12 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   public Set<Veto> filter(
       ResourceSlot offer,
       String slaveHost,
+      MaintenanceMode mode,
       ITaskConfig task,
       String taskId,
       AttributeAggregate jobState) {
 
-    Set<Veto> vetoes = delegate.filter(offer, slaveHost, task, taskId, jobState);
+    Set<Veto> vetoes = delegate.filter(offer, slaveHost, mode, task, taskId, jobState);
     if (!vetoes.isEmpty()) {
       eventSink.post(new Vetoed(taskId, vetoes));
     }

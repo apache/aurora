@@ -42,17 +42,18 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
+import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.mesos.Protos.Offer;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -62,6 +63,7 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.PREEMPTING;
+import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
 import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
 
 /**
@@ -128,6 +130,7 @@ public interface Preemptor {
     private final SchedulingFilter schedulingFilter;
     private final Amount<Long, Time> preemptionCandidacyDelay;
     private final Clock clock;
+    private final MaintenanceController maintenance;
 
     /**
      * Creates a new preemptor.
@@ -147,7 +150,8 @@ public interface Preemptor {
         OfferQueue offerQueue,
         SchedulingFilter schedulingFilter,
         @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
-        Clock clock) {
+        Clock clock,
+        MaintenanceController maintenance) {
 
       this.storage = requireNonNull(storage);
       this.stateManager = requireNonNull(stateManager);
@@ -155,6 +159,7 @@ public interface Preemptor {
       this.schedulingFilter = requireNonNull(schedulingFilter);
       this.preemptionCandidacyDelay = requireNonNull(preemptionCandidacyDelay);
       this.clock = requireNonNull(clock);
+      this.maintenance = requireNonNull(maintenance);
     }
 
     private List<IAssignedTask> fetch(Query.Builder query, Predicate<IScheduledTask> filter) {
@@ -192,19 +197,27 @@ public interface Preemptor {
           }
         };
 
-    private static final Function<Offer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
-        new Function<Offer, ResourceSlot>() {
+    private static final Function<HostOffer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
+        new Function<HostOffer, ResourceSlot>() {
           @Override
-          public ResourceSlot apply(Offer offer) {
-            return ResourceSlot.from(offer);
+          public ResourceSlot apply(HostOffer hostOffer) {
+            return ResourceSlot.from(hostOffer.getOffer());
           }
         };
 
-    private static final Function<Offer, String> OFFER_TO_HOST =
-        new Function<Offer, String>() {
+    private static final Function<HostOffer, String> OFFER_TO_HOST =
+        new Function<HostOffer, String>() {
           @Override
-          public String apply(Offer offer) {
-            return offer.getHostname();
+          public String apply(HostOffer hostOffer) {
+            return hostOffer.getOffer().getHostname();
+          }
+        };
+
+    private static final Function<HostOffer, MaintenanceMode> OFFER_TO_MODE =
+        new Function<HostOffer, MaintenanceMode>() {
+          @Override
+          public MaintenanceMode apply(HostOffer hostOffer) {
+            return hostOffer.getMode();
           }
         };
 
@@ -220,7 +233,7 @@ public interface Preemptor {
      */
     private Optional<Set<IAssignedTask>> getTasksToPreempt(
         Iterable<IAssignedTask> possibleVictims,
-        Iterable<Offer> offers,
+        Iterable<HostOffer> offers,
         IAssignedTask pendingTask,
         AttributeAggregate attributeAggregate) {
 
@@ -236,9 +249,19 @@ public interface Preemptor {
           ResourceSlot.sum(Iterables.transform(offers, OFFER_TO_RESOURCE_SLOT));
 
       if (!Iterables.isEmpty(offers)) {
+        if (Iterables.size(offers) > 1) {
+          // There are multiple offers for the same host. Since both have maintenance information
+          // we don't preempt with this information and wait for mesos to merge the two offers for
+          // us.
+          return Optional.absent();
+        }
+        MaintenanceMode mode =
+            Iterables.getOnlyElement(FluentIterable.from(offers).transform(OFFER_TO_MODE).toSet());
+
         Set<SchedulingFilter.Veto> vetos = schedulingFilter.filter(
             slackResources,
             host,
+            mode,
             pendingTask.getTask(),
             pendingTask.getTaskId(),
             attributeAggregate);
@@ -269,6 +292,7 @@ public interface Preemptor {
         Set<SchedulingFilter.Veto> vetos = schedulingFilter.filter(
             totalResource,
             host,
+            maintenance.getMode(host),
             pendingTask.getTask(),
             pendingTask.getTaskId(),
             attributeAggregate);
@@ -280,11 +304,11 @@ public interface Preemptor {
       return Optional.absent();
     }
 
-    private static final Function<Offer, String> OFFER_TO_SLAVE_ID =
-        new Function<Offer, String>() {
+    private static final Function<HostOffer, String> OFFER_TO_SLAVE_ID =
+        new Function<HostOffer, String>() {
           @Override
-          public String apply(Offer offer) {
-            return offer.getSlaveId().getValue();
+          public String apply(HostOffer hostOffer) {
+            return hostOffer.getOffer().getSlaveId().getValue();
           }
         };
 
@@ -323,7 +347,7 @@ public interface Preemptor {
       attemptedPreemptions.incrementAndGet();
 
       // Group the offers by slave id so they can be paired with active tasks from the same slave.
-      Multimap<String, Offer> slavesToOffers =
+      Multimap<String, HostOffer> slavesToOffers =
           Multimaps.index(offerQueue.getOffers(), OFFER_TO_SLAVE_ID);
 
       Set<String> allSlaves = ImmutableSet.<String>builder()

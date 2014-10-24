@@ -20,6 +20,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ExecutorConfig;
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.MesosTaskFactory;
@@ -44,6 +45,7 @@ import org.apache.mesos.Protos.Value.Type;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
@@ -61,6 +63,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
           .setRanges(
               Ranges.newBuilder().addRange(Range.newBuilder().setBegin(PORT).setEnd(PORT))))
       .build();
+  private static final HostOffer HOST_OFFER = new HostOffer(OFFER, MaintenanceMode.NONE);
   private static final IScheduledTask TASK = IScheduledTask.build(
       new ScheduledTask()
           .setAssignedTask(new AssignedTask()
@@ -96,6 +99,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     expect(filter.filter(
         ResourceSlot.from(OFFER),
         OFFER.getHostname(),
+        MaintenanceMode.NONE,
         TASK.getAssignedTask().getTask(),
         Tasks.id(TASK),
         emptyJob))
@@ -110,7 +114,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(Optional.of(TASK_INFO), assigner.maybeAssign(OFFER, TASK, emptyJob));
+    assertEquals(Optional.of(TASK_INFO), assigner.maybeAssign(HOST_OFFER, TASK, emptyJob));
   }
 
   @Test
@@ -118,6 +122,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
     expect(filter.filter(
         ResourceSlot.from(OFFER),
         OFFER.getHostname(),
+        MaintenanceMode.NONE,
         TASK.getAssignedTask().getTask(),
         Tasks.id(TASK),
         emptyJob))
@@ -125,6 +130,6 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(Optional.<TaskInfo>absent(), assigner.maybeAssign(OFFER, TASK, emptyJob));
+    assertEquals(Optional.<TaskInfo>absent(), assigner.maybeAssign(HOST_OFFER, TASK, emptyJob));
   }
 }

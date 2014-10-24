@@ -34,6 +34,8 @@ import org.apache.mesos.Protos.TaskInfo;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
+
 /**
  * Responsible for matching a task against an offer.
  */
@@ -43,13 +45,13 @@ public interface TaskAssigner {
    * Tries to match a task against an offer.  If a match is found, the assigner should
    * make the appropriate changes to the task and provide a non-empty result.
    *
-   * @param offer The resource offer.
+   * @param hostOffer The resource offer.
    * @param task The task to match against and optionally assign.
    * @param attributeAggregate Attribute information for tasks in the job containing {@code task}.
    * @return Instructions for launching the task if matching and assignment were successful.
    */
   Optional<TaskInfo> maybeAssign(
-      Offer offer,
+      HostOffer hostOffer,
       IScheduledTask task,
       AttributeAggregate attributeAggregate);
 
@@ -87,20 +89,21 @@ public interface TaskAssigner {
 
     @Override
     public Optional<TaskInfo> maybeAssign(
-        Offer offer,
+        HostOffer hostOffer,
         IScheduledTask task,
         AttributeAggregate attributeAggregate) {
 
       Set<Veto> vetoes = filter.filter(
-          ResourceSlot.from(offer),
-          offer.getHostname(),
+          ResourceSlot.from(hostOffer.getOffer()),
+          hostOffer.getOffer().getHostname(),
+          hostOffer.getMode(),
           task.getAssignedTask().getTask(),
           Tasks.id(task),
           attributeAggregate);
       if (vetoes.isEmpty()) {
-        return Optional.of(assign(offer, task));
+        return Optional.of(assign(hostOffer.getOffer(), task));
       } else {
-        LOG.fine("Slave " + offer.getHostname() + " vetoed task " + Tasks.id(task)
+        LOG.fine("Slave " + hostOffer.getOffer().getHostname() + " vetoed task " + Tasks.id(task)
             + ": " + vetoes);
         return Optional.absent();
       }
