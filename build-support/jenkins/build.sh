@@ -14,7 +14,7 @@
 #
 
 # Jenkins build script used with builds at http://builds.apache.org
-set -ex
+set -eux
 date
 
 # Run all Java tests
@@ -23,6 +23,8 @@ date
 # Run all Python tests
 # Setting the timeout value to 1 minute ensures package fetches from PyPI do not
 # fail on Apache Jenkins.
+export JUNIT_XML_BASE="$PWD/dist/test-results"
+mkdir -p "$JUNIT_XML_BASE"
 ./pants build --timeout=60 src/test/python:all -vxs
 
 # Run Python style checks
