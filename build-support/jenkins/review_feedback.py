@@ -141,6 +141,7 @@ def main():
         latest_diff['links']['self']['href'],
         accept='text/x-patch')
     sha = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).strip()
+    ship = False
     try:
       _apply_patch(patch_data, args.git_clean_exclude)
       print('Running build command.')
@@ -149,19 +150,24 @@ def main():
       # Pipe to a file in case output is large.
       result = subprocess.call(['bash', '-c', '%s > %s 2>&1' % (command, build_output)])
       if result == 0:
-        review_text = '+1: Master (%s) is green with this patch.\n  %s' % (sha, command)
+        review_text = 'Master (%s) is green with this patch.\n  %s' % (sha, command)
+        ship = True
       else:
         build_tail = subprocess.check_output(['tail', '-n', str(args.tail_lines), build_output])
         review_text = (
-            '-1: Master (%s) is red with this patch.\n  %s\n\n%s' % (sha, command, build_tail))
+            'Master (%s) is red with this patch.\n  %s\n\n%s' % (sha, command, build_tail))
     except PatchApplyError:
       review_text = (
-          '-1: This patch does not apply cleanly on master (%s), do you need to rebase?' % sha)
+          'This patch does not apply cleanly on master (%s), do you need to rebase?' % sha)
 
     print('Replying to review %d:\n%s' % (request['id'], review_text))
     print(server.get_resource(
         request['links']['reviews']['href'],
-        data=urllib.urlencode({'body_top': review_text, 'public': 'true'})))
+        data=urllib.urlencode({
+            'body_top': review_text,
+            'public': 'true',
+            'ship_it': 'true' if ship else 'false'
+        })))
 
 
 if __name__=="__main__":
