@@ -123,12 +123,39 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
-            fp.name])
+                     fp.name])
 
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       self.assert_create_job_called(api)
       self.assert_scheduler_called(api, mock_query, 2)
+
+  def test_simple_successful_create_job_open_page(self):
+    mock_context = FakeAuroraCommandContext()
+    with contextlib.nested(
+        # TODO(maxim): Patching threading.Event with all possible namespace/patch/mock
+        #              combinations did not produce the desired effect. Investigate why (AURORA-510)
+        patch('threading._Event.wait'),
+        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
+      mock_query = self.create_mock_query()
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.PENDING))
+      mock_context.add_expected_status_query_result(
+        self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+      api = mock_context.get_api('west')
+      api.create_job.return_value = self.get_createjob_response()
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        result = cmd.execute(['job', 'create', '--wait-until=RUNNING', '--open-browser',
+                     'west/bozo/test/hello',
+            fp.name])
+        assert result == EXIT_OK
+
+      self.assert_create_job_called(api)
+      self.assert_scheduler_called(api, mock_query, 2)
+      assert mock_context.showed_urls == ["http://something_or_other/scheduler/bozo/test/hello"]
 
   def test_create_job_fail_and_write_log(self):
     """Check that when an unknown error occurs during command execution,

@@ -122,7 +122,7 @@ class CreateJobCommand(Verb):
     context.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE,
                                    err_msg="Job creation failed due to error:")
     if context.options.open_browser:
-      context.open_job_page(api, config)
+      context.open_job_page(api, context.options.jobspec)
     if context.options.wait_until == "RUNNING":
       JobMonitor(api.scheduler_proxy, config.job_key()).wait_until(JobMonitor.running_or_finished)
     elif context.options.wait_until == "FINISHED":
