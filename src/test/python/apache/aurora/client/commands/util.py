@@ -33,6 +33,7 @@ class AuroraClientCommandTest(unittest.TestCase):
     response.responseCode = code
     response.messageDEPRECATED = msg
     response.result = Mock(spec=Result)
+    response.details = []
     return response
 
   @classmethod

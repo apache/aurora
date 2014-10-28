@@ -42,7 +42,8 @@ def die(msg):
 
 def format_response(resp):
   return 'Response from scheduler: %s (message: %s)' % (
-    ResponseCode._VALUES_TO_NAMES[resp.responseCode], resp.messageDEPRECATED)
+    ResponseCode._VALUES_TO_NAMES[resp.responseCode],
+    ", ".join([m.message for m in resp.details]) if resp.details else resp.messageDEPRECATED)
 
 
 def check_and_log_response(resp):

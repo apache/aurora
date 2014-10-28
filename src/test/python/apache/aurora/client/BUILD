@@ -34,6 +34,13 @@ python_tests(
   ],
 )
 
+python_tests(name = 'base',
+  sources = ['test_base.py'],
+  dependencies = [
+    'src/main/python/apache/aurora/client:base',
+  ],
+)
+
 python_tests(name = 'config',
   sources = ['test_config.py'],
   dependencies = [

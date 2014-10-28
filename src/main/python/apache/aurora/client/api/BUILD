@@ -165,6 +165,7 @@ python_library(
     ':updater_util',
     ':quota_check',
     '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/aurora/client:base',
     'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
