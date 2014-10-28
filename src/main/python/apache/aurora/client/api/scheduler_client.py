@@ -287,7 +287,7 @@ class SchedulerProxy(object):
             resp = method(*(args + auth_args))
             if resp is not None and resp.responseCode == ResponseCode.ERROR_TRANSIENT:
               raise self.TransientError(", ".join(
-                  [m for m in resp.details] if resp.details else []))
+                  [m.message for m in resp.details] if resp.details else []))
             if resp.serverInfo.thriftAPIVersion != THRIFT_API_VERSION:
               raise self.APIVersionError("Client Version: %s, Server Version: %s" %
                   (THRIFT_API_VERSION, resp.serverInfo.thriftAPIVersion))

@@ -42,6 +42,7 @@ from gen.apache.aurora.api.ttypes import (
     ResourceAggregate,
     Response,
     ResponseCode,
+    ResponseDetail,
     RewriteConfigsRequest,
     ScheduleStatus,
     ServerInfo,
@@ -398,7 +399,7 @@ def test_transient_error(_, client):
   mock_thrift_client = mock.Mock(spec=AuroraAdmin.Client)
   mock_thrift_client.killTasks.side_effect = [
       Response(responseCode=ResponseCode.ERROR_TRANSIENT,
-               details=["message1", "message2"],
+               details=[ResponseDetail(message="message1"), ResponseDetail(message="message2")],
                serverInfo=DEFAULT_RESPONSE.serverInfo),
       Response(responseCode=ResponseCode.ERROR_TRANSIENT,
                serverInfo=DEFAULT_RESPONSE.serverInfo),
