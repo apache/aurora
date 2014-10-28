@@ -30,6 +30,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
@@ -131,7 +132,7 @@ public final class StorageBackfill {
     storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {
       @Override
       public IScheduledTask apply(final IScheduledTask task) {
-        if (!task.getAssignedTask().getTask().isSetJob()) {
+        if (!JobKeys.isValid(task.getAssignedTask().getTask().getJob())) {
           ScheduledTask builder = task.newBuilder();
           TaskConfig config = builder.getAssignedTask().getTask();
           config.setJob(new JobKey()

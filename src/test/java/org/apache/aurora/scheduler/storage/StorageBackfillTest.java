@@ -18,9 +18,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -29,6 +30,7 @@ import org.apache.aurora.gen.Constraint;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
+import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -134,7 +136,6 @@ public class StorageBackfillTest {
 
   @Test
   public void testShardUniquenessCorrection() throws Exception {
-
     final AtomicInteger taskId = new AtomicInteger();
 
     final TaskConfig task = defaultTask();
@@ -164,6 +165,49 @@ public class StorageBackfillTest {
 
     assertEquals(1, getTasksByStatus(RUNNING).size());
     assertEquals(9, getTasksByStatus(KILLED).size());
+  }
+
+  @Test
+  public void testBackfillTaskJob() throws Exception {
+    TaskConfig task = defaultTask();
+    ConfigurationManager.applyDefaultsIfUnset(task);
+    task.unsetJob();
+
+    IScheduledTask noJobKey = IScheduledTask.build(new ScheduledTask()
+        .setStatus(RUNNING)
+        .setAssignedTask(new AssignedTask()
+            .setInstanceId(0)
+            .setTaskId("nojobkey")
+            .setTask(task)));
+    IScheduledTask nullJobKeyFields = IScheduledTask.build(new ScheduledTask()
+        .setStatus(RUNNING)
+        .setAssignedTask(new AssignedTask()
+            .setInstanceId(1)
+            .setTaskId("nulled_fields")
+            .setTask(task.setJob(new JobKey()))));
+
+    final Set<IScheduledTask> backfilledTasks = ImmutableSet.of(noJobKey, nullJobKeyFields);
+    storage.write(new Storage.MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        storeProvider.getUnsafeTaskStore().saveTasks(backfilledTasks);
+      }
+    });
+
+    backfill();
+    ScheduledTask noJobKeyBackfilled = noJobKey.newBuilder();
+    noJobKeyBackfilled.getAssignedTask().getTask()
+        .setJob(new JobKey(OWNER.getRole(), ENV, JOB_NAME));
+
+    ScheduledTask nullJobKeyFieldsBackfilled = nullJobKeyFields.newBuilder();
+    nullJobKeyFieldsBackfilled.getAssignedTask().getTask()
+        .setJob(new JobKey(OWNER.getRole(), ENV, JOB_NAME));
+
+    assertEquals(
+        ImmutableSet.of(
+            IScheduledTask.build(noJobKeyBackfilled),
+            IScheduledTask.build(nullJobKeyFieldsBackfilled)),
+        Storage.Util.consistentFetchTasks(storage, Query.unscoped()));
   }
 
   private void backfill() {
@@ -200,9 +244,9 @@ public class StorageBackfillTest {
         .setRamMb(ONE_GB)
         .setDiskMb(500)
         .setExecutorConfig(EXECUTOR_CONFIG)
-        .setRequestedPorts(ImmutableSet.<String>of())
-        .setConstraints(ImmutableSet.<Constraint>of())
-        .setTaskLinks(ImmutableMap.<String, String>of());
+        .setRequestedPorts(Sets.<String>newHashSet())
+        .setConstraints(Sets.<Constraint>newHashSet())
+        .setTaskLinks(Maps.<String, String>newHashMap());
   }
 
   private IScheduledTask getTask(String taskId) {
