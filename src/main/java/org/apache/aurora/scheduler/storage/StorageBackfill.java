@@ -52,6 +52,9 @@ public final class StorageBackfill {
   private static final AtomicLong BACKFILLED_TASK_CONFIG_KEYS =
       Stats.exportLong("task_config_keys_backfilled");
 
+  private static final AtomicLong BACKFILLED_JOB_CONFIG_KEYS =
+      Stats.exportLong("job_store_task_config_keys_backfilled");
+
   private StorageBackfill() {
     // Utility class.
   }
@@ -59,6 +62,7 @@ public final class StorageBackfill {
   private static void backfillJobDefaults(JobStore.Mutable jobStore) {
     for (String id : jobStore.fetchManagerIds()) {
       for (JobConfiguration job : IJobConfiguration.toBuildersList(jobStore.fetchJobs(id))) {
+        populateJobKey(job.getTaskConfig(), BACKFILLED_JOB_CONFIG_KEYS);
         ConfigurationManager.applyDefaultsIfUnset(job);
         jobStore.saveAcceptedJob(id, IJobConfiguration.build(job));
       }
@@ -116,6 +120,17 @@ public final class StorageBackfill {
     }
   }
 
+  private static void populateJobKey(TaskConfig config, AtomicLong counter) {
+    if (!config.isSetJob() || !JobKeys.isValid(IJobKey.build(config.getJob()))) {
+      config.setJob(new JobKey()
+          .setRole(config.getOwner().getRole())
+          .setEnvironment(config.getEnvironment())
+          .setName(config.getJobName()));
+
+      counter.incrementAndGet();
+    }
+  }
+
   /**
    * Backfills the storage to make it match any assumptions that may have changed since
    * the structs were first written.
@@ -132,19 +147,9 @@ public final class StorageBackfill {
     storeProvider.getUnsafeTaskStore().mutateTasks(Query.unscoped(), new TaskMutation() {
       @Override
       public IScheduledTask apply(final IScheduledTask task) {
-        if (!JobKeys.isValid(task.getAssignedTask().getTask().getJob())) {
-          ScheduledTask builder = task.newBuilder();
-          TaskConfig config = builder.getAssignedTask().getTask();
-          config.setJob(new JobKey()
-              .setRole(config.getOwner().getRole())
-              .setEnvironment(config.getEnvironment())
-              .setName(config.getJobName()));
-
-          BACKFILLED_TASK_CONFIG_KEYS.incrementAndGet();
-          return IScheduledTask.build(builder);
-        }
-
-        return task;
+        ScheduledTask builder = task.newBuilder();
+        populateJobKey(builder.getAssignedTask().getTask(), BACKFILLED_TASK_CONFIG_KEYS);
+        return IScheduledTask.build(builder);
       }
     });
 

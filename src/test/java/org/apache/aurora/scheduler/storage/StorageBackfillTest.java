@@ -168,6 +168,34 @@ public class StorageBackfillTest {
   }
 
   @Test
+  public void testJobConfigurationBackfill() throws Exception {
+    final JobConfiguration config = makeJobConfig(JOB_KEY, defaultTask(), 1);
+    SanitizedConfiguration expected =
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(config));
+
+    // Unset task config job key.
+    config.getTaskConfig().unsetJob();
+    storage.write(new Storage.MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        storeProvider.getJobStore().saveAcceptedJob("CRON", IJobConfiguration.build(config));
+      }
+    });
+
+    backfill();
+
+    IJobConfiguration actual = Iterables.getOnlyElement(
+        storage.consistentRead(new Storage.Work.Quiet<Iterable<IJobConfiguration>>() {
+          @Override
+          public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
+            return storeProvider.getJobStore().fetchJobs("CRON");
+          }
+        }));
+
+    assertEquals(expected.getJobConfig(), actual);
+  }
+
+  @Test
   public void testBackfillTaskJob() throws Exception {
     TaskConfig task = defaultTask();
     ConfigurationManager.applyDefaultsIfUnset(task);
@@ -219,12 +247,8 @@ public class StorageBackfillTest {
     });
   }
 
-  private static SanitizedConfiguration makeJob(
-      IJobKey jobKey,
-      TaskConfig task,
-      int numTasks) throws Exception {
-
-    JobConfiguration job = new JobConfiguration()
+  private static JobConfiguration makeJobConfig(IJobKey jobKey, TaskConfig task, int numTasks) {
+    return new JobConfiguration()
         .setOwner(OWNER)
         .setKey(jobKey.newBuilder())
         .setInstanceCount(numTasks)
@@ -232,7 +256,13 @@ public class StorageBackfillTest {
             .setOwner(OWNER)
             .setEnvironment(jobKey.getEnvironment())
             .setJobName(jobKey.getName()));
-    return SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(job));
+  }
+
+  private static SanitizedConfiguration makeJob(IJobKey jobKey, TaskConfig task, int numTasks)
+      throws Exception {
+
+    return SanitizedConfiguration.fromUnsanitized(
+        IJobConfiguration.build(makeJobConfig(jobKey, task, numTasks)));
   }
 
   private static TaskConfig defaultTask() {
