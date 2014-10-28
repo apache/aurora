@@ -225,11 +225,18 @@ echo "to send to the dev@aurora.incubator.apache.org mailing list"
 echo
 
 # Create the email template for the release candidate to be sent to the mailing lists.
+if [[ $(uname) == Darwin ]]; then
+  vote_end=$(date -v+3d)
+else
+  vote_end=$(date -d+3days)
+fi
+
 MESSAGE=$(cat <<__EOF__
 To: dev@aurora.incubator.apache.org
 Subject: [VOTE] Release Apache Aurora ${current_version} (incubating) RC${rc_tag_version}
 
 All,
+
 I propose that we accept the following release candidate as the official
 Apache Aurora ${current_version} release.
 
@@ -241,7 +248,6 @@ ${aurora_git_web_url}&f=CHANGELOG&hb=${current_version_tag}
 
 The branch used to create the release candidate is:
 ${aurora_git_web_url}&hb=${current_version_tag}
-
 
 The release candidate is available at:
 ${aurora_svn_dist_url}/${current_version_tag}/${dist_name}.tar.gz
@@ -257,11 +263,11 @@ ${aurora_svn_dist_url}/KEYS
 
 Please download, verify, and test.
 
-The vote will close on `date -v+3d`
+The vote will close on ${vote_end}
 
 [ ] +1 Release this as Apache Aurora ${current_version}
 [ ] +0
-[ ] -1 Do not release this as Apache Aurora ${current_version} becuase...
+[ ] -1 Do not release this as Apache Aurora ${current_version} because...
 
 __EOF__
 )
