@@ -19,6 +19,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
@@ -31,6 +33,7 @@ import static org.apache.mesos.Protos.Offer;
  * Resource containing class that is aware of executor overhead.
  */
 public final class ResourceSlot {
+  // TODO(zmanji): Remove this class and overhead in 0.8.0 (AURORA-906)
 
   private final Resources resources;
 
@@ -38,22 +41,28 @@ public final class ResourceSlot {
    * CPU allocated for each executor.
    */
   @VisibleForTesting
-  static final double EXECUTOR_CPUS = 0.25;
+  @CmdLine(name = "thermos_executor_cpu",
+      help = "The number of CPU cores to allocate for each instance of the executor.")
+  public static final Arg<Double> EXECUTOR_CPUS = Arg.create(0.25);
 
   /**
    * RAM required for the executor.  Executors in the wild have been observed using 48-54MB RSS,
    * setting to 128MB to be extra vigilant initially.
    */
   @VisibleForTesting
-  static final Amount<Long, Data> EXECUTOR_RAM = Amount.of(128L, Data.MB);
+  @CmdLine(name = "thermos_executor_ram",
+      help = "The amount of RAM to allocate for each instance of the executor.")
+  public static final Arg<Amount<Integer, Data>> EXECUTOR_RAM =
+  Arg.create(Amount.of(128, Data.MB));
 
   private ResourceSlot(Resources r) {
     this.resources = r;
   }
 
   public static ResourceSlot from(ITaskConfig task) {
-    double totalCPU = task.getNumCpus() + EXECUTOR_CPUS;
-    Amount<Long, Data> totalRAM = Amount.of(task.getRamMb() + EXECUTOR_RAM.as(Data.MB), Data.MB);
+    double totalCPU = task.getNumCpus() + EXECUTOR_CPUS.get();
+    Amount<Long, Data> totalRAM =
+        Amount.of(task.getRamMb() + EXECUTOR_RAM.get().as(Data.MB), Data.MB);
     Amount<Long, Data> disk = Amount.of(task.getDiskMb(), Data.MB);
     return new ResourceSlot(
         new Resources(totalCPU, totalRAM, disk, task.getRequestedPorts().size()));
@@ -84,8 +93,9 @@ public final class ResourceSlot {
                                   Amount<Long, Data> ram,
                                   Amount<Long, Data> disk,
                                   int ports) {
-    double totalCPU = cpu + EXECUTOR_CPUS;
-    Amount<Long, Data> totalRAM = Amount.of(ram.as(Data.MB) + EXECUTOR_RAM.as(Data.MB), Data.MB);
+    double totalCPU = cpu + EXECUTOR_CPUS.get();
+    Amount<Long, Data> totalRAM =
+        Amount.of(ram.as(Data.MB) + EXECUTOR_RAM.get().as(Data.MB), Data.MB);
 
     return new ResourceSlot(new Resources(totalCPU, totalRAM, disk, ports));
   }

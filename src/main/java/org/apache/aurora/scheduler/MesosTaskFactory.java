@@ -142,9 +142,11 @@ public interface MesosTaskFactory {
           .setExecutorId(getExecutorId(task.getTaskId()))
           .setName(EXECUTOR_NAME)
           .setSource(getInstanceSourceName(config, task.getInstanceId()))
-          .addResources(Resources.makeMesosResource(Resources.CPUS, ResourceSlot.EXECUTOR_CPUS))
           .addResources(
-              Resources.makeMesosResource(Resources.RAM_MB, ResourceSlot.EXECUTOR_RAM.as(Data.MB)))
+              Resources.makeMesosResource(Resources.CPUS, ResourceSlot.EXECUTOR_CPUS.get()))
+          .addResources(Resources.makeMesosResource(
+              Resources.RAM_MB,
+              ResourceSlot.EXECUTOR_RAM.get().as(Data.MB)))
           .build();
       return taskBuilder
           .setExecutor(executor)

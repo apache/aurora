@@ -64,9 +64,10 @@ public class MesosTaskFactoryImplTest {
       .setExecutorId(MesosTaskFactoryImpl.getExecutorId(TASK.getTaskId()))
       .setName(MesosTaskFactoryImpl.EXECUTOR_NAME)
       .setSource(MesosTaskFactoryImpl.getInstanceSourceName(TASK.getTask(), TASK.getInstanceId()))
-      .addResources(Resources.makeMesosResource(Resources.CPUS, ResourceSlot.EXECUTOR_CPUS))
-      .addResources(
-          Resources.makeMesosResource(Resources.RAM_MB, ResourceSlot.EXECUTOR_RAM.as(Data.MB)))
+      .addResources(Resources.makeMesosResource(Resources.CPUS, ResourceSlot.EXECUTOR_CPUS.get()))
+      .addResources(Resources.makeMesosResource(
+          Resources.RAM_MB,
+          ResourceSlot.EXECUTOR_RAM.get().as(Data.MB)))
       .setCommand(CommandInfo.newBuilder()
           .setValue("./executor.sh")
           .addUris(URI.newBuilder().setValue(EXECUTOR_PATH).setExecutable(true)))
