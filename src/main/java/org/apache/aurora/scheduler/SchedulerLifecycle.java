@@ -27,6 +27,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
+import com.google.common.base.Supplier;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Atomics;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -37,8 +38,7 @@ import com.twitter.common.base.Closures;
 import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatImpl;
-import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.StateMachine;
 import com.twitter.common.util.StateMachine.Transition;
@@ -93,7 +93,8 @@ public class SchedulerLifecycle implements EventSubscriber {
 
   private static final Logger LOG = Logger.getLogger(SchedulerLifecycle.class.getName());
 
-  private enum State {
+  @VisibleForTesting
+  enum State {
     IDLE,
     PREPARING_STORAGE,
     STORAGE_PREPARED,
@@ -132,7 +133,8 @@ public class SchedulerLifecycle implements EventSubscriber {
       ScheduledExecutorService executorService,
       Clock clock,
       EventSink eventSink,
-      ShutdownRegistry shutdownRegistry) {
+      ShutdownRegistry shutdownRegistry,
+      StatsProvider statsProvider) {
 
     this(
         driverFactory,
@@ -142,7 +144,8 @@ public class SchedulerLifecycle implements EventSubscriber {
         new DefaultDelayedActions(leadingOptions, executorService),
         clock,
         eventSink,
-        shutdownRegistry);
+        shutdownRegistry,
+        statsProvider);
   }
 
   private static final class DefaultDelayedActions implements DelayedActions {
@@ -192,6 +195,14 @@ public class SchedulerLifecycle implements EventSubscriber {
   }
 
   @VisibleForTesting
+  static final String REGISTERED_GAUGE = "framework_registered";
+
+  @VisibleForTesting
+  static String stateGaugeName(State state) {
+    return "scheduler_lifecycle_" + state;
+  }
+
+  @VisibleForTesting
   SchedulerLifecycle(
       final DriverFactory driverFactory,
       final NonVolatileStorage storage,
@@ -200,7 +211,8 @@ public class SchedulerLifecycle implements EventSubscriber {
       final DelayedActions delayedActions,
       final Clock clock,
       final EventSink eventSink,
-      final ShutdownRegistry shutdownRegistry) {
+      final ShutdownRegistry shutdownRegistry,
+      StatsProvider statsProvider) {
 
     requireNonNull(driverFactory);
     requireNonNull(storage);
@@ -211,19 +223,23 @@ public class SchedulerLifecycle implements EventSubscriber {
     requireNonNull(eventSink);
     requireNonNull(shutdownRegistry);
 
-    Stats.export(new StatImpl<Integer>("framework_registered") {
-      @Override
-      public Integer read() {
-        return registrationAcked.get() ? 1 : 0;
-      }
-    });
+    statsProvider.makeGauge(
+        REGISTERED_GAUGE,
+        new Supplier<Integer>() {
+          @Override
+          public Integer get() {
+            return registrationAcked.get() ? 1 : 0;
+          }
+        });
     for (final State state : State.values()) {
-      Stats.export(new StatImpl<Integer>("scheduler_lifecycle_" + state) {
-        @Override
-        public Integer read() {
-          return (state == stateMachine.getState()) ? 1 : 0;
-        }
-      });
+      statsProvider.makeGauge(
+          stateGaugeName(state),
+          new Supplier<Integer>() {
+            @Override
+            public Integer get() {
+              return (state == stateMachine.getState()) ? 1 : 0;
+            }
+          });
     }
 
     shutdownRegistry.addAction(new Command() {

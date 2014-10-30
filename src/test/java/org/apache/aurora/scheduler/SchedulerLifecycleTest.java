@@ -32,6 +32,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.SchedulerDriver;
 import org.easymock.Capture;
@@ -39,9 +40,12 @@ import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.SchedulerLifecycle.State;
+import static org.apache.aurora.scheduler.SchedulerLifecycle.stateGaugeName;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 public class SchedulerLifecycleTest extends EasyMockTest {
@@ -56,6 +60,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   private SchedulerDriver schedulerDriver;
   private DelayedActions delayedActions;
   private EventSink eventSink;
+  private FakeStatsProvider statsProvider;
 
   private SchedulerLifecycle schedulerLifecycle;
 
@@ -69,6 +74,7 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     schedulerDriver = createMock(SchedulerDriver.class);
     delayedActions = createMock(DelayedActions.class);
     eventSink = createMock(EventSink.class);
+    statsProvider = new FakeStatsProvider();
   }
 
   /**
@@ -98,7 +104,10 @@ public class SchedulerLifecycleTest extends EasyMockTest {
         delayedActions,
         clock,
         eventSink,
-        shutdownRegistry);
+        shutdownRegistry,
+        statsProvider);
+    assertEquals(0, statsProvider.getValue(SchedulerLifecycle.REGISTERED_GAUGE));
+    assertEquals(1, statsProvider.getValue(stateGaugeName(State.IDLE)));
     return shutdownCommand;
   }
 
@@ -149,8 +158,13 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     replayAndCreateLifecycle();
 
     LeadershipListener leaderListener = schedulerLifecycle.prepare();
+    assertEquals(1, statsProvider.getValue(stateGaugeName(State.STORAGE_PREPARED)));
     leaderListener.onLeading(leaderControl);
+    assertEquals(1, statsProvider.getValue(stateGaugeName(State.LEADER_AWAITING_REGISTRATION)));
+    assertEquals(0, statsProvider.getValue(SchedulerLifecycle.REGISTERED_GAUGE));
     schedulerLifecycle.registered(new DriverRegistered());
+    assertEquals(1, statsProvider.getValue(stateGaugeName(State.ACTIVE)));
+    assertEquals(1, statsProvider.getValue(SchedulerLifecycle.REGISTERED_GAUGE));
     handleRegistered.getValue().run();
     triggerFailover.getValue().run();
   }
