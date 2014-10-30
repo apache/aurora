@@ -19,12 +19,15 @@ import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
+import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stat;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.testing.FakeClock;
@@ -111,6 +114,7 @@ public class TaskSchedulerTest extends EasyMockTest {
   private OfferQueue offerQueue;
   private TaskGroups taskGroups;
   private FakeClock clock;
+  private StatsProvider statsProvider;
   private RescheduleCalculator rescheduleCalculator;
   private Preemptor preemptor;
   private AttributeAggregate emptyJob;
@@ -129,6 +133,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     returnDelay = createMock(OfferReturnDelay.class);
     clock = new FakeClock();
     clock.setNowMillis(0);
+    statsProvider = createMock(StatsProvider.class);
     rescheduleCalculator = createMock(RescheduleCalculator.class);
     preemptor = createMock(Preemptor.class);
     emptyJob = new AttributeAggregate(
@@ -137,6 +142,12 @@ public class TaskSchedulerTest extends EasyMockTest {
   }
 
   private void replayAndCreateScheduler() {
+    Capture<Supplier<Long>> cacheSizeSupplier = createCapture();
+    Stat<Long> stat = createMock(new Clazz<Stat<Long>>() { });
+    expect(statsProvider.makeGauge(
+        EasyMock.eq(TaskSchedulerImpl.RESERVATIONS_CACHE_SIZE_STAT),
+        capture(cacheSizeSupplier))).andReturn(stat);
+
     control.replay();
     offerQueue = new OfferQueueImpl(driver, returnDelay, executor, maintenance);
     TaskScheduler scheduler = new TaskSchedulerImpl(storage,
@@ -145,7 +156,8 @@ public class TaskSchedulerTest extends EasyMockTest {
         offerQueue,
         preemptor,
         reservationDuration,
-        clock);
+        clock,
+        statsProvider);
     taskGroups = new TaskGroups(
         executor,
         Amount.of(FIRST_SCHEDULE_DELAY_MS, Time.MILLISECONDS),
@@ -153,6 +165,7 @@ public class TaskSchedulerTest extends EasyMockTest {
         RateLimiter.create(100),
         scheduler,
         rescheduleCalculator);
+    assertEquals(0L, (long) cacheSizeSupplier.getValue().get());
   }
 
   private Capture<Runnable> expectOffer() {

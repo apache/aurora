@@ -22,6 +22,8 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
@@ -113,6 +115,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         bind(TaskAssigner.class).toInstance(assigner);
         bind(Clock.class).toInstance(clock);
         bind(Storage.class).toInstance(storageImpl);
+        bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
       }
     });
   }

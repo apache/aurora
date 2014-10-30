@@ -37,8 +37,8 @@ import com.google.common.eventbus.Subscribe;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 
 import org.apache.aurora.scheduler.base.Query;
@@ -116,14 +116,15 @@ public interface TaskScheduler extends EventSubscriber {
         OfferQueue offerQueue,
         Preemptor preemptor,
         @ReservationDuration Amount<Long, Time> reservationDuration,
-        final Clock clock) {
+        final Clock clock,
+        StatsProvider statsProvider) {
 
       this.storage = requireNonNull(storage);
       this.stateManager = requireNonNull(stateManager);
       this.assigner = requireNonNull(assigner);
       this.offerQueue = requireNonNull(offerQueue);
       this.preemptor = requireNonNull(preemptor);
-      this.reservations = new Reservations(reservationDuration, clock);
+      this.reservations = new Reservations(statsProvider, reservationDuration, clock);
     }
 
     private Function<HostOffer, Optional<TaskInfo>> getAssignerFunction(
@@ -241,10 +242,16 @@ public interface TaskScheduler extends EventSubscriber {
       }
     }
 
+    @VisibleForTesting
+    static final String RESERVATIONS_CACHE_SIZE_STAT = "reservation_cache_size";
+
     private static class Reservations {
       private final Cache<SlaveID, String> reservations;
 
-      Reservations(final Amount<Long, Time> duration, final Clock clock) {
+      Reservations(
+          StatsProvider statsProvider,
+          Amount<Long, Time> duration,
+          final Clock clock) {
         requireNonNull(duration);
         requireNonNull(clock);
         this.reservations = CacheBuilder.newBuilder()
@@ -256,12 +263,14 @@ public interface TaskScheduler extends EventSubscriber {
               }
             })
             .build();
-        Stats.export(new StatImpl<Long>("reservation_cache_size") {
-          @Override
-          public Long read() {
-            return reservations.size();
-          }
-        });
+        statsProvider.makeGauge(
+            RESERVATIONS_CACHE_SIZE_STAT,
+            new Supplier<Long>() {
+              @Override
+              public Long get() {
+                return reservations.size();
+              }
+            });
       }
 
       private synchronized void add(SlaveID slaveId, String taskId) {
