@@ -14,6 +14,8 @@
 
 import subprocess
 
+import pytest
+
 
 def build_and_execute_pex_target(target, binary):
   assert subprocess.call(["./pants", target]) == 0
@@ -25,11 +27,17 @@ def build_and_execute_pex_target(target, binary):
   assert so.startswith('Options'), 'Unexpected build output: %s' % so
 
 
+# TODO(ksweeney): Unignore when mesos.native is pip-installable
+# (https://issues.apache.org/jira/browse/MESOS-684).
+@pytest.mark.skipif("True")
 def test_thermos_executor_build():
   build_and_execute_pex_target('src/main/python/apache/aurora/executor/bin:thermos_executor',
                                'dist/thermos_executor.pex')
 
 
+# TODO(ksweeney): Unignore when mesos.native is pip-installable
+# (https://issues.apache.org/jira/browse/MESOS-684).
+@pytest.mark.skipif("True")
 def test_gc_executor_build():
   build_and_execute_pex_target('src/main/python/apache/aurora/executor/bin:gc_executor',
                                'dist/gc_executor.pex')

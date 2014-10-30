@@ -19,7 +19,8 @@ from mock import Mock, patch
 from apache.aurora.client.api.scheduler_client import SchedulerClient
 from apache.aurora.client.cli import EXIT_UNKNOWN_ERROR
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest
+
+from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api import AuroraAdmin
 from gen.apache.aurora.api.ttypes import (

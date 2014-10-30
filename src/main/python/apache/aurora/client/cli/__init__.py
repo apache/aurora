@@ -40,6 +40,7 @@ import time
 import traceback
 from abc import abstractmethod
 from uuid import uuid1
+from zipfile import BadZipfile
 
 from twitter.common.python.pex import PexInfo
 
@@ -93,7 +94,7 @@ def get_client_version():
     pex_info = PexInfo.from_pex(pexpath)
     return ("%s@%s" % (pex_info.build_properties.get("sha", "unknown"),
         pex_info.build_properties.get("date", "unknown")))
-  except (IOError, OSError):
+  except (BadZipfile, IOError, OSError):
     return "VersionUnknown"
 
 

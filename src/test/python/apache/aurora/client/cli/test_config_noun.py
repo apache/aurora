@@ -19,7 +19,8 @@ from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import EXIT_COMMAND_FAILURE
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 
 class TestClientCreateCommand(AuroraClientCommandTest):

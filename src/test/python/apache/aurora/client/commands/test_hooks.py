@@ -18,9 +18,10 @@ from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.commands.core import create
-from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.client.config import AuroraConfig, GlobalHookRegistry
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
+
+from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,

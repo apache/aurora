@@ -18,7 +18,8 @@ from mock import Mock, patch
 
 from apache.aurora.client.cli import EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest
+
+from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
     JobKey,

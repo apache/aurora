@@ -21,8 +21,9 @@ from twitter.common.contextutil import temporary_file
 from apache.aurora.client.cli import EXIT_TIMEOUT
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.options import parse_instances
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.common.aurora_job_key import AuroraJobKey
+
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 from gen.apache.aurora.api.ttypes import JobKey, ScheduleStatus, ScheduleStatusResult, TaskQuery
 

@@ -24,13 +24,14 @@ from twitter.common.testing.clock import ThreadedClock
 
 from apache.aurora.common.http_signaler import HttpSignaler
 from apache.aurora.config.schema.base import HealthCheckConfig
-from apache.aurora.executor.common.fixtures import HELLO_WORLD, MESOS_JOB
 from apache.aurora.executor.common.health_checker import (
     HealthChecker,
     HealthCheckerProvider,
     ThreadedHealthChecker
 )
 from apache.aurora.executor.common.sandbox import SandboxInterface
+
+from .fixtures import HELLO_WORLD, MESOS_JOB
 
 from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, TaskConfig
 

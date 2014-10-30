@@ -17,7 +17,8 @@ import contextlib
 from mock import Mock, patch
 
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 
 class TestGetTaskUpCountCommand(AuroraClientCommandTest):

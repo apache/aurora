@@ -24,9 +24,10 @@ from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck
 from apache.aurora.client.api.scheduler_mux import SchedulerMux
 from apache.aurora.client.api.updater import Updater
-from apache.aurora.client.fake_scheduler_proxy import FakeSchedulerProxy
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
+
+from ..fake_scheduler_proxy import FakeSchedulerProxy
 
 from gen.apache.aurora.api.AuroraSchedulerManager import Client as scheduler_client
 from gen.apache.aurora.api.constants import ACTIVE_STATES, THRIFT_API_VERSION

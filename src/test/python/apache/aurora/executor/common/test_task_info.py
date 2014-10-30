@@ -12,8 +12,9 @@
 # limitations under the License.
 #
 
-from apache.aurora.executor.common.fixtures import BASE_MTI, HELLO_WORLD, HELLO_WORLD_MTI, MESOS_JOB
 from apache.aurora.executor.common.task_info import mesos_task_instance_from_assigned_task
+
+from .fixtures import BASE_MTI, HELLO_WORLD, HELLO_WORLD_MTI, MESOS_JOB
 
 from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, TaskConfig
 

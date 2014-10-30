@@ -18,4 +18,5 @@
 /dist/*
 /gradle-app.setting
 /out/*
+/requirements.txt
 /third_party/*

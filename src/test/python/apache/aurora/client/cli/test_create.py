@@ -27,8 +27,9 @@ from apache.aurora.client.cli import (
     EXIT_UNKNOWN_ERROR
 )
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.config import AuroraConfig
+
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,

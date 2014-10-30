@@ -19,8 +19,9 @@ from pystachio.config import Config
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.commands.core import create
-from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.config import AuroraConfig
+
+from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,

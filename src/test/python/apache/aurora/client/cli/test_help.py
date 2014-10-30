@@ -55,6 +55,7 @@ class TestHelp(unittest.TestCase):
     with patch('apache.aurora.client.cli.client.AuroraCommandLine.print_out',
         side_effect=self.mock_print):
       self.cmd.execute(['help'])
+      print(self.transcript)
       assert len(self.transcript) > 10
       assert self.transcript[1] == 'Usage:'
       assert '==Commands for jobs' in self.transcript

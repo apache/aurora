@@ -20,7 +20,8 @@ from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
 from apache.aurora.client.commands.core import restart
-from apache.aurora.client.commands.util import AuroraClientCommandTest
+
+from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,

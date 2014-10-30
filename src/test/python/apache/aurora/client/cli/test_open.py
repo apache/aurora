@@ -16,7 +16,8 @@ from mock import patch
 
 from apache.aurora.client.cli import EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
+
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 
 class TestClientOpenCommand(AuroraClientCommandTest):

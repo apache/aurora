@@ -20,7 +20,8 @@ from twitter.common.contextutil import temporary_file
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
 from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest, IOMock
+
+from .util import AuroraClientCommandTest, IOMock
 
 from gen.apache.aurora.api.ttypes import JobKey, PopulateJobResult, TaskConfig
 

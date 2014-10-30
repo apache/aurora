@@ -24,7 +24,8 @@ from apache.aurora.client.commands.maintenance import (
     host_drain,
     host_status
 )
-from apache.aurora.client.commands.util import AuroraClientCommandTest
+
+from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
     DrainHostsResult,

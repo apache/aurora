@@ -20,8 +20,9 @@ from twitter.common.contextutil import temporary_file
 from apache.aurora.client.cli import EXIT_PERMISSION_VIOLATION
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.command_hooks import CommandHook, GlobalCommandHookRegistry
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext
 from apache.aurora.config import AuroraConfig
+
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,

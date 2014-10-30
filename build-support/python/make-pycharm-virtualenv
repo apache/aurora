@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Wrapper for genearing PyCharm-compatible virtualenv.
+set -e
+
+HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+BUILDROOT=$HERE/../..
+
+pushd "$BUILDROOT"
+  ./pants goal dependencies --dependencies-external src/test/python:all > requirements.txt
+  ./pants setup_py src/main/thrift/org/apache/aurora/gen:py-thrift-packaged
+  ./pants setup_py src/main/thrift/org/apache/thermos:py-thrift
+  source build-support/pants.venv/bin/activate
+    pytest_requirement=$(pip freeze | grep pytest==)
+    pytest_cov_requirement=$(pip freeze | grep pytest-cov==)
+  deactivate
+  rm -rf build-support/python/pycharm.venv
+  ./build-support/virtualenv build-support/python/pycharm.venv
+  source build-support/python/pycharm.venv/bin/activate
+    # NOTE: PyCharm navigation (ctrl-click) doesn't work without --egg - it gets confused by
+    # the namespace packages in twitter.common.
+    pip install --egg -r requirements.txt
+    pip install --egg -f dist \
+      apache.gen.aurora==$(< .auroraversion) \
+      apache.gen.thermos==$(<.auroraversion)
+    # Use same py.test version embedded into pants
+    pip install $pytest_requirement $pytest_cov_requirement
+  deactivate
+popd

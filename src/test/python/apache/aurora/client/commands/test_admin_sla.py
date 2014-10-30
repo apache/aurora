@@ -22,8 +22,9 @@ from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.sla import DomainUpTimeSlaVector, JobUpTimeDetails, JobUpTimeLimit
 from apache.aurora.client.base import DEFAULT_GROUPING
 from apache.aurora.client.commands.admin import sla_list_safe_domain, sla_probe_hosts
-from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.common.aurora_job_key import AuroraJobKey
+
+from .util import AuroraClientCommandTest
 
 MIN_INSTANCE_COUNT = 1
 

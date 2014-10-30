@@ -17,7 +17,8 @@ import contextlib
 from mock import Mock, patch
 
 from apache.aurora.client.commands.core import status
-from apache.aurora.client.commands.util import AuroraClientCommandTest
+
+from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,

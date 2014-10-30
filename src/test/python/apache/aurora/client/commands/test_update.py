@@ -24,8 +24,9 @@ from apache.aurora.client.api.quota_check import QuotaCheck
 from apache.aurora.client.api.scheduler_mux import SchedulerMux
 from apache.aurora.client.api.updater import Updater
 from apache.aurora.client.commands.core import update
-from apache.aurora.client.commands.util import AuroraClientCommandTest
 from apache.aurora.config import AuroraConfig
+
+from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (

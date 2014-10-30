@@ -23,8 +23,9 @@ from apache.aurora.client.api.quota_check import QuotaCheck
 from apache.aurora.client.api.scheduler_mux import SchedulerMux
 from apache.aurora.client.cli import EXIT_INVALID_CONFIGURATION, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest, FakeAuroraCommandContext, IOMock
 from apache.aurora.config import AuroraConfig
+
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext, IOMock
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (

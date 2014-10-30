@@ -25,7 +25,8 @@ from apache.aurora.client.commands.admin import (
     query,
     set_quota
 )
-from apache.aurora.client.commands.util import AuroraClientCommandTest
+
+from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,

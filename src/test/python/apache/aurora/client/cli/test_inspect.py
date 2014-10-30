@@ -18,8 +18,9 @@ from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.util import AuroraClientCommandTest
 from apache.aurora.config import AuroraConfig
+
+from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api.ttypes import CronCollisionPolicy
 

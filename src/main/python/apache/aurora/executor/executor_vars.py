@@ -14,6 +14,7 @@
 
 import os
 import time
+from zipfile import BadZipfile
 
 import psutil
 from twitter.common.exceptions import ExceptionalThread
@@ -57,7 +58,7 @@ class ExecutorVars(Observable, ExceptionalThread):
     try:
       pex_info = PexInfo.from_pex(binary)
       return cls.get_release_from_tag(pex_info.build_properties.get('tag', ''))
-    except (IOError, OSError):
+    except (BadZipfile, IOError, OSError):
       return 'UNKNOWN'
 
   def __init__(self, clock=time):
