@@ -36,7 +36,6 @@ import com.google.inject.servlet.GuiceServletContextListener;
 import com.sun.jersey.api.container.filter.GZIPContentEncodingFilter;
 import com.sun.jersey.guice.JerseyServletModule;
 import com.sun.jersey.guice.spi.container.servlet.GuiceContainer;
-import com.twitter.common.application.http.DefaultQuitHandler;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.application.modules.LifecycleModule.LaunchException;
 import com.twitter.common.args.Arg;
@@ -117,8 +116,8 @@ public class JettyServerModule extends AbstractModule {
         .to(AbortCallback.class);
     bind(AbortCallback.class).in(Singleton.class);
     bind(Runnable.class).annotatedWith(Names.named(QuitHandler.QUIT_HANDLER_KEY))
-        .to(DefaultQuitHandler.class);
-    bind(DefaultQuitHandler.class).in(Singleton.class);
+        .to(QuitCallback.class);
+    bind(QuitCallback.class).in(Singleton.class);
     bind(new TypeLiteral<ExceptionalSupplier<Boolean, ?>>() { })
         .annotatedWith(Names.named(HealthHandler.HEALTH_CHECKER_KEY))
         .toInstance(MoreSuppliers.ofInstance(true));

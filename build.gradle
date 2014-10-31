@@ -185,11 +185,6 @@ dependencies {
   compile 'com.twitter.common.zookeeper:group:0.0.69'
   compile 'com.twitter.common.zookeeper:server-set:1.0.74'
   compile 'com.twitter.common.zookeeper:singleton-service:0.0.85'
-  compile('com.twitter.common:application-http:0.0.59') {
-    // TODO(wfarner): Contribute a patch to twitter commons that allows us to register /graphview
-    // resources without pulling in a jetty dependency.
-    exclude(group: 'org.mortbay.jetty', module: 'jetty')
-  }
   compile 'com.twitter.common:application-module-applauncher:0.0.51'
   compile 'com.twitter.common:application-module-lifecycle:0.0.48'
   compile 'com.twitter.common:application-module-stats:0.0.44'
@@ -200,7 +195,6 @@ dependencies {
   compile 'com.twitter.common:dynamic-host-set:0.0.44'
   compile 'com.twitter.common:inject-timed:0.0.11'
   compile 'com.twitter.common:inject:0.0.35'
-  compile 'com.twitter.common:io:0.0.53'
   compile 'com.twitter.common:jdk-logging:0.0.44'
   compile 'com.twitter.common:logging:0.0.61'
   compile 'com.twitter.common:net-http-handlers-time-series:0.0.51'
@@ -214,6 +208,7 @@ dependencies {
   compile 'com.twitter.common:util:0.0.94'
 
   testCompile "com.sun.jersey:jersey-client:${jerseyRev}"
+  testCompile 'com.twitter.common:io:0.0.53'
   testCompile 'com.twitter.common:testing-easymock:0.0.4'
   testCompile 'com.twitter.common:util-system-mocks:0.0.72'
   testCompile 'com.twitter.common:zookeeper-testing:0.0.45'
