@@ -78,9 +78,22 @@ class CoverageReportCheck extends DefaultTask {
       // constructor for anonymous classes.  Anonymous classes are identified by their name,
       // which we expect to be of the form 'Something$1'.  Jacoco names default constructors
       // '<init>', so we filter based on that.
-      def methodFilter = cls.@name ==~ /.*\$\d+/ ? { m -> m.@name != '<init>' } : { true }
+      def isAnonymous = { c -> c.@name ==~ /.*\$\d+/ }
+      def methodFilter = isAnonymous(cls) ? { m -> m.@name != '<init>' } : { true }
 
-      def covered = cls.method.findAll(methodFilter).collect { m ->
+      def matchedMethods = cls.method.findAll(methodFilter)
+      if (isAnonymous(cls) && matchedMethods.isEmpty()) {
+        // Ignore anonymous classes that only have a constructor. This will avoid tripping for
+        // things like TypeLiteral and Clazz.
+        if (cls.@name in legacyClassesWithoutCoverage) {
+          return 'Please remove ' + cls.@name + ' from the legacyClassesWithoutCoverage list' \
+              + ', this check does not apply for constructor-only anonymous classes.'
+        } else {
+          return null
+        }
+      }
+
+      def covered = matchedMethods.collect { m ->
         m.counter.find({ c -> c.@type == 'INSTRUCTION' }).@covered.toInteger()}.sum(0)
 
       if (cls.@name in legacyClassesWithoutCoverage) {

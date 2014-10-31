@@ -37,6 +37,7 @@ import com.twitter.common.inject.Bindings.KeyFactory;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 import com.twitter.common.util.TruncatedBinaryBackoff;
@@ -92,6 +93,7 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.mem.MemStorage.Delegated;
 import org.apache.aurora.scheduler.storage.mem.MemStorageModule;
 import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.EasyMock;
 import org.easymock.IExpectationSetters;
 import org.junit.After;
@@ -164,6 +166,7 @@ public class JobUpdaterIT extends EasyMockTest {
         new AbstractModule() {
           @Override
           protected void configure() {
+            bind(StatsProvider.class).toInstance(new FakeStatsProvider());
             bind(Clock.class).toInstance(clock);
             bind(StateManager.class).to(StateManagerImpl.class);
             bind(Driver.class).toInstance(driver);

@@ -20,27 +20,27 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.logging.Logger;
 
+import javax.inject.Inject;
 import javax.inject.Qualifier;
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
-
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNegative;
 import com.twitter.common.args.constraints.Positive;
+import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
-import com.twitter.common.stats.StatImpl;
-import com.twitter.common.stats.Stats;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
@@ -61,6 +61,7 @@ import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl;
 import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl.PreemptionDelay;
@@ -203,19 +204,34 @@ public class AsyncModule extends AbstractModule {
   @CmdLine(name = "gc_executor_path", help = "Path to the gc executor launch script.")
   private static final Arg<String> GC_EXECUTOR_PATH = Arg.create(null);
 
+  @Qualifier
+  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
+  private @interface AsyncExecutor { }
+
+  private final boolean enablePreemptor;
+
+  @VisibleForTesting
+  AsyncModule(boolean enablePreemptor) {
+    this.enablePreemptor = enablePreemptor;
+  }
+
+  public AsyncModule() {
+    this(ENABLE_PREEMPTOR.get());
+  }
+
+  @VisibleForTesting
+  static final String TIMEOUT_QUEUE_GAUGE = "timeout_queue_size";
+
+  @VisibleForTesting
+  static final String ASYNC_TASKS_GAUGE = "async_tasks_completed";
+
   @Override
   protected void configure() {
     // Don't worry about clean shutdown, these can be daemon and cleanup-free.
     final ScheduledThreadPoolExecutor executor =
         AsyncUtil.loggingScheduledExecutor(ASYNC_WORKER_THREADS.get(), "AsyncProcessor-%d", LOG);
-
-    Stats.exportSize("timeout_queue_size", executor.getQueue());
-    Stats.export(new StatImpl<Long>("async_tasks_completed") {
-      @Override
-      public Long read() {
-        return executor.getCompletedTaskCount();
-      }
-    });
+    bind(ScheduledThreadPoolExecutor.class).annotatedWith(AsyncExecutor.class).toInstance(executor);
+    LifecycleModule.bindStartupAction(binder(), RegisterGauges.class);
 
     // AsyncModule itself is not a subclass of PrivateModule because TaskEventModule internally uses
     // a MultiBinder, which cannot span multiple injectors.
@@ -227,7 +243,6 @@ public class AsyncModule extends AbstractModule {
         bind(ScheduledExecutorService.class).toInstance(executor);
 
         bind(TaskTimeout.class).in(Singleton.class);
-        requireBinding(StatsProvider.class);
         expose(TaskTimeout.class);
       }
     });
@@ -251,7 +266,7 @@ public class AsyncModule extends AbstractModule {
 
         bind(RescheduleCalculator.class).to(RescheduleCalculatorImpl.class).in(Singleton.class);
         expose(RescheduleCalculator.class);
-        if (ENABLE_PREEMPTOR.get()) {
+        if (enablePreemptor) {
           bind(PREEMPTOR_KEY).to(PreemptorImpl.class);
           bind(PreemptorImpl.class).in(Singleton.class);
           LOG.info("Preemptor Enabled.");
@@ -356,17 +371,53 @@ public class AsyncModule extends AbstractModule {
       Binder binder,
       final Key<Preemptor> preemptorKey,
       final Amount<Long, Time> reservationDuration) {
-        binder.install(new PrivateModule() {
-          @Override
-          protected void configure() {
-            bind(Preemptor.class).to(preemptorKey);
-            bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(ReservationDuration.class)
-                .toInstance(reservationDuration);
-            bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
-            bind(TaskSchedulerImpl.class).in(Singleton.class);
-            expose(TaskScheduler.class);
+
+    binder.install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(Preemptor.class).to(preemptorKey);
+        bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(ReservationDuration.class)
+            .toInstance(reservationDuration);
+        bind(TaskScheduler.class).to(TaskSchedulerImpl.class);
+        bind(TaskSchedulerImpl.class).in(Singleton.class);
+        expose(TaskScheduler.class);
+      }
+    });
+    PubsubEventModule.bindSubscriber(binder, TaskScheduler.class);
+  }
+
+  static class RegisterGauges implements Command {
+    private final StatsProvider statsProvider;
+    private final ScheduledThreadPoolExecutor executor;
+
+    @Inject
+    RegisterGauges(
+        StatsProvider statsProvider,
+        @AsyncExecutor ScheduledThreadPoolExecutor executor) {
+
+      this.statsProvider = requireNonNull(statsProvider);
+      this.executor = requireNonNull(executor);
+    }
+
+    @Override
+    public void execute() throws RuntimeException {
+      statsProvider.makeGauge(
+          TIMEOUT_QUEUE_GAUGE,
+          new Supplier<Integer>() {
+            @Override
+            public Integer get() {
+              return executor.getQueue().size();
+            }
+          });
+      statsProvider.makeGauge(
+          ASYNC_TASKS_GAUGE,
+          new Supplier<Long>() {
+            @Override
+            public Long get() {
+              return executor.getCompletedTaskCount();
+            }
           }
-        });
-        PubsubEventModule.bindSubscriber(binder, TaskScheduler.class);
+      );
+    }
   }
 }

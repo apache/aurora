@@ -16,7 +16,9 @@ package org.apache.aurora.scheduler.testing;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.base.Function;
 import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.twitter.common.stats.Stat;
 import com.twitter.common.stats.StatsProvider;
@@ -35,6 +37,22 @@ public class FakeStatsProvider implements StatsProvider {
    */
   public Number getValue(String statName) {
     return stats.get(statName).get();
+  }
+
+  /**
+   * Gets the current values of all exported stats.
+   *
+   * @return All exported stat names and their associated values.
+   */
+  public Map<String, ? extends Number> getAllValues() {
+    return ImmutableMap.copyOf(Maps.transformValues(
+        stats,
+        new Function<Supplier<? extends Number>, Number>() {
+        @Override
+        public Number apply(Supplier<? extends Number> supplier) {
+          return supplier.get();
+        }
+      }));
   }
 
   @Override

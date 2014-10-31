@@ -23,14 +23,16 @@ import javax.inject.Inject;
 import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Supplier;
+import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.twitter.common.inject.Bindings;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.SlidingStats;
-import com.twitter.common.stats.StatImpl;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.JobStore;
@@ -79,6 +81,9 @@ public class MemStorage implements Storage {
   @Qualifier
   public @interface Delegated { }
 
+  @VisibleForTesting
+  static final String THREADS_WAITING_GAUGE = "storage_lock_threads_waiting";
+
   @Inject
   MemStorage(
       @Delegated final SchedulerStore.Mutable schedulerStore,
@@ -88,9 +93,10 @@ public class MemStorage implements Storage {
       @Delegated final Storage delegated,
       @Delegated final QuotaStore.Mutable quotaStore,
       @Delegated final AttributeStore.Mutable attributeStore,
-      @Delegated final JobUpdateStore.Mutable updateStore) {
+      @Delegated final JobUpdateStore.Mutable updateStore,
+      StatsProvider statsProvider) {
 
-    this.delegatedStore = delegated;
+    this.delegatedStore = requireNonNull(delegated);
     storeProvider = new MutableStoreProvider() {
       @Override
       public SchedulerStore.Mutable getSchedulerStore() {
@@ -133,12 +139,37 @@ public class MemStorage implements Storage {
       }
     };
 
-    Stats.export(new StatImpl<Integer>("storage_lock_threads_waiting") {
-      @Override
-      public Integer read() {
-        return lockManager.getQueueLength();
-      }
-    });
+    statsProvider.makeGauge(
+        THREADS_WAITING_GAUGE,
+        new Supplier<Integer>() {
+          @Override
+          public Integer get() {
+            return lockManager.getQueueLength();
+          }
+        }
+    );
+  }
+
+  /**
+   * Creates a new empty in-memory storage for use in testing, exporting gauges to the provided
+   * stats provider.  NOTE: Due to the fact that some libraries statically access {@link Stats},
+   * not all guaranteed to use the stats provider.
+   */
+  @VisibleForTesting
+  public static Storage newEmptyStorage(final StatsProvider statsProvider) {
+    Injector injector = Guice.createInjector(
+        DbModule.testModule(Bindings.annotatedKeyFactory(Delegated.class)),
+        new MemStorageModule(Bindings.annotatedKeyFactory(Volatile.class)),
+        new AbstractModule() {
+          @Override
+          protected void configure() {
+            bind(StatsProvider.class).toInstance(statsProvider);
+          }
+        });
+
+    Storage storage = injector.getInstance(Key.get(Storage.class, Volatile.class));
+    storage.prepare();
+    return storage;
   }
 
   /**
@@ -146,13 +177,7 @@ public class MemStorage implements Storage {
    */
   @VisibleForTesting
   public static Storage newEmptyStorage() {
-    Injector injector = Guice.createInjector(
-        DbModule.testModule(Bindings.annotatedKeyFactory(Delegated.class)),
-        new MemStorageModule(Bindings.annotatedKeyFactory(Volatile.class)));
-
-    Storage storage = injector.getInstance(Key.get(Storage.class, Volatile.class));
-    storage.prepare();
-    return storage;
+    return newEmptyStorage(Stats.STATS_PROVIDER);
   }
 
   private <S extends StoreProvider, T, E extends Exception> T doWork(

@@ -45,6 +45,7 @@ import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -57,11 +58,12 @@ import static org.junit.Assert.fail;
 public class MemStorageTest extends TearDownTestCase {
 
   private ExecutorService executor;
+  private FakeStatsProvider statsProvider;
   private Storage storage;
 
   @Before
   public void setUp() {
-    executor = Executors.newSingleThreadExecutor(
+    executor = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder().setNameFormat("SlowRead-%d").setDaemon(true).build());
     addTearDown(new TearDown() {
       @Override
@@ -69,7 +71,8 @@ public class MemStorageTest extends TearDownTestCase {
         new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
       }
     });
-    storage = MemStorage.newEmptyStorage();
+    statsProvider = new FakeStatsProvider();
+    storage = MemStorage.newEmptyStorage(statsProvider);
   }
 
   @Test
@@ -108,6 +111,13 @@ public class MemStorageTest extends TearDownTestCase {
     assertEquals("fastResult", fastResult);
     slowReadFinished.countDown();
     assertEquals("slowResult", future.get());
+
+    // It would be nice to check the stat values (specifically with simulated lock contention, but
+    // this value is based off ReentrantReadWriteLock#getQueueLength(), which is documented as an
+    // approximation and not a guaranteed accurate value.
+    assertEquals(
+        ImmutableSet.of(MemStorage.THREADS_WAITING_GAUGE),
+        statsProvider.getAllValues().keySet());
   }
 
   private IScheduledTask makeTask(String taskId) {
