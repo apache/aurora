@@ -77,7 +77,7 @@ def setup_tree(td, lose=False):
   safe_rmtree(td)
 
   # TODO(wickman) These should be referred as resources= in the python_target instead.
-  shutil.copytree('src/resources/org/apache/thermos/root', td)
+  shutil.copytree('src/test/resources/org/apache/thermos/root', td)
 
   if lose:
     lost_age = time.time() - (
