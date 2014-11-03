@@ -26,4 +26,4 @@ task = SequentialTask(
   resources = Resources(cpu = 1.0, ram = 128*MB, disk = 128*MB))
 
 jobs = [Service(
-  task = task, cluster = 'example', role = 'www-data', environment = 'prod', name = 'hello')]
+  task = task, cluster = 'devcluster', role = 'www-data', environment = 'prod', name = 'hello')]

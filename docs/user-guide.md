@@ -329,7 +329,7 @@ You interact with Aurora jobs either via:
 
   For example:
 
-      vagrant@precise64:~$ aurora create example/www-data/prod/hello \
+      vagrant@precise64:~$ aurora create devcluster/www-data/prod/hello \
       /vagrant/examples/jobs/hello_world.aurora
       INFO] Creating job hello
       INFO] Response from scheduler: OK (message: 1 new tasks pending for job www-data/prod/hello)
