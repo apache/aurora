@@ -209,6 +209,7 @@ public class LogStorageTest extends EasyMockTest {
     Entry entry2 = createMock(Entry.class);
     Entry entry3 = createMock(Entry.class);
     Entry entry4 = createMock(Entry.class);
+    Entry entry5 = createMock(Entry.class);
     String frameworkId1 = "bob";
     LogEntry recoveredEntry1 =
         createTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId1)));
@@ -226,11 +227,14 @@ public class LogStorageTest extends EasyMockTest {
         .setMode(MaintenanceMode.DRAINED));
     LogEntry recoveredEntry4 =
         createTransaction(Op.saveHostAttributes(new SaveHostAttributes(attributes.newBuilder())));
+    LogEntry recoveredEntry5 =
+        createTransaction(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory()));
     expect(entry1.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry1));
     expect(entry2.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry2));
     expect(entry3.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry3));
     expect(entry4.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry4));
-    expect(stream.readAll()).andReturn(Iterators.forArray(entry1, entry2, entry3, entry4));
+    expect(entry5.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry5));
+    expect(stream.readAll()).andReturn(Iterators.forArray(entry1, entry2, entry3, entry4, entry5));
 
     final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
     expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
@@ -275,7 +279,7 @@ public class LogStorageTest extends EasyMockTest {
             snapshotWork.getValue().apply(storageUtil.mutableStoreProvider);
             return null;
           }
-        }).times(4);
+        }).times(5);
 
     control.replay();
 

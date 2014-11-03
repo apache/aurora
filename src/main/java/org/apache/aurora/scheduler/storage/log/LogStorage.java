@@ -30,6 +30,8 @@ import javax.inject.Qualifier;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.twitter.common.application.ShutdownRegistry;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
@@ -218,6 +220,11 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   @Target({ ElementType.PARAMETER, ElementType.METHOD })
   @Qualifier
   public @interface WriteBehind { }
+
+  // TODO(wfarner): This is a temporary emergency fix.  Revisit.
+  @CmdLine(name = "log_storage_fail_on_unknown_op",
+      help = "If true, fail if an unknown log transition operation is encountered.")
+  public static final Arg<Boolean> FAIL_ON_UNKNOWN_OP = Arg.create(false);
 
   @Inject
   LogStorage(LogManager logManager,
@@ -480,7 +487,11 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         break;
 
       default:
-        throw new IllegalStateException("Unknown transaction op: " + op);
+        if (FAIL_ON_UNKNOWN_OP.get()) {
+          throw new IllegalStateException("Unknown transaction op: " + op);
+        } else {
+          LOG.log(Level.SEVERE, "Unkown transaction op: " + op);
+        }
     }
   }
 
