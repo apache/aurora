@@ -48,10 +48,28 @@ public final class FakeScheduledExecutor extends FakeClock {
     mock.schedule(
         EasyMock.<Runnable>anyObject(),
         EasyMock.anyLong(),
-        EasyMock.eq(TimeUnit.MILLISECONDS));
-    expectLastCall().andAnswer(addExpectations(executor, 1)).anyTimes();
+        EasyMock.<TimeUnit>anyObject());
+    expectLastCall().andAnswer(answerSchedule(executor)).anyTimes();
 
     return executor;
+  }
+
+  private static IAnswer<ScheduledFuture<?>> answerSchedule(final FakeScheduledExecutor executor) {
+    return new IAnswer<ScheduledFuture<?>>() {
+      @Override
+      public ScheduledFuture<?> answer() {
+        Object[] args = EasyMock.getCurrentArguments();
+        Runnable work = (Runnable) args[0];
+        long value = (Long) args[1];
+        TimeUnit unit = (TimeUnit) args[2];
+        addDelayedWork(executor, toMillis(value, unit), work);
+        return null;
+      }
+    };
+  }
+
+  private static long toMillis(long value, TimeUnit unit) {
+    return TimeUnit.MILLISECONDS.convert(value, unit);
   }
 
   public static FakeScheduledExecutor scheduleAtFixedRateExecutor(
@@ -63,13 +81,13 @@ public final class FakeScheduledExecutor extends FakeClock {
         EasyMock.<Runnable>anyObject(),
         EasyMock.anyLong(),
         EasyMock.anyLong(),
-        EasyMock.eq(TimeUnit.MILLISECONDS));
-    expectLastCall().andAnswer(addExpectations(executor, maxInvocations)).once();
+        EasyMock.<TimeUnit>anyObject());
+    expectLastCall().andAnswer(answerScheduleAtFixedRate(executor, maxInvocations)).once();
 
     return executor;
   }
 
-  private static IAnswer<ScheduledFuture<?>> addExpectations(
+  private static IAnswer<ScheduledFuture<?>> answerScheduleAtFixedRate(
       final FakeScheduledExecutor executor,
       final int workCount) {
 
@@ -78,14 +96,24 @@ public final class FakeScheduledExecutor extends FakeClock {
       public ScheduledFuture<?> answer() {
         Object[] args = EasyMock.getCurrentArguments();
         Runnable work = (Runnable) args[0];
-        long millis = (Long) args[1];
-        Preconditions.checkArgument(millis > 0);
+        long initialDelay = (Long) args[1];
+        long period = (Long) args[2];
+        TimeUnit unit = (TimeUnit) args[3];
         for (int i = 1; i <= workCount; i++) {
-          executor.deferredWork.add(Pair.of(executor.nowMillis() + i * millis, work));
+          addDelayedWork(executor, toMillis(initialDelay, unit) + i * toMillis(period, unit), work);
         }
         return null;
       }
     };
+  }
+
+  private static void addDelayedWork(
+      FakeScheduledExecutor executor,
+      long delayMillis,
+      Runnable work) {
+
+    Preconditions.checkArgument(delayMillis > 0);
+    executor.deferredWork.add(Pair.of(executor.nowMillis() + delayMillis, work));
   }
 
   @Override

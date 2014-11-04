@@ -42,6 +42,7 @@ import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatsProvider;
+import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
@@ -173,6 +174,12 @@ public class AsyncModule extends AbstractModule {
       help = "Time after which the scheduler will prune completed job update history.")
   private static final Arg<Amount<Long, Time>> JOB_UPDATE_HISTORY_PRUNING_THRESHOLD =
       Arg.create(Amount.of(30L, Time.DAYS));
+
+  @CmdLine(name = "initial_task_kill_retry_interval",
+      help = "When killing a task, retry after this delay if mesos has not responded,"
+          + " backing off up to transient_task_state_timeout")
+  private static final Arg<Amount<Long, Time>> INITIAL_TASK_KILL_RETRY_INTERVAL =
+      Arg.create(Amount.of(5L, Time.SECONDS));
 
   private static final Preemptor NULL_PREEMPTOR = new Preemptor() {
     @Override
@@ -358,6 +365,20 @@ public class AsyncModule extends AbstractModule {
       }
     });
     LifecycleModule.bindStartupAction(binder(), JobUpdateHistoryPruner.class);
+
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        bind(ScheduledExecutorService.class).toInstance(executor);
+        bind(BackoffStrategy.class).toInstance(
+            new TruncatedBinaryBackoff(
+                INITIAL_TASK_KILL_RETRY_INTERVAL.get(),
+                TRANSIENT_TASK_STATE_TIMEOUT.get()));
+        bind(KillRetry.class).in(Singleton.class);
+        expose(KillRetry.class);
+      }
+    });
+    PubsubEventModule.bindSubscriber(binder(), KillRetry.class);
   }
 
   /**

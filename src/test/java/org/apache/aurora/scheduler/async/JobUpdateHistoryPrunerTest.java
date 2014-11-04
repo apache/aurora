@@ -57,7 +57,7 @@ public class JobUpdateHistoryPrunerTest extends EasyMockTest {
             1));
 
     pruner.execute();
-    executorClock.advance(Amount.of(1L, Time.MILLISECONDS));
+    executorClock.advance(Amount.of(2L, Time.MILLISECONDS));
     executorClock.advance(Amount.of(1L, Time.MILLISECONDS));
   }
 }
