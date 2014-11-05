@@ -59,7 +59,7 @@ class Deschedule(Verb):
     return "Remove the cron schedule for a job."
 
   def get_options(self):
-    return [BIND_OPTION, JOBSPEC_ARGUMENT]
+    return [JOBSPEC_ARGUMENT]
 
   def execute(self, context):
     api = context.get_api(context.options.jobspec.cluster)
