@@ -33,7 +33,8 @@ python_tests(
     'test_listjobs.py',
     'test_restart.py',
     'test_status.py',
-    'test_update.py'
+    'test_update.py',
+    'test_version.py'
   ],
   dependencies = [
     ':util',

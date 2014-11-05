@@ -25,6 +25,7 @@ import sys
 import time
 from datetime import datetime
 from tempfile import NamedTemporaryFile
+from zipfile import BadZipfile
 
 from twitter.common import app, log
 from twitter.common.python.pex import PexInfo
@@ -155,10 +156,17 @@ def version(args):
   """
   try:
     pex_info = PexInfo.from_pex(sys.argv[0])
+    properties = pex_info.build_properties
+    # Different versions of pants/pex set different keys in the PEX-INFO file. This approach
+    # attempts to work regardless of the pants/pex version used.
+    build_sha = properties.get('sha', properties.get('revision'))
+    build_date = properties.get('date', properties.get('datetime'))
+
     print("Aurora client build info:")
-    print("\tsha: %s" % pex_info.build_properties['sha'])
-    print("\tdate: %s" % pex_info.build_properties['date'])
-  except (IOError, OSError):
+    print("\tsha: %s" % build_sha)
+    print("\tdate: %s" % build_date)
+
+  except (IOError, OSError, BadZipfile):
     print("Aurora client build info not available")
   print("Aurora API version: %s" % CURRENT_API_VERSION)
 
