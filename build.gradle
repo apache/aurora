@@ -208,7 +208,6 @@ dependencies {
   compile 'com.twitter.common:util:0.0.94'
 
   testCompile "com.sun.jersey:jersey-client:${jerseyRev}"
-  testCompile 'com.twitter.common:io:0.0.53'
   testCompile 'com.twitter.common:testing-easymock:0.0.4'
   testCompile 'com.twitter.common:util-system-mocks:0.0.72'
   testCompile 'com.twitter.common:zookeeper-testing:0.0.45'

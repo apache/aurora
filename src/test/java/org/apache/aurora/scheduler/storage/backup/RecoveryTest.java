@@ -16,9 +16,9 @@ package org.apache.aurora.scheduler.storage.backup;
 import java.io.File;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Files;
 import com.google.common.testing.TearDown;
 import com.twitter.common.base.Command;
-import com.twitter.common.io.FileUtils;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -75,7 +75,7 @@ public class RecoveryTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    final File backupDir = FileUtils.createTempDir();
+    final File backupDir = Files.createTempDir();
     addTearDown(new TearDown() {
       @Override
       public void tearDown() throws Exception {

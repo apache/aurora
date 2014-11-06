@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.Hashing;
+import com.google.common.io.Files;
 import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.Atomics;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -46,7 +47,6 @@ import com.twitter.common.application.StartupStage;
 import com.twitter.common.application.modules.AppLauncherModule;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.ExceptionalCommand;
-import com.twitter.common.io.FileUtils;
 import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
@@ -146,7 +146,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
         control.verify();
       }
     });
-    backupDir = FileUtils.createTempDir();
+    backupDir = Files.createTempDir();
     addTearDown(new TearDown() {
       @Override
       public void tearDown() throws Exception {

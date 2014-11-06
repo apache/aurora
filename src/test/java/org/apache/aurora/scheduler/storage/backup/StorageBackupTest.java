@@ -21,7 +21,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.Files;
 import com.google.common.testing.TearDown;
-import com.twitter.common.io.FileUtils;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -61,7 +60,7 @@ public class StorageBackupTest extends EasyMockTest {
   public void setUp() {
     delegate = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
     clock = new FakeClock();
-    final File backupDir = FileUtils.createTempDir();
+    final File backupDir = Files.createTempDir();
     addTearDown(new TearDown() {
       @Override
       public void tearDown() throws Exception {
