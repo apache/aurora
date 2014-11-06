@@ -11,11 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import logging
 import sys
 
 from apache.aurora.client.cli.bridge import Bridge, CommandProcessor
-from apache.aurora.client.cli.logsetup import setup_default_log_handlers
 from apache.aurora.client.cli.standalone_client import AuroraCommandLine
 
 
@@ -35,7 +33,6 @@ class AuroraClientV2CommandProcessor(CommandProcessor):
     return self.commandline.registered_nouns
 
   def execute(self, args):
-    setup_default_log_handlers(logging.INFO)
     return self.commandline.execute(args[1:])
 
 
