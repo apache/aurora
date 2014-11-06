@@ -66,7 +66,8 @@ def test_du_diskcollector():
   _run_collector_tests(collector, target, wait)
 
 
-@pytest.mark.skipif("sys.platform == 'darwin'")
+# Flaky test, c.f. https://issues.apache.org/jira/browse/AURORA-916
+@pytest.mark.skipif('True')
 def test_inotify_diskcollector():
   target = safe_mkdtemp()
   INTERVAL = Amount(50, Time.MILLISECONDS)
