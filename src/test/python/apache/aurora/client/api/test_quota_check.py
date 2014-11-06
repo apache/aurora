@@ -15,9 +15,11 @@
 import unittest
 from copy import deepcopy
 
-from mock import Mock
+from mock import create_autospec
 
 from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck
+
+from .api_util import SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     GetQuotaResult,
@@ -31,7 +33,7 @@ from gen.apache.aurora.api.ttypes import (
 
 class QuotaCheckTest(unittest.TestCase):
   def setUp(self):
-    self._scheduler = Mock()
+    self._scheduler = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
     self._quota_checker = QuotaCheck(self._scheduler)
     self._role = 'mesos'
     self._name = 'quotajob'

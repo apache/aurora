@@ -15,13 +15,15 @@
 import textwrap
 import unittest
 
-from mock import Mock
+from mock import create_autospec
 
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
+
+from ..api.api_util import SchedulerProxyApiSpec, SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -30,6 +32,7 @@ from gen.apache.aurora.api.ttypes import (
     JobKey,
     Response,
     ResponseCode,
+    ResponseDetail,
     Result,
     ScheduledTask,
     ScheduleStatus,
@@ -57,16 +60,10 @@ class FakeAuroraCommandContext(AuroraCommandContext):
   def create_mock_api(cls):
     """Builds up a mock API object, with a mock SchedulerProxy.
     Returns the API and the proxy"""
-    # This looks strange, but we set up the same object to use as both
-    # the SchedulerProxy and the SchedulerClient. These tests want to observe
-    # what API calls get made against the scheduler, and both of these objects
-    # delegate calls to the scheduler. It doesn't matter which one is used:
-    # what we care about is that the right API calls get made.
-    mock_api = Mock(spec=HookedAuroraClientAPI)
-    mock_scheduler_proxy = Mock()
+    mock_scheduler_proxy = create_autospec(spec=SchedulerProxyApiSpec, instance=True)
     mock_scheduler_proxy.url = "http://something_or_other"
     mock_scheduler_proxy.scheduler_client.return_value = mock_scheduler_proxy
-    mock_api = Mock(spec=HookedAuroraClientAPI)
+    mock_api = create_autospec(spec=HookedAuroraClientAPI)
     mock_api.scheduler_proxy = mock_scheduler_proxy
     return mock_api
 
@@ -109,14 +106,11 @@ class AuroraClientCommandTest(unittest.TestCase):
 
   @classmethod
   def create_blank_response(cls, code, msg):
-    response = Mock(spec=Response)
-    response.responseCode = code
-    mock_msg = Mock()
-    mock_msg.message = msg
-    response.details = [mock_msg]
-    response.messageDEPRECATED = msg
-    response.result = Mock(spec=Result)
-    return response
+    return Response(
+        responseCode=code,
+        details=[ResponseDetail(message=msg)],
+        messageDEPRECATED=msg
+    )
 
   @classmethod
   def create_simple_success_response(cls):
@@ -129,29 +123,28 @@ class AuroraClientCommandTest(unittest.TestCase):
   @classmethod
   def create_mock_api(cls):
     """Builds up a mock API object, with a mock SchedulerProxy"""
-    mock_scheduler = Mock()
+    mock_scheduler = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
     mock_scheduler.url = "http://something_or_other"
-    mock_scheduler_client = Mock()
-    mock_scheduler_client.scheduler.return_value = mock_scheduler
+    mock_scheduler_client = create_autospec(spec=SchedulerProxyApiSpec, instance=True)
+    #mock_scheduler_client.scheduler.return_value = mock_scheduler
     mock_scheduler_client.url = "http://something_or_other"
-    mock_api = Mock(spec=HookedAuroraClientAPI)
+    mock_api = create_autospec(spec=HookedAuroraClientAPI, instance=True)
     mock_api.scheduler_proxy = mock_scheduler_client
-    return (mock_api, mock_scheduler_client)
+    return mock_api, mock_scheduler_client
 
   @classmethod
   def create_mock_api_factory(cls):
     """Create a collection of mocks for a test that wants to mock out the client API
     by patching the api factory."""
     mock_api, mock_scheduler_client = cls.create_mock_api()
-    mock_api_factory = Mock()
-    mock_api_factory.return_value = mock_api
+    mock_api_factory = lambda: mock_api
     return mock_api_factory, mock_scheduler_client
 
   @classmethod
   def create_status_call_result(cls, mock_task=None):
     status_response = cls.create_simple_success_response()
-    schedule_status = Mock(spec=ScheduleStatusResult)
-    status_response.result.scheduleStatusResult = schedule_status
+    schedule_status = create_autospec(spec=ScheduleStatusResult, instance=True)
+    status_response.result = Result(scheduleStatusResult=schedule_status)
     # This should be a list of ScheduledTask's.
     schedule_status.tasks = []
     if mock_task is None:
@@ -163,15 +156,15 @@ class AuroraClientCommandTest(unittest.TestCase):
 
   @classmethod
   def create_mock_task(cls, instance_id, status=ScheduleStatus.RUNNING):
-    mock_task = Mock(spec=ScheduledTask)
-    mock_task.assignedTask = Mock(spec=AssignedTask)
+    mock_task = create_autospec(spec=ScheduledTask, instance=True)
+    mock_task.assignedTask = create_autospec(spec=AssignedTask, instance=True)
     mock_task.assignedTask.instanceId = instance_id
     mock_task.assignedTask.taskId = "Task%s" % instance_id
     mock_task.assignedTask.slaveId = "Slave%s" % instance_id
-    mock_task.assignedTask.task = Mock(spec=TaskConfig)
+    mock_task.assignedTask.task = create_autospec(spec=TaskConfig, instance=True)
     mock_task.slaveHost = "Slave%s" % instance_id
     mock_task.status = status
-    mock_task_event = Mock(spec=TaskEvent)
+    mock_task_event = create_autospec(spec=TaskEvent, instance=True)
     mock_task_event.timestamp = 1000
     mock_task.taskEvents = [mock_task_event]
     return mock_task
@@ -188,7 +181,7 @@ class AuroraClientCommandTest(unittest.TestCase):
       task.assignedTask.task = TaskConfig()
       task.assignedTask.task.maxTaskFailures = 1
       task.assignedTask.task.executorConfig = ExecutorConfig()
-      task.assignedTask.task.executorConfig.data = Mock()
+      task.assignedTask.task.executorConfig.data = 'fake data'
       task.assignedTask.task.metadata = []
       task.assignedTask.task.job = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
       task.assignedTask.task.owner = Identity(role=cls.TEST_ROLE)

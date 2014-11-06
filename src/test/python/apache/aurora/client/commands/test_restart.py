@@ -14,8 +14,9 @@
 
 import contextlib
 import functools
+from collections import namedtuple
 
-from mock import Mock, patch
+from mock import call, create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
@@ -23,38 +24,53 @@ from apache.aurora.client.commands.core import restart
 
 from .util import AuroraClientCommandTest
 
+from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     JobKey,
     PopulateJobResult,
+    Result,
     ScheduledTask,
     ScheduleStatusResult,
-    TaskConfig
+    TaskConfig,
+    TaskQuery
 )
 
 
-class TestRestartCommand(AuroraClientCommandTest):
+class FakeOptions(namedtuple('FakeOptions', ['max_total_failures',
+     'disable_all_hooks_reason',
+     'batch_size',
+     'restart_threshold',
+     'watch_secs',
+     'max_per_shard_failures',
+     'shards',
+     'health_check_interval_seconds',
+     'open_browser'])):
 
-  @classmethod
-  def setup_mock_options(cls):
-    """set up to get a mock options object."""
-    mock_options = Mock(
-        spec=['json', 'bindings', 'open_browser', 'shards', 'cluster',
-              'health_check_interval_seconds', 'batch_size', 'max_per_shard_failures',
-              'max_total_failures', 'restart_threshold', 'watch_secs'])
-    mock_options.json = False
-    mock_options.bindings = {}
-    mock_options.open_browser = False
-    mock_options.shards = None
-    mock_options.cluster = None
-    mock_options.health_check_interval_seconds = 3
-    mock_options.batch_size = 5
-    mock_options.max_per_shard_failures = 0
-    mock_options.max_total_failures = 0
-    mock_options.restart_threshold = 30
-    mock_options.watch_secs = 30
-    mock_options.disable_all_hooks_reason = None
-    return mock_options
+  def __new__(cls,
+      max_total_failures=None,
+      disable_all_hooks_reason=None,
+      batch_size=None,
+      restart_threshold=None,
+      watch_secs=None,
+      max_per_shard_failures=None,
+      shards=None,
+      health_check_interval_seconds=None,
+      open_browser=None):
+    return super(FakeOptions, cls).__new__(
+        cls,
+        max_total_failures,
+        disable_all_hooks_reason,
+        batch_size,
+        restart_threshold,
+        watch_secs,
+        max_per_shard_failures,
+        shards,
+        health_check_interval_seconds,
+        open_browser)
+
+
+class TestRestartCommand(AuroraClientCommandTest):
 
   @classmethod
   def setup_mock_scheduler_for_simple_restart(cls, api):
@@ -67,61 +83,63 @@ class TestRestartCommand(AuroraClientCommandTest):
   @classmethod
   def setup_populate_job_config(cls, api):
     populate = cls.create_simple_success_response()
-    populate.result.populateJobResult = Mock(spec=PopulateJobResult)
+    populate.result.populateJobResult = create_autospec(
+        spec=PopulateJobResult,
+        spec_set=False,
+        instance=True,
+        watch_secs=None)
     api.populateJobConfig.return_value = populate
     configs = []
     for i in range(20):
-      task_config = Mock(spec=TaskConfig)
+      task_config = create_autospec(spec=TaskConfig, instance=True)
       configs.append(task_config)
     populate.result.populateJobResult.populatedDEPRECATED = set(configs)
     return populate
 
   @classmethod
   def setup_get_tasks_status_calls(cls, scheduler):
-    status_response = cls.create_simple_success_response()
-    scheduler.getTasksWithoutConfigs.return_value = status_response
-    schedule_status = Mock(spec=ScheduleStatusResult)
-    status_response.result.scheduleStatusResult = schedule_status
-    mock_task_config = Mock()
-    # This should be a list of ScheduledTask's.
-    schedule_status.tasks = []
+
+    tasks = []
     for i in range(20):
-      task_status = Mock(spec=ScheduledTask)
-      task_status.assignedTask = Mock(spec=AssignedTask)
-      task_status.assignedTask.instanceId = i
-      task_status.assignedTask.taskId = "Task%s" % i
-      task_status.assignedTask.slaveId = "Slave%s" % i
-      task_status.slaveHost = "Slave%s" % i
-      task_status.assignedTask.task = mock_task_config
-      schedule_status.tasks.append(task_status)
+      tasks.append(ScheduledTask(
+        assignedTask=AssignedTask(
+          slaveHost='slave%s' % i,
+          instanceId=i,
+          taskId='task%s' % i,
+          slaveId='slave%s' % i,
+          task=TaskConfig())))
+    status_response = cls.create_simple_success_response()
+    status_response.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
+    scheduler.getTasksWithoutConfigs.return_value = status_response
 
   @classmethod
   def setup_health_checks(cls, mock_api):
-    mock_health_check = Mock(spec=StatusHealthCheck)
+    mock_health_check = create_autospec(spec=StatusHealthCheck, instance=True)
     mock_health_check.health.return_value = Retriable.alive()
     return mock_health_check
 
   def test_restart_simple(self):
-    # Test the client-side restart logic in its simplest case: everything succeeds
-    mock_options = self.setup_mock_options()
+    options = FakeOptions(
+        max_total_failures=1,
+        batch_size=5,
+        restart_threshold=10,
+        watch_secs=10)
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     with contextlib.nested(
-        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('twitter.common.app.get_options', return_value=options),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('threading._Event.wait')
-    ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
-        time_patch, sleep_patch):
+        patch('threading._Event.wait')):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        restart(['west/mchucarroll/test/hello'], mock_options)
+        restart(['west/mchucarroll/test/hello'], options)
 
         # Like the update test, the exact number of calls here doesn't matter.
         # what matters is that it must have been called once before batching, plus
@@ -134,43 +152,37 @@ class TestRestartCommand(AuroraClientCommandTest):
             role=self.TEST_ROLE, name=self.TEST_JOB), [15, 16, 17, 18, 19], None)
 
   def test_restart_simple_invalid_max_failures(self):
-    # Test the client-side restart logic in its simplest case: everything succeeds
-    mock_options = self.setup_mock_options()
-    mock_options.max_total_failures = -1
-    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    options = FakeOptions(
+        max_total_failures=None,
+        batch_size=5,
+        restart_threshold=10,
+        watch_secs=10)
+    mock_api, mock_scheduler_proxy = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     with contextlib.nested(
-        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('twitter.common.app.get_options', return_value=options),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('threading._Event.wait')
-    ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
-        time_patch, sleep_patch):
+        patch('threading._Event.wait')):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        self.assertRaises(SystemExit, restart, ['west/mchucarroll/test/hello'], mock_options)
-
-        # Like the update test, the exact number of calls here doesn't matter.
-        # what matters is that it must have been called once before batching, plus
-        # at least once per batch, and there are 4 batches.
-        assert mock_scheduler_proxy.getTasksWithoutConfigs.call_count == 0
-        # called once per batch
-        assert mock_scheduler_proxy.restartShards.call_count == 0
+        self.assertRaises(SystemExit, restart, ['west/mchucarroll/test/hello'], options)
+        assert mock_scheduler_proxy.mock_calls == []
 
   def test_restart_failed_status(self):
-    mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    options = FakeOptions()
+    mock_api, mock_scheduler_proxy = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_error_response()
     with contextlib.nested(
-        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('twitter.common.app.get_options', return_value=options),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
@@ -183,34 +195,39 @@ class TestRestartCommand(AuroraClientCommandTest):
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        self.assertRaises(SystemExit, restart, ['west/mchucarroll/test/hello'], mock_options)
-        assert mock_scheduler_proxy.getTasksWithoutConfigs.call_count == 1
-        assert mock_scheduler_proxy.restartShards.call_count == 0
+        self.assertRaises(SystemExit, restart, ['west/mchucarroll/test/hello'], options)
+        # TODO(wfarner): Spread this pattern further, as it flags unexpected method calls.
+        assert mock_scheduler_proxy.mock_calls == [
+          call.getTasksWithoutConfigs(
+              TaskQuery(jobKeys=[JobKey('mchucarroll', 'test', 'hello')], statuses=ACTIVE_STATES))
+        ]
 
   def test_restart_failed_restart(self):
-    # Test the client-side updater logic in its simplest case: everything succeeds, and no rolling
-    # updates.
-    mock_options = self.setup_mock_options()
-    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    options = FakeOptions(
+        max_total_failures=1,
+        batch_size=5,
+        restart_threshold=10,
+        watch_secs=10)
+    mock_api, mock_scheduler_proxy = self.create_mock_api()
     mock_health_check = self.setup_health_checks(mock_api)
     self.setup_mock_scheduler_for_simple_restart(mock_api)
     mock_scheduler_proxy.restartShards.return_value = self.create_error_response()
     with contextlib.nested(
-        patch('twitter.common.app.get_options', return_value=mock_options),
+        patch('twitter.common.app.get_options', return_value=options),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.api.instance_watcher.StatusHealthCheck',
             return_value=mock_health_check),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
-        patch('threading._Event.wait')
-    ) as (options, scheduler_proxy_class, test_clusters, mock_health_check_factory,
-        time_patch, sleep_patch):
+        patch('threading._Event.wait')):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        self.assertRaises(SystemExit, restart, ['west/mchucarroll/test/hello'], mock_options)
+        self.assertRaises(SystemExit, restart, ['west/mchucarroll/test/hello'], options)
         assert mock_scheduler_proxy.getTasksWithoutConfigs.call_count == 1
         assert mock_scheduler_proxy.restartShards.call_count == 1
-        mock_scheduler_proxy.restartShards.assert_called_with(JobKey(environment=self.TEST_ENV,
-            role=self.TEST_ROLE, name=self.TEST_JOB), [0, 1, 2, 3, 4], None)
+        mock_scheduler_proxy.restartShards.assert_called_with(
+            JobKey(environment=self.TEST_ENV, role=self.TEST_ROLE, name=self.TEST_JOB),
+            [0, 1, 2, 3, 4],
+            None)

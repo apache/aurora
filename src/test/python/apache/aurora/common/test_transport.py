@@ -15,8 +15,8 @@
 import logging
 from threading import Thread
 
-import mock
 import requests
+from mock import create_autospec, Mock
 from requests import exceptions as request_exceptions
 from thrift.protocol import TJSONProtocol
 from thrift.server import THttpServer
@@ -43,8 +43,6 @@ def test_request_transport_integration():
   server_thread.start()
   _, server_port = server.httpd.socket.getsockname()
 
-  response = None
-
   try:
     transport = TRequestsTransport('http://localhost:%d' % server_port)
     protocol = TJSONProtocol.TJSONProtocol(transport)
@@ -62,9 +60,9 @@ def test_request_transport_integration():
 
 
 def test_request_transport_timeout():
-  session = mock.MagicMock(spec=requests.Session)
+  session = create_autospec(spec=requests.Session, instance=True)
   session.headers = {}
-  session.post = mock.Mock(side_effect=request_exceptions.Timeout())
+  session.post = Mock(side_effect=request_exceptions.Timeout())
   transport = TRequestsTransport('http://localhost:12345', session_factory=lambda: session)
   protocol = TJSONProtocol.TJSONProtocol(transport)
   client = ReadOnlyScheduler.Client(protocol)
@@ -81,9 +79,9 @@ def test_request_transport_timeout():
 
 
 def test_request_any_other_exception():
-  session = mock.MagicMock(spec=requests.Session)
+  session = create_autospec(spec=requests.Session, instance=True)
   session.headers = {}
-  session.post = mock.Mock(side_effect=request_exceptions.ConnectionError())
+  session.post = Mock(side_effect=request_exceptions.ConnectionError())
   transport = TRequestsTransport('http://localhost:12345', session_factory=lambda: session)
   protocol = TJSONProtocol.TJSONProtocol(transport)
   client = ReadOnlyScheduler.Client(protocol)
@@ -104,6 +102,6 @@ def test_requests_transports_lowers_logging_level():
 
   TRequestsTransport(
       'http://localhost:12345',
-      session_factory=lambda: mock.MagicMock(spec=requests.Session))
+      session_factory=lambda: create_autospec(spec=requests.Session, instance=True))
 
   assert logging.getLogger('requests').level == logging.WARNING

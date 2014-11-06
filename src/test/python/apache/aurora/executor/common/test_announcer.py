@@ -14,10 +14,10 @@
 
 import threading
 
-import mock
 import pytest
 from kazoo.client import KazooClient
 from kazoo.exceptions import KazooException
+from mock import create_autospec, MagicMock, patch
 from twitter.common.quantity import Amount, Time
 from twitter.common.testing.clock import ThreadedClock
 from twitter.common.zookeeper.serverset import Endpoint, ServerSet
@@ -72,10 +72,10 @@ def test_announcer_under_normal_circumstances():
     joined.set()
     return 'membership foo'
 
-  mock_serverset = mock.MagicMock(spec=ServerSet)
-  mock_serverset.join = mock.MagicMock()
+  mock_serverset = create_autospec(spec=ServerSet, instance=True)
+  mock_serverset.join = MagicMock()
   mock_serverset.join.side_effect = joined_side_effect
-  mock_serverset.cancel = mock.MagicMock()
+  mock_serverset.cancel = MagicMock()
 
   endpoint = Endpoint('localhost', 12345)
   clock = ThreadedClock(31337.0)
@@ -125,10 +125,10 @@ def test_announcer_on_expiration():
     else:
       raise KazooException('Failed to reconnect')
 
-  mock_serverset = mock.MagicMock(spec=ServerSet)
-  mock_serverset.join = mock.MagicMock()
+  mock_serverset = create_autospec(spec=ServerSet, instance=True)
+  mock_serverset.join = MagicMock()
   mock_serverset.join.side_effect = joined_side_effect
-  mock_serverset.cancel = mock.MagicMock()
+  mock_serverset.cancel = MagicMock()
 
   endpoint = Endpoint('localhost', 12345)
   clock = ThreadedClock(31337.0)
@@ -160,13 +160,13 @@ def test_announcer_on_expiration():
 # TODO(wickman) https://issues.apache.org/jira/browse/AURORA-639
 @pytest.mark.skipif('True')
 def test_announcer_under_abnormal_circumstances():
-  mock_serverset = mock.MagicMock(spec=ServerSet)
-  mock_serverset.join = mock.MagicMock()
+  mock_serverset = create_autospec(spec=ServerSet, instance=True)
+  mock_serverset.join = MagicMock()
   mock_serverset.join.side_effect = [
       KazooException('Whoops the ensemble is down!'),
       'member0001',
   ]
-  mock_serverset.cancel = mock.MagicMock()
+  mock_serverset.cancel = MagicMock()
 
   endpoint = Endpoint('localhost', 12345)
   clock = ThreadedClock(31337.0)
@@ -244,15 +244,15 @@ def test_make_empty_endpoints():
   assert additional == {}
 
 
-@mock.patch('apache.aurora.executor.common.announcer.ServerSet')
-@mock.patch('apache.aurora.executor.common.announcer.KazooClient')
+@patch('apache.aurora.executor.common.announcer.ServerSet')
+@patch('apache.aurora.executor.common.announcer.KazooClient')
 def test_announcer_provider_with_timeout(mock_client_provider, mock_serverset_provider):
-  mock_client = mock.MagicMock(spec=KazooClient)
+  mock_client = create_autospec(spec=KazooClient, instance=True)
   mock_client_provider.return_value = mock_client
   client_connect_event = threading.Event()
   mock_client.start_async.return_value = client_connect_event
 
-  mock_serverset = mock.MagicMock(spec=ServerSet)
+  mock_serverset = create_autospec(spec=ServerSet, instance=True)
   mock_serverset_provider.return_value = mock_serverset
 
   dap = DefaultAnnouncerCheckerProvider('zookeeper.example.com', root='/aurora')
@@ -272,12 +272,12 @@ def test_announcer_provider_with_timeout(mock_client_provider, mock_serverset_pr
   assert checker.status is not None
 
 
-@mock.patch('apache.aurora.executor.common.announcer.ServerSet')
-@mock.patch('apache.aurora.executor.common.announcer.KazooClient')
+@patch('apache.aurora.executor.common.announcer.ServerSet')
+@patch('apache.aurora.executor.common.announcer.KazooClient')
 def test_default_announcer_provider(mock_client_provider, mock_serverset_provider):
-  mock_client = mock.MagicMock(spec=KazooClient)
+  mock_client = create_autospec(spec=KazooClient, instance=True)
   mock_client_provider.return_value = mock_client
-  mock_serverset = mock.MagicMock(spec=ServerSet)
+  mock_serverset = create_autospec(spec=ServerSet, instance=True)
   mock_serverset_provider.return_value = mock_serverset
 
   dap = DefaultAnnouncerCheckerProvider('zookeeper.example.com', root='/aurora')

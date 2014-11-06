@@ -177,7 +177,7 @@ class ListUpdates(Verb):
     api = context.get_api(context.options.cluster)
     response = api.query_job_updates(
         role=context.options.role,
-        jobKey=context.options.jobspec,
+        job_key=context.options.jobspec,
         user=context.options.user,
         update_statuses=context.options.status)
     context.check_and_log_response(response)
@@ -221,8 +221,7 @@ class UpdateStatus(Verb):
 
   def _get_update_id(self, context, jobkey):
     api = context.get_api(context.options.jobspec.cluster)
-    response = api.query_job_updates(
-        jobKey=context.options.jobspec)
+    response = api.query_job_updates(job_key=context.options.jobspec)
     context.check_and_log_response(response, "")
     for summary in response.result.getJobUpdateSummariesResult.updateSummaries:
       if summary.jobKey == jobkey:

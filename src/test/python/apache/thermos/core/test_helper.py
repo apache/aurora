@@ -38,7 +38,7 @@ def set_side_effect(mock_obj, value):
 
 
 def mock_process(pid, username, uid=None):
-  process = mock.Mock(spec=psutil.Process, pid=pid)
+  process = mock.create_autospec(spec=psutil.Process, pid=pid, instance=True)
   set_side_effect(process.uids, uid)
   set_side_effect(process.username, username)
   process.create_time.return_value = CREATE_TIME

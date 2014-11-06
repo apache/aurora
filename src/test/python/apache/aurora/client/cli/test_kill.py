@@ -15,7 +15,7 @@
 import contextlib
 import unittest
 
-from mock import Mock, patch
+from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import EXIT_TIMEOUT
@@ -23,9 +23,16 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.options import parse_instances
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
+from ..api.api_util import SchedulerThriftApiSpec
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
-from gen.apache.aurora.api.ttypes import JobKey, ScheduleStatus, ScheduleStatusResult, TaskQuery
+from gen.apache.aurora.api.ttypes import (
+    JobKey,
+    Result,
+    ScheduleStatus,
+    ScheduleStatusResult,
+    TaskQuery
+)
 
 
 class TestInstancesParser(unittest.TestCase):
@@ -65,7 +72,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
   def test_killall_job(self):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
-    mock_scheduler_proxy = Mock()
+    mock_scheduler_proxy = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
     with contextlib.nested(
         patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
@@ -92,7 +99,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
   def test_killall_job_wait_until_timeout(self):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
-    mock_scheduler_proxy = Mock()
+    mock_scheduler_proxy = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
     with contextlib.nested(
         patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
@@ -121,7 +128,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
   def test_killall_job_something_else(self):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
-    mock_scheduler_proxy = Mock()
+    mock_scheduler_proxy = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
     with contextlib.nested(
         patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
@@ -303,9 +310,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
       api = mock_context.get_api('west')
       # set up an empty instance list in the getTasksWithoutConfigs response
       status_response = self.create_simple_success_response()
-      schedule_status = Mock(spec=ScheduleStatusResult)
-      status_response.result.scheduleStatusResult = schedule_status
-      schedule_status.tasks = []
+      status_response.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[[]]))
       mock_context.add_expected_status_query_result(status_response)
       api.kill_job.return_value = self.get_kill_job_response()
       with temporary_file() as fp:
@@ -340,7 +345,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
   def test_killall_job_output(self):
     """Test kill output."""
     mock_context = FakeAuroraCommandContext()
-    mock_scheduler_proxy = Mock()
+    mock_scheduler_proxy = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
     with contextlib.nested(
         patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),

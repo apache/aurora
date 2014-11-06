@@ -107,15 +107,16 @@ class TestJobStatus(AuroraClientCommandTest):
   @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = ScheduleStatusResult(
-      tasks=set(cls.create_scheduled_tasks()))
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(tasks=set(cls.create_scheduled_tasks())))
     return resp
 
   @classmethod
   def create_status_null_metadata(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = ScheduleStatusResult(
-      tasks=set(cls.create_mock_scheduled_task_no_metadata()))
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(
+            tasks=set(cls.create_mock_scheduled_task_no_metadata())))
     return resp
 
   @classmethod
@@ -127,7 +128,7 @@ class TestJobStatus(AuroraClientCommandTest):
   @classmethod
   def create_empty_status(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = ScheduleStatusResult(tasks=None)
+    resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=None))
     return resp
 
   def get_task_status_json(cls):
@@ -172,14 +173,14 @@ class TestJobStatus(AuroraClientCommandTest):
       create_scheduled_task(0, 123456),
       create_scheduled_task(1, 234567)
     ]
-    resp.result.scheduleStatusResult = scheduleStatus
+    resp.result = Result(scheduleStatusResult=scheduleStatus)
     return resp
 
   @classmethod
   def create_status_with_metadata(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = ScheduleStatusResult(
-      tasks=set(cls.create_mock_scheduled_task_with_metadata()))
+    resp.result = Result(scheduleStatusResult=ScheduleStatusResult(
+        tasks=set(cls.create_mock_scheduled_task_with_metadata())))
     return resp
 
   @classmethod
@@ -189,7 +190,7 @@ class TestJobStatus(AuroraClientCommandTest):
   @classmethod
   def create_nojobs_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = ScheduleStatusResult(tasks=set())
+    resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=set()))
     return resp
 
   def test_successful_status_shallow(self):
@@ -219,8 +220,7 @@ class TestJobStatus(AuroraClientCommandTest):
   def test_successful_status_deep(self):
     """Test the status command more deeply: in a request with a fully specified
     job, it should end up doing a query using getTasksWithoutConfigs."""
-    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_scheduler_proxy.query.return_value = self.create_status_response()
+    _, mock_scheduler_proxy = self.create_mock_api()
     mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_null_metadata()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
@@ -350,7 +350,6 @@ class TestJobStatus(AuroraClientCommandTest):
 
   def test_successful_status_deep_null_metadata(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_scheduler_proxy.query.return_value = self.create_status_null_metadata()
     mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_null_metadata()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),

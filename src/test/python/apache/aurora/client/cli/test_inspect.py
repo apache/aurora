@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import Mock, patch
+from mock import create_autospec, Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli.client import AuroraCommandLine
@@ -27,9 +27,9 @@ from gen.apache.aurora.api.ttypes import CronCollisionPolicy
 
 class TestInspectCommand(AuroraClientCommandTest):
   def get_mock_config(self):
-    config = Mock(spec=AuroraConfig)
-    # TODO(mchucarroll): figure out how to spec this. The raw_config is a Pystachio spec,
-    # and that seems to blow up mock.
+    config = create_autospec(spec=AuroraConfig, instance=True)
+    # TODO(wfarner): figure out how to spec this. The raw_config is a Pystachio spec, and that seems
+    # to blow up mock.
     raw_config = Mock()
     config.raw.return_value = raw_config
     raw_config.contact.return_value = "bozo@the.clown"

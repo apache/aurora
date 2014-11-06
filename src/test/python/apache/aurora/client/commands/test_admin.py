@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import Mock, patch, PropertyMock
+from mock import create_autospec, patch, PropertyMock
 
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.scheduler_client import SchedulerClient, SchedulerProxy
@@ -52,7 +52,10 @@ class TestQueryCommand(AuroraClientCommandTest):
 
   @classmethod
   def setup_mock_options(cls, force=False, shards=None, states='RUNNING', listformat=None):
-    mock_options = Mock(spec=['force', 'shards', 'states', 'listformat', 'verbosity'])
+    mock_options = create_autospec(
+        spec=['force', 'shards', 'states', 'listformat', 'verbosity'],
+        spec_set=False,
+        instance=True)
     mock_options.force = force
     mock_options.shards = shards
     mock_options.states = states
@@ -133,7 +136,7 @@ class TestIncreaseQuotaCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-            new=Mock(spec=AuroraClientAPI)),
+            new=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)
     ) as (_, api, _):
 
@@ -169,7 +172,7 @@ class TestSetQuotaCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-              new=Mock(spec=AuroraClientAPI)),
+              new=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)
     ) as (_, api, _):
 
@@ -208,7 +211,7 @@ class TestGetLocksCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-              new=Mock(spec=AuroraClientAPI)),
+              new=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.commands.admin.print_results'),
     ) as (_, api, _, mock_print_results):
@@ -228,8 +231,8 @@ class TestGetSchedulerCommand(AuroraClientCommandTest):
   def test_get_scheduler(self):
     """Tests successful execution of the get_scheduler command."""
     mock_options = self.setup_mock_options()
-    mock_proxy = Mock(spec=SchedulerProxy)
-    mock_scheduler_client = Mock(spec=SchedulerClient)
+    mock_proxy = create_autospec(spec=SchedulerProxy, instance=True)
+    mock_scheduler_client = create_autospec(spec=SchedulerClient, instance=True)
     mock_raw_url = PropertyMock(return_value="url")
     mock_proxy.scheduler_client.return_value = mock_scheduler_client
     mock_scheduler_client.raw_url = mock_raw_url
@@ -237,7 +240,7 @@ class TestGetSchedulerCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-              new=Mock(spec=AuroraClientAPI)),
+              new=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
     ) as (_, api, _):
 

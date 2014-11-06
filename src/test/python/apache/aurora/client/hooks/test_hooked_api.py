@@ -14,7 +14,7 @@
 
 from inspect import getargspec
 
-from mock import Mock
+from mock import create_autospec, Mock
 
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI, NonHookedAuroraClientAPI
@@ -37,7 +37,7 @@ def test_api_methods_exist(method_name):
 
 
 def test_api_methods_params(method_name):
-  cluster = Mock(spec=Cluster)
+  cluster = create_autospec(spec=Cluster, instance=True)
   api = HookedAuroraClientAPI(cluster=cluster)  # cant use mock here; need to inspect methods
 
   hooked_method = getattr(api, method_name)

@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import Mock, patch
+from mock import patch
 
 from apache.aurora.client.commands.core import status
 
@@ -25,6 +25,8 @@ from gen.apache.aurora.api.ttypes import (
     Identity,
     JobKey,
     ResponseCode,
+    Result,
+    ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
     TaskConfig,
@@ -35,44 +37,30 @@ from gen.apache.aurora.api.ttypes import (
 
 class TestListJobs(AuroraClientCommandTest):
   @classmethod
-  def setup_mock_options(cls):
-    """set up to get a mock options object."""
-    mock_options = Mock()
-    mock_options.pretty = False
-    mock_options.show_cron = False
-    mock_options.disable_all_hooks = False
-    return mock_options
-
-  @classmethod
   def create_mock_scheduled_tasks(cls):
-    jobs = []
+    tasks = []
     for name in ['foo', 'bar', 'baz']:
-      job_key = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
-      job = Mock()
-      job.key = job_key
-      job.failure_count = 0
-      job.assignedTask = Mock(spec=AssignedTask)
-      job.assignedTask.slaveHost = 'slavehost'
-      job.assignedTask.task = Mock(spec=TaskConfig)
-      job.assignedTask.task.maxTaskFailures = 1
-      job.assignedTask.task.metadata = []
-      job.assignedTask.task.job = job_key
-      job.assignedTask.task.owner = Identity(role=cls.TEST_ROLE)
-      job.assignedTask.task.environment = cls.TEST_ENV
-      job.assignedTask.task.jobName = name
-      job.assignedTask.task.numCpus = 2
-      job.assignedTask.task.ramMb = 2
-      job.assignedTask.task.diskMb = 2
-      job.assignedTask.instanceId = 4237894
-      job.assignedTask.assignedPorts = None
-      job.status = ScheduleStatus.RUNNING
-      mockEvent = Mock(spec=TaskEvent)
-      mockEvent.timestamp = 28234726395
-      mockEvent.status = ScheduleStatus.RUNNING
-      mockEvent.message = "Hi there"
-      job.taskEvents = [mockEvent]
-      jobs.append(job)
-    return jobs
+      tasks.append(ScheduledTask(
+          status=ScheduleStatus.RUNNING,
+          failureCount=0,
+          taskEvents=[TaskEvent(timestamp=123, status=ScheduleStatus.RUNNING, message='Hi there')],
+          assignedTask=AssignedTask(
+              instanceId=0,
+              assignedPorts={},
+              task=TaskConfig(
+                  maxTaskFailures=1,
+                  metadata={},
+                  job=JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name),
+                  owner=Identity(role=cls.TEST_ROLE),
+                  environment=cls.TEST_ENV,
+                  jobName=name,
+                  numCpus=2,
+                  ramMb=2,
+                  diskMb=2
+              )
+          )
+      ))
+    return tasks
 
   @classmethod
   def create_mock_scheduled_task_no_metadata(cls):
@@ -84,15 +72,16 @@ class TestListJobs(AuroraClientCommandTest):
   @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_tasks())
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(tasks=set(cls.create_mock_scheduled_tasks())))
     return resp
 
   @classmethod
   def create_status_null_metadata(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_no_metadata())
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(
+            tasks=set(cls.create_mock_scheduled_task_no_metadata())))
     return resp
 
   @classmethod
@@ -102,15 +91,15 @@ class TestListJobs(AuroraClientCommandTest):
   def test_successful_status(self):
     """Test the status command."""
     # Calls api.check_status, which calls scheduler_proxy.getJobs
-    mock_options = self.setup_mock_options()
+    fake_options = {}
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     mock_scheduler_proxy.getTasksWithoutConfigs.return_value = self.create_status_response()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('twitter.common.app.get_options', return_value=mock_options)):
+        patch('twitter.common.app.get_options', return_value=fake_options)):
 
-      status(['west/mchucarroll/test/hello'], mock_options)
+      status(['west/mchucarroll/test/hello'], fake_options)
       # The status command sends a getTasksWithoutConfigs query to the scheduler,
       # and then prints the result.
       mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(

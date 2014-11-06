@@ -24,6 +24,7 @@ from .util import AuroraClientCommandTest
 from gen.apache.aurora.api.ttypes import (
     JobKey,
     ResponseCode,
+    Result,
     ScheduleStatus,
     ScheduleStatusResult,
     TaskQuery
@@ -41,8 +42,8 @@ class TestRunCommand(AuroraClientCommandTest):
   @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = cls.create_scheduled_tasks()
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(tasks=cls.create_scheduled_tasks()))
     return resp
 
   @classmethod
@@ -116,15 +117,14 @@ class TestSshCommand(AuroraClientCommandTest):
   @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = cls.create_scheduled_tasks()
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(tasks=cls.create_scheduled_tasks()))
     return resp
 
   @classmethod
   def create_nojob_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = ScheduleStatusResult()
-    resp.result.scheduleStatusResult.tasks = []
+    resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[]))
     return resp
 
   @classmethod

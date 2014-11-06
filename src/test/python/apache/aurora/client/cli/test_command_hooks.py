@@ -14,7 +14,8 @@
 
 import contextlib
 
-from mock import Mock, patch
+import requests
+from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import EXIT_PERMISSION_VIOLATION
@@ -27,6 +28,7 @@ from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     JobKey,
+    Result,
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
@@ -99,27 +101,25 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
   @classmethod
   def create_mock_task(cls, task_id, instance_id, initial_time, status):
-    mock_task = Mock(spec=ScheduledTask)
-    mock_task.assignedTask = Mock(spec=AssignedTask)
-    mock_task.assignedTask.taskId = task_id
-    mock_task.assignedTask.instanceId = instance_id
-    mock_task.status = status
-    mock_task_event = Mock(spec=TaskEvent)
-    mock_task_event.timestamp = initial_time
-    mock_task.taskEvents = [mock_task_event]
-    return mock_task
+    return ScheduledTask(
+        status=status,
+        assignedTask=AssignedTask(
+          taskId=task_id,
+          instanceId=instance_id),
+        taskEvents=[TaskEvent(timestamp=initial_time)]
+    )
 
   @classmethod
   def create_mock_status_query_result(cls, scheduleStatus):
     mock_query_result = cls.create_simple_success_response()
-    mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
     if scheduleStatus == ScheduleStatus.INIT:
       # status query result for before job is launched.
-      mock_query_result.result.scheduleStatusResult.tasks = []
+      tasks = []
     else:
       mock_task_one = cls.create_mock_task("hello", 0, 1000, scheduleStatus)
       mock_task_two = cls.create_mock_task("hello", 1, 1004, scheduleStatus)
-      mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]
+      tasks = [mock_task_one, mock_task_two]
+    mock_query_result.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
     return mock_query_result
 
   @classmethod
@@ -158,11 +158,11 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     with patch("apache.aurora.client.cli.jobs.Job.create_context", return_value=mock_context):
       mock_query = self.create_mock_query()
       mock_context.add_expected_status_query_result(
-        self.create_mock_status_query_result(ScheduleStatus.INIT))
+          self.create_mock_status_query_result(ScheduleStatus.INIT))
       mock_context.add_expected_status_query_result(
-        self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+          self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       mock_context.add_expected_status_query_result(
-        self.create_mock_status_query_result(ScheduleStatus.RUNNING))
+          self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       mock_context.get_api("west").check_status.side_effect = (
         lambda x: self.create_mock_status_query_result(ScheduleStatus.RUNNING))
       api = mock_context.get_api("west")
@@ -253,7 +253,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     """Load up a set of skips, specified in JSON, and then check a bunch of different
     cases to see that the skip rules work correctly.
     """
-    mock_response = Mock()
+    mock_response = create_autospec(spec=requests.Response, instance=True)
     mock_context = FakeAuroraCommandContext()
     with patch("requests.get", return_value=mock_response):
       mock_response.json.return_value = {
@@ -300,7 +300,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     GlobalCommandHookRegistry.register_command_hook(command_hook)
     command_hook_two = SecondHookForTesting(False)
     GlobalCommandHookRegistry.register_command_hook(command_hook_two)
-    mock_response = Mock()
+    mock_response = create_autospec(spec=requests.Response, instance=True)
     mock_context = FakeAuroraCommandContext()
 
     with contextlib.nested(
@@ -350,7 +350,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     GlobalCommandHookRegistry.register_command_hook(command_hook)
     command_hook_two = SecondHookForTesting(False)
     GlobalCommandHookRegistry.register_command_hook(command_hook_two)
-    mock_response = Mock()
+    mock_response = create_autospec(spec=requests.Response, instance=True)
     mock_context = FakeAuroraCommandContext()
 
     with contextlib.nested(

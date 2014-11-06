@@ -14,10 +14,12 @@
 
 import unittest
 
-from mock import Mock
+from mock import create_autospec
 
 from apache.aurora.client.api.scheduler_mux import SchedulerMux
 from apache.aurora.client.api.task_util import StatusMuxHelper
+
+from ..api.api_util import SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -49,13 +51,13 @@ class TaskUtilTest(unittest.TestCase):
 
   @classmethod
   def mock_mux(cls, tasks):
-    mux = Mock(spec=SchedulerMux)
+    mux = create_autospec(spec=SchedulerMux, instance=True)
     mux.enqueue_and_wait.return_value = tasks
     return mux
 
   @classmethod
   def mock_scheduler(cls, response_code=None):
-    scheduler = Mock()
+    scheduler = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
     response_code = ResponseCode.OK if response_code is None else response_code
     resp = Response(responseCode=response_code, messageDEPRECATED='test')
     resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=cls.create_tasks()))

@@ -15,7 +15,7 @@
 import contextlib
 from collections import defaultdict
 
-from mock import Mock, patch
+from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api import AuroraClientAPI
@@ -34,9 +34,9 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_options(cls, exclude=None, include=None, override=None,
                          exclude_list=None, include_list=None, list_jobs=False, grouping=None):
-    mock_options = Mock(spec=['exclude_filename', 'exclude_hosts', 'include_filename',
+    mock_options = create_autospec(spec=['exclude_filename', 'exclude_hosts', 'include_filename',
         'include_hosts', 'override_filename', 'list_jobs', 'verbosity', 'disable_all_hooks',
-        'min_instance_count', 'grouping'])
+        'min_instance_count', 'grouping'], instance=True)
 
     mock_options.exclude_filename = exclude
     mock_options.exclude_hosts = exclude_list
@@ -61,7 +61,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
 
   @classmethod
   def create_mock_vector(cls, result):
-    mock_vector = Mock(spec=DomainUpTimeSlaVector)
+    mock_vector = create_autospec(spec=DomainUpTimeSlaVector, instance=True)
     mock_vector.get_safe_hosts.return_value = result
     return mock_vector
 
@@ -71,7 +71,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
     mock_vector = self.create_mock_vector(self.create_hosts(3, 80, 100))
     with contextlib.nested(
         patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-            new=Mock(spec=AuroraClientAPI)),
+            new=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.print_results'),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)
@@ -96,7 +96,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
       mock_options = self.setup_mock_options(exclude=fp.name)
       with contextlib.nested(
           patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-              new=Mock(spec=AuroraClientAPI)),
+              new=create_autospec(spec=AuroraClientAPI)),
           patch('apache.aurora.client.commands.admin.print_results'),
           patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
           patch('twitter.common.app.get_options', return_value=mock_options)
@@ -119,7 +119,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options(exclude_list=','.join(['h0', 'h1']))
     with contextlib.nested(
         patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-            new=Mock(spec=AuroraClientAPI)),
+            new=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.print_results'),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)
@@ -146,7 +146,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
       mock_options = self.setup_mock_options(include=fp.name)
       with contextlib.nested(
           patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-              new=Mock(spec=AuroraClientAPI)),
+              new=create_autospec(spec=AuroraClientAPI)),
           patch('apache.aurora.client.commands.admin.print_results'),
           patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
           patch('twitter.common.app.get_options', return_value=mock_options)
@@ -172,7 +172,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options(include_list=','.join(hosts))
     with contextlib.nested(
         patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-            new=Mock(spec=AuroraClientAPI)),
+            new=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.print_results'),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)
@@ -200,7 +200,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
       mock_options = self.setup_mock_options(override=fp.name)
       with contextlib.nested(
           patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-              new=Mock(spec=AuroraClientAPI)),
+              new=create_autospec(spec=AuroraClientAPI)),
           patch('apache.aurora.client.commands.admin.print_results'),
           patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
           patch('twitter.common.app.get_options', return_value=mock_options)
@@ -225,7 +225,7 @@ class TestAdminSlaListSafeDomainCommand(AuroraClientCommandTest):
     mock_vector = self.create_mock_vector(self.create_hosts(3, 50, 100))
     with contextlib.nested(
         patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-            new=Mock(spec=AuroraClientAPI)),
+            new=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.print_results'),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)
@@ -299,16 +299,20 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
 
   @classmethod
   def setup_mock_options(cls, hosts=None, filename=None, grouping=None):
-    mock_options = Mock(spec=['hosts', 'filename', 'verbosity', 'min_instance_count', 'grouping'])
+    mock_options = create_autospec(
+        spec=['hosts', 'filename', 'verbosity', 'min_instance_count', 'grouping'],
+        spec_set=False,
+        instance=True)
     mock_options.hosts = hosts
     mock_options.filename = filename
     mock_options.verbosity = False
     mock_options.grouping = grouping or DEFAULT_GROUPING
+    mock_options.min_instance_count = 1
     return mock_options
 
   @classmethod
   def create_mock_vector(cls, result):
-    mock_vector = Mock(spec=DomainUpTimeSlaVector)
+    mock_vector = create_autospec(spec=DomainUpTimeSlaVector, instance=True)
     mock_vector.probe_hosts.return_value = result
     return mock_vector
 
@@ -328,7 +332,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
     mock_vector = self.create_mock_probe_hosts_vector([self.create_probe_hosts(2, 80, True, 0)])
     with contextlib.nested(
         patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-            new=Mock(spec=AuroraClientAPI)),
+            new=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.print_results'),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)
@@ -358,7 +362,7 @@ class TestAdminSlaProbeHostsCommand(AuroraClientCommandTest):
       mock_options = self.setup_mock_options(filename=fp.name)
       with contextlib.nested(
           patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-              new=Mock(spec=AuroraClientAPI)),
+              new=create_autospec(spec=AuroraClientAPI)),
           patch('apache.aurora.client.commands.admin.print_results'),
           patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
           patch('twitter.common.app.get_options', return_value=mock_options)

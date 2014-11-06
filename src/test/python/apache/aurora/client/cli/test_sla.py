@@ -14,8 +14,9 @@
 
 import contextlib
 
-from mock import Mock, patch
+from mock import create_autospec, patch
 
+from apache.aurora.client.api.sla import JobUpTimeSlaVector
 from apache.aurora.client.cli.client import AuroraCommandLine
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext
@@ -25,7 +26,7 @@ class TestGetTaskUpCountCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_sla_uptime_vector(cls, mock_context, upcount):
     api = mock_context.get_api('west')
-    response = Mock()
+    response = create_autospec(spec=JobUpTimeSlaVector, instance=True)
     response.get_task_up_count.return_value = upcount
     api.sla_get_job_uptime_vector.return_value = response
 
@@ -62,7 +63,7 @@ class TestGetJobUptimeCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_sla_uptime_vector(cls, mock_context, uptime):
     api = mock_context.get_api('west')
-    response = Mock()
+    response = create_autospec(spec=JobUpTimeSlaVector, instance=True)
     response.get_job_uptime.return_value = uptime
     api.sla_get_job_uptime_vector.return_value = response
 

@@ -14,7 +14,7 @@
 import contextlib
 import functools
 
-from mock import Mock, patch
+from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
@@ -23,7 +23,7 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 
 from .util import AuroraClientCommandTest, IOMock
 
-from gen.apache.aurora.api.ttypes import JobKey, PopulateJobResult, TaskConfig
+from gen.apache.aurora.api.ttypes import JobKey, PopulateJobResult, Result, TaskConfig
 
 
 class TestRestartCommand(AuroraClientCommandTest):
@@ -39,15 +39,15 @@ class TestRestartCommand(AuroraClientCommandTest):
   @classmethod
   def setup_populate_job_config(cls, api):
     populate = cls.create_simple_success_response()
-    populate.result.populateJobResult = Mock(spec=PopulateJobResult)
+    populate.result = Result(populateJobResult=PopulateJobResult(
+        populatedDEPRECATED={TaskConfig()}
+    ))
     api.populateJobConfig.return_value = populate
-    configs = [Mock(spec=TaskConfig) for i in range(20)]
-    populate.result.populateJobResult.populatedDEPRECATED = set(configs)
     return populate
 
   @classmethod
   def setup_health_checks(cls, mock_api):
-    mock_health_check = Mock(spec=StatusHealthCheck)
+    mock_health_check = create_autospec(spec=StatusHealthCheck, instance=True)
     mock_health_check.health.return_value = Retriable.alive()
     return mock_health_check
 

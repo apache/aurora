@@ -15,7 +15,7 @@
 import contextlib
 import os
 
-from mock import Mock, patch
+from mock import create_autospec, Mock, patch
 from pystachio.config import Config
 from twitter.common.contextutil import temporary_file
 
@@ -32,6 +32,7 @@ from gen.apache.aurora.api.ttypes import (
     JobKey,
     PopulateJobResult,
     ResponseCode,
+    Result,
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
@@ -59,14 +60,13 @@ class TestDiffCommand(AuroraClientCommandTest):
   def create_mock_scheduled_tasks(cls):
     jobs = []
     for name in ['foo', 'bar', 'baz']:
-      job = Mock(spec=ScheduledTask)
+      job = create_autospec(spec=ScheduledTask, instance=True)
       job.failure_count = 0
-      job.assignedTask = Mock(spec=AssignedTask)
+      job.assignedTask = create_autospec(spec=AssignedTask, instance=True)
       job.assignedTask.slaveHost = 'slavehost'
-      job.assignedTask.task = Mock(spec=TaskConfig)
+      job.assignedTask.task = create_autospec(spec=TaskConfig, instance=True)
       job.assignedTask.task.maxTaskFailures = 1
-      job.assignedTask.task.executorConfig = Mock(spec=ExecutorConfig)
-      job.assignedTask.task.executorConfig.data = Mock()
+      job.assignedTask.task.executorConfig = ExecutorConfig(name='name', data='fake data')
       job.assignedTask.task.metadata = []
       job.assignedTask.task.job = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
       job.assignedTask.task.owner = Identity(role='mchucarroll')
@@ -78,7 +78,7 @@ class TestDiffCommand(AuroraClientCommandTest):
       job.assignedTask.instanceId = 4237894
       job.assignedTask.assignedPorts = None
       job.status = ScheduleStatus.RUNNING
-      mockEvent = Mock(spec=TaskEvent)
+      mockEvent = create_autospec(spec=TaskEvent, instance=True)
       mockEvent.timestamp = 28234726395
       mockEvent.status = ScheduleStatus.RUNNING
       mockEvent.message = "Hi there"
@@ -89,8 +89,8 @@ class TestDiffCommand(AuroraClientCommandTest):
   @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_tasks())
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(tasks=set(cls.create_mock_scheduled_tasks())))
     return resp
 
   @classmethod
@@ -100,10 +100,12 @@ class TestDiffCommand(AuroraClientCommandTest):
   @classmethod
   def setup_populate_job_config(cls, api):
     populate = cls.create_simple_success_response()
-    populate.result.populateJobResult = Mock(spec=PopulateJobResult)
+
     api.populateJobConfig.return_value = populate
     tasks = set(task.assignedTask.task for task in cls.create_mock_scheduled_tasks())
-    populate.result.populateJobResult.populatedDEPRECATED = tasks
+    populate.result = Result(populateJobResult=PopulateJobResult(
+      populatedDEPRECATED=tasks
+    ))
     return populate
 
   def test_successful_diff(self):

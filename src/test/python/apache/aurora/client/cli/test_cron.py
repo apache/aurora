@@ -16,16 +16,17 @@
 
 import contextlib
 
-from mock import Mock, patch
+from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_CONFIGURATION, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.config import AuroraConfig
 
+from ..api.api_util import SchedulerProxyApiSpec
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
-from gen.apache.aurora.api.ttypes import JobKey
+from gen.apache.aurora.api.ttypes import GetJobsResult, JobConfiguration, JobKey, Result
 
 
 class TestCronNoun(AuroraClientCommandTest):
@@ -126,19 +127,16 @@ class TestCronNoun(AuroraClientCommandTest):
   @classmethod
   def _create_getjobs_response(cls):
     response = cls.create_simple_success_response()
-    response.result = Mock()
-    response.result.getJobsResult = Mock()
-    mockjob = Mock()
-    mockjob.cronSchedule = "* * * * *"
-    mockjob.key = Mock()
-    mockjob.key.environment = "test"
-    mockjob.key.name = "hello"
-    mockjob.key.role = "bozo"
-    response.result.getJobsResult.configs = [mockjob]
+    response.result = Result(getJobsResult=GetJobsResult(configs=[
+        JobConfiguration(
+            cronSchedule='* * * * *',
+            key=JobKey(role='bozo', environment='test', name='hello'))
+    ]))
     return response
 
   def test_cron_status(self):
-    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    (_, mock_scheduler_proxy) = self.create_mock_api()
+    mock_scheduler_proxy = create_autospec(spec=SchedulerProxyApiSpec)
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
@@ -154,7 +152,7 @@ class TestCronNoun(AuroraClientCommandTest):
       mock_print.assert_called_with("west/bozo/test/hello\t * * * * *")
 
   def test_cron_status_multiple_jobs(self):
-    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
+    _, mock_scheduler_proxy = self.create_mock_api()
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
@@ -162,21 +160,14 @@ class TestCronNoun(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.context.AuroraCommandContext.print_out')) as (
             _, _, _, mock_print):
       response = self.create_simple_success_response()
-      response.result = Mock()
-      response.result.getJobsResult = Mock()
-      mockjob1 = Mock()
-      mockjob1.cronSchedule = "* * * * *"
-      mockjob1.key = Mock()
-      mockjob1.key.environment = "test"
-      mockjob1.key.name = "hello2"
-      mockjob1.key.role = "bozo"
-      mockjob2 = Mock()
-      mockjob2.cronSchedule = "* * * * *"
-      mockjob2.key = Mock()
-      mockjob2.key.environment = "test"
-      mockjob2.key.name = "hello"
-      mockjob2.key.role = "bozo"
-      response.result.getJobsResult.configs = [mockjob1, mockjob2]
+      response.result = Result(getJobsResult=GetJobsResult(configs=[
+          JobConfiguration(
+              key=JobKey(role='bozo', environment='test', name='hello'),
+              cronSchedule='* * * * *'),
+          JobConfiguration(
+              key=JobKey(role='bozo', environment='test', name='hello2'),
+              cronSchedule='* * * * *')
+      ]))
       mock_scheduler_proxy.getJobs.return_value = response
 
       cmd = AuroraCommandLine()

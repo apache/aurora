@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import Mock, patch
+from mock import create_autospec, Mock, patch
 
 from apache.aurora.client.commands.run import run
 
@@ -26,6 +26,7 @@ from gen.apache.aurora.api.ttypes import (
     Identity,
     JobKey,
     ResponseCode,
+    ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
     TaskConfig,
@@ -49,39 +50,41 @@ class TestRunCommand(AuroraClientCommandTest):
 
   @classmethod
   def create_mock_scheduled_tasks(cls):
-    jobs = []
+    tasks = []
     for name in ['foo', 'bar', 'baz']:
-      job = Mock()
-      job.key = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
-      job.failure_count = 0
-      job.assignedTask = Mock(spec=AssignedTask)
-      job.assignedTask.taskId = 1287391823
-      job.assignedTask.slaveHost = 'slavehost'
-      job.assignedTask.task = Mock(spec=TaskConfig)
-      job.assignedTask.task.executorConfig = Mock()
-      job.assignedTask.task.maxTaskFailures = 1
-      job.assignedTask.task.metadata = []
-      job.assignedTask.task.owner = Identity(role='mchucarroll')
-      job.assignedTask.task.environment = 'test'
-      job.assignedTask.task.jobName = 'woops'
-      job.assignedTask.task.numCpus = 2
-      job.assignedTask.task.ramMb = 2
-      job.assignedTask.task.diskMb = 2
-      job.assignedTask.instanceId = 4237894
-      job.assignedTask.assignedPorts = {}
-      job.status = ScheduleStatus.RUNNING
-      mockEvent = Mock(spec=TaskEvent)
-      mockEvent.timestamp = 28234726395
-      mockEvent.status = ScheduleStatus.RUNNING
-      mockEvent.message = "Hi there"
-      job.taskEvents = [mockEvent]
-      jobs.append(job)
-    return jobs
+      task = ScheduledTask(
+        failureCount=0,
+        status=ScheduleStatus.RUNNING,
+        taskEvents=[
+            TaskEvent(timestamp=123, status=ScheduleStatus.RUNNING, message='Fake message')],
+        assignedTask=AssignedTask(
+            assignedPorts={},
+            slaveHost='slavehost',
+            instanceId=0,
+            taskId='taskid',
+            task=TaskConfig(
+                maxTaskFailures=1,
+                executorConfig='fake data',
+                metadata=[],
+                owner=Identity(role='fakerole'),
+                environment='test',
+                jobName=name,
+                numCpus=2,
+                ramMb=2,
+                diskMb=2
+            )
+        )
+      )
+      tasks.append(task)
+    return tasks
 
   @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
+    resp.result.scheduleStatusResult = create_autospec(
+        spec=ScheduleStatusResult,
+        spec_set=False,
+        instance=True)
     resp.result.scheduleStatusResult.tasks = cls.create_mock_scheduled_tasks()
     return resp
 
@@ -127,6 +130,6 @@ class TestRunCommand(AuroraClientCommandTest):
       # The mock status call returns 3 three ScheduledTasks, so three commands should have been run
       assert mock_subprocess.call_count == 3
       mock_subprocess.assert_called_with(['ssh', '-n', '-q', 'mchucarroll@slavehost',
-          'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-1287391823/runs/'
+          'cd /slaveroot/slaves/*/frameworks/*/executors/thermos-taskid/runs/'
           'slaverun/sandbox;ls'],
           stderr=-2, stdout=-1)

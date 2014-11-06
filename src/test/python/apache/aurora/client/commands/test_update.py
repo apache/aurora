@@ -15,7 +15,7 @@
 import contextlib
 import functools
 
-from mock import Mock, patch
+from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
@@ -35,8 +35,10 @@ from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     JobConfiguration,
     JobKey,
+    Lock,
     PopulateJobResult,
     ResponseCode,
+    Result,
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
@@ -56,21 +58,20 @@ class TestUpdateCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_options(cls):
     """set up to get a mock options object."""
-    mock_options = Mock()
-    mock_options.json = False
-    mock_options.bindings = {}
-    mock_options.open_browser = False
-    mock_options.cluster = None
-    mock_options.force = True
-    mock_options.env = None
-    mock_options.shards = None
-    mock_options.health_check_interval_seconds = 3
-    mock_options.disable_all_hooks = False
+    mock_options = create_autospec(
+        spec=object,
+        spec_set=False,
+        instance=True,
+        json=False,
+        shards=None,
+        health_check_interval_seconds=3,
+        force=True,
+        disable_all_hooks_reason='Fake reason')
     return mock_options
 
   @classmethod
   def setup_mock_updater(cls):
-    updater = Mock(spec=Updater)
+    updater = create_autospec(spec=Updater, instance=True)
     return updater
 
   # First, we pretend that the updater isn't really client-side, and test
@@ -117,8 +118,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     """Set up all of the API mocks for scheduler calls during a simple update"""
     sched_proxy = api.scheduler_proxy
     # First, the updater acquires a lock
-    sched_proxy.acquireLock.return_value = cls.create_acquire_lock_response(ResponseCode.OK,
-         'OK', 'token', False)
+    sched_proxy.acquireLock.return_value = cls.create_acquire_lock_response(ResponseCode.OK, 'OK')
     # Then in gets the status of the tasks for the updating job.
     cls.setup_get_tasks_status_calls(sched_proxy)
     # Next, it needs to populate the update config.
@@ -145,7 +145,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
   @classmethod
   def setup_populate_job_config(cls, api):
     populate = cls.create_simple_success_response()
-    populate.result.populateJobResult = Mock(spec=PopulateJobResult)
+
     api.populateJobConfig.return_value = populate
     configs = []
     for _ in range(20):
@@ -154,18 +154,18 @@ class TestUpdateCommand(AuroraClientCommandTest):
           ramMb=1,
           diskMb=1,
           job=JobKey(role='mchucarroll', environment='test', name='hello'))
-
       configs.append(task_config)
-    populate.result.populateJobResult.populatedDEPRECATED = set(configs)
+    populate.result = Result(populateJobResult=PopulateJobResult(
+        populatedDEPRECATED=set(configs)
+    ))
     return populate
 
   @classmethod
-  def create_acquire_lock_response(cls, code, msg, token, rolling):
+  def create_acquire_lock_response(cls, code, msg):
     """Set up the response to a startUpdate API call."""
     start_update_response = cls.create_blank_response(code, msg)
-    start_update_response.result.acquireLockResult = Mock(spec=AcquireLockResult)
-    start_update_response.result.acquireLockResult.lock = "foo"
-    start_update_response.result.acquireLockResult.updateToken = 'token'
+    start_update_response.result = Result(
+        acquireLockResult=AcquireLockResult(lock=Lock(key='foo', token='token')))
     return start_update_response
 
   @classmethod
@@ -180,7 +180,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     status_response = cls.create_simple_success_response()
     scheduler_proxy.getTasksStatus.return_value = status_response
     scheduler_proxy.getTasksWithoutConfigs.return_value = status_response
-    schedule_status = Mock(spec=ScheduleStatusResult)
+    schedule_status = create_autospec(spec=ScheduleStatusResult, instance=True)
     status_response.result.scheduleStatusResult = schedule_status
     task_config = TaskConfig(
         numCpus=1.0,
@@ -191,8 +191,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
     # This should be a list of ScheduledTask's.
     schedule_status.tasks = []
     for i in range(20):
-      task_status = Mock(spec=ScheduledTask)
-      task_status.assignedTask = Mock(spec=AssignedTask)
+      task_status = create_autospec(spec=ScheduledTask, instance=True)
+      task_status.assignedTask = create_autospec(spec=AssignedTask, instance=True)
       task_status.assignedTask.instanceId = i
       task_status.assignedTask.taskId = "Task%s" % i
       task_status.assignedTask.slaveId = "Slave%s" % i
@@ -207,20 +207,20 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
   @classmethod
   def setup_health_checks(cls, mock_api):
-    mock_health_check = Mock(spec=StatusHealthCheck)
+    mock_health_check = create_autospec(spec=StatusHealthCheck, instance=True)
     mock_health_check.health.return_value = Retriable.alive()
     return mock_health_check
 
   @classmethod
   def setup_quota_check(cls):
-    mock_quota_check = Mock(spec=QuotaCheck)
+    mock_quota_check = create_autospec(spec=QuotaCheck, instance=True)
     mock_quota_check.validate_quota_from_requested.return_value = (
         cls.create_simple_success_response())
     return mock_quota_check
 
   @classmethod
   def setup_job_monitor(cls):
-    mock_job_monitor = Mock(spec=JobMonitor)
+    mock_job_monitor = create_autospec(spec=JobMonitor, instance=True)
     mock_job_monitor.wait_until.return_value = True
     return mock_job_monitor
 
@@ -286,7 +286,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
             jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')],
             instanceIds=frozenset([19]),
             statuses=ACTIVE_STATES),
-        'foo')
+        Lock(key='foo', token='token'))
 
   @classmethod
   def assert_correct_status_calls(cls, api):
@@ -302,7 +302,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
       status_call[0][0] == TaskQuery(
         taskIds=None,
         jobKeys=[JobKey(role='mchucarroll', environment='test', name='hello')],
-        statuses=set([ScheduleStatus.RUNNING]))
+        statuses={ScheduleStatus.RUNNING})
 
     # getTasksStatus is called only once to build an generate update instructions
     assert api.getTasksStatus.call_count == 1

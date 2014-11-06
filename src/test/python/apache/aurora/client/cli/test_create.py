@@ -16,7 +16,7 @@ import contextlib
 import os
 import shutil
 
-from mock import Mock, patch
+from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import (
@@ -34,6 +34,7 @@ from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     JobKey,
+    Result,
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
@@ -50,12 +51,12 @@ class TestClientCreateCommand(AuroraClientCommandTest):
 
   @classmethod
   def create_mock_task(cls, task_id, instance_id, initial_time, status):
-    mock_task = Mock(spec=ScheduledTask)
-    mock_task.assignedTask = Mock(spec=AssignedTask)
+    mock_task = create_autospec(spec=ScheduledTask, instance=True)
+    mock_task.assignedTask = create_autospec(spec=AssignedTask, instance=True)
     mock_task.assignedTask.taskId = task_id
     mock_task.assignedTask.instanceId = instance_id
     mock_task.status = status
-    mock_task_event = Mock(spec=TaskEvent)
+    mock_task_event = create_autospec(spec=TaskEvent, instance=True)
     mock_task_event.timestamp = initial_time
     mock_task.taskEvents = [mock_task_event]
     return mock_task
@@ -63,10 +64,10 @@ class TestClientCreateCommand(AuroraClientCommandTest):
   @classmethod
   def create_mock_status_query_result(cls, scheduleStatus):
     mock_query_result = cls.create_simple_success_response()
-    mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    mock_task_one = cls.create_mock_task('hello', 0, 1000, scheduleStatus)
-    mock_task_two = cls.create_mock_task('hello', 1, 1004, scheduleStatus)
-    mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]
+    mock_query_result.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[
+        cls.create_mock_task('hello', 0, 1000, scheduleStatus),
+        cls.create_mock_task('hello', 1, 1004, scheduleStatus)
+    ]))
     return mock_query_result
 
   @classmethod
@@ -249,7 +250,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # Check that create_job was not called.
       api = mock_context.get_api('west')
       assert api.create_job.call_count == 0
-      assert api.scheduler_proxy.test_simple_successful_create_job.call_count == 0
 
   def test_interrupt(self):
     mock_context = FakeAuroraCommandContext()

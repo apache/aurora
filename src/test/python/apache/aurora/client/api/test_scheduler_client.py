@@ -334,7 +334,7 @@ def test_url_when_not_connected_and_cluster_has_no_proxy_url(scheme):
   host = 'some-host.example.com'
   port = 31181
 
-  mock_zk = mock.MagicMock(spec=TwitterKazooClient)
+  mock_zk = mock.create_autospec(spec=TwitterKazooClient, instance=True)
 
   service_json = '''{
     "additionalEndpoints": {
@@ -382,7 +382,7 @@ def test_url_when_not_connected_and_cluster_has_no_proxy_url(scheme):
 @mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
 def test_connect_scheduler(mock_client):
   mock_client.return_value.open.side_effect = [TTransport.TTransportException, True]
-  mock_time = mock.Mock(spec=time)
+  mock_time = mock.create_autospec(spec=time, instance=True)
   scheduler_client.SchedulerClient._connect_scheduler(
       'https://scheduler.example.com:1337',
       mock_time)
@@ -395,8 +395,11 @@ def test_connect_scheduler(mock_client):
             spec=scheduler_client.SchedulerClient)
 @mock.patch('threading._Event.wait')
 def test_transient_error(_, client):
-  mock_scheduler_client = mock.Mock(spec=scheduler_client.SchedulerClient)
-  mock_thrift_client = mock.Mock(spec=AuroraAdmin.Client)
+  mock_scheduler_client = mock.create_autospec(
+      spec=scheduler_client.SchedulerClient,
+      spec_set=False,
+      instance=True)
+  mock_thrift_client = mock.create_autospec(spec=AuroraAdmin.Client, instance=True)
   mock_thrift_client.killTasks.side_effect = [
       Response(responseCode=ResponseCode.ERROR_TRANSIENT,
                details=[ResponseDetail(message="message1"), ResponseDetail(message="message2")],
@@ -410,6 +413,6 @@ def test_transient_error(_, client):
   client.get.return_value = mock_scheduler_client
 
   proxy = TestSchedulerProxy(Cluster(name='local'))
-  proxy.killTasks(TaskQuery())
+  proxy.killTasks(TaskQuery(), None)
 
   assert mock_thrift_client.killTasks.call_count == 3

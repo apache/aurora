@@ -13,10 +13,12 @@
 #
 import unittest
 
-from mock import Mock
+from mock import create_autospec
 
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.common.aurora_job_key import AuroraJobKey
+
+from .api_util import SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -49,7 +51,7 @@ class FakeEvent(object):
 class JobMonitorTest(unittest.TestCase):
 
   def setUp(self):
-    self._scheduler = Mock()
+    self._scheduler = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
     self._job_key = AuroraJobKey('cl', 'johndoe', 'test', 'test_job')
     self._event = FakeEvent()
 

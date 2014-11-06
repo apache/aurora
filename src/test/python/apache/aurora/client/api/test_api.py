@@ -13,14 +13,18 @@
 #
 import unittest
 
-from mock import Mock
+from mock import create_autospec
 
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.config import AuroraConfig
+from apache.aurora.config.schema.base import UpdateConfig
+
+from .api_util import SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
+    JobConfiguration,
     JobUpdateQuery,
     JobUpdateRequest,
     JobUpdateSettings,
@@ -49,11 +53,11 @@ class TestJobUpdateApis(unittest.TestCase):
 
   @classmethod
   def create_blank_response(cls, code, msg):
-    response = Mock(spec=Response)
-    response.responseCode = code
-    response.messageDEPRECATED = msg
-    response.result = Mock(spec=Result)
-    return response
+    return Response(
+      responseCode=code,
+      messageDEPRECATED=msg,
+      result=create_autospec(spec=Result, spec_set=True, instance=True)
+    )
 
   @classmethod
   def create_simple_success_response(cls):
@@ -66,7 +70,7 @@ class TestJobUpdateApis(unittest.TestCase):
   @classmethod
   def mock_api(cls):
     api = AuroraClientAPI(Cluster(name="foo"))
-    mock_proxy = Mock()
+    mock_proxy = create_autospec(spec=SchedulerThriftApiSpec, spec_set=True, instance=True)
     api._scheduler_proxy = mock_proxy
     return api, mock_proxy
 
@@ -90,14 +94,14 @@ class TestJobUpdateApis(unittest.TestCase):
 
   @classmethod
   def mock_job_config(cls, error=None):
-    config = Mock(spec=AuroraConfig)
-    mock_get = Mock()
+    config = create_autospec(spec=AuroraConfig, instance=True)
+    mock_get = create_autospec(spec=UpdateConfig, instance=True)
     mock_get.get.return_value = cls.UPDATE_CONFIG
     if error:
       config.update_config.side_effect = error
     else:
       config.update_config.return_value = mock_get
-    mock_task_config = Mock()
+    mock_task_config = create_autospec(spec=JobConfiguration, instance=True)
     mock_task_config.taskConfig = TaskConfig()
     config.job.return_value = mock_task_config
     config.role.return_value = "role"
@@ -169,7 +173,7 @@ class TestJobUpdateApis(unittest.TestCase):
     job_key = AuroraJobKey("foo", "role", "env", "name")
     query = JobUpdateQuery(
         jobKey=job_key.to_thrift(),
-        updateStatuses=set([JobUpdateStatus.ROLLING_FORWARD]))
+        updateStatuses={JobUpdateStatus.ROLLING_FORWARD})
     api.query_job_updates(job_key=job_key, update_statuses=query.updateStatuses)
     mock_proxy.getJobUpdateSummaries.assert_called_once_with(query)
 

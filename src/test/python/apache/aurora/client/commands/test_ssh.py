@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import Mock, patch
+from mock import create_autospec, Mock, patch
 
 from apache.aurora.client.commands.ssh import ssh
 
@@ -54,10 +54,10 @@ class TestSshCommand(AuroraClientCommandTest):
       job = Mock()
       job.key = job_key
       job.failure_count = 0
-      job.assignedTask = Mock(spec=AssignedTask)
+      job.assignedTask = create_autospec(spec=AssignedTask, instance=True)
       job.assignedTask.taskId = 1287391823
       job.assignedTask.slaveHost = 'slavehost'
-      job.assignedTask.task = Mock(spec=TaskConfig)
+      job.assignedTask.task = create_autospec(spec=TaskConfig, instance=True)
       job.assignedTask.task.executorConfig = Mock()
       job.assignedTask.task.maxTaskFailures = 1
       job.assignedTask.task.metadata = []
@@ -71,7 +71,7 @@ class TestSshCommand(AuroraClientCommandTest):
       job.assignedTask.instanceId = 4237894
       job.assignedTask.assignedPorts = {}
       job.status = ScheduleStatus.RUNNING
-      mockEvent = Mock(spec=TaskEvent)
+      mockEvent = create_autospec(spec=TaskEvent, instance=True)
       mockEvent.timestamp = 28234726395
       mockEvent.status = ScheduleStatus.RUNNING
       mockEvent.message = "Hi there"

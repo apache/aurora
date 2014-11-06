@@ -43,7 +43,7 @@ class TestStatusManager(TestCase):
     def callback(result):
       assert result == TaskState.Value('TASK_KILLED')
       self.callback_called = True
-    mock_time = mock.Mock(spec=time)
+    mock_time = mock.create_autospec(spec=time, instance=True)
     status_manager = StatusManager(checker, callback, mock_time)
     status_manager.run()
     assert mock_time.sleep.call_count == 2

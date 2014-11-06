@@ -21,7 +21,7 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
-from gen.apache.aurora.api.ttypes import GetQuotaResult, ResourceAggregate
+from gen.apache.aurora.api.ttypes import GetQuotaResult, ResourceAggregate, Result
 
 
 class TestGetQuotaCommand(AuroraClientCommandTest):
@@ -29,22 +29,22 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
   def setup_mock_quota_call_no_consumption(cls, mock_context):
     api = mock_context.get_api('west')
     response = cls.create_simple_success_response()
-    response.result.getQuotaResult = GetQuotaResult(
-      quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
-      prodConsumption=None,
-      nonProdConsumption=None
-    )
+    response.result = Result(getQuotaResult=GetQuotaResult(
+        quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
+        prodConsumption=None,
+        nonProdConsumption=None
+    ))
     api.get_quota.return_value = response
 
   @classmethod
   def setup_mock_quota_call_with_consumption(cls, mock_context):
     api = mock_context.get_api('west')
     response = cls.create_simple_success_response()
-    response.result.getQuotaResult = GetQuotaResult(
+    response.result = Result(getQuotaResult=GetQuotaResult(
       quota=ResourceAggregate(numCpus=5, ramMb=20480, diskMb=40960),
       prodConsumption=ResourceAggregate(numCpus=1, ramMb=1024, diskMb=2048),
       nonProdConsumption=ResourceAggregate(numCpus=1, ramMb=1024, diskMb=2048),
-    )
+    ))
     api.get_quota.return_value = response
 
   def test_get_quota_no_consumption(self):

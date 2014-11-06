@@ -15,7 +15,7 @@
 import unittest
 from collections import defaultdict
 
-from mock import Mock
+from mock import create_autospec
 
 from apache.aurora.client.api.sla import DomainUpTimeSlaVector, JobUpTimeDetails
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
@@ -23,16 +23,19 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
 
+from ..api.api_util import SchedulerProxyApiSpec
+
 from gen.apache.aurora.api.ttypes import Response, ResponseCode, Result
 
 
 class AuroraClientCommandTest(unittest.TestCase):
   @classmethod
   def create_blank_response(cls, code, msg):
-    response = Mock(spec=Response)
+    # TODO(wfarner): Don't use a mock here.
+    response = create_autospec(spec=Response, instance=True)
     response.responseCode = code
     response.messageDEPRECATED = msg
-    response.result = Mock(spec=Result)
+    response.result = create_autospec(spec=Result, instance=True)
     response.details = []
     return response
 
@@ -47,25 +50,24 @@ class AuroraClientCommandTest(unittest.TestCase):
   @classmethod
   def create_mock_api(cls):
     """Builds up a mock API object, with a mock SchedulerProxy"""
-    # This looks strange, but we set up the same object to use as both
-    # the SchedulerProxy and the SchedulerClient. These tests want to observe
-    # what API calls get made against the scheduler, and both of these objects
-    # delegate calls to the scheduler. It doesn't matter which one is used:
-    # what we care about is that the right API calls get made.
-    mock_scheduler_proxy = Mock()
+    """Builds up a mock API object, with a mock SchedulerProxy.
+    Returns the API and the proxy"""
+    mock_scheduler_proxy = create_autospec(
+        spec=SchedulerProxyApiSpec,
+        spec_set=False,
+        instance=True)
     mock_scheduler_proxy.url = "http://something_or_other"
     mock_scheduler_proxy.scheduler_client.return_value = mock_scheduler_proxy
-    mock_api = Mock(spec=HookedAuroraClientAPI)
+    mock_api = create_autospec(spec=HookedAuroraClientAPI)
     mock_api.scheduler_proxy = mock_scheduler_proxy
-    return (mock_api, mock_scheduler_proxy)
+    return mock_api, mock_scheduler_proxy
 
   @classmethod
   def create_mock_api_factory(cls):
     """Create a collection of mocks for a test that wants to mock out the client API
     by patching the api factory."""
     mock_api, mock_scheduler_proxy = cls.create_mock_api()
-    mock_api_factory = Mock()
-    mock_api_factory.return_value = mock_api
+    mock_api_factory = lambda x: mock_api
     return mock_api_factory, mock_scheduler_proxy
 
   FAKE_TIME = 42131
@@ -132,7 +134,7 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def create_mock_probe_hosts_vector(cls, side_effects):
-    mock_vector = Mock(spec=DomainUpTimeSlaVector)
+    mock_vector = create_autospec(spec=DomainUpTimeSlaVector, instance=True)
     mock_vector.probe_hosts.side_effect = side_effects
     return mock_vector
 
@@ -143,8 +145,9 @@ jobs = [HELLO_WORLD]
     hosts[hostname].append(JobUpTimeDetails(job, predicted, safe, safe_in))
     return [hosts]
 
+  #TODO(wfarner): Remove this, force tests to call out their flags.
   @classmethod
   def setup_mock_options(cls):
-    mock_options = Mock(spec=['verbosity'])
+    mock_options = create_autospec(spec=['verbosity'], instance=True)
     mock_options.verbosity = 'verbose'
     return mock_options

@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import Mock, patch
+from mock import create_autospec, Mock, patch
 
 from apache.aurora.client.commands.core import list_jobs
 
@@ -46,7 +46,7 @@ class TestListJobs(AuroraClientCommandTest):
   @classmethod
   def create_listjobs_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.getJobsResult = Mock(spec=GetJobsResult)
+    resp.result.getJobsResult = create_autospec(spec=GetJobsResult, instance=True)
     resp.result.getJobsResult.configs = set(cls.create_mock_jobs())
     return resp
 

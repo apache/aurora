@@ -22,7 +22,7 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from .util import AuroraClientCommandTest
 
-from gen.apache.aurora.api.ttypes import JobKey, ScheduleStatus, ScheduleStatusResult, TaskQuery
+from gen.apache.aurora.api.ttypes import JobKey, TaskQuery
 
 
 class TestClientCancelUpdateCommand(AuroraClientCommandTest):
@@ -41,21 +41,8 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_api_factory(cls):
     mock_api_factory, mock_api = cls.create_mock_api_factory()
-    mock_api_factory.return_value.cancel_update.return_value = cls.get_cancel_update_response()
+    mock_api_factory('fake').cancel_update.return_value = cls.get_cancel_update_response()
     return mock_api_factory
-
-  @classmethod
-  def create_mock_status_query_result(cls, scheduleStatus):
-    mock_query_result = cls.create_simple_success_response()
-    mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    if scheduleStatus == ScheduleStatus.INIT:
-      # status query result for before job is launched.
-      mock_query_result.result.scheduleStatusResult.tasks = []
-    else:
-      mock_task_one = cls.create_mock_task('hello', 0, 1000, scheduleStatus)
-      mock_task_two = cls.create_mock_task('hello', 1, 1004, scheduleStatus)
-      mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]
-    return mock_query_result
 
   @classmethod
   def get_cancel_update_response(cls):
@@ -66,7 +53,7 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
     # Running cancel update should result in calling the API cancel_update
     # method once, with an AuroraJobKey parameter.
     assert mock_api.cancel_update.call_count == 1
-    assert mock_api.cancel_update.called_with(
+    mock_api.cancel_update.assert_called_with(
         AuroraJobKey(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB),
         config=None)
 
@@ -81,9 +68,8 @@ class TestClientCancelUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.commands.core.make_client_factory',
             return_value=mock_api_factory),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            mock_make_client_factory, options, mock_get_job_config):
-      mock_api = mock_api_factory.return_value
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
+      mock_api = mock_api_factory('fake')
 
       cancel_update(['west/mchucarroll/test/hello'], mock_options)
       self.assert_cancel_update_called(mock_api)

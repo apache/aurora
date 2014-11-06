@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import Mock, patch
+from mock import create_autospec, patch
 from pystachio.config import Config
 from twitter.common.contextutil import temporary_file
 
@@ -38,23 +38,24 @@ class TestClientCreateCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_options(cls):
     """set up to get a mock options object."""
-    mock_options = Mock()
+    mock_options = create_autospec(spec={}, instance=True)
     mock_options.json = False
     mock_options.bindings = {}
     mock_options.open_browser = False
     mock_options.cluster = None
     mock_options.wait_until = 'RUNNING'  # or 'FINISHED' for other tests
     mock_options.disable_all_hooks = False
+    mock_options.disable_all_hooks_reason = None
     return mock_options
 
   @classmethod
   def create_mock_task(cls, task_id, instance_id, initial_time, status):
-    mock_task = Mock(spec=ScheduledTask)
-    mock_task.assignedTask = Mock(spec=AssignedTask)
+    mock_task = create_autospec(spec=ScheduledTask, instance=True)
+    mock_task.assignedTask = create_autospec(spec=AssignedTask, instance=True)
     mock_task.assignedTask.taskId = task_id
     mock_task.assignedTask.instanceId = instance_id
     mock_task.status = status
-    mock_task_event = Mock(spec=TaskEvent)
+    mock_task_event = create_autospec(spec=TaskEvent, instance=True)
     mock_task_event.timestamp = initial_time
     mock_task.taskEvents = [mock_task_event]
     return mock_task
@@ -62,7 +63,10 @@ class TestClientCreateCommand(AuroraClientCommandTest):
   @classmethod
   def create_mock_status_query_result(cls, scheduleStatus):
     mock_query_result = cls.create_simple_success_response()
-    mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
+    mock_query_result.result.scheduleStatusResult = create_autospec(
+        spec=ScheduleStatusResult,
+        spec_set=False,
+        instance=True)
     mock_task_one = cls.create_mock_task('hello', 0, 1000, scheduleStatus)
     mock_task_two = cls.create_mock_task('hello', 1, 1004, scheduleStatus)
     mock_query_result.result.scheduleStatusResult.tasks = [mock_task_one, mock_task_two]

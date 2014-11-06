@@ -13,8 +13,9 @@
 #
 
 import contextlib
+import threading
 
-from mock import Mock, patch
+from mock import create_autospec, Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.commands.core import CoreCommandHook, kill, killall
@@ -31,6 +32,7 @@ from gen.apache.aurora.api.ttypes import (
     ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
+    TaskConfig,
     TaskEvent,
     TaskQuery
 )
@@ -41,7 +43,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
   @classmethod
   def setup_mock_options(cls):
     """set up to get a mock options object."""
-    mock_options = Mock()
+    mock_options = create_autospec(spec=[], instance=True)
     mock_options.open_browser = False
     mock_options.shards = None
     mock_options.cluster = None
@@ -49,12 +51,14 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_options.batch_size = None
     mock_options.max_total_failures = 1
     mock_options.disable_all_hooks = False
+    mock_options.disable_all_hooks_reason = None
+    mock_options.max_failures_option = None
     return mock_options
 
   @classmethod
   def setup_mock_api_factory(cls):
     mock_api_factory, mock_api = cls.create_mock_api_factory()
-    mock_api_factory.return_value.kill_job.return_value = cls.get_kill_job_response()
+    mock_api_factory('x').return_value.kill_job.return_value = cls.get_kill_job_response()
     return mock_api_factory
 
   @classmethod
@@ -71,12 +75,12 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
   @classmethod
   def create_mock_task(cls, task_id, instance_id, initial_time, status):
-    mock_task = Mock(spec=ScheduledTask)
-    mock_task.assignedTask = Mock(spec=AssignedTask)
+    mock_task = create_autospec(spec=ScheduledTask, instance=True)
+    mock_task.assignedTask = create_autospec(spec=AssignedTask, instance=True)
     mock_task.assignedTask.taskId = task_id
     mock_task.assignedTask.instanceId = instance_id
     mock_task.status = status
-    mock_task_event = Mock(spec=TaskEvent)
+    mock_task_event = create_autospec(spec=TaskEvent, instance=True)
     mock_task_event.timestamp = initial_time
     mock_task.taskEvents = [mock_task_event]
     return mock_task
@@ -84,7 +88,10 @@ class TestClientKillCommand(AuroraClientCommandTest):
   @classmethod
   def create_mock_status_query_result(cls, scheduleStatus):
     mock_query_result = cls.create_simple_success_response()
-    mock_query_result.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
+    mock_query_result.result.scheduleStatusResult = create_autospec(
+        spec=ScheduleStatusResult,
+        spec_set=False,
+        instance=True)
     task = cls.create_mock_task('hello', 0, 1000, scheduleStatus)
     mock_query_result.result.scheduleStatusResult.tasks = [task]
     return mock_query_result
@@ -143,14 +150,13 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('twitter.common.app.get_options', return_value=mock_options),
         patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
 
-      mock_api = mock_api_factory.return_value
+      mock_api = mock_api_factory('x').return_value
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
         self.assertRaises(SystemExit, kill, ['west/mchucarroll/test/hello', fp.name], mock_options)
 
-      # Now check that the right API calls got made.
-      mock_api.kill_job.call_count == 0
+      assert mock_api.kill_job.call_count == 0
 
   def test_simple_successful_killall_job(self):
     """Run a test of the "kill" command against a mocked-out API:
@@ -168,19 +174,20 @@ class TestClientKillCommand(AuroraClientCommandTest):
         self.create_mock_status_query_result(ScheduleStatus.KILLED),
     ]
     mock_scheduler_proxy.getTasksWithoutConfigs.side_effect = mock_query_results
+    mock_event = create_autospec(spec=threading.Event)
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.commands.core.make_client',
             return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config),
+        patch('threading._Event.wait', return_value=mock_event)):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
         killall(['west/mchucarroll/test/hello', fp.name], mock_options)
 
-      # Now check that the right API calls got made.
       self.assert_kill_job_called(mock_api)
       mock_api.kill_job.assert_called_with(
         AuroraJobKey(cluster=self.TEST_CLUSTER, role=self.TEST_ROLE, env=self.TEST_ENV,
@@ -216,18 +223,13 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.commands.core.make_client',
             return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            sleep,
-            mock_make_client,
-            options,
-            mock_get_job_config):
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
         killall(['west/mchucarroll/test/hello', fp.name], mock_options)
 
-      # Now check that the right API calls got made.
       self.assert_kill_job_called(mock_api)
       mock_api.kill_job.assert_called_with(
         AuroraJobKey(cluster=self.TEST_CLUSTER, role=self.TEST_ROLE, env=self.TEST_ENV,
@@ -259,11 +261,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.commands.core.make_client',
             return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)) as (
-            sleep,
-            mock_make_client,
-            options,
-            mock_get_job_config):
+        patch('apache.aurora.client.commands.core.get_job_config', return_value=mock_config)):
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -272,31 +270,28 @@ class TestClientKillCommand(AuroraClientCommandTest):
             SystemExit, killall, ['west/mchucarroll/test/hello', fp.name], mock_options)
 
       CoreCommandHook.clear_hooks()
-      mock_api.kill_job.call_count == 0
+      assert mock_api.kill_job.call_count == 0
 
   def create_status_call_result(cls):
     """Set up the mock status call that will be used to get a task list for
     a batched kill command.
     """
-    status_response = Mock(spec=Response)
-    status_response.responseCode = ResponseCode.OK
-    status_response.messageDEPRECATED = "Ok"
-    status_response.result = Mock(spec=Result)
-    schedule_status = Mock(spec=ScheduleStatusResult)
-    status_response.result.scheduleStatusResult = schedule_status
-    mock_task_config = Mock()
-    # This should be a list of ScheduledTask's.
-    schedule_status.tasks = []
+    tasks = []
     for i in range(20):
-      task_status = Mock(spec=ScheduledTask)
-      task_status.assignedTask = Mock(spec=AssignedTask)
-      task_status.assignedTask.instanceId = i
-      task_status.assignedTask.taskId = "Task%s" % i
-      task_status.assignedTask.slaveId = "Slave%s" % i
-      task_status.slaveHost = "Slave%s" % i
-      task_status.assignedTask.task = mock_task_config
-      schedule_status.tasks.append(task_status)
-    return status_response
+      tasks.append(ScheduledTask(
+        assignedTask=AssignedTask(
+          instanceId=i,
+          taskId='Task%s' % i,
+          slaveId='Slave%s' % i,
+          slaveHost='SlaveHost%s' % i,
+          task=TaskConfig()
+        )
+      ))
+    return Response(
+        responseCode=ResponseCode.OK,
+        messageDEPRECATED='Ok',
+        result=Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
+    )
 
   def test_successful_batched_killall_job(self):
     """Run a test of the "kill" command against a mocked-out API:
@@ -439,6 +434,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     mock_options.batch_size = 2
     mock_options.shards = [0, 1, 2, 3]
+    mock_options.max_failures_option = 3
     mock_config = Mock()
     mock_config.hooks = []
     mock_config.raw.return_value.enable_hooks.return_value.get.return_value = False
@@ -460,7 +456,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
         # We should get an exception in this case, because the one of the two calls fails.
         self.assertRaises(SystemExit, kill, ['west/mchucarroll/test/hello', fp.name], mock_options)
 
-      # killTasks should still have gotten called twice - the first error shouldn't abort
+      # killTasks should still have been called twice - the first error shouldn't abort
       # the second batch.
       assert mock_scheduler_proxy.killTasks.call_count == 2
       query = self.get_expected_task_query([2, 3])

@@ -14,7 +14,7 @@
 
 import contextlib
 
-from mock import Mock, patch
+from mock import create_autospec, patch
 
 from apache.aurora.client.api.scheduler_client import SchedulerClient
 from apache.aurora.client.cli import EXIT_UNKNOWN_ERROR
@@ -24,10 +24,7 @@ from .util import AuroraClientCommandTest
 
 from gen.apache.aurora.api import AuroraAdmin
 from gen.apache.aurora.api.ttypes import (
-    GetJobsResult,
-    JobConfiguration,
     JobKey,
-    Response,
     ResponseCode,
     Result,
     ScheduleStatusResult,
@@ -48,36 +45,18 @@ class TestApiFromCLI(AuroraClientCommandTest):
     return result
 
   @classmethod
-  def create_getjobs_response(cls):
-    result = Mock(spec=Response)
-    result.responseCode = ResponseCode.OK
-    result.result = Mock(spec=Result)
-    result.result.getJobsResult = Mock(spec=GetJobsResult)
-    mock_job_one = Mock(spec=JobConfiguration)
-    mock_job_one.key = Mock(spec=JobKey)
-    mock_job_one.key.role = 'RoleA'
-    mock_job_one.key.environment = 'test'
-    mock_job_one.key.name = 'hithere'
-    mock_job_two = Mock(spec=JobConfiguration)
-    mock_job_two.key = Mock(spec=JobKey)
-    mock_job_two.key.role = 'bozo'
-    mock_job_two.key.environment = 'test'
-    mock_job_two.key.name = 'hello'
-    result.result.getJobsResult.configs = [mock_job_one, mock_job_two]
-    return result
-
-  @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_scheduled_tasks())
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(tasks=set(cls.create_scheduled_tasks())))
     return resp
 
   @classmethod
   def create_status_response_null_metadata(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_mock_scheduled_task_no_metadata())
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(
+            tasks=set(cls.create_mock_scheduled_task_no_metadata())))
     return resp
 
   @classmethod
@@ -87,20 +66,22 @@ class TestApiFromCLI(AuroraClientCommandTest):
   def test_successful_status_deep(self):
     """Test the status command more deeply: in a request with a fully specified
     job, it should end up doing a query using getTasksWithoutConfigs."""
-    _, mock_scheduler_proxy = self.create_mock_api()
-    mock_scheduler_proxy.query.return_value = self.create_status_response()
+    mock_scheduler_client = create_autospec(spec=SchedulerClient, instance=True)
+    mock_thrift_client = create_autospec(spec=AuroraAdmin.Client, instance=True)
+    mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
+    mock_thrift_client.getTasksWithoutConfigs.return_value = self.create_status_response()
     with contextlib.nested(
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
+        patch('apache.aurora.client.api.scheduler_client.SchedulerClient.get',
+            return_value=mock_scheduler_client),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       cmd = AuroraCommandLine()
       cmd.execute(['job', 'status', 'west/bozo/test/hello'])
-      mock_scheduler_proxy.getTasksWithoutConfigs.assert_called_with(
+      mock_thrift_client.getTasksWithoutConfigs.assert_called_with(
           TaskQuery(jobKeys=[JobKey(role='bozo', environment='test', name='hello')]))
 
   def test_status_api_failure(self):
-    # TODO(wfarner): Consider spec_set instead of spec.
-    mock_scheduler_client = Mock(spec=SchedulerClient)
-    mock_thrift_client = Mock(spec=AuroraAdmin.Client)
+    mock_scheduler_client = create_autospec(spec=SchedulerClient, instance=True)
+    mock_thrift_client = create_autospec(spec=AuroraAdmin.Client, instance=True)
     mock_scheduler_client.get_thrift_client.return_value = mock_thrift_client
 
     mock_thrift_client.getTasksWithoutConfigs.side_effect = IOError("Uh-Oh")

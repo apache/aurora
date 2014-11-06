@@ -29,6 +29,7 @@ from gen.apache.aurora.api.ttypes import (
     JobKey,
     PopulateJobResult,
     ResponseCode,
+    Result,
     ScheduleStatusResult,
     TaskQuery
 )
@@ -50,8 +51,8 @@ class TestDiffCommand(AuroraClientCommandTest):
   @classmethod
   def create_status_response(cls):
     resp = cls.create_simple_success_response()
-    resp.result.scheduleStatusResult = Mock(spec=ScheduleStatusResult)
-    resp.result.scheduleStatusResult.tasks = set(cls.create_scheduled_tasks())
+    resp.result = Result(
+        scheduleStatusResult=ScheduleStatusResult(tasks=set(cls.create_scheduled_tasks())))
     return resp
 
   @classmethod
@@ -61,10 +62,11 @@ class TestDiffCommand(AuroraClientCommandTest):
   @classmethod
   def setup_populate_job_config(cls, api):
     populate = cls.create_simple_success_response()
-    populate.result.populateJobResult = Mock(spec=PopulateJobResult)
     api.populateJobConfig.return_value = populate
     tasks = set(task.assignedTask.task for task in cls.create_scheduled_tasks())
-    populate.result.populateJobResult.populatedDEPRECATED = tasks
+    populate.result = Result(populateJobResult=PopulateJobResult(
+        populatedDEPRECATED=tasks
+    ))
     return populate
 
   def test_successful_diff(self):

@@ -338,7 +338,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
           "  Instance 2 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATING",
           "  Instance 1 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATED",
           "  Instance 2 at YYYY-MM-DD HH:MM:SS: INSTANCE_UPDATED"]
-      mock_context.get_api("west").query_job_updates.assert_called_with(jobKey=AuroraJobKey(
+      mock_context.get_api("west").query_job_updates.assert_called_with(job_key=AuroraJobKey(
           'west', 'mcc', 'test', 'hello'))
 
   def test_update_status_json(self):
@@ -353,7 +353,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
       cmd = AuroraCommandLine()
       result = cmd.execute(["beta-update", "status", "--write-json", "west/mcc/test/hello"])
       assert result == EXIT_OK
-      mock_context.get_api("west").query_job_updates.assert_called_with(jobKey=AuroraJobKey(
+      mock_context.get_api("west").query_job_updates.assert_called_with(job_key=AuroraJobKey(
           'west', 'mcc', 'test', 'hello'))
       mock_context.get_api("west").get_job_update_details.assert_called_with('hello')
       assert mock_context.get_out_str() == textwrap.dedent("""\

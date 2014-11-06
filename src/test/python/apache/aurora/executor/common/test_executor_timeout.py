@@ -25,7 +25,7 @@ from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
 class TestExecutorTimeout(TestCase):
   def test_run(self):
     event = Event()
-    mock_driver = mock.Mock(spec=ExecutorDriver)
+    mock_driver = mock.create_autospec(spec=ExecutorDriver, instance=True)
     event.set()
     executor_timeout = ExecutorTimeout(event, mock_driver, timeout=Amount(0, Time.SECONDS))
     executor_timeout.run()
@@ -33,7 +33,7 @@ class TestExecutorTimeout(TestCase):
 
   def test_run_timeout(self):
     event = Event()
-    mock_driver = mock.Mock(spec=ExecutorDriver)
+    mock_driver = mock.create_autospec(spec=ExecutorDriver, instance=True)
     executor_timeout = ExecutorTimeout(event, mock_driver, timeout=Amount(0, Time.SECONDS))
     executor_timeout.run()
     mock_driver.stop.assert_called_once_with()
