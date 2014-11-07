@@ -18,6 +18,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.eventbus.Subscribe;
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.Inject;
 import com.twitter.common.stats.Stats;
 
@@ -34,7 +35,7 @@ import static org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 /**
  * A pubsub event subscriber that forwards status updates to the job update controller.
  */
-class JobUpdateEventSubscriber implements PubsubEvent.EventSubscriber {
+class JobUpdateEventSubscriber extends AbstractIdleService implements PubsubEvent.EventSubscriber {
   private static final Logger LOG = Logger.getLogger(JobUpdateEventSubscriber.class.getName());
 
   private static final AtomicLong RECOVERY_ERRORS = Stats.exportLong("job_update_recovery_errors");
@@ -77,13 +78,19 @@ class JobUpdateEventSubscriber implements PubsubEvent.EventSubscriber {
     }
   }
 
-  @Subscribe
-  public void schedulerActive(PubsubEvent.SchedulerActive event) {
+  // TODO(ksweeney): Investigate letting this exception propagate up.
+  @Override
+  protected void startUp() {
     try {
       controller.systemResume();
     } catch (RuntimeException e) {
       LOG.log(Level.SEVERE, "Failed to resume job updates: " + e, e);
       RECOVERY_ERRORS.incrementAndGet();
     }
+  }
+
+  @Override
+  protected void shutDown() {
+    // Ignored. VM shutdown is required to stop processing updates.
   }
 }

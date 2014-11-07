@@ -36,9 +36,7 @@ import com.twitter.common.util.Clock;
 import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.scheduler.base.Query;
-import org.apache.aurora.scheduler.events.EventSink;
-import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
-import org.apache.aurora.scheduler.state.PubsubTestUtil;
+import org.apache.aurora.scheduler.sla.SlaModule.SlaUpdater;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.EasyMock;
@@ -58,7 +56,6 @@ public class SlaModuleTest extends EasyMockTest {
   private StorageTestUtil storageUtil;
   private StatsProvider statsProvider;
   private SlaModule module;
-  private EventSink eventSink;
 
   @Before
   public void setUp() throws Exception {
@@ -74,14 +71,12 @@ public class SlaModuleTest extends EasyMockTest {
             .add(new AbstractModule() {
               @Override
               protected void configure() {
-                PubsubTestUtil.installPubsub(binder());
                 bind(Clock.class).toInstance(clock);
                 bind(Storage.class).toInstance(storageUtil.storage);
                 bind(StatsProvider.class).toInstance(statsProvider);
               }
             }).build()
     );
-    eventSink = PubsubTestUtil.startPubsub(injector);
   }
 
   @Test
@@ -121,7 +116,7 @@ public class SlaModuleTest extends EasyMockTest {
 
     control.replay();
 
-    eventSink.post(new SchedulerActive());
+    injector.getInstance(SlaUpdater.class).startAsync().awaitRunning();
     latch.await();
   }
 }

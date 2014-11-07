@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.logging.Logger;
@@ -21,17 +22,25 @@ import java.util.logging.Logger;
 import javax.inject.Singleton;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Service;
+import com.google.common.util.concurrent.ServiceManager;
 import com.google.inject.AbstractModule;
+import com.google.inject.Binder;
 import com.google.inject.PrivateModule;
 import com.google.inject.Provides;
+import com.google.inject.binder.LinkedBindingBuilder;
+import com.google.inject.multibindings.Multibinder;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
+import org.apache.aurora.GuavaUtils;
+import org.apache.aurora.GuavaUtils.ServiceManagerIface;
 import org.apache.aurora.scheduler.Driver.DriverImpl;
 import org.apache.aurora.scheduler.Driver.SettableDriver;
 import org.apache.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
+import org.apache.aurora.scheduler.SchedulerLifecycle.SchedulerActive;
 import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher;
 import org.apache.aurora.scheduler.base.AsyncUtil;
@@ -88,7 +97,9 @@ public class SchedulerModule extends AbstractModule {
     });
 
     PubsubEventModule.bindSubscriber(binder(), SchedulerLifecycle.class);
+    bind(TaskVars.class).in(Singleton.class);
     PubsubEventModule.bindSubscriber(binder(), TaskVars.class);
+    addSchedulerActiveServiceBinding(binder()).to(TaskVars.class);
   }
 
   @Provides
@@ -98,5 +109,25 @@ public class SchedulerModule extends AbstractModule {
       UserTaskLauncher userTaskLauncher) {
 
     return ImmutableList.of(gcLauncher, userTaskLauncher);
+  }
+
+  /**
+   * Register a Service to run after storage is ready, but before the scheduler has announced
+   * leadership. If this service fails to startup the scheduler will abort.
+   *
+   * Usage: {@code addSchedulerActiveServiceBinding(binder()).to(YourService.class)}.
+   *
+   * @param binder Binder for the current non-private module.
+   * @return a linked binding builder with the normal Guice EDSL methods.
+   */
+  public static LinkedBindingBuilder<Service> addSchedulerActiveServiceBinding(Binder binder) {
+    return Multibinder.newSetBinder(binder, Service.class, SchedulerActive.class).addBinding();
+  }
+
+  @Provides
+  @Singleton
+  @SchedulerActive
+  ServiceManagerIface provideSchedulerActiveServiceManager(@SchedulerActive Set<Service> services) {
+    return GuavaUtils.serviceManager(new ServiceManager(services));
   }
 }

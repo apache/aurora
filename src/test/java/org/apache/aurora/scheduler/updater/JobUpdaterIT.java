@@ -120,7 +120,6 @@ import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.STARTING;
-import static org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import static org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult;
 import static org.apache.aurora.scheduler.updater.UpdateFactory.UpdateFactoryImpl.expandInstanceIds;
 import static org.easymock.EasyMock.expectLastCall;
@@ -766,7 +765,7 @@ public class JobUpdaterIT extends EasyMockTest {
       }
     });
 
-    eventBus.post(new SchedulerActive());
+    subscriber.startAsync().awaitRunning();
 
     // Instance 0 is updated.
     changeState(JOB, 0, KILLED, ASSIGNED, STARTING, RUNNING);
@@ -798,7 +797,7 @@ public class JobUpdaterIT extends EasyMockTest {
       }
     });
 
-    eventBus.post(new SchedulerActive());
+    subscriber.startAsync().awaitRunning();
     assertState(ERROR, ImmutableMultimap.<Integer, JobUpdateAction>of());
   }
 

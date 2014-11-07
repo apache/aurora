@@ -20,8 +20,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.util.Modules;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 
@@ -33,15 +31,11 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CrontabEntry;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
-import org.apache.aurora.scheduler.events.EventSink;
-import org.apache.aurora.scheduler.events.PubsubEvent;
-import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
-import org.easymock.Capture;
 import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
@@ -50,7 +44,6 @@ import org.quartz.Scheduler;
 import org.quartz.Trigger;
 import org.quartz.TriggerListener;
 
-import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.isA;
 import static org.junit.Assert.assertEquals;
@@ -82,18 +75,13 @@ public class CronIT extends EasyMockTest {
               .setDiskMb(9))
   );
 
-  private ShutdownRegistry shutdownRegistry;
-  private EventSink eventSink;
   private Injector injector;
   private StateManager stateManager;
   private Storage storage;
   private AuroraCronJob auroraCronJob;
 
-  private Capture<ExceptionalCommand<?>> shutdown;
-
   @Before
   public void setUp() throws Exception {
-    shutdownRegistry = createMock(ShutdownRegistry.class);
     stateManager = createMock(StateManager.class);
     storage = MemStorage.newEmptyStorage();
     auroraCronJob = createMock(AuroraCronJob.class);
@@ -110,21 +98,16 @@ public class CronIT extends EasyMockTest {
           @Override
           protected void configure() {
             bind(Clock.class).toInstance(Clock.SYSTEM_CLOCK);
-            bind(ShutdownRegistry.class).toInstance(shutdownRegistry);
             bind(StateManager.class).toInstance(stateManager);
             bind(Storage.class).toInstance(storage);
-
-            PubsubTestUtil.installPubsub(binder());
           }
         });
-    eventSink = PubsubTestUtil.startPubsub(injector);
-
-    shutdown = createCapture();
-    shutdownRegistry.addAction(capture(shutdown));
   }
 
-  private void boot() {
-    eventSink.post(new PubsubEvent.SchedulerActive());
+  private Service boot() {
+    Service service = injector.getInstance(CronLifecycle.class);
+    service.startAsync().awaitRunning();
+    return service;
   }
 
   @Test
@@ -134,13 +117,12 @@ public class CronIT extends EasyMockTest {
     Scheduler scheduler = injector.getInstance(Scheduler.class);
     assertTrue(!scheduler.isStarted());
 
-    boot();
-    Service cronLifecycle = injector.getInstance(CronLifecycle.class);
+    Service cronLifecycle = boot();
 
     assertTrue(cronLifecycle.isRunning());
     assertTrue(scheduler.isStarted());
 
-    shutdown.getValue().execute();
+    cronLifecycle.stopAsync().awaitTerminated();
 
     assertTrue(!cronLifecycle.isRunning());
     assertTrue(scheduler.isShutdown());
@@ -165,11 +147,11 @@ public class CronIT extends EasyMockTest {
 
     final CountDownLatch cronRan = new CountDownLatch(1);
     scheduler.getListenerManager().addTriggerListener(new CountDownWhenComplete(cronRan));
-    boot();
+    Service service = boot();
 
     cronRan.await();
 
-    shutdown.getValue().execute();
+    service.stopAsync().awaitTerminated();
   }
 
   @Test

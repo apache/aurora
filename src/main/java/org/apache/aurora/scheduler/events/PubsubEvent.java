@@ -246,15 +246,4 @@ public interface PubsubEvent {
     }
   }
 
-  class SchedulerActive implements PubsubEvent {
-    @Override
-    public boolean equals(Object o) {
-      return o != null && getClass().equals(o.getClass());
-    }
-
-    @Override
-    public int hashCode() {
-      return getClass().hashCode();
-    }
-  }
 }

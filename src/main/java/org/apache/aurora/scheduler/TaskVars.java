@@ -32,12 +32,12 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.twitter.common.stats.StatsProvider;
 
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -52,7 +52,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * A container that tracks and exports stat counters for tasks.
  */
-class TaskVars implements EventSubscriber {
+class TaskVars extends AbstractIdleService implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(TaskVars.class.getName());
   private static final ImmutableSet<ScheduleStatus> TRACKED_JOB_STATES =
       ImmutableSet.of(ScheduleStatus.LOST, ScheduleStatus.FAILED);
@@ -180,8 +180,8 @@ class TaskVars implements EventSubscriber {
     updateJobCounters(task, task.getStatus());
   }
 
-  @Subscribe
-  public void schedulerActive(SchedulerActive event) {
+  @Override
+  protected void startUp() {
     // Dummy read the counter for each status counter. This is important to guarantee a stat with
     // value zero is present for each state, even if all states are not represented in the task
     // store.
@@ -191,6 +191,11 @@ class TaskVars implements EventSubscriber {
 
     exportCounters(counters.asMap());
     exportCounters(untrackedCounters.asMap());
+  }
+
+  @Override
+  protected void shutDown() {
+    // Ignored. VM shutdown is required to stop exporting task vars.
   }
 
   private void exportCounters(Map<String, Counter> counterMap) {

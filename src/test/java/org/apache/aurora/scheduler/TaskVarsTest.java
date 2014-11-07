@@ -32,7 +32,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
@@ -119,7 +118,7 @@ public class TaskVarsTest extends EasyMockTest {
     for (IScheduledTask task : initialTasks) {
       vars.taskChangedState(TaskStateChange.initialized(task));
     }
-    vars.schedulerActive(new SchedulerActive());
+    vars.startAsync().awaitRunning();
   }
 
   private IScheduledTask makeTask(String job, ScheduleStatus status, String host) {

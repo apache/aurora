@@ -15,6 +15,7 @@ package org.apache.aurora.scheduler.updater;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.EventBus;
+import com.google.common.util.concurrent.Service;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -30,7 +31,6 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import static org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import static org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import static org.easymock.EasyMock.expectLastCall;
@@ -56,6 +56,7 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
           .setInstanceId(TASK.getAssignedTask().getInstanceId()));
 
   private JobUpdateController updater;
+  private Service service;
 
   private EventBus eventBus;
 
@@ -63,8 +64,10 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
   public void setUp() {
     updater = createMock(JobUpdateController.class);
 
+    service = new JobUpdateEventSubscriber(updater);
+
     eventBus = new EventBus();
-    eventBus.register(new JobUpdateEventSubscriber(updater));
+    eventBus.register(service);
   }
 
   @Test
@@ -91,7 +94,7 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
 
     control.replay();
 
-    eventBus.post(new SchedulerActive());
+    service.startAsync().awaitRunning();
   }
 
   @Test
@@ -105,7 +108,7 @@ public class JobUpdateEventSubscriberTest extends EasyMockTest {
 
     control.replay();
 
-    eventBus.post(new SchedulerActive());
+    service.startAsync().awaitRunning();
     eventBus.post(TaskStateChange.initialized(TASK));
     eventBus.post(new TasksDeleted(ImmutableSet.of(TASK)));
   }

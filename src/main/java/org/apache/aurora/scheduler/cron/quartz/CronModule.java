@@ -28,10 +28,10 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.BackoffHelper;
 
+import org.apache.aurora.scheduler.SchedulerModule;
 import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.cron.CronPredictor;
 import org.apache.aurora.scheduler.cron.CronScheduler;
-import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
@@ -90,7 +90,7 @@ public class CronModule extends AbstractModule {
         new BackoffHelper(CRON_START_INITIAL_BACKOFF.get(), CRON_START_MAX_BACKOFF.get())));
 
     bind(CronLifecycle.class).in(Singleton.class);
-    PubsubEventModule.bindSubscriber(binder(), CronLifecycle.class);
+    SchedulerModule.addSchedulerActiveServiceBinding(binder()).to(CronLifecycle.class);
   }
 
   @Provides

@@ -23,21 +23,17 @@ import javax.inject.Inject;
 import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.eventbus.Subscribe;
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
-import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.Positive;
-import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
+import org.apache.aurora.scheduler.SchedulerModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
-import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
-import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -84,11 +80,12 @@ public class SlaModule extends AbstractModule {
         .annotatedWith(SlaExecutor.class)
         .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SlaStat-%d", LOG));
 
-    PubsubEventModule.bindSubscriber(binder(), SlaUpdater.class);
-    LifecycleModule.bindStartupAction(binder(), SlaUpdater.class);
+    bind(SlaUpdater.class).in(Singleton.class);
+    SchedulerModule.addSchedulerActiveServiceBinding(binder()).to(SlaUpdater.class);
   }
 
-  static class SlaUpdater implements Command, EventSubscriber {
+  // TODO(ksweeney): This should use AbstractScheduledService.
+  static class SlaUpdater extends AbstractIdleService {
     private final ScheduledExecutorService executor;
     private final MetricCalculator calculator;
     private final MetricCalculatorSettings settings;
@@ -104,16 +101,16 @@ public class SlaModule extends AbstractModule {
       this.settings = requireNonNull(settings);
     }
 
-    @Subscribe
-    public void schedulerActive(SchedulerActive event) {
+    @Override
+    protected void startUp() {
       long interval = settings.getRefreshRateMs();
       executor.scheduleAtFixedRate(calculator, interval, interval, TimeUnit.MILLISECONDS);
       LOG.info(String.format("Scheduled SLA calculation with %d msec interval.", interval));
     }
 
     @Override
-    public void execute() throws RuntimeException {
-      // Execution scheduled on SchedulerActive event.
+    protected void shutDown() {
+      // Ignored. VM shutdown is required to stop computing SLAs.
     }
   }
 }

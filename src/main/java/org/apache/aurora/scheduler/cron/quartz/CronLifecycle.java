@@ -20,16 +20,12 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.AbstractIdleService;
-import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.base.Command;
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.cron.CronException;
 import org.apache.aurora.scheduler.cron.SanitizedCronJob;
-import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
@@ -39,7 +35,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Manager for startup and teardown of Quartz scheduler.
  */
-class CronLifecycle extends AbstractIdleService implements PubsubEvent.EventSubscriber {
+class CronLifecycle extends AbstractIdleService {
   private static final Logger LOG = Logger.getLogger(CronLifecycle.class.getName());
 
   private static final AtomicInteger RUNNING_FLAG = Stats.exportInt("quartz_scheduler_running");
@@ -47,36 +43,12 @@ class CronLifecycle extends AbstractIdleService implements PubsubEvent.EventSubs
   private static final AtomicLong LAUNCH_FAILURES = Stats.exportLong("cron_job_launch_failures");
 
   private final Scheduler scheduler;
-  private final ShutdownRegistry shutdownRegistry;
   private final CronJobManagerImpl cronJobManager;
 
   @Inject
-  CronLifecycle(
-      Scheduler scheduler,
-      ShutdownRegistry shutdownRegistry,
-      CronJobManagerImpl cronJobManager) {
-
+  CronLifecycle(Scheduler scheduler, CronJobManagerImpl cronJobManager) {
     this.scheduler = requireNonNull(scheduler);
-    this.shutdownRegistry = requireNonNull(shutdownRegistry);
     this.cronJobManager = requireNonNull(cronJobManager);
-  }
-
-  /**
-   * Notifies the cronScheduler job manager that the scheduler is active, and job configurations
-   * are ready to load.
-   *
-   * @param schedulerActive Event.
-   */
-  @Subscribe
-  public void schedulerActive(PubsubEvent.SchedulerActive schedulerActive) {
-    startAsync();
-    shutdownRegistry.addAction(new Command() {
-      @Override
-      public void execute() {
-        CronLifecycle.this.stopAsync().awaitTerminated();
-      }
-    });
-    awaitRunning();
   }
 
   @Override

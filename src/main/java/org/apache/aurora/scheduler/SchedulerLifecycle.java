@@ -13,7 +13,13 @@
  */
 package org.apache.aurora.scheduler;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
@@ -21,6 +27,7 @@ import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -28,6 +35,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
+import com.google.common.base.Throwables;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.util.concurrent.Atomics;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -35,7 +43,7 @@ import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.Closures;
-import com.twitter.common.base.Command;
+import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatsProvider;
@@ -46,11 +54,11 @@ import com.twitter.common.zookeeper.Group.JoinException;
 import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 
+import org.apache.aurora.GuavaUtils.ServiceManagerIface;
 import org.apache.aurora.scheduler.Driver.SettableDriver;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.events.PubsubEvent.SchedulerActive;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
@@ -134,7 +142,8 @@ public class SchedulerLifecycle implements EventSubscriber {
       Clock clock,
       EventSink eventSink,
       ShutdownRegistry shutdownRegistry,
-      StatsProvider statsProvider) {
+      StatsProvider statsProvider,
+      @SchedulerActive ServiceManagerIface schedulerActiveServiceManager) {
 
     this(
         driverFactory,
@@ -145,7 +154,8 @@ public class SchedulerLifecycle implements EventSubscriber {
         clock,
         eventSink,
         shutdownRegistry,
-        statsProvider);
+        statsProvider,
+        schedulerActiveServiceManager);
   }
 
   private static final class DefaultDelayedActions implements DelayedActions {
@@ -187,11 +197,6 @@ public class SchedulerLifecycle implements EventSubscriber {
           leadingOptions.registrationDelayLimit.getValue(),
           leadingOptions.registrationDelayLimit.getUnit().getTimeUnit());
     }
-
-    @Override
-    public void onRegistered(Runnable runnable) {
-      executorService.submit(runnable);
-    }
   }
 
   @VisibleForTesting
@@ -212,7 +217,8 @@ public class SchedulerLifecycle implements EventSubscriber {
       final Clock clock,
       final EventSink eventSink,
       final ShutdownRegistry shutdownRegistry,
-      StatsProvider statsProvider) {
+      StatsProvider statsProvider,
+      final ServiceManagerIface schedulerActiveServiceManager) {
 
     requireNonNull(driverFactory);
     requireNonNull(storage);
@@ -242,10 +248,12 @@ public class SchedulerLifecycle implements EventSubscriber {
           });
     }
 
-    shutdownRegistry.addAction(new Command() {
+    shutdownRegistry.addAction(new ExceptionalCommand<TimeoutException>() {
       @Override
-      public void execute() {
+      public void execute() throws TimeoutException {
         stateMachine.transition(State.DEAD);
+        schedulerActiveServiceManager.stopAsync();
+        schedulerActiveServiceManager.awaitStopped(5L, TimeUnit.SECONDS);
       }
     });
 
@@ -321,47 +329,14 @@ public class SchedulerLifecycle implements EventSubscriber {
           }
         });
 
-        // This action sequence must be deferred due to a subtle detail of how guava's EventBus
-        // works. EventBus event handlers are guaranteed to not be reentrant, meaning that posting
-        // an event from an event handler will not dispatch in the same sequence as the calls to
-        // post().
-        // In short, this is to enforce a happens-before relationship between delivering
-        // SchedulerActive and advertising leadership. Without deferring, you end up with a call
-        // sequence like this:
-        //
-        // - Enter DriverRegistered handler
-        //   - Post SchedulerActive event
-        //   - Announce leadership
-        // - Exit DriverRegistered handler
-        // - Dispatch SchedulerActive to subscribers
-        //
-        // With deferring, we get this instead:
-        //
-        // - Enter DriverRegistered handler
-        // - Exit DriverRegistered handler
-        // (executor service dispatch delay)
-        // - Post SchedulerActive Event
-        //   - Dispatch SchedulerActive to subscribers
-        // - Announce leadership
-        //
-        // The latter is preferable since it makes it easier to reason about the state of an
-        // announced scheduler.
-        delayedActions.onRegistered(new Runnable() {
-          @Override
-          public void run() {
-            eventSink.post(new SchedulerActive());
-            try {
-              leaderControl.get().advertise();
-            } catch (JoinException e) {
-              LOG.log(Level.SEVERE, "Failed to advertise leader, shutting down.", e);
-              stateMachine.transition(State.DEAD);
-            } catch (InterruptedException e) {
-              LOG.log(Level.SEVERE, "Interrupted while advertising leader, shutting down.", e);
-              stateMachine.transition(State.DEAD);
-              Thread.currentThread().interrupt();
-            }
-          }
-        });
+        // TODO(ksweeney): Extract leader advertisement to its own service.
+        schedulerActiveServiceManager.startAsync().awaitHealthy();
+        try {
+          leaderControl.get().advertise();
+        } catch (JoinException | InterruptedException e) {
+          LOG.log(Level.SEVERE, "Failed to advertise leader, shutting down.");
+          throw Throwables.propagate(e);
+        }
       }
     };
 
@@ -522,7 +497,14 @@ public class SchedulerLifecycle implements EventSubscriber {
     void onAutoFailover(Runnable runnable);
 
     void onRegistrationTimeout(Runnable runnable);
-
-    void onRegistered(Runnable runnable);
   }
+
+  /**
+   * Qualifier for services that will be run after the scheduler storage is available
+   * but before leadership is announced in ZooKeeper.
+   */
+  @Qualifier
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER})
+  static @interface SchedulerActive { }
 }
