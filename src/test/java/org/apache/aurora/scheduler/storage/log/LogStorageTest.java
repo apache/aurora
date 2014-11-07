@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
+import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -22,9 +23,11 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.Sets;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
 import com.google.common.testing.TearDown;
+
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
@@ -205,37 +208,6 @@ public class LogStorageTest extends EasyMockTest {
       }
     });
 
-    Entry entry1 = createMock(Entry.class);
-    Entry entry2 = createMock(Entry.class);
-    Entry entry3 = createMock(Entry.class);
-    Entry entry4 = createMock(Entry.class);
-    Entry entry5 = createMock(Entry.class);
-    String frameworkId1 = "bob";
-    LogEntry recoveredEntry1 =
-        createTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId1)));
-    String frameworkId2 = "jim";
-    LogEntry recoveredEntry2 =
-        createTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId2)));
-    // This entry lacks a slave ID, and should therefore be discarded.
-    LogEntry recoveredEntry3 =
-        createTransaction(Op.saveHostAttributes(new SaveHostAttributes(new HostAttributes()
-            .setHost("host1")
-            .setMode(MaintenanceMode.DRAINED))));
-    IHostAttributes attributes = IHostAttributes.build(new HostAttributes()
-        .setHost("host2")
-        .setSlaveId("slave2")
-        .setMode(MaintenanceMode.DRAINED));
-    LogEntry recoveredEntry4 =
-        createTransaction(Op.saveHostAttributes(new SaveHostAttributes(attributes.newBuilder())));
-    LogEntry recoveredEntry5 =
-        createTransaction(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory()));
-    expect(entry1.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry1));
-    expect(entry2.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry2));
-    expect(entry3.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry3));
-    expect(entry4.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry4));
-    expect(entry5.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(recoveredEntry5));
-    expect(stream.readAll()).andReturn(Iterators.forArray(entry1, entry2, entry3, entry4, entry5));
-
     final Capture<MutateWork<Void, RuntimeException>> recoveryWork = createCapture();
     expect(storageUtil.storage.write(capture(recoveryWork))).andAnswer(
         new IAnswer<Void>() {
@@ -245,9 +217,6 @@ public class LogStorageTest extends EasyMockTest {
             return null;
           }
         });
-    storageUtil.schedulerStore.saveFrameworkId(frameworkId1);
-    storageUtil.schedulerStore.saveFrameworkId(frameworkId2);
-    storageUtil.attributeStore.saveHostAttributes(attributes);
 
     final Capture<MutateWork<Void, RuntimeException>> initializationWork = createCapture();
     expect(storageUtil.storage.write(capture(initializationWork))).andAnswer(
@@ -279,7 +248,10 @@ public class LogStorageTest extends EasyMockTest {
             snapshotWork.getValue().apply(storageUtil.mutableStoreProvider);
             return null;
           }
-        }).times(5);
+        }).anyTimes();
+
+    // Populate all LogEntry types.
+    buildReplayLogEntries();
 
     control.replay();
 
@@ -289,6 +261,123 @@ public class LogStorageTest extends EasyMockTest {
 
     // Run the snapshot thread.
     snapshotAction.getValue().run();
+
+    // Assert all LogEntry types have handlers defined.
+    // Our current StreamManagerImpl.readFromBeginning() does not let some entries escape
+    // the decoding routine making handling them in replay unnecessary.
+    assertEquals(
+        Sets.complementOf(EnumSet.of(
+            LogEntry._Fields.FRAME,
+            LogEntry._Fields.DEDUPLICATED_SNAPSHOT,
+            LogEntry._Fields.DEFLATED_ENTRY)),
+        EnumSet.copyOf(logStorage.buildLogEntryReplayActions().keySet()));
+
+    // Assert all Transaction types have handlers defined.
+    assertEquals(
+        EnumSet.allOf(Op._Fields.class),
+        EnumSet.copyOf(logStorage.buildTransactionReplayActions().keySet()));
+  }
+
+  private void buildReplayLogEntries() throws Exception {
+    ImmutableSet.Builder<LogEntry> builder = ImmutableSet.builder();
+
+    builder.add(createTransaction(Op.saveFrameworkId(new SaveFrameworkId("bob"))));
+    storageUtil.schedulerStore.saveFrameworkId("bob");
+
+    SaveAcceptedJob acceptedJob =
+        new SaveAcceptedJob().setManagerId("CRON").setJobConfig(new JobConfiguration());
+    builder.add(createTransaction(Op.saveAcceptedJob(acceptedJob)));
+    storageUtil.jobStore.saveAcceptedJob(
+        acceptedJob.getManagerId(),
+        IJobConfiguration.build(acceptedJob.getJobConfig()));
+
+    RemoveJob removeJob = new RemoveJob(JOB_KEY.newBuilder());
+    builder.add(createTransaction(Op.removeJob(removeJob)));
+    storageUtil.jobStore.removeJob(JOB_KEY);
+
+    SaveTasks saveTasks = new SaveTasks(ImmutableSet.of(new ScheduledTask()));
+    builder.add(createTransaction(Op.saveTasks(saveTasks)));
+    storageUtil.taskStore.saveTasks(IScheduledTask.setFromBuilders(saveTasks.getTasks()));
+
+    RewriteTask rewriteTask = new RewriteTask("id1", new TaskConfig());
+    builder.add(createTransaction(Op.rewriteTask(rewriteTask)));
+    expect(storageUtil.taskStore.unsafeModifyInPlace(
+        rewriteTask.getTaskId(),
+        ITaskConfig.build(rewriteTask.getTask()))).andReturn(true);
+
+    RemoveTasks removeTasks = new RemoveTasks(ImmutableSet.<String>of("taskId1"));
+    builder.add(createTransaction(Op.removeTasks(removeTasks)));
+    storageUtil.taskStore.deleteTasks(removeTasks.getTaskIds());
+
+    SaveQuota saveQuota = new SaveQuota(JOB_KEY.getRole(), new ResourceAggregate());
+    builder.add(createTransaction(Op.saveQuota(saveQuota)));
+    storageUtil.quotaStore.saveQuota(
+        saveQuota.getRole(),
+        IResourceAggregate.build(saveQuota.getQuota()));
+
+    builder.add(createTransaction(Op.removeQuota(new RemoveQuota(JOB_KEY.getRole()))));
+    storageUtil.quotaStore.removeQuota(JOB_KEY.getRole());
+
+    // This entry lacks a slave ID, and should therefore be discarded.
+    SaveHostAttributes hostAttributes1 = new SaveHostAttributes(new HostAttributes()
+        .setHost("host1")
+        .setMode(MaintenanceMode.DRAINED));
+    builder.add(createTransaction(Op.saveHostAttributes(hostAttributes1)));
+
+    SaveHostAttributes hostAttributes2 = new SaveHostAttributes(new HostAttributes()
+        .setHost("host2")
+        .setSlaveId("slave2")
+        .setMode(MaintenanceMode.DRAINED));
+    builder.add(createTransaction(Op.saveHostAttributes(hostAttributes2)));
+    storageUtil.attributeStore.saveHostAttributes(
+        IHostAttributes.build(hostAttributes2.getHostAttributes()));
+
+    SaveLock saveLock = new SaveLock(new Lock().setKey(LockKey.job(JOB_KEY.newBuilder())));
+    builder.add(createTransaction(Op.saveLock(saveLock)));
+    storageUtil.lockStore.saveLock(ILock.build(saveLock.getLock()));
+
+    RemoveLock removeLock = new RemoveLock(LockKey.job(JOB_KEY.newBuilder()));
+    builder.add(createTransaction(Op.removeLock(removeLock)));
+    storageUtil.lockStore.removeLock(ILockKey.build(removeLock.getLockKey()));
+
+    SaveJobUpdate saveUpdate = new SaveJobUpdate(new JobUpdate(), "token");
+    builder.add(createTransaction(Op.saveJobUpdate(saveUpdate)));
+    storageUtil.jobUpdateStore.saveJobUpdate(
+        IJobUpdate.build(saveUpdate.getJobUpdate()),
+        Optional.of(saveUpdate.getLockToken()));
+
+    SaveJobUpdateEvent saveUpdateEvent = new SaveJobUpdateEvent(new JobUpdateEvent(), "update");
+    builder.add(createTransaction(Op.saveJobUpdateEvent(saveUpdateEvent)));
+    storageUtil.jobUpdateStore.saveJobUpdateEvent(
+        IJobUpdateEvent.build(saveUpdateEvent.getEvent()),
+        saveUpdateEvent.getUpdateId());
+
+    SaveJobInstanceUpdateEvent saveInstanceEvent =
+        new SaveJobInstanceUpdateEvent(new JobInstanceUpdateEvent(), "update");
+    builder.add(createTransaction(Op.saveJobInstanceUpdateEvent(saveInstanceEvent)));
+    storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(
+        IJobInstanceUpdateEvent.build(saveInstanceEvent.getEvent()),
+        saveInstanceEvent.getUpdateId());
+
+    builder.add(createTransaction(Op.pruneJobUpdateHistory(new PruneJobUpdateHistory(5, 10L))));
+    expect(storageUtil.jobUpdateStore.pruneHistory(5, 10L)).andReturn(ImmutableSet.of("id2"));
+
+    // NOOP LogEntry
+    builder.add(LogEntry.noop(true));
+
+    // Snapshot LogEntry
+    Snapshot snapshot = new Snapshot();
+    builder.add(LogEntry.snapshot(snapshot));
+    snapshotStore.applySnapshot(snapshot);
+
+    ImmutableSet.Builder<Entry> entryBuilder = ImmutableSet.builder();
+    for (LogEntry logEntry : builder.build()) {
+      Entry entry = createMock(Entry.class);
+      entryBuilder.add(entry);
+      expect(entry.contents()).andReturn(ThriftBinaryCodec.encodeNonNull(logEntry));
+    }
+
+    expect(stream.readAll()).andReturn(entryBuilder.build().iterator());
   }
 
   abstract class StorageTestFixture {

@@ -19,6 +19,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.Date;
+import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -29,9 +30,9 @@ import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableMap;
+
 import com.twitter.common.application.ShutdownRegistry;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
@@ -221,10 +222,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   @Qualifier
   public @interface WriteBehind { }
 
-  // TODO(wfarner): This is a temporary emergency fix.  Revisit.
-  @CmdLine(name = "log_storage_fail_on_unknown_op",
-      help = "If true, fail if an unknown log transition operation is encountered.")
-  public static final Arg<Boolean> FAIL_ON_UNKNOWN_OP = Arg.create(false);
+  private final Map<LogEntry._Fields, Closure<LogEntry>> logEntryReplayActions;
+  private final Map<Op._Fields, Closure<Op>> transactionReplayActions;
 
   @Inject
   LogStorage(LogManager logManager,
@@ -306,6 +305,164 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         quotaStore,
         attributeStore,
         jobUpdateStore);
+
+    this.logEntryReplayActions = buildLogEntryReplayActions();
+    this.transactionReplayActions = buildTransactionReplayActions();
+  }
+
+  @VisibleForTesting
+  final Map<LogEntry._Fields, Closure<LogEntry>> buildLogEntryReplayActions() {
+
+    return ImmutableMap.<LogEntry._Fields, Closure<LogEntry>>builder()
+        .put(LogEntry._Fields.SNAPSHOT, new Closure<LogEntry>() {
+          @Override
+          public void execute(LogEntry logEntry) throws RuntimeException {
+            Snapshot snapshot = logEntry.getSnapshot();
+            LOG.info("Applying snapshot taken on " + new Date(snapshot.getTimestamp()));
+            snapshotStore.applySnapshot(snapshot);
+          }
+        })
+        .put(LogEntry._Fields.TRANSACTION, new Closure<LogEntry>() {
+          @Override
+          public void execute(final LogEntry logEntry) throws RuntimeException {
+            write(new MutateWork.NoResult.Quiet() {
+              @Override
+              protected void execute(MutableStoreProvider unused) {
+                for (Op op : logEntry.getTransaction().getOps()) {
+                  replayOp(op);
+                }
+              }
+            });
+          }
+        })
+        .put(LogEntry._Fields.NOOP, new Closure<LogEntry>() {
+          @Override
+          public void execute(LogEntry item) throws RuntimeException {
+            // Nothing to do here
+          }
+        }).build();
+  }
+
+  @VisibleForTesting
+  final Map<Op._Fields, Closure<Op>> buildTransactionReplayActions() {
+
+    return ImmutableMap.<Op._Fields, Closure<Op>>builder()
+        .put(Op._Fields.SAVE_FRAMEWORK_ID, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindSchedulerStore.saveFrameworkId(op.getSaveFrameworkId().getId());
+          }
+        })
+        .put(Op._Fields.SAVE_ACCEPTED_JOB, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            SaveAcceptedJob acceptedJob = op.getSaveAcceptedJob();
+            writeBehindJobStore.saveAcceptedJob(
+                acceptedJob.getManagerId(),
+                IJobConfiguration.build(acceptedJob.getJobConfig()));
+          }
+        })
+        .put(Op._Fields.REMOVE_JOB, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindJobStore.removeJob(IJobKey.build(op.getRemoveJob().getJobKey()));
+          }
+        })
+        .put(Op._Fields.SAVE_TASKS, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindTaskStore.saveTasks(
+                IScheduledTask.setFromBuilders(op.getSaveTasks().getTasks()));
+          }
+        })
+        .put(Op._Fields.REWRITE_TASK, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            RewriteTask rewriteTask = op.getRewriteTask();
+            writeBehindTaskStore.unsafeModifyInPlace(
+                rewriteTask.getTaskId(),
+                ITaskConfig.build(rewriteTask.getTask()));
+          }
+        })
+        .put(Op._Fields.REMOVE_TASKS, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindTaskStore.deleteTasks(op.getRemoveTasks().getTaskIds());
+          }
+        })
+        .put(Op._Fields.SAVE_QUOTA, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            SaveQuota saveQuota = op.getSaveQuota();
+            writeBehindQuotaStore.saveQuota(
+                saveQuota.getRole(),
+                IResourceAggregate.build(saveQuota.getQuota()));
+          }
+        })
+        .put(Op._Fields.REMOVE_QUOTA, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindQuotaStore.removeQuota(op.getRemoveQuota().getRole());
+          }
+        })
+        .put(Op._Fields.SAVE_HOST_ATTRIBUTES, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            HostAttributes attributes = op.getSaveHostAttributes().getHostAttributes();
+            // Prior to commit 5cf760b, the store would persist maintenance mode changes for
+            // unknown hosts.  5cf760b began rejecting these, but the replicated log may still
+            // contain entries with a null slave ID.
+            if (attributes.isSetSlaveId()) {
+              writeBehindAttributeStore.saveHostAttributes(IHostAttributes.build(attributes));
+            } else {
+              LOG.info("Dropping host attributes with no slave ID: " + attributes);
+            }
+          }
+        })
+        .put(Op._Fields.SAVE_LOCK, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindLockStore.saveLock(ILock.build(op.getSaveLock().getLock()));
+          }
+        })
+        .put(Op._Fields.REMOVE_LOCK, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindLockStore.removeLock(ILockKey.build(op.getRemoveLock().getLockKey()));
+          }
+        })
+        .put(Op._Fields.SAVE_JOB_UPDATE, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindJobUpdateStore.saveJobUpdate(
+                IJobUpdate.build(op.getSaveJobUpdate().getJobUpdate()),
+                Optional.fromNullable(op.getSaveJobUpdate().getLockToken()));
+          }
+        })
+        .put(Op._Fields.SAVE_JOB_UPDATE_EVENT, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindJobUpdateStore.saveJobUpdateEvent(
+                IJobUpdateEvent.build(op.getSaveJobUpdateEvent().getEvent()),
+                op.getSaveJobUpdateEvent().getUpdateId());
+          }
+        })
+        .put(Op._Fields.SAVE_JOB_INSTANCE_UPDATE_EVENT, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindJobUpdateStore.saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent.build(
+                op.getSaveJobInstanceUpdateEvent().getEvent()),
+                op.getSaveJobInstanceUpdateEvent().getUpdateId());
+          }
+        })
+        .put(Op._Fields.PRUNE_JOB_UPDATE_HISTORY, new Closure<Op>() {
+          @Override
+          public void execute(Op op) throws RuntimeException {
+            writeBehindJobUpdateStore.pruneHistory(
+                op.getPruneJobUpdateHistory().getPerJobRetainCount(),
+                op.getPruneJobUpdateHistory().getHistoryPruneThresholdMs());
+          }
+        }).build();
   }
 
   @Override
@@ -367,132 +524,22 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     }
   }
 
-  void replay(final LogEntry logEntry) {
-    switch (logEntry.getSetField()) {
-      case SNAPSHOT:
-        Snapshot snapshot = logEntry.getSnapshot();
-        LOG.info("Applying snapshot taken on " + new Date(snapshot.getTimestamp()));
-        snapshotStore.applySnapshot(snapshot);
-        break;
-
-      case TRANSACTION:
-        write(new MutateWork.NoResult.Quiet() {
-          @Override
-          protected void execute(MutableStoreProvider unused) {
-            for (Op op : logEntry.getTransaction().getOps()) {
-              replayOp(op);
-            }
-          }
-        });
-        break;
-
-      case NOOP:
-        // Nothing to do here
-        break;
-
-      case DEFLATED_ENTRY:
-        throw new IllegalArgumentException("Deflated entries are not handled at this layer.");
-
-      case FRAME:
-        throw new IllegalArgumentException("Framed entries are not handled at this layer.");
-
-      case DEDUPLICATED_SNAPSHOT:
-        throw new IllegalArgumentException("Deduplicated snapshots are not handled at this layer.");
-
-      default:
-        throw new IllegalStateException("Unknown log entry type: " + logEntry);
+  private void replay(final LogEntry logEntry) {
+    LogEntry._Fields entryField = logEntry.getSetField();
+    if (!logEntryReplayActions.containsKey(entryField)) {
+      throw new IllegalStateException("Unknown log entry type: " + entryField);
     }
+
+    logEntryReplayActions.get(entryField).execute(logEntry);
   }
 
   private void replayOp(Op op) {
-    switch (op.getSetField()) {
-      case SAVE_FRAMEWORK_ID:
-        writeBehindSchedulerStore.saveFrameworkId(op.getSaveFrameworkId().getId());
-        break;
-
-      case SAVE_ACCEPTED_JOB:
-        SaveAcceptedJob acceptedJob = op.getSaveAcceptedJob();
-        writeBehindJobStore.saveAcceptedJob(
-            acceptedJob.getManagerId(),
-            IJobConfiguration.build(acceptedJob.getJobConfig()));
-        break;
-
-      case REMOVE_JOB:
-        writeBehindJobStore.removeJob(IJobKey.build(op.getRemoveJob().getJobKey()));
-        break;
-
-      case SAVE_TASKS:
-        writeBehindTaskStore.saveTasks(
-            IScheduledTask.setFromBuilders(op.getSaveTasks().getTasks()));
-        break;
-
-      case REWRITE_TASK:
-        RewriteTask rewriteTask = op.getRewriteTask();
-        writeBehindTaskStore.unsafeModifyInPlace(
-            rewriteTask.getTaskId(),
-            ITaskConfig.build(rewriteTask.getTask()));
-        break;
-
-      case REMOVE_TASKS:
-        writeBehindTaskStore.deleteTasks(op.getRemoveTasks().getTaskIds());
-        break;
-
-      case SAVE_QUOTA:
-        SaveQuota saveQuota = op.getSaveQuota();
-        writeBehindQuotaStore.saveQuota(
-            saveQuota.getRole(),
-            IResourceAggregate.build(saveQuota.getQuota()));
-        break;
-
-      case REMOVE_QUOTA:
-        writeBehindQuotaStore.removeQuota(op.getRemoveQuota().getRole());
-        break;
-
-      case SAVE_HOST_ATTRIBUTES:
-        HostAttributes attributes = op.getSaveHostAttributes().getHostAttributes();
-        // Prior to commit 5cf760b, the store would persist maintenance mode changes for
-        // unknown hosts.  5cf760b began rejecting these, but the replicated log may still
-        // contain entries with a null slave ID.
-        if (attributes.isSetSlaveId()) {
-          writeBehindAttributeStore.saveHostAttributes(IHostAttributes.build(attributes));
-        } else {
-          LOG.info("Dropping host attributes with no slave ID: " + attributes);
-        }
-        break;
-
-      case SAVE_LOCK:
-        writeBehindLockStore.saveLock(ILock.build(op.getSaveLock().getLock()));
-        break;
-
-      case REMOVE_LOCK:
-        writeBehindLockStore.removeLock(ILockKey.build(op.getRemoveLock().getLockKey()));
-        break;
-
-      case SAVE_JOB_UPDATE:
-        writeBehindJobUpdateStore.saveJobUpdate(
-            IJobUpdate.build(op.getSaveJobUpdate().getJobUpdate()),
-            Optional.fromNullable(op.getSaveJobUpdate().getLockToken()));
-        break;
-
-      case SAVE_JOB_UPDATE_EVENT:
-        writeBehindJobUpdateStore.saveJobUpdateEvent(
-            IJobUpdateEvent.build(op.getSaveJobUpdateEvent().getEvent()),
-            op.getSaveJobUpdateEvent().getUpdateId());
-        break;
-
-      case SAVE_JOB_INSTANCE_UPDATE_EVENT:
-        writeBehindJobUpdateStore.saveJobInstanceUpdateEvent(IJobInstanceUpdateEvent.build(
-            op.getSaveJobInstanceUpdateEvent().getEvent()),
-            op.getSaveJobInstanceUpdateEvent().getUpdateId());
-        break;
-
-      default:
-        if (FAIL_ON_UNKNOWN_OP.get()) {
-          throw new IllegalStateException("Unknown transaction op: " + op);
-        } else {
-          LOG.log(Level.SEVERE, "Unkown transaction op: " + op);
-        }
+    Op._Fields opField = op.getSetField();
+    if (!transactionReplayActions.containsKey(opField)) {
+      throw new IllegalStateException("Unknown transaction op: " + opField);
     }
+
+    transactionReplayActions.get(opField).execute(op);
   }
 
   private void scheduleSnapshots() {
