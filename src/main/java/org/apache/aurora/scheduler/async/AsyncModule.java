@@ -46,6 +46,7 @@ import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
+import org.apache.aurora.scheduler.SchedulerModule;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.GcExecutorSettings;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.RandomGcExecutorSettings;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
@@ -254,6 +255,7 @@ public class AsyncModule extends AbstractModule {
       }
     });
     PubsubEventModule.bindSubscriber(binder(), TaskTimeout.class);
+    SchedulerModule.addSchedulerActiveServiceBinding(binder()).to(TaskTimeout.class);
 
     install(new PrivateModule() {
       @Override

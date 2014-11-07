@@ -37,10 +37,10 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.gen.MaintenanceMode;
-import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.HostMaintenanceStateChange;
+import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;

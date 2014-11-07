@@ -75,31 +75,39 @@ import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
-import org.apache.aurora.scheduler.DriverFactory;
-import org.apache.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
+import org.apache.aurora.scheduler.mesos.DriverFactory;
+import org.apache.aurora.scheduler.mesos.DriverSettings;
+import org.apache.aurora.scheduler.mesos.MesosTaskFactory.ExecutorConfig;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.log.EntrySerializer;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
 import org.apache.aurora.scheduler.storage.log.SnapshotStoreImpl;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher;
 import org.apache.aurora.scheduler.storage.log.testing.LogOpMatcher.StreamMatcher;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
+import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.easymock.IMocksControl;
 import org.junit.Before;
 import org.junit.Test;
 
+import static com.twitter.common.testing.easymock.EasyMockTest.createCapture;
+
+import static org.apache.mesos.Protos.FrameworkInfo;
+import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createControl;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -113,6 +121,14 @@ public class SchedulerIT extends BaseZooKeeperTest {
   private static final String SERVERSET_PATH = "/fake/service/path";
   private static final String STATS_URL_PREFIX = "fake_url";
   private static final String FRAMEWORK_ID = "integration_test_framework_id";
+
+  private static final DriverSettings SETTINGS = new DriverSettings(
+      "fakemaster",
+      Optional.<Protos.Credential>absent(),
+      FrameworkInfo.newBuilder()
+          .setUser("framework user")
+          .setName("test framework")
+          .build());
 
   private ExecutorService executor = Executors.newCachedThreadPool(
       new ThreadFactoryBuilder().setNameFormat("SchedulerIT-%d").setDaemon(true).build());
@@ -176,6 +192,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
       @Override
       protected void configure() {
         bind(DriverFactory.class).toInstance(driverFactory);
+        bind(DriverSettings.class).toInstance(SETTINGS);
         bind(Log.class).toInstance(log);
         bind(ExecutorConfig.class).toInstance(new ExecutorConfig("/executor/thermos"));
         install(new BackupModule(backupDir, SnapshotStoreImpl.class));
@@ -297,7 +314,13 @@ public class SchedulerIT extends BaseZooKeeperTest {
 
   @Test
   public void testLaunch() throws Exception {
-    expect(driverFactory.apply(null)).andReturn(driver).anyTimes();
+    Capture<Scheduler> scheduler = createCapture();
+    expect(driverFactory.create(
+        capture(scheduler),
+        eq(SETTINGS.getCredentials()),
+        eq(SETTINGS.getFrameworkInfo()),
+        eq(SETTINGS.getMasterUri())))
+        .andReturn(driver).anyTimes();
 
     ScheduledTask snapshotTask = makeTask("snapshotTask", ScheduleStatus.ASSIGNED);
     ScheduledTask transactionTask = makeTask("transactionTask", ScheduleStatus.RUNNING);
@@ -346,7 +369,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
     startScheduler();
 
     driverStarted.await();
-    injector.getInstance(Scheduler.class).registered(driver,
+    scheduler.getValue().registered(driver,
         FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build(),
         MasterInfo.getDefaultInstance());
 

@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler;
+package org.apache.aurora.scheduler.mesos;
 
 import java.util.List;
 import java.util.logging.Level;
@@ -27,6 +27,7 @@ import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
+import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.CommandUtil;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.SchedulerException;
@@ -73,6 +74,7 @@ public interface MesosTaskFactory {
     }
   }
 
+  // TODO(wfarner): Move this class to its own file to reduce visibility to package private.
   class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = Logger.getLogger(MesosTaskFactoryImpl.class.getName());
     private static final String EXECUTOR_PREFIX = "thermos-";

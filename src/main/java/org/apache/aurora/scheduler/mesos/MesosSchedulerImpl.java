@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler;
+package org.apache.aurora.scheduler.mesos;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -30,6 +30,7 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.GuiceUtils.AllowUnchecked;
+import org.apache.aurora.scheduler.TaskLauncher;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;

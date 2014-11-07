@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.storage.log;
 
 import java.nio.ByteBuffer;
+
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;

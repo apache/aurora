@@ -25,16 +25,21 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.eventbus.EventBus;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.SettableFuture;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.scheduler.app.local.simulator.Events.Started;
+import org.apache.aurora.scheduler.mesos.DriverFactory;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.Filters;
 import org.apache.mesos.Protos.FrameworkID;
@@ -53,11 +58,13 @@ import org.apache.mesos.SchedulerDriver;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.mesos.Protos.FrameworkInfo;
+
 /**
  * A simulated master for use in scheduler testing.
  */
 @SuppressWarnings("deprecation")
-public class FakeMaster implements SchedulerDriver {
+public class FakeMaster implements SchedulerDriver, DriverFactory {
 
   private static final Logger LOG = Logger.getLogger(FakeMaster.class.getName());
 
@@ -71,12 +78,11 @@ public class FakeMaster implements SchedulerDriver {
   private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
   private final CountDownLatch stopped = new CountDownLatch(1);
 
-  private final Scheduler scheduler;
+  private final SettableFuture<Scheduler> schedulerFuture = SettableFuture.create();
   private final EventBus eventBus;
 
   @Inject
-  FakeMaster(Scheduler scheduler, EventBus eventBus) {
-    this.scheduler = requireNonNull(scheduler);
+  FakeMaster(EventBus eventBus) {
     this.eventBus = requireNonNull(eventBus);
   }
 
@@ -95,17 +101,28 @@ public class FakeMaster implements SchedulerDriver {
     assertNotStopped();
 
     checkState(activeTasks.containsKey(task), "Task " + task + " does not exist.");
-    scheduler.statusUpdate(this, TaskStatus.newBuilder()
+    Futures.getUnchecked(schedulerFuture).statusUpdate(this, TaskStatus.newBuilder()
         .setTaskId(task)
         .setState(state)
         .build());
   }
 
   @Override
+  public SchedulerDriver create(
+      Scheduler scheduler,
+      Optional<Protos.Credential> credentials,
+      FrameworkInfo frameworkInfo,
+      String master) {
+
+    schedulerFuture.set(scheduler);
+    return this;
+  }
+
+  @Override
   public Status start() {
     assertNotStopped();
 
-    scheduler.registered(this,
+    Futures.getUnchecked(schedulerFuture).registered(this,
         FrameworkID.newBuilder().setValue("local").build(),
         MasterInfo.getDefaultInstance());
 
@@ -127,7 +144,7 @@ public class FakeMaster implements SchedulerDriver {
             if (allOffers.isEmpty()) {
               LOG.info("All offers consumed, suppressing offer cycle.");
             } else {
-              scheduler.resourceOffers(FakeMaster.this, allOffers);
+              Futures.getUnchecked(schedulerFuture).resourceOffers(FakeMaster.this, allOffers);
             }
           }
         },
@@ -182,7 +199,7 @@ public class FakeMaster implements SchedulerDriver {
 
   private void checkState(boolean assertion, String failureMessage) {
     if (!assertion) {
-      scheduler.error(this, failureMessage);
+      Futures.getUnchecked(schedulerFuture).error(this, failureMessage);
       stop();
       throw new IllegalStateException(failureMessage);
     }
@@ -217,10 +234,12 @@ public class FakeMaster implements SchedulerDriver {
         new Runnable() {
           @Override
           public void run() {
-            scheduler.statusUpdate(FakeMaster.this, TaskStatus.newBuilder()
-                .setTaskId(task.getTaskId())
-                .setState(TaskState.TASK_RUNNING)
-                .build());
+            Futures.getUnchecked(schedulerFuture).statusUpdate(
+                FakeMaster.this,
+                TaskStatus.newBuilder()
+                    .setTaskId(task.getTaskId())
+                    .setState(TaskState.TASK_RUNNING)
+                    .build());
           }
         },
         1,
@@ -247,7 +266,7 @@ public class FakeMaster implements SchedulerDriver {
     checkState(task != null, "Task " + taskId + " not found.");
     idleOffers.put(task.getOffer().getId(), task.getOffer());
 
-    scheduler.statusUpdate(this, TaskStatus.newBuilder()
+    Futures.getUnchecked(schedulerFuture).statusUpdate(this, TaskStatus.newBuilder()
         .setTaskId(taskId)
         .setState(TaskState.TASK_FINISHED)
         .build());

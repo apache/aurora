@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler;
+package org.apache.aurora.scheduler.mesos;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -21,9 +21,10 @@ import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobKey;
 import org.apache.aurora.gen.TaskConfig;
-import org.apache.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
-import org.apache.aurora.scheduler.MesosTaskFactory.MesosTaskFactoryImpl;
+import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.mesos.MesosTaskFactory.ExecutorConfig;
+import org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.CommandInfo.URI;

@@ -16,10 +16,9 @@ package org.apache.aurora.scheduler.app.local;
 import java.io.File;
 import java.util.List;
 
-import javax.annotation.Nullable;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Files;
 import com.google.inject.AbstractModule;
@@ -29,19 +28,29 @@ import com.twitter.common.application.AppLauncher;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.gen.storage.Snapshot;
-import org.apache.aurora.scheduler.DriverFactory;
 import org.apache.aurora.scheduler.app.SchedulerMain;
 import org.apache.aurora.scheduler.app.local.simulator.ClusterSimulatorModule;
+import org.apache.aurora.scheduler.mesos.DriverFactory;
+import org.apache.aurora.scheduler.mesos.DriverSettings;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.log.LogStorage;
+import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
 
 /**
  * A main class that runs the scheduler in local mode, using fakes for external components.
  */
 public class LocalSchedulerMain extends SchedulerMain {
+
+  private static final DriverSettings DRIVER_SETTINGS = new DriverSettings(
+      "fakemaster",
+      Optional.<Protos.Credential>absent(),
+      Protos.FrameworkInfo.newBuilder()
+          .setUser("framework user")
+          .setName("test framework")
+          .build());
 
   @Override
   protected Module getPersistentStorageModule() {
@@ -65,26 +74,13 @@ public class LocalSchedulerMain extends SchedulerMain {
     return new AbstractModule() {
       @Override
       protected void configure() {
-        bind(DriverFactory.class).to(FakeDriverFactory.class);
+        bind(DriverSettings.class).toInstance(DRIVER_SETTINGS);
         bind(SchedulerDriver.class).to(FakeMaster.class);
+        bind(DriverFactory.class).to(FakeMaster.class);
         bind(FakeMaster.class).in(Singleton.class);
         install(new ClusterSimulatorModule());
       }
     };
-  }
-
-  static class FakeDriverFactory implements DriverFactory {
-    private final SchedulerDriver driver;
-
-    @Inject
-    FakeDriverFactory(SchedulerDriver driver) {
-      this.driver = driver;
-    }
-
-    @Override
-    public SchedulerDriver apply(@Nullable String input) {
-      return driver;
-    }
   }
 
   public static void main(String[] args) {

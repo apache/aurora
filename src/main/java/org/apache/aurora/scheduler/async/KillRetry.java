@@ -26,10 +26,10 @@ import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.BackoffStrategy;
 
 import org.apache.aurora.gen.ScheduleStatus;
-import org.apache.aurora.scheduler.Driver;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.Storage;
 
 import static java.util.Objects.requireNonNull;

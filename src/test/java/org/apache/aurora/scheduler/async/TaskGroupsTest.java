@@ -18,7 +18,6 @@ import java.util.concurrent.ScheduledFuture;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;

@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler;
+package org.apache.aurora.scheduler.mesos;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +31,7 @@ import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Command;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.scheduler.TaskLauncher;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;

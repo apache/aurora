@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler;
 
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.logging.Logger;
 
@@ -37,15 +36,12 @@ import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.GuavaUtils;
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
-import org.apache.aurora.scheduler.Driver.DriverImpl;
-import org.apache.aurora.scheduler.Driver.SettableDriver;
 import org.apache.aurora.scheduler.SchedulerLifecycle.LeadingOptions;
 import org.apache.aurora.scheduler.SchedulerLifecycle.SchedulerActive;
 import org.apache.aurora.scheduler.TaskIdGenerator.TaskIdGeneratorImpl;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
-import org.apache.mesos.Scheduler;
 
 /**
  * Binding module for top-level scheduling logic.
@@ -66,20 +62,8 @@ public class SchedulerModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(Driver.class).to(DriverImpl.class);
-    bind(SettableDriver.class).to(DriverImpl.class);
-    bind(DriverImpl.class).in(Singleton.class);
-
-    bind(Scheduler.class).to(MesosSchedulerImpl.class);
-    bind(MesosSchedulerImpl.class).in(Singleton.class);
-
     bind(TaskIdGenerator.class).to(TaskIdGeneratorImpl.class);
-
     bind(UserTaskLauncher.class).in(Singleton.class);
-
-    // TODO(zmanji): Create singleThreadedExecutor (non-scheduled) variant.
-    bind(Executor.class).annotatedWith(MesosSchedulerImpl.SchedulerExecutor.class)
-        .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SchedulerImpl-%d", LOG));
 
     install(new PrivateModule() {
       @Override

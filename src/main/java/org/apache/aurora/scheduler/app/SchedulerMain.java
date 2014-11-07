@@ -17,7 +17,6 @@ import java.net.InetSocketAddress;
 import java.util.List;
 
 import javax.inject.Inject;
-import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
@@ -46,12 +45,12 @@ import com.twitter.common.zookeeper.guice.client.flagged.FlaggedClientConfig;
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.SessionValidator;
 import org.apache.aurora.auth.UnsecureAuthModule;
-import org.apache.aurora.scheduler.DriverFactory;
-import org.apache.aurora.scheduler.DriverFactory.DriverFactoryImpl;
-import org.apache.aurora.scheduler.MesosTaskFactory.ExecutorConfig;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
+import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
+import org.apache.aurora.scheduler.mesos.LibMesosLoadingModule;
+import org.apache.aurora.scheduler.mesos.MesosTaskFactory.ExecutorConfig;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.db.MigrationModule;
@@ -157,8 +156,8 @@ public class SchedulerMain extends AbstractApplication {
     return new AbstractModule() {
       @Override
       protected void configure() {
-        bind(DriverFactory.class).to(DriverFactoryImpl.class);
-        bind(DriverFactoryImpl.class).in(Singleton.class);
+        install(new CommandLineDriverSettingsModule());
+        install(new LibMesosLoadingModule());
         install(new MesosLogStreamModule(zkClientConfig));
       }
     };

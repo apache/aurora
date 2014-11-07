@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.async;
 
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Optional;
@@ -57,7 +56,7 @@ import static org.junit.Assert.assertEquals;
 public class TaskTimeoutTest extends EasyMockTest {
 
   private static final String TASK_ID = "task_id";
-  private static final long TIMEOUT_MS = Amount.of(1L, Time.MINUTES).as(Time.MILLISECONDS);
+  private static final Amount<Long, Time> TIMEOUT = Amount.of(1L, Time.MINUTES);
 
   private AtomicLong timedOutTaskCounter;
   private ScheduledExecutorService executor;
@@ -81,25 +80,22 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   private void replayAndCreate() {
     control.replay();
-    timeout = new TaskTimeout(
-        executor,
-        stateManager,
-        Amount.of(TIMEOUT_MS, Time.MILLISECONDS),
-        statsProvider);
+    timeout = new TaskTimeout(executor, stateManager, TIMEOUT, statsProvider);
+    timeout.startAsync().awaitRunning();
   }
 
-  private Capture<Runnable> expectTaskWatch(long expireMs) {
+  private Capture<Runnable> expectTaskWatch(Amount<Long, Time> expireIn) {
     Capture<Runnable> capture = createCapture();
     executor.schedule(
         EasyMock.capture(capture),
-        eq(expireMs),
-        eq(TimeUnit.MILLISECONDS));
+        eq((long) expireIn.getValue()),
+        eq(expireIn.getUnit().getTimeUnit()));
     expectLastCall().andReturn(future);
     return capture;
   }
 
   private Capture<Runnable> expectTaskWatch() {
-    return expectTaskWatch(TIMEOUT_MS);
+    return expectTaskWatch(TIMEOUT);
   }
 
   private void changeState(String taskId, ScheduleStatus from, ScheduleStatus to) {
@@ -197,17 +193,17 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   @Test
   public void testStorageStart() {
-    expectTaskWatch(TIMEOUT_MS);
-    expectTaskWatch(TIMEOUT_MS);
-    expectTaskWatch(TIMEOUT_MS);
+    expectTaskWatch(TIMEOUT);
+    expectTaskWatch(TIMEOUT);
+    expectTaskWatch(TIMEOUT);
 
     replayAndCreate();
 
-    clock.setNowMillis(TIMEOUT_MS * 2);
+    clock.setNowMillis(TIMEOUT.as(Time.MILLISECONDS) * 2);
     for (IScheduledTask task : ImmutableList.of(
         makeTask("a", ASSIGNED, 0),
-        makeTask("b", KILLING, TIMEOUT_MS),
-        makeTask("c", PREEMPTING, clock.nowMillis() + TIMEOUT_MS))) {
+        makeTask("b", KILLING, TIMEOUT.as(Time.MILLISECONDS)),
+        makeTask("c", PREEMPTING, clock.nowMillis() + TIMEOUT.as(Time.MILLISECONDS)))) {
 
       timeout.recordStateChange(TaskStateChange.initialized(task));
     }
@@ -215,5 +211,21 @@ public class TaskTimeoutTest extends EasyMockTest {
     changeState("a", ASSIGNED, RUNNING);
     changeState("b", KILLING, KILLED);
     changeState("c", PREEMPTING, FINISHED);
+  }
+
+  @Test
+  public void testTimeoutWhileNotStarted() throws Exception {
+    // Since the timeout is never instructed to start, it should not attempt to transition tasks,
+    // but it should try again later.
+    Capture<Runnable> assignedTimeout = expectTaskWatch();
+    expectTaskWatch(TaskTimeout.NOT_STARTED_RETRY);
+
+    control.replay();
+    timeout = new TaskTimeout(executor, stateManager, TIMEOUT, statsProvider);
+
+    changeState(INIT, PENDING);
+    changeState(PENDING, ASSIGNED);
+    assignedTimeout.getValue().run();
+    assertEquals(timedOutTaskCounter.intValue(), 0);
   }
 }

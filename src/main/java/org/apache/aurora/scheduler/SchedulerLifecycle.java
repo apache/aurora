@@ -30,7 +30,6 @@ import javax.inject.Inject;
 import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -55,18 +54,14 @@ import com.twitter.common.zookeeper.ServerSet;
 import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
-import org.apache.aurora.scheduler.Driver.SettableDriver;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
+import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.StorageBackfill;
-import org.apache.mesos.Protos;
-import org.apache.mesos.SchedulerDriver;
 
 import static java.util.Objects.requireNonNull;
 
@@ -125,18 +120,11 @@ public class SchedulerLifecycle implements EventSubscriber {
   private final AtomicReference<LeaderControl> leaderControl = Atomics.newReference();
   private final StateMachine<State> stateMachine;
 
-  // The local driver reference, distinct from the global SettableDriver.
-  // This is used to perform actions with the driver (i.e. invoke start(), join()),
-  // which no other code should do.  It also permits us to save the reference until we are ready to
-  // make the driver ready by invoking SettableDriver.initialize().
-  private final AtomicReference<SchedulerDriver> driverRef = Atomics.newReference();
-
   @Inject
   SchedulerLifecycle(
-      DriverFactory driverFactory,
       NonVolatileStorage storage,
       Lifecycle lifecycle,
-      SettableDriver driver,
+      Driver driver,
       LeadingOptions leadingOptions,
       ScheduledExecutorService executorService,
       Clock clock,
@@ -146,7 +134,6 @@ public class SchedulerLifecycle implements EventSubscriber {
       @SchedulerActive ServiceManagerIface schedulerActiveServiceManager) {
 
     this(
-        driverFactory,
         storage,
         lifecycle,
         driver,
@@ -209,10 +196,9 @@ public class SchedulerLifecycle implements EventSubscriber {
 
   @VisibleForTesting
   SchedulerLifecycle(
-      final DriverFactory driverFactory,
       final NonVolatileStorage storage,
       final Lifecycle lifecycle,
-      final SettableDriver driver,
+      final Driver driver,
       final DelayedActions delayedActions,
       final Clock clock,
       final EventSink eventSink,
@@ -220,7 +206,6 @@ public class SchedulerLifecycle implements EventSubscriber {
       StatsProvider statsProvider,
       final ServiceManagerIface schedulerActiveServiceManager) {
 
-    requireNonNull(driverFactory);
     requireNonNull(storage);
     requireNonNull(lifecycle);
     requireNonNull(driver);
@@ -276,17 +261,7 @@ public class SchedulerLifecycle implements EventSubscriber {
           }
         });
 
-        final Optional<String> frameworkId = storage.consistentRead(
-            new Work.Quiet<Optional<String>>() {
-              @Override
-              public Optional<String> apply(StoreProvider storeProvider) {
-                return storeProvider.getSchedulerStore().fetchFrameworkId();
-              }
-            });
-
-        // Save the prepared driver locally, but don't expose it until the registered callback is
-        // received.
-        driverRef.set(driverFactory.apply(frameworkId.orNull()));
+        driver.startAsync().awaitRunning();
 
         delayedActions.onRegistrationTimeout(
             new Runnable() {
@@ -308,9 +283,6 @@ public class SchedulerLifecycle implements EventSubscriber {
                 stateMachine.transition(State.DEAD);
               }
             });
-
-        Protos.Status status = driverRef.get().start();
-        LOG.info("Driver started with code " + status);
       }
     };
 
@@ -318,12 +290,10 @@ public class SchedulerLifecycle implements EventSubscriber {
       @Override
       public void execute(Transition<State> transition) {
         registrationAcked.set(true);
-        driver.initialize(driverRef.get());
         delayedActions.blockingDriverJoin(new Runnable() {
           @Override
           public void run() {
-            // Blocks until driver exits.
-            driverRef.get().join();
+            driver.blockUntilStopped();
             LOG.info("Driver exited, terminating lifecycle.");
             stateMachine.transition(State.DEAD);
           }
@@ -365,7 +335,7 @@ public class SchedulerLifecycle implements EventSubscriber {
 
           // TODO(wfarner): Re-evaluate tear-down ordering here.  Should the top-level shutdown
           // be invoked first, or the underlying critical components?
-          driver.stop();
+          driver.stopAsync().awaitTerminated();
           storage.stop();
         } finally {
           lifecycle.shutdown();

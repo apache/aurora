@@ -16,7 +16,6 @@ package org.apache.aurora.scheduler;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.base.Optional;
 import com.twitter.common.application.Lifecycle;
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Command;
@@ -27,16 +26,14 @@ import com.twitter.common.zookeeper.SingletonService.LeaderControl;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
 
 import org.apache.aurora.GuavaUtils.ServiceManagerIface;
-import org.apache.aurora.scheduler.Driver.SettableDriver;
 import org.apache.aurora.scheduler.SchedulerLifecycle.DelayedActions;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
+import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork.NoResult.Quiet;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
-import org.apache.mesos.Protos.Status;
-import org.apache.mesos.SchedulerDriver;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.junit.Before;
@@ -54,12 +51,10 @@ public class SchedulerLifecycleTest extends EasyMockTest {
 
   private static final String FRAMEWORK_ID = "framework id";
 
-  private DriverFactory driverFactory;
   private StorageTestUtil storageUtil;
   private ShutdownSystem shutdownRegistry;
-  private SettableDriver driver;
+  private Driver driver;
   private LeaderControl leaderControl;
-  private SchedulerDriver schedulerDriver;
   private DelayedActions delayedActions;
   private EventSink eventSink;
   private FakeStatsProvider statsProvider;
@@ -69,12 +64,10 @@ public class SchedulerLifecycleTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    driverFactory = createMock(DriverFactory.class);
     storageUtil = new StorageTestUtil(this);
     shutdownRegistry = createMock(ShutdownSystem.class);
-    driver = createMock(SettableDriver.class);
+    driver = createMock(Driver.class);
     leaderControl = createMock(LeaderControl.class);
-    schedulerDriver = createMock(SchedulerDriver.class);
     delayedActions = createMock(DelayedActions.class);
     eventSink = createMock(EventSink.class);
     statsProvider = new FakeStatsProvider();
@@ -96,7 +89,6 @@ public class SchedulerLifecycleTest extends EasyMockTest {
     control.replay();
 
     schedulerLifecycle = new SchedulerLifecycle(
-        driverFactory,
         storageUtil.storage,
         new Lifecycle(shutdownRegistry, new UncaughtExceptionHandler() {
           @Override
@@ -119,12 +111,11 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   private void expectLoadStorage() {
     storageUtil.storage.start(EasyMock.<Quiet>anyObject());
     storageUtil.expectOperations();
-    expect(storageUtil.schedulerStore.fetchFrameworkId()).andReturn(Optional.of(FRAMEWORK_ID));
   }
 
   private void expectInitializeDriver() {
-    driver.initialize(schedulerDriver);
-    expect(schedulerDriver.start()).andReturn(Status.DRIVER_RUNNING);
+    expect(driver.startAsync()).andReturn(driver);
+    driver.awaitRunning();
     delayedActions.blockingDriverJoin(EasyMock.<Runnable>anyObject());
   }
 
@@ -137,7 +128,8 @@ public class SchedulerLifecycleTest extends EasyMockTest {
 
   private void expectShutdown() throws Exception {
     leaderControl.leave();
-    driver.stop();
+    expect(driver.stopAsync()).andReturn(driver);
+    driver.awaitTerminated();
     storageUtil.storage.stop();
     shutdownRegistry.execute();
   }
@@ -150,7 +142,6 @@ public class SchedulerLifecycleTest extends EasyMockTest {
 
     storageUtil.storage.prepare();
     expectLoadStorage();
-    expect(driverFactory.apply(FRAMEWORK_ID)).andReturn(schedulerDriver);
     Capture<Runnable> triggerFailover = createCapture();
     delayedActions.onAutoFailover(capture(triggerFailover));
     delayedActions.onRegistrationTimeout(EasyMock.<Runnable>anyObject());
@@ -176,11 +167,11 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   public void testRegistrationTimeout() throws Exception {
     storageUtil.storage.prepare();
     expectLoadStorage();
-    expect(driverFactory.apply(FRAMEWORK_ID)).andReturn(schedulerDriver);
     delayedActions.onAutoFailover(EasyMock.<Runnable>anyObject());
     Capture<Runnable> registrationTimeout = createCapture();
     delayedActions.onRegistrationTimeout(capture(registrationTimeout));
-    expect(schedulerDriver.start()).andReturn(Status.DRIVER_RUNNING);
+    expect(driver.startAsync()).andReturn(driver);
+    driver.awaitRunning();
 
     expectShutdown();
 
@@ -195,10 +186,10 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   public void testDefeatedBeforeRegistered() throws Exception {
     storageUtil.storage.prepare();
     expectLoadStorage();
-    expect(driverFactory.apply(FRAMEWORK_ID)).andReturn(schedulerDriver);
     delayedActions.onAutoFailover(EasyMock.<Runnable>anyObject());
     delayedActions.onRegistrationTimeout(EasyMock.<Runnable>anyObject());
-    expect(schedulerDriver.start()).andReturn(Status.DRIVER_RUNNING);
+    expect(driver.startAsync()).andReturn(driver);
+    driver.awaitRunning();
 
     // Important piece here is what's absent - leader presence is not advertised.
     expectShutdown();
@@ -234,7 +225,6 @@ public class SchedulerLifecycleTest extends EasyMockTest {
   public void testExternalShutdown() throws Exception {
     storageUtil.storage.prepare();
     expectLoadStorage();
-    expect(driverFactory.apply(FRAMEWORK_ID)).andReturn(schedulerDriver);
     Capture<Runnable> triggerFailover = createCapture();
     delayedActions.onAutoFailover(capture(triggerFailover));
     delayedActions.onRegistrationTimeout(EasyMock.<Runnable>anyObject());
