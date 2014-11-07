@@ -74,8 +74,12 @@ class StartUpdate(Verb):
     api = context.get_api(config.cluster())
     resp = api.start_job_update(config, instances)
     context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
-        err_msg="Failed to start scheduler-driven update due to error:")
-    context.print_out("Scheduler-driven update of job %s has started." % job)
+        err_msg="Failed to start update due to error:")
+
+    if resp.result:
+      context.print_out("Job update has started.")
+    else:
+      context.print_out_response_details(resp)
     return EXIT_OK
 
 
@@ -98,8 +102,8 @@ class PauseUpdate(Verb):
     api = context.get_api(jobkey.cluster)
     resp = api.pause_job_update(jobkey)
     context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
-      err_msg="Failed to pause scheduler-driven update due to error:")
-    context.print_out("Scheduler-driven update of job %s has been paused." % jobkey)
+      err_msg="Failed to pause update due to error:")
+    context.print_out("Update has been paused.")
     return EXIT_OK
 
 
@@ -122,8 +126,8 @@ class ResumeUpdate(Verb):
     api = context.get_api(jobkey.cluster)
     resp = api.resume_job_update(jobkey)
     context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
-      err_msg="Failed to resume scheduler-driven update due to error:")
-    context.print_out("Scheduler-driven update of job %s has been resumed." % jobkey)
+      err_msg="Failed to resume update due to error:")
+    context.print_out("Update has been resumed.")
     return EXIT_OK
 
 
@@ -139,15 +143,15 @@ class AbortUpdate(Verb):
 
   @property
   def help(self):
-    return """Abort an in-pregress scheduler-driven rolling update."""
+    return """Abort an in-progress scheduler-driven rolling update."""
 
   def execute(self, context):
     jobkey = context.options.jobspec
     api = context.get_api(jobkey.cluster)
     resp = api.abort_job_update(jobkey)
     context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
-      err_msg="Failed to abort scheduler-driven update due to error:")
-    context.print_out("Scheduler-driven update of job %s has been aborted." % jobkey)
+      err_msg="Failed to abort update due to error:")
+    context.print_out("Update has been aborted.")
     return EXIT_OK
 
 
@@ -171,7 +175,10 @@ class ListUpdates(Verb):
 
   @property
   def help(self):
-    return """List all jobs updates, with summary info, about active updates that match a query."""
+    return textwrap.dedent("""\
+        List all scheduler-driven jobs updates, with summary info, about active updates
+        that match a query.
+        """)
 
   def execute(self, context):
     api = context.get_api(context.options.cluster)
@@ -217,7 +224,7 @@ class UpdateStatus(Verb):
 
   @property
   def help(self):
-    return """Display detailed status information about an in-progress update."""
+    return """Display detailed status information about a scheduler-driven in-progress update."""
 
   def _get_update_id(self, context, jobkey):
     api = context.get_api(context.options.jobspec.cluster)

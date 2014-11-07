@@ -163,6 +163,7 @@ import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFIC
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASKS_PER_JOB;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASK_ID_LENGTH;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_JOB_UPDATE_MESSAGE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.killedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.restartedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
@@ -2470,7 +2471,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
     JobUpdateRequest request = buildJobUpdateRequest(update);
-    assertResponse(OK, thrift.startJobUpdate(request, SESSION));
+    Response response = thrift.startJobUpdate(request, SESSION);
+    assertResponse(OK, response);
+    assertEquals(
+        NOOP_JOB_UPDATE_MESSAGE,
+        Iterables.getOnlyElement(response.getDetails()).getMessage());
   }
 
   @Test

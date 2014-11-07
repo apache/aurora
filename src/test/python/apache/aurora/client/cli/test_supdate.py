@@ -37,7 +37,9 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateSummary,
     Response,
     ResponseCode,
-    Result
+    ResponseDetail,
+    Result,
+    StartJobUpdateResult
 )
 
 
@@ -45,11 +47,13 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
   def test_start_update_command_line_succeeds(self):
     mock_context = FakeAuroraCommandContext()
+    resp = self.create_simple_success_response()
+    resp.result = Result(startJobUpdateResult=StartJobUpdateResult(updateId="id"))
     with contextlib.nested(
         patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       mock_api = mock_context.get_api('west')
-      mock_api.start_job_update.return_value = self.create_simple_success_response()
+      mock_api.start_job_update.return_value = resp
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -61,8 +65,30 @@ class TestUpdateCommand(AuroraClientCommandTest):
       args, kwargs = mock_api.start_job_update.call_args
       assert isinstance(args[0], AuroraConfig)
       assert args[1] is None
-      assert mock_context.get_out() == [
-          "Scheduler-driven update of job west/bozo/test/hello has started."]
+      assert mock_context.get_out() == ["Job update has started."]
+      assert mock_context.get_err() == []
+
+  def test_start_update_command_line_succeeds_noop_update(self):
+    mock_context = FakeAuroraCommandContext()
+    resp = self.create_simple_success_response()
+    resp.details = [ResponseDetail(message="Noop update.")]
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.update.Update.create_context', return_value=mock_context),
+        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
+      mock_api = mock_context.get_api('west')
+      mock_api.start_job_update.return_value = resp
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        result = cmd.execute(['beta-update', 'start', self.TEST_JOBSPEC, fp.name])
+        assert result == EXIT_OK
+
+      assert mock_api.start_job_update.call_count == 1
+      args, kwargs = mock_api.start_job_update.call_args
+      assert isinstance(args[0], AuroraConfig)
+      assert args[1] is None
+      assert mock_context.get_out() == ["Noop update."]
       assert mock_context.get_err() == []
 
   def test_pause_update_command_line_succeeds(self):
@@ -80,8 +106,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         assert result == EXIT_OK
 
       mock_api.pause_job_update.assert_called_with(self.TEST_JOBKEY)
-      assert mock_context.get_out() == [
-          "Scheduler-driven update of job west/bozo/test/hello has been paused."]
+      assert mock_context.get_out() == ["Update has been paused."]
       assert mock_context.get_err() == []
 
   def test_abort_update_command_line_succeeds(self):
@@ -99,8 +124,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         assert result == EXIT_OK
 
       mock_api.abort_job_update.assert_called_with(self.TEST_JOBKEY)
-      assert mock_context.get_out() == [
-          "Scheduler-driven update of job west/bozo/test/hello has been aborted."]
+      assert mock_context.get_out() == ["Update has been aborted."]
       assert mock_context.get_err() == []
 
   def test_resume_update_command_line_succeeds(self):
@@ -118,8 +142,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         assert result == EXIT_OK
 
       mock_api.resume_job_update.assert_called_with(self.TEST_JOBKEY)
-      assert mock_context.get_out() == [
-          "Scheduler-driven update of job west/bozo/test/hello has been resumed."]
+      assert mock_context.get_out() == ["Update has been resumed."]
 
   def test_update_invalid_config(self):
     mock_context = FakeAuroraCommandContext()
@@ -151,8 +174,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
       mock_api.resume_job_update.assert_called_with(self.TEST_JOBKEY)
       assert mock_context.get_out() == []
-      assert mock_context.get_err() == [
-         "Failed to resume scheduler-driven update due to error:", "\tDamn"]
+      assert mock_context.get_err() == ["Failed to resume update due to error:", "\tDamn"]
 
   def test_abort_update_command_line_error(self):
     mock_context = FakeAuroraCommandContext()
@@ -170,8 +192,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
       mock_api.abort_job_update.assert_called_with(self.TEST_JOBKEY)
       assert mock_context.get_out() == []
-      assert mock_context.get_err() == [
-        "Failed to abort scheduler-driven update due to error:", "\tDamn"]
+      assert mock_context.get_err() == ["Failed to abort update due to error:", "\tDamn"]
 
   def test_pause_update_command_line_error(self):
     mock_context = FakeAuroraCommandContext()
@@ -189,8 +210,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
 
       mock_api.pause_job_update.assert_called_with(self.TEST_JOBKEY)
       assert mock_context.get_out() == []
-      assert mock_context.get_err() == [
-        "Failed to pause scheduler-driven update due to error:", "\tDamn"]
+      assert mock_context.get_err() == ["Failed to pause update due to error:", "\tDamn"]
 
   @classmethod
   def get_status_query_response(cls):

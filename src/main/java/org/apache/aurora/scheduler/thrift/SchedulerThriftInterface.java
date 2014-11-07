@@ -1415,7 +1415,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             settings.getUpdateOnlyTheseInstances());
 
         if (diff.isNoop()) {
-          return addMessage(emptyResponse(), OK, "Job is unchanged by proposed update.");
+          return addMessage(emptyResponse(), OK, NOOP_JOB_UPDATE_MESSAGE);
         }
 
         Set<Integer> invalidScope = diff.getOutOfScopeInstances(
@@ -1571,6 +1571,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @VisibleForTesting
   static final String NO_TASKS_TO_KILL_MESSAGE = "No tasks to kill.";
+
+  @VisibleForTesting
+  static final String NOOP_JOB_UPDATE_MESSAGE = "Job is unchanged by proposed update.";
 
   private static Response okEmptyResponse()  {
     return emptyResponse().setResponseCode(OK);

@@ -124,7 +124,12 @@ class AuroraCommandContext(Context):
     self.open_page(synthesize_url(api.scheduler_proxy.scheduler_client().url,
         role, env, name))
 
-  def display_response_to_user(self, resp):
+  def print_out_response_details(self, resp):
+    if resp.details is not None:
+      for m in resp.details:
+        self.print_out(m.message)
+
+  def log_response(self, resp):
     if resp.responseCode != ResponseCode.OK:
       for m in resp.details:
         self.print_err("\t%s" % m.message)
@@ -138,7 +143,7 @@ class AuroraCommandContext(Context):
       if err_msg is None:
         err_msg = resp.messageDEPRECATED
       self.print_err(err_msg)
-    self.display_response_to_user(resp)
+    self.log_response(resp)
     if resp.responseCode != ResponseCode.OK:
       raise self.CommandError(err_code, err_msg)
 

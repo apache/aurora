@@ -328,7 +328,7 @@ class AbstractKillCommand(Verb):
       if resp.responseCode is not ResponseCode.OK or self.wait_kill_tasks(
           context, api.scheduler_proxy, job, batch) is not EXIT_OK:
         context.print_err("Kill of shards %s failed with error:" % batch)
-        context.display_response_to_user(resp)
+        context.log_response(resp)
         errors += 1
         if errors > context.options.max_total_failures:
           context.print_err("Exceeded maximum number of errors while killing instances")
