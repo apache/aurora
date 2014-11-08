@@ -14,15 +14,20 @@
 package org.apache.aurora.scheduler.events;
 
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.logging.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.eventbus.AsyncEventBus;
 import com.google.common.eventbus.DeadEvent;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.multibindings.Multibinder;
@@ -42,24 +47,37 @@ public final class PubsubEventModule extends AbstractModule {
 
   private static final Logger LOG = Logger.getLogger(PubsubEventModule.class.getName());
 
-  private PubsubEventModule() {
+  private final boolean async;
+
+  private PubsubEventModule(boolean async) {
     // Must be constructed through factory.
+    this.async = async;
   }
 
   @VisibleForTesting
   public static void installForTest(Binder binder) {
-    binder.install(new PubsubEventModule());
+    binder.install(new PubsubEventModule(false));
   }
 
   @Override
   protected void configure() {
-    final EventBus eventBus = new EventBus("TaskEvents");
+    final Executor executor;
+    if (async) {
+      executor = Executors.newCachedThreadPool(
+          new ThreadFactoryBuilder()
+              .setDaemon(true)
+              .setNameFormat("AsyncTaskEvents-%d")
+              .build());
+    } else {
+      executor = MoreExecutors.sameThreadExecutor();
+    }
+
+    final EventBus eventBus = new AsyncEventBus("AsyncTaskEvents", executor);
     eventBus.register(new Object() {
       @Subscribe public void logDeadEvent(DeadEvent event) {
         LOG.warning("Captured dead event " + event.getEvent());
       }
     });
-
     bind(EventBus.class).toInstance(eventBus);
 
     EventSink eventSink = new EventSink() {
@@ -103,7 +121,7 @@ public final class PubsubEventModule extends AbstractModule {
     binder.bind(SchedulingFilter.class).annotatedWith(NotifyDelegate.class).to(filterClass);
     binder.bind(SchedulingFilter.class).to(NotifyingSchedulingFilter.class);
     binder.bind(NotifyingSchedulingFilter.class).in(Singleton.class);
-    binder.install(new PubsubEventModule());
+    binder.install(new PubsubEventModule(true));
   }
 
   private static Multibinder<EventSubscriber> getSubscriberBinder(Binder binder) {
