@@ -46,6 +46,10 @@ class Schedule(Verb):
     resp = api.schedule_cron(config)
     context.check_and_log_response(resp,
         err_msg=("Error scheduling cron job %s:" % context.options.jobspec))
+
+    context.print_out("Cron job scheduled, status can be viewed at %s"
+        % context.get_job_page(api, context.options.jobspec))
+
     return EXIT_OK
 
 

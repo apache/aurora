@@ -21,6 +21,7 @@ from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_CONFIGURATION, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
 
 from ..api.api_util import SchedulerProxyApiSpec
@@ -33,6 +34,7 @@ class TestCronNoun(AuroraClientCommandTest):
 
   def test_successful_schedule(self):
     mock_context = FakeAuroraCommandContext()
+    key = AuroraJobKey("west", "bozo", "test", "hello")
     with contextlib.nested(
         patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context)):
 
@@ -42,13 +44,15 @@ class TestCronNoun(AuroraClientCommandTest):
         fp.write(self.get_valid_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['cron', 'schedule', 'west/bozo/test/hello',
-            fp.name])
+        cmd.execute(['cron', 'schedule', key.to_path(), fp.name])
 
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       assert api.schedule_cron.call_count == 1
       assert isinstance(api.schedule_cron.call_args[0][0], AuroraConfig)
+
+      # The last text printed out to the user should contain a url to the job
+      assert mock_context.get_job_page(api, key) in mock_context.out[-1]
 
   def test_schedule_failed(self):
     mock_context = FakeAuroraCommandContext()
