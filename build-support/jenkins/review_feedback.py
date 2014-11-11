@@ -94,7 +94,7 @@ def _needs_reply(server, request):
     latest_request = _get_latest_user_request(reviews)
     latest_diff = _get_latest_diff_time(server, request, reviews)
     return ((latest_request and (latest_request > latest_feedback_time))
-            or (latest_diff and (latest_diff > latest_feedback_time))
+            or (latest_diff and (latest_diff > latest_feedback_time)))
   return True
 
 
