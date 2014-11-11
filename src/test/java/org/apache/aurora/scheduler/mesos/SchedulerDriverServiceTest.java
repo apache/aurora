@@ -122,6 +122,8 @@ public class SchedulerDriverServiceTest extends EasyMockTest {
 
   @Test(expected = IllegalStateException.class)
   public void testMultipleStarts() {
+    expectCreateDriver(NEW_FRAMEWORK_ID);
+
     control.replay();
 
     driverService.startAsync().awaitRunning();
