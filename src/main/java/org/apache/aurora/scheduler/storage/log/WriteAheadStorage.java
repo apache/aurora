@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.twitter.common.base.MorePreconditions;
-import com.twitter.common.inject.TimedInterceptor.Timed;
 
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.storage.Op;
@@ -85,8 +84,6 @@ class WriteAheadStorage extends ForwardingStore implements
     AttributeStore.Mutable,
     JobUpdateStore.Mutable {
 
-  private static final Logger LOG = Logger.getLogger(WriteAheadStorage.class.getName());
-
   private final TransactionManager transactionManager;
   private final SchedulerStore.Mutable schedulerStore;
   private final JobStore.Mutable jobStore;
@@ -95,6 +92,7 @@ class WriteAheadStorage extends ForwardingStore implements
   private final QuotaStore.Mutable quotaStore;
   private final AttributeStore.Mutable attributeStore;
   private final JobUpdateStore.Mutable jobUpdateStore;
+  private final Logger log;
 
   /**
    * Creates a new write-ahead storage that delegates to the providing default stores.
@@ -116,7 +114,8 @@ class WriteAheadStorage extends ForwardingStore implements
       LockStore.Mutable lockStore,
       QuotaStore.Mutable quotaStore,
       AttributeStore.Mutable attributeStore,
-      JobUpdateStore.Mutable jobUpdateStore) {
+      JobUpdateStore.Mutable jobUpdateStore,
+      Logger log) {
 
     super(
         schedulerStore,
@@ -135,6 +134,7 @@ class WriteAheadStorage extends ForwardingStore implements
     this.quotaStore = requireNonNull(quotaStore);
     this.attributeStore = requireNonNull(attributeStore);
     this.jobUpdateStore = requireNonNull(jobUpdateStore);
+    this.log = requireNonNull(log);
   }
 
   private void write(Op op) {
@@ -144,7 +144,6 @@ class WriteAheadStorage extends ForwardingStore implements
     transactionManager.log(op);
   }
 
-  @Timed("scheduler_log_save_framework_id")
   @Override
   public void saveFrameworkId(final String frameworkId) {
     requireNonNull(frameworkId);
@@ -153,7 +152,6 @@ class WriteAheadStorage extends ForwardingStore implements
     schedulerStore.saveFrameworkId(frameworkId);
   }
 
-  @Timed("scheduler_log_unsafe_modify_in_place")
   @Override
   public boolean unsafeModifyInPlace(final String taskId, final ITaskConfig taskConfiguration) {
     requireNonNull(taskId);
@@ -166,7 +164,6 @@ class WriteAheadStorage extends ForwardingStore implements
     return mutated;
   }
 
-  @Timed("scheduler_log_tasks_remove")
   @Override
   public void deleteTasks(final Set<String> taskIds) {
     requireNonNull(taskIds);
@@ -175,7 +172,6 @@ class WriteAheadStorage extends ForwardingStore implements
     taskStore.deleteTasks(taskIds);
   }
 
-  @Timed("scheduler_log_tasks_save")
   @Override
   public void saveTasks(final Set<IScheduledTask> newTasks) {
     requireNonNull(newTasks);
@@ -184,7 +180,6 @@ class WriteAheadStorage extends ForwardingStore implements
     taskStore.saveTasks(newTasks);
   }
 
-  @Timed("scheduler_log_tasks_mutate")
   @Override
   public ImmutableSet<IScheduledTask> mutateTasks(
       final Query.Builder query,
@@ -196,8 +191,8 @@ class WriteAheadStorage extends ForwardingStore implements
     ImmutableSet<IScheduledTask> mutated = taskStore.mutateTasks(query, mutator);
 
     Map<String, IScheduledTask> tasksById = Tasks.mapById(mutated);
-    if (LOG.isLoggable(Level.FINE)) {
-      LOG.fine("Storing updated tasks to log: "
+    if (log.isLoggable(Level.FINE)) {
+      log.fine("Storing updated tasks to log: "
           + Maps.transformValues(tasksById, Tasks.GET_STATUS));
     }
 
@@ -206,7 +201,6 @@ class WriteAheadStorage extends ForwardingStore implements
     return mutated;
   }
 
-  @Timed("scheduler_log_quota_save")
   @Override
   public void saveQuota(final String role, final IResourceAggregate quota) {
     requireNonNull(role);
@@ -216,7 +210,6 @@ class WriteAheadStorage extends ForwardingStore implements
     quotaStore.saveQuota(role, quota);
   }
 
-  @Timed("scheduler_save_host_attribute")
   @Override
   public void saveHostAttributes(final IHostAttributes attrs) {
     requireNonNull(attrs);
@@ -234,7 +227,6 @@ class WriteAheadStorage extends ForwardingStore implements
     }
   }
 
-  @Timed("scheduler_log_job_remove")
   @Override
   public void removeJob(final IJobKey jobKey) {
     requireNonNull(jobKey);
@@ -243,7 +235,6 @@ class WriteAheadStorage extends ForwardingStore implements
     jobStore.removeJob(jobKey);
   }
 
-  @Timed("scheduler_log_job_save")
   @Override
   public void saveAcceptedJob(final String managerId, final IJobConfiguration jobConfig) {
     requireNonNull(managerId);
@@ -253,7 +244,6 @@ class WriteAheadStorage extends ForwardingStore implements
     jobStore.saveAcceptedJob(managerId, jobConfig);
   }
 
-  @Timed("scheduler_log_quota_remove")
   @Override
   public void removeQuota(final String role) {
     requireNonNull(role);
@@ -262,7 +252,6 @@ class WriteAheadStorage extends ForwardingStore implements
     quotaStore.removeQuota(role);
   }
 
-  @Timed("scheduler_lock_save")
   @Override
   public void saveLock(final ILock lock) {
     requireNonNull(lock);
@@ -271,7 +260,6 @@ class WriteAheadStorage extends ForwardingStore implements
     lockStore.saveLock(lock);
   }
 
-  @Timed("scheduler_lock_remove")
   @Override
   public void removeLock(final ILockKey lockKey) {
     requireNonNull(lockKey);

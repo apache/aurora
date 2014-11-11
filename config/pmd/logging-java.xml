@@ -48,6 +48,7 @@ public class Foo {
      </example>
      </rule>
 
+<!-- It's valid to inject the logger, and in some cases preferable.
      <rule name="LoggerIsNotStaticFinal"
    		language="java"
      		since="2.0"
@@ -82,6 +83,7 @@ public class Foo{
 ]]>
      </example>
    </rule>
+-->
 
     <rule name="SystemPrintln"
    		language="java"

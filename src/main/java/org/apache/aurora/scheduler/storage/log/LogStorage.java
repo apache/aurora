@@ -304,7 +304,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         lockStore,
         quotaStore,
         attributeStore,
-        jobUpdateStore);
+        jobUpdateStore,
+        Logger.getLogger(WriteAheadStorage.class.getName()));
 
     this.logEntryReplayActions = buildLogEntryReplayActions();
     this.transactionReplayActions = buildTransactionReplayActions();
