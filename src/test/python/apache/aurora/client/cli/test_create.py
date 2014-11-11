@@ -13,8 +13,6 @@
 #
 
 import contextlib
-import os
-import shutil
 
 from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
@@ -159,37 +157,6 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       self.assert_scheduler_called(api, mock_query, 2)
       assert mock_context.showed_urls == ["http://something_or_other/scheduler/bozo/test/hello"]
 
-  def test_create_job_fail_and_write_log(self):
-    """Check that when an unknown error occurs during command execution,
-    the command-line framework catches it, and writes out an error log file
-    containing the details of the error, including the command-line arguments
-    passed to aurora to execute the command, and the stack trace of the error.
-    """
-    mock_context = FakeAuroraCommandContext()
-    with contextlib.nested(
-        patch('time.time', return_value=23),
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
-      api = mock_context.get_api('west')
-      api.create_job.side_effect = UnknownException()
-
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        result = cmd.execute(['job', 'create', '--wait-until=RUNNING',
-           '--error-log-dir=./logged-errors', 'west/bozo/test/hello',
-            fp.name])
-        assert result == EXIT_UNKNOWN_ERROR
-        with open("./logged-errors/aurora-23.error-log", "r") as logfile:
-          error_log = logfile.read()
-          assert error_log.startswith("ERROR LOG: command arguments = %s" %
-              ['job', 'create', '--wait-until=RUNNING', '--error-log-dir=./logged-errors',
-               'west/bozo/test/hello',
-              fp.name])
-          assert "Traceback" in error_log
-        if os.path.exists("./logged-errors"):
-          shutil.rmtree("./logged-errors")
-
   def test_create_job_delayed(self):
     """Run a test of the "create" command against a mocked-out API:
     this time, make the monitor check status several times before successful completion.
@@ -283,12 +250,9 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         fp.flush()
         cmd = AuroraCommandLine()
         result = cmd.execute(['job', 'create', '--wait-until=RUNNING', 'west/bozo/test/hello',
-            '--error-log-dir=./error-logs',
             fp.name])
         assert result == EXIT_UNKNOWN_ERROR
         assert api.create_job.call_count == 0
-        if os.path.exists("./error-logs"):
-          shutil.rmtree("./error-logs")
 
   def test_simple_successful_create_job_output(self):
     """Run a test of the "create" command against a mocked-out API:

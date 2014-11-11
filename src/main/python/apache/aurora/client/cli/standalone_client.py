@@ -21,31 +21,6 @@ from apache.aurora.client.cli.logsetup import setup_default_log_handlers
 from apache.aurora.client.cli.options import CommandOption
 
 
-class AuroraErrorHandlingPlugin(ConfigurationPlugin):
-  """Plugin for managing error logs for internal system errors.
-  When an unknown error occurs, the command-line supresses the stack dump on standard out/standard
-  error and instead dumps the detailed information including the stack trace into a log
-  file. This plugin allows the location where the error log will be written to be defined by
-  the user.
-  """
-
-  def get_options(self):
-    return [
-        CommandOption("--error-log-dir", default="~/.aurora/errors",
-            help="Directory location where error files containing stack traces "
-            "should be written. If the directory doesn't exist, it will be "
-            "created")]
-
-  def before_dispatch(self, raw_args):
-    return raw_args
-
-  def before_execution(self, context):
-    context.set_error_log_dir(context.options.error_log_dir)
-
-  def after_execution(self, context, result_code):
-    pass
-
-
 class AuroraLogConfigurationPlugin(ConfigurationPlugin):
   """Plugin for configuring log level settings for the aurora client."""
 
@@ -100,7 +75,6 @@ class AuroraCommandLine(CommandLine):
   def __init__(self):
     super(AuroraCommandLine, self).__init__()
     self.register_plugin(AuroraLogConfigurationPlugin())
-    self.register_plugin(AuroraErrorHandlingPlugin())
 
   @property
   def name(self):

@@ -33,10 +33,7 @@ from __future__ import print_function
 import argparse
 import getpass
 import logging
-import os
-import os.path
 import sys
-import time
 import traceback
 from abc import abstractmethod
 from uuid import uuid1
@@ -107,16 +104,6 @@ class Context(object):
       super(Context.CommandError, self).__init__(msg)  # noqa:T800
       self.msg = msg
       self.code = code
-
-  ERROR_LOG_DIR = None
-
-  @staticmethod
-  def set_error_log_dir(dir):
-    Context.ERROR_LOG_DIR = dir  # noqa
-
-  @staticmethod
-  def get_error_log_dir():
-    return Context.ERROR_LOG_DIR # noqa
 
   def __init__(self):
     self.options = None
@@ -418,29 +405,9 @@ class CommandLine(object):
       self.print_err("Error executing command: %s" % c.msg)
       return c.code
     except Exception:
-      exc_type, exc_value, exc_traceback = sys.exc_info()
-      self.dump_error_log(args, exc_type, exc_value, exc_traceback)
+      print("Fatal error running command:", file=sys.stderr)
+      print(traceback.format_exc(), file=sys.stderr)
       return EXIT_UNKNOWN_ERROR
-
-  def dump_error_log(self, cmd_args, exc_type, exc_value, exc_traceback):
-    """Create an error log file in the directly where a command was executed,
-    and print detailed information about the error into the file.
-    :param cmd_args: the command-line arguments passed to the command that resulted in an error.
-    :param exc_type: the exc_type value for the error returnen by sys.exc_info()
-    :param exc_value: the exc_value value for the error returnen by sys.exc_info()
-    :param exc_traceback: the exc_traceback value for the error returnen by sys.exc_info()
-    """
-    now = str(int(time.time()))
-    dir = os.path.expanduser(Context.get_error_log_dir())
-    if not os.path.isdir(dir):
-      os.makedirs(dir)
-    path = os.path.join(dir, "%s-%s.error-log" % (self.name, now))
-    print("Fatal error running command; traceback can be found in %s" % path,
-        file=sys.stderr)
-
-    with open(path, "w") as out:
-      print("ERROR LOG: command arguments = %s" % cmd_args, file=out)
-      traceback.print_exception(exc_type, exc_value, exc_traceback, file=out)
 
   def execute(self, args):
     try:
@@ -450,8 +417,6 @@ class CommandLine(object):
       return EXIT_INTERRUPTED
     except Exception as e:
       print_aurora_log(logging.ERROR, "Unknown error: %s" % e)
-      exc_type, exc_value, exc_traceback = sys.exc_info()
-      self.dump_error_log(args, exc_type, exc_value, exc_traceback)
       return EXIT_UNKNOWN_ERROR
 
 
