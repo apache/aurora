@@ -69,17 +69,41 @@ def _apply_patch(patch_data, clean_excludes):
     raise PatchApplyError()
 
 
+def _get_latest_diff_time(server, request, reviews):
+  feedback_reviews = [r for r in reviews if r['links']['user']['title'] == server.user]
+  if feedback_reviews:
+    return feedback_reviews[-1]['timestamp']
+
+
+REPLY_REQUEST = '@ReviewBot retry'
+
+
+def _get_latest_user_request(reviews):
+  reply_requests = [r for r in reviews if REPLY_REQUEST.lower() in r['body_top'].lower()]
+  if reply_requests:
+    return reply_requests[-1]['timestamp']
+
+
 def _needs_reply(server, request):
   print('Inspecting review %d: %s' % (request['id'], request['summary']))
   reviews = server.get_resource(request['links']['reviews']['href'])['reviews']
   feedback_reviews = [r for r in reviews if r['links']['user']['title'] == server.user]
   if feedback_reviews:
     # Determine whether another round of feedback is necessary.
-    diffs = server.get_resource(request['links']['diffs']['href'])['diffs']
-    latest_diff_time = diffs[-1]['timestamp']
     latest_feedback_time = feedback_reviews[-1]['timestamp']
-    return latest_diff_time > latest_feedback_time
+    latest_request = _get_latest_user_request(reviews)
+    latest_diff = _get_latest_diff_time(server, request, reviews)
+    return ((latest_request and (latest_request > latest_feedback_time))
+            or (latest_diff and (latest_diff > latest_feedback_time))
   return True
+
+
+def _missing_tests(server, diff):
+  # Get files that were modified by the change, flag if test coverage appears lacking.
+  diff_files = server.get_resource(diff['links']['files']['href'])['files']
+  paths = [f['source_file'] for f in diff_files]
+  return (filter(lambda f: f.startswith('src/main/'), paths) and not
+          filter(lambda f: f.startswith('src/test/'), paths))
 
 
 def main():
@@ -151,7 +175,10 @@ def main():
       result = subprocess.call(['bash', '-c', '%s > %s 2>&1' % (command, build_output)])
       if result == 0:
         review_text = 'Master (%s) is green with this patch.\n  %s' % (sha, command)
-        ship = True
+        if _missing_tests(server, latest_diff):
+          review_text = '%s\n\nHowever, it appears that it might lack test coverage.'
+        else:
+          ship = True
       else:
         build_tail = subprocess.check_output(['tail', '-n', str(args.tail_lines), build_output])
         review_text = (
@@ -160,6 +187,8 @@ def main():
       review_text = (
           'This patch does not apply cleanly on master (%s), do you need to rebase?' % sha)
 
+    review_text = ('%s\n\nI will refresh this build result if you post a review containing "%s"'
+                   % (review_text, REPLY_REQUEST))
     print('Replying to review %d:\n%s' % (request['id'], review_text))
     print(server.get_resource(
         request['links']['reviews']['href'],
