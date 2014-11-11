@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -31,6 +32,8 @@ import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Command;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.gen.HostAttributes;
+import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.TaskLauncher;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
@@ -39,6 +42,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
@@ -53,6 +57,7 @@ import org.apache.mesos.SchedulerDriver;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertTrue;
 
@@ -175,6 +180,24 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testAttributesModePreserved() throws Exception {
+    new OfferFixture() {
+      @Override
+      void respondToOffer() throws Exception {
+        IHostAttributes draining = IHostAttributes.build(new HostAttributes().setMode(DRAINING));
+        expect(storageUtil.attributeStore.getHostAttributes(OFFER.getHostname()))
+            .andReturn(Optional.of(draining));
+        IHostAttributes saved = IHostAttributes.build(
+            Conversions.getAttributes(OFFER).newBuilder().setMode(DRAINING));
+        expect(storageUtil.attributeStore.saveHostAttributes(saved)).andReturn(true);
+
+        expect(systemLauncher.willUse(OFFER)).andReturn(false);
+        expect(userLauncher.willUse(OFFER)).andReturn(true);
+      }
+    }.run();
+  }
+
+  @Test
   public void testStatusUpdateNoAccepts() throws Exception {
     new StatusFixture() {
       @Override
@@ -264,7 +287,11 @@ public class MesosSchedulerImplTest extends EasyMockTest {
   }
 
   private void expectOfferAttributesSaved(Offer offer) {
-    storageUtil.attributeStore.saveHostAttributes(Conversions.getAttributes(offer));
+    expect(storageUtil.attributeStore.getHostAttributes(offer.getHostname()))
+        .andReturn(Optional.<IHostAttributes>absent());
+    IHostAttributes defaultMode = IHostAttributes.build(
+        Conversions.getAttributes(offer).newBuilder().setMode(MaintenanceMode.NONE));
+    expect(storageUtil.attributeStore.saveHostAttributes(defaultMode)).andReturn(true);
   }
 
   private abstract class RegisteredFixture {

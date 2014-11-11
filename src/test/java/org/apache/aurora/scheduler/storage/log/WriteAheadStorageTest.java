@@ -18,18 +18,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
-import org.apache.aurora.gen.Attribute;
-import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
-import org.apache.aurora.gen.storage.SaveHostAttributes;
 import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -39,7 +34,6 @@ import org.apache.aurora.scheduler.storage.LockStore;
 import org.apache.aurora.scheduler.storage.QuotaStore;
 import org.apache.aurora.scheduler.storage.SchedulerStore;
 import org.apache.aurora.scheduler.storage.TaskStore;
-import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.easymock.EasyMock;
 import org.junit.Before;
@@ -47,8 +41,6 @@ import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class WriteAheadStorageTest extends EasyMockTest {
 
@@ -90,35 +82,6 @@ public class WriteAheadStorageTest extends EasyMockTest {
   private void expectOp(Op op) {
     expect(transactionManager.hasActiveTransaction()).andReturn(true);
     transactionManager.log(op);
-  }
-
-  @Test
-  public void testSetMaintenanceModeSaved() {
-    String host = "a";
-    MaintenanceMode mode = MaintenanceMode.DRAINED;
-    expect(attributeStore.setMaintenanceMode(host, mode)).andReturn(true);
-    IHostAttributes attribute = IHostAttributes.build(new HostAttributes()
-        .setHost(host)
-        .setMode(mode)
-        .setAttributes(ImmutableSet.of(
-            new Attribute().setName("os").setValues(ImmutableSet.of("linux")))));
-    expect(attributeStore.getHostAttributes(host)).andReturn(Optional.of(attribute));
-    expectOp(Op.saveHostAttributes(new SaveHostAttributes(attribute.newBuilder())));
-
-    control.replay();
-
-    assertTrue(storage.setMaintenanceMode(host, mode));
-  }
-
-  @Test
-  public void testSetMaintenanceModeNotSaved() {
-    String host = "a";
-    MaintenanceMode mode = MaintenanceMode.DRAINED;
-    expect(attributeStore.setMaintenanceMode(host, mode)).andReturn(false);
-
-    control.replay();
-
-    assertFalse(storage.setMaintenanceMode(host, mode));
   }
 
   @Test

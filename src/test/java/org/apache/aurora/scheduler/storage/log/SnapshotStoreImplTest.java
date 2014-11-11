@@ -130,7 +130,7 @@ public class SnapshotStoreImplTest extends EasyMockTest {
     expectDataWipe();
     storageUtil.taskStore.saveTasks(tasks);
     storageUtil.quotaStore.saveQuota("steve", ResourceAggregates.none());
-    storageUtil.attributeStore.saveHostAttributes(attribute);
+    expect(storageUtil.attributeStore.saveHostAttributes(attribute)).andReturn(true);
     storageUtil.jobStore.saveAcceptedJob(
         job.getJobManagerId(),
         IJobConfiguration.build(job.getJobConfiguration()));

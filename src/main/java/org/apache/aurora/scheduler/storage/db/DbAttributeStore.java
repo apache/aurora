@@ -18,17 +18,15 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.inject.Inject;
 
-import org.apache.aurora.gen.Attribute;
-import org.apache.aurora.gen.HostAttributes;
-import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 import static com.twitter.common.inject.TimedInterceptor.Timed;
 
 /**
@@ -50,35 +48,18 @@ class DbAttributeStore implements AttributeStore.Mutable {
 
   @Timed("attribute_store_save")
   @Override
-  public void saveHostAttributes(IHostAttributes hostAttributes) {
-    HostAttributes mutableAttributes = hostAttributes.newBuilder();
+  public boolean saveHostAttributes(IHostAttributes hostAttributes) {
+    checkNotBlank(hostAttributes.getHost());
+    checkArgument(hostAttributes.isSetAttributes());
+    checkArgument(hostAttributes.isSetMode());
 
-    // Default to NONE maintenance mode.
-    if (!hostAttributes.isSetMode()) {
-      mutableAttributes.setMode(MaintenanceMode.NONE);
-    }
-    // Ensure attributes is non-null.
-    if (!hostAttributes.isSetAttributes()) {
-      mutableAttributes.setAttributes(ImmutableSet.<Attribute>of());
-    }
-
-    // If this is an 'upsert', don't overwrite the previously-set maintenance mode.
     Optional<IHostAttributes> existing = getHostAttributes(hostAttributes.getHost());
-    IHostAttributes toSave;
-    if (existing.isPresent()) {
-      mutableAttributes.setMode(existing.get().getMode());
-
-      toSave = IHostAttributes.build(mutableAttributes);
-
-      // Avoid inserting again if this is a no-op update.
-      if (existing.get().equals(toSave)) {
-        return;
-      }
+    if (existing.equals(Optional.of(hostAttributes))) {
+      return false;
     } else {
-      toSave = IHostAttributes.build(mutableAttributes);
+      merge(hostAttributes);
+      return true;
     }
-
-    merge(toSave);
   }
 
   private static final Predicate<IAttribute> EMPTY_VALUES = new Predicate<IAttribute>() {
@@ -98,18 +79,6 @@ class DbAttributeStore implements AttributeStore.Mutable {
     mapper.insert(hostAttributes);
     if (!hostAttributes.getAttributes().isEmpty()) {
       mapper.insertAttributeValues(hostAttributes);
-    }
-  }
-
-  @Timed("attribute_store_set_mode")
-  @Override
-  public boolean setMaintenanceMode(String host, MaintenanceMode mode) {
-    Optional<IHostAttributes> existing = getHostAttributes(host);
-    if (existing.isPresent()) {
-      merge(IHostAttributes.build(existing.get().newBuilder().setMode(mode)));
-      return true;
-    } else {
-      return false;
     }
   }
 

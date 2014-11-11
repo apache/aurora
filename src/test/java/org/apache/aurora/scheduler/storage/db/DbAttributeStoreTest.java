@@ -33,8 +33,6 @@ import org.junit.Test;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class DbAttributeStoreTest {
 
@@ -48,10 +46,12 @@ public class DbAttributeStoreTest {
   private static final IHostAttributes HOST_A_ATTRS =
       IHostAttributes.build(new HostAttributes(HOST_A, ImmutableSet.of(ATTR1, ATTR2))
           .setSlaveId(SLAVE_A)
+          .setAttributes(ImmutableSet.<Attribute>of())
           .setMode(MaintenanceMode.NONE));
   private static final IHostAttributes HOST_B_ATTRS =
       IHostAttributes.build(new HostAttributes(HOST_B, ImmutableSet.of(ATTR2, ATTR3))
           .setSlaveId(SLAVE_B)
+          .setAttributes(ImmutableSet.<Attribute>of())
           .setMode(MaintenanceMode.DRAINING));
 
   private Storage storage;
@@ -81,6 +81,11 @@ public class DbAttributeStoreTest {
     assertEquals(Optional.of(updatedA), read(HOST_A));
     assertEquals(ImmutableSet.of(updatedA, HOST_B_ATTRS), readAll());
 
+    IHostAttributes updatedMode = IHostAttributes.build(updatedA.newBuilder().setMode(DRAINED));
+    insert(updatedMode);
+    assertEquals(Optional.of(updatedMode), read(HOST_A));
+    assertEquals(ImmutableSet.of(updatedMode, HOST_B_ATTRS), readAll());
+
     truncate();
     assertEquals(Optional.<IHostAttributes>absent(), read(HOST_A));
     assertEquals(ImmutableSet.<IHostAttributes>of(), readAll());
@@ -101,36 +106,20 @@ public class DbAttributeStoreTest {
     assertEquals(Optional.of(attributes), read(HOST_A));
   }
 
-  @Test
-  public void testSetMaintenanceMode() {
+  @Test(expected = IllegalArgumentException.class)
+  public void testNoMode() {
     HostAttributes noMode = HOST_A_ATTRS.newBuilder();
     noMode.unsetMode();
 
     insert(IHostAttributes.build(noMode));
-    // Default mode NONE should be automatically applied.
-    assertEquals(Optional.of(HOST_A_ATTRS), read(HOST_A));
-
-    IHostAttributes updatedA = IHostAttributes.build(noMode.deepCopy().setMode(DRAINED));
-    // Inserting the updated value should ignore the mode.
-    insert(updatedA);
-    assertEquals(Optional.of(HOST_A_ATTRS), read(HOST_A));
-
-    // Instead, the mode must be explicitly set to be changed.
-    assertTrue(setMode(HOST_A, DRAINED));
-    assertEquals(Optional.of(updatedA), read(HOST_A));
-
-    assertFalse(setMode(HOST_B, DRAINED));
   }
 
-  @Test
+  @Test(expected = IllegalArgumentException.class)
   public void testSaveAttributesNotSet() {
     HostAttributes attributes = HOST_A_ATTRS.newBuilder();
     attributes.unsetAttributes();
 
     insert(IHostAttributes.build(attributes));
-    assertEquals(
-        Optional.of(IHostAttributes.build(attributes.setAttributes(ImmutableSet.<Attribute>of()))),
-        read(HOST_A));
   }
 
   @Test
@@ -146,15 +135,6 @@ public class DbAttributeStoreTest {
       @Override
       protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getAttributeStore().saveHostAttributes(attributes);
-      }
-    });
-  }
-
-  private boolean setMode(final String host, final MaintenanceMode mode) {
-    return storage.write(new MutateWork.Quiet<Boolean>() {
-      @Override
-      public Boolean apply(MutableStoreProvider storeProvider) {
-        return storeProvider.getAttributeStore().setMaintenanceMode(host, mode);
       }
     });
   }

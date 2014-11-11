@@ -32,6 +32,7 @@ import com.google.common.collect.Multimaps;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
@@ -62,7 +63,9 @@ public class Maintenance {
       public Response apply(StoreProvider storeProvider) {
         Multimap<MaintenanceMode, String> hostsByMode =
             Multimaps.transformValues(
-              Multimaps.index(storeProvider.getAttributeStore().getHostAttributes(), GET_MODE),
+              Multimaps.index(
+                  storeProvider.getAttributeStore().getHostAttributes(),
+                  AttributeStore.Util.GET_MODE),
               HOST_NAME);
 
         Map<MaintenanceMode, Object> hosts = Maps.newHashMap();
@@ -87,14 +90,6 @@ public class Maintenance {
         @Override
         public String apply(IHostAttributes attributes) {
           return attributes.getHost();
-        }
-      };
-
-  private static final Function<IHostAttributes, MaintenanceMode> GET_MODE =
-      new Function<IHostAttributes, MaintenanceMode>() {
-        @Override
-        public MaintenanceMode apply(IHostAttributes attrs) {
-          return attrs.getMode();
         }
       };
 }

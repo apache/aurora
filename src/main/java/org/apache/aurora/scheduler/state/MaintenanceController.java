@@ -268,7 +268,9 @@ public interface MaintenanceController {
       AttributeStore.Mutable store = storeProvider.getAttributeStore();
       ImmutableSet.Builder<HostStatus> statuses = ImmutableSet.builder();
       for (String host : hosts) {
-        if (store.setMaintenanceMode(host, mode)) {
+        Optional<IHostAttributes> toSave = AttributeStore.Util.mergeMode(store, host, mode);
+        if (toSave.isPresent()) {
+          store.saveHostAttributes(toSave.get());
           HostStatus status = new HostStatus().setHost(host).setMode(mode);
           eventSink.post(new PubsubEvent.HostMaintenanceStateChange(status.deepCopy()));
           statuses.add(status);

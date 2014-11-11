@@ -126,8 +126,8 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
 
   @Test
   public void testUnknownHost() {
-    expect(storageUtil.attributeStore.setMaintenanceMode("b", MaintenanceMode.SCHEDULED))
-        .andReturn(false);
+    expect(storageUtil.attributeStore.getHostAttributes("b"))
+        .andReturn(Optional.<IHostAttributes>absent());
 
     control.replay();
 
@@ -186,7 +186,12 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
   }
 
   private void expectMaintenanceModeChange(String hostName, MaintenanceMode mode) {
-    expect(storageUtil.attributeStore.setMaintenanceMode(hostName, mode)).andReturn(true);
+    IHostAttributes attributes = IHostAttributes.build(new HostAttributes().setHost(hostName));
+
+    expect(storageUtil.attributeStore.getHostAttributes(hostName))
+        .andReturn(Optional.of(attributes));
+    IHostAttributes updated = IHostAttributes.build(attributes.newBuilder().setMode(mode));
+    expect(storageUtil.attributeStore.saveHostAttributes(updated)).andReturn(true);
     eventSink.post(
         new PubsubEvent.HostMaintenanceStateChange(
             new HostStatus().setHost(hostName).setMode(mode)));

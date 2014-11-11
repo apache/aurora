@@ -115,6 +115,7 @@ import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.easymock.EasyMock.notNull;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class LogStorageTest extends EasyMockTest {
@@ -329,8 +330,8 @@ public class LogStorageTest extends EasyMockTest {
         .setSlaveId("slave2")
         .setMode(MaintenanceMode.DRAINED));
     builder.add(createTransaction(Op.saveHostAttributes(hostAttributes2)));
-    storageUtil.attributeStore.saveHostAttributes(
-        IHostAttributes.build(hostAttributes2.getHostAttributes()));
+    expect(storageUtil.attributeStore.saveHostAttributes(
+        IHostAttributes.build(hostAttributes2.getHostAttributes()))).andReturn(true);
 
     SaveLock saveLock = new SaveLock(new Lock().setKey(LockKey.job(JOB_KEY.newBuilder())));
     builder.add(createTransaction(Op.saveLock(saveLock)));
@@ -837,26 +838,30 @@ public class LogStorageTest extends EasyMockTest {
         expect(storageUtil.attributeStore.getHostAttributes(host))
             .andReturn(Optional.<IHostAttributes>absent());
 
-        // Each logStorage save invokes get, save, get to the underlying attribute store.
-        storageUtil.attributeStore.saveHostAttributes(hostAttributes.get());
         expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
+
+        expect(storageUtil.attributeStore.saveHostAttributes(hostAttributes.get())).andReturn(true);
         streamMatcher.expectTransaction(
             Op.saveHostAttributes(new SaveHostAttributes(hostAttributes.get().newBuilder())))
             .andReturn(position);
-        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
 
-        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
-        storageUtil.attributeStore.saveHostAttributes(hostAttributes.get());
-        expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
+        expect(storageUtil.attributeStore.saveHostAttributes(hostAttributes.get()))
+            .andReturn(false);
+
         expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
       }
 
       @Override
       protected void performMutations(MutableStoreProvider storeProvider) {
         AttributeStore.Mutable store = storeProvider.getAttributeStore();
-        store.saveHostAttributes(hostAttributes.get());
+        assertEquals(Optional.<IHostAttributes>absent(), store.getHostAttributes(host));
+
+        assertTrue(store.saveHostAttributes(hostAttributes.get()));
+
         assertEquals(hostAttributes, store.getHostAttributes(host));
-        store.saveHostAttributes(hostAttributes.get());
+
+        assertFalse(store.saveHostAttributes(hostAttributes.get()));
+
         assertEquals(hostAttributes, store.getHostAttributes(host));
       }
     }.run();

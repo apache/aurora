@@ -25,7 +25,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.twitter.common.base.MorePreconditions;
 
-import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.storage.Op;
 import org.apache.aurora.gen.storage.PruneJobUpdateHistory;
 import org.apache.aurora.gen.storage.RemoveJob;
@@ -211,20 +210,14 @@ class WriteAheadStorage extends ForwardingStore implements
   }
 
   @Override
-  public void saveHostAttributes(final IHostAttributes attrs) {
+  public boolean saveHostAttributes(final IHostAttributes attrs) {
     requireNonNull(attrs);
 
-    // Pass the updated attributes upstream, and then check if the stored value changes.
-    // We do this since different parts of the system write partial HostAttributes objects
-    // and they are merged together internally.
-    // TODO(William Farner): Split out a separate method
-    //                       saveAttributes(String host, Iterable<Attributes>) to simplify this.
-    Optional<IHostAttributes> saved = getHostAttributes(attrs.getHost());
-    attributeStore.saveHostAttributes(attrs);
-    Optional<IHostAttributes> updated = getHostAttributes(attrs.getHost());
-    if (!saved.equals(updated)) {
-      write(Op.saveHostAttributes(new SaveHostAttributes(updated.get().newBuilder())));
+    boolean changed = attributeStore.saveHostAttributes(attrs);
+    if (changed) {
+      write(Op.saveHostAttributes(new SaveHostAttributes(attrs.newBuilder())));
     }
+    return changed;
   }
 
   @Override
@@ -348,19 +341,6 @@ class WriteAheadStorage extends ForwardingStore implements
   public void deleteAllUpdatesAndEvents() {
     throw new UnsupportedOperationException(
         "Unsupported since casual storage users should never be doing this.");
-  }
-
-  @Override
-  public boolean setMaintenanceMode(final String host, final MaintenanceMode mode) {
-    requireNonNull(host);
-    requireNonNull(mode);
-
-    boolean saved = attributeStore.setMaintenanceMode(host, mode);
-    if (saved) {
-      write(Op.saveHostAttributes(
-          new SaveHostAttributes(attributeStore.getHostAttributes(host).get().newBuilder())));
-    }
-    return saved;
   }
 
   @Override

@@ -31,11 +31,11 @@ import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.GuiceUtils.AllowUnchecked;
 import org.apache.aurora.scheduler.TaskLauncher;
-import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverRegistered;
+import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
@@ -167,8 +167,8 @@ class MesosSchedulerImpl implements Scheduler {
           @Override
           protected void execute(MutableStoreProvider storeProvider) {
             for (final Offer offer : offers) {
-              storeProvider.getAttributeStore()
-                  .saveHostAttributes(Conversions.getAttributes(offer));
+              storeProvider.getAttributeStore().saveHostAttributes(
+                  AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer));
             }
           }
         });
