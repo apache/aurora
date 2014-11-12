@@ -16,6 +16,7 @@ reflection.
     - [Running a Command On a Running Job](#running-a-command-on-a-running-job)
     - [Killing a Job](#killing-a-job)
     - [Updating a Job](#updating-a-job)
+        - [Asynchronous job updates (beta)](#user-content-asynchronous-job-updates-beta)
     - [Renaming a Job](#renaming-a-job)
     - [Restarting Jobs](#restarting-jobs)
 - [Cron Jobs](#cron-jobs)
@@ -243,6 +244,36 @@ used to define and activate hooks for `update`.
   Defaults to `False`.
 - `--updater_health_check_interval_seconds=HEALTH_CHECK_INTERVAL_SECONDS`
   Time interval between subsequent shard status checks. Defaults to `3`.
+
+#### Asynchronous job updates (beta)
+
+As of 0.6.0, Aurora will coordinate updates (and rollbacks) within the
+scheduler. Performing updates this way also allows the scheduler to display
+update progress and job update history in the browser.
+
+There are several sub-commands to manage job updates:
+
+    aurora2 beta-update start <job key> <configuration file
+    aurora2 beta-update status <job key>
+    aurora2 beta-update pause <job key>
+    aurora2 beta-update resume <job key>
+    aurora2 beta-update abort <job key>
+    aurora2 beta-update list <cluster>
+
+When you `start` a job update, the command will return once it has sent the
+instructions to the scheduler.  At that point, you may view detailed
+progress for the update with the `status` subcommand, in addition to viewing
+graphical progress in the web browser.  You may also get a full listing of
+in-progress updates in a cluster with `list`.
+
+Once an update has been started, you can `pause` to keep the update but halt
+progress.  This can be useful for doing things like debug a  partially-updated
+job to determine whether you would like to proceed.  You can `resume` to
+proceed.
+
+You may `abort` a job update regardless of the state it is in. This will
+instruct the scheduler to completely abandon the job update and leave the job
+in the current (possibly partially-updated) state.
 
 ### Renaming a Job
 
