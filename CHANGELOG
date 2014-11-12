@@ -2,27 +2,10 @@ Aurora 0.6.0
 --------------------------------------------------------------------------------
 ## Bug
     * [AURORA-145] - Test dependencies leak into distribution
-    * [AURORA-546] - aurora command not found in vagrant
     * [AURORA-788] - GC executor doesn't need to exit after period of inactivity
     * [AURORA-807] - GC executor doesn't ignore launchTasks when it's shutting down
     * [AURORA-607] - release script is broken
     * [AURORA-877] - Build fails if thrift cannot be downloaded
-    * [AURORA-490] - aurora create fail due to incorrect UpdateConfig.watch_secs
-    * [AURORA-602] - e2e tests broken due to "aurora run" hanging
-    * [AURORA-652] - GC Executor termination should be co-ordinated by the scheduler
-    * [AURORA-773] - Usage text is incorrect for list_jobs subcommand
-    * [AURORA-860] - aurora job status should not log when writing json
-    * [AURORA-197] - aurora client fails in rollback if rolled-back instances already dead
-    * [AURORA-629] - Scheduler client does not retry closed connection errors
-    * [AURORA-759] - Scheduler updater stuck in ROLLING_BACK
-    * [AURORA-780] - python checkstyle looks at 3rdparty
-    * [AURORA-578] - observer shouldn't include jquery
-    * [AURORA-164] - scheduler does not leave enough resources available to run a GC executor
-    * [AURORA-643] - Redirect loop when accessing /scheduler//
-    * [AURORA-699] - Stack trace in AttributeAggregate
-    * [AURORA-654] - "Could not deserialize AssignedTask" from thermos_executor.pex
-    * [AURORA-462] - Client fails with DistributionNotFound: argparse
-    * [AURORA-704] - Update cron documentation
     * [AURORA-673] - aurora job restart should not require job config
     * [AURORA-672] - aurora job output format is broken around metadata
     * [AURORA-694] - When MemStorage is layered over DbStorage, SQL is not transactioned
@@ -105,8 +88,6 @@ Aurora 0.6.0
     * [AURORA-784] - Client reports "update has started" for no-op update
 
 ## Epic
-    * [AURORA-256] - Implement a centralized logging and analytics framework for aurora
-    * [AURORA-429] - Add features to the aurora client to allow users to customize around common patterns
     * [AURORA-16] - Refactor Aurora UI
     * [AURORA-610] - Job update orchestration in the scheduler
     * [AURORA-147] - Initial Apache Incubator release
@@ -114,19 +95,6 @@ Aurora 0.6.0
 ## Story
     * [AURORA-736] - Update committer docs with steps for adding a gpg key
     * [AURORA-600] - RC2 License and NOTICE updates
-    * [AURORA-308] - Move /utilization into aurora UI
-    * [AURORA-517] - Building a Python Client for Suro
-    * [AURORA-518] - Distributed logging from the Scheduler
-    * [AURORA-746] - LocalSchedulerMain shutdown deadlock
-    * [AURORA-217] - Aurora CLI Improvements: Init file
-    * [AURORA-559] - Move src/resources to src/{test,main}/resources as appropriate
-    * [AURORA-638] - Build broken due to AURORA-587
-    * [AURORA-598] - add -thermos_executor_flags option to scheduler
-    * [AURORA-273] - Automate testing the Aurora UI
-    * [AURORA-689] - Start vetting Mesos 0.21.0
-    * [AURORA-821] - Aurora_admin does not persist DRAINED state across scheduler fail-over
-    * [AURORA-360] - The scheduler should have authority on reacting to task health check failures
-    * [AURORA-540] - Consider removing ExecutorConfig data from the scheduler
     * [AURORA-231] - Upgrade gradle license plugin to v9 which contains reduced debug output
     * [AURORA-703] - Document dedicated roles
     * [AURORA-114] - Globs for Aurora job keys
@@ -176,21 +144,6 @@ Aurora 0.6.0
     * [AURORA-551] - Use getTasksWithoutConfig and getConfigSummary in UI
 
 ## Task
-    * [AURORA-160] - implement the ability to do one-off GC executor runs
-    * [AURORA-364] - gc_executor should not reconcile tasks if AdjustRetainedTask contains an unknown state
-    * [AURORA-89] - Add support for displaying arbitrary user-defined elements in scheduler pages
-    * [AURORA-289] - Automatically push rendered docs to the website upon commit
-    * [AURORA-815] - Remove remaining deprecated code
-    * [AURORA-24] - Build a standalone UI
-    * [AURORA-510] - Investigate a way to mock patch threading.Event in unit tests
-    * [AURORA-99] - Do not queue task for local gc if it started after the AdjustRetainedTask message was sent
-    * [AURORA-257] - GSoC: Investigate distributed logging systems
-    * [AURORA-354] - Replace quota consumption table in role and role/env page with pie charts
-    * [AURORA-258] - GSoC: add optional command logging to the clientv2 framework
-    * [AURORA-789] - Resources field should belong to aurora, not thermos
-    * [AURORA-620] - Consider using JCenter over HTTPS instead of Maven Central
-    * [AURORA-98] - Updater health checking needs verbose logging
-    * [AURORA-554] - client-commands.md should use v2 syntax for invocations
     * [AURORA-87] - Display job diff in the scheduler when an update is in progress
     * [AURORA-612] - Implement the storage primitives to persist update history
     * [AURORA-382] - Organize tasks by tabs on job page
