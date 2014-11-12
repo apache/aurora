@@ -34,7 +34,7 @@ class CoverageReportCheck extends DefaultTask {
   def legacyClassesWithoutCoverage
 
   // The amount of wiggle room when requiring min coverage be raised.
-  def epsilon = 0.5
+  def epsilon = 0.005
 
   private def computeCoverage(counterNodes, type) {
     def node = counterNodes.find { it.@type == type }
