@@ -27,7 +27,7 @@ python_requirement_library(
   ]
 )
 
-COMMONS_VERSION = '0.3.0'
+COMMONS_VERSION = '0.3.2'
 MESOS_VERSION = '0.20.1'
 
 make_link('argparse', '1.2.1')
