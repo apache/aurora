@@ -106,7 +106,8 @@ class AppModule extends AbstractModule {
                 .setStatsUrlPrefix(statsUrlPrefix)));
 
     // Filter layering: notifier filter -> base impl
-    PubsubEventModule.bind(binder(), SchedulingFilterImpl.class);
+    install(new PubsubEventModule(true));
+    PubsubEventModule.bindSchedulingFilterDelegate(binder()).to(SchedulingFilterImpl.class);
     bind(SchedulingFilterImpl.class).in(Singleton.class);
 
     LifecycleModule.bindStartupAction(binder(), RegisterShutdownStackPrinter.class);

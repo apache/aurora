@@ -18,10 +18,10 @@ import java.util.Set;
 
 import com.google.common.base.Optional;
 
-import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static java.util.Objects.requireNonNull;
@@ -156,32 +156,39 @@ public interface PubsubEvent {
   }
 
   /**
-   * Event sent when a host changed maintenance state.
+   * Event sent when a host's attributes change.
    */
-  class HostMaintenanceStateChange implements PubsubEvent {
-    private final HostStatus status;
+  class HostAttributesChanged implements PubsubEvent {
+    private final IHostAttributes attributes;
 
-    public HostMaintenanceStateChange(HostStatus status) {
-      this.status = requireNonNull(status);
+    public HostAttributesChanged(IHostAttributes attributes) {
+      this.attributes = requireNonNull(attributes);
     }
 
-    public HostStatus getStatus() {
-      return status;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof HostMaintenanceStateChange)) {
-        return false;
-      }
-
-      HostMaintenanceStateChange other = (HostMaintenanceStateChange) o;
-      return Objects.equals(status, other.status);
+    public IHostAttributes getAttributes() {
+      return attributes;
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(status);
+      return attributes.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof HostAttributesChanged)) {
+        return false;
+      }
+
+      HostAttributesChanged other = (HostAttributesChanged) o;
+      return Objects.equals(attributes, other.getAttributes());
+    }
+
+    @Override
+    public String toString() {
+      return com.google.common.base.Objects.toStringHelper(this)
+          .add("attributes", getAttributes())
+          .toString();
     }
   }
 

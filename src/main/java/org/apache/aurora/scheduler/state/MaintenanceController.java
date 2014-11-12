@@ -32,8 +32,6 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
-import org.apache.aurora.scheduler.events.EventSink;
-import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -105,17 +103,11 @@ public interface MaintenanceController {
     private static final Logger LOG = Logger.getLogger(MaintenanceControllerImpl.class.getName());
     private final Storage storage;
     private final StateManager stateManager;
-    private final EventSink eventSink;
 
     @Inject
-    public MaintenanceControllerImpl(
-        Storage storage,
-        StateManager stateManager,
-        EventSink eventSink) {
-
+    public MaintenanceControllerImpl(Storage storage, StateManager stateManager) {
       this.storage = requireNonNull(storage);
       this.stateManager = requireNonNull(stateManager);
-      this.eventSink = requireNonNull(eventSink);
     }
 
     private Set<HostStatus> watchDrainingTasks(MutableStoreProvider store, Set<String> hosts) {
@@ -272,7 +264,6 @@ public interface MaintenanceController {
         if (toSave.isPresent()) {
           store.saveHostAttributes(toSave.get());
           HostStatus status = new HostStatus().setHost(host).setMode(mode);
-          eventSink.post(new PubsubEvent.HostMaintenanceStateChange(status.deepCopy()));
           statuses.add(status);
         }
       }

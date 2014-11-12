@@ -43,6 +43,8 @@ import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.SaveTasks;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.events.EventSink;
+import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.ForwardingStore;
 import org.apache.aurora.scheduler.storage.JobStore;
@@ -92,6 +94,7 @@ class WriteAheadStorage extends ForwardingStore implements
   private final AttributeStore.Mutable attributeStore;
   private final JobUpdateStore.Mutable jobUpdateStore;
   private final Logger log;
+  private final EventSink eventSink;
 
   /**
    * Creates a new write-ahead storage that delegates to the providing default stores.
@@ -114,7 +117,8 @@ class WriteAheadStorage extends ForwardingStore implements
       QuotaStore.Mutable quotaStore,
       AttributeStore.Mutable attributeStore,
       JobUpdateStore.Mutable jobUpdateStore,
-      Logger log) {
+      Logger log,
+      EventSink eventSink) {
 
     super(
         schedulerStore,
@@ -134,6 +138,7 @@ class WriteAheadStorage extends ForwardingStore implements
     this.attributeStore = requireNonNull(attributeStore);
     this.jobUpdateStore = requireNonNull(jobUpdateStore);
     this.log = requireNonNull(log);
+    this.eventSink = requireNonNull(eventSink);
   }
 
   private void write(Op op) {
@@ -216,6 +221,7 @@ class WriteAheadStorage extends ForwardingStore implements
     boolean changed = attributeStore.saveHostAttributes(attrs);
     if (changed) {
       write(Op.saveHostAttributes(new SaveHostAttributes(attrs.newBuilder())));
+      eventSink.post(new PubsubEvent.HostAttributesChanged(attrs));
     }
     return changed;
   }

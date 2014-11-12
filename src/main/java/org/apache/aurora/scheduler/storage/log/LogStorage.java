@@ -31,7 +31,6 @@ import javax.inject.Qualifier;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
-
 import com.twitter.common.application.ShutdownRegistry;
 import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
@@ -49,6 +48,7 @@ import org.apache.aurora.gen.storage.SaveQuota;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.base.SchedulerException;
+import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.log.Log.Stream.InvalidPositionException;
 import org.apache.aurora.scheduler.log.Log.Stream.StreamAccessException;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -226,19 +226,21 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   private final Map<Op._Fields, Closure<Op>> transactionReplayActions;
 
   @Inject
-  LogStorage(LogManager logManager,
-             ShutdownRegistry shutdownRegistry,
-             @ShutdownGracePeriod Amount<Long, Time> shutdownGracePeriod,
-             SnapshotStore<Snapshot> snapshotStore,
-             @SnapshotInterval Amount<Long, Time> snapshotInterval,
-             @WriteBehind Storage storage,
-             @WriteBehind SchedulerStore.Mutable schedulerStore,
-             @WriteBehind JobStore.Mutable jobStore,
-             @WriteBehind TaskStore.Mutable taskStore,
-             @WriteBehind LockStore.Mutable lockStore,
-             @WriteBehind QuotaStore.Mutable quotaStore,
-             @WriteBehind AttributeStore.Mutable attributeStore,
-             @WriteBehind JobUpdateStore.Mutable jobUpdateStore) {
+  LogStorage(
+      LogManager logManager,
+      ShutdownRegistry shutdownRegistry,
+      @ShutdownGracePeriod Amount<Long, Time> shutdownGracePeriod,
+      SnapshotStore<Snapshot> snapshotStore,
+      @SnapshotInterval Amount<Long, Time> snapshotInterval,
+      @WriteBehind Storage storage,
+      @WriteBehind SchedulerStore.Mutable schedulerStore,
+      @WriteBehind JobStore.Mutable jobStore,
+      @WriteBehind TaskStore.Mutable taskStore,
+      @WriteBehind LockStore.Mutable lockStore,
+      @WriteBehind QuotaStore.Mutable quotaStore,
+      @WriteBehind AttributeStore.Mutable attributeStore,
+      @WriteBehind JobUpdateStore.Mutable jobUpdateStore,
+      EventSink eventSink) {
 
     this(logManager,
         new ScheduledExecutorSchedulingService(shutdownRegistry, shutdownGracePeriod),
@@ -251,22 +253,25 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         lockStore,
         quotaStore,
         attributeStore,
-        jobUpdateStore);
+        jobUpdateStore,
+        eventSink);
   }
 
   @VisibleForTesting
-  LogStorage(LogManager logManager,
-             SchedulingService schedulingService,
-             SnapshotStore<Snapshot> snapshotStore,
-             Amount<Long, Time> snapshotInterval,
-             Storage delegateStorage,
-             SchedulerStore.Mutable schedulerStore,
-             JobStore.Mutable jobStore,
-             TaskStore.Mutable taskStore,
-             LockStore.Mutable lockStore,
-             QuotaStore.Mutable quotaStore,
-             AttributeStore.Mutable attributeStore,
-             JobUpdateStore.Mutable jobUpdateStore) {
+  LogStorage(
+      LogManager logManager,
+      SchedulingService schedulingService,
+      SnapshotStore<Snapshot> snapshotStore,
+      Amount<Long, Time> snapshotInterval,
+      Storage delegateStorage,
+      SchedulerStore.Mutable schedulerStore,
+      JobStore.Mutable jobStore,
+      TaskStore.Mutable taskStore,
+      LockStore.Mutable lockStore,
+      QuotaStore.Mutable quotaStore,
+      AttributeStore.Mutable attributeStore,
+      JobUpdateStore.Mutable jobUpdateStore,
+      EventSink eventSink) {
 
     this.logManager = requireNonNull(logManager);
     this.schedulingService = requireNonNull(schedulingService);
@@ -305,7 +310,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         quotaStore,
         attributeStore,
         jobUpdateStore,
-        Logger.getLogger(WriteAheadStorage.class.getName()));
+        Logger.getLogger(WriteAheadStorage.class.getName()),
+        eventSink);
 
     this.logEntryReplayActions = buildLogEntryReplayActions();
     this.transactionReplayActions = buildTransactionReplayActions();

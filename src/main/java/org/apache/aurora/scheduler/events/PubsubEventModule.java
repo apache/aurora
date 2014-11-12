@@ -30,6 +30,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
+import com.google.inject.binder.LinkedBindingBuilder;
 import com.google.inject.multibindings.Multibinder;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.Command;
@@ -45,19 +46,21 @@ import static java.util.Objects.requireNonNull;
  */
 public final class PubsubEventModule extends AbstractModule {
 
-  private static final Logger LOG = Logger.getLogger(PubsubEventModule.class.getName());
-
   private final boolean async;
+  private final Logger log;
 
-  private PubsubEventModule(boolean async) {
-    // Must be constructed through factory.
-    this.async = async;
+  @VisibleForTesting
+  PubsubEventModule(boolean async, Logger log) {
+    this.log = requireNonNull(log);
+    this.async = requireNonNull(async);
+  }
+
+  public PubsubEventModule(boolean async) {
+    this(async, Logger.getLogger(PubsubEventModule.class.getName()));
   }
 
   @VisibleForTesting
-  public static void installForTest(Binder binder) {
-    binder.install(new PubsubEventModule(false));
-  }
+  static final String DEAD_EVENT_MESSAGE = "Captured dead event %s";
 
   @Override
   protected void configure() {
@@ -75,7 +78,7 @@ public final class PubsubEventModule extends AbstractModule {
     final EventBus eventBus = new AsyncEventBus("AsyncTaskEvents", executor);
     eventBus.register(new Object() {
       @Subscribe public void logDeadEvent(DeadEvent event) {
-        LOG.warning("Captured dead event " + event.getEvent());
+        log.warning(String.format(DEAD_EVENT_MESSAGE, event.getEvent()));
       }
     });
     bind(EventBus.class).toInstance(eventBus);
@@ -112,15 +115,24 @@ public final class PubsubEventModule extends AbstractModule {
   }
 
   /**
+   * Gets a binding builder that must be used to wire up the scheduling filter implementation
+   * that backs the delegating scheduling filter that fires pubsub events.
+   *
+   * @param binder Binder to create a binding against.
+   * @return A linked binding builder that may be used to wire up the scheduling filter.
+   */
+  public static LinkedBindingBuilder<SchedulingFilter> bindSchedulingFilterDelegate(Binder binder) {
+    binder.bind(SchedulingFilter.class).to(NotifyingSchedulingFilter.class);
+    binder.bind(NotifyingSchedulingFilter.class).in(Singleton.class);
+    return binder.bind(SchedulingFilter.class).annotatedWith(NotifyDelegate.class);
+  }
+
+  /**
    * Binds a task event module.
    *
    * @param binder Binder to bind against.
-   * @param filterClass Delegate scheduling filter implementation class.
    */
-  public static void bind(Binder binder, final Class<? extends SchedulingFilter> filterClass) {
-    binder.bind(SchedulingFilter.class).annotatedWith(NotifyDelegate.class).to(filterClass);
-    binder.bind(SchedulingFilter.class).to(NotifyingSchedulingFilter.class);
-    binder.bind(NotifyingSchedulingFilter.class).in(Singleton.class);
+  public static void bind(Binder binder) {
     binder.install(new PubsubEventModule(true));
   }
 

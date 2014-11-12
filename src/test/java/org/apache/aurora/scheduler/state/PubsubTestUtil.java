@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.state;
 
 import java.util.Set;
 
-import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
@@ -23,7 +22,6 @@ import com.twitter.common.application.StartupStage;
 import com.twitter.common.base.ExceptionalCommand;
 
 import org.apache.aurora.scheduler.events.EventSink;
-import org.apache.aurora.scheduler.events.PubsubEventModule;
 
 /**
  * A convenience utility for unit tests that which to verify pubsub wiring.
@@ -33,15 +31,6 @@ public final class PubsubTestUtil {
 
   private PubsubTestUtil() {
     // Utility class.
-  }
-
-  /**
-   * Installs the pubsub system on the given binder.
-   *
-   * @param binder Binder to install pubsub system onto.
-   */
-  public static void installPubsub(Binder binder) {
-    PubsubEventModule.installForTest(binder);
   }
 
   /**

@@ -27,7 +27,6 @@ import com.google.common.collect.Sets;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
 import com.google.common.testing.TearDown;
-
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
@@ -79,6 +78,8 @@ import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.events.EventSink;
+import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
@@ -134,6 +135,7 @@ public class LogStorageTest extends EasyMockTest {
   private SnapshotStore<Snapshot> snapshotStore;
   private StorageTestUtil storageUtil;
   private SnapshotDeduplicator snapshotDeduplicator;
+  private EventSink eventSink;
 
   @Before
   public void setUp() {
@@ -160,20 +162,22 @@ public class LogStorageTest extends EasyMockTest {
     schedulingService = createMock(SchedulingService.class);
     snapshotStore = createMock(new Clazz<SnapshotStore<Snapshot>>() { });
     storageUtil = new StorageTestUtil(this);
+    eventSink = createMock(EventSink.class);
 
-    logStorage =
-        new LogStorage(logManager,
-            schedulingService,
-            snapshotStore,
-            SNAPSHOT_INTERVAL,
-            storageUtil.storage,
-            storageUtil.schedulerStore,
-            storageUtil.jobStore,
-            storageUtil.taskStore,
-            storageUtil.lockStore,
-            storageUtil.quotaStore,
-            storageUtil.attributeStore,
-            storageUtil.jobUpdateStore);
+    logStorage = new LogStorage(
+        logManager,
+        schedulingService,
+        snapshotStore,
+        SNAPSHOT_INTERVAL,
+        storageUtil.storage,
+        storageUtil.schedulerStore,
+        storageUtil.jobStore,
+        storageUtil.taskStore,
+        storageUtil.lockStore,
+        storageUtil.quotaStore,
+        storageUtil.attributeStore,
+        storageUtil.jobUpdateStore,
+        eventSink);
 
     stream = createMock(Stream.class);
     streamMatcher = LogOpMatcher.matcherFor(stream);
@@ -306,7 +310,7 @@ public class LogStorageTest extends EasyMockTest {
         rewriteTask.getTaskId(),
         ITaskConfig.build(rewriteTask.getTask()))).andReturn(true);
 
-    RemoveTasks removeTasks = new RemoveTasks(ImmutableSet.<String>of("taskId1"));
+    RemoveTasks removeTasks = new RemoveTasks(ImmutableSet.of("taskId1"));
     builder.add(createTransaction(Op.removeTasks(removeTasks)));
     storageUtil.taskStore.deleteTasks(removeTasks.getTaskIds());
 
@@ -841,6 +845,7 @@ public class LogStorageTest extends EasyMockTest {
         expect(storageUtil.attributeStore.getHostAttributes(host)).andReturn(hostAttributes);
 
         expect(storageUtil.attributeStore.saveHostAttributes(hostAttributes.get())).andReturn(true);
+        eventSink.post(new PubsubEvent.HostAttributesChanged(hostAttributes.get()));
         streamMatcher.expectTransaction(
             Op.saveHostAttributes(new SaveHostAttributes(hostAttributes.get().newBuilder())))
             .andReturn(position);

@@ -80,20 +80,20 @@ public class KillRetryTest extends EasyMockTest {
     statsProvider = new FakeStatsProvider();
 
     Injector injector = Guice.createInjector(
+        new LifecycleModule(),
+        new PubsubEventModule(false),
         new AbstractModule() {
           @Override
           protected void configure() {
             bind(Driver.class).toInstance(driver);
             bind(Storage.class).toInstance(storageUtil.storage);
             bind(ScheduledExecutorService.class).toInstance(executorMock);
-            PubsubEventModule.installForTest(binder());
             PubsubEventModule.bindSubscriber(binder(), KillRetry.class);
             bind(KillRetry.class).in(Singleton.class);
             bind(BackoffStrategy.class).toInstance(backoffStrategy);
             bind(StatsProvider.class).toInstance(statsProvider);
             bind(UncaughtExceptionHandler.class)
                 .toInstance(createMock(UncaughtExceptionHandler.class));
-            install(new LifecycleModule());
           }
         }
     );

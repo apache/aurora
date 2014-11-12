@@ -39,6 +39,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -104,20 +105,21 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   private Injector getInjector(final Storage storageImpl) {
-    return Guice.createInjector(new AbstractModule() {
-      @Override
-      protected void configure() {
-        PubsubTestUtil.installPubsub(binder());
-        bind(AsyncModule.PREEMPTOR_KEY).toInstance(preemptor);
-        AsyncModule.bindTaskScheduler(binder(), AsyncModule.PREEMPTOR_KEY, reservationDuration);
-        bind(OfferQueue.class).toInstance(offerQueue);
-        bind(StateManager.class).toInstance(stateManager);
-        bind(TaskAssigner.class).toInstance(assigner);
-        bind(Clock.class).toInstance(clock);
-        bind(Storage.class).toInstance(storageImpl);
-        bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
-      }
-    });
+    return Guice.createInjector(
+        new PubsubEventModule(false),
+        new AbstractModule() {
+          @Override
+          protected void configure() {
+            bind(AsyncModule.PREEMPTOR_KEY).toInstance(preemptor);
+            AsyncModule.bindTaskScheduler(binder(), AsyncModule.PREEMPTOR_KEY, reservationDuration);
+            bind(OfferQueue.class).toInstance(offerQueue);
+            bind(StateManager.class).toInstance(stateManager);
+            bind(TaskAssigner.class).toInstance(assigner);
+            bind(Clock.class).toInstance(clock);
+            bind(Storage.class).toInstance(storageImpl);
+            bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
+          }
+        });
   }
 
   private void expectTaskStillPendingQuery(IScheduledTask task) {

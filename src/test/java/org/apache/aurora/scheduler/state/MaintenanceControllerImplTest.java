@@ -33,8 +33,8 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
-import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -69,10 +69,10 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     stateManager = createMock(StateManager.class);
 
     Injector injector = Guice.createInjector(
+        new PubsubEventModule(false),
         new AbstractModule() {
           @Override
           protected void configure() {
-            PubsubTestUtil.installPubsub(binder());
             StateModule.bindMaintenanceController(binder());
             bind(Storage.class).toInstance(storageUtil.storage);
             bind(StateManager.class).toInstance(stateManager);
@@ -192,9 +192,6 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
         .andReturn(Optional.of(attributes));
     IHostAttributes updated = IHostAttributes.build(attributes.newBuilder().setMode(mode));
     expect(storageUtil.attributeStore.saveHostAttributes(updated)).andReturn(true);
-    eventSink.post(
-        new PubsubEvent.HostMaintenanceStateChange(
-            new HostStatus().setHost(hostName).setMode(mode)));
   }
 
   private void assertStatus(String host, MaintenanceMode mode, Set<HostStatus> statuses) {

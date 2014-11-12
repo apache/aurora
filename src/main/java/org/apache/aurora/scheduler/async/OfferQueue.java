@@ -39,7 +39,6 @@ import com.twitter.common.stats.Stats;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
-import org.apache.aurora.scheduler.events.PubsubEvent.HostMaintenanceStateChange;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.mesos.Protos.Offer;
@@ -53,6 +52,7 @@ import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
+import static org.apache.aurora.scheduler.events.PubsubEvent.HostAttributesChanged;
 
 /**
  * Tracks the Offers currently known by the scheduler.
@@ -86,11 +86,11 @@ public interface OfferQueue extends EventSubscriber {
   boolean launchFirst(Function<HostOffer, Optional<TaskInfo>> acceptor) throws LaunchException;
 
   /**
-   * Notifies the offer queue that a host has changed state.
+   * Notifies the offer queue that a host's attributes have changed.
    *
    * @param change State change notification.
    */
-  void hostChangedState(HostMaintenanceStateChange change);
+  void hostAttributesChanged(HostAttributesChanged change);
 
   /**
    * Gets the offers that the scheduler is holding.
@@ -251,8 +251,8 @@ public interface OfferQueue extends EventSubscriber {
      * @param change Host change notification.
      */
     @Subscribe
-    public void hostChangedState(HostMaintenanceStateChange change) {
-      hostOffers.updateHostMode(change.getStatus().getHost(), change.getStatus().getMode());
+    public void hostAttributesChanged(HostAttributesChanged change) {
+      hostOffers.updateHostMode(change.getAttributes().getHost(), change.getAttributes().getMode());
     }
 
     /**
