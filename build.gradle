@@ -52,7 +52,7 @@ tasks.withType(JavaCompile).matching { it.name != 'compileGeneratedJava' }.all {
 }
 
 task wrapper(type: Wrapper) {
-  gradleVersion = '2.1'
+  gradleVersion = '2.2'
 }
 
 task sourceJar(type: Jar) {
@@ -439,6 +439,9 @@ tasks.withType(Test) {
 ideaProject.dependsOn generateSources
 
 idea {
+  project {
+    vcs = 'Git'
+  }
   module {
     def codegenDirs = [file(generatedJavaDir)]
 
