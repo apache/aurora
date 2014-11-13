@@ -19,6 +19,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.ResourceSlot;
@@ -27,6 +28,7 @@ import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.junit.Before;
@@ -43,8 +45,8 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
       .setDiskMb(1024));
   private static final ResourceSlot TASK_RESOURCES = ResourceSlot.from(TASK);
   private static final String TASK_ID = "taskId";
-  private static final String SLAVE = "slaveHost";
-  private static final MaintenanceMode MODE = MaintenanceMode.NONE;
+  private static final IHostAttributes ATTRIBUTES =
+      IHostAttributes.build(new HostAttributes().setHost("host").setMode(MaintenanceMode.NONE));
 
   private static final Veto VETO_1 = new Veto("veto1", 1);
   private static final Veto VETO_2 = new Veto("veto2", 2);
@@ -67,21 +69,21 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
   @Test
   public void testEvents() {
     Set<Veto> vetoes = ImmutableSet.of(VETO_1, VETO_2);
-    expect(delegate.filter(TASK_RESOURCES, SLAVE, MODE, TASK, TASK_ID, emptyJob)).andReturn(vetoes);
+    expect(delegate.filter(TASK_RESOURCES, ATTRIBUTES, TASK, TASK_ID, emptyJob)).andReturn(vetoes);
     eventSink.post(new Vetoed(TASK_ID, vetoes));
 
     control.replay();
 
-    assertEquals(vetoes, filter.filter(TASK_RESOURCES, SLAVE, MODE, TASK, TASK_ID, emptyJob));
+    assertEquals(vetoes, filter.filter(TASK_RESOURCES, ATTRIBUTES, TASK, TASK_ID, emptyJob));
   }
 
   @Test
   public void testNoVetoes() {
     Set<Veto> vetoes = ImmutableSet.of();
-    expect(delegate.filter(TASK_RESOURCES, SLAVE, MODE, TASK, TASK_ID, emptyJob)).andReturn(vetoes);
+    expect(delegate.filter(TASK_RESOURCES, ATTRIBUTES, TASK, TASK_ID, emptyJob)).andReturn(vetoes);
 
     control.replay();
 
-    assertEquals(vetoes, filter.filter(TASK_RESOURCES, SLAVE, MODE, TASK, TASK_ID, emptyJob));
+    assertEquals(vetoes, filter.filter(TASK_RESOURCES, ATTRIBUTES, TASK, TASK_ID, emptyJob));
   }
 }

@@ -27,7 +27,6 @@ import org.apache.aurora.scheduler.async.OfferQueue;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskStatus;
 
@@ -56,7 +55,7 @@ class UserTaskLauncher implements TaskLauncher {
   }
 
   @Override
-  public boolean willUse(Offer offer) {
+  public boolean willUse(HostOffer offer) {
     requireNonNull(offer);
 
     offerQueue.addOffer(offer);

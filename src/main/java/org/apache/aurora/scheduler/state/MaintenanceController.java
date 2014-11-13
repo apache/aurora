@@ -52,6 +52,7 @@ import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
  * All state-changing functions return their results.  Additionally, all state-changing functions
  * will ignore requests to change state of unknown hosts and subsequently omit these hosts from
  * return values.
+ * TODO(wfarner): Convert use of HostStatus in this API to IHostStatus (immutable).
  */
 public interface MaintenanceController {
 

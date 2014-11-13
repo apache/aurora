@@ -17,8 +17,6 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Set;
 
-import javax.inject.Inject;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
@@ -33,15 +31,9 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
-import org.apache.aurora.scheduler.storage.AttributeStore;
-import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
-import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-
-import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
@@ -64,18 +56,6 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private static final Optional<Veto> NO_VETO = Optional.absent();
 
   private static final Set<MaintenanceMode> VETO_MODES = EnumSet.of(DRAINING, DRAINED);
-
-  private final Storage storage;
-
-  /**
-   * Creates a new scheduling filter.
-   *
-   * @param storage Interface to accessing the task store.
-   */
-  @Inject
-  public SchedulingFilterImpl(Storage storage) {
-    this.storage = requireNonNull(storage);
-  }
 
   /**
    * A function that may veto a task.
@@ -187,7 +167,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   private FilterRule getConstraintFilter(
       final AttributeAggregate jobState,
-      final String slaveHost) {
+      final IHostAttributes offerAttributes) {
 
     return new FilterRule() {
       @Override
@@ -196,32 +176,23 @@ public class SchedulingFilterImpl implements SchedulingFilter {
           return ImmutableList.of();
         }
 
-        // In the interest of performance, we perform a weakly consistent read here.  The biggest
-        // risk of this is that we might schedule against stale host attributes, or we might fail
-        // to correctly satisfy a diversity constraint.  Given that the likelihood is relatively low
-        // for both of these, and the impact is also low, the weak consistency is acceptable.
-        return storage.weaklyConsistentRead(new Quiet<Iterable<Veto>>() {
-          @Override
-          public Iterable<Veto> apply(final StoreProvider storeProvider) {
-            ConstraintFilter constraintFilter = new ConstraintFilter(
-                jobState,
-                AttributeStore.Util.attributesOrNone(storeProvider, slaveHost));
-            ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
-            for (IConstraint constraint : VALUES_FIRST.sortedCopy(task.getConstraints())) {
-              Optional<Veto> veto = constraintFilter.getVeto(constraint);
-              if (veto.isPresent()) {
-                vetoes.add(veto.get());
-                if (isValueConstraint(constraint)) {
-                  // Break when a value constraint mismatch is found to avoid other
-                  // potentially-expensive operations to satisfy other constraints.
-                  break;
-                }
-              }
+        ConstraintFilter constraintFilter = new ConstraintFilter(
+            jobState,
+            offerAttributes.getAttributes());
+        ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
+        for (IConstraint constraint : VALUES_FIRST.sortedCopy(task.getConstraints())) {
+          Optional<Veto> veto = constraintFilter.getVeto(constraint);
+          if (veto.isPresent()) {
+            vetoes.add(veto.get());
+            if (isValueConstraint(constraint)) {
+              // Break when a value constraint mismatch is found to avoid other
+              // potentially-expensive operations to satisfy other constraints.
+              break;
             }
-
-            return vetoes.build();
           }
-        });
+        }
+
+        return vetoes.build();
       }
     };
   }
@@ -240,38 +211,31 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     return builder.build();
   }
 
-  private boolean isDedicated(final String slaveHost) {
-    Iterable<IAttribute> slaveAttributes =
-        storage.weaklyConsistentRead(new Quiet<Iterable<IAttribute>>() {
-          @Override
-          public Iterable<IAttribute> apply(final StoreProvider storeProvider) {
-            return AttributeStore.Util.attributesOrNone(storeProvider, slaveHost);
-          }
-        });
-
-    return Iterables.any(slaveAttributes, new ConstraintFilter.NameFilter(DEDICATED_ATTRIBUTE));
+  private boolean isDedicated(IHostAttributes attributes) {
+    return Iterables.any(
+        attributes.getAttributes(),
+        new ConstraintFilter.NameFilter(DEDICATED_ATTRIBUTE));
   }
 
   @Override
   public Set<Veto> filter(
       ResourceSlot offer,
-      String slaveHost,
-      MaintenanceMode mode,
+      IHostAttributes attributes,
       ITaskConfig task,
       String taskId,
       AttributeAggregate attributeAggregate) {
 
-    if (!ConfigurationManager.isDedicated(task) && isDedicated(slaveHost)) {
+    if (!ConfigurationManager.isDedicated(task) && isDedicated(attributes)) {
       return ImmutableSet.of(DEDICATED_HOST_VETO);
     }
 
-    Optional<Veto> maintenanceVeto = getMaintenanceVeto(mode);
+    Optional<Veto> maintenanceVeto = getMaintenanceVeto(attributes.getMode());
     if (maintenanceVeto.isPresent()) {
       return maintenanceVeto.asSet();
     }
 
     return ImmutableSet.<Veto>builder()
-        .addAll(getConstraintFilter(attributeAggregate, slaveHost).apply(task))
+        .addAll(getConstraintFilter(attributeAggregate, attributes).apply(task))
         .addAll(getResourceVetoes(offer, task))
         .build();
   }

@@ -35,6 +35,7 @@ import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.OfferQueue;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.base.Conversions;
@@ -48,8 +49,6 @@ import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
-
-import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
 
 /**
  * Module to configure export of cluster-wide resource allocation and consumption statistics.
@@ -115,13 +114,13 @@ public class AsyncStatsModule extends AbstractModule {
     private static final Function<HostOffer, MachineResource> TO_RESOURCE =
         new Function<HostOffer, MachineResource>() {
           @Override
-          public MachineResource apply(HostOffer hostOffer) {
-            Resources resources = Resources.from(hostOffer.getOffer());
+          public MachineResource apply(HostOffer offer) {
+            Resources resources = Resources.from(offer.getOffer());
             IResourceAggregate quota = IResourceAggregate.build(new ResourceAggregate()
                 .setNumCpus(resources.getNumCpus())
                 .setRamMb(resources.getRam().as(Data.MB))
                 .setDiskMb(resources.getDisk().as(Data.MB)));
-            return new MachineResource(quota, Conversions.isDedicated(hostOffer.getOffer()));
+            return new MachineResource(quota, Conversions.isDedicated(offer.getOffer()));
           }
         };
 

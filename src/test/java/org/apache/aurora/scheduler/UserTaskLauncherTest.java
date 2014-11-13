@@ -22,14 +22,15 @@ import com.google.common.collect.Iterables;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.OfferQueue;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
@@ -47,6 +48,7 @@ import org.junit.Test;
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.HOST_CONSTRAINT;
+import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertTrue;
 
@@ -60,7 +62,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
   private static final String TASK_ID_A = "task_id_a";
 
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("OfferId").build();
-  private static final Offer OFFER = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 1024, 1024);
+  private static final HostOffer OFFER = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 1024, 1024);
 
   private OfferQueue offerQueue;
   private StateManager stateManager;
@@ -171,13 +173,13 @@ public class UserTaskLauncherTest extends EasyMockTest {
     launcher.statusUpdate(status);
   }
 
-  private static Offer createOffer(SlaveID slave, String slaveHost, double cpu,
+  private static HostOffer createOffer(SlaveID slave, String slaveHost, double cpu,
       double ramMb, double diskMb) {
     return createOffer(slave, slaveHost, cpu, ramMb, diskMb,
         ImmutableSet.<Pair<Integer, Integer>>of());
   }
 
-  private static Offer createOffer(SlaveID slave, String slaveHost, double cpu,
+  private static HostOffer createOffer(SlaveID slave, String slaveHost, double cpu,
       double ramMb, double diskMb, Set<Pair<Integer, Integer>> ports) {
 
     Ranges portRanges = Ranges.newBuilder()
@@ -189,7 +191,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
         }))
         .build();
 
-    return Offer.newBuilder()
+    Offer mesosOffer = Offer.newBuilder()
         .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.CPUS)
             .setScalar(Scalar.newBuilder().setValue(cpu)))
         .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.RAM_MB)
@@ -206,5 +208,6 @@ public class UserTaskLauncherTest extends EasyMockTest {
         .setFrameworkId(FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build())
         .setId(OFFER_ID)
         .build();
+    return new HostOffer(mesosOffer, IHostAttributes.build(new HostAttributes()));
   }
 }

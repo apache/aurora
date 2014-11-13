@@ -33,6 +33,7 @@ import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobKey;
@@ -40,6 +41,7 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
@@ -62,7 +64,6 @@ import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
@@ -72,13 +73,17 @@ import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
+import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
+import static org.apache.aurora.gen.MaintenanceMode.NONE;
+import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
 import static org.apache.aurora.gen.ScheduleStatus.FINISHED;
 import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
+import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
@@ -93,14 +98,10 @@ public class TaskSchedulerTest extends EasyMockTest {
 
   private static final long FIRST_SCHEDULE_DELAY_MS = 1L;
 
-  private static final HostOffer OFFER_A =
-      new HostOffer(Offers.makeOffer("OFFER_A", "HOST_A"), MaintenanceMode.NONE);
-  private static final HostOffer OFFER_B =
-      new HostOffer(Offers.makeOffer("OFFER_B", "HOST_B"), MaintenanceMode.SCHEDULED);
-  private static final HostOffer OFFER_C =
-      new HostOffer(Offers.makeOffer("OFFER_C", "HOST_C"), MaintenanceMode.DRAINING);
-  private static final HostOffer OFFER_D =
-      new HostOffer(Offers.makeOffer("OFFER_D", "HOST_D"), MaintenanceMode.DRAINED);
+  private static final HostOffer OFFER_A =  makeOffer("OFFER_A", "HOST_A", NONE);
+  private static final HostOffer OFFER_B = makeOffer("OFFER_B", "HOST_B", SCHEDULED);
+  private static final HostOffer OFFER_C = makeOffer("OFFER_C", "HOST_C", DRAINING);
+  private static final HostOffer OFFER_D = makeOffer("OFFER_D", "HOST_D", DRAINED);
 
   private Storage storage;
 
@@ -150,7 +151,7 @@ public class TaskSchedulerTest extends EasyMockTest {
         capture(cacheSizeSupplier))).andReturn(stat);
 
     control.replay();
-    offerQueue = new OfferQueueImpl(driver, returnDelay, executor, maintenance);
+    offerQueue = new OfferQueueImpl(driver, returnDelay, executor);
     TaskScheduler scheduler = new TaskSchedulerImpl(storage,
         stateManager,
         assigner,
@@ -173,10 +174,10 @@ public class TaskSchedulerTest extends EasyMockTest {
     return expectOfferDeclineIn(10);
   }
 
-  private Capture<Runnable> expectOfferDeclineIn(int delayMillis) {
+  private Capture<Runnable> expectOfferDeclineIn(long delayMillis) {
     expect(returnDelay.get()).andReturn(Amount.of(delayMillis, Time.MILLISECONDS));
     Capture<Runnable> runnable = createCapture();
-    executor.schedule(capture(runnable), eq((long) delayMillis), eq(TimeUnit.MILLISECONDS));
+    executor.schedule(capture(runnable), eq(delayMillis), eq(TimeUnit.MILLISECONDS));
     expectLastCall().andReturn(createMock(ScheduledFuture.class));
     return runnable;
   }
@@ -223,8 +224,8 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    offerQueue.addOffer(OFFER_A.getOffer());
-    offerQueue.addOffer(OFFER_B.getOffer());
+    offerQueue.addOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_B);
   }
 
   @Test
@@ -310,7 +311,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    offerQueue.addOffer(OFFER_A.getOffer());
+    offerQueue.addOffer(OFFER_A);
     changeState(task, INIT, PENDING);
     timeoutCapture.getValue().run();
     timeoutCapture2.getValue().run();
@@ -345,7 +346,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     replayAndCreateScheduler();
 
     changeState(task, INIT, PENDING);
-    offerQueue.addOffer(OFFER_A.getOffer());
+    offerQueue.addOffer(OFFER_A);
     timeoutCapture.getValue().run();
   }
 
@@ -372,7 +373,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     replayAndCreateScheduler();
 
     changeState(task, INIT, PENDING);
-    offerQueue.addOffer(OFFER_A.getOffer());
+    offerQueue.addOffer(OFFER_A);
     timeoutCapture.getValue().run();
     timeoutCapture2.getValue().run();
   }
@@ -394,7 +395,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     replayAndCreateScheduler();
 
     changeState(task, INIT, PENDING);
-    offerQueue.addOffer(OFFER_A.getOffer());
+    offerQueue.addOffer(OFFER_A);
     timeoutCapture.getValue().run();
     offerExpirationCapture.getValue().run();
     timeoutCapture2.getValue().run();
@@ -405,15 +406,16 @@ public class TaskSchedulerTest extends EasyMockTest {
     expectAnyMaintenanceCalls();
     Capture<Runnable> offerExpirationCapture = expectOfferDeclineIn(10);
 
-    Offer offerAB =
-        Offers.makeOffer("OFFER_B").toBuilder().setSlaveId(OFFER_A.getOffer().getSlaveId()).build();
+    HostOffer offerAB = new HostOffer(
+        Offers.makeOffer("OFFER_B").toBuilder().setSlaveId(OFFER_A.getOffer().getSlaveId()).build(),
+        IHostAttributes.build(new HostAttributes()));
 
     driver.declineOffer(OFFER_A.getOffer().getId());
-    driver.declineOffer(offerAB.getId());
+    driver.declineOffer(offerAB.getOffer().getId());
 
     replayAndCreateScheduler();
 
-    offerQueue.addOffer(OFFER_A.getOffer());
+    offerQueue.addOffer(OFFER_A);
     offerQueue.addOffer(offerAB);
     offerExpirationCapture.getValue().run();
   }
@@ -431,7 +433,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    offerQueue.addOffer(OFFER_A.getOffer());
+    offerQueue.addOffer(OFFER_A);
     offerQueue.launchFirst(offerAcceptor);
     offerExpirationCapture.getValue().run();
   }
@@ -439,13 +441,9 @@ public class TaskSchedulerTest extends EasyMockTest {
   @Test
   public void testBasicMaintenancePreferences() {
     expectOffer();
-    expect(maintenance.getMode("HOST_D")).andReturn(OFFER_D.getMode());
     expectOffer();
-    expect(maintenance.getMode("HOST_C")).andReturn(OFFER_C.getMode());
     expectOffer();
-    expect(maintenance.getMode("HOST_B")).andReturn(OFFER_B.getMode());
     expectOffer();
-    expect(maintenance.getMode("HOST_A")).andReturn(OFFER_A.getMode());
 
     IScheduledTask taskA = makeTask("A", PENDING);
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
@@ -461,10 +459,10 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    offerQueue.addOffer(OFFER_D.getOffer());
-    offerQueue.addOffer(OFFER_C.getOffer());
-    offerQueue.addOffer(OFFER_B.getOffer());
-    offerQueue.addOffer(OFFER_A.getOffer());
+    offerQueue.addOffer(OFFER_D);
+    offerQueue.addOffer(OFFER_C);
+    offerQueue.addOffer(OFFER_B);
+    offerQueue.addOffer(OFFER_A);
 
     changeState(taskA, INIT, PENDING);
     captureA.getValue().run();
@@ -476,11 +474,8 @@ public class TaskSchedulerTest extends EasyMockTest {
   @Test
   public void testChangingMaintenancePreferences() {
     expectOffer();
-    expect(maintenance.getMode("HOST_A")).andReturn(OFFER_A.getMode());
     expectOffer();
-    expect(maintenance.getMode("HOST_B")).andReturn(OFFER_B.getMode());
     expectOffer();
-    expect(maintenance.getMode("HOST_C")).andReturn(OFFER_C.getMode());
 
     IScheduledTask taskA = makeTask("A", PENDING);
     TaskInfo mesosTaskA = makeTaskInfo(taskA);
@@ -490,27 +485,28 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     IScheduledTask taskB = makeTask("B", PENDING);
     TaskInfo mesosTaskB = makeTaskInfo(taskB);
-    HostOffer updatedOfferC =
-        new HostOffer(OFFER_C.getOffer(), MaintenanceMode.NONE);
+    HostOffer updatedOfferC = new HostOffer(
+        OFFER_C.getOffer(),
+        IHostAttributes.build(OFFER_C.getAttributes().newBuilder().setMode(NONE)));
     expect(assigner.maybeAssign(updatedOfferC, taskB, emptyJob)).andReturn(Optional.of(mesosTaskB));
     driver.launchTask(OFFER_C.getOffer().getId(), mesosTaskB);
     Capture<Runnable> captureB = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
     replayAndCreateScheduler();
 
-    offerQueue.addOffer(OFFER_A.getOffer());
-    offerQueue.addOffer(OFFER_B.getOffer());
-    offerQueue.addOffer(OFFER_C.getOffer());
+    offerQueue.addOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_B);
+    offerQueue.addOffer(OFFER_C);
 
     // Initially, we'd expect the offers to be consumed in order (A, B), with (C) unschedulable
 
     // Expected order now (B), with (C, A) unschedulable
-    changeHostMaintenanceState("HOST_A", MaintenanceMode.DRAINING);
+    changeHostMaintenanceState(OFFER_A.getAttributes(), DRAINING);
     changeState(taskA, INIT, PENDING);
     captureA.getValue().run();
 
     // Expected order now (C), with (A) unschedulable and (B) already consumed
-    changeHostMaintenanceState("HOST_C", MaintenanceMode.NONE);
+    changeHostMaintenanceState(OFFER_C.getAttributes(), NONE);
     changeState(taskB, INIT, PENDING);
     captureB.getValue().run();
   }
@@ -564,10 +560,10 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    offerQueue.addOffer(OFFER_A.getOffer());
-    offerQueue.addOffer(OFFER_B.getOffer());
-    offerQueue.addOffer(OFFER_C.getOffer());
-    offerQueue.addOffer(OFFER_D.getOffer());
+    offerQueue.addOffer(OFFER_A);
+    offerQueue.addOffer(OFFER_B);
+    offerQueue.addOffer(OFFER_C);
+    offerQueue.addOffer(OFFER_D);
     changeState(jobA0, INIT, PENDING);
     changeState(jobA1, INIT, PENDING);
     changeState(jobA2, INIT, PENDING);
@@ -593,7 +589,7 @@ public class TaskSchedulerTest extends EasyMockTest {
 
     replayAndCreateScheduler();
 
-    offerQueue.addOffer(OFFER_A.getOffer());
+    offerQueue.addOffer(OFFER_A);
     changeState(task, INIT, PENDING);
     timeoutCapture.getValue().run();
 
@@ -618,11 +614,22 @@ public class TaskSchedulerTest extends EasyMockTest {
   }
 
   private void expectAnyMaintenanceCalls() {
-    expect(maintenance.getMode(isA(String.class))).andReturn(MaintenanceMode.NONE).anyTimes();
+    expect(maintenance.getMode(isA(String.class))).andReturn(NONE).anyTimes();
   }
 
-  private void changeHostMaintenanceState(String hostName, MaintenanceMode mode) {
+  private void changeHostMaintenanceState(IHostAttributes attributes, MaintenanceMode mode) {
     offerQueue.hostAttributesChanged(new PubsubEvent.HostAttributesChanged(
-        IHostAttributes.build(new HostAttributes().setHost(hostName).setMode(mode))));
+        IHostAttributes.build(attributes.newBuilder().setMode(mode))));
+  }
+
+  private static HostOffer makeOffer(String offerId, String hostName, MaintenanceMode mode) {
+    Offer offer = Offers.makeOffer(offerId, hostName);
+    return new HostOffer(
+        offer,
+        IHostAttributes.build(new HostAttributes()
+            .setHost(hostName)
+            .setSlaveId(offer.getSlaveId().getValue())
+            .setAttributes(ImmutableSet.<Attribute>of())
+            .setMode(mode)));
   }
 }

@@ -41,6 +41,7 @@ import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.gen.comm.AdjustRetainedTasks;
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskLauncher;
 import org.apache.aurora.scheduler.base.CommandUtil;
 import org.apache.aurora.scheduler.base.Query;
@@ -52,7 +53,6 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
@@ -192,20 +192,22 @@ public class GcExecutorLauncher implements TaskLauncher {
             Maps.transformValues(Tasks.mapById(tasksOnHost), Tasks.GET_STATUS)));
   }
 
-  private boolean sufficientResources(Offer offer) {
-    boolean sufficient = Resources.from(offer).greaterThanOrEqual(TOTAL_GC_EXECUTOR_RESOURCES);
+  private boolean sufficientResources(HostOffer offer) {
+    boolean sufficient =
+        Resources.from(offer.getOffer()).greaterThanOrEqual(TOTAL_GC_EXECUTOR_RESOURCES);
     if (!sufficient) {
-      LOG.warning("Offer for host " + offer.getHostname() + " is too small for a GC executor");
+      LOG.warning("Offer for host " + offer.getOffer().getHostname()
+          + " is too small for a GC executor");
       insufficientOffers.incrementAndGet();
     }
     return sufficient;
   }
 
   @Override
-  public boolean willUse(final Offer offer) {
+  public boolean willUse(final HostOffer offer) {
     if (!settings.getGcExecutorPath().isPresent()
         || !sufficientResources(offer)
-        || !isTimeToCollect(offer.getHostname())) {
+        || !isTimeToCollect(offer.getOffer().getHostname())) {
 
       return false;
     }
@@ -213,7 +215,9 @@ public class GcExecutorLauncher implements TaskLauncher {
     executor.execute(new Runnable() {
       @Override
       public void run() {
-        driver.launchTask(offer.getId(), makeGcTask(offer.getHostname(), offer.getSlaveId()));
+        driver.launchTask(
+            offer.getOffer().getId(),
+            makeGcTask(offer.getOffer().getHostname(), offer.getOffer().getSlaveId()));
       }
     });
     offersConsumed.incrementAndGet();

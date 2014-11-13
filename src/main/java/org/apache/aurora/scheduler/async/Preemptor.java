@@ -40,19 +40,20 @@ import com.google.common.collect.Sets;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 
-import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.ScheduleStatus;
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
-import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -63,8 +64,9 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.PREEMPTING;
-import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
 import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
+import static org.apache.aurora.scheduler.storage.Storage.StoreProvider;
+import static org.apache.aurora.scheduler.storage.Storage.Work;
 
 /**
  * Preempts active tasks in favor of higher priority tasks.
@@ -130,7 +132,7 @@ public interface Preemptor {
     private final SchedulingFilter schedulingFilter;
     private final Amount<Long, Time> preemptionCandidacyDelay;
     private final Clock clock;
-    private final MaintenanceController maintenance;
+    private final AtomicLong missingAttributes;
 
     /**
      * Creates a new preemptor.
@@ -151,7 +153,7 @@ public interface Preemptor {
         SchedulingFilter schedulingFilter,
         @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
         Clock clock,
-        MaintenanceController maintenance) {
+        StatsProvider statsProvider) {
 
       this.storage = requireNonNull(storage);
       this.stateManager = requireNonNull(stateManager);
@@ -159,7 +161,7 @@ public interface Preemptor {
       this.schedulingFilter = requireNonNull(schedulingFilter);
       this.preemptionCandidacyDelay = requireNonNull(preemptionCandidacyDelay);
       this.clock = requireNonNull(clock);
-      this.maintenance = requireNonNull(maintenance);
+      missingAttributes = statsProvider.makeCounter("preemptor_missing_attributes");
     }
 
     private List<IAssignedTask> fetch(Query.Builder query, Predicate<IScheduledTask> filter) {
@@ -200,24 +202,24 @@ public interface Preemptor {
     private static final Function<HostOffer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
         new Function<HostOffer, ResourceSlot>() {
           @Override
-          public ResourceSlot apply(HostOffer hostOffer) {
-            return ResourceSlot.from(hostOffer.getOffer());
+          public ResourceSlot apply(HostOffer offer) {
+            return ResourceSlot.from(offer.getOffer());
           }
         };
 
     private static final Function<HostOffer, String> OFFER_TO_HOST =
         new Function<HostOffer, String>() {
           @Override
-          public String apply(HostOffer hostOffer) {
-            return hostOffer.getOffer().getHostname();
+          public String apply(HostOffer offer) {
+            return offer.getOffer().getHostname();
           }
         };
 
-    private static final Function<HostOffer, MaintenanceMode> OFFER_TO_MODE =
-        new Function<HostOffer, MaintenanceMode>() {
+    private static final Function<HostOffer, IHostAttributes> OFFER_TO_ATTRIBUTES =
+        new Function<HostOffer, IHostAttributes>() {
           @Override
-          public MaintenanceMode apply(HostOffer hostOffer) {
-            return hostOffer.getMode();
+          public IHostAttributes apply(HostOffer offer) {
+            return offer.getAttributes();
           }
         };
 
@@ -255,18 +257,17 @@ public interface Preemptor {
           // us.
           return Optional.absent();
         }
-        MaintenanceMode mode =
-            Iterables.getOnlyElement(FluentIterable.from(offers).transform(OFFER_TO_MODE).toSet());
+        IHostAttributes attributes = Iterables.getOnlyElement(
+            FluentIterable.from(offers).transform(OFFER_TO_ATTRIBUTES).toSet());
 
-        Set<SchedulingFilter.Veto> vetos = schedulingFilter.filter(
+        Set<SchedulingFilter.Veto> vetoes = schedulingFilter.filter(
             slackResources,
-            host,
-            mode,
+            attributes,
             pendingTask.getTask(),
             pendingTask.getTaskId(),
             attributeAggregate);
 
-        if (vetos.isEmpty()) {
+        if (vetoes.isEmpty()) {
           return Optional.<Set<IAssignedTask>>of(ImmutableSet.<IAssignedTask>of());
         }
       }
@@ -289,26 +290,40 @@ public interface Preemptor {
             ResourceSlot.sum(Iterables.transform(toPreemptTasks, TASK_TO_RESOURCES)),
             slackResources);
 
-        Set<SchedulingFilter.Veto> vetos = schedulingFilter.filter(
+        Optional<IHostAttributes> attributes = getHostAttributes(host);
+        if (!attributes.isPresent()) {
+          missingAttributes.incrementAndGet();
+          continue;
+        }
+
+        Set<SchedulingFilter.Veto> vetoes = schedulingFilter.filter(
             totalResource,
-            host,
-            maintenance.getMode(host),
+            attributes.get(),
             pendingTask.getTask(),
             pendingTask.getTaskId(),
             attributeAggregate);
 
-        if (vetos.isEmpty()) {
+        if (vetoes.isEmpty()) {
           return Optional.<Set<IAssignedTask>>of(ImmutableSet.copyOf(toPreemptTasks));
         }
       }
       return Optional.absent();
     }
 
+    private Optional<IHostAttributes> getHostAttributes(final String host) {
+      return storage.weaklyConsistentRead(new Work.Quiet<Optional<IHostAttributes>>() {
+        @Override
+        public Optional<IHostAttributes> apply(StoreProvider storeProvider) {
+          return storeProvider.getAttributeStore().getHostAttributes(host);
+        }
+      });
+    }
+
     private static final Function<HostOffer, String> OFFER_TO_SLAVE_ID =
         new Function<HostOffer, String>() {
           @Override
-          public String apply(HostOffer hostOffer) {
-            return hostOffer.getOffer().getSlaveId().getValue();
+          public String apply(HostOffer offer) {
+            return offer.getOffer().getSlaveId().getValue();
           }
         };
 

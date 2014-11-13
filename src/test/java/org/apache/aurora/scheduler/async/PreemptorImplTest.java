@@ -28,6 +28,7 @@ import com.google.common.collect.Lists;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.testing.FakeClock;
 
@@ -42,6 +43,7 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
@@ -49,7 +51,6 @@ import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
-import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -60,6 +61,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
+import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
@@ -70,7 +72,6 @@ import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
-import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
 import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl;
 import static org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import static org.apache.mesos.Protos.Offer;
@@ -103,7 +104,7 @@ public class PreemptorImplTest extends EasyMockTest {
   private StateManager stateManager;
   private SchedulingFilter schedulingFilter;
   private FakeClock clock;
-  private MaintenanceController maintenance;
+  private StatsProvider statsProvider;
   private OfferQueue offerQueue;
   private AttributeAggregate emptyJob;
 
@@ -112,8 +113,8 @@ public class PreemptorImplTest extends EasyMockTest {
     storageUtil = new StorageTestUtil(this);
     storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
-    maintenance = createMock(MaintenanceController.class);
     clock = new FakeClock();
+    statsProvider = new FakeStatsProvider();
     offerQueue = createMock(OfferQueue.class);
     emptyJob = new AttributeAggregate(
         Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
@@ -128,7 +129,7 @@ public class PreemptorImplTest extends EasyMockTest {
         schedulingFilter,
         PREEMPTION_DELAY,
         clock,
-        maintenance);
+        statsProvider);
 
     preemptor.findPreemptionSlotFor(pendingTask.getAssignedTask().getTaskId(), emptyJob);
   }
@@ -150,12 +151,10 @@ public class PreemptorImplTest extends EasyMockTest {
         IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
   }
 
-  private void expectGetMaintenance(String host) {
-    expect(maintenance.getMode(host)).andReturn(MaintenanceMode.NONE);
-  }
-
   @Test
   public void testPreempted() throws Exception {
+    setUpHost(HOST_A, RACK_A);
+
     schedulingFilter = createMock(SchedulingFilter.class);
     ScheduledTask lowPriority = makeTask(USER_A, JOB_A, TASK_ID_A);
     runOnHost(lowPriority, HOST_A);
@@ -168,8 +167,6 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetPendingTasks(highPriority);
     expectGetActiveTasks(lowPriority);
 
-    expectGetMaintenance(HOST_A);
-
     expectFiltering();
     expectPreempted(lowPriority);
 
@@ -179,6 +176,8 @@ public class PreemptorImplTest extends EasyMockTest {
 
   @Test
   public void testLowestPriorityPreempted() throws Exception {
+    setUpHost(HOST_A, RACK_A);
+
     schedulingFilter = createMock(SchedulingFilter.class);
     ScheduledTask lowPriority = makeTask(USER_A, JOB_A, TASK_ID_A, 10);
     runOnHost(lowPriority, HOST_A);
@@ -194,7 +193,6 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetPendingTasks(highPriority);
     expectGetActiveTasks(lowerPriority, lowerPriority);
 
-    expectGetMaintenance(HOST_A);
     expectFiltering();
     expectPreempted(lowerPriority);
 
@@ -204,6 +202,8 @@ public class PreemptorImplTest extends EasyMockTest {
 
   @Test
   public void testOnePreemptableTask() throws Exception {
+    setUpHost(HOST_A, RACK_A);
+
     schedulingFilter = createMock(SchedulingFilter.class);
     ScheduledTask highPriority = makeTask(USER_A, JOB_A, TASK_ID_A, 100);
     runOnHost(highPriority, HOST_A);
@@ -222,7 +222,6 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetPendingTasks(pendingPriority);
     expectGetActiveTasks(highPriority, lowerPriority, lowestPriority);
 
-    expectGetMaintenance(HOST_A);
     expectFiltering();
     expectPreempted(lowestPriority);
 
@@ -250,6 +249,8 @@ public class PreemptorImplTest extends EasyMockTest {
 
   @Test
   public void testProductionPreemptingNonproduction() throws Exception {
+    setUpHost(HOST_A, RACK_A);
+
     schedulingFilter = createMock(SchedulingFilter.class);
     // Use a very low priority for the production task to show that priority is irrelevant.
     ScheduledTask p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1", -1000);
@@ -263,7 +264,6 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetPendingTasks(p1);
     expectGetActiveTasks(a1);
 
-    expectGetMaintenance(HOST_A);
     expectFiltering();
     expectPreempted(a1);
 
@@ -273,6 +273,8 @@ public class PreemptorImplTest extends EasyMockTest {
 
   @Test
   public void testProductionPreemptingNonproductionAcrossUsers() throws Exception {
+    setUpHost(HOST_A, RACK_A);
+
     schedulingFilter = createMock(SchedulingFilter.class);
     // Use a very low priority for the production task to show that priority is irrelevant.
     ScheduledTask p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1", -1000);
@@ -286,7 +288,6 @@ public class PreemptorImplTest extends EasyMockTest {
     expectGetPendingTasks(p1);
     expectGetActiveTasks(a1);
 
-    expectGetMaintenance(HOST_A);
     expectFiltering();
     expectPreempted(a1);
 
@@ -315,7 +316,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures a production task can preempt 2 tasks on the same host.
   @Test
   public void testProductionPreemptingManyNonProduction() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl(storageUtil.storage);
+    schedulingFilter = new SchedulingFilterImpl();
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
 
@@ -347,7 +348,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures we select the minimal number of tasks to preempt
   @Test
   public void testMinimalSetPreempted() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl(storageUtil.storage);
+    schedulingFilter = new SchedulingFilterImpl();
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(4).setRamMb(4096);
 
@@ -382,7 +383,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures a production task *never* preempts a production task from another job.
   @Test
   public void testProductionJobNeverPreemptsProductionJob() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl(storageUtil.storage);
+    schedulingFilter = new SchedulingFilterImpl();
     ScheduledTask p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
 
@@ -407,7 +408,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures that we can preempt if a task + offer can satisfy a pending task.
   @Test
   public void testPreemptWithOfferAndTask() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl(storageUtil.storage);
+    schedulingFilter = new SchedulingFilterImpl();
 
     setUpHost(HOST_A, RACK_A);
 
@@ -435,7 +436,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures we can preempt if two tasks and an offer can satisfy a pending task.
   @Test
   public void testPreemptWithOfferAndMultipleTasks() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl(storageUtil.storage);
+    schedulingFilter = new SchedulingFilterImpl();
 
     setUpHost(HOST_A, RACK_A);
 
@@ -468,7 +469,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures we don't preempt if a host has enough slack to satisfy a pending task.
   @Test
   public void testPreemptWithLargeOffer() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl(storageUtil.storage);
+    schedulingFilter = new SchedulingFilterImpl();
 
     setUpHost(HOST_A, RACK_A);
 
@@ -524,7 +525,7 @@ public class PreemptorImplTest extends EasyMockTest {
         schedulingFilter,
         PREEMPTION_DELAY,
         clock,
-        maintenance);
+        statsProvider);
 
     assertEquals(
         Optional.<String>absent(),
@@ -556,7 +557,9 @@ public class PreemptorImplTest extends EasyMockTest {
         .transform(new Function<Offer, HostOffer>() {
           @Override
           public HostOffer apply(Offer offer) {
-            return new HostOffer(offer, MaintenanceMode.NONE);
+            return new HostOffer(
+                offer,
+                IHostAttributes.build(new HostAttributes().setMode(MaintenanceMode.NONE)));
           }
         });
     expect(offerQueue.getOffers()).andReturn(hostOffers);
@@ -569,8 +572,7 @@ public class PreemptorImplTest extends EasyMockTest {
   private IExpectationSetters<Set<Veto>> expectFiltering() {
     return expect(schedulingFilter.filter(
         EasyMock.<ResourceSlot>anyObject(),
-        EasyMock.eq(HOST_A),
-        EasyMock.eq(MaintenanceMode.NONE),
+        EasyMock.<IHostAttributes>anyObject(),
         EasyMock.<ITaskConfig>anyObject(),
         EasyMock.<String>anyObject(),
         EasyMock.eq(emptyJob))).andAnswer(
@@ -659,6 +661,5 @@ public class PreemptorImplTest extends EasyMockTest {
 
     expect(this.storageUtil.attributeStore.getHostAttributes(host))
         .andReturn(Optional.of(hostAttrs)).anyTimes();
-    expect(this.maintenance.getMode(host)).andReturn(NONE).anyTimes();
   }
 }

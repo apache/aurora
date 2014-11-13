@@ -43,7 +43,7 @@ class RandomJitterReturnDelay implements OfferReturnDelay {
   }
 
   @Override
-  public Amount<Integer, Time> get() {
-    return Amount.of(minHoldTimeMs + random.nextInt(maxJitterWindowMs), Time.MILLISECONDS);
+  public Amount<Long, Time> get() {
+    return Amount.of((long) minHoldTimeMs + random.nextInt(maxJitterWindowMs), Time.MILLISECONDS);
   }
 }

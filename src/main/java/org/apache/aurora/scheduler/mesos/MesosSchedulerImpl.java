@@ -30,6 +30,7 @@ import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.stats.Stats;
 
 import org.apache.aurora.GuiceUtils.AllowUnchecked;
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskLauncher;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -39,10 +40,10 @@ import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskStatus;
@@ -54,6 +55,8 @@ import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
+
+import static org.apache.mesos.Protos.Offer;
 
 /**
  * Location for communication with mesos.
@@ -90,7 +93,7 @@ class MesosSchedulerImpl implements Scheduler {
    * @param storage Store to save host attributes into.
    * @param lifecycle Application lifecycle manager.
    * @param taskLaunchers Task launchers, which will be used in order.  Calls to
-   *                      {@link TaskLauncher#willUse(Offer)} and
+   *                      {@link TaskLauncher#willUse(HostOffer)} and
    *                      {@link TaskLauncher#statusUpdate(TaskStatus)} are propagated to provided
    *                      launchers, ceasing after the first match (based on a return value of
    *                      {@code true}.
@@ -153,37 +156,30 @@ class MesosSchedulerImpl implements Scheduler {
   public void resourceOffers(SchedulerDriver driver, final List<Offer> offers) {
     Preconditions.checkState(isRegistered, "Must be registered before receiving offers.");
 
-    // Store all host attributes in a single write operation to prevent other threads from
-    // securing the storage lock between saves.  We also save the host attributes before passing
-    // offers elsewhere to ensure that host attributes are available before attempting to
-    // schedule tasks associated with offers.
-    // TODO(wfarner): Reconsider the requirements here, augment the task scheduler to skip over
-    //                offers when the host attributes cannot be found. (AURORA-137)
-
     executor.execute(new Runnable() {
       @Override
       public void run() {
+        // TODO(wfarner): Reconsider the requirements here, augment the task scheduler to skip over
+        //                offers when the host attributes cannot be found. (AURORA-137)
         storage.write(new MutateWork.NoResult.Quiet() {
           @Override
           protected void execute(MutableStoreProvider storeProvider) {
-            for (final Offer offer : offers) {
-              storeProvider.getAttributeStore().saveHostAttributes(
-                  AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer));
+            for (Offer offer : offers) {
+              IHostAttributes attributes =
+                  AttributeStore.Util.mergeOffer(storeProvider.getAttributeStore(), offer);
+              storeProvider.getAttributeStore().saveHostAttributes(attributes);
+              if (LOG.isLoggable(Level.FINE)) {
+                LOG.log(Level.FINE, String.format("Received offer: %s", offer));
+              }
+              totalResourceOffers.incrementAndGet();
+              for (TaskLauncher launcher : taskLaunchers) {
+                if (launcher.willUse(new HostOffer(offer, attributes))) {
+                  break;
+                }
+              }
             }
           }
         });
-
-        for (Offer offer : offers) {
-          if (LOG.isLoggable(Level.FINE)) {
-            LOG.log(Level.FINE, String.format("Received offer: %s", offer));
-          }
-          totalResourceOffers.incrementAndGet();
-          for (TaskLauncher launcher : taskLaunchers) {
-            if (launcher.willUse(offer)) {
-              break;
-            }
-          }
-        }
       }
     });
   }

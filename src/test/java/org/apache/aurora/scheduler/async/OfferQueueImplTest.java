@@ -13,154 +13,124 @@
  */
 package org.apache.aurora.scheduler.async;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.base.Throwables;
 import com.google.common.testing.TearDown;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.testing.easymock.EasyMockTest;
-import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
+import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
-import org.apache.aurora.scheduler.async.OfferQueue.LaunchException;
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferReturnDelay;
 import org.apache.aurora.scheduler.events.PubsubEvent.DriverDisconnected;
 import org.apache.aurora.scheduler.mesos.Driver;
-import org.apache.aurora.scheduler.state.MaintenanceController;
-import org.apache.mesos.Protos.Offer;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.testing.FakeScheduledExecutor;
 import org.apache.mesos.Protos.TaskInfo;
-import org.easymock.IAnswer;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
+import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
+import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class OfferQueueImplTest extends EasyMockTest {
 
-  private static final Amount<Integer, Time> RETURN_DELAY = Amount.of(1, Time.DAYS);
+  private static final Amount<Long, Time> RETURN_DELAY = Amount.of(1L, Time.DAYS);
   private static final String HOST_A = "HOST_A";
-  private static final Offer OFFER_A = Offers.makeOffer("OFFER_A", HOST_A);
+  private static final HostOffer OFFER_A = new HostOffer(
+      Offers.makeOffer("OFFER_A", HOST_A),
+      IHostAttributes.build(new HostAttributes().setMode(NONE)));
   private static final String HOST_B = "HOST_B";
-  private static final Offer OFFER_B = Offers.makeOffer("OFFER_B", HOST_B);
+  private static final HostOffer OFFER_B = new HostOffer(
+      Offers.makeOffer("OFFER_B", HOST_B),
+      IHostAttributes.build(new HostAttributes().setMode(NONE)));
   private static final String HOST_C = "HOST_C";
-  private static final Offer OFFER_C = Offers.makeOffer("OFFER_C", HOST_C);
+  private static final HostOffer OFFER_C = new HostOffer(
+      Offers.makeOffer("OFFER_C", HOST_C),
+      IHostAttributes.build(new HostAttributes().setMode(NONE)));
 
   private Driver driver;
-  private ScheduledExecutorService executor;
-  private ExecutorService testExecutor;
-  private MaintenanceController maintenanceController;
+  private FakeScheduledExecutor clock;
   private Function<HostOffer, Optional<TaskInfo>> offerAcceptor;
   private OfferQueueImpl offerQueue;
 
   @Before
   public void setUp() {
     driver = createMock(Driver.class);
-    ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true).build();
-    executor = Executors.newSingleThreadScheduledExecutor(threadFactory);
-    testExecutor = Executors.newCachedThreadPool(threadFactory);
+    ScheduledExecutorService executorMock = createMock(ScheduledExecutorService.class);
+    clock = FakeScheduledExecutor.scheduleExecutor(executorMock);
+
     addTearDown(new TearDown() {
       @Override
       public void tearDown() throws Exception {
-        new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
-        new ExecutorServiceShutdown(testExecutor, Amount.of(1L, Time.SECONDS)).execute();
+        clock.assertEmpty();
       }
     });
-    maintenanceController = createMock(MaintenanceController.class);
     offerAcceptor = createMock(new Clazz<Function<HostOffer, Optional<TaskInfo>>>() { });
     OfferReturnDelay returnDelay = new OfferReturnDelay() {
       @Override
-      public Amount<Integer, Time> get() {
+      public Amount<Long, Time> get() {
         return RETURN_DELAY;
       }
     };
-    offerQueue = new OfferQueueImpl(driver, returnDelay, executor, maintenanceController);
-  }
-
-  @Test
-  public void testNoDeadlock() throws Exception {
-    // Test that a blocked call to maintenanceController does not result in a deadlock between
-    // the intrinsic lock and the storage lock.
-    final CountDownLatch launchAttempted = new CountDownLatch(1);
-    expect(maintenanceController.getMode(HOST_A)).andAnswer(new IAnswer<MaintenanceMode>() {
-      @Override
-      public MaintenanceMode answer() throws InterruptedException {
-        launchAttempted.await();
-        return MaintenanceMode.NONE;
-      }
-    });
-
-    control.replay();
-
-    final CountDownLatch offerAdded = new CountDownLatch(1);
-    testExecutor.submit(new Runnable() {
-      @Override
-      public void run() {
-        offerQueue.addOffer(OFFER_A);
-        offerAdded.countDown();
-      }
-    });
-    testExecutor.submit(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          offerQueue.launchFirst(offerAcceptor);
-          launchAttempted.countDown();
-        } catch (LaunchException e) {
-          throw Throwables.propagate(e);
-        }
-      }
-    });
-
-    launchAttempted.await();
-    offerAdded.await();
+    offerQueue = new OfferQueueImpl(driver, returnDelay, executorMock);
   }
 
   @Test
   public void testOffersSorted() throws Exception {
-    MaintenanceMode modeA = MaintenanceMode.NONE;
-    MaintenanceMode modeB = MaintenanceMode.DRAINING;
-    MaintenanceMode modeC = MaintenanceMode.NONE;
+    // Ensures that non-DRAINING offers are preferred - the DRAINING offer would be tried last.
 
-    HostOffer hostOfferA = new HostOffer(OFFER_A, modeA);
-    HostOffer hostOfferB = new HostOffer(OFFER_B, modeB);
-    HostOffer hostOfferC = new HostOffer(OFFER_C, modeC);
+    HostOffer offerA = setMode(OFFER_A, DRAINING);
+    HostOffer offerC = setMode(OFFER_C, DRAINING);
 
-    expect(maintenanceController.getMode(HOST_A)).andReturn(modeA);
-    expect(maintenanceController.getMode(HOST_B)).andReturn(modeB);
-    expect(maintenanceController.getMode(HOST_C)).andReturn(modeC);
-    expect(offerAcceptor.apply(hostOfferA)).andReturn(Optional.<TaskInfo>absent());
-    expect(offerAcceptor.apply(hostOfferB)).andReturn(Optional.<TaskInfo>absent());
-    expect(offerAcceptor.apply(hostOfferC)).andReturn(Optional.<TaskInfo>absent());
+    TaskInfo task = TaskInfo.getDefaultInstance();
+    expect(offerAcceptor.apply(OFFER_B)).andReturn(Optional.of(task));
+    driver.launchTask(OFFER_B.getOffer().getId(), task);
+
+    driver.declineOffer(offerA.getOffer().getId());
+    driver.declineOffer(offerC.getOffer().getId());
 
     control.replay();
 
-    offerQueue.addOffer(OFFER_A);
+    offerQueue.addOffer(offerA);
     offerQueue.addOffer(OFFER_B);
-    offerQueue.addOffer(OFFER_C);
-    assertFalse(offerQueue.launchFirst(offerAcceptor));
+    offerQueue.addOffer(offerC);
+    assertTrue(offerQueue.launchFirst(offerAcceptor));
+    clock.advance(RETURN_DELAY);
   }
 
   @Test
   public void testFlushOffers() throws Exception {
-    expect(maintenanceController.getMode(HOST_A)).andReturn(MaintenanceMode.NONE);
-    expect(maintenanceController.getMode(HOST_B)).andReturn(MaintenanceMode.NONE);
-
     control.replay();
 
     offerQueue.addOffer(OFFER_A);
     offerQueue.addOffer(OFFER_B);
     offerQueue.driverDisconnected(new DriverDisconnected());
     assertFalse(offerQueue.launchFirst(offerAcceptor));
+    clock.advance(RETURN_DELAY);
+  }
+
+  @Test
+  public void testDeclineOffer() throws Exception {
+    driver.declineOffer(OFFER_A.getOffer().getId());
+
+    control.replay();
+
+    offerQueue.addOffer(OFFER_A);
+    clock.advance(RETURN_DELAY);
+  }
+
+  private static HostOffer setMode(HostOffer offer, MaintenanceMode mode) {
+    return new HostOffer(
+        offer.getOffer(),
+        IHostAttributes.build(offer.getAttributes().newBuilder().setMode(mode)));
   }
 }

@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler;
 
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskStatus;
 
@@ -33,7 +32,7 @@ public interface TaskLauncher {
    * @return {@code false} if the launcher will not act on the offer, or {@code true} if the
    *         launcher may accept the offer at some point in the future.
    */
-  boolean willUse(Offer offer);
+  boolean willUse(HostOffer offer);
 
   /**
    * Informs the launcher that a status update has been received for a task.  If the task is not

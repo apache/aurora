@@ -20,9 +20,10 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ExecutorConfig;
-import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
@@ -31,9 +32,9 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
 import org.apache.aurora.scheduler.storage.AttributeStore;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
@@ -45,14 +46,14 @@ import org.apache.mesos.Protos.Value.Type;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
+import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 
 public class TaskAssignerImplTest extends EasyMockTest {
 
   private static final int PORT = 5000;
-  private static final Offer OFFER = Offer.newBuilder()
+  private static final Offer MESOS_OFFER = Offer.newBuilder()
       .setId(OfferID.newBuilder().setValue("offerId"))
       .setFrameworkId(FrameworkID.newBuilder().setValue("frameworkId"))
       .setSlaveId(SlaveID.newBuilder().setValue("slaveId"))
@@ -63,7 +64,8 @@ public class TaskAssignerImplTest extends EasyMockTest {
           .setRanges(
               Ranges.newBuilder().addRange(Range.newBuilder().setBegin(PORT).setEnd(PORT))))
       .build();
-  private static final HostOffer HOST_OFFER = new HostOffer(OFFER, MaintenanceMode.NONE);
+  private static final HostOffer OFFER =
+      new HostOffer(MESOS_OFFER, IHostAttributes.build(new HostAttributes()));
   private static final IScheduledTask TASK = IScheduledTask.build(
       new ScheduledTask()
           .setAssignedTask(new AssignedTask()
@@ -74,7 +76,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
   private static final TaskInfo TASK_INFO = TaskInfo.newBuilder()
       .setName("taskName")
       .setTaskId(TaskID.newBuilder().setValue(Tasks.id(TASK)))
-      .setSlaveId(OFFER.getSlaveId())
+      .setSlaveId(MESOS_OFFER.getSlaveId())
       .build();
 
   private StateManager stateManager;
@@ -97,32 +99,31 @@ public class TaskAssignerImplTest extends EasyMockTest {
   @Test
   public void testAssignNoVetoes() {
     expect(filter.filter(
-        ResourceSlot.from(OFFER),
-        OFFER.getHostname(),
-        MaintenanceMode.NONE,
+        ResourceSlot.from(MESOS_OFFER),
+        OFFER.getAttributes(),
         TASK.getAssignedTask().getTask(),
         Tasks.id(TASK),
         emptyJob))
         .andReturn(ImmutableSet.<Veto>of());
     expect(stateManager.assignTask(
         Tasks.id(TASK),
-        OFFER.getHostname(),
-        OFFER.getSlaveId(),
+        MESOS_OFFER.getHostname(),
+        MESOS_OFFER.getSlaveId(),
         ImmutableSet.of(PORT)))
         .andReturn(TASK.getAssignedTask());
-    expect(taskFactory.createFrom(TASK.getAssignedTask(), OFFER.getSlaveId())).andReturn(TASK_INFO);
+    expect(taskFactory.createFrom(TASK.getAssignedTask(), MESOS_OFFER.getSlaveId()))
+        .andReturn(TASK_INFO);
 
     control.replay();
 
-    assertEquals(Optional.of(TASK_INFO), assigner.maybeAssign(HOST_OFFER, TASK, emptyJob));
+    assertEquals(Optional.of(TASK_INFO), assigner.maybeAssign(OFFER, TASK, emptyJob));
   }
 
   @Test
   public void testAssignVetoes() {
     expect(filter.filter(
-        ResourceSlot.from(OFFER),
-        OFFER.getHostname(),
-        MaintenanceMode.NONE,
+        ResourceSlot.from(MESOS_OFFER),
+        OFFER.getAttributes(),
         TASK.getAssignedTask().getTask(),
         Tasks.id(TASK),
         emptyJob))
@@ -130,6 +131,6 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(Optional.<TaskInfo>absent(), assigner.maybeAssign(HOST_OFFER, TASK, emptyJob));
+    assertEquals(Optional.<TaskInfo>absent(), assigner.maybeAssign(OFFER, TASK, emptyJob));
   }
 }

@@ -30,20 +30,22 @@ import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ExecutorConfig;
+import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.comm.AdjustRetainedTasks;
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.GcExecutorSettings;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.mesos.Driver;
+import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos.FrameworkID;
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
@@ -58,6 +60,7 @@ import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.scheduler.async.GcExecutorLauncher.INSUFFICIENT_OFFERS_STAT_NAME;
 import static org.apache.aurora.scheduler.async.GcExecutorLauncher.LOST_TASKS_STAT_NAME;
 import static org.apache.aurora.scheduler.async.GcExecutorLauncher.SYSTEM_TASK_PREFIX;
+import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -67,13 +70,15 @@ public class GcExecutorLauncherTest extends EasyMockTest {
 
   private static final String HOST = "slave-host";
 
-  private static final Offer OFFER = Offer.newBuilder()
+  private static final Offer MESOS_OFFER = Offer.newBuilder()
       .setSlaveId(SlaveID.newBuilder().setValue("slave-id"))
       .setHostname(HOST)
       .setFrameworkId(FrameworkID.newBuilder().setValue("framework-id").build())
       .setId(OfferID.newBuilder().setValue("offer-id"))
       .addAllResources(GcExecutorLauncher.TOTAL_GC_EXECUTOR_RESOURCES.toResourceList())
       .build();
+  private static final HostOffer OFFER =
+      new HostOffer(MESOS_OFFER, IHostAttributes.build(new HostAttributes()));
 
   private static final String JOB_A = "jobA";
   private static final String TASK_UUID = "gc";
@@ -166,18 +171,19 @@ public class GcExecutorLauncherTest extends EasyMockTest {
         Resources.subtract(
             GcExecutorLauncher.TOTAL_GC_EXECUTOR_RESOURCES,
             GcExecutorLauncher.EPSILON).toResourceList();
-    Offer smallOffer = OFFER.toBuilder()
+    Offer smallOffer = MESOS_OFFER.toBuilder()
         .clearResources()
         .addAllResources(resources)
         .build();
     assertEquals(0, insufficientOffers.get());
-    assertFalse(gcExecutorLauncher.willUse(smallOffer));
+    assertFalse(gcExecutorLauncher.willUse(
+        new HostOffer(smallOffer, IHostAttributes.build(new HostAttributes()))));
     assertEquals(1, insufficientOffers.get());
   }
 
   private static TaskStatus makeStatus(String taskId) {
     return TaskStatus.newBuilder()
-        .setSlaveId(OFFER.getSlaveId())
+        .setSlaveId(OFFER.getOffer().getSlaveId())
         .setState(TaskState.TASK_RUNNING)
         .setTaskId(TaskID.newBuilder().setValue(taskId))
         .build();
@@ -220,8 +226,12 @@ public class GcExecutorLauncherTest extends EasyMockTest {
         Maps.transformValues(Tasks.mapById(ImmutableSet.copyOf(tasks)), Tasks.GET_STATUS);
     AdjustRetainedTasks message = new AdjustRetainedTasks().setRetainedTasks(statuses);
     TaskInfo task = GcExecutorLauncher.makeGcTask(
-        HOST, OFFER.getSlaveId(), SETTINGS.getGcExecutorPath().get(), TASK_UUID, message);
-    driver.launchTask(OFFER.getId(), task);
+        HOST,
+        OFFER.getOffer().getSlaveId(),
+        SETTINGS.getGcExecutorPath().get(),
+        TASK_UUID,
+        message);
+    driver.launchTask(OFFER.getOffer().getId(), task);
   }
 
   private IScheduledTask makeTask(String jobName, ScheduleStatus status) {

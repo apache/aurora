@@ -41,6 +41,7 @@ import com.twitter.common.stats.Stats;
 import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
@@ -65,7 +66,6 @@ import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
-import static org.apache.aurora.scheduler.async.OfferQueue.HostOffer;
 
 /**
  * Enables scheduling and preemption of tasks.
@@ -134,20 +134,20 @@ public interface TaskScheduler extends EventSubscriber {
 
       return new Function<HostOffer, Optional<TaskInfo>>() {
         @Override
-        public Optional<TaskInfo> apply(HostOffer hostOffer) {
+        public Optional<TaskInfo> apply(HostOffer offer) {
           Optional<String> reservedTaskId =
-              reservations.getSlaveReservation(hostOffer.getOffer().getSlaveId());
+              reservations.getSlaveReservation(offer.getOffer().getSlaveId());
           if (reservedTaskId.isPresent()) {
             if (taskId.equals(reservedTaskId.get())) {
               // Slave is reserved to satisfy this task.
-              return assigner.maybeAssign(hostOffer, task, attributeAggregate);
+              return assigner.maybeAssign(offer, task, attributeAggregate);
             } else {
               // Slave is reserved for another task.
               return Optional.absent();
             }
           } else {
             // Slave is not reserved.
-            return assigner.maybeAssign(hostOffer, task, attributeAggregate);
+            return assigner.maybeAssign(offer, task, attributeAggregate);
           }
         }
       };

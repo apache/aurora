@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.AbstractModule;
@@ -32,8 +33,10 @@ import com.twitter.common.application.Lifecycle;
 import com.twitter.common.base.Command;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
+import org.apache.aurora.gen.Attribute;
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.MaintenanceMode;
+import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.TaskLauncher;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
@@ -47,7 +50,6 @@ import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.MasterInfo;
-import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
@@ -58,6 +60,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
+import static org.apache.aurora.gen.MaintenanceMode.NONE;
+import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertTrue;
 
@@ -75,18 +79,32 @@ public class MesosSchedulerImplTest extends EasyMockTest {
       ExecutorID.newBuilder().setValue("executor-id").build();
 
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("offer-id").build();
-  private static final Offer OFFER = Offer.newBuilder()
-      .setFrameworkId(FRAMEWORK)
-      .setSlaveId(SLAVE_ID)
-      .setHostname(SLAVE_HOST)
-      .setId(OFFER_ID)
-      .build();
+  private static final HostOffer OFFER = new HostOffer(
+      Offer.newBuilder()
+          .setFrameworkId(FRAMEWORK)
+          .setSlaveId(SLAVE_ID)
+          .setHostname(SLAVE_HOST)
+          .setId(OFFER_ID)
+          .build(),
+      IHostAttributes.build(
+          new HostAttributes()
+              .setHost(SLAVE_HOST)
+              .setSlaveId(SLAVE_ID.getValue())
+              .setMode(NONE)
+              .setAttributes(ImmutableSet.<Attribute>of())));
   private static final OfferID OFFER_ID_2 = OfferID.newBuilder().setValue("offer-id-2").build();
-  private static final Offer OFFER_2 = Offer.newBuilder(OFFER)
-      .setSlaveId(SLAVE_ID_2)
-      .setHostname(SLAVE_HOST_2)
-      .setId(OFFER_ID_2)
-      .build();
+  private static final HostOffer OFFER_2 = new HostOffer(
+      Offer.newBuilder(OFFER.getOffer())
+          .setSlaveId(SLAVE_ID_2)
+          .setHostname(SLAVE_HOST_2)
+          .setId(OFFER_ID_2)
+          .build(),
+      IHostAttributes.build(
+          new HostAttributes()
+              .setHost(SLAVE_HOST_2)
+              .setSlaveId(SLAVE_ID_2.getValue())
+              .setMode(NONE)
+              .setAttributes(ImmutableSet.<Attribute>of())));
 
   private static final TaskStatus STATUS = TaskStatus.newBuilder()
       .setState(TaskState.TASK_RUNNING)
@@ -184,15 +202,17 @@ public class MesosSchedulerImplTest extends EasyMockTest {
     new OfferFixture() {
       @Override
       void respondToOffer() throws Exception {
-        IHostAttributes draining = IHostAttributes.build(new HostAttributes().setMode(DRAINING));
-        expect(storageUtil.attributeStore.getHostAttributes(OFFER.getHostname()))
+        IHostAttributes draining =
+            IHostAttributes.build(OFFER.getAttributes().newBuilder().setMode(DRAINING));
+        expect(storageUtil.attributeStore.getHostAttributes(OFFER.getOffer().getHostname()))
             .andReturn(Optional.of(draining));
         IHostAttributes saved = IHostAttributes.build(
-            Conversions.getAttributes(OFFER).newBuilder().setMode(DRAINING));
+            Conversions.getAttributes(OFFER.getOffer()).newBuilder().setMode(DRAINING));
         expect(storageUtil.attributeStore.saveHostAttributes(saved)).andReturn(true);
 
-        expect(systemLauncher.willUse(OFFER)).andReturn(false);
-        expect(userLauncher.willUse(OFFER)).andReturn(true);
+        HostOffer offer = new HostOffer(OFFER.getOffer(), draining);
+        expect(systemLauncher.willUse(offer)).andReturn(false);
+        expect(userLauncher.willUse(offer)).andReturn(true);
       }
     }.run();
   }
@@ -255,7 +275,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
       @Override
       void test() {
-        scheduler.resourceOffers(driver, ImmutableList.of(OFFER, OFFER_2));
+        scheduler.resourceOffers(driver, ImmutableList.of(OFFER.getOffer(), OFFER_2.getOffer()));
       }
     }.run();
   }
@@ -286,11 +306,11 @@ public class MesosSchedulerImplTest extends EasyMockTest {
         "hello".getBytes(StandardCharsets.UTF_8));
   }
 
-  private void expectOfferAttributesSaved(Offer offer) {
-    expect(storageUtil.attributeStore.getHostAttributes(offer.getHostname()))
+  private void expectOfferAttributesSaved(HostOffer offer) {
+    expect(storageUtil.attributeStore.getHostAttributes(offer.getOffer().getHostname()))
         .andReturn(Optional.<IHostAttributes>absent());
     IHostAttributes defaultMode = IHostAttributes.build(
-        Conversions.getAttributes(offer).newBuilder().setMode(MaintenanceMode.NONE));
+        Conversions.getAttributes(offer.getOffer()).newBuilder().setMode(MaintenanceMode.NONE));
     expect(storageUtil.attributeStore.saveHostAttributes(defaultMode)).andReturn(true);
   }
 
@@ -341,7 +361,7 @@ public class MesosSchedulerImplTest extends EasyMockTest {
 
     @Override
     void test() {
-      scheduler.resourceOffers(driver, ImmutableList.of(OFFER));
+      scheduler.resourceOffers(driver, ImmutableList.of(OFFER.getOffer()));
     }
   }
 
