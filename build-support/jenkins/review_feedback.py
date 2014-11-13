@@ -69,10 +69,9 @@ def _apply_patch(patch_data, clean_excludes):
     raise PatchApplyError()
 
 
-def _get_latest_diff_time(server, request, reviews):
-  feedback_reviews = [r for r in reviews if r['links']['user']['title'] == server.user]
-  if feedback_reviews:
-    return feedback_reviews[-1]['timestamp']
+def _get_latest_diff_time(server, request):
+  diffs = server.get_resource(request['links']['diffs']['href'])['diffs']
+  return diffs[-1]['timestamp']
 
 
 REPLY_REQUEST = '@ReviewBot retry'
@@ -92,7 +91,7 @@ def _needs_reply(server, request):
     # Determine whether another round of feedback is necessary.
     latest_feedback_time = feedback_reviews[-1]['timestamp']
     latest_request = _get_latest_user_request(reviews)
-    latest_diff = _get_latest_diff_time(server, request, reviews)
+    latest_diff = _get_latest_diff_time(server, request)
     return ((latest_request and (latest_request > latest_feedback_time))
             or (latest_diff and (latest_diff > latest_feedback_time)))
   return True
