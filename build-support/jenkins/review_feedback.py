@@ -175,7 +175,7 @@ def main():
       if result == 0:
         review_text = 'Master (%s) is green with this patch.\n  %s' % (sha, command)
         if _missing_tests(server, latest_diff):
-          review_text = '%s\n\nHowever, it appears that it might lack test coverage.'
+          review_text = '%s\n\nHowever, it appears that it might lack test coverage.' % review_text
         else:
           ship = True
       else:
