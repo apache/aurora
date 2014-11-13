@@ -49,7 +49,7 @@ class CoverageReportCheck extends DefaultTask {
     } else {
       def floored = Math.floor(coverage * 100) / 100
       if (floored > (minCoverage + epsilon)) {
-        return("$type coverage of $floored exceeds min instruction coverage of $minCoverage,"
+        println("$type coverage of $floored exceeds min instruction coverage of $minCoverage"
             + " by more than $epsilon, please raise the threshold!")
       } else {
         println("$type coverage of $coverage exceeds minimum coverage of $minCoverage.")
