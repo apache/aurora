@@ -13,17 +13,55 @@
 #
 import contextlib
 import functools
+import unittest
 
+import pytest
 from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
+from apache.aurora.client.api import UpdaterConfig
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
-from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_PARAMETER
+from apache.aurora.client.cli import Context, EXIT_API_ERROR, EXIT_INVALID_PARAMETER
 from apache.aurora.client.cli.client import AuroraCommandLine
+from apache.aurora.client.cli.jobs import RestartCommand
+from apache.aurora.client.cli.options import TaskInstanceKey
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from .util import AuroraClientCommandTest, IOMock
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext, IOMock, mock_verb_options
 
-from gen.apache.aurora.api.ttypes import JobKey, PopulateJobResult, Result, TaskConfig
+from gen.apache.aurora.api.ttypes import JobKey, PopulateJobResult, ResponseCode, Result, TaskConfig
+
+
+class TestRestartJobCommand(unittest.TestCase):
+
+  def test_restart_with_lock(self):
+    command = RestartCommand()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(jobkey, [])
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+
+    mock_api = fake_context.get_api("test")
+    mock_api.restart.return_value = AuroraClientCommandTest.create_blank_response(
+      ResponseCode.LOCK_ERROR, "Error.")
+
+    with pytest.raises(Context.CommandError):
+      command.execute(fake_context)
+
+    updater_config = UpdaterConfig(
+      mock_options.batch_size,
+      mock_options.restart_threshold,
+      mock_options.watch_secs,
+      mock_options.max_per_instance_failures,
+      mock_options.max_total_failures,
+      mock_options.rollback_on_failure)
+
+    mock_api.restart.assert_called_once_with(jobkey, mock_options.instance_spec.instance,
+      updater_config, mock_options.healthcheck_interval_seconds, config=None)
+    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
 
 
 class TestRestartCommand(AuroraClientCommandTest):

@@ -97,6 +97,9 @@ class UpdaterConfig(object):
         waitForBatchCompletion=self.wait_for_batch_completion,
         updateOnlyTheseInstances=self.instances_to_ranges(instances) if instances else None)
 
+  def __eq__(self, other):
+    return self.__dict__ == other.__dict__
+
 
 class FailureThreshold(object):
   def __init__(self, max_per_instance_failures, max_total_failures):

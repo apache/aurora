@@ -13,16 +13,20 @@
 #
 import contextlib
 import textwrap
+import unittest
 
-from mock import patch
+import pytest
+from mock import create_autospec, Mock, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_CONFIGURATION, EXIT_OK
+from apache.aurora.client.cli import Context, EXIT_API_ERROR, EXIT_INVALID_CONFIGURATION, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
+from apache.aurora.client.cli.options import TaskInstanceKey
+from apache.aurora.client.cli.update import StartUpdate
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
 
-from .util import AuroraClientCommandTest, FakeAuroraCommandContext
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
 
 from gen.apache.aurora.api.ttypes import (
     GetJobUpdateDetailsResult,
@@ -41,6 +45,33 @@ from gen.apache.aurora.api.ttypes import (
     Result,
     StartJobUpdateResult
 )
+
+
+class TestStartUpdateCommand(unittest.TestCase):
+
+  def test_start_update_with_lock(self):
+    command = StartUpdate()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(jobkey, [])
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+
+    mock_config = create_autospec(spec=AuroraConfig, spec_set=True, instance=True)
+    fake_context.get_job_config = Mock(return_value=mock_config)
+
+    mock_api = fake_context.get_api("test")
+    mock_api.start_job_update.return_value = AuroraClientCommandTest.create_blank_response(
+      ResponseCode.LOCK_ERROR, "Error.")
+
+    with pytest.raises(Context.CommandError):
+      command.execute(fake_context)
+
+    mock_api.start_job_update.assert_called_once_with(mock_config,
+      mock_options.instance_spec.instance)
+    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
 
 
 class TestUpdateCommand(AuroraClientCommandTest):

@@ -13,19 +13,24 @@
 #
 import contextlib
 import functools
+import unittest
 
-from mock import create_autospec, patch
+import pytest
+from mock import create_autospec, Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import QuotaCheck
 from apache.aurora.client.api.scheduler_mux import SchedulerMux
-from apache.aurora.client.cli import EXIT_INVALID_CONFIGURATION, EXIT_OK
+from apache.aurora.client.cli import Context, EXIT_INVALID_CONFIGURATION, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
+from apache.aurora.client.cli.jobs import UpdateCommand
+from apache.aurora.client.cli.options import TaskInstanceKey
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
 
-from .util import AuroraClientCommandTest, FakeAuroraCommandContext, IOMock
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext, IOMock, mock_verb_options
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
@@ -43,6 +48,35 @@ from gen.apache.aurora.api.ttypes import (
     TaskConfig,
     TaskQuery
 )
+
+
+class TestJobUpdateCommand(unittest.TestCase):
+
+  def test_update_with_lock(self):
+    command = UpdateCommand()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(jobkey, [])
+    mock_options.force = True
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+
+    mock_config = create_autospec(spec=AuroraConfig, spec_set=True, instance=True)
+    fake_context.get_job_config = Mock(return_value=mock_config)
+
+    mock_api = fake_context.get_api("test")
+    mock_api.update_job.return_value = AuroraClientCommandTest.create_blank_response(
+      ResponseCode.LOCK_ERROR, "Error.")
+
+    with pytest.raises(Context.CommandError):
+      command.execute(fake_context)
+
+    mock_api.update_job.assert_called_once_with(mock_config,
+      mock_options.healthcheck_interval_seconds,
+      mock_options.instance_spec.instance)
+    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
 
 
 class TestUpdateCommand(AuroraClientCommandTest):

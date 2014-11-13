@@ -13,11 +13,14 @@
 #
 
 import contextlib
+import unittest
 
-from mock import create_autospec, patch
+import pytest
+from mock import create_autospec, Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import (
+    Context,
     EXIT_COMMAND_FAILURE,
     EXIT_INTERRUPTED,
     EXIT_INVALID_CONFIGURATION,
@@ -25,13 +28,16 @@ from apache.aurora.client.cli import (
     EXIT_UNKNOWN_ERROR
 )
 from apache.aurora.client.cli.client import AuroraCommandLine
+from apache.aurora.client.cli.jobs import CreateJobCommand
+from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
 
-from .util import AuroraClientCommandTest, FakeAuroraCommandContext
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     JobKey,
+    ResponseCode,
     Result,
     ScheduledTask,
     ScheduleStatus,
@@ -43,6 +49,33 @@ from gen.apache.aurora.api.ttypes import (
 
 class UnknownException(Exception):
   pass
+
+
+class TestCreateJobCommand(unittest.TestCase):
+
+  def test_create_with_lock(self):
+    command = CreateJobCommand()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+    mock_options = mock_verb_options(command)
+    mock_options.jobspec = jobkey
+    mock_options.config_file = "/tmp/whatever"
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+
+    mock_config = create_autospec(spec=AuroraConfig, spec_set=True, instance=True)
+    fake_context.get_job_config = Mock(return_value=mock_config)
+    mock_api = fake_context.get_api("test")
+
+    mock_api.create_job.return_value = AuroraClientCommandTest.create_blank_response(
+      ResponseCode.LOCK_ERROR, "Error.")
+
+    with pytest.raises(Context.CommandError):
+      command.execute(fake_context)
+
+    mock_api.create_job.assert_called_once_with(mock_config)
+    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
 
 
 class TestClientCreateCommand(AuroraClientCommandTest):

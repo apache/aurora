@@ -15,19 +15,22 @@
 import contextlib
 import unittest
 
+import pytest
 from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.cli import EXIT_TIMEOUT
+from apache.aurora.client.cli import Context, EXIT_TIMEOUT
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.client.cli.options import parse_instances
+from apache.aurora.client.cli.jobs import KillCommand
+from apache.aurora.client.cli.options import parse_instances, TaskInstanceKey
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 from ..api.api_util import SchedulerThriftApiSpec
-from .util import AuroraClientCommandTest, FakeAuroraCommandContext
+from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
 
 from gen.apache.aurora.api.ttypes import (
     JobKey,
+    ResponseCode,
     Result,
     ScheduleStatus,
     ScheduleStatusResult,
@@ -44,6 +47,59 @@ class TestInstancesParser(unittest.TestCase):
   def test_parse_none(self):
     assert parse_instances(None) is None
     assert parse_instances("") is None
+
+
+class TestKillCommand(unittest.TestCase):
+
+  def test_kill_lock_error_nobatch(self):
+    """Verify that the no batch code path correctly includes the lock error message."""
+    command = KillCommand()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(jobkey, [])
+    mock_options.no_batching = True
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+
+    mock_api = fake_context.get_api('test')
+    mock_api.kill_job.return_value = AuroraClientCommandTest.create_blank_response(
+      ResponseCode.LOCK_ERROR, "Error.")
+
+    with pytest.raises(Context.CommandError):
+      command.execute(fake_context)
+
+    mock_api.kill_job.assert_called_once_with(jobkey, mock_options.instance_spec.instance)
+    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
+
+  def test_kill_lock_error_batches(self):
+    """Verify that the batch kill path short circuits and includes the lock error message."""
+    command = KillCommand()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(jobkey, [1])
+    mock_options.no_batching = False
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+
+    fake_context.add_expected_status_query_result(
+      AuroraClientCommandTest.create_status_call_result(
+        AuroraClientCommandTest.create_mock_task(1, ScheduleStatus.KILLED)))
+
+    mock_api = fake_context.get_api('test')
+    mock_api.kill_job.return_value = AuroraClientCommandTest.create_blank_response(
+      ResponseCode.LOCK_ERROR, "Error.")
+
+    with pytest.raises(Context.CommandError):
+      command.execute(fake_context)
+
+    mock_api.kill_job.assert_called_once_with(jobkey, mock_options.instance_spec.instance)
+    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
 
 
 class TestClientKillCommand(AuroraClientCommandTest):

@@ -325,8 +325,11 @@ class AbstractKillCommand(Verb):
       for i in range(min(context.options.batch_size, len(instances_to_kill))):
         batch.append(instances_to_kill.pop())
       resp = api.kill_job(job, batch)
-      if resp.responseCode is not ResponseCode.OK or self.wait_kill_tasks(
-          context, api.scheduler_proxy, job, batch) is not EXIT_OK:
+      if resp.responseCode == ResponseCode.LOCK_ERROR:
+        # Short circuit max errors in this case, and be sure to show the lock error message.
+        context.check_and_log_response(resp)
+      elif (resp.responseCode != ResponseCode.OK
+            or self.wait_kill_tasks(context, api.scheduler_proxy, job, batch) != EXIT_OK):
         context.print_err("Kill of shards %s failed with error:" % batch)
         context.log_response(resp)
         errors += 1

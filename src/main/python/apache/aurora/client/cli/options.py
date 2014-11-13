@@ -58,6 +58,17 @@ class CommandOption(object):
       displayname = self.name
     return displayname
 
+  def get_destination(self):
+    """Get the attribute name this option will be stored under internally."""
+    if self.kwargs.get('dest'):
+      return self.kwargs['dest']
+    # See the spec here: https://docs.python.org/2/library/argparse.html#dest
+    return self.name.lstrip('--').replace('-', '_')
+
+  def get_default_value(self):
+    """Get the default value if no argument for this option is supplied."""
+    return self.kwargs.get('default')
+
   def render_usage(self):
     """Create a usage string for this option"""
     if not self.name.startswith('--'):

@@ -15,7 +15,7 @@
 import textwrap
 import unittest
 
-from mock import create_autospec
+from mock import create_autospec, Mock
 
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
@@ -42,10 +42,23 @@ from gen.apache.aurora.api.ttypes import (
 )
 
 
+def mock_verb_options(verb):
+  return create_options_mock(verb.get_options())
+
+
+def create_options_mock(options):
+  """Inspects a list of CommandOption instances for their attribute and default values and
+     constructs a mock with specification from it."""
+  attributes = [o.get_destination() for o in options]
+  mock = Mock(spec_set=attributes)
+  for o in options:
+    setattr(mock, o.get_destination(), o.get_default_value())
+  return mock
+
+
 class FakeAuroraCommandContext(AuroraCommandContext):
   def __init__(self):
     super(FakeAuroraCommandContext, self).__init__()
-    self.options = None
     self.status = []
     self.fake_api = self.create_mock_api()
     self.task_status = []

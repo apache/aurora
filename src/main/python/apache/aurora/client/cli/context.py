@@ -61,6 +61,11 @@ def bindings_to_list(bindings):
 
 
 class AuroraCommandContext(Context):
+
+  LOCK_ERROR_MSG = """Error: job is locked by an incomplete update.
+                      run 'aurora job cancel-update' to release the lock if no update is in progress
+                   """
+
   """A context object used by Aurora commands to manage command processing state
   and common operations.
   """
@@ -142,6 +147,8 @@ class AuroraCommandContext(Context):
     if resp.responseCode != ResponseCode.OK:
       if err_msg is None:
         err_msg = resp.messageDEPRECATED
+      if resp.responseCode == ResponseCode.LOCK_ERROR:
+        self.print_err(self.LOCK_ERROR_MSG)
       self.print_err(err_msg)
     self.log_response(resp)
     if resp.responseCode != ResponseCode.OK:

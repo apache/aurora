@@ -106,18 +106,22 @@ class Context(object):
       self.code = code
 
   def __init__(self):
-    self.options = None
+    self._options = None
     self.logging_level = None
 
   @classmethod
   def exit(cls, code, msg):
     raise cls.CommandError(code, msg)
 
+  @property
+  def options(self):
+    return self._options
+
   def set_options(self, options):
     """Add the options object to a context.
     This is separated from the constructor to make patching tests easier.
     """
-    self.options = options
+    self._options = options
 
   def set_args(self, args):
     """Add the raw argument list to a context."""
