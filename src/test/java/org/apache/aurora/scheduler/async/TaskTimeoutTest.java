@@ -33,6 +33,7 @@ import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.junit.Before;
@@ -60,6 +61,7 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   private AtomicLong timedOutTaskCounter;
   private ScheduledExecutorService executor;
+  private StorageTestUtil storageUtil;
   private ScheduledFuture<?> future;
   private StateManager stateManager;
   private FakeClock clock;
@@ -69,6 +71,8 @@ public class TaskTimeoutTest extends EasyMockTest {
   @Before
   public void setUp() {
     executor = createMock(ScheduledExecutorService.class);
+    storageUtil = new StorageTestUtil(this);
+    storageUtil.expectOperations();
     future = createMock(new Clazz<ScheduledFuture<?>>() { });
     stateManager = createMock(StateManager.class);
     clock = new FakeClock();
@@ -80,7 +84,12 @@ public class TaskTimeoutTest extends EasyMockTest {
 
   private void replayAndCreate() {
     control.replay();
-    timeout = new TaskTimeout(executor, stateManager, TIMEOUT, statsProvider);
+    timeout = new TaskTimeout(
+        executor,
+        storageUtil.storage,
+        stateManager,
+        TIMEOUT,
+        statsProvider);
     timeout.startAsync().awaitRunning();
   }
 
@@ -129,6 +138,7 @@ public class TaskTimeoutTest extends EasyMockTest {
     expectTaskWatch();
     Capture<Runnable> killingTimeout = expectTaskWatch();
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         TASK_ID,
         Optional.of(KILLING),
         LOST,
@@ -146,6 +156,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   public void testTimeout() throws Exception {
     Capture<Runnable> assignedTimeout = expectTaskWatch();
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         TASK_ID,
         Optional.of(ASSIGNED),
         LOST,
@@ -164,6 +175,7 @@ public class TaskTimeoutTest extends EasyMockTest {
   public void testTaskDeleted() throws Exception {
     Capture<Runnable> assignedTimeout = expectTaskWatch();
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         TASK_ID,
         Optional.of(KILLING),
         LOST,
@@ -221,7 +233,7 @@ public class TaskTimeoutTest extends EasyMockTest {
     expectTaskWatch(TaskTimeout.NOT_STARTED_RETRY);
 
     control.replay();
-    timeout = new TaskTimeout(executor, stateManager, TIMEOUT, statsProvider);
+    timeout = new TaskTimeout(executor, storageUtil.storage, stateManager, TIMEOUT, statsProvider);
 
     changeState(INIT, PENDING);
     changeState(PENDING, ASSIGNED);

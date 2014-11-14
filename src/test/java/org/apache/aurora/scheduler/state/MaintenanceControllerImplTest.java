@@ -102,6 +102,7 @@ public class MaintenanceControllerImplTest extends EasyMockTest {
     expectMaintenanceModeChange(HOST_A, SCHEDULED);
     expectFetchTasksByHost(HOST_A, ImmutableSet.of(task));
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         Tasks.id(task),
         Optional.<ScheduleStatus>absent(),
         ScheduleStatus.DRAINING,

@@ -27,6 +27,7 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.storage.Storage;
 
 import static java.util.Objects.requireNonNull;
 
@@ -44,6 +45,7 @@ class TaskThrottler implements EventSubscriber {
   private final RescheduleCalculator rescheduleCalculator;
   private final Clock clock;
   private final ScheduledExecutorService executor;
+  private final Storage storage;
   private final StateManager stateManager;
 
   private final SlidingStats throttleStats = new SlidingStats("task_throttle", "ms");
@@ -53,11 +55,13 @@ class TaskThrottler implements EventSubscriber {
       RescheduleCalculator rescheduleCalculator,
       Clock clock,
       ScheduledExecutorService executor,
+      Storage storage,
       StateManager stateManager) {
 
     this.rescheduleCalculator = requireNonNull(rescheduleCalculator);
     this.clock = requireNonNull(clock);
     this.executor = requireNonNull(executor);
+    this.storage = requireNonNull(storage);
     this.stateManager = requireNonNull(stateManager);
   }
 
@@ -72,11 +76,17 @@ class TaskThrottler implements EventSubscriber {
           new Runnable() {
             @Override
             public void run() {
-              stateManager.changeState(
-                  stateChange.getTaskId(),
-                  Optional.of(THROTTLED),
-                  PENDING,
-                  Optional.<String>absent());
+              storage.write(new Storage.MutateWork.NoResult.Quiet() {
+                @Override
+                protected void execute(Storage.MutableStoreProvider storeProvider) {
+                  stateManager.changeState(
+                      storeProvider,
+                      stateChange.getTaskId(),
+                      Optional.of(THROTTLED),
+                      PENDING,
+                      Optional.<String>absent());
+                }
+              });
             }
           },
           delayMs,

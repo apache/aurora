@@ -287,7 +287,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
     eventDispatch.setName(getClass().getName() + "-EventDispatch");
     eventDispatch.start();
 
-    stateManager.deleteTasks(ImmutableSet.of(taskId));
+    stateManager.deleteTasks(storageUtil.mutableStoreProvider, ImmutableSet.of(taskId));
     expectLastCall().andAnswer(new IAnswer<Void>() {
       @Override
       public Void answer() {
@@ -306,7 +306,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
   }
 
   private void expectDeleteTasks(String... tasks) {
-    stateManager.deleteTasks(ImmutableSet.copyOf(tasks));
+    stateManager.deleteTasks(storageUtil.mutableStoreProvider, ImmutableSet.copyOf(tasks));
   }
 
   private Capture<Runnable> expectDefaultDelayedPrune() {
@@ -342,7 +342,7 @@ public class TaskHistoryPrunerTest extends EasyMockTest {
         FluentIterable.from(tasksInJob).transform(Tasks.SCHEDULED_TO_JOB_KEY).toSet());
     storageUtil.expectTaskFetch(TaskHistoryPruner.jobHistoryQuery(jobKey), tasksInJob);
     if (pruned.length > 0) {
-      stateManager.deleteTasks(Tasks.ids(pruned));
+      stateManager.deleteTasks(storageUtil.mutableStoreProvider, Tasks.ids(pruned));
     }
   }
 

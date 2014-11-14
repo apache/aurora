@@ -36,7 +36,6 @@ import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.TaskIdGenerator;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
-import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -45,7 +44,6 @@ import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
@@ -77,7 +75,6 @@ public class StateManagerImplTest extends EasyMockTest {
   private static final String HOST_A = "host_a";
   private static final Identity JIM = new Identity("jim", "jim-user");
   private static final String MY_JOB = "myJob";
-  private static final IJobKey JOB_KEY = JobKeys.from(JIM.getRole(), "devel", MY_JOB);
 
   private Driver driver;
   private TaskIdGenerator taskIdGenerator;
@@ -96,7 +93,6 @@ public class StateManagerImplTest extends EasyMockTest {
     // TODO(William Farner): Use a mocked storage.
     storage = MemStorage.newEmptyStorage();
     stateManager = new StateManagerImpl(
-        storage,
         clock,
         driver,
         taskIdGenerator,
@@ -352,12 +348,12 @@ public class StateManagerImplTest extends EasyMockTest {
 
     insertTask(task, 0);
     assignTask(taskId, HOST_A);
-    assertFalse(stateManager.changeState(
+    assertFalse(changeState(
         taskId,
         Optional.of(PENDING),
         RUNNING,
         Optional.<String>absent()));
-    assertTrue(stateManager.changeState(
+    assertTrue(changeState(
         taskId,
         Optional.of(ASSIGNED),
         FAILED,
@@ -368,7 +364,7 @@ public class StateManagerImplTest extends EasyMockTest {
   public void testCasTaskNotFound() {
     control.replay();
 
-    assertFalse(stateManager.changeState(
+    assertFalse(changeState(
         "a",
         Optional.of(PENDING),
         ASSIGNED,
@@ -378,7 +374,7 @@ public class StateManagerImplTest extends EasyMockTest {
   @Test
   public void testDeleteTasks() {
     ITaskConfig task = makeTask(JIM, MY_JOB);
-    String taskId = "a";
+    final String taskId = "a";
     expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
     expectStateTransitions(taskId, INIT, PENDING, ASSIGNED, RUNNING, FINISHED);
     eventSink.post(matchTasksDeleted(taskId));
@@ -389,7 +385,13 @@ public class StateManagerImplTest extends EasyMockTest {
     assignTask(taskId, HOST_A);
     changeState(taskId, RUNNING);
     changeState(taskId, FINISHED);
-    stateManager.deleteTasks(ImmutableSet.of(taskId));
+    storage.write(new Storage.MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        stateManager.deleteTasks(storeProvider, ImmutableSet.of(taskId));
+      }
+    });
+
   }
 
   @Test
@@ -448,7 +450,15 @@ public class StateManagerImplTest extends EasyMockTest {
   @Test(expected = IllegalArgumentException.class)
   public void insertEmptyPendingInstancesFails() {
     control.replay();
-    stateManager.insertPendingTasks(makeTask(JIM, MY_JOB), ImmutableSet.<Integer>of());
+    storage.write(new Storage.MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        stateManager.insertPendingTasks(
+            storeProvider,
+            makeTask(JIM, MY_JOB),
+            ImmutableSet.<Integer>of());
+      }
+    });
   }
 
   @Test(expected = IllegalArgumentException.class)
@@ -488,12 +498,36 @@ public class StateManagerImplTest extends EasyMockTest {
     }
   }
 
-  private void insertTask(ITaskConfig task, int instanceId) {
-    stateManager.insertPendingTasks(task, ImmutableSet.of(instanceId));
+  private void insertTask(final ITaskConfig task, final int instanceId) {
+    storage.write(new Storage.MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        stateManager.insertPendingTasks(storeProvider, task, ImmutableSet.of(instanceId));
+      }
+    });
   }
 
-  private boolean changeState(String taskId, ScheduleStatus status) {
-    return stateManager.changeState(
+  private boolean changeState(
+      final String taskId,
+      final Optional<ScheduleStatus> casState,
+      final ScheduleStatus newState,
+      final Optional<String> auditMessage) {
+
+    return storage.write(new Storage.MutateWork.Quiet<Boolean>() {
+      @Override
+      public Boolean apply(Storage.MutableStoreProvider storeProvider) {
+        return stateManager.changeState(
+            storeProvider,
+            taskId,
+            casState,
+            newState,
+            auditMessage);
+      }
+    });
+  }
+
+  private boolean changeState(final String taskId, final ScheduleStatus status) {
+    return changeState(
         taskId,
         Optional.<ScheduleStatus>absent(),
         status,
@@ -513,7 +547,17 @@ public class StateManagerImplTest extends EasyMockTest {
     assignTask(taskId, host, ImmutableSet.<Integer>of());
   }
 
-  private void assignTask(String taskId, String host, Set<Integer> ports) {
-    stateManager.assignTask(taskId, host, SlaveID.newBuilder().setValue(host).build(), ports);
+  private void assignTask(final String taskId, final String host, final Set<Integer> ports) {
+    storage.write(new Storage.MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        stateManager.assignTask(
+            storeProvider,
+            taskId,
+            host,
+            SlaveID.newBuilder().setValue(host).build(),
+            ports);
+      }
+    });
   }
 }

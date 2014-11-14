@@ -29,6 +29,7 @@ import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.OfferID;
@@ -66,6 +67,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
 
   private OfferQueue offerQueue;
   private StateManager stateManager;
+  private StorageTestUtil storageUtil;
 
   private TaskLauncher launcher;
 
@@ -73,7 +75,9 @@ public class UserTaskLauncherTest extends EasyMockTest {
   public void setUp() {
     offerQueue = createMock(OfferQueue.class);
     stateManager = createMock(StateManager.class);
-    launcher = new UserTaskLauncher(offerQueue, stateManager);
+    storageUtil = new StorageTestUtil(this);
+    storageUtil.expectOperations();
+    launcher = new UserTaskLauncher(storageUtil.storage, offerQueue, stateManager);
   }
 
   @Test
@@ -88,6 +92,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
   @Test
   public void testForwardsStatusUpdates() throws Exception {
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         TASK_ID_A,
         Optional.<ScheduleStatus>absent(),
         RUNNING,
@@ -116,6 +121,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
   @Test(expected = StorageException.class)
   public void testFailedStatusUpdate() throws Exception {
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         TASK_ID_A,
         Optional.<ScheduleStatus>absent(),
         RUNNING,
@@ -135,6 +141,7 @@ public class UserTaskLauncherTest extends EasyMockTest {
   @Test
   public void testMemoryLimitTranslationHack() throws Exception {
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         TASK_ID_A,
         Optional.<ScheduleStatus>absent(),
         FAILED,

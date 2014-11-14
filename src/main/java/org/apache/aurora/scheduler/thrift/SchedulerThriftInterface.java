@@ -320,7 +320,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             cronJobManager.createJob(SanitizedCronJob.from(sanitized));
           } else {
             LOG.info("Launching " + count + " tasks.");
-            stateManager.insertPendingTasks(template, sanitized.getInstanceIds());
+            stateManager.insertPendingTasks(
+                storeProvider,
+                template,
+                sanitized.getInstanceIds());
           }
           return okEmptyResponse();
         } catch (LockException e) {
@@ -763,12 +766,14 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
         final Set<IScheduledTask> tasks = storeProvider.getTaskStore().fetchTasks(query);
 
-        Optional<SessionContext> context = isAdmin(session);
-        if (context.isPresent()) {
+        Optional<SessionContext> maybeAdminContext = isAdmin(session);
+        final SessionContext context;
+        if (maybeAdminContext.isPresent()) {
           LOG.info("Granting kill query to admin user: " + query);
+          context = maybeAdminContext.get();
         } else {
           try {
-            context = Optional.of(validateSessionKeyForTasks(session, query, tasks));
+            context = validateSessionKeyForTasks(session, query, tasks);
           } catch (AuthFailedException e) {
             return errorResponse(AUTH_FAILED, e);
           }
@@ -784,7 +789,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
         LOG.info("Killing tasks matching " + query);
 
-        boolean tasksKilled = false;
+        final boolean cronJobKilled;
         if (isSingleJobScoped) {
           // If this looks like a query for all tasks in a job, instruct the cron
           // scheduler to delete it.
@@ -792,19 +797,30 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           IJobKey jobKey = Iterables.getOnlyElement(JobKeys.from(query).get());
           LOG.warning("Deprecated behavior: descheduling job " + jobKey
               + " with cron via killTasks. (See AURORA-454)");
-          tasksKilled = cronJobManager.deleteJob(jobKey);
+          cronJobKilled = cronJobManager.deleteJob(jobKey);
+        } else {
+          cronJobKilled = false;
         }
 
-        for (String taskId : Tasks.ids(tasks)) {
-          tasksKilled |= stateManager.changeState(
-              taskId,
-              Optional.<ScheduleStatus>absent(),
-              ScheduleStatus.KILLING,
-              killedByMessage(context.get().getIdentity()));
-        }
+        final boolean tasksKilled = storage.write(new MutateWork.Quiet<Boolean>() {
+          @Override
+          public Boolean apply(MutableStoreProvider storeProvider) {
+            boolean match = false;
+            for (String taskId : Tasks.ids(tasks)) {
+              match |= stateManager.changeState(
+                  storeProvider,
+                  taskId,
+                  Optional.<ScheduleStatus>absent(),
+                  ScheduleStatus.KILLING,
+                  killedByMessage(context.getIdentity()));
+            }
+            return match;
+          }
+        });
 
-        return tasksKilled
-            ? okEmptyResponse() : addMessage(emptyResponse(), OK, NO_TASKS_TO_KILL_MESSAGE);
+        return cronJobKilled || tasksKilled
+            ? okEmptyResponse()
+            : addMessage(emptyResponse(), OK, NO_TASKS_TO_KILL_MESSAGE);
       }
     });
   }
@@ -839,19 +855,25 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         }
 
         Query.Builder query = Query.instanceScoped(jobKey, shardIds).active();
-        Set<IScheduledTask> matchingTasks = storeProvider.getTaskStore().fetchTasks(query);
+        final Set<IScheduledTask> matchingTasks = storeProvider.getTaskStore().fetchTasks(query);
         if (matchingTasks.size() != shardIds.size()) {
           return invalidResponse("Not all requested shards are active.");
         }
 
         LOG.info("Restarting shards matching " + query);
-        for (String taskId : Tasks.ids(matchingTasks)) {
-          stateManager.changeState(
-              taskId,
-              Optional.<ScheduleStatus>absent(),
-              ScheduleStatus.RESTARTING,
-              restartedByMessage(context.getIdentity()));
-        }
+        storage.write(new MutateWork.NoResult.Quiet() {
+          @Override
+          protected void execute(MutableStoreProvider storeProvider) {
+            for (String taskId : Tasks.ids(matchingTasks)) {
+              stateManager.changeState(
+                  storeProvider,
+                  taskId,
+                  Optional.<ScheduleStatus>absent(),
+                  ScheduleStatus.RESTARTING,
+                  restartedByMessage(context.getIdentity()));
+            }
+          }
+        });
         return okEmptyResponse();
       }
     });
@@ -919,12 +941,16 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response forceTaskState(String taskId, ScheduleStatus status, SessionKey session) {
+  public Response forceTaskState(
+      final String taskId,
+      final ScheduleStatus status,
+      SessionKey session) {
+
     checkNotBlank(taskId);
     requireNonNull(status);
     requireNonNull(session);
 
-    SessionContext context;
+    final SessionContext context;
     try {
       // TODO(Sathya): Remove this after AOP-style session validation passes in a SessionContext.
       context = sessionValidator.checkAuthorized(session, Capability.ROOT, AuditCheck.REQUIRED);
@@ -932,11 +958,17 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return errorResponse(AUTH_FAILED, e);
     }
 
-    stateManager.changeState(
-        taskId,
-        Optional.<ScheduleStatus>absent(),
-        status,
-        transitionMessage(context.getIdentity()));
+    storage.write(new MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(MutableStoreProvider storeProvider) {
+        stateManager.changeState(
+            storeProvider,
+            taskId,
+            Optional.<ScheduleStatus>absent(),
+            status,
+            transitionMessage(context.getIdentity()));
+      }
+    });
 
     return okEmptyResponse();
   }
@@ -1204,7 +1236,16 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               currentTasks.size() + config.getInstanceIdsSize(),
               quotaManager.checkInstanceAddition(task, config.getInstanceIdsSize()));
 
-          stateManager.insertPendingTasks(task, ImmutableSet.copyOf(config.getInstanceIds()));
+          storage.write(new NoResult.Quiet() {
+            @Override
+            protected void execute(MutableStoreProvider storeProvider) {
+              stateManager.insertPendingTasks(
+                  storeProvider,
+                  task,
+                  ImmutableSet.copyOf(config.getInstanceIds()));
+            }
+          });
+
           return okEmptyResponse();
         } catch (LockException e) {
           return errorResponse(LOCK_ERROR, e);

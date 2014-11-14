@@ -21,11 +21,12 @@ import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateStatus;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 
 public class AddTaskTest extends EasyMockTest {
   private static final IJobUpdateInstructions INSTRUCTIONS = IJobUpdateInstructions.build(
@@ -36,14 +37,14 @@ public class AddTaskTest extends EasyMockTest {
   private static final IInstanceKey INSTANCE =
       IInstanceKey.build(new InstanceKey(JobKeys.from("role", "env", "job").newBuilder(), 0));
 
-  private TaskStore taskStore;
+  private MutableStoreProvider storeProvider;
   private StateManager stateManager;
   private InstanceActionHandler handler;
 
   @Before
   public void setUp() {
     stateManager = createMock(StateManager.class);
-    taskStore = createMock(TaskStore.class);
+    storeProvider = createMock(MutableStoreProvider.class);
     handler = new InstanceActionHandler.AddTask();
   }
 
@@ -54,7 +55,7 @@ public class AddTaskTest extends EasyMockTest {
     handler.getReevaluationDelay(
         INSTANCE,
         INSTRUCTIONS,
-        taskStore,
+        storeProvider,
         stateManager,
         JobUpdateStatus.ROLLING_BACK);
   }

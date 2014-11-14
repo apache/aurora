@@ -587,6 +587,7 @@ public class PreemptorImplTest extends EasyMockTest {
 
   private void expectPreempted(ScheduledTask preempted) throws Exception {
     expect(stateManager.changeState(
+        eq(storageUtil.mutableStoreProvider),
         eq(Tasks.id(preempted)),
         eq(Optional.<ScheduleStatus>absent()),
         eq(ScheduleStatus.PREEMPTING),

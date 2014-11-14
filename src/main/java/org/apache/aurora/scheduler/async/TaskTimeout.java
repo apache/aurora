@@ -33,8 +33,11 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.storage.Storage;
 
 import static java.util.Objects.requireNonNull;
+
+import static org.apache.aurora.scheduler.storage.Storage.MutateWork;
 
 /**
  * Observes task transitions and identifies tasks that are 'stuck' in a transient state.  Stuck
@@ -61,6 +64,7 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
       ScheduleStatus.DRAINING);
 
   private final ScheduledExecutorService executor;
+  private final Storage storage;
   private final StateManager stateManager;
   private final Amount<Long, Time> timeout;
   private final AtomicLong timedOutTasks;
@@ -68,11 +72,13 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
   @Inject
   TaskTimeout(
       ScheduledExecutorService executor,
+      Storage storage,
       StateManager stateManager,
       Amount<Long, Time> timeout,
       StatsProvider statsProvider) {
 
     this.executor = requireNonNull(executor);
+    this.storage = requireNonNull(storage);
     this.stateManager = requireNonNull(stateManager);
     this.timeout = requireNonNull(timeout);
     this.timedOutTasks = statsProvider.makeCounter(TIMED_OUT_TASKS_COUNTER);
@@ -93,41 +99,56 @@ class TaskTimeout extends AbstractIdleService implements EventSubscriber {
     // Nothing to do for shutting down.
   }
 
+  private class TimedOutTaskHandler implements Runnable {
+    private final String taskId;
+    private final ScheduleStatus newState;
+
+    TimedOutTaskHandler(String taskId, ScheduleStatus newState) {
+      this.taskId = taskId;
+      this.newState = newState;
+    }
+
+    @Override
+    public void run() {
+      if (isRunning()) {
+        // This query acts as a CAS by including the state that we expect the task to be in
+        // if the timeout is still valid.  Ideally, the future would have already been
+        // canceled, but in the event of a state transition race, including transientState
+        // prevents an unintended task timeout.
+        // Note: This requires LOST transitions trigger Driver.killTask.
+        boolean movedToLost = storage.write(new MutateWork.Quiet<Boolean>() {
+          @Override
+          public Boolean apply(Storage.MutableStoreProvider storeProvider) {
+            return stateManager.changeState(
+                storeProvider,
+                taskId,
+                Optional.of(newState),
+                ScheduleStatus.LOST,
+                TIMEOUT_MESSAGE);
+          }
+        });
+
+        if (movedToLost) {
+          LOG.info("Timeout reached for task " + taskId + ":" + taskId);
+          timedOutTasks.incrementAndGet();
+        }
+      } else {
+        // Our service is not yet started.  We don't want to lose track of the task, so
+        // we will try again later.
+        LOG.fine("Retrying timeout of task " + taskId + " in " + NOT_STARTED_RETRY);
+        executor.schedule(
+            this,
+            NOT_STARTED_RETRY.getValue(),
+            NOT_STARTED_RETRY.getUnit().getTimeUnit());
+      }
+    }
+  }
+
   @Subscribe
   public void recordStateChange(TaskStateChange change) {
-    final String taskId = change.getTaskId();
-    final ScheduleStatus newState = change.getNewState();
-    if (isTransient(newState)) {
+    if (isTransient(change.getNewState())) {
       executor.schedule(
-          new Runnable() {
-            @Override
-            public void run() {
-              if (isRunning()) {
-                // This query acts as a CAS by including the state that we expect the task to be in
-                // if the timeout is still valid.  Ideally, the future would have already been
-                // canceled, but in the event of a state transition race, including transientState
-                // prevents an unintended task timeout.
-                // Note: This requires LOST transitions trigger Driver.killTask.
-                if (stateManager.changeState(
-                    taskId,
-                    Optional.of(newState),
-                    ScheduleStatus.LOST,
-                    TIMEOUT_MESSAGE)) {
-
-                  LOG.info("Timeout reached for task " + taskId + ":" + taskId);
-                  timedOutTasks.incrementAndGet();
-                }
-              } else {
-                // Our service is not yet started.  We don't want to lose track of the task, so
-                // we will try again later.
-                LOG.fine("Retrying timeout of task " + taskId + " in " + NOT_STARTED_RETRY);
-                executor.schedule(
-                    this,
-                    NOT_STARTED_RETRY.getValue(),
-                    NOT_STARTED_RETRY.getUnit().getTimeUnit());
-              }
-            }
-          },
+          new TimedOutTaskHandler(change.getTaskId(), change.getNewState()),
           timeout.getValue(),
           timeout.getUnit().getTimeUnit());
     }

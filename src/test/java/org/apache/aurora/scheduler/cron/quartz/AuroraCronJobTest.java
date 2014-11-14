@@ -38,6 +38,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.quartz.JobExecutionException;
 
+import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertFalse;
@@ -47,7 +49,6 @@ public class AuroraCronJobTest extends EasyMockTest {
   public static final String TASK_ID = "A";
   private Storage storage;
   private StateManager stateManager;
-  private CronJobManager cronJobManager;
   private BackoffHelper backoffHelper;
 
   private AuroraCronJob auroraCronJob;
@@ -58,7 +59,7 @@ public class AuroraCronJobTest extends EasyMockTest {
   public void setUp() {
     storage = MemStorage.newEmptyStorage();
     stateManager = createMock(StateManager.class);
-    cronJobManager = createMock(CronJobManager.class);
+    CronJobManager cronJobManager = createMock(CronJobManager.class);
     backoffHelper = createMock(BackoffHelper.class);
 
     auroraCronJob = new AuroraCronJob(
@@ -78,7 +79,7 @@ public class AuroraCronJobTest extends EasyMockTest {
     control.replay();
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(
             MANAGER_ID,
             IJobConfiguration.build(QuartzTestUtil.JOB.newBuilder().setCronSchedule(null)));
@@ -91,6 +92,7 @@ public class AuroraCronJobTest extends EasyMockTest {
   @Test
   public void testEmptyStorage() throws JobExecutionException {
     stateManager.insertPendingTasks(
+        EasyMock.<MutableStoreProvider>anyObject(),
         EasyMock.<ITaskConfig>anyObject(),
         EasyMock.<Set<Integer>>anyObject());
     expectLastCall().times(3);
@@ -122,13 +124,15 @@ public class AuroraCronJobTest extends EasyMockTest {
     Capture<Supplier<Boolean>> capture = createCapture();
 
     expect(stateManager.changeState(
-        TASK_ID,
-        Optional.<ScheduleStatus>absent(),
-        ScheduleStatus.KILLING,
-        AuroraCronJob.KILL_AUDIT_MESSAGE))
+        EasyMock.<MutableStoreProvider>anyObject(),
+        eq(TASK_ID),
+        eq(Optional.<ScheduleStatus>absent()),
+        eq(ScheduleStatus.KILLING),
+        eq(AuroraCronJob.KILL_AUDIT_MESSAGE)))
         .andReturn(true);
     backoffHelper.doUntilSuccess(EasyMock.capture(capture));
     stateManager.insertPendingTasks(
+        EasyMock.<MutableStoreProvider>anyObject(),
         EasyMock.<ITaskConfig>anyObject(),
         EasyMock.<Set<Integer>>anyObject());
 
@@ -141,7 +145,7 @@ public class AuroraCronJobTest extends EasyMockTest {
     storage.write(
         new Storage.MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(Storage.MutableStoreProvider storeProvider) {
+          protected void execute(MutableStoreProvider storeProvider) {
             storeProvider.getUnsafeTaskStore().deleteAllTasks();
           }
         });
@@ -151,7 +155,7 @@ public class AuroraCronJobTest extends EasyMockTest {
   private void populateTaskStore() {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      protected void execute(MutableStoreProvider storeProvider) {
         storeProvider.getUnsafeTaskStore().saveTasks(ImmutableSet.of(
             IScheduledTask.build(new ScheduledTask()
                 .setStatus(ScheduleStatus.RUNNING)
@@ -166,7 +170,7 @@ public class AuroraCronJobTest extends EasyMockTest {
   private void populateStorage(final CronCollisionPolicy policy) {
     storage.write(new Storage.MutateWork.NoResult.Quiet() {
       @Override
-      public void execute(Storage.MutableStoreProvider storeProvider) {
+      public void execute(MutableStoreProvider storeProvider) {
         storeProvider.getJobStore().saveAcceptedJob(
             MANAGER_ID,
             QuartzTestUtil.makeSanitizedCronJob(policy).getSanitizedConfig().getJobConfig());

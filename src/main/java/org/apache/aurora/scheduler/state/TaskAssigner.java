@@ -34,6 +34,7 @@ import org.apache.mesos.Protos.TaskInfo;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.mesos.Protos.Offer;
 
 /**
@@ -45,12 +46,14 @@ public interface TaskAssigner {
    * Tries to match a task against an offer.  If a match is found, the assigner should
    * make the appropriate changes to the task and provide a non-empty result.
    *
+   * @param storeProvider Storage provider.
    * @param offer The resource offer.
    * @param task The task to match against and optionally assign.
    * @param attributeAggregate Attribute information for tasks in the job containing {@code task}.
    * @return Instructions for launching the task if matching and assignment were successful.
    */
   Optional<TaskInfo> maybeAssign(
+      MutableStoreProvider storeProvider,
       HostOffer offer,
       IScheduledTask task,
       AttributeAggregate attributeAggregate);
@@ -73,11 +76,12 @@ public interface TaskAssigner {
       this.taskFactory = requireNonNull(taskFactory);
     }
 
-    private TaskInfo assign(Offer offer, IScheduledTask task) {
+    private TaskInfo assign(MutableStoreProvider storeProvider, Offer offer, IScheduledTask task) {
       String host = offer.getHostname();
       Set<Integer> selectedPorts =
           Resources.getPorts(offer, task.getAssignedTask().getTask().getRequestedPorts().size());
       IAssignedTask assigned = stateManager.assignTask(
+          storeProvider,
           Tasks.id(task),
           host,
           offer.getSlaveId(),
@@ -89,6 +93,7 @@ public interface TaskAssigner {
 
     @Override
     public Optional<TaskInfo> maybeAssign(
+        MutableStoreProvider storeProvider,
         HostOffer offer,
         IScheduledTask task,
         AttributeAggregate attributeAggregate) {
@@ -100,7 +105,7 @@ public interface TaskAssigner {
           Tasks.id(task),
           attributeAggregate);
       if (vetoes.isEmpty()) {
-        return Optional.of(assign(offer.getOffer(), task));
+        return Optional.of(assign(storeProvider, offer.getOffer(), task));
       } else {
         LOG.fine("Slave " + offer.getOffer().getHostname() + " vetoed task " + Tasks.id(task)
             + ": " + vetoes);

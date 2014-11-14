@@ -46,6 +46,7 @@ import org.apache.mesos.Protos.Value.Type;
 import org.junit.Before;
 import org.junit.Test;
 
+import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
@@ -79,6 +80,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
       .setSlaveId(MESOS_OFFER.getSlaveId())
       .build();
 
+  private MutableStoreProvider storeProvider;
   private StateManager stateManager;
   private SchedulingFilter filter;
   private MesosTaskFactory taskFactory;
@@ -87,6 +89,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
   @Before
   public void setUp() throws Exception {
+    storeProvider = createMock(MutableStoreProvider.class);
     stateManager = createMock(StateManager.class);
     filter = createMock(SchedulingFilter.class);
     taskFactory = createMock(MesosTaskFactory.class);
@@ -106,6 +109,7 @@ public class TaskAssignerImplTest extends EasyMockTest {
         emptyJob))
         .andReturn(ImmutableSet.<Veto>of());
     expect(stateManager.assignTask(
+        storeProvider,
         Tasks.id(TASK),
         MESOS_OFFER.getHostname(),
         MESOS_OFFER.getSlaveId(),
@@ -116,7 +120,9 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(Optional.of(TASK_INFO), assigner.maybeAssign(OFFER, TASK, emptyJob));
+    assertEquals(
+        Optional.of(TASK_INFO),
+        assigner.maybeAssign(storeProvider, OFFER, TASK, emptyJob));
   }
 
   @Test
@@ -131,6 +137,8 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     control.replay();
 
-    assertEquals(Optional.<TaskInfo>absent(), assigner.maybeAssign(OFFER, TASK, emptyJob));
+    assertEquals(
+        Optional.<TaskInfo>absent(),
+        assigner.maybeAssign(storeProvider, OFFER, TASK, emptyJob));
   }
 }

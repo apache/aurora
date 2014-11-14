@@ -72,6 +72,7 @@ import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLED_FORWARD;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_BACK;
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
+import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import static org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.ACTIVE_QUERY;
 import static org.apache.aurora.scheduler.updater.JobUpdateStateMachine.MonitorAction;
@@ -131,7 +132,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider)
+      protected void execute(MutableStoreProvider storeProvider)
           throws UpdateStateException {
 
         IJobUpdateSummary summary = update.getSummary();
@@ -159,8 +160,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
             Optional.of(requireNonNull(lock.getToken())));
 
         recordAndChangeJobUpdateStatus(
-            storeProvider.getJobUpdateStore(),
-            storeProvider.getTaskStore(),
+            storeProvider,
             summary.getUpdateId(),
             job,
             ROLLING_FORWARD,
@@ -197,14 +197,13 @@ class JobUpdateControllerImpl implements JobUpdateController {
   public void systemResume() {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      protected void execute(MutableStoreProvider storeProvider) {
         for (IJobUpdateSummary summary
             : storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(ACTIVE_QUERY)) {
 
           LOG.info("Automatically resuming update " + JobKeys.canonicalString(summary.getJobKey()));
           changeJobUpdateStatus(
-              storeProvider.getJobUpdateStore(),
-              storeProvider.getTaskStore(),
+              storeProvider,
               summary.getUpdateId(),
               summary.getJobKey(),
               summary.getState().getStatus(),
@@ -234,15 +233,14 @@ class JobUpdateControllerImpl implements JobUpdateController {
   private void instanceChanged(final IInstanceKey instance, final Optional<IScheduledTask> state) {
     storage.write(new MutateWork.NoResult.Quiet() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
+      protected void execute(MutableStoreProvider storeProvider) {
         IJobKey job = instance.getJobKey();
         UpdateFactory.Update update = updates.get(job);
         if (update != null) {
           if (update.getUpdater().containsInstance(instance.getInstanceId())) {
             LOG.info("Forwarding task change for " + InstanceKeys.toString(instance));
             evaluateUpdater(
-                storeProvider.getJobUpdateStore(),
-                storeProvider.getTaskStore(),
+                storeProvider,
                 update,
                 getOnlyMatch(storeProvider.getJobUpdateStore(), queryByJob(job)),
                 ImmutableMap.of(instance.getInstanceId(), state));
@@ -291,7 +289,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
     storage.write(new MutateWork.NoResult<UpdateStateException>() {
       @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider)
+      protected void execute(MutableStoreProvider storeProvider)
           throws UpdateStateException {
 
         IJobUpdateSummary update = Iterables.getOnlyElement(
@@ -302,19 +300,13 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
         JobUpdateStatus status = update.getState().getStatus();
         JobUpdateStatus newStatus = requireNonNull(stateChange.apply(status));
-        changeUpdateStatus(
-            storeProvider.getJobUpdateStore(),
-            storeProvider.getTaskStore(),
-            update,
-            newStatus,
-            user);
+        changeUpdateStatus(storeProvider, update, newStatus, user);
       }
     });
   }
 
   private void changeUpdateStatus(
-      JobUpdateStore.Mutable updateStore,
-      TaskStore taskStore,
+      MutableStoreProvider storeProvider,
       IJobUpdateSummary updateSummary,
       JobUpdateStatus newStatus,
       Optional<String> user) {
@@ -325,8 +317,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
 
     assertTransitionAllowed(updateSummary.getState().getStatus(), newStatus);
     recordAndChangeJobUpdateStatus(
-        updateStore,
-        taskStore,
+        storeProvider,
         updateSummary.getUpdateId(),
         updateSummary.getJobKey(),
         newStatus,
@@ -334,14 +325,13 @@ class JobUpdateControllerImpl implements JobUpdateController {
   }
 
   private void recordAndChangeJobUpdateStatus(
-      JobUpdateStore.Mutable updateStore,
-      TaskStore taskStore,
+      MutableStoreProvider storeProvider,
       String updateId,
       IJobKey job,
       JobUpdateStatus status,
       Optional<String> user) {
 
-    changeJobUpdateStatus(updateStore, taskStore, updateId, job, status, user, true);
+    changeJobUpdateStatus(storeProvider, updateId, job, status, user, true);
   }
 
   private static final Set<JobUpdateStatus> UNLOCK_STATES = ImmutableSet.of(
@@ -353,8 +343,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
   );
 
   private void changeJobUpdateStatus(
-      JobUpdateStore.Mutable updateStore,
-      TaskStore taskStore,
+      MutableStoreProvider storeProvider,
       String updateId,
       IJobKey job,
       JobUpdateStatus newStatus,
@@ -364,6 +353,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
     JobUpdateStatus status;
     boolean record;
 
+    JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
     Optional<String> updateLock = updateStore.getLockToken(updateId);
     if (updateLock.isPresent()) {
       status = newStatus;
@@ -407,13 +397,12 @@ class JobUpdateControllerImpl implements JobUpdateController {
         update = updateFactory.newUpdate(jobUpdate.getInstructions(), action == ROLL_FORWARD);
       } catch (RuntimeException e) {
         LOG.log(Level.WARNING, "Uncaught exception: " + e, e);
-        changeJobUpdateStatus(updateStore, taskStore, updateId, job, ERROR, user, true);
+        changeJobUpdateStatus(storeProvider, updateId, job, ERROR, user, true);
         return;
       }
       updates.put(job, update);
       evaluateUpdater(
-          updateStore,
-          taskStore,
+          storeProvider,
           update,
           jobUpdate.getSummary(),
           ImmutableMap.<Integer, Optional<IScheduledTask>>of());
@@ -433,8 +422,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       ImmutableSet.of(InstanceUpdateStatus.WORKING, InstanceUpdateStatus.SUCCEEDED);
 
   private void evaluateUpdater(
-      JobUpdateStore.Mutable updateStore,
-      final TaskStore taskStore,
+      final MutableStoreProvider storeProvider,
       final UpdateFactory.Update update,
       IJobUpdateSummary summary,
       Map<Integer, Optional<IScheduledTask>> changedInstance) {
@@ -442,10 +430,10 @@ class JobUpdateControllerImpl implements JobUpdateController {
     JobUpdateStatus updaterStatus = summary.getState().getStatus();
     final IJobKey job = summary.getJobKey();
 
+    final JobUpdateStore.Mutable updateStore = storeProvider.getJobUpdateStore();
     if (!updateStore.getLockToken(summary.getUpdateId()).isPresent()) {
       recordAndChangeJobUpdateStatus(
-          updateStore,
-          taskStore,
+          storeProvider,
           summary.getUpdateId(),
           job,
           ERROR,
@@ -457,7 +445,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
         new InstanceStateProvider<Integer, Optional<IScheduledTask>>() {
           @Override
           public Optional<IScheduledTask> getState(Integer instanceId) {
-            return getActiveInstance(taskStore, job, instanceId);
+            return getActiveInstance(storeProvider.getTaskStore(), job, instanceId);
           }
         };
 
@@ -505,16 +493,13 @@ class JobUpdateControllerImpl implements JobUpdateController {
       }
 
       if (status == SUCCEEDED) {
-        changeUpdateStatus(
-            updateStore,
-            taskStore,
+        changeUpdateStatus(storeProvider,
             summary,
             update.getSuccessStatus(),
             Optional.<String>absent());
       } else {
         changeUpdateStatus(
-            updateStore,
-            taskStore,
+            storeProvider,
             summary,
             update.getFailureStatus(),
             Optional.<String>absent());
@@ -531,7 +516,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
             Amount<Long, Time> reevaluateDelay = handler.get().getReevaluationDelay(
                 instance,
                 updateStore.fetchJobUpdateInstructions(summary.getUpdateId()).get(),
-                taskStore,
+                storeProvider,
                 stateManager,
                 updaterStatus);
             executor.schedule(
@@ -575,7 +560,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
       public void run() {
         storage.write(new MutateWork.NoResult.Quiet() {
           @Override
-          protected void execute(Storage.MutableStoreProvider storeProvider) {
+          protected void execute(MutableStoreProvider storeProvider) {
             IJobUpdateSummary summary =
                 getOnlyMatch(storeProvider.getJobUpdateStore(), queryByUpdateId(updateId));
             JobUpdateStatus status = summary.getState().getStatus();
@@ -583,8 +568,7 @@ class JobUpdateControllerImpl implements JobUpdateController {
             if (JobUpdateStateMachine.isActive(status)) {
               UpdateFactory.Update update = updates.get(instance.getJobKey());
               evaluateUpdater(
-                  storeProvider.getJobUpdateStore(),
-                  storeProvider.getTaskStore(),
+                  storeProvider,
                   update,
                   summary,
                   ImmutableMap.of(

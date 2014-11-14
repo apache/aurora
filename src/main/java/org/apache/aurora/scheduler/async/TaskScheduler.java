@@ -128,10 +128,14 @@ public interface TaskScheduler extends EventSubscriber {
     }
 
     private Function<HostOffer, Optional<TaskInfo>> getAssignerFunction(
+        final MutableStoreProvider storeProvider,
         final AttributeAggregate attributeAggregate,
         final String taskId,
         final IScheduledTask task) {
 
+      // TODO(wfarner): Turn this into Predicate<Offer>, and in the caller, find the first match
+      // and perform the assignment at the very end.  This will allow us to use optimistic locking
+      // at the top of the stack and avoid holding the write lock for too long.
       return new Function<HostOffer, Optional<TaskInfo>>() {
         @Override
         public Optional<TaskInfo> apply(HostOffer offer) {
@@ -140,14 +144,14 @@ public interface TaskScheduler extends EventSubscriber {
           if (reservedTaskId.isPresent()) {
             if (taskId.equals(reservedTaskId.get())) {
               // Slave is reserved to satisfy this task.
-              return assigner.maybeAssign(offer, task, attributeAggregate);
+              return assigner.maybeAssign(storeProvider, offer, task, attributeAggregate);
             } else {
               // Slave is reserved for another task.
               return Optional.absent();
             }
           } else {
             // Slave is not reserved.
-            return assigner.maybeAssign(offer, task, attributeAggregate);
+            return assigner.maybeAssign(storeProvider, offer, task, attributeAggregate);
           }
         }
       };
@@ -194,7 +198,7 @@ public interface TaskScheduler extends EventSubscriber {
               AttributeAggregate aggregate =
                   getJobState(store, Tasks.SCHEDULED_TO_JOB_KEY.apply(task));
               try {
-                if (!offerQueue.launchFirst(getAssignerFunction(aggregate, taskId, task))) {
+                if (!offerQueue.launchFirst(getAssignerFunction(store, aggregate, taskId, task))) {
                   // Task could not be scheduled.
                   maybePreemptFor(taskId, aggregate);
                   attemptsNoMatch.incrementAndGet();
@@ -209,7 +213,12 @@ public interface TaskScheduler extends EventSubscriber {
                 // It is in the LOST state and a new task will move to PENDING to replace it.
                 // Should the state change fail due to storage issues, that's okay.  The task will
                 // time out in the ASSIGNED state and be moved to LOST.
-                stateManager.changeState(taskId, Optional.of(PENDING), LOST, LAUNCH_FAILED_MSG);
+                stateManager.changeState(
+                    store,
+                    taskId,
+                    Optional.of(PENDING),
+                    LOST,
+                    LAUNCH_FAILED_MSG);
               }
             }
 

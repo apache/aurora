@@ -127,6 +127,7 @@ public interface MaintenanceController {
           LOG.info(String.format("Draining tasks: %s on host: %s", activeTasks, host));
           for (String taskId : activeTasks) {
             stateManager.changeState(
+                store,
                 taskId,
                 Optional.<ScheduleStatus>absent(),
                 ScheduleStatus.DRAINING,

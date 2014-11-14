@@ -65,6 +65,8 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.PREEMPTING;
 import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
+import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
+import static org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import static org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import static org.apache.aurora.scheduler.storage.Storage.Work;
 
@@ -351,7 +353,7 @@ public interface Preemptor {
         return Optional.absent();
       }
 
-      IAssignedTask pendingTask = Iterables.getOnlyElement(pendingTasks);
+      final IAssignedTask pendingTask = Iterables.getOnlyElement(pendingTasks);
 
       Multimap<String, IAssignedTask> slavesToActiveTasks = getSlavesToActiveTasks();
 
@@ -371,21 +373,27 @@ public interface Preemptor {
           .build();
 
       for (String slaveID : allSlaves) {
-        Optional<Set<IAssignedTask>> toPreemptTasks = getTasksToPreempt(
+        final Optional<Set<IAssignedTask>> toPreemptTasks = getTasksToPreempt(
             slavesToActiveTasks.get(slaveID),
             slavesToOffers.get(slaveID),
             pendingTask,
             attributeAggregate);
 
         if (toPreemptTasks.isPresent()) {
-          for (IAssignedTask toPreempt : toPreemptTasks.get()) {
-            stateManager.changeState(
-                toPreempt.getTaskId(),
-                Optional.<ScheduleStatus>absent(),
-                PREEMPTING,
-                Optional.of("Preempting in favor of " + pendingTask.getTaskId()));
-            tasksPreempted.incrementAndGet();
-          }
+          storage.write(new MutateWork.NoResult.Quiet() {
+            @Override
+            protected void execute(MutableStoreProvider storeProvider) {
+              for (IAssignedTask toPreempt : toPreemptTasks.get()) {
+                stateManager.changeState(
+                    storeProvider,
+                    toPreempt.getTaskId(),
+                    Optional.<ScheduleStatus>absent(),
+                    PREEMPTING,
+                    Optional.of("Preempting in favor of " + pendingTask.getTaskId()));
+                tasksPreempted.incrementAndGet();
+              }
+            }
+          });
           return Optional.of(slaveID);
         }
       }

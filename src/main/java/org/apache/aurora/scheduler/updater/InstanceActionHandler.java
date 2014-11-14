@@ -27,7 +27,6 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.state.StateManager;
-import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IInstanceKey;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
@@ -35,13 +34,14 @@ import org.apache.aurora.scheduler.storage.entities.IRange;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static org.apache.aurora.gen.JobUpdateStatus.ROLLING_FORWARD;
+import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 
 interface InstanceActionHandler {
 
   Amount<Long, Time> getReevaluationDelay(
       IInstanceKey instance,
       IJobUpdateInstructions instructions,
-      TaskStore taskStore,
+      MutableStoreProvider storeProvider,
       StateManager stateManager,
       JobUpdateStatus status);
 
@@ -73,7 +73,7 @@ interface InstanceActionHandler {
     public Amount<Long, Time> getReevaluationDelay(
         IInstanceKey instance,
         IJobUpdateInstructions instructions,
-        TaskStore taskStore,
+        MutableStoreProvider storeProvider,
         StateManager stateManager,
         JobUpdateStatus status) {
 
@@ -82,7 +82,10 @@ interface InstanceActionHandler {
           instructions,
           status == ROLLING_FORWARD,
           instance.getInstanceId());
-      stateManager.insertPendingTasks(replacement, ImmutableSet.of(instance.getInstanceId()));
+      stateManager.insertPendingTasks(
+          storeProvider,
+          replacement,
+          ImmutableSet.of(instance.getInstanceId()));
       return  Amount.of(
           (long) instructions.getSettings().getMaxWaitToInstanceRunningMs(),
           Time.MILLISECONDS);
@@ -94,14 +97,15 @@ interface InstanceActionHandler {
     public Amount<Long, Time> getReevaluationDelay(
         IInstanceKey instance,
         IJobUpdateInstructions instructions,
-        TaskStore taskStore,
+        MutableStoreProvider storeProvider,
         StateManager stateManager,
         JobUpdateStatus status) {
 
       String taskId = Tasks.id(Iterables.getOnlyElement(
-          taskStore.fetchTasks(Query.instanceScoped(instance).active())));
+          storeProvider.getTaskStore().fetchTasks(Query.instanceScoped(instance).active())));
       LOG.info("Killing " + instance + " while " + status);
       stateManager.changeState(
+          storeProvider,
           taskId,
           Optional.<ScheduleStatus>absent(),
           ScheduleStatus.KILLING,
@@ -117,7 +121,7 @@ interface InstanceActionHandler {
     public Amount<Long, Time> getReevaluationDelay(
         IInstanceKey instance,
         IJobUpdateInstructions instructions,
-        TaskStore taskStore,
+        MutableStoreProvider storeProvider,
         StateManager stateManager,
         JobUpdateStatus status) {
 

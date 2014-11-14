@@ -121,9 +121,14 @@ public class TaskHistoryPruner implements EventSubscriber {
     }
   }
 
-  private void deleteTasks(Set<String> taskIds) {
+  private void deleteTasks(final Set<String> taskIds) {
     LOG.info("Pruning inactive tasks " + taskIds);
-    stateManager.deleteTasks(taskIds);
+    storage.write(new Storage.MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        stateManager.deleteTasks(storeProvider, taskIds);
+      }
+    });
   }
 
   @VisibleForTesting

@@ -27,6 +27,7 @@ import org.apache.aurora.scheduler.async.OfferQueue;
 import org.apache.aurora.scheduler.base.Conversions;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.state.StateManager;
+import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.TaskStatus;
 
@@ -45,11 +46,13 @@ class UserTaskLauncher implements TaskLauncher {
   @VisibleForTesting
   static final String MEMORY_LIMIT_DISPLAY = "Task used more memory than requested.";
 
+  private final Storage storage;
   private final OfferQueue offerQueue;
   private final StateManager stateManager;
 
   @Inject
-  UserTaskLauncher(OfferQueue offerQueue, StateManager stateManager) {
+  UserTaskLauncher(Storage storage, OfferQueue offerQueue, StateManager stateManager) {
+    this.storage = requireNonNull(storage);
     this.offerQueue = requireNonNull(offerQueue);
     this.stateManager = requireNonNull(stateManager);
   }
@@ -63,14 +66,14 @@ class UserTaskLauncher implements TaskLauncher {
   }
 
   @Override
-  public synchronized boolean statusUpdate(TaskStatus status) {
+  public synchronized boolean statusUpdate(final TaskStatus status) {
     @Nullable String message = null;
     if (status.hasMessage()) {
       message = status.getMessage();
     }
 
     try {
-      ScheduleStatus translatedState = Conversions.convertProtoState(status.getState());
+      final ScheduleStatus translatedState = Conversions.convertProtoState(status.getState());
       // TODO(William Farner): Remove this hack once Mesos API change is done.
       //                       Tracked by: https://issues.apache.org/jira/browse/MESOS-343
       if (translatedState == ScheduleStatus.FAILED
@@ -79,11 +82,18 @@ class UserTaskLauncher implements TaskLauncher {
         message = MEMORY_LIMIT_DISPLAY;
       }
 
-      stateManager.changeState(
-          status.getTaskId().getValue(),
-          Optional.<ScheduleStatus>absent(),
-          translatedState,
-          Optional.fromNullable(message));
+      final String auditMessage = message;
+      storage.write(new Storage.MutateWork.NoResult.Quiet() {
+        @Override
+        protected void execute(Storage.MutableStoreProvider storeProvider) {
+          stateManager.changeState(
+              storeProvider,
+              status.getTaskId().getValue(),
+              Optional.<ScheduleStatus>absent(),
+              translatedState,
+              Optional.fromNullable(auditMessage));
+        }
+      });
     } catch (SchedulerException e) {
       LOG.log(Level.WARNING, "Failed to update status for: " + status, e);
       throw e;

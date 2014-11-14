@@ -14,6 +14,7 @@
 package org.apache.aurora.scheduler.updater;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 
 import com.google.common.base.Function;
@@ -222,19 +223,25 @@ public class JobUpdaterIT extends EasyMockTest {
   }
 
   private void changeState(
-      IJobKey job,
-      int instanceId,
+      final IJobKey job,
+      final int instanceId,
       ScheduleStatus status,
       ScheduleStatus... statuses) {
 
-    for (ScheduleStatus s
+    for (final ScheduleStatus s
         : ImmutableList.<ScheduleStatus>builder().add(status).add(statuses).build()) {
 
-      assertTrue(stateManager.changeState(
-          getTaskId(job, instanceId),
-          Optional.<ScheduleStatus>absent(),
-          s,
-          Optional.<String>absent()));
+      storage.write(new NoResult.Quiet() {
+        @Override
+        protected void execute(Storage.MutableStoreProvider storeProvider) {
+          assertTrue(stateManager.changeState(
+              storeProvider,
+              getTaskId(job, instanceId),
+              Optional.<ScheduleStatus>absent(),
+              s,
+              Optional.<String>absent()));
+        }
+      });
     }
   }
 
@@ -285,10 +292,24 @@ public class JobUpdaterIT extends EasyMockTest {
     return expectLastCall();
   }
 
-  private void insertInitialTasks(IJobUpdate update) {
-    for (IInstanceTaskConfig config : update.getInstructions().getInitialState()) {
-      stateManager.insertPendingTasks(config.getTask(), expandInstanceIds(ImmutableSet.of(config)));
-    }
+  private void insertPendingTasks(final ITaskConfig task, final Set<Integer> instanceIds) {
+    storage.write(new NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        stateManager.insertPendingTasks(storeProvider, task, instanceIds);
+      }
+    });
+  }
+
+  private void insertInitialTasks(final IJobUpdate update) {
+    storage.write(new NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        for (IInstanceTaskConfig config : update.getInstructions().getInitialState()) {
+          insertPendingTasks(config.getTask(), expandInstanceIds(ImmutableSet.of(config)));
+        }
+      }
+    });
   }
 
   private void assertJobState(IJobKey job, Map<Integer, ITaskConfig> expected) {
@@ -343,7 +364,7 @@ public class JobUpdaterIT extends EasyMockTest {
     assertState(ROLLING_FORWARD, actions.build());
 
     // A task outside the scope of the update should be ignored by the updater.
-    stateManager.insertPendingTasks(NEW_CONFIG, ImmutableSet.of(100));
+    insertPendingTasks(NEW_CONFIG, ImmutableSet.of(100));
 
     // Instance 2 is updated
     changeState(JOB, 2, KILLED, ASSIGNED, STARTING, RUNNING);
@@ -873,7 +894,7 @@ public class JobUpdaterIT extends EasyMockTest {
     control.replay();
 
     IJobUpdate update = makeJobUpdate();
-    stateManager.insertPendingTasks(NEW_CONFIG, ImmutableSet.of(0, 1));
+    insertPendingTasks(NEW_CONFIG, ImmutableSet.of(0, 1));
 
     changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
     changeState(JOB, 1, ASSIGNED, STARTING, RUNNING);

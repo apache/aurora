@@ -152,7 +152,7 @@ class AuroraCronJob implements Job {
             ITaskConfig task = cronJob.getSanitizedConfig().getJobConfig().getTaskConfig();
             Set<Integer> instanceIds = cronJob.getSanitizedConfig().getInstanceIds();
             if (activeTasks.isEmpty()) {
-              stateManager.insertPendingTasks(task, instanceIds);
+              stateManager.insertPendingTasks(storeProvider, task, instanceIds);
 
               return Optional.absent();
             }
@@ -182,13 +182,20 @@ class AuroraCronJob implements Job {
       return;
     }
 
-    for (String taskId : deferredLaunch.get().activeTaskIds) {
-      stateManager.changeState(
-          taskId,
-          Optional.<ScheduleStatus>absent(),
-          KILLING,
-          KILL_AUDIT_MESSAGE);
-    }
+    storage.write(new Storage.MutateWork.NoResult.Quiet() {
+      @Override
+      protected void execute(Storage.MutableStoreProvider storeProvider) {
+        for (String taskId : deferredLaunch.get().activeTaskIds) {
+          stateManager.changeState(
+              storeProvider,
+              taskId,
+              Optional.<ScheduleStatus>absent(),
+              KILLING,
+              KILL_AUDIT_MESSAGE);
+        }
+      }
+    });
+
     LOG.info(String.format("Waiting for job to terminate before launching cron job %s.", path));
 
     final Query.Builder query = Query.taskScoped(deferredLaunch.get().activeTaskIds).active();
@@ -200,9 +207,16 @@ class AuroraCronJob implements Job {
         public Boolean get() {
           if (Storage.Util.consistentFetchTasks(storage, query).isEmpty()) {
             LOG.info("Initiating delayed launch of cron " + path);
-            stateManager.insertPendingTasks(
-                deferredLaunch.get().task,
-                deferredLaunch.get().instanceIds);
+            storage.write(new Storage.MutateWork.NoResult.Quiet() {
+              @Override
+              protected void execute(Storage.MutableStoreProvider storeProvider) {
+                stateManager.insertPendingTasks(
+                    storeProvider,
+                    deferredLaunch.get().task,
+                    deferredLaunch.get().instanceIds);
+              }
+            });
+
             return true;
           } else {
             LOG.info("Not yet safe to run cron " + path);

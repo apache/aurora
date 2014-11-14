@@ -56,12 +56,14 @@ import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.mesos.Protos.TaskInfo;
 import org.easymock.Capture;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
 import static org.easymock.EasyMock.capture;
+import static org.easymock.EasyMock.eq;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -132,7 +134,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   private void expectAssigned(IScheduledTask task) {
-    expect(assigner.maybeAssign(OFFER, task, emptyJob))
+    expect(assigner.maybeAssign(storageUtil.mutableStoreProvider, OFFER, task, emptyJob))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
   }
 
@@ -192,7 +194,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     Capture<Function<HostOffer, Optional<TaskInfo>>> secondAssignment = expectLaunchAttempt(true);
 
-    expect(assigner.maybeAssign(OFFER, TASK_B, emptyJob))
+    expect(assigner.maybeAssign(storageUtil.mutableStoreProvider, OFFER, TASK_B, emptyJob))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
 
     control.replay();
@@ -302,7 +304,11 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     });
 
     Capture<Function<HostOffer, Optional<TaskInfo>>> assignment = expectLaunchAttempt(true);
-    expect(assigner.maybeAssign(OFFER, taskA, emptyJob))
+    expect(assigner.maybeAssign(
+        EasyMock.<MutableStoreProvider>anyObject(),
+        eq(OFFER),
+        eq(taskA),
+        eq(emptyJob)))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
 
     control.replay();

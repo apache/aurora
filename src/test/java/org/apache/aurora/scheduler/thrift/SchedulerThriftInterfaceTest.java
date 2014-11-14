@@ -349,6 +349,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(ENOUGH_QUOTA);
 
     stateManager.insertPendingTasks(
+        storageUtil.mutableStoreProvider,
         sanitized.getJobConfig().getTaskConfig(),
         sanitized.getInstanceIds());
 
@@ -371,6 +372,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(ENOUGH_QUOTA);
 
     stateManager.insertPendingTasks(
+        storageUtil.mutableStoreProvider,
         sanitized.getJobConfig().getTaskConfig(),
         sanitized.getInstanceIds());
 
@@ -414,6 +416,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .andReturn(ENOUGH_QUOTA);
 
     stateManager.insertPendingTasks(
+        storageUtil.mutableStoreProvider,
         sanitized.getJobConfig().getTaskConfig(),
         sanitized.getInstanceIds());
 
@@ -668,6 +671,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(quotaManager.checkInstanceAddition(ITaskConfig.build(sanitized.getTaskConfig()), 1))
         .andReturn(ENOUGH_QUOTA);
     stateManager.insertPendingTasks(
+        storageUtil.mutableStoreProvider,
         ITaskConfig.build(sanitized.getTaskConfig()),
         ImmutableSet.of(0));
 
@@ -733,6 +737,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private void expectTransitionsToKilling() {
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         TASK_ID,
         Optional.<ScheduleStatus>absent(),
         ScheduleStatus.KILLING,
@@ -986,6 +991,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     ScheduleStatus status = ScheduleStatus.FAILED;
 
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         TASK_ID,
         Optional.<ScheduleStatus>absent(),
         ScheduleStatus.FAILED,
@@ -1021,6 +1027,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         buildScheduledTask());
 
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         TASK_ID,
         Optional.<ScheduleStatus>absent(),
         ScheduleStatus.RESTARTING,
@@ -1972,7 +1979,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(taskIdGenerator.generate(populatedTask, 1))
         .andReturn(TASK_ID);
     expect(quotaManager.checkInstanceAddition(populatedTask, 1)).andReturn(ENOUGH_QUOTA);
-    stateManager.insertPendingTasks(populatedTask, ImmutableSet.of(0));
+    stateManager.insertPendingTasks(
+        storageUtil.mutableStoreProvider,
+        populatedTask,
+        ImmutableSet.of(0));
 
     control.replay();
 
@@ -1993,7 +2003,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(taskIdGenerator.generate(populatedTask, 1))
         .andReturn(TASK_ID);
     expect(quotaManager.checkInstanceAddition(populatedTask, 1)).andReturn(ENOUGH_QUOTA);
-    stateManager.insertPendingTasks(populatedTask, ImmutableSet.of(0));
+    stateManager.insertPendingTasks(
+        storageUtil.mutableStoreProvider,
+        populatedTask,
+        ImmutableSet.of(0));
 
     control.replay();
 
@@ -2112,7 +2125,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(taskIdGenerator.generate(populatedTask, 1))
         .andReturn(TASK_ID);
     expect(quotaManager.checkInstanceAddition(populatedTask, 1)).andReturn(ENOUGH_QUOTA);
-    stateManager.insertPendingTasks(populatedTask, ImmutableSet.of(0));
+    stateManager.insertPendingTasks(
+        storageUtil.mutableStoreProvider,
+        populatedTask,
+        ImmutableSet.of(0));
     expectLastCall().andThrow(new IllegalArgumentException("instance collision"));
 
     control.replay();

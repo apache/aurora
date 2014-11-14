@@ -31,6 +31,7 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Test;
@@ -48,6 +49,7 @@ public class TaskThrottlerTest extends EasyMockTest {
   private RescheduleCalculator rescheduleCalculator;
   private FakeClock clock;
   private ScheduledExecutorService executor;
+  private StorageTestUtil storageUtil;
   private StateManager stateManager;
   private TaskThrottler throttler;
 
@@ -56,8 +58,15 @@ public class TaskThrottlerTest extends EasyMockTest {
     rescheduleCalculator = createMock(RescheduleCalculator.class);
     clock = new FakeClock();
     executor = createMock(ScheduledExecutorService.class);
+    storageUtil = new StorageTestUtil(this);
+    storageUtil.expectOperations();
     stateManager = createMock(StateManager.class);
-    throttler = new TaskThrottler(rescheduleCalculator, clock, executor, stateManager);
+    throttler = new TaskThrottler(
+        rescheduleCalculator,
+        clock,
+        executor,
+        storageUtil.storage,
+        stateManager);
   }
 
   @Test
@@ -116,6 +125,7 @@ public class TaskThrottlerTest extends EasyMockTest {
 
   private void expectMovedToPending(IScheduledTask task) {
     expect(stateManager.changeState(
+        storageUtil.mutableStoreProvider,
         Tasks.id(task),
         Optional.of(THROTTLED),
         PENDING,
