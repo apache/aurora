@@ -16,7 +16,13 @@
 
 from __future__ import print_function
 
-from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK, Noun, Verb
+from apache.aurora.client.cli import (
+    EXIT_COMMAND_FAILURE,
+    EXIT_INVALID_PARAMETER,
+    EXIT_OK,
+    Noun,
+    Verb
+)
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
     BIND_OPTION,
@@ -31,7 +37,7 @@ from apache.aurora.client.cli.options import (
 class Schedule(Verb):
   @property
   def name(self):
-    return 'schedule'
+    return "schedule"
 
   @property
   def help(self):
@@ -43,6 +49,11 @@ class Schedule(Verb):
   def execute(self, context):
     api = context.get_api(context.options.jobspec.cluster)
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
+    if not config.raw().has_cron_schedule():
+      raise context.CommandError(
+          EXIT_COMMAND_FAILURE,
+          "Non-cron jobs may only be created with \"aurora job create\" command")
+
     resp = api.schedule_cron(config)
     context.check_and_log_response(resp,
         err_msg=("Error scheduling cron job %s:" % context.options.jobspec))
@@ -56,7 +67,7 @@ class Schedule(Verb):
 class Deschedule(Verb):
   @property
   def name(self):
-    return 'deschedule'
+    return "deschedule"
 
   @property
   def help(self):
@@ -70,13 +81,14 @@ class Deschedule(Verb):
     resp = api.deschedule_cron(context.options.jobspec)
     context.check_and_log_response(resp,
         err_msg=("Error descheduling cron job %s:" % context.options.jobspec))
+    context.print_out("Cron descheduling succeeded.")
     return EXIT_OK
 
 
 class Start(Verb):
   @property
   def name(self):
-    return 'start'
+    return "start"
 
   @property
   def help(self):
@@ -100,7 +112,7 @@ class Start(Verb):
 class Show(Verb):
   @property
   def name(self):
-    return 'show'
+    return "show"
 
   @property
   def help(self):
@@ -122,7 +134,7 @@ class Show(Verb):
           context.print_err("No cron entry found for job %s" % jobkey)
           return EXIT_INVALID_PARAMETER
         else:
-          context.print_out('%s\t %s' % (jobkey, job.cronSchedule))
+          context.print_out("%s\t %s" % (jobkey, job.cronSchedule))
           return EXIT_OK
     context.print_err("No cron entry found for job %s" % jobkey)
     return EXIT_INVALID_PARAMETER
@@ -131,7 +143,7 @@ class Show(Verb):
 class CronNoun(Noun):
   @property
   def name(self):
-    return 'cron'
+    return "cron"
 
   @property
   def help(self):

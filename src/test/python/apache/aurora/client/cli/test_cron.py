@@ -19,7 +19,12 @@ import contextlib
 from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_INVALID_CONFIGURATION, EXIT_OK
+from apache.aurora.client.cli import (
+    EXIT_API_ERROR,
+    EXIT_COMMAND_FAILURE,
+    EXIT_INVALID_CONFIGURATION,
+    EXIT_OK
+)
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
@@ -41,7 +46,7 @@ class TestCronNoun(AuroraClientCommandTest):
       api = mock_context.get_api('west')
       api.schedule_cron.return_value = self.create_simple_success_response()
       with temporary_file() as fp:
-        fp.write(self.get_valid_config())
+        fp.write(self.get_valid_cron_config())
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.execute(['cron', 'schedule', key.to_path(), fp.name])
@@ -60,7 +65,7 @@ class TestCronNoun(AuroraClientCommandTest):
       api = mock_context.get_api('west')
       api.schedule_cron.return_value = self.create_error_response()
       with temporary_file() as fp:
-        fp.write(self.get_valid_config())
+        fp.write(self.get_valid_cron_config())
         fp.flush()
         cmd = AuroraCommandLine()
         result = cmd.execute(['cron', 'schedule', 'west/bozo/test/hello', fp.name])
@@ -70,11 +75,21 @@ class TestCronNoun(AuroraClientCommandTest):
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       assert api.schedule_cron.call_count == 1
 
+  def test_schedule_failed_non_cron(self):
+    mock_context = FakeAuroraCommandContext()
+    with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
+      with temporary_file() as fp:
+        fp.write(self.get_valid_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        result = cmd.execute(['cron', 'schedule', 'west/bozo/test/hello', fp.name])
+        assert result == EXIT_COMMAND_FAILURE
+
   def test_schedule_cron_failed_invalid_config(self):
     mock_context = FakeAuroraCommandContext()
     with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
       with temporary_file() as fp:
-        fp.write(self.get_invalid_config('invalid_clause=oops'))
+        fp.write(self.get_invalid_cron_config('invalid_clause=oops'))
         fp.flush()
         cmd = AuroraCommandLine()
         result = cmd.execute(['cron', 'schedule', 'west/bozo/test/hello', fp.name])
@@ -93,7 +108,7 @@ class TestCronNoun(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       mock_scheduler_proxy.scheduleCronJob.return_value = self.create_simple_success_response()
       with temporary_file() as fp:
-        fp.write(self.get_valid_config())
+        fp.write(self.get_valid_cron_config())
         fp.flush()
         cmd = AuroraCommandLine()
         result = cmd.execute(['cron', 'schedule', 'west/bozo/test/hello', fp.name])

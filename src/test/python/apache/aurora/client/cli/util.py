@@ -248,6 +248,19 @@ HELLO_WORLD = Job(
 jobs = [HELLO_WORLD]
 """
 
+  CRON_CONFIG_BASE = """
+HELLO_WORLD = Job(
+  name = '%(job)s',
+  role = '%(role)s',
+  cluster = '%(cluster)s',
+  environment = '%(env)s',
+  cron_schedule = '*/5 * * * *',
+  %(inner)s
+  task = SimpleTask('test', 'echo test')
+)
+jobs = [HELLO_WORLD]
+"""
+
   UNBOUND_CONFIG = textwrap.dedent("""\
       HELLO_WORLD = Job(
         name = '%(job)s',
@@ -289,9 +302,9 @@ jobs = [HELLO_WORLD]
       auth_mechanism='UNAUTHENTICATED')])
 
   @classmethod
-  def get_test_config(cls, cluster, role, env, job, filler=''):
+  def get_test_config(cls, base, cluster, role, env, job, filler=''):
     """Create a config from the template"""
-    return cls.CONFIG_BASE % {'job': job, 'role': role, 'env': env, 'cluster': cluster,
+    return base % {'job': job, 'role': role, 'env': env, 'cluster': cluster,
         'inner': filler}
 
   @classmethod
@@ -302,11 +315,40 @@ jobs = [HELLO_WORLD]
 
   @classmethod
   def get_valid_config(cls):
-    return cls.get_test_config(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB)
+    return cls.get_test_config(
+        cls.CONFIG_BASE,
+        cls.TEST_CLUSTER,
+        cls.TEST_ROLE,
+        cls.TEST_ENV,
+        cls.TEST_JOB)
+
+  @classmethod
+  def get_valid_cron_config(cls):
+    return cls.get_test_config(
+        cls.CRON_CONFIG_BASE,
+        cls.TEST_CLUSTER,
+        cls.TEST_ROLE,
+        cls.TEST_ENV,
+        cls.TEST_JOB)
 
   @classmethod
   def get_invalid_config(cls, bad_clause):
-    return cls.get_test_config(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB,
+    return cls.get_test_config(
+        cls.CONFIG_BASE,
+        cls.TEST_CLUSTER,
+        cls.TEST_ROLE,
+        cls.TEST_ENV,
+        cls.TEST_JOB,
+        bad_clause)
+
+  @classmethod
+  def get_invalid_cron_config(cls, bad_clause):
+    return cls.get_test_config(
+        cls.CRON_CONFIG_BASE,
+        cls.TEST_CLUSTER,
+        cls.TEST_ROLE,
+        cls.TEST_ENV,
+        cls.TEST_JOB,
         bad_clause)
 
 

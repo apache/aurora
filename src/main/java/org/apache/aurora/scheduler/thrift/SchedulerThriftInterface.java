@@ -356,8 +356,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
       if (!sanitized.isCron()) {
-        LOG.info("Invalid attempt to schedule non-cron job " + jobKey + " with cron.");
-        return invalidResponse("Job " + jobKey + " has no cron schedule");
+        return invalidResponse(noCronScheduleMessage(jobKey));
       }
 
       ITaskConfig template = sanitized.getJobConfig().getTaskConfig();
@@ -396,7 +395,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
       if (!cronJobManager.deleteJob(jobKey)) {
-        return invalidResponse("Job " + jobKey + " is not scheduled with cron");
+        return invalidResponse(notScheduledCronMessage(jobKey));
       }
       return okEmptyResponse();
     } catch (AuthFailedException e) {
@@ -1567,6 +1566,16 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @VisibleForTesting
   static Optional<String> restartedByMessage(String user) {
     return Optional.of("Restarted by " + user);
+  }
+
+  @VisibleForTesting
+  static String noCronScheduleMessage(IJobKey jobKey) {
+    return String.format("Job %s has no cron schedule", JobKeys.canonicalString(jobKey));
+  }
+
+  @VisibleForTesting
+  static String notScheduledCronMessage(IJobKey jobKey) {
+    return String.format("Job %s is not scheduled with cron", JobKeys.canonicalString(jobKey));
   }
 
   @VisibleForTesting

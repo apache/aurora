@@ -65,7 +65,7 @@ from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleS
 
 def arg_type_jobkey(key):
   return AuroraCommandContext.parse_partial_jobkey(key)
-WILDCARD_JOBKEY_OPTION = CommandOption('jobspec', type=arg_type_jobkey,
+WILDCARD_JOBKEY_OPTION = CommandOption("jobspec", type=arg_type_jobkey,
         metavar="cluster[/role[/env[/name]]]",
         help="A jobkey, optionally containing wildcards")
 
@@ -102,7 +102,7 @@ class CreateJobCommand(Verb):
 
   @property
   def help(self):
-    return "Create a job using aurora"
+    return "Create a service or ad hoc job using aurora"
 
   CREATE_STATES = ("PENDING", "RUNNING", "FINISHED")
 
@@ -117,6 +117,11 @@ class CreateJobCommand(Verb):
 
   def execute(self, context):
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
+    if config.raw().has_cron_schedule():
+      raise context.CommandError(
+          EXIT_COMMAND_FAILURE,
+          "Cron jobs may only be scheduled with \"aurora cron schedule\" command")
+
     api = context.get_api(config.cluster())
     resp = api.create_job(config)
     context.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE,
@@ -461,12 +466,12 @@ class RestartCommand(Verb):
   def get_options(self):
     return [BATCH_OPTION, BIND_OPTION, BROWSER_OPTION, FORCE_OPTION, HEALTHCHECK_OPTION,
         JSON_READ_OPTION, WATCH_OPTION,
-        CommandOption('--max-per-instance-failures', type=int, default=0,
-             help='Maximum number of restarts per instance during restart. Increments total '
-                  'failure count when this limit is exceeded.'),
-        CommandOption('--restart-threshold', type=int, default=60,
-             help='Maximum number of seconds before an instance must move into the RUNNING state '
-                  'before considered a failure.'),
+        CommandOption("--max-per-instance-failures", type=int, default=0,
+             help="Maximum number of restarts per instance during restart. Increments total "
+                  "failure count when this limit is exceeded."),
+        CommandOption("--restart-threshold", type=int, default=60,
+             help="Maximum number of seconds before an instance must move into the RUNNING state "
+                  "before considered a failure."),
         CONFIG_OPTION,
         MAX_TOTAL_FAILURES_OPTION,
         STRICT_OPTION,
@@ -542,16 +547,16 @@ class StatusCommand(Verb):
           protocol_factory=TJSONProtocol.TSimpleJSONProtocolFactory()))
       # Now, clean it up: take all fields that are actually enums, and convert
       # their values to strings.
-      task['status'] = ScheduleStatus._VALUES_TO_NAMES[task['status']]
-      events = sorted(task['taskEvents'], key=lambda event: event['timestamp'])
+      task["status"] = ScheduleStatus._VALUES_TO_NAMES[task["status"]]
+      events = sorted(task["taskEvents"], key=lambda event: event["timestamp"])
       for event in events:
-        event['status'] = ScheduleStatus._VALUES_TO_NAMES[event['status']]
+        event["status"] = ScheduleStatus._VALUES_TO_NAMES[event["status"]]
       # convert boolean fields to boolean value names.
-      assigned = task['assignedTask']
-      task_config = assigned['task']
-      task_config['isService'] = (task_config['isService'] != 0)
-      if 'production' in task_config:
-        task_config['production'] = (task_config['production'] != 0)
+      assigned = task["assignedTask"]
+      task_config = assigned["task"]
+      task_config["isService"] = (task_config["isService"] != 0)
+      if "production" in task_config:
+        task_config["production"] = (task_config["production"] != 0)
       return task
 
     return {"job": str(jobkey),
@@ -589,7 +594,7 @@ class StatusCommand(Verb):
         task_strings.append("\t  metadata:")
         for md in assigned_task.task.metadata:
           task_strings.append("\t\t  (key: '%s', value: '%s')" % (md.key, md.value))
-      task_strings.append('')
+      task_strings.append("")
       return "\n".join(task_strings)
 
     result = ["Active tasks (%s):\n" % len(active_tasks)]
@@ -622,9 +627,9 @@ class StatusCommand(Verb):
     if result == []:
       return None
     if context.options.write_json:
-      return json.dumps(result, indent=2, separators=[',', ': '], sort_keys=False)
+      return json.dumps(result, indent=2, separators=[",", ": "], sort_keys=False)
     else:
-      return ''.join(result)
+      return "".join(result)
 
   def _print_jobs_not_found(self, context):
     if context.options.write_json:
@@ -657,7 +662,7 @@ class StatusCommand(Verb):
 class UpdateCommand(Verb):
   @property
   def name(self):
-    return 'update'
+    return "update"
 
   def get_options(self):
     return [FORCE_OPTION, BIND_OPTION, JSON_READ_OPTION, HEALTHCHECK_OPTION,

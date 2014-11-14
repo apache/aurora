@@ -65,6 +65,9 @@ class TestCreateJobCommand(unittest.TestCase):
     fake_context.set_options(mock_options)
 
     mock_config = create_autospec(spec=AuroraConfig, spec_set=True, instance=True)
+    mock_job_config = Mock()
+    mock_job_config.has_cron_schedule.return_value = False
+    mock_config.raw.return_value = mock_job_config
     fake_context.get_job_config = Mock(return_value=mock_config)
     mock_api = fake_context.get_api("test")
 
@@ -420,3 +423,15 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       assert mock_context.get_err() == [
           "TypeCheck(FAILED): MesosJob[update_config] failed: "
           "UpdateConfig[batch_size] failed: u'{{TEST_BATCH}}' not an integer"]
+
+  def test_create_cron_job_fails(self):
+    """Test a cron job is not accepted."""
+    mock_context = FakeAuroraCommandContext()
+    with patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context):
+      with temporary_file() as fp:
+        fp.write(self.get_valid_cron_config())
+        fp.flush()
+        cmd = AuroraCommandLine()
+        result = cmd.execute(['job', 'create', '--wait-until=RUNNING',
+            'west/bozo/test/hello', fp.name])
+        assert result == EXIT_COMMAND_FAILURE

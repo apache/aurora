@@ -165,6 +165,8 @@ import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TA
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASK_ID_LENGTH;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_JOB_UPDATE_MESSAGE;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.killedByMessage;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.noCronScheduleMessage;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.notScheduledCronMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.restartedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.transitionMessage;
 import static org.easymock.EasyMock.anyInt;
@@ -1200,7 +1202,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     control.replay();
-    assertResponse(INVALID_REQUEST, thrift.scheduleCronJob(makeJob(), DEFAULT_LOCK, SESSION));
+
+    assertEquals(
+        invalidResponse(noCronScheduleMessage(JOB_KEY)),
+        thrift.scheduleCronJob(makeJob(), DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -1246,13 +1251,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testDescheduleCronJobWithError() throws Exception {
+  public void testDescheduleNotACron() throws Exception {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     expect(cronJobManager.deleteJob(JOB_KEY)).andReturn(false);
     control.replay();
-    assertResponse(INVALID_REQUEST,
-        thrift.descheduleCronJob(CRON_JOB.getKey(), DEFAULT_LOCK, SESSION));
+
+    assertEquals(
+        invalidResponse(notScheduledCronMessage(JOB_KEY)),
+        thrift.descheduleCronJob(JOB_KEY.newBuilder(), DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -1571,6 +1578,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setDEPRECATEDversion(API_VERSION)
         .setServerInfo(SERVER_INFO)
         .setResult(result);
+  }
+
+  private Response invalidResponse(String message) {
+    return Util.emptyResponse()
+        .setResponseCode(INVALID_REQUEST)
+        .setDEPRECATEDversion(API_VERSION)
+        .setServerInfo(SERVER_INFO)
+        .setMessageDEPRECATED(message)
+        .setDetails(ImmutableList.of(new ResponseDetail(message)));
   }
 
   @Test
