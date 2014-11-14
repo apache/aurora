@@ -23,6 +23,7 @@ python_test_suite(name = 'all',
     ':restarter',
     ':scheduler_client',
     ':sla',
+    ':task_util',
     ':updater',
     ':updater_util'
   ],
@@ -118,6 +119,7 @@ python_tests(name = 'task_util',
   sources = ['test_task_util.py'],
   dependencies = [
     '3rdparty/python:mock',
+    'src/main/python/apache/aurora/client/api:scheduler_client',
     'src/main/python/apache/aurora/client/api:task_util',
     'src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
