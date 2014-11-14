@@ -354,7 +354,8 @@ def test_url_when_not_connected_and_cluster_has_no_proxy_url(scheme):
   service_endpoints = [ServiceInstance.unpack(service_json)]
 
   def make_mock_client(proxy_url):
-    client = scheduler_client.ZookeeperSchedulerClient(Cluster(proxy_url=proxy_url))
+    client = scheduler_client.ZookeeperSchedulerClient(Cluster(proxy_url=proxy_url),
+        _deadline=lambda x, **kws: x())
     client.get_scheduler_serverset = mock.MagicMock(return_value=(mock_zk, service_endpoints))
     client.SERVERSET_TIMEOUT = Amount(0, Time.SECONDS)
     client._connect_scheduler = mock.MagicMock()

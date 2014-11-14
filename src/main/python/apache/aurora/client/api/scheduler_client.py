@@ -21,6 +21,7 @@ from pystachio import Default, Integer, String
 from thrift.protocol import TJSONProtocol
 from thrift.transport import TTransport
 from twitter.common import log
+from twitter.common.concurrent import deadline, Timeout
 from twitter.common.quantity import Amount, Time
 from twitter.common.zookeeper.kazoo_client import TwitterKazooClient
 from twitter.common.zookeeper.serverset import ServerSet
@@ -116,22 +117,35 @@ class ZookeeperSchedulerClient(SchedulerClient):
     zk = TwitterKazooClient.make(str('%s:%s' % (cluster.zk, port)), verbose=verbose)
     return zk, ServerSet(zk, cluster.scheduler_zk_path, **kw)
 
-  def __init__(self, cluster, port=2181, verbose=False):
+  def __init__(self, cluster, port=2181, verbose=False, _deadline=deadline):
     SchedulerClient.__init__(self, verbose=verbose)
     self._cluster = cluster
     self._zkport = port
     self._endpoint = None
     self._uri = None
+    self._deadline = _deadline
 
   def _resolve(self):
     """Resolve the uri associated with this scheduler from zookeeper."""
     joined = threading.Event()
     def on_join(elements):
       joined.set()
+
     zk, serverset = self.get_scheduler_serverset(self._cluster, verbose=self._verbose,
-        port=self._zkport, on_join=on_join)
+      port=self._zkport, on_join=on_join)
+
     joined.wait(timeout=self.SERVERSET_TIMEOUT.as_(Time.SECONDS))
-    serverset_endpoints = list(serverset)
+
+    try:
+      # Need to perform this operation in a separate thread, because kazoo will wait for the
+      # result of this serverset evaluation indefinitely, which will prevent people killing
+      # the client with keyboard interrupts.
+      serverset_endpoints = self._deadline(lambda: list(serverset),
+        timeout=self.SERVERSET_TIMEOUT.as_(Time.SECONDS), daemon=True, propagate=True)
+    except Timeout:
+      raise self.CouldNotConnect("Failed to connect to Zookeeper within %d seconds." %
+        self.SERVERSET_TIMEOUT.as_(Time.SECONDS))
+
     if len(serverset_endpoints) == 0:
       raise self.CouldNotConnect('No schedulers detected in %s!' % self._cluster.name)
     instance = serverset_endpoints[0]
