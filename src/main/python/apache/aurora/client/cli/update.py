@@ -39,6 +39,9 @@ from gen.apache.aurora.api.ttypes import JobUpdateAction, JobUpdateStatus
 
 
 class StartUpdate(Verb):
+
+  UPDATE_MSG_TEMPLATE = "Job update has started. View your update progress at %s"
+
   @property
   def name(self):
     return 'start'
@@ -77,7 +80,8 @@ class StartUpdate(Verb):
         err_msg="Failed to start update due to error:")
 
     if resp.result:
-      context.print_out("Job update has started.")
+      url = context.get_update_page(api, job, resp.result.startJobUpdateResult.updateId)
+      context.print_out(self.UPDATE_MSG_TEMPLATE % url)
     else:
       context.print_out_response_details(resp)
     return EXIT_OK

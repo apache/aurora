@@ -92,11 +92,14 @@ class TestUpdateCommand(AuroraClientCommandTest):
         result = cmd.execute(['beta-update', 'start', self.TEST_JOBSPEC, fp.name])
         assert result == EXIT_OK
 
+      update_url_msg = StartUpdate.UPDATE_MSG_TEMPLATE % (
+          mock_context.get_update_page(mock_api, AuroraJobKey.from_path(self.TEST_JOBSPEC), "id"))
+
       assert mock_api.start_job_update.call_count == 1
       args, kwargs = mock_api.start_job_update.call_args
       assert isinstance(args[0], AuroraConfig)
       assert args[1] is None
-      assert mock_context.get_out() == ["Job update has started."]
+      assert mock_context.get_out() == [update_url_msg]
       assert mock_context.get_err() == []
 
   def test_start_update_command_line_succeeds_noop_update(self):
