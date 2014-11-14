@@ -13,6 +13,8 @@
  */
 package org.apache.aurora.scheduler.quota;
 
+import java.util.Objects;
+
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 
 import static java.util.Objects.requireNonNull;
@@ -60,5 +62,32 @@ public class QuotaInfo {
    */
   public IResourceAggregate getNonProdConsumption() {
     return nonProdConsumption;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof QuotaInfo)) {
+      return false;
+    }
+
+    QuotaInfo other = (QuotaInfo) o;
+
+    return Objects.equals(quota, other.quota)
+        && Objects.equals(prodConsumption, other.prodConsumption)
+        && Objects.equals(nonProdConsumption, other.nonProdConsumption);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(quota, prodConsumption, nonProdConsumption);
+  }
+
+  @Override
+  public String toString() {
+    return com.google.common.base.Objects.toStringHelper(this)
+        .add("quota", quota)
+        .add("prodConsumption", prodConsumption)
+        .add("nonProdConsumption", nonProdConsumption)
+        .toString();
   }
 }

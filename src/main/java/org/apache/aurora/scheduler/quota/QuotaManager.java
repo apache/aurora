@@ -27,6 +27,7 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeSet;
 import com.google.common.collect.Sets;
@@ -34,14 +35,16 @@ import com.google.inject.Inject;
 
 import org.apache.aurora.gen.JobUpdateQuery;
 import org.apache.aurora.gen.ResourceAggregate;
+import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.ResourceAggregates;
-import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.cron.CronJobManager;
 import org.apache.aurora.scheduler.storage.JobUpdateStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IInstanceTaskConfig;
+import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdate;
 import org.apache.aurora.scheduler.storage.entities.IJobUpdateInstructions;
@@ -55,6 +58,9 @@ import org.apache.aurora.scheduler.updater.JobUpdateController;
 
 import static java.util.Objects.requireNonNull;
 
+import static org.apache.aurora.scheduler.base.Tasks.INFO_TO_JOB_KEY;
+import static org.apache.aurora.scheduler.base.Tasks.IS_PRODUCTION;
+import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_INFO;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
 
 /**
@@ -112,10 +118,12 @@ public interface QuotaManager {
    */
   class QuotaManagerImpl implements QuotaManager {
     private final Storage storage;
+    private final CronJobManager cronJobManager;
 
     @Inject
-    QuotaManagerImpl(Storage storage) {
+    QuotaManagerImpl(Storage storage, CronJobManager cronJobManager) {
       this.storage = requireNonNull(storage);
+      this.cronJobManager = requireNonNull(cronJobManager);
     }
 
     @Override
@@ -151,11 +159,11 @@ public interface QuotaManager {
       }
 
       QuotaInfo quotaInfo = getQuotaInfo(template.getJob().getRole());
+      IResourceAggregate requestedTotal = add(
+          quotaInfo.getProdConsumption(),
+          ResourceAggregates.scale(fromTasks(ImmutableSet.of(template)), instances));
 
-      return QuotaCheckResult.greaterOrEqual(
-          quotaInfo.getQuota(),
-          add(quotaInfo.getProdConsumption(), ResourceAggregates.scale(
-              prodResourcesFromTasks(ImmutableSet.of(template)), instances)));
+      return QuotaCheckResult.greaterOrEqual(quotaInfo.getQuota(), requestedTotal);
     }
 
     @Override
@@ -177,11 +185,11 @@ public interface QuotaManager {
     /**
      * Gets QuotaInfo with currently allocated quota and actual consumption data.
      * <p>
-     * In case an optional {@code requestedUpdate} is specified, the production consumption returned
-     * also includes an estimated resources share of that update as if it was already in progress.
+     * In case an optional {@code requestedUpdate} is specified, the consumption returned also
+     * includes an estimated resources share of that update as if it was already in progress.
      *
      * @param role Role to get quota info for.
-     * @param requestedUpdate An optional {@code IJobUpdate} to forecast the prod consumption.
+     * @param requestedUpdate An optional {@code IJobUpdate} to forecast the consumption.
      * @return {@code QuotaInfo} with quota and consumption details.
      */
     private QuotaInfo getQuotaInfo(final String role, final Optional<IJobUpdate> requestedUpdate) {
@@ -191,12 +199,25 @@ public interface QuotaManager {
           FluentIterable<IScheduledTask> tasks = FluentIterable.from(
               storeProvider.getTaskStore().fetchTasks(Query.roleScoped(role).active()));
 
-          IResourceAggregate prodConsumed =
-              getProdConsumption(storeProvider.getJobUpdateStore(), role, tasks, requestedUpdate);
+          Map<IJobKey, IJobUpdate> updates = Maps.newHashMap(
+              fetchActiveJobUpdates(storeProvider.getJobUpdateStore(), role)
+                  .uniqueIndex(UPDATE_TO_JOB_KEY));
 
-          // TODO(maxim): Consider a similar update-aware approach for computing nonProdConsumed.
-          IResourceAggregate nonProdConsumed = fromTasks(
-              tasks.transform(Tasks.SCHEDULED_TO_INFO).filter(Predicates.not(Tasks.IS_PRODUCTION)));
+          // Mix in a requested job update (if present) to correctly calculate consumption.
+          // This would be an update that is not saved in the store yet (i.e. the one quota is
+          // checked for).
+          if (requestedUpdate.isPresent()) {
+            updates.put(requestedUpdate.get().getSummary().getJobKey(), requestedUpdate.get());
+          }
+
+          Map<IJobKey, IJobConfiguration> cronTemplates =
+              FluentIterable.from(cronJobManager.getJobs())
+                  .filter(Predicates.compose(Predicates.equalTo(role), JobKeys.CONFIG_TO_ROLE))
+                  .uniqueIndex(JobKeys.FROM_CONFIG);
+
+          IResourceAggregate prodConsumed = getConsumption(tasks, updates, cronTemplates, true);
+
+          IResourceAggregate nonProdConsumed = getConsumption(tasks, updates, cronTemplates, false);
 
           IResourceAggregate quota =
               storeProvider.getQuotaStore().fetchQuota(role).or(ResourceAggregates.none());
@@ -206,45 +227,97 @@ public interface QuotaManager {
       });
     }
 
-    private IResourceAggregate getProdConsumption(
-        JobUpdateStore jobUpdateStore,
-        String role,
+    private IResourceAggregate getConsumption(
         FluentIterable<IScheduledTask> tasks,
-        Optional<IJobUpdate> requestedUpdate) {
+        Map<IJobKey, IJobUpdate> updatesByKey,
+        Map<IJobKey, IJobConfiguration> cronTemplatesByKey,
+        boolean isProd) {
 
-      // The algorithm here is as follows:
-      // 1. Load all production active tasks that belong to jobs without active updates OR
-      //    unaffected by an active update working set. An example of the latter would be instances
-      //    not updated by the update due to being already in desired state or outside of update
-      //    range (e.g. not in JobUpdateInstructions.updateOnlyTheseInstances).
-      //    Calculate consumed resources as "nonUpdateConsumption".
+      Predicate<ITaskConfig> prodFilter = isProd ? IS_PRODUCTION : Predicates.not(IS_PRODUCTION);
+
+      FluentIterable<IScheduledTask> filteredTasks =
+          tasks.filter(Predicates.compose(prodFilter, SCHEDULED_TO_INFO));
+
+      IResourceAggregate nonCronConsumption = getNonCronConsumption(
+          updatesByKey,
+          excludeCronTasks(filteredTasks, cronTemplatesByKey),
+          isProd);
+
+      IResourceAggregate cronConsumption =
+          getCronConsumption(cronTemplatesByKey, filteredTasks, isProd);
+
+      return add(nonCronConsumption, cronConsumption);
+    }
+
+    private static IResourceAggregate getNonCronConsumption(
+        Map<IJobKey, IJobUpdate> updatesByKey,
+        FluentIterable<IScheduledTask> tasks,
+        boolean isProd) {
+
+      // 1. Get all active tasks that belong to jobs without active updates OR unaffected by an
+      //    active update working set. An example of the latter would be instances not updated by
+      //    the update due to being already in desired state or outside of update range (e.g.
+      //    not in JobUpdateInstructions.updateOnlyTheseInstances). Calculate consumed resources
+      //    as "nonUpdateConsumption".
       //
-      // 2. Mix in a requested job update (if present) to correctly calculate prod consumption.
-      //    This would be an update that is not saved in the store yet (i.e. the one quota is
-      //    checked for).
-      //
-      // 3. Calculate consumed resources from instances affected by the active job updates as
+      // 2. Calculate consumed resources from instances affected by the active job updates as
       //    "updateConsumption".
       //
-      // 4. Add up the two to yield total prod consumption.
+      // 3. Add up the two to yield total consumption.
 
-      Map<IJobKey, IJobUpdate> updatesByKey = Maps.newHashMap(
-          fetchActiveJobUpdates(jobUpdateStore, role).uniqueIndex(UPDATE_TO_JOB_KEY));
-
-      if (requestedUpdate.isPresent()) {
-        updatesByKey.put(requestedUpdate.get().getSummary().getJobKey(), requestedUpdate.get());
-      }
-
-      IResourceAggregate nonUpdateConsumption = prodResourcesFromTasks(tasks
+      IResourceAggregate nonUpdateConsumption = fromTasks(tasks
           .filter(buildNonUpdatingTasksFilter(updatesByKey))
-          .transform(Tasks.SCHEDULED_TO_INFO));
+          .transform(SCHEDULED_TO_INFO));
 
       IResourceAggregate updateConsumption = ResourceAggregates.EMPTY;
       for (IJobUpdate update : updatesByKey.values()) {
-        updateConsumption = add(updateConsumption, toProdResources(update.getInstructions()));
+        updateConsumption =
+            add(updateConsumption, instructionsToResources(update.getInstructions(), isProd));
       }
 
       return add(nonUpdateConsumption, updateConsumption);
+    }
+
+    private static IResourceAggregate getCronConsumption(
+        Map<IJobKey, IJobConfiguration> cronTemplates,
+        FluentIterable<IScheduledTask> tasks,
+        boolean isProd) {
+
+      // Calculate the overall cron consumption as MAX between cron template resources and active
+      // cron tasks. This is required to account for a case when a running cron task has higher
+      // resource requirements than its updated template.
+      //
+      // While this is the "worst case" calculation that does not account for a possible "staggered"
+      // cron scheduling, it's the simplest approach possible given the system constraints (e.g.:
+      // lack of enforcement on a cron job run duration).
+
+      Multimap<IJobKey, ITaskConfig> taskConfigsByKey =
+          tasks.transform(SCHEDULED_TO_INFO).index(INFO_TO_JOB_KEY);
+
+      IResourceAggregate totalConsumption = ResourceAggregates.EMPTY;
+      for (IJobConfiguration config : cronTemplates.values()) {
+        if (isProd == config.getTaskConfig().isProduction()) {
+          IResourceAggregate templateConsumption = ResourceAggregates.scale(
+              fromTasks(ImmutableSet.of(config.getTaskConfig())), config.getInstanceCount());
+
+          IResourceAggregate taskConsumption = fromTasks(taskConfigsByKey.get(config.getKey()));
+
+          totalConsumption = add(totalConsumption, max(templateConsumption, taskConsumption));
+        }
+      }
+      return totalConsumption;
+    }
+
+    private static FluentIterable<IScheduledTask> excludeCronTasks(
+        FluentIterable<IScheduledTask> tasks,
+        final Map<IJobKey, IJobConfiguration> cronJobs) {
+
+      return tasks.filter(new Predicate<IScheduledTask>() {
+        @Override
+        public boolean apply(IScheduledTask input) {
+          return !cronJobs.containsKey(input.getAssignedTask().getTask().getJob());
+        }
+      });
     }
 
     private static Predicate<IScheduledTask> buildNonUpdatingTasksFilter(
@@ -303,6 +376,56 @@ public interface QuotaManager {
       return builder.build();
     }
 
+    /**
+     * This function calculates max aggregate resources consumed by the job update
+     * {@code instructions}. The max is calculated between existing and desired task configs on per
+     * resource basis. This means max CPU, RAM and DISK values are computed individually and may
+     * come from different task configurations. While it may not be the most accurate
+     * representation of job update resources during the update, it does guarantee none of the
+     * individual resource values is exceeded during the forward/back roll.
+     *
+     * NOTE: In case of a job update converting the job production bit (i.e. prod -> non-prod or
+     *       non-prod -> prod), only the matching state is counted towards consumption. For example,
+     *       prod -> non-prod AND {@code prodConsumption=True}: only the initial state is accounted.
+     *
+     * @param instructions Update instructions with resource definitions.
+     * @param isProd Flag indicating whether the prod or non-prod calculation requested.
+     * @return Resources consumed by the update.
+     */
+    private static IResourceAggregate instructionsToResources(
+        IJobUpdateInstructions instructions,
+        final boolean isProd) {
+
+      // Calculate initial state consumption.
+      IResourceAggregate initial = ResourceAggregates.EMPTY;
+      for (IInstanceTaskConfig group : instructions.getInitialState()) {
+        ITaskConfig task = group.getTask();
+        if (isProd == task.isProduction()) {
+          for (IRange range : group.getInstances()) {
+            initial = add(initial, ResourceAggregates.scale(
+                fromTasks(ImmutableSet.of(task)),
+                instanceCountFromRange(range)));
+          }
+        }
+      }
+
+      // Calculate desired state consumption.
+      IResourceAggregate desired = Optional.fromNullable(instructions.getDesiredState())
+          .transform(new Function<IInstanceTaskConfig, IResourceAggregate>() {
+            @Override
+            public IResourceAggregate apply(IInstanceTaskConfig input) {
+              return isProd == input.getTask().isProduction()
+                  ? ResourceAggregates.scale(
+                  fromTasks(ImmutableSet.of(input.getTask())),
+                  getUpdateInstanceCount(input.getInstances()))
+                  : ResourceAggregates.EMPTY;
+            }
+          }).or(ResourceAggregates.EMPTY);
+
+      // Calculate result as max(existing, desired) per resource type.
+      return max(initial, desired);
+    }
+
     private static IResourceAggregate add(IResourceAggregate a, IResourceAggregate b) {
       return IResourceAggregate.build(new ResourceAggregate()
           .setNumCpus(a.getNumCpus() + b.getNumCpus())
@@ -310,46 +433,11 @@ public interface QuotaManager {
           .setDiskMb(a.getDiskMb() + b.getDiskMb()));
     }
 
-    /**
-     * This function calculates max aggregate production resources consumed by the job update
-     * {@code instructions}. The max is calculated between existing and desired task configs on per
-     * resource basis. This means max CPU, RAM and DISK values are computed individually and may
-     * come from different task configurations. While it may not be the most accurate
-     * representation of job update resources during the update, it does guarantee none of the
-     * individual resource values is exceeded during the forward/back roll.
-     *
-     * @param instructions Update instructions with resource definitions.
-     * @return Resources consumed by the update.
-     */
-    private static IResourceAggregate toProdResources(IJobUpdateInstructions instructions) {
-      double existingCpu = 0;
-      int existingRamMb = 0;
-      int existingDiskMb = 0;
-      for (IInstanceTaskConfig group : instructions.getInitialState()) {
-        ITaskConfig task = group.getTask();
-        if (task.isProduction()) {
-          for (IRange range : group.getInstances()) {
-            int numInstances = range.getLast() - range.getFirst() + 1;
-            existingCpu += task.getNumCpus() * numInstances;
-            existingRamMb += task.getRamMb() * numInstances;
-            existingDiskMb += task.getDiskMb() * numInstances;
-          }
-        }
-      }
-
-      // Calculate desired prod task consumption.
-      IResourceAggregate desired = Optional.fromNullable(instructions.getDesiredState())
-          .transform(TO_PROD_RESOURCES).or(ResourceAggregates.EMPTY);
-
-      // Calculate result as max(existing, desired) per resource.
+    private static IResourceAggregate max(IResourceAggregate a, IResourceAggregate b) {
       return IResourceAggregate.build(new ResourceAggregate()
-          .setNumCpus(Math.max(existingCpu, desired.getNumCpus()))
-          .setRamMb(Math.max(existingRamMb, desired.getRamMb()))
-          .setDiskMb(Math.max(existingDiskMb, desired.getDiskMb())));
-    }
-
-    private static IResourceAggregate prodResourcesFromTasks(Iterable<ITaskConfig> tasks) {
-      return fromTasks(FluentIterable.from(tasks).filter(Tasks.IS_PRODUCTION));
+          .setNumCpus(Math.max(a.getNumCpus(), b.getNumCpus()))
+          .setRamMb(Math.max(a.getRamMb(), b.getRamMb()))
+          .setDiskMb(Math.max(a.getDiskMb(), b.getDiskMb())));
     }
 
     private static IResourceAggregate fromTasks(Iterable<ITaskConfig> tasks) {
@@ -368,18 +456,6 @@ public interface QuotaManager {
           .setDiskMb(diskMb));
     }
 
-    private static final Function<IInstanceTaskConfig, IResourceAggregate> TO_PROD_RESOURCES =
-        new Function<IInstanceTaskConfig, IResourceAggregate>() {
-          @Override
-          public IResourceAggregate apply(IInstanceTaskConfig input) {
-            return input.getTask().isProduction()
-                ? ResourceAggregates.scale(
-                prodResourcesFromTasks(ImmutableSet.of(input.getTask())),
-                getUpdateInstanceCount(input.getInstances()))
-                : ResourceAggregates.EMPTY;
-          }
-        };
-
     private static final Function<IJobUpdate, IJobKey> UPDATE_TO_JOB_KEY =
         new Function<IJobUpdate, IJobKey>() {
           @Override
@@ -391,10 +467,14 @@ public interface QuotaManager {
     private static int getUpdateInstanceCount(Set<IRange> ranges) {
       int instanceCount = 0;
       for (IRange range : ranges) {
-        instanceCount += range.getLast() - range.getFirst() + 1;
+        instanceCount += instanceCountFromRange(range);
       }
 
       return instanceCount;
+    }
+
+    private static int instanceCountFromRange(IRange range) {
+      return range.getLast() - range.getFirst() + 1;
     }
   }
 }
