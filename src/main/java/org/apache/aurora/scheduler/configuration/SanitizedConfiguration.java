@@ -18,13 +18,13 @@ import java.util.logging.Logger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
+import com.google.common.base.Strings;
 import com.google.common.collect.ContiguousSet;
 import com.google.common.collect.DiscreteDomain;
 import com.google.common.collect.Range;
 
 import org.apache.aurora.scheduler.configuration.ConfigurationManager.TaskDescriptionException;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
-import org.apache.commons.lang.StringUtils;
 
 /**
  * Wrapper for a configuration that has been fully-sanitized and populated with defaults.
@@ -78,7 +78,7 @@ public final class SanitizedConfiguration {
    */
   public boolean isCron() {
     if (getJobConfig().isSetCronSchedule()) {
-      if (StringUtils.isEmpty(getJobConfig().getCronSchedule())) {
+      if (Strings.isNullOrEmpty(getJobConfig().getCronSchedule())) {
         // TODO(ksweeney): Remove this in 0.7.0 (AURORA-423).
         LOG.warning("Got service config with empty string cron schedule. aurora-0.7.x "
             + "will interpret this as cron job and cause an error.");

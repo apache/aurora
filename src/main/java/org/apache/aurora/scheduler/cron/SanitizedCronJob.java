@@ -17,13 +17,13 @@ import javax.annotation.Nullable;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Optional;
+import com.google.common.base.Strings;
 
 import org.apache.aurora.gen.CronCollisionPolicy;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
-import org.apache.commons.lang.StringUtils;
 
 import static java.util.Objects.requireNonNull;
 
@@ -107,7 +107,7 @@ public final class SanitizedCronJob {
 
   private static boolean hasCronSchedule(IJobConfiguration job) {
     requireNonNull(job);
-    return !StringUtils.isEmpty(job.getCronSchedule());
+    return !Strings.isNullOrEmpty(job.getCronSchedule());
   }
 
   /**

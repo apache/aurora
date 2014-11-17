@@ -52,9 +52,10 @@ import org.apache.aurora.scheduler.storage.TaskStore;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.apache.commons.lang.StringUtils;
 
 import static java.util.Objects.requireNonNull;
+
+import static com.google.common.base.CharMatcher.WHITESPACE;
 
 /**
  * An in-memory task store.
@@ -232,7 +233,7 @@ class MemTaskStore implements TaskStore.Mutable {
         IScheduledTask task = canonicalTask.storedTask;
         ITaskConfig config = task.getAssignedTask().getTask();
         if (query.getRole() != null
-            && !StringUtils.isBlank(query.getRole())
+            && !WHITESPACE.matchesAllOf(query.getRole())
             && !query.getRole().equals(config.getJob().getRole())) {
           return false;
         }

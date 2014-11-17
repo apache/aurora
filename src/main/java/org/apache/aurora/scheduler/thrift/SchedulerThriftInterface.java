@@ -163,7 +163,6 @@ import org.apache.aurora.scheduler.thrift.auth.Requires;
 import org.apache.aurora.scheduler.updater.JobDiff;
 import org.apache.aurora.scheduler.updater.JobUpdateController;
 import org.apache.aurora.scheduler.updater.UpdateStateException;
-import org.apache.commons.lang.StringUtils;
 import org.apache.thrift.TException;
 
 import static java.lang.annotation.ElementType.FIELD;
@@ -172,6 +171,7 @@ import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
+import static com.google.common.base.CharMatcher.WHITESPACE;
 import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.auth.SessionValidator.SessionContext;
@@ -749,7 +749,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     requireNonNull(mutableQuery);
     requireNonNull(session);
 
-    if (mutableQuery.getJobName() != null && StringUtils.isBlank(mutableQuery.getJobName())) {
+    if (mutableQuery.getJobName() != null && WHITESPACE.matchesAllOf(mutableQuery.getJobName())) {
       return invalidResponse(String.format("Invalid job name: '%s'", mutableQuery.getJobName()));
     }
 

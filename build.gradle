@@ -160,7 +160,6 @@ dependencies {
   compile "com.sun.jersey:jersey-server:${jerseyRev}"
   compile "com.sun.jersey:jersey-servlet:${jerseyRev}"
   compile "com.sun.jersey.contribs:jersey-guice:${jerseyRev}"
-  compile 'commons-lang:commons-lang:2.6'
   compile 'javax.inject:javax.inject:1'
   compile 'javax.servlet:servlet-api:2.5'
   compile "log4j:log4j:${log4jRev}"

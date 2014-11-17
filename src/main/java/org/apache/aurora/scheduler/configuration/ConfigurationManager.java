@@ -20,6 +20,7 @@ import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -42,7 +43,6 @@ import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 import org.apache.aurora.scheduler.storage.entities.IValueConstraint;
-import org.apache.commons.lang.StringUtils;
 
 import static org.apache.aurora.gen.apiConstants.GOOD_IDENTIFIER_PATTERN_JVM;
 
@@ -255,7 +255,7 @@ public final class ConfigurationManager {
         validateAndPopulate(ITaskConfig.build(builder.getTaskConfig())).newBuilder());
 
     // Only one of [service=true, cron_schedule] may be set.
-    if (!StringUtils.isEmpty(job.getCronSchedule()) && builder.getTaskConfig().isIsService()) {
+    if (!Strings.isNullOrEmpty(job.getCronSchedule()) && builder.getTaskConfig().isIsService()) {
       throw new TaskDescriptionException(
           "A service task may not be run on a cron schedule: " + builder);
     }
