@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.annotation.Nullable;
@@ -35,7 +34,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
-import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMultimap;
@@ -142,7 +140,6 @@ import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.backup.Recovery;
-import org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import org.apache.aurora.scheduler.storage.backup.StorageBackup;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -176,7 +173,6 @@ import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 import static org.apache.aurora.auth.SessionValidator.SessionContext;
 import static org.apache.aurora.gen.ResponseCode.AUTH_FAILED;
-import static org.apache.aurora.gen.ResponseCode.ERROR;
 import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
@@ -987,45 +983,26 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response stageRecovery(String backupId, SessionKey session) {
-    try {
-      recovery.stage(backupId);
-      return okEmptyResponse();
-    } catch (RecoveryException e) {
-      LOG.log(Level.WARNING, "Failed to stage recovery: " + e, e);
-      return errorResponse(ERROR, e);
-    }
+    recovery.stage(backupId);
+    return okEmptyResponse();
   }
 
   @Override
   public Response queryRecovery(TaskQuery query, SessionKey session) {
-    try {
-      return okResponse(Result.queryRecoveryResult(new QueryRecoveryResult()
-              .setTasks(IScheduledTask.toBuildersSet(recovery.query(Query.arbitrary(query))))));
-    } catch (RecoveryException e) {
-      LOG.log(Level.WARNING, "Failed to query recovery: " + e, e);
-      return errorResponse(ERROR, e);
-    }
+    return okResponse(Result.queryRecoveryResult(new QueryRecoveryResult()
+            .setTasks(IScheduledTask.toBuildersSet(recovery.query(Query.arbitrary(query))))));
   }
 
   @Override
   public Response deleteRecoveryTasks(TaskQuery query, SessionKey session) {
-    try {
-      recovery.deleteTasks(Query.arbitrary(query));
-      return okEmptyResponse();
-    } catch (RecoveryException e) {
-      LOG.log(Level.WARNING, "Failed to delete recovery tasks: " + e, e);
-      return errorResponse(ERROR, e);
-    }
+    recovery.deleteTasks(Query.arbitrary(query));
+    return okEmptyResponse();
   }
 
   @Override
   public Response commitRecovery(SessionKey session) {
-    try {
-      recovery.commit();
-      return okEmptyResponse();
-    } catch (RecoveryException e) {
-      return errorResponse(ERROR, e);
-    }
+    recovery.commit();
+    return okEmptyResponse();
   }
 
   @Override
@@ -1036,34 +1013,25 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @Override
   public Response snapshot(SessionKey session) {
-    try {
-      storage.snapshot();
-      return okEmptyResponse();
-    } catch (Storage.StorageException e) {
-      LOG.log(Level.WARNING, "Requested snapshot failed.", e);
-      return errorResponse(ERROR, e);
-    }
+    storage.snapshot();
+    return okEmptyResponse();
   }
 
   private static Multimap<String, IJobConfiguration> jobsByKey(JobStore jobStore, IJobKey jobKey) {
     ImmutableMultimap.Builder<String, IJobConfiguration> matches = ImmutableMultimap.builder();
     for (String managerId : jobStore.fetchManagerIds()) {
-      for (IJobConfiguration job : jobStore.fetchJobs(managerId)) {
-        if (job.getKey().equals(jobKey)) {
-          matches.put(managerId, job);
-        }
+      Optional<IJobConfiguration> job = jobStore.fetchJob(managerId, jobKey);
+      if (job.isPresent()) {
+        matches.put(managerId, job.get());
       }
     }
     return matches.build();
   }
 
   @Override
-  public Response rewriteConfigs(
-      final RewriteConfigsRequest request,
-      SessionKey session) {
-
+  public Response rewriteConfigs(final RewriteConfigsRequest request, SessionKey session) {
     if (request.getRewriteCommandsSize() == 0) {
-      return addMessage(Util.emptyResponse(), ERROR, "No rewrite commands provided.");
+      return addMessage(Util.emptyResponse(), INVALID_REQUEST, "No rewrite commands provided.");
     }
 
     return storage.write(new MutateWork.Quiet<Response>() {
@@ -1101,7 +1069,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     } catch (TaskDescriptionException e) {
       // We could add an error here, but this is probably a hint of something wrong in
       // the client that's causing a bad configuration to be applied.
-      throw Throwables.propagate(e);
+      throw new RuntimeException(e);
     }
 
     if (existingJob.getKey().equals(rewrittenJob.getKey())) {
@@ -1454,16 +1422,16 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
             JobDiff.asMap(request.getTaskConfig(), request.getInstanceCount()),
             settings.getUpdateOnlyTheseInstances());
 
-        if (diff.isNoop()) {
-          return addMessage(emptyResponse(), OK, NOOP_JOB_UPDATE_MESSAGE);
-        }
-
         Set<Integer> invalidScope = diff.getOutOfScopeInstances(
             Numbers.rangesToInstanceIds(settings.getUpdateOnlyTheseInstances()));
         if (!invalidScope.isEmpty()) {
           return invalidResponse(
               "updateOnlyTheseInstances contains instances irrelevant to the update: "
                   + invalidScope);
+        }
+
+        if (diff.isNoop()) {
+          return addMessage(emptyResponse(), OK, NOOP_JOB_UPDATE_MESSAGE);
         }
 
         JobUpdateInstructions instructions = new JobUpdateInstructions()
@@ -1557,9 +1525,12 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     });
   }
 
+  @VisibleForTesting
+  static final String NOT_IMPLEMENTED_MESSAGE = "Not implemented";
+
   @Override
   public Response pulseJobUpdate(String updateId, SessionKey session) {
-    throw new UnsupportedOperationException("Not implemented");
+    throw new UnsupportedOperationException(NOT_IMPLEMENTED_MESSAGE);
   }
 
   @Override

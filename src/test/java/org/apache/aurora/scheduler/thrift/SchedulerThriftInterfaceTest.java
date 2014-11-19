@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.thrift;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -25,9 +26,11 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -74,9 +77,11 @@ import org.apache.aurora.gen.JobUpdateRequest;
 import org.apache.aurora.gen.JobUpdateSettings;
 import org.apache.aurora.gen.JobUpdateSummary;
 import org.apache.aurora.gen.LimitConstraint;
+import org.apache.aurora.gen.ListBackupsResult;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
 import org.apache.aurora.gen.PendingReason;
+import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.Range;
 import org.apache.aurora.gen.ResourceAggregate;
 import org.apache.aurora.gen.Response;
@@ -147,6 +152,7 @@ import static org.apache.aurora.auth.CapabilityValidator.Capability.PROVISIONER;
 import static org.apache.aurora.auth.CapabilityValidator.Capability.ROOT;
 import static org.apache.aurora.auth.SessionValidator.SessionContext;
 import static org.apache.aurora.gen.LockValidation.CHECKED;
+import static org.apache.aurora.gen.LockValidation.UNCHECKED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
 import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.MaintenanceMode.SCHEDULED;
@@ -161,6 +167,7 @@ import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.SUFFICIENT_QUOTA;
+import static org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryException;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASKS_PER_JOB;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASK_ID_LENGTH;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_JOB_UPDATE_MESSAGE;
@@ -575,10 +582,20 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testCreateHomogeneousJobNoShards() throws Exception {
+  public void testCreateHomogeneousJobNoInstances() throws Exception {
     JobConfiguration job = makeJob();
-    job.setInstanceCount(0);
     job.unsetInstanceCount();
+    expectAuth(ROLE, true);
+
+    control.replay();
+
+    assertResponse(INVALID_REQUEST, thrift.createJob(job, DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testCreateJobNegativeInstanceCount() throws Exception {
+    JobConfiguration job = makeJob();
+    job.setInstanceCount(0 - 1);
     expectAuth(ROLE, true);
 
     control.replay();
@@ -769,6 +786,19 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     control.replay();
 
     assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testKillByJobName() throws Exception {
+    TaskQuery query = new TaskQuery().setJobName("job");
+    expectAuth(ROOT, true);
+    storageUtil.expectTaskFetch(Query.arbitrary(query).active(), buildScheduledTask());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expectTransitionsToKilling();
+
+    control.replay();
+
+    assertEquals(okEmptyResponse(), thrift.killTasks(query, DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -1002,9 +1032,83 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     // Note: This will change after AOP-style session validation passes in a SessionContext.
     expectAuth(ROOT, true).times(2);
 
+    // Auth for the second call.  AOP auth fails, but second auth attempt required to get
+    // SessionContext fails.  This is pretty contrived, but not technically impossible.
+    expectAuth(ROOT, true);
+    expectAuth(ROOT, false);
+
     control.replay();
 
     assertOkResponse(thrift.forceTaskState(TASK_ID, status, SESSION));
+    assertEquals(
+        response(AUTH_FAILED, Optional.<Result>absent(), AUTH_DENIED_MESSAGE),
+        thrift.forceTaskState(TASK_ID, status, SESSION));
+  }
+
+  @Test
+  public void testBackupControls() throws Exception {
+    expectAuth(ROOT, true);
+    backup.backupNow();
+
+    expectAuth(ROOT, true);
+    Set<String> backups = ImmutableSet.of("a", "b");
+    expect(recovery.listBackups()).andReturn(backups);
+
+    expectAuth(ROOT, true);
+    String backupId = "backup";
+    recovery.stage(backupId);
+
+    expectAuth(ROOT, true);
+    Query.Builder query = Query.taskScoped("taskId");
+    Set<IScheduledTask> queryResult = ImmutableSet.of(
+        IScheduledTask.build(new ScheduledTask().setStatus(ScheduleStatus.RUNNING)));
+    expect(recovery.query(query)).andReturn(queryResult);
+
+    expectAuth(ROOT, true);
+    recovery.deleteTasks(query);
+
+    expectAuth(ROOT, true);
+    recovery.commit();
+
+    expectAuth(ROOT, true);
+    recovery.unload();
+
+    control.replay();
+
+    assertEquals(okEmptyResponse(), thrift.performBackup(SESSION));
+
+    assertEquals(
+        okResponse(Result.listBackupsResult(new ListBackupsResult().setBackups(backups))),
+        thrift.listBackups(SESSION));
+
+    assertEquals(okEmptyResponse(), thrift.stageRecovery(backupId, SESSION));
+
+    assertEquals(
+        okResponse(Result.queryRecoveryResult(
+            new QueryRecoveryResult().setTasks(IScheduledTask.toBuildersSet(queryResult)))),
+        thrift.queryRecovery(query.get(), SESSION));
+
+    assertEquals(okEmptyResponse(), thrift.deleteRecoveryTasks(query.get(), SESSION));
+
+    assertEquals(okEmptyResponse(), thrift.commitRecovery(SESSION));
+
+    assertEquals(okEmptyResponse(), thrift.unloadRecovery(SESSION));
+  }
+
+  @Test
+  public void testRecoveryException() throws Exception {
+    Throwable recoveryException = new RecoveryException("Injected");
+
+    expectAuth(ROOT, true);
+    String backupId = "backup";
+    recovery.stage(backupId);
+    expectLastCall().andThrow(recoveryException);
+
+    control.replay();
+
+    assertEquals(
+        errorResponse(recoveryException.getMessage()),
+        thrift.stageRecovery(backupId, SESSION));
   }
 
   @Test
@@ -1287,6 +1391,49 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testRewriteNoCommands() throws Exception {
+    expectAuth(ROOT, true);
+
+    control.replay();
+
+    RewriteConfigsRequest request = new RewriteConfigsRequest(ImmutableList.<ConfigRewrite>of());
+    assertResponse(INVALID_REQUEST, thrift.rewriteConfigs(request, SESSION));
+  }
+
+  @Test
+  public void testRewriteInvalidJob() throws Exception {
+    expectAuth(ROOT, true);
+
+    control.replay();
+
+    IJobConfiguration job = IJobConfiguration.build(makeJob());
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.jobRewrite(
+            new JobConfigRewrite(job.newBuilder(), job.newBuilder().setTaskConfig(null)))));
+    assertResponse(ERROR, thrift.rewriteConfigs(request, SESSION));
+  }
+
+  @Test
+  public void testRewriteChangeJobKey() throws Exception {
+    expectAuth(ROOT, true);
+
+    control.replay();
+
+    IJobConfiguration job = IJobConfiguration.build(makeJob());
+    JobKey rewrittenJobKey = JobKeys.from("a", "b", "c").newBuilder();
+    Identity rewrittenIdentity = new Identity(rewrittenJobKey.getRole(), "steve");
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.jobRewrite(new JobConfigRewrite(
+            job.newBuilder(),
+            job.newBuilder()
+                .setTaskConfig(job.getTaskConfig().newBuilder().setJob(rewrittenJobKey)
+                    .setOwner(rewrittenIdentity))
+                .setOwner(rewrittenIdentity)
+                .setKey(rewrittenJobKey)))));
+    assertResponse(WARNING, thrift.rewriteConfigs(request, SESSION));
+  }
+
+  @Test
   public void testRewriteShardCasMismatch() throws Exception {
     TaskConfig storedConfig = productionTask();
     TaskConfig modifiedConfig =
@@ -1313,7 +1460,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testRewriteShard() throws Exception {
+  public void testRewriteInstance() throws Exception {
     TaskConfig storedConfig = productionTask();
     ITaskConfig modifiedConfig = ITaskConfig.build(
         storedConfig.deepCopy().setExecutorConfig(new ExecutorConfig("aurora", "rewritten")));
@@ -1346,6 +1493,37 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testRewriteInstanceUnchanged() throws Exception {
+    TaskConfig config = productionTask();
+    String taskId = "task_id";
+    IScheduledTask task = IScheduledTask.build(new ScheduledTask().setAssignedTask(
+        new AssignedTask()
+            .setTaskId(taskId)
+            .setTask(config)));
+    InstanceKey instanceKey = new InstanceKey(
+        JobKeys.from(
+            config.getOwner().getRole(),
+            config.getEnvironment(),
+            config.getJobName()).newBuilder(),
+        0);
+
+    expectAuth(ROOT, true);
+    storageUtil.expectTaskFetch(
+        Query.instanceScoped(IInstanceKey.build(instanceKey)).active(), task);
+    expect(storageUtil.taskStore.unsafeModifyInPlace(
+        taskId,
+        ITaskConfig.build(ConfigurationManager.applyDefaultsIfUnset(config.deepCopy()))))
+        .andReturn(false);
+
+    control.replay();
+
+    RewriteConfigsRequest request = new RewriteConfigsRequest(
+        ImmutableList.of(ConfigRewrite.instanceRewrite(
+            new InstanceConfigRewrite(instanceKey, config, config))));
+    assertResponse(WARNING, thrift.rewriteConfigs(request, SESSION));
+  }
+
+  @Test
   public void testRewriteJobCasMismatch() throws Exception {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
@@ -1353,8 +1531,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     String manager = "manager_key";
     expectAuth(ROOT, true);
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
-    expect(storageUtil.jobStore.fetchJobs(manager))
-        .andReturn(ImmutableList.of(IJobConfiguration.build(oldJob)));
+    expect(storageUtil.jobStore.fetchJob(manager, IJobKey.build(oldJob.getKey())))
+        .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
 
     control.replay();
 
@@ -1372,8 +1550,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     String manager = "manager_key";
     expectAuth(ROOT, true);
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
-    expect(storageUtil.jobStore.fetchJobs(manager))
-        .andReturn(ImmutableList.<IJobConfiguration>of());
+    expect(storageUtil.jobStore.fetchJob(manager, IJobKey.build(oldJob.getKey())))
+        .andReturn(Optional.<IJobConfiguration>absent());
 
     control.replay();
 
@@ -1388,11 +1566,19 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     JobConfiguration oldJob = makeJob(productionTask());
     JobConfiguration newJob = oldJob.deepCopy();
     newJob.getTaskConfig().setExecutorConfig(new ExecutorConfig("aurora", "rewritten"));
-    String manager = "manager_key";
+    String manager1 = "manager1";
+    String manager2 = "manager2";
+    String manager3 = "manager3";
     expectAuth(ROOT, true);
-    expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
-    expect(storageUtil.jobStore.fetchJobs(manager))
-        .andReturn(IJobConfiguration.listFromBuilders(ImmutableList.of(oldJob, makeJob())));
+    expect(storageUtil.jobStore.fetchManagerIds())
+        .andReturn(ImmutableSet.of(manager1, manager2, manager3));
+    expect(storageUtil.jobStore.fetchJob(manager1, IJobKey.build(oldJob.getKey())))
+        .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
+    expect(storageUtil.jobStore.fetchJob(manager2, IJobKey.build(oldJob.getKey())))
+        .andReturn(Optional.of(IJobConfiguration.build(makeJob())));
+    expect(storageUtil.jobStore.fetchJob(manager3, IJobKey.build(oldJob.getKey())))
+        .andReturn(Optional.of(IJobConfiguration.build(
+            makeJob().setKey(JobKeys.from("1", "2", "3").newBuilder()))));
 
     control.replay();
 
@@ -1410,8 +1596,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     String manager = "manager_key";
     expectAuth(ROOT, true);
     expect(storageUtil.jobStore.fetchManagerIds()).andReturn(ImmutableSet.of(manager));
-    expect(storageUtil.jobStore.fetchJobs(manager))
-        .andReturn(ImmutableList.of(IJobConfiguration.build(oldJob)));
+    expect(storageUtil.jobStore.fetchJob(manager, IJobKey.build(oldJob.getKey())))
+        .andReturn(Optional.of(IJobConfiguration.build(oldJob)));
     storageUtil.jobStore.saveAcceptedJob(
         manager,
         ConfigurationManager.validateAndPopulate(IJobConfiguration.build(newJob)));
@@ -1579,12 +1765,42 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return okResponse(Result.jobSummaryResult(new JobSummaryResult().setSummaries(jobSummaries)));
   }
 
-  private Response okResponse(Result result) {
-    return Util.emptyResponse()
-        .setResponseCode(OK)
+  private static final Function<String, ResponseDetail> MESSAGE_TO_DETAIL =
+      new Function<String, ResponseDetail>() {
+        @Override
+        public ResponseDetail apply(String message) {
+          return new ResponseDetail().setMessage(message);
+        }
+      };
+
+  private Response response(ResponseCode code, Optional<Result> result, String... messages) {
+    Response response = Util.emptyResponse()
+        .setResponseCode(code)
         .setDEPRECATEDversion(API_VERSION)
         .setServerInfo(SERVER_INFO)
-        .setResult(result);
+        .setResult(result.orNull());
+    if (messages.length > 0) {
+      response.setMessageDEPRECATED(Joiner.on(", ").join(messages));
+      response
+          .setDetails(FluentIterable.from(Arrays.asList(messages)).transform(MESSAGE_TO_DETAIL)
+              .toList());
+    }
+
+    return response;
+  }
+
+  private Response okResponse(Result result) {
+    return response(OK, Optional.of(result));
+  }
+
+  private Response okEmptyResponse() {
+    return response(OK, Optional.<Result>absent());
+  }
+
+  private Response errorResponse(String message) {
+    return response(ERROR, Optional.<Result>absent())
+        .setMessageDEPRECATED(message)
+        .setDetails(ImmutableList.of(new ResponseDetail().setMessage(message)));
   }
 
   private Response invalidResponse(String message) {
@@ -2213,6 +2429,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testReleaseLockUnchecked() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.releaseLock(LOCK);
+
+    control.replay();
+
+    assertEquals(okEmptyResponse(), thrift.releaseLock(LOCK.newBuilder(), UNCHECKED, SESSION));
+  }
+
+  @Test
   public void testGetLocks() throws Exception {
     expect(lockManager.getLocks()).andReturn(ImmutableSet.of(LOCK));
 
@@ -2530,7 +2756,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     control.replay();
     JobUpdateRequest request = buildJobUpdateRequest(IJobUpdate.build(builder));
-    assertResponse(OK, thrift.startJobUpdate(request, SESSION));
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
   }
 
   @Test
@@ -2736,6 +2962,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertResponse(INVALID_REQUEST, thrift.abortJobUpdate(JOB_KEY.newBuilder(), SESSION));
   }
 
+  @Test
+  public void testPulseJobUpdate() throws Exception {
+    control.replay();
+
+    assertEquals(
+        errorResponse(SchedulerThriftInterface.NOT_IMPLEMENTED_MESSAGE),
+        thrift.pulseJobUpdate("update", SESSION));
+  }
+
   private static JobConfiguration makeProdJob() {
     return makeJob(productionTask(), 1);
   }
@@ -2770,12 +3005,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setKey(JOB_KEY.newBuilder());
   }
 
+  private static final String AUTH_DENIED_MESSAGE = "Denied!";
+
   private IExpectationSetters<?> expectAuth(Set<String> roles, boolean allowed)
       throws AuthFailedException {
 
     if (!allowed) {
       return expect(userValidator.checkAuthenticated(SESSION, roles))
-          .andThrow(new AuthFailedException("Denied!"));
+          .andThrow(new AuthFailedException(AUTH_DENIED_MESSAGE));
     } else {
       return expect(userValidator.checkAuthenticated(SESSION, roles))
           .andReturn(context);
@@ -2795,7 +3032,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
       return expect(userValidator.checkAuthorized(
           eq(SESSION),
           eq(capability),
-          anyObject(AuditCheck.class))).andThrow(new AuthFailedException("Denied!"));
+          anyObject(AuditCheck.class))).andThrow(new AuthFailedException(AUTH_DENIED_MESSAGE));
     } else {
       return expect(userValidator.checkAuthorized(
           eq(SESSION),

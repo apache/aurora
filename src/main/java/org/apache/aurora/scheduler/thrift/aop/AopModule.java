@@ -86,8 +86,12 @@ public class AopModule extends AbstractModule {
     requireBinding(CapabilityValidator.class);
 
     // Layer ordering:
-    // Log -> CapabilityValidator -> FeatureToggle -> StatsExporter -> APIVersion ->
+    // APIVersion -> Log -> CapabilityValidator -> FeatureToggle -> StatsExporter ->
     // SchedulerThriftInterface
+
+    // It's important for this interceptor to be registered first to ensure it's at the 'top' of
+    // the stack and the standard message is always applied.
+    bindThriftDecorator(new ServerInfoInterceptor());
 
     // TODO(Sathya): Consider using provider pattern for constructing interceptors to facilitate
     // unit testing without the creation of Guice injectors.
@@ -126,7 +130,6 @@ public class AopModule extends AbstractModule {
     });
     bindThriftDecorator(new FeatureToggleInterceptor());
     bindThriftDecorator(new ThriftStatsExporterInterceptor());
-    bindThriftDecorator(new ServerInfoInterceptor());
   }
 
   private void bindThriftDecorator(MethodInterceptor interceptor) {

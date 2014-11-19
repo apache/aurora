@@ -64,9 +64,5 @@ public interface SessionValidator {
     public AuthFailedException(String msg) {
       super(msg);
     }
-
-    public AuthFailedException(String msg, Throwable cause) {
-      super(msg, cause);
-    }
   }
 }

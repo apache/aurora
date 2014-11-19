@@ -21,6 +21,8 @@ import org.apache.aurora.gen.Response;
 import org.apache.aurora.gen.ResponseCode;
 import org.apache.aurora.gen.ResponseDetail;
 
+import static org.apache.aurora.gen.ResponseCode.OK;
+
 /**
  * Utility class for constructing responses to API calls.
  */
@@ -84,5 +86,14 @@ public final class Util {
 
     response.addToDetails(new ResponseDetail(message));
     return response;
+  }
+
+  /**
+   * Creates an OK response that has no result entity.
+   *
+   * @return Ok response with an empty result.
+   */
+  public static Response okEmptyResponse()  {
+    return emptyResponse().setResponseCode(OK);
   }
 }
