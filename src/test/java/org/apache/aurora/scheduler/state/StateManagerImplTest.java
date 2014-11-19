@@ -183,7 +183,7 @@ public class StateManagerImplTest extends EasyMockTest {
             .setTaskId(taskId)
             .setTask(task.newBuilder()));
     assertEquals(ImmutableSet.of(IScheduledTask.build(expected)),
-        Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId)));
+        Storage.Util.fetchTasks(storage, Query.taskScoped(taskId)));
   }
 
   @Test
@@ -332,7 +332,7 @@ public class StateManagerImplTest extends EasyMockTest {
     changeState(taskId, RUNNING);
     changeState(taskId, FAILED);
     IScheduledTask rescheduledTask = Iterables.getOnlyElement(
-        Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId2)));
+        Storage.Util.fetchTasks(storage, Query.taskScoped(taskId2)));
     assertEquals(taskId, rescheduledTask.getAncestorId());
     assertEquals(1, rescheduledTask.getFailureCount());
   }
@@ -410,7 +410,7 @@ public class StateManagerImplTest extends EasyMockTest {
     assignTask(taskId, HOST_A, ImmutableSet.of(80, 81, 82));
 
     IScheduledTask actual = Iterables.getOnlyElement(
-        Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId)));
+        Storage.Util.fetchTasks(storage, Query.taskScoped(taskId)));
 
     assertEquals(
         requestedPorts,
@@ -442,7 +442,7 @@ public class StateManagerImplTest extends EasyMockTest {
     assignTask(newTaskId, HOST_A, ImmutableSet.of(86));
 
     IScheduledTask actual = Iterables.getOnlyElement(
-        Storage.Util.consistentFetchTasks(storage, Query.taskScoped(newTaskId)));
+        Storage.Util.fetchTasks(storage, Query.taskScoped(newTaskId)));
 
     assertEquals(ImmutableMap.of("one", 86), actual.getAssignedTask().getAssignedPorts());
   }
@@ -471,7 +471,7 @@ public class StateManagerImplTest extends EasyMockTest {
     control.replay();
 
     insertTask(task, 0);
-    Iterables.getOnlyElement(Storage.Util.consistentFetchTasks(storage, Query.taskScoped(taskId)));
+    Iterables.getOnlyElement(Storage.Util.fetchTasks(storage, Query.taskScoped(taskId)));
 
     insertTask(task, 0);
   }

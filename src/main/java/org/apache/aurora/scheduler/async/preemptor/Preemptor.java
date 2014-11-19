@@ -53,6 +53,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.Util;
+import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -275,7 +276,7 @@ public interface Preemptor {
     }
 
     private Optional<IHostAttributes> getHostAttributes(final String host) {
-      return storage.weaklyConsistentRead(new Storage.Work.Quiet<Optional<IHostAttributes>>() {
+      return storage.read(new Work.Quiet<Optional<IHostAttributes>>() {
         @Override
         public Optional<IHostAttributes> apply(Storage.StoreProvider storeProvider) {
           return storeProvider.getAttributeStore().getHostAttributes(host);
@@ -294,7 +295,7 @@ public interface Preemptor {
     private Optional<IAssignedTask> fetchIdlePendingTask(String taskId) {
       Query.Builder query = Query.taskScoped(taskId).byStatus(PENDING);
       Iterable<IAssignedTask> result = FluentIterable
-          .from(Util.consistentFetchTasks(storage, query))
+          .from(Util.fetchTasks(storage, query))
           .filter(isIdleTask)
           .transform(SCHEDULED_TO_ASSIGNED);
       return Optional.fromNullable(Iterables.getOnlyElement(result, null));

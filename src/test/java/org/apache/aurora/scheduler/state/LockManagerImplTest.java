@@ -173,7 +173,7 @@ public class LockManagerImplTest extends EasyMockTest {
 
     final CountDownLatch reads = new CountDownLatch(2);
     EasyMock.makeThreadSafe(storageUtil.storage, false);
-    expect(storageUtil.storage.consistentRead(EasyMock.<Work<Object, ?>>anyObject()))
+    expect(storageUtil.storage.read(EasyMock.<Work<Object, ?>>anyObject()))
         .andAnswer(new IAnswer<Object>() {
           @Override
           public Object answer() throws Throwable {

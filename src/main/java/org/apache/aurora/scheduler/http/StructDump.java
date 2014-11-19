@@ -122,7 +122,7 @@ public class StructDump extends JerseyTemplateServlet {
       @Override
       public void execute(StringTemplate template) {
         template.setAttribute("id", id);
-        Optional<? extends TBase<?, ?>> struct = storage.weaklyConsistentRead(work);
+        Optional<? extends TBase<?, ?>> struct = storage.read(work);
         if (struct.isPresent()) {
           template.setAttribute("structPretty", Util.prettyPrint(struct.get()));
         } else {

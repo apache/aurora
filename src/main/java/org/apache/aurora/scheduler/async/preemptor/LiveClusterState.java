@@ -59,7 +59,7 @@ class LiveClusterState implements ClusterState {
   public Multimap<String, IAssignedTask> getSlavesToActiveTasks() {
     // Only non-pending active tasks may be preempted.
     Iterable<IAssignedTask> activeTasks = Iterables.transform(
-        Storage.Util.consistentFetchTasks(storage, CANDIDATE_QUERY),
+        Storage.Util.fetchTasks(storage, CANDIDATE_QUERY),
         SCHEDULED_TO_ASSIGNED);
 
     // Group the tasks by slave id so they can be paired with offers from the same slave.

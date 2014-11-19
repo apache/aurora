@@ -168,7 +168,7 @@ class MetricCalculator implements Runnable {
   @Override
   public void run() {
     FluentIterable<IScheduledTask> tasks =
-        FluentIterable.from(Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped()));
+        FluentIterable.from(Storage.Util.fetchTasks(storage, Query.unscoped()));
 
     List<IScheduledTask> prodTasks = tasks.filter(Predicates.compose(
         Predicates.and(Tasks.IS_PRODUCTION, IS_SERVICE),

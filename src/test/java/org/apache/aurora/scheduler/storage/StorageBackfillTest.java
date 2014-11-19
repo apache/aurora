@@ -185,7 +185,7 @@ public class StorageBackfillTest {
     backfill();
 
     IJobConfiguration actual = Iterables.getOnlyElement(
-        storage.consistentRead(new Storage.Work.Quiet<Iterable<IJobConfiguration>>() {
+        storage.read(new Storage.Work.Quiet<Iterable<IJobConfiguration>>() {
           @Override
           public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
             return storeProvider.getJobStore().fetchJobs("CRON");
@@ -235,7 +235,7 @@ public class StorageBackfillTest {
         ImmutableSet.of(
             IScheduledTask.build(noJobKeyBackfilled),
             IScheduledTask.build(nullJobKeyFieldsBackfilled)),
-        Storage.Util.consistentFetchTasks(storage, Query.unscoped()));
+        Storage.Util.fetchTasks(storage, Query.unscoped()));
   }
 
   private void backfill() {
@@ -280,12 +280,12 @@ public class StorageBackfillTest {
   }
 
   private IScheduledTask getTask(String taskId) {
-    return Iterables.getOnlyElement(Storage.Util.consistentFetchTasks(
+    return Iterables.getOnlyElement(Storage.Util.fetchTasks(
         storage,
         Query.taskScoped(taskId)));
   }
 
   private Set<IScheduledTask> getTasksByStatus(ScheduleStatus status) {
-    return Storage.Util.consistentFetchTasks(storage, Query.unscoped().byStatus(status));
+    return Storage.Util.fetchTasks(storage, Query.unscoped().byStatus(status));
   }
 }

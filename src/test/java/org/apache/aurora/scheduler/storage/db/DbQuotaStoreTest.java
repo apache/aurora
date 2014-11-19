@@ -97,7 +97,7 @@ public class DbQuotaStoreTest {
   }
 
   private Optional<IResourceAggregate> select(final String role) {
-    return storage.consistentRead(new Work.Quiet<Optional<IResourceAggregate>>() {
+    return storage.read(new Work.Quiet<Optional<IResourceAggregate>>() {
       @Override
       public Optional<IResourceAggregate> apply(StoreProvider storeProvider) {
         return storeProvider.getQuotaStore().fetchQuota(role);
@@ -108,7 +108,7 @@ public class DbQuotaStoreTest {
   private void assertQuotas(Map<String, IResourceAggregate> quotas) {
     assertEquals(
         quotas,
-        storage.consistentRead(new Work.Quiet<Map<String, IResourceAggregate>>() {
+        storage.read(new Work.Quiet<Map<String, IResourceAggregate>>() {
           @Override
           public Map<String, IResourceAggregate> apply(StoreProvider storeProvider) {
             return storeProvider.getQuotaStore().fetchQuotas();

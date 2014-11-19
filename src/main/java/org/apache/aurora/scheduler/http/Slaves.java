@@ -63,7 +63,7 @@ public class Slaves extends JerseyTemplateServlet {
   }
 
   private Iterable<IHostAttributes> getHostAttributes() {
-    return storage.weaklyConsistentRead(new Work.Quiet<Iterable<IHostAttributes>>() {
+    return storage.read(new Work.Quiet<Iterable<IHostAttributes>>() {
       @Override
       public Iterable<IHostAttributes> apply(StoreProvider storeProvider) {
         return storeProvider.getAttributeStore().getHostAttributes();

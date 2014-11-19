@@ -16,6 +16,7 @@ package org.apache.aurora.scheduler.storage.log;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
@@ -177,7 +178,8 @@ public class LogStorageTest extends EasyMockTest {
         storageUtil.quotaStore,
         storageUtil.attributeStore,
         storageUtil.jobUpdateStore,
-        eventSink);
+        eventSink,
+        new ReentrantLock());
 
     stream = createMock(Stream.class);
     streamMatcher = LogOpMatcher.matcherFor(stream);
@@ -481,7 +483,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws CodingException {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.schedulerStore.saveFrameworkId(frameworkId);
         streamMatcher.expectTransaction(Op.saveFrameworkId(new SaveFrameworkId(frameworkId)))
             .andReturn(position);
@@ -502,7 +504,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.jobStore.saveAcceptedJob(managerId, jobConfig);
         streamMatcher.expectTransaction(
             Op.saveAcceptedJob(new SaveAcceptedJob(managerId, jobConfig.newBuilder())))
@@ -521,7 +523,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.jobStore.removeJob(JOB_KEY);
         streamMatcher.expectTransaction(
             Op.removeJob(new RemoveJob().setJobKey(JOB_KEY.newBuilder())))
@@ -541,7 +543,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.taskStore.saveTasks(tasks);
         streamMatcher.expectTransaction(
             Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(tasks))))
@@ -564,7 +566,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         expect(storageUtil.taskStore.mutateTasks(query, mutation)).andReturn(mutated);
         streamMatcher.expectTransaction(
             Op.saveTasks(new SaveTasks(IScheduledTask.toBuildersSet(mutated))))
@@ -587,7 +589,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         expect(storageUtil.taskStore.unsafeModifyInPlace(taskId2, updatedConfig)).andReturn(false);
         expect(storageUtil.taskStore.unsafeModifyInPlace(taskId, updatedConfig)).andReturn(true);
         streamMatcher.expectTransaction(
@@ -614,7 +616,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         expect(storageUtil.taskStore.mutateTasks(query, mutation)).andReturn(mutated);
 
         storageUtil.taskStore.deleteTasks(tasksToRemove);
@@ -649,7 +651,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.taskStore.saveTasks(saved);
 
         // Nested transaction with result.
@@ -679,7 +681,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.taskStore.saveTasks(saved);
 
         // Nested transaction with result.
@@ -710,7 +712,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.taskStore.deleteTasks(taskIds);
         streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
             .andReturn(position);
@@ -729,7 +731,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.taskStore.deleteTasks(taskIds);
         streamMatcher.expectTransaction(Op.removeTasks(new RemoveTasks(taskIds)))
             .andReturn(position);
@@ -751,7 +753,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.quotaStore.saveQuota(role, quota);
         streamMatcher.expectTransaction(Op.saveQuota(new SaveQuota(role, quota.newBuilder())))
             .andReturn(position);
@@ -770,7 +772,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.quotaStore.removeQuota(role);
         streamMatcher.expectTransaction(Op.removeQuota(new RemoveQuota(role))).andReturn(position);
       }
@@ -792,7 +794,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.lockStore.saveLock(lock);
         streamMatcher.expectTransaction(Op.saveLock(new SaveLock(lock.newBuilder())))
             .andReturn(position);
@@ -812,7 +814,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.lockStore.removeLock(lockKey);
         streamMatcher.expectTransaction(Op.removeLock(new RemoveLock(lockKey.newBuilder())))
             .andReturn(position);
@@ -838,7 +840,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         expect(storageUtil.attributeStore.getHostAttributes(host))
             .andReturn(Optional.<IHostAttributes>absent());
 
@@ -902,7 +904,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.jobUpdateStore.saveJobUpdate(update, lockToken);
         streamMatcher.expectTransaction(
             Op.saveJobUpdate(new SaveJobUpdate(update.newBuilder(), lockToken.orNull())))
@@ -925,7 +927,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.jobUpdateStore.saveJobUpdateEvent(event, UPDATE_ID);
         streamMatcher.expectTransaction(Op.saveJobUpdateEvent(new SaveJobUpdateEvent(
             event.newBuilder(),
@@ -949,7 +951,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         storageUtil.jobUpdateStore.saveJobInstanceUpdateEvent(event, UPDATE_ID);
         streamMatcher.expectTransaction(Op.saveJobInstanceUpdateEvent(
             new SaveJobInstanceUpdateEvent(event.newBuilder(), UPDATE_ID))).andReturn(position);
@@ -971,7 +973,7 @@ public class LogStorageTest extends EasyMockTest {
     new MutationFixture() {
       @Override
       protected void setupExpectations() throws Exception {
-        storageUtil.expectWriteOperation();
+        storageUtil.expectWrite();
         expect(storageUtil.jobUpdateStore.pruneHistory(
             pruneHistory.getPerJobRetainCount(),
             pruneHistory.getHistoryPruneThresholdMs())).andReturn(ImmutableSet.of("id1"));

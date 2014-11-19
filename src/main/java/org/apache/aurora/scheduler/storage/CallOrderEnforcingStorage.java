@@ -110,17 +110,9 @@ public class CallOrderEnforcingStorage implements NonVolatileStorage {
   }
 
   @Override
-  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
+  public <T, E extends Exception> T read(Work<T, E> work) throws StorageException, E {
     checkInState(State.READY);
-    return wrapped.consistentRead(work);
-  }
-
-  @Override
-  public <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work)
-      throws StorageException, E {
-
-    checkInState(State.READY);
-    return wrapped.weaklyConsistentRead(work);
+    return wrapped.read(work);
   }
 
   @Override

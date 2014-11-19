@@ -13,15 +13,12 @@
  */
 package org.apache.aurora.scheduler.storage.log;
 
-import java.lang.annotation.Annotation;
-
 import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
-import com.google.inject.AbstractModule;
-import com.google.inject.Key;
+import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 import com.google.inject.assistedinject.FactoryModuleBuilder;
 import com.twitter.common.args.Arg;
@@ -32,10 +29,11 @@ import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.scheduler.storage.CallOrderEnforcingStorage;
 import org.apache.aurora.scheduler.storage.DistributedSnapshotStore;
+import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.NonVolatileStorage;
 import org.apache.aurora.scheduler.storage.log.LogManager.DeduplicateSnapshots;
 import org.apache.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
-import org.apache.aurora.scheduler.storage.log.LogStorage.ShutdownGracePeriod;
-import org.apache.aurora.scheduler.storage.log.LogStorage.SnapshotInterval;
+import org.apache.aurora.scheduler.storage.log.LogStorage.Settings;
 
 import static org.apache.aurora.scheduler.storage.log.EntrySerializer.EntrySerializerImpl;
 import static org.apache.aurora.scheduler.storage.log.LogManager.DeflateSnapshots;
@@ -45,7 +43,7 @@ import static org.apache.aurora.scheduler.storage.log.SnapshotDeduplicator.Snaps
 /**
  * Bindings for scheduler distributed log based storage.
  */
-public class LogStorageModule extends AbstractModule {
+public class LogStorageModule extends PrivateModule {
 
   @CmdLine(name = "dlog_shutdown_grace_period",
            help = "Specifies the maximum time to wait for scheduled checkpoint and snapshot "
@@ -76,8 +74,8 @@ public class LogStorageModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bindInterval(ShutdownGracePeriod.class, SHUTDOWN_GRACE_PERIOD);
-    bindInterval(SnapshotInterval.class, SNAPSHOT_INTERVAL);
+    bind(Settings.class)
+        .toInstance(new Settings(SHUTDOWN_GRACE_PERIOD.get(), SNAPSHOT_INTERVAL.get()));
 
     bind(new TypeLiteral<Amount<Integer, Data>>() { }).annotatedWith(MaxEntrySize.class)
         .toInstance(MAX_LOG_ENTRY_SIZE.get());
@@ -88,6 +86,9 @@ public class LogStorageModule extends AbstractModule {
 
     install(CallOrderEnforcingStorage.wrappingModule(LogStorage.class));
     bind(DistributedSnapshotStore.class).to(LogStorage.class);
+    expose(Storage.class);
+    expose(NonVolatileStorage.class);
+    expose(DistributedSnapshotStore.class);
 
     bind(EntrySerializer.class).to(EntrySerializerImpl.class);
     // TODO(ksweeney): We don't need a cryptographic checksum here - assess performance of MD5
@@ -99,9 +100,5 @@ public class LogStorageModule extends AbstractModule {
     install(new FactoryModuleBuilder()
         .implement(StreamManager.class, StreamManagerImpl.class)
         .build(StreamManagerFactory.class));
-  }
-
-  private void bindInterval(Class<? extends Annotation> key, Arg<Amount<Long, Time>> value) {
-    bind(Key.get(new TypeLiteral<Amount<Long, Time>>() { }, key)).toInstance(value.get());
   }
 }

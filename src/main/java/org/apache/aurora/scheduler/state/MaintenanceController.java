@@ -219,7 +219,7 @@ public interface MaintenanceController {
 
     @Override
     public MaintenanceMode getMode(final String host) {
-      return storage.weaklyConsistentRead(new Work.Quiet<MaintenanceMode>() {
+      return storage.read(new Work.Quiet<MaintenanceMode>() {
         @Override
         public MaintenanceMode apply(StoreProvider storeProvider) {
           return storeProvider.getAttributeStore().getHostAttributes(host)
@@ -232,7 +232,7 @@ public interface MaintenanceController {
 
     @Override
     public Set<HostStatus> getStatus(final Set<String> hosts) {
-      return storage.weaklyConsistentRead(new Work.Quiet<Set<HostStatus>>() {
+      return storage.read(new Work.Quiet<Set<HostStatus>>() {
         @Override
         public Set<HostStatus> apply(StoreProvider storeProvider) {
           // Warning - this is filtering _all_ host attributes.  If using this to frequently query

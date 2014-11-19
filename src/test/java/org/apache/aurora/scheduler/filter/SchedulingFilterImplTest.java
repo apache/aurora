@@ -43,14 +43,9 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.AttributeStore;
-import org.apache.aurora.scheduler.storage.Storage;
-import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import org.apache.aurora.scheduler.storage.Storage.Work.Quiet;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
-import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.easymock.IExpectationSetters;
 import org.junit.Before;
 import org.junit.Test;
@@ -103,35 +98,15 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private final AtomicLong taskIdCounter = new AtomicLong();
 
   private SchedulingFilter defaultFilter;
-  private Storage storage;
-  private StoreProvider storeProvider;
   private AttributeStore.Mutable attributeStore;
 
   @Before
   public void setUp() {
-    storage = createMock(Storage.class);
     defaultFilter = new SchedulingFilterImpl();
-    storeProvider = createMock(StoreProvider.class);
     attributeStore = createMock(AttributeStore.Mutable.class);
     emptyJob = new AttributeAggregate(
         Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
         attributeStore);
-
-    // Link the store provider to the store mocks.
-    expectReads();
-
-    expect(storeProvider.getAttributeStore()).andReturn(attributeStore).anyTimes();
-  }
-
-  private void expectReads() {
-    expect(storage.weaklyConsistentRead(EasyMock.<Quiet<Object>>anyObject()))
-        .andAnswer(new IAnswer<Object>() {
-          @Override
-          public Object answer() {
-            Quiet<?> arg = (Quiet<?>) EasyMock.getCurrentArguments()[0];
-            return arg.apply(storeProvider);
-          }
-        }).anyTimes();
   }
 
   @Test

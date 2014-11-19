@@ -185,7 +185,7 @@ public class Mname {
       Optional<String> forwardRequest) {
 
     IScheduledTask task = Iterables.getOnlyElement(
-        Storage.Util.consistentFetchTasks(storage,
+        Storage.Util.fetchTasks(storage,
             Query.instanceScoped(JobKeys.from(role, env, job), instanceId).active()),
         null);
     if (task == null) {

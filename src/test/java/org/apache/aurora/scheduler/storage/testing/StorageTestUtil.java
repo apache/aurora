@@ -73,9 +73,9 @@ public class StorageTestUtil {
     this.storage = easyMock.createMock(NonVolatileStorage.class);
   }
 
-  public <T> IExpectationSetters<T> expectConsistentRead() {
+  public <T> IExpectationSetters<T> expectRead() {
     final Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.<T, RuntimeException>consistentRead(capture(work)))
+    return expect(storage.read(capture(work)))
         .andAnswer(new IAnswer<T>() {
           @Override
           public T answer() {
@@ -84,20 +84,9 @@ public class StorageTestUtil {
         });
   }
 
-  public <T> IExpectationSetters<T> expectWeaklyConsistentRead() {
-    final Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.<T, RuntimeException>weaklyConsistentRead(capture(work)))
-        .andAnswer(new IAnswer<T>() {
-          @Override
-          public T answer() {
-            return work.getValue().apply(storeProvider);
-          }
-        });
-  }
-
-  public <T> IExpectationSetters<T> expectWriteOperation() {
+  public <T> IExpectationSetters<T> expectWrite() {
     final Capture<MutateWork<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.<T, RuntimeException>write(capture(work))).andAnswer(new IAnswer<T>() {
+    return expect(storage.write(capture(work))).andAnswer(new IAnswer<T>() {
       @Override
       public T answer() {
         return work.getValue().apply(mutableStoreProvider);
@@ -124,9 +113,8 @@ public class StorageTestUtil {
     expect(mutableStoreProvider.getLockStore()).andReturn(lockStore).anyTimes();
     expect(mutableStoreProvider.getSchedulerStore()).andReturn(schedulerStore).anyTimes();
     expect(mutableStoreProvider.getJobUpdateStore()).andReturn(jobUpdateStore).anyTimes();
-    expectConsistentRead().anyTimes();
-    expectWeaklyConsistentRead().anyTimes();
-    expectWriteOperation().anyTimes();
+    expectRead().anyTimes();
+    expectWrite().anyTimes();
   }
 
   public IExpectationSetters<?> expectTaskFetch(

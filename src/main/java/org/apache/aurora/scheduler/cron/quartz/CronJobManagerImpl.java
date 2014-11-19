@@ -74,7 +74,7 @@ class CronJobManagerImpl implements CronJobManager {
   public void startJobNow(final IJobKey jobKey) throws CronException {
     requireNonNull(jobKey);
 
-    storage.weaklyConsistentRead(new Work<Void, CronException>() {
+    storage.read(new Work<Void, CronException>() {
       @Override
       public Void apply(Storage.StoreProvider storeProvider) throws CronException {
         checkCronExists(jobKey, storeProvider.getJobStore());
@@ -182,7 +182,7 @@ class CronJobManagerImpl implements CronJobManager {
   @Override
   public Iterable<IJobConfiguration> getJobs() {
     // NOTE: no synchronization is needed here since we don't touch internal quartz state.
-    return storage.consistentRead(new Work.Quiet<Iterable<IJobConfiguration>>() {
+    return storage.read(new Work.Quiet<Iterable<IJobConfiguration>>() {
       @Override
       public Iterable<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobStore().fetchJobs(getManagerKey());
@@ -194,7 +194,7 @@ class CronJobManagerImpl implements CronJobManager {
   public boolean hasJob(final IJobKey jobKey) {
     requireNonNull(jobKey);
 
-    return storage.consistentRead(new Work.Quiet<Boolean>() {
+    return storage.read(new Work.Quiet<Boolean>() {
       @Override
       public Boolean apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobStore().fetchJob(getManagerKey(), jobKey).isPresent();

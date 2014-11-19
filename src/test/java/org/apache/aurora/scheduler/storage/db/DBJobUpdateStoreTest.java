@@ -658,7 +658,7 @@ public class DBJobUpdateStoreTest {
   }
 
   private Optional<IJobUpdate> getUpdate(final String updateId) {
-    return storage.consistentRead(new Quiet<Optional<IJobUpdate>>() {
+    return storage.read(new Quiet<Optional<IJobUpdate>>() {
       @Override
       public Optional<IJobUpdate> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobUpdateStore().fetchJobUpdate(updateId);
@@ -667,7 +667,7 @@ public class DBJobUpdateStoreTest {
   }
 
   private List<IJobInstanceUpdateEvent> getInstanceEvents(final String updateId, final int id) {
-    return storage.consistentRead(new Quiet<List<IJobInstanceUpdateEvent>>() {
+    return storage.read(new Quiet<List<IJobInstanceUpdateEvent>>() {
       @Override
       public List<IJobInstanceUpdateEvent> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobUpdateStore().fetchInstanceEvents(updateId, id);
@@ -676,7 +676,7 @@ public class DBJobUpdateStoreTest {
   }
 
   private Optional<IJobUpdateInstructions> getUpdateInstructions(final String updateId) {
-    return storage.consistentRead(new Quiet<Optional<IJobUpdateInstructions>>() {
+    return storage.read(new Quiet<Optional<IJobUpdateInstructions>>() {
       @Override
       public Optional<IJobUpdateInstructions> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobUpdateStore().fetchJobUpdateInstructions(updateId);
@@ -685,7 +685,7 @@ public class DBJobUpdateStoreTest {
   }
 
   private Optional<IJobUpdateDetails> getUpdateDetails(final String updateId) {
-    return storage.consistentRead(new Quiet<Optional<IJobUpdateDetails>>() {
+    return storage.read(new Quiet<Optional<IJobUpdateDetails>>() {
       @Override
       public Optional<IJobUpdateDetails> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(updateId);
@@ -694,7 +694,7 @@ public class DBJobUpdateStoreTest {
   }
 
   private Set<StoredJobUpdateDetails> getAllUpdateDetails() {
-    return storage.consistentRead(new Quiet<Set<StoredJobUpdateDetails>>() {
+    return storage.read(new Quiet<Set<StoredJobUpdateDetails>>() {
       @Override
       public Set<StoredJobUpdateDetails> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobUpdateStore().fetchAllJobUpdateDetails();
@@ -703,7 +703,7 @@ public class DBJobUpdateStoreTest {
   }
 
   private List<IJobUpdateSummary> getSummaries(final JobUpdateQuery query) {
-    return storage.consistentRead(new Quiet<List<IJobUpdateSummary>>() {
+    return storage.read(new Quiet<List<IJobUpdateSummary>>() {
       @Override
       public List<IJobUpdateSummary> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(

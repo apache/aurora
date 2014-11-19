@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.async;
 
-import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -156,8 +155,8 @@ public class TaskHistoryPruner implements EventSubscriber {
     executor.submit(new Runnable() {
       @Override
       public void run() {
-        Collection<IScheduledTask> inactiveTasks =
-            Storage.Util.weaklyConsistentFetchTasks(storage, jobHistoryQuery(jobKey));
+        Set<IScheduledTask> inactiveTasks =
+            Storage.Util.fetchTasks(storage, jobHistoryQuery(jobKey));
         int tasksToPrune = inactiveTasks.size() - settings.perJobHistoryGoal;
         if (tasksToPrune > 0 && inactiveTasks.size() > settings.perJobHistoryGoal) {
           Set<String> toPrune = FluentIterable

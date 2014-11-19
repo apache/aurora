@@ -44,7 +44,7 @@ public class DbLockStoreTest {
   private void assertLocks(final ILock... expected) {
     assertEquals(
         ImmutableSet.<ILock>builder().add(expected).build(),
-        storage.consistentRead(new Quiet<Set<ILock>>() {
+        storage.read(new Quiet<Set<ILock>>() {
           @Override
           public Set<ILock> apply(Storage.StoreProvider storeProvider) {
             return storeProvider.getLockStore().fetchLocks();
@@ -53,7 +53,7 @@ public class DbLockStoreTest {
   }
 
   private Optional<ILock> getLock(final ILockKey key) {
-    return storage.consistentRead(new Quiet<Optional<ILock>>() {
+    return storage.read(new Quiet<Optional<ILock>>() {
       @Override
       public Optional<ILock> apply(StoreProvider storeProvider) {
         return storeProvider.getLockStore().fetchLock(key);

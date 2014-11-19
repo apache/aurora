@@ -211,7 +211,7 @@ public class CronJobManagerImplTest extends EasyMockTest {
   }
 
   private Optional<IJobConfiguration> fetchFromStorage() {
-    return storage.consistentRead(new Storage.Work.Quiet<Optional<IJobConfiguration>>() {
+    return storage.read(new Storage.Work.Quiet<Optional<IJobConfiguration>>() {
       @Override
       public Optional<IJobConfiguration> apply(Storage.StoreProvider storeProvider) {
         return storeProvider.getJobStore().fetchJob(cronJobManager.getManagerKey(),

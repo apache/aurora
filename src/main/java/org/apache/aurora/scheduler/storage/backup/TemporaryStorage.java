@@ -88,7 +88,7 @@ interface TemporaryStorage {
 
         @Override
         public Set<IScheduledTask> fetchTasks(final Query.Builder query) {
-          return storage.consistentRead(new Work.Quiet<Set<IScheduledTask>>() {
+          return storage.read(new Work.Quiet<Set<IScheduledTask>>() {
             @Override
             public Set<IScheduledTask> apply(StoreProvider storeProvider) {
               return storeProvider.getTaskStore().fetchTasks(query);

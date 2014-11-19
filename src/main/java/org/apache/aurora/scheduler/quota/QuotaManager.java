@@ -193,7 +193,7 @@ public interface QuotaManager {
      * @return {@code QuotaInfo} with quota and consumption details.
      */
     private QuotaInfo getQuotaInfo(final String role, final Optional<IJobUpdate> requestedUpdate) {
-      return storage.consistentRead(new Work.Quiet<QuotaInfo>() {
+      return storage.read(new Work.Quiet<QuotaInfo>() {
         @Override
         public QuotaInfo apply(StoreProvider storeProvider) {
           FluentIterable<IScheduledTask> tasks = FluentIterable.from(

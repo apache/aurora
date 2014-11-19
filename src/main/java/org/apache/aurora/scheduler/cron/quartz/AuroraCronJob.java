@@ -205,7 +205,7 @@ class AuroraCronJob implements Job {
       delayedStartBackoff.doUntilSuccess(new Supplier<Boolean>() {
         @Override
         public Boolean get() {
-          if (Storage.Util.consistentFetchTasks(storage, query).isEmpty()) {
+          if (Storage.Util.fetchTasks(storage, query).isEmpty()) {
             LOG.info("Initiating delayed launch of cron " + path);
             storage.write(new Storage.MutateWork.NoResult.Quiet() {
               @Override

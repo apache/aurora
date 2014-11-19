@@ -140,7 +140,7 @@ public class DbAttributeStoreTest {
   }
 
   private Optional<IHostAttributes> read(final String host) {
-    return storage.consistentRead(new Work.Quiet<Optional<IHostAttributes>>() {
+    return storage.read(new Work.Quiet<Optional<IHostAttributes>>() {
       @Override
       public Optional<IHostAttributes> apply(StoreProvider storeProvider) {
         return storeProvider.getAttributeStore().getHostAttributes(host);
@@ -149,7 +149,7 @@ public class DbAttributeStoreTest {
   }
 
   private Set<IHostAttributes> readAll() {
-    return storage.consistentRead(new Work.Quiet<Set<IHostAttributes>>() {
+    return storage.read(new Work.Quiet<Set<IHostAttributes>>() {
       @Override
       public Set<IHostAttributes> apply(StoreProvider storeProvider) {
         return storeProvider.getAttributeStore().getHostAttributes();

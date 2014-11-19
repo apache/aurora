@@ -497,9 +497,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   private List<ScheduledTask> getTasks(TaskQuery query) {
     requireNonNull(query);
 
-    Iterable<IScheduledTask> tasks =
-        Storage.Util.weaklyConsistentFetchTasks(storage, Query.arbitrary(query));
-
+    Iterable<IScheduledTask> tasks = Storage.Util.fetchTasks(storage, Query.arbitrary(query));
     if (query.isSetOffset()) {
       tasks = Iterables.skip(tasks, query.getOffset());
     }
@@ -558,7 +556,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     IJobKey jobKey = JobKeys.assertValid(IJobKey.build(job));
 
     Set<IScheduledTask> activeTasks =
-        Storage.Util.weaklyConsistentFetchTasks(storage, Query.jobScoped(jobKey).active());
+        Storage.Util.fetchTasks(storage, Query.jobScoped(jobKey).active());
 
     Iterable<IAssignedTask> assignedTasks =
         Iterables.transform(activeTasks, Tasks.SCHEDULED_TO_ASSIGNED);
@@ -578,7 +576,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   @Override
   public Response getRoleSummary() {
     Multimap<String, IJobKey> jobsByRole = mapByRole(
-        Storage.Util.weaklyConsistentFetchTasks(storage, Query.unscoped()),
+        Storage.Util.fetchTasks(storage, Query.unscoped()),
         Tasks.SCHEDULED_TO_JOB_KEY);
 
     Multimap<String, IJobKey> cronJobsByRole = mapByRole(
@@ -674,7 +672,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   private Multimap<IJobKey, IScheduledTask> getTasks(Query.Builder query) {
-    return Tasks.byJobKey(Storage.Util.weaklyConsistentFetchTasks(storage, query));
+    return Tasks.byJobKey(Storage.Util.fetchTasks(storage, query));
   }
 
   private static <T> Multimap<String, IJobKey> mapByRole(
@@ -1538,7 +1536,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     final IJobUpdateQuery query = IJobUpdateQuery.build(requireNonNull(mutableQuery));
     return okResponse(Result.getJobUpdateSummariesResult(
         new GetJobUpdateSummariesResult().setUpdateSummaries(IJobUpdateSummary.toBuildersList(
-            storage.weaklyConsistentRead(new Work.Quiet<List<IJobUpdateSummary>>() {
+            storage.read(new Work.Quiet<List<IJobUpdateSummary>>() {
               @Override
               public List<IJobUpdateSummary> apply(StoreProvider storeProvider) {
                 return storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(query);
@@ -1550,7 +1548,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   public Response getJobUpdateDetails(final String updateId) {
     requireNonNull(updateId);
     Optional<IJobUpdateDetails> details =
-        storage.weaklyConsistentRead(new Work.Quiet<Optional<IJobUpdateDetails>>() {
+        storage.read(new Work.Quiet<Optional<IJobUpdateDetails>>() {
           @Override
           public Optional<IJobUpdateDetails> apply(StoreProvider storeProvider) {
             return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(updateId);

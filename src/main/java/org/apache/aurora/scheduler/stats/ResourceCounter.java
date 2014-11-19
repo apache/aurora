@@ -53,7 +53,7 @@ public class ResourceCounter {
 
   private Iterable<ITaskConfig> getTasks(Query.Builder query) throws StorageException {
     return Iterables.transform(
-        Storage.Util.consistentFetchTasks(storage, query),
+        Storage.Util.fetchTasks(storage, query),
         Tasks.SCHEDULED_TO_INFO);
   }
 
@@ -91,7 +91,7 @@ public class ResourceCounter {
    * @throws StorageException if there was a problem fetching quotas from storage.
    */
   public Metric computeQuotaAllocationTotals() throws StorageException {
-    return storage.weaklyConsistentRead(new Work.Quiet<Metric>() {
+    return storage.read(new Work.Quiet<Metric>() {
       @Override
       public Metric apply(StoreProvider storeProvider) {
         Metric allocation = new Metric();

@@ -55,7 +55,7 @@ public class DbSchedulerStoreTest {
   }
 
   private Optional<String> select() {
-    return storage.consistentRead(new Work.Quiet<Optional<String>>() {
+    return storage.read(new Work.Quiet<Optional<String>>() {
       @Override
       public Optional<String> apply(StoreProvider storeProvider) {
         return storeProvider.getSchedulerStore().fetchFrameworkId();

@@ -25,7 +25,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.twitter.common.quantity.Amount;
@@ -147,8 +146,8 @@ public interface RescheduleCalculator {
         return Optional.absent();
       }
 
-      ImmutableSet<IScheduledTask> res =
-          Storage.Util.weaklyConsistentFetchTasks(storage, Query.taskScoped(task.getAncestorId()));
+      Set<IScheduledTask> res =
+          Storage.Util.fetchTasks(storage, Query.taskScoped(task.getAncestorId()));
 
       return Optional.fromNullable(Iterables.getOnlyElement(res, null));
     }

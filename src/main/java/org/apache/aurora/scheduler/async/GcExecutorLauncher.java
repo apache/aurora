@@ -179,9 +179,7 @@ public class GcExecutorLauncher implements TaskLauncher {
   }
 
   private TaskInfo makeGcTask(String hostName, SlaveID slaveId) {
-    Set<IScheduledTask> tasksOnHost =
-        Storage.Util.weaklyConsistentFetchTasks(storage, Query.slaveScoped(hostName));
-
+    Set<IScheduledTask> tasksOnHost = Storage.Util.fetchTasks(storage, Query.slaveScoped(hostName));
     tasksCreated.incrementAndGet();
     return makeGcTask(
         hostName,

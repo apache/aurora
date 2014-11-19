@@ -256,7 +256,7 @@ public class SnapshotStoreImpl implements SnapshotStore<Snapshot> {
   @Timed("snapshot_create")
   @Override
   public Snapshot createSnapshot() {
-    return storage.consistentRead(new Work.Quiet<Snapshot>() {
+    return storage.read(new Work.Quiet<Snapshot>() {
       @Override
       public Snapshot apply(StoreProvider storeProvider) {
         Snapshot snapshot = new Snapshot();

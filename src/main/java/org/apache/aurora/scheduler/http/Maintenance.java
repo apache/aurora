@@ -58,7 +58,7 @@ public class Maintenance {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   public Response getHosts() {
-    return storage.weaklyConsistentRead(new Work.Quiet<Response>() {
+    return storage.read(new Work.Quiet<Response>() {
       @Override
       public Response apply(StoreProvider storeProvider) {
         Multimap<MaintenanceMode, String> hostsByMode =

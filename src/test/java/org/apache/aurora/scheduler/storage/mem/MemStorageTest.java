@@ -45,7 +45,6 @@ import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IResourceAggregate;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.testing.FakeStatsProvider;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -58,7 +57,6 @@ import static org.junit.Assert.fail;
 public class MemStorageTest extends TearDownTestCase {
 
   private ExecutorService executor;
-  private FakeStatsProvider statsProvider;
   private Storage storage;
 
   @Before
@@ -71,8 +69,7 @@ public class MemStorageTest extends TearDownTestCase {
         new ExecutorServiceShutdown(executor, Amount.of(1L, Time.SECONDS)).execute();
       }
     });
-    statsProvider = new FakeStatsProvider();
-    storage = MemStorage.newEmptyStorage(statsProvider);
+    storage = MemStorage.newEmptyStorage();
   }
 
   @Test
@@ -85,7 +82,7 @@ public class MemStorageTest extends TearDownTestCase {
     Future<String> future = executor.submit(new Callable<String>() {
       @Override
       public String call() throws Exception {
-        return storage.consistentRead(new Work.Quiet<String>() {
+        return storage.read(new Work.Quiet<String>() {
           @Override
           public String apply(StoreProvider storeProvider) {
             slowReadStarted.countDown();
@@ -102,7 +99,7 @@ public class MemStorageTest extends TearDownTestCase {
 
     slowReadStarted.await();
 
-    String fastResult = storage.consistentRead(new Work.Quiet<String>() {
+    String fastResult = storage.read(new Work.Quiet<String>() {
       @Override
       public String apply(StoreProvider storeProvider) {
         return "fastResult";
@@ -111,13 +108,6 @@ public class MemStorageTest extends TearDownTestCase {
     assertEquals("fastResult", fastResult);
     slowReadFinished.countDown();
     assertEquals("slowResult", future.get());
-
-    // It would be nice to check the stat values (specifically with simulated lock contention, but
-    // this value is based off ReentrantReadWriteLock#getQueueLength(), which is documented as an
-    // approximation and not a guaranteed accurate value.
-    assertEquals(
-        ImmutableSet.of(MemStorage.THREADS_WAITING_GAUGE),
-        statsProvider.getAllValues().keySet());
   }
 
   private IScheduledTask makeTask(String taskId) {
@@ -143,7 +133,7 @@ public class MemStorageTest extends TearDownTestCase {
   }
 
   private void expectTasks(final String... taskIds) {
-    storage.consistentRead(new Work.Quiet<Void>() {
+    storage.read(new Work.Quiet<Void>() {
       @Override
       public Void apply(StoreProvider storeProvider) {
         Query.Builder query = Query.unscoped();
@@ -174,12 +164,12 @@ public class MemStorageTest extends TearDownTestCase {
       // Expected
     }
 
-    storage.consistentRead(new Work.Quiet<Void>() {
+    storage.read(new Work.Quiet<Void>() {
       @Override
       public Void apply(StoreProvider storeProvider) {
         // If the previous write was under a transaction then there would be no quota records.
         assertEquals(ImmutableMap.<String, IResourceAggregate>of(),
-                storeProvider.getQuotaStore().fetchQuotas());
+            storeProvider.getQuotaStore().fetchQuotas());
         return null;
       }
     });
@@ -221,7 +211,7 @@ public class MemStorageTest extends TearDownTestCase {
       }
     });
     expectTasks("a");
-    storage.consistentRead(new Work.Quiet<Void>() {
+    storage.read(new Work.Quiet<Void>() {
       @Override
       public Void apply(StoreProvider storeProvider) {
         assertEquals(

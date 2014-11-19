@@ -167,7 +167,7 @@ class TaskVars extends AbstractIdleService implements EventSubscriber {
     if (Strings.isNullOrEmpty(task.getAssignedTask().getSlaveHost())) {
       rack = Optional.absent();
     } else {
-      rack = storage.consistentRead(new Work.Quiet<Optional<String>>() {
+      rack = storage.read(new Work.Quiet<Optional<String>>() {
         @Override
         public Optional<String> apply(StoreProvider storeProvider) {
           Optional<IAttribute> rack = FluentIterable

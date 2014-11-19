@@ -56,14 +56,7 @@ class FakeNonVolatileStorage implements NonVolatileStorage {
   }
 
   @Override
-  public <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work)
-      throws StorageException, E {
-
-    return delegate.weaklyConsistentRead(work);
-  }
-
-  @Override
-  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
-    return delegate.consistentRead(work);
+  public <T, E extends Exception> T read(Work<T, E> work) throws StorageException, E {
+    return delegate.read(work);
   }
 }

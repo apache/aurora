@@ -22,6 +22,7 @@ import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,6 +37,7 @@ import com.twitter.common.base.Closure;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
+import com.twitter.common.stats.SlidingStats;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
@@ -185,6 +187,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   private final QuotaStore.Mutable writeBehindQuotaStore;
   private final AttributeStore.Mutable writeBehindAttributeStore;
   private final JobUpdateStore.Mutable writeBehindJobUpdateStore;
+  private final ReentrantLock writeLock;
 
   private StreamManager streamManager;
   private final WriteAheadStorage writeAheadStorage;
@@ -196,22 +199,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   private boolean recovered = false;
   private StreamTransaction transaction = null;
 
-  /**
-   * Identifies the grace period to give in-process snapshots and checkpoints to complete during
-   * shutdown.
-   */
-  @Retention(RetentionPolicy.RUNTIME)
-  @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @Qualifier
-  public @interface ShutdownGracePeriod { }
-
-  /**
-   * Identifies the interval between snapshots of local storage truncating the log.
-   */
-  @Retention(RetentionPolicy.RUNTIME)
-  @Target({ ElementType.PARAMETER, ElementType.METHOD })
-  @Qualifier
-  public @interface SnapshotInterval { }
+  private final SlidingStats writerWaitStats =
+      new SlidingStats("log_storage_write_lock_wait", "ns");
 
   /**
    * Identifies a local storage layer that is written to only after first ensuring the write
@@ -229,9 +218,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   LogStorage(
       LogManager logManager,
       ShutdownRegistry shutdownRegistry,
-      @ShutdownGracePeriod Amount<Long, Time> shutdownGracePeriod,
+      Settings settings,
       SnapshotStore<Snapshot> snapshotStore,
-      @SnapshotInterval Amount<Long, Time> snapshotInterval,
       @WriteBehind Storage storage,
       @WriteBehind SchedulerStore.Mutable schedulerStore,
       @WriteBehind JobStore.Mutable jobStore,
@@ -240,12 +228,13 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       @WriteBehind QuotaStore.Mutable quotaStore,
       @WriteBehind AttributeStore.Mutable attributeStore,
       @WriteBehind JobUpdateStore.Mutable jobUpdateStore,
-      EventSink eventSink) {
+      EventSink eventSink,
+      ReentrantLock writeLock) {
 
     this(logManager,
-        new ScheduledExecutorSchedulingService(shutdownRegistry, shutdownGracePeriod),
+        new ScheduledExecutorSchedulingService(shutdownRegistry, settings.getShutdownGracePeriod()),
         snapshotStore,
-        snapshotInterval,
+        settings.getSnapshotInterval(),
         storage,
         schedulerStore,
         jobStore,
@@ -254,7 +243,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         quotaStore,
         attributeStore,
         jobUpdateStore,
-        eventSink);
+        eventSink,
+        writeLock);
   }
 
   @VisibleForTesting
@@ -271,7 +261,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       QuotaStore.Mutable quotaStore,
       AttributeStore.Mutable attributeStore,
       JobUpdateStore.Mutable jobUpdateStore,
-      EventSink eventSink) {
+      EventSink eventSink,
+      ReentrantLock writeLock) {
 
     this.logManager = requireNonNull(logManager);
     this.schedulingService = requireNonNull(schedulingService);
@@ -290,6 +281,7 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     this.writeBehindQuotaStore = requireNonNull(quotaStore);
     this.writeBehindAttributeStore = requireNonNull(attributeStore);
     this.writeBehindJobUpdateStore = requireNonNull(jobUpdateStore);
+    this.writeLock = requireNonNull(writeLock);
     TransactionManager transactionManager = new TransactionManager() {
       @Override
       public boolean hasActiveTransaction() {
@@ -319,7 +311,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
 
   @VisibleForTesting
   final Map<LogEntry._Fields, Closure<LogEntry>> buildLogEntryReplayActions() {
-
     return ImmutableMap.<LogEntry._Fields, Closure<LogEntry>>builder()
         .put(LogEntry._Fields.SNAPSHOT, new Closure<LogEntry>() {
           @Override
@@ -347,12 +338,12 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
           public void execute(LogEntry item) throws RuntimeException {
             // Nothing to do here
           }
-        }).build();
+        })
+        .build();
   }
 
   @VisibleForTesting
   final Map<Op._Fields, Closure<Op>> buildTransactionReplayActions() {
-
     return ImmutableMap.<Op._Fields, Closure<Op>>builder()
         .put(Op._Fields.SAVE_FRAMEWORK_ID, new Closure<Op>() {
           @Override
@@ -481,9 +472,6 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     } catch (IOException e) {
       throw new IllegalStateException("Failed to open the log, cannot continue", e);
     }
-
-    // TODO(John Sirois): start incremental recovery here from the log and do a final recovery
-    // catchup in start after shutting down the incremental syncer.
   }
 
   @Override
@@ -586,11 +574,11 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
         Snapshot snapshot = snapshotStore.createSnapshot();
         persist(snapshot);
         LOG.info("Snapshot complete."
-                 + " host attrs: " + snapshot.getHostAttributesSize()
-                 + ", jobs: " + snapshot.getJobsSize()
-                 + ", locks: " + snapshot.getLocksSize()
-                 + ", quota confs: " + snapshot.getQuotaConfigurationsSize()
-                 + ", tasks: " + snapshot.getTasksSize());
+            + " host attrs: " + snapshot.getHostAttributesSize()
+            + ", jobs: " + snapshot.getJobsSize()
+            + ", locks: " + snapshot.getLocksSize()
+            + ", quota confs: " + snapshot.getQuotaConfigurationsSize()
+            + ", tasks: " + snapshot.getTasksSize());
       }
     });
   }
@@ -603,15 +591,8 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
     streamManager.snapshot(snapshot);
   }
 
-  @Override
-  public synchronized <T, E extends Exception> T write(final MutateWork<T, E> work)
+  private <T, E extends Exception> T doInTransaction(final MutateWork<T, E> work)
       throws StorageException, E {
-
-    // We don't want to use the log when recovering from it, we just want to update the underlying
-    // store - so pass mutations straight through to the underlying storage.
-    if (!recovered) {
-      return writeBehindStorage.write(work);
-    }
 
     // The log stream transaction has already been set up so we just need to delegate with our
     // store provider so any mutations performed by work get logged.
@@ -643,15 +624,26 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
   }
 
   @Override
-  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
-    return writeBehindStorage.consistentRead(work);
+  public <T, E extends Exception> T write(final MutateWork<T, E> work) throws StorageException, E {
+    long waitStart = System.nanoTime();
+    writeLock.lock();
+    try {
+      writerWaitStats.accumulate(System.nanoTime() - waitStart);
+      // We don't want to use the log when recovering from it, we just want to update the underlying
+      // store - so pass mutations straight through to the underlying storage.
+      if (!recovered) {
+        return writeBehindStorage.write(work);
+      }
+
+      return doInTransaction(work);
+    } finally {
+      writeLock.unlock();
+    }
   }
 
   @Override
-  public <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work)
-      throws StorageException, E {
-
-    return writeBehindStorage.weaklyConsistentRead(work);
+  public <T, E extends Exception> T read(Work<T, E> work) throws StorageException, E {
+    return writeBehindStorage.read(work);
   }
 
   @Override
@@ -664,6 +656,27 @@ public class LogStorage implements NonVolatileStorage, DistributedSnapshotStore 
       throw new StorageException("Saved snapshot but failed to truncate entries preceding it", e);
     } catch (StreamAccessException e) {
       throw new StorageException("Failed to create a snapshot", e);
+    }
+  }
+
+  /**
+   * Configuration settings for log storage.
+   */
+  public static class Settings {
+    private final Amount<Long, Time> shutdownGracePeriod;
+    private final Amount<Long, Time> snapshotInterval;
+
+    public Settings(Amount<Long, Time> shutdownGracePeriod, Amount<Long, Time> snapshotInterval) {
+      this.shutdownGracePeriod = requireNonNull(shutdownGracePeriod);
+      this.snapshotInterval = requireNonNull(snapshotInterval);
+    }
+
+    public Amount<Long, Time> getShutdownGracePeriod() {
+      return shutdownGracePeriod;
+    }
+
+    public Amount<Long, Time> getSnapshotInterval() {
+      return snapshotInterval;
     }
   }
 }

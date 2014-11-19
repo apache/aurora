@@ -96,7 +96,7 @@ public class LockManagerImpl implements LockManager {
   public void validateIfLocked(final ILockKey context, Optional<ILock> heldLock)
       throws LockException {
 
-    Optional<ILock> stored = storage.consistentRead(new Work.Quiet<Optional<ILock>>() {
+    Optional<ILock> stored = storage.read(new Work.Quiet<Optional<ILock>>() {
       @Override
       public Optional<ILock> apply(StoreProvider storeProvider) {
         return storeProvider.getLockStore().fetchLock(context);
@@ -125,7 +125,7 @@ public class LockManagerImpl implements LockManager {
 
   @Override
   public Iterable<ILock> getLocks() {
-    return storage.weaklyConsistentRead(new Work.Quiet<Iterable<ILock>>() {
+    return storage.read(new Work.Quiet<Iterable<ILock>>() {
       @Override
       public Iterable<ILock> apply(StoreProvider storeProvider) {
         return storeProvider.getLockStore().fetchLocks();

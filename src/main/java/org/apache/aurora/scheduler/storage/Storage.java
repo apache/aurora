@@ -22,7 +22,7 @@ import javax.inject.Qualifier;
 
 import com.google.common.collect.ImmutableSet;
 
-import org.apache.aurora.scheduler.base.Query;
+import org.apache.aurora.scheduler.base.Query.Builder;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
@@ -175,8 +175,12 @@ public interface Storage {
   }
 
   /**
-   * Executes the unit of read-only {@code work}.  All data in the stores may be expected to be
-   * consistent, as the invocation is mutually exclusive of any writes.
+   * Executes the unit of read-only {@code work}.  The consistency model creates the possibility
+   * for a reader to read uncommitted state from a concurrent writer.
+   * <p>
+   * TODO(wfarner): Update this documentation once all stores are backed by
+   * {@link org.apache.aurora.scheduler.storage.db.DbStorage}, as the concurrency behavior will then
+   * be dictated by the {@link org.mybatis.guice.transactional.Transactional#isolation()} used.
    *
    * @param work The unit of work to execute.
    * @param <T> The type of result this unit of work produces.
@@ -185,21 +189,7 @@ public interface Storage {
    * @throws StorageException if there was a problem reading from stable storage.
    * @throws E bubbled transparently when the unit of work throws
    */
-  <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E;
-
-  /**
-   * Executes a unit of read-only {@code work}.  This is functionally identical to
-   * {@link #consistentRead(Work)} with the exception that data in the stores may not be fully
-   * consistent.
-   *
-   * @param work The unit of work to execute.
-   * @param <T> The type of result this unit of work produces.
-   * @param <E> The type of exception this unit of work can throw.
-   * @return the result when the unit of work completes successfully
-   * @throws StorageException if there was a problem reading from stable storage.
-   * @throws E bubbled transparently when the unit of work throws
-   */
-  <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work) throws StorageException, E;
+  <T, E extends Exception> T read(Work<T, E> work) throws StorageException, E;
 
   /**
    * Executes the unit of mutating {@code work}.
@@ -234,7 +224,7 @@ public interface Storage {
      *
      * @param initializationLogic work to perform after this storage system is ready but before
      *     allowing general use of
-     *     {@link #consistentRead}.
+     *     {@link #read}.
      * @throws StorageException if there was a starting storage.
      */
     void start(MutateWork.NoResult.Quiet initializationLogic) throws StorageException;
@@ -274,37 +264,13 @@ public interface Storage {
      * Fetch tasks matching the query returned by {@code query} from {@code storage} in a
      * read operation.
      *
-     * @see #consistentFetchTasks
+     * @see #fetchTasks
      * @param storage Storage instance to query from.
      * @param query Builder of the query to perform.
      * @return Tasks returned from the query.
      */
-    public static ImmutableSet<IScheduledTask> consistentFetchTasks(
-        Storage storage,
-        final Query.Builder query) {
-
-      return storage.consistentRead(new Work.Quiet<ImmutableSet<IScheduledTask>>() {
-        @Override
-        public ImmutableSet<IScheduledTask> apply(StoreProvider storeProvider) {
-          return storeProvider.getTaskStore().fetchTasks(query);
-        }
-      });
-    }
-
-    /**
-     * Identical to {@link #consistentFetchTasks(Storage, Query.Builder)}, but fetches tasks using a
-     * weakly-consistent read operation.
-     *
-     * @see #consistentFetchTasks
-     * @param storage Storage instance to query from.
-     * @param query Builder of the query to perform.
-     * @return Tasks returned from the query.
-     */
-    public static ImmutableSet<IScheduledTask> weaklyConsistentFetchTasks(
-        Storage storage,
-        final Query.Builder query) {
-
-      return storage.weaklyConsistentRead(new Work.Quiet<ImmutableSet<IScheduledTask>>() {
+    public static ImmutableSet<IScheduledTask> fetchTasks(Storage storage, final Builder query) {
+      return storage.read(new Work.Quiet<ImmutableSet<IScheduledTask>>() {
         @Override
         public ImmutableSet<IScheduledTask> apply(StoreProvider storeProvider) {
           return storeProvider.getTaskStore().fetchTasks(query);

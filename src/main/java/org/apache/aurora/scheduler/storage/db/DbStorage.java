@@ -46,14 +46,13 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * A storage implementation backed by a relational database.
- *
- * <p>Delegates read and write concurrency semantics to the underlying database.
- * In this implementation, {@link #weaklyConsistentRead(Work)} and {@link #consistentRead(Work)}
- * have identical behaviour as they are both annotated by
- * {@link org.mybatis.guice.transactional.Transactional}. This class is currently only
- * partially implemented, with the underlying {@link MutableStoreProvider} only providing
- * a {@link LockStore.Mutable} implementation. It is designed to be a long term replacement
- * for {@link org.apache.aurora.scheduler.storage.mem.MemStorage}.</p>
+ * <p>
+ * Delegates read and write concurrency semantics to the underlying database.
+ * This class is currently only partially implemented, with the underlying
+ * {@link MutableStoreProvider} only providing some, but not all, store implementations. It is
+ * designed to be a long term replacement for
+ * {@link org.apache.aurora.scheduler.storage.mem.MemStorage}.
+ * </p>
  */
 class DbStorage extends AbstractIdleService implements Storage {
 
@@ -123,19 +122,7 @@ class DbStorage extends AbstractIdleService implements Storage {
 
   @Override
   @Transactional
-  public <T, E extends Exception> T consistentRead(Work<T, E> work) throws StorageException, E {
-    try {
-      return work.apply(storeProvider);
-    } catch (PersistenceException e) {
-      throw new StorageException(e.getMessage(), e);
-    }
-  }
-
-  @Override
-  @Transactional
-  public <T, E extends Exception> T weaklyConsistentRead(Work<T, E> work)
-      throws StorageException, E {
-
+  public <T, E extends Exception> T read(Work<T, E> work) throws StorageException, E {
     try {
       return work.apply(storeProvider);
     } catch (PersistenceException e) {

@@ -88,7 +88,7 @@ public class KillRetry implements EventSubscriber {
     @Override
     public void run() {
       Query.Builder query = Query.taskScoped(taskId).byStatus(ScheduleStatus.KILLING);
-      if (!Storage.Util.weaklyConsistentFetchTasks(storage, query).isEmpty()) {
+      if (!Storage.Util.fetchTasks(storage, query).isEmpty()) {
         LOG.info("Task " + taskId + " not yet killed, retrying.");
 
         // Kill did not yet take effect, try again.

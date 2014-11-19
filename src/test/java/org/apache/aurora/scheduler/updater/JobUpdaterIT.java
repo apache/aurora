@@ -217,7 +217,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
   private String getTaskId(IJobKey job, int instanceId) {
     return Tasks.id(Iterables.getOnlyElement(
-        Storage.Util.consistentFetchTasks(
+        Storage.Util.fetchTasks(
             storage,
             Query.instanceScoped(job, instanceId).active())));
   }
@@ -271,7 +271,7 @@ public class JobUpdaterIT extends EasyMockTest {
       JobUpdateStatus expected,
       Multimap<Integer, JobUpdateAction> expectedActions) {
 
-    IJobUpdateDetails details = storage.consistentRead(new Work.Quiet<IJobUpdateDetails>() {
+    IJobUpdateDetails details = storage.read(new Work.Quiet<IJobUpdateDetails>() {
       @Override
       public IJobUpdateDetails apply(StoreProvider storeProvider) {
         return storeProvider.getJobUpdateStore().fetchJobUpdateDetails(UPDATE_ID).get();
@@ -314,7 +314,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
   private void assertJobState(IJobKey job, Map<Integer, ITaskConfig> expected) {
     Iterable<IScheduledTask> tasks =
-        Storage.Util.consistentFetchTasks(storage, Query.jobScoped(job).active());
+        Storage.Util.fetchTasks(storage, Query.jobScoped(job).active());
 
     Map<Integer, IScheduledTask> tasksByInstance =
         Maps.uniqueIndex(tasks, Tasks.SCHEDULED_TO_INSTANCE_ID);
