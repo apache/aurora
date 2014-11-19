@@ -148,27 +148,35 @@ def wait_kill_tasks(scheduler, job_key, instances=None):
     die('Tasks were not killed in time.')
 
 
-@app.command
-def version(args):
-  """usage: version
+_API_VERSION_MESSAGE = "Aurora API version: %s" % CURRENT_API_VERSION
+_BUILD_INFO_HEADER = "Aurora client build info:"
+_NO_BUILD_INFO_MESSAGE = "Aurora client build info not available"
 
-  Prints information about the version of the aurora client being run.
-  """
+
+def _version(_argv=sys.argv, _print=print, _from_pex=PexInfo.from_pex):
   try:
-    pex_info = PexInfo.from_pex(sys.argv[0])
-    properties = pex_info.build_properties
+    properties = _from_pex(_argv[0]).build_properties
     # Different versions of pants/pex set different keys in the PEX-INFO file. This approach
     # attempts to work regardless of the pants/pex version used.
     build_sha = properties.get('sha', properties.get('revision'))
     build_date = properties.get('date', properties.get('datetime'))
 
-    print("Aurora client build info:")
-    print("\tsha: %s" % build_sha)
-    print("\tdate: %s" % build_date)
+    _print(_BUILD_INFO_HEADER)
+    _print("\tsha: %s" % build_sha)
+    _print("\tdate: %s" % build_date)
 
-  except (IOError, OSError, BadZipfile):
-    print("Aurora client build info not available")
-  print("Aurora API version: %s" % CURRENT_API_VERSION)
+  except (AttributeError, IOError, OSError, BadZipfile):
+    _print(_NO_BUILD_INFO_MESSAGE)
+  _print(_API_VERSION_MESSAGE)
+
+
+@app.command
+def version():
+  """usage: version
+
+  Prints information about the version of the aurora client being run.
+  """
+  _version()
 
 
 def maybe_disable_hooks(options):
