@@ -43,6 +43,7 @@ import org.apache.aurora.scheduler.events.EventSink;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
@@ -134,7 +135,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
   }
 
   private void expectAssigned(IScheduledTask task) {
-    expect(assigner.maybeAssign(storageUtil.mutableStoreProvider, OFFER, task, emptyJob))
+    expect(assigner.maybeAssign(
+        storageUtil.mutableStoreProvider,
+        OFFER,
+        new ResourceRequest(task.getAssignedTask().getTask(), Tasks.id(task), emptyJob)))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
   }
 
@@ -194,7 +198,10 @@ public class TaskSchedulerImplTest extends EasyMockTest {
 
     Capture<Function<HostOffer, Optional<TaskInfo>>> secondAssignment = expectLaunchAttempt(true);
 
-    expect(assigner.maybeAssign(storageUtil.mutableStoreProvider, OFFER, TASK_B, emptyJob))
+    expect(assigner.maybeAssign(
+        storageUtil.mutableStoreProvider,
+        OFFER,
+        new ResourceRequest(TASK_B.getAssignedTask().getTask(), Tasks.id(TASK_B), emptyJob)))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
 
     control.replay();
@@ -307,8 +314,7 @@ public class TaskSchedulerImplTest extends EasyMockTest {
     expect(assigner.maybeAssign(
         EasyMock.<MutableStoreProvider>anyObject(),
         eq(OFFER),
-        eq(taskA),
-        eq(emptyJob)))
+        eq(new ResourceRequest(taskA.getAssignedTask().getTask(), Tasks.id(taskA), emptyJob))))
         .andReturn(Optional.of(TaskInfo.getDefaultInstance()));
 
     control.replay();

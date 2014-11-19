@@ -26,6 +26,7 @@ import javax.inject.Qualifier;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
+import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -50,11 +51,14 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -105,14 +109,6 @@ public interface Preemptor {
     @VisibleForTesting
     static final Query.Builder CANDIDATE_QUERY = Query.statusScoped(
         EnumSet.copyOf(Sets.difference(Tasks.SLAVE_ASSIGNED_STATES, EnumSet.of(PREEMPTING))));
-
-    private static final Function<IAssignedTask, Integer> GET_PRIORITY =
-        new Function<IAssignedTask, Integer>() {
-          @Override
-          public Integer apply(IAssignedTask task) {
-            return task.getTask().getPriority();
-          }
-        };
 
     private final AtomicLong tasksPreempted = Stats.exportLong("preemptor_tasks_preempted");
     // Incremented every time the preemptor is invoked and finds tasks pending and preemptable tasks
@@ -184,20 +180,11 @@ public interface Preemptor {
           }
         };
 
-    private static Predicate<IAssignedTask> canPreempt(final IAssignedTask pending) {
-      return new Predicate<IAssignedTask>() {
-        @Override
-        public boolean apply(IAssignedTask possibleVictim) {
-          return preemptionFilter(possibleVictim).apply(pending);
-        }
-      };
-    }
-
     private static final Function<IAssignedTask, ResourceSlot> TASK_TO_RESOURCES =
         new Function<IAssignedTask, ResourceSlot>() {
           @Override
-          public ResourceSlot apply(IAssignedTask input) {
-            return ResourceSlot.from(input.getTask());
+          public ResourceSlot apply(IAssignedTask task) {
+            return ResourceSlot.from(task.getTask());
           }
         };
 
@@ -239,7 +226,7 @@ public interface Preemptor {
         Iterable<IAssignedTask> possibleVictims,
         Iterable<HostOffer> offers,
         IAssignedTask pendingTask,
-        AttributeAggregate attributeAggregate) {
+        AttributeAggregate jobState) {
 
       // This enforces the precondition that all of the resources are from the same host. We need to
       // get the host for the schedulingFilter.
@@ -263,19 +250,18 @@ public interface Preemptor {
             FluentIterable.from(offers).transform(OFFER_TO_ATTRIBUTES).toSet());
 
         Set<SchedulingFilter.Veto> vetoes = schedulingFilter.filter(
-            slackResources,
-            attributes,
-            pendingTask.getTask(),
-            pendingTask.getTaskId(),
-            attributeAggregate);
+            new UnusedResource(slackResources, attributes),
+            new ResourceRequest(pendingTask.getTask(), pendingTask.getTaskId(), jobState));
 
         if (vetoes.isEmpty()) {
           return Optional.<Set<IAssignedTask>>of(ImmutableSet.<IAssignedTask>of());
         }
       }
 
-      FluentIterable<IAssignedTask> preemptableTasks =
-          FluentIterable.from(possibleVictims).filter(canPreempt(pendingTask));
+      FluentIterable<IAssignedTask> preemptableTasks = FluentIterable.from(possibleVictims)
+          .filter(Predicates.compose(
+              preemptionFilter(pendingTask.getTask()),
+              Tasks.ASSIGNED_TO_INFO));
 
       if (preemptableTasks.isEmpty()) {
         return Optional.absent();
@@ -299,11 +285,8 @@ public interface Preemptor {
         }
 
         Set<SchedulingFilter.Veto> vetoes = schedulingFilter.filter(
-            totalResource,
-            attributes.get(),
-            pendingTask.getTask(),
-            pendingTask.getTaskId(),
-            attributeAggregate);
+            new UnusedResource(totalResource, attributes.get()),
+            new ResourceRequest(pendingTask.getTask(), pendingTask.getTaskId(), jobState));
 
         if (vetoes.isEmpty()) {
           return Optional.<Set<IAssignedTask>>of(ImmutableSet.copyOf(toPreemptTasks));
@@ -329,12 +312,23 @@ public interface Preemptor {
           }
         };
 
+    /**
+     * Order by production flag (true, then false), subsorting by task ID.
+     * TODO(wfarner): Re-evaluate - what do we gain from sorting by task ID?
+     */
+    private static final Ordering<IAssignedTask> SCHEDULING_ORDER =
+        Ordering.explicit(true, false)
+            .onResultOf(Functions.compose(
+                Functions.forPredicate(Tasks.IS_PRODUCTION),
+                Tasks.ASSIGNED_TO_INFO))
+            .compound(Ordering.natural().onResultOf(Tasks.ASSIGNED_TO_ID));
+
     private Multimap<String, IAssignedTask> getSlavesToActiveTasks() {
       // Only non-pending active tasks may be preempted.
       List<IAssignedTask> activeTasks = fetch(CANDIDATE_QUERY);
 
       // Walk through the preemption candidates in reverse scheduling order.
-      Collections.sort(activeTasks, Tasks.SCHEDULING_ORDER.reverse());
+      Collections.sort(activeTasks, SCHEDULING_ORDER.reverse());
 
       // Group the tasks by slave id so they can be paired with offers from the same slave.
       return Multimaps.index(activeTasks, TASK_TO_SLAVE_ID);
@@ -402,9 +396,6 @@ public interface Preemptor {
       return Optional.absent();
     }
 
-    private static final Predicate<IAssignedTask> IS_PRODUCTION =
-        Predicates.compose(Tasks.IS_PRODUCTION, Tasks.ASSIGNED_TO_INFO);
-
     /**
      * Creates a static filter that will identify tasks that may preempt the provided task.
      * A task may preempt another task if the following conditions hold true:
@@ -412,47 +403,31 @@ public interface Preemptor {
      * - The tasks are owned by the same user and the priority of {@code preemptableTask} is lower
      *     OR {@code preemptableTask} is non-production and the compared task is production.
      *
-     * @param preemptableTask Task to possibly preempt.
+     * @param pendingTask A task that is not scheduled to possibly preempt other tasks for.
      * @return A filter that will compare the priorities and resources required by other tasks
      *     with {@code preemptableTask}.
      */
-    private static Predicate<IAssignedTask> preemptionFilter(IAssignedTask preemptableTask) {
-      Predicate<IAssignedTask> preemptableIsProduction = preemptableTask.getTask().isProduction()
-          ? Predicates.<IAssignedTask>alwaysTrue()
-          : Predicates.<IAssignedTask>alwaysFalse();
-
-      Predicate<IAssignedTask> priorityFilter =
-          greaterPriorityFilter(GET_PRIORITY.apply(preemptableTask));
-      return Predicates.or(
-          Predicates.and(Predicates.not(preemptableIsProduction), IS_PRODUCTION),
-          Predicates.and(isOwnedBy(getRole(preemptableTask)), priorityFilter)
-      );
-    }
-
-    private static Predicate<IAssignedTask> isOwnedBy(final String role) {
-      return new Predicate<IAssignedTask>() {
+    private static Predicate<ITaskConfig> preemptionFilter(final ITaskConfig pendingTask) {
+      return new Predicate<ITaskConfig>() {
         @Override
-        public boolean apply(IAssignedTask task) {
-          return getRole(task).equals(role);
+        public boolean apply(ITaskConfig possibleVictim) {
+          boolean pendingIsProduction = pendingTask.isProduction();
+          boolean victimIsProduction = possibleVictim.isProduction();
+
+          if (pendingIsProduction && !victimIsProduction) {
+            return true;
+          } else if (pendingIsProduction == victimIsProduction) {
+            // If production flags are equal, preemption is based on priority within the same role.
+            if (pendingTask.getJob().getRole().equals(possibleVictim.getJob().getRole())) {
+              return pendingTask.getPriority() > possibleVictim.getPriority();
+            } else {
+              return false;
+            }
+          } else {
+            return false;
+          }
         }
       };
-    }
-
-    private static String getRole(IAssignedTask task) {
-      return task.getTask().getJob().getRole();
-    }
-
-    private static Predicate<Integer> greaterThan(final int value) {
-      return new Predicate<Integer>() {
-        @Override
-        public boolean apply(Integer input) {
-          return input > value;
-        }
-      };
-    }
-
-    private static Predicate<IAssignedTask> greaterPriorityFilter(int priority) {
-      return Predicates.compose(greaterThan(priority), GET_PRIORITY);
     }
   }
 }

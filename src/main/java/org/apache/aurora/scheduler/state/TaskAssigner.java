@@ -22,14 +22,13 @@ import com.google.common.base.Optional;
 
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
-import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
-import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.mesos.Protos.TaskInfo;
 
 import static java.util.Objects.requireNonNull;
@@ -48,15 +47,13 @@ public interface TaskAssigner {
    *
    * @param storeProvider Storage provider.
    * @param offer The resource offer.
-   * @param task The task to match against and optionally assign.
-   * @param attributeAggregate Attribute information for tasks in the job containing {@code task}.
+   * @param resourceRequest The request for resources being scheduled.
    * @return Instructions for launching the task if matching and assignment were successful.
    */
   Optional<TaskInfo> maybeAssign(
       MutableStoreProvider storeProvider,
       HostOffer offer,
-      IScheduledTask task,
-      AttributeAggregate attributeAggregate);
+      ResourceRequest resourceRequest);
 
   class TaskAssignerImpl implements TaskAssigner {
     private static final Logger LOG = Logger.getLogger(TaskAssignerImpl.class.getName());
@@ -76,18 +73,22 @@ public interface TaskAssigner {
       this.taskFactory = requireNonNull(taskFactory);
     }
 
-    private TaskInfo assign(MutableStoreProvider storeProvider, Offer offer, IScheduledTask task) {
+    private TaskInfo assign(
+        MutableStoreProvider storeProvider,
+        Offer offer,
+        int numRequestedPorts,
+        String taskId) {
+
       String host = offer.getHostname();
-      Set<Integer> selectedPorts =
-          Resources.getPorts(offer, task.getAssignedTask().getTask().getRequestedPorts().size());
+      Set<Integer> selectedPorts = Resources.getPorts(offer, numRequestedPorts);
       IAssignedTask assigned = stateManager.assignTask(
           storeProvider,
-          Tasks.id(task),
+          taskId,
           host,
           offer.getSlaveId(),
           selectedPorts);
       LOG.info(String.format("Offer on slave %s (id %s) is being assigned task for %s.",
-          host, offer.getSlaveId().getValue(), Tasks.id(task)));
+          host, offer.getSlaveId().getValue(), taskId));
       return taskFactory.createFrom(assigned, offer.getSlaveId());
     }
 
@@ -95,20 +96,20 @@ public interface TaskAssigner {
     public Optional<TaskInfo> maybeAssign(
         MutableStoreProvider storeProvider,
         HostOffer offer,
-        IScheduledTask task,
-        AttributeAggregate attributeAggregate) {
+        ResourceRequest resourceRequest) {
 
       Set<Veto> vetoes = filter.filter(
-          ResourceSlot.from(offer.getOffer()),
-          offer.getAttributes(),
-          task.getAssignedTask().getTask(),
-          Tasks.id(task),
-          attributeAggregate);
+          new UnusedResource(ResourceSlot.from(offer.getOffer()), offer.getAttributes()),
+          resourceRequest);
       if (vetoes.isEmpty()) {
-        return Optional.of(assign(storeProvider, offer.getOffer(), task));
+        return Optional.of(assign(
+            storeProvider,
+            offer.getOffer(),
+            resourceRequest.getNumRequestedPorts(),
+            resourceRequest.getTaskId()));
       } else {
-        LOG.fine("Slave " + offer.getOffer().getHostname() + " vetoed task " + Tasks.id(task)
-            + ": " + vetoes);
+        LOG.fine("Slave " + offer.getOffer().getHostname()
+            + " vetoed task " + resourceRequest.getTaskId() + ": " + vetoes);
         return Optional.absent();
       }
     }

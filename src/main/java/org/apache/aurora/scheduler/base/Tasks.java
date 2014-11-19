@@ -160,15 +160,6 @@ public final class Tasks {
         }
       };
 
-  /**
-   * Order by production flag (true, then false), subsorting by task ID.
-   * TODO(Suman Karumuri): Move this call into SchedulerThriftInterface once SchedulerzRole is gone.
-   */
-  public static final Ordering<IAssignedTask> SCHEDULING_ORDER =
-      Ordering.explicit(true, false)
-          .onResultOf(Functions.compose(Functions.forPredicate(IS_PRODUCTION), ASSIGNED_TO_INFO))
-          .compound(Ordering.natural().onResultOf(ASSIGNED_TO_ID));
-
   private Tasks() {
     // Utility class.
   }

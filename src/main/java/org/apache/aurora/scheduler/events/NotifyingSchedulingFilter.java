@@ -20,12 +20,8 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
-import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
-import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
-import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -58,16 +54,10 @@ class NotifyingSchedulingFilter implements SchedulingFilter {
   }
 
   @Override
-  public Set<Veto> filter(
-      ResourceSlot offer,
-      IHostAttributes hostAttributes,
-      ITaskConfig task,
-      String taskId,
-      AttributeAggregate jobState) {
-
-    Set<Veto> vetoes = delegate.filter(offer, hostAttributes, task, taskId, jobState);
+  public Set<Veto> filter(UnusedResource resource, ResourceRequest request) {
+    Set<Veto> vetoes = delegate.filter(resource, request);
     if (!vetoes.isEmpty()) {
-      eventSink.post(new Vetoed(taskId, vetoes));
+      eventSink.post(new Vetoed(request.getTaskId(), vetoes));
     }
 
     return vetoes;

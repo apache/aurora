@@ -29,24 +29,12 @@ import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 
-import static java.util.Objects.requireNonNull;
-
 /**
  * Filter that determines whether a task's constraints are satisfied.
  */
-class ConstraintFilter {
-  private final AttributeAggregate cachedjobState;
-  private final Iterable<IAttribute> hostAttributes;
-
-  /**
-   * Creates a new constraint filer for a given job.
-   *
-   * @param cachedjobState Cached information about the job containing the task being matched.
-   * @param hostAttributes The attributes of the host to test against.
-   */
-  ConstraintFilter(AttributeAggregate cachedjobState, Iterable<IAttribute> hostAttributes) {
-    this.cachedjobState = requireNonNull(cachedjobState);
-    this.hostAttributes = requireNonNull(hostAttributes);
+final class ConstraintMatcher {
+  private ConstraintMatcher() {
+    // Utility class.
   }
 
   @VisibleForTesting
@@ -79,7 +67,11 @@ class ConstraintFilter {
    * @param constraint Scheduling filter to check.
    * @return A veto if the constraint is not satisfied based on the existing state of the job.
    */
-  Optional<Veto> getVeto(IConstraint constraint) {
+  static Optional<Veto> getVeto(
+      AttributeAggregate cachedjobState,
+      Iterable<IAttribute> hostAttributes,
+      IConstraint constraint) {
+
     Iterable<IAttribute> sameNameAttributes =
         Iterables.filter(hostAttributes, new NameFilter(constraint.getName()));
     Optional<IAttribute> attribute;

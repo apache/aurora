@@ -39,6 +39,8 @@ import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.gen.ValueConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -54,8 +56,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static org.apache.aurora.scheduler.filter.ConstraintFilter.limitVeto;
-import static org.apache.aurora.scheduler.filter.ConstraintFilter.mismatchVeto;
+import static org.apache.aurora.scheduler.filter.ConstraintMatcher.limitVeto;
+import static org.apache.aurora.scheduler.filter.ConstraintMatcher.mismatchVeto;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.DEDICATED_HOST_VETO;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
@@ -63,7 +65,6 @@ import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVe
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.RAM;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class SchedulingFilterImplTest extends EasyMockTest {
 
@@ -171,15 +172,26 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     Set<Veto> none = ImmutableSet.of();
     IHostAttributes hostA = hostAttributes(HOST_A, host(HOST_A), rack(RACK_A));
-    assertEquals(none,
-        defaultFilter.filter(twoPorts, hostA, noPortTask, TASK_ID, emptyJob));
-    assertEquals(none,
-        defaultFilter.filter(twoPorts, hostA, onePortTask, TASK_ID, emptyJob));
-    assertEquals(none,
-        defaultFilter.filter(twoPorts, hostA, twoPortTask, TASK_ID, emptyJob));
+    assertEquals(
+        none,
+        defaultFilter.filter(
+            new UnusedResource(twoPorts, hostA),
+            new ResourceRequest(noPortTask, TASK_ID, emptyJob)));
+    assertEquals(
+        none,
+        defaultFilter.filter(
+            new UnusedResource(twoPorts, hostA),
+            new ResourceRequest(onePortTask, TASK_ID, emptyJob)));
+    assertEquals(
+        none,
+        defaultFilter.filter(
+            new UnusedResource(twoPorts, hostA),
+            new ResourceRequest(twoPortTask, TASK_ID, emptyJob)));
     assertEquals(
         ImmutableSet.of(PORTS.veto(1)),
-        defaultFilter.filter(twoPorts, hostA, threePortTask, TASK_ID, emptyJob));
+        defaultFilter.filter(
+            new UnusedResource(twoPorts, hostA),
+            new ResourceRequest(threePortTask, TASK_ID, emptyJob)));
   }
 
   @Test
@@ -260,7 +272,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     assertVetoes(makeTask(),
         hostAttributes(HOST_A, MaintenanceMode.DRAINING, host(HOST_A), rack(RACK_A)),
-        ConstraintFilter.maintenanceVeto("draining"));
+        ConstraintMatcher.maintenanceVeto("draining"));
   }
 
   @Test
@@ -270,7 +282,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertVetoes(
         makeTask(),
         hostAttributes(HOST_A, MaintenanceMode.DRAINED, host(HOST_A), rack(RACK_A)),
-        ConstraintFilter.maintenanceVeto("drained"));
+        ConstraintMatcher.maintenanceVeto("drained"));
   }
 
   @Test
@@ -435,8 +447,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     Constraint zoneConstraint = makeConstraint("zone", "c");
 
     ITaskConfig task = makeTask(OWNER_A, JOB_A, jvmConstraint, zoneConstraint);
-    assertTrue(
-        defaultFilter.filter(DEFAULT_OFFER, hostA, task, TASK_ID, emptyJob).isEmpty());
+    assertEquals(
+        ImmutableSet.<Veto>of(),
+        defaultFilter.filter(
+            new UnusedResource(DEFAULT_OFFER, hostA),
+            new ResourceRequest(task, TASK_ID, emptyJob)));
 
     Constraint jvmNegated = jvmConstraint.deepCopy();
     jvmNegated.getConstraint().getValue().setNegated(true);
@@ -524,11 +539,9 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertEquals(
         expected,
         defaultFilter.filter(
-             DEFAULT_OFFER,
-            hostAttributes,
-            task,
-            TASK_ID,
-            aggregate).isEmpty());
+            new UnusedResource(DEFAULT_OFFER, hostAttributes),
+            new ResourceRequest(task, TASK_ID, aggregate))
+            .isEmpty());
 
     Constraint negated = constraint.deepCopy();
     negated.getConstraint().getValue().setNegated(!value.isNegated());
@@ -536,11 +549,9 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertEquals(
         !expected,
         defaultFilter.filter(
-            DEFAULT_OFFER,
-            hostAttributes,
-            negatedTask,
-            TASK_ID,
-            aggregate).isEmpty());
+            new UnusedResource(DEFAULT_OFFER, hostAttributes),
+            new ResourceRequest(negatedTask, TASK_ID, aggregate))
+            .isEmpty());
     return task;
   }
 
@@ -568,7 +579,9 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
     assertEquals(
         ImmutableSet.copyOf(vetoes),
-        defaultFilter.filter(DEFAULT_OFFER, hostAttributes, task, TASK_ID, jobState));
+        defaultFilter.filter(
+            new UnusedResource(DEFAULT_OFFER, hostAttributes),
+            new ResourceRequest(task, TASK_ID, jobState)));
   }
 
   private static IHostAttributes hostAttributes(

@@ -28,6 +28,8 @@ import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory;
 import org.apache.aurora.scheduler.state.TaskAssigner.TaskAssignerImpl;
@@ -102,11 +104,8 @@ public class TaskAssignerImplTest extends EasyMockTest {
   @Test
   public void testAssignNoVetoes() {
     expect(filter.filter(
-        ResourceSlot.from(MESOS_OFFER),
-        OFFER.getAttributes(),
-        TASK.getAssignedTask().getTask(),
-        Tasks.id(TASK),
-        emptyJob))
+        new UnusedResource(ResourceSlot.from(MESOS_OFFER), OFFER.getAttributes()),
+        new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), emptyJob)))
         .andReturn(ImmutableSet.<Veto>of());
     expect(stateManager.assignTask(
         storeProvider,
@@ -122,23 +121,26 @@ public class TaskAssignerImplTest extends EasyMockTest {
 
     assertEquals(
         Optional.of(TASK_INFO),
-        assigner.maybeAssign(storeProvider, OFFER, TASK, emptyJob));
+        assigner.maybeAssign(
+            storeProvider,
+            OFFER,
+            new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), emptyJob)));
   }
 
   @Test
   public void testAssignVetoes() {
     expect(filter.filter(
-        ResourceSlot.from(MESOS_OFFER),
-        OFFER.getAttributes(),
-        TASK.getAssignedTask().getTask(),
-        Tasks.id(TASK),
-        emptyJob))
+        new UnusedResource(ResourceSlot.from(MESOS_OFFER), OFFER.getAttributes()),
+        new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), emptyJob)))
         .andReturn(ImmutableSet.of(Veto.constraintMismatch("denied")));
 
     control.replay();
 
     assertEquals(
         Optional.<TaskInfo>absent(),
-        assigner.maybeAssign(storeProvider, OFFER, TASK, emptyJob));
+        assigner.maybeAssign(
+            storeProvider,
+            OFFER,
+            new ResourceRequest(TASK.getAssignedTask().getTask(), Tasks.id(TASK), emptyJob)));
   }
 }

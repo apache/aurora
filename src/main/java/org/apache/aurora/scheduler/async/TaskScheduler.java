@@ -47,6 +47,7 @@ import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.state.TaskAssigner;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -55,6 +56,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
+import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskInfo;
 
@@ -129,9 +131,7 @@ public interface TaskScheduler extends EventSubscriber {
 
     private Function<HostOffer, Optional<TaskInfo>> getAssignerFunction(
         final MutableStoreProvider storeProvider,
-        final AttributeAggregate attributeAggregate,
-        final String taskId,
-        final IScheduledTask task) {
+        final ResourceRequest resourceRequest) {
 
       // TODO(wfarner): Turn this into Predicate<Offer>, and in the caller, find the first match
       // and perform the assignment at the very end.  This will allow us to use optimistic locking
@@ -142,16 +142,16 @@ public interface TaskScheduler extends EventSubscriber {
           Optional<String> reservedTaskId =
               reservations.getSlaveReservation(offer.getOffer().getSlaveId());
           if (reservedTaskId.isPresent()) {
-            if (taskId.equals(reservedTaskId.get())) {
+            if (resourceRequest.getTaskId().equals(reservedTaskId.get())) {
               // Slave is reserved to satisfy this task.
-              return assigner.maybeAssign(storeProvider, offer, task, attributeAggregate);
+              return assigner.maybeAssign(storeProvider, offer, resourceRequest);
             } else {
               // Slave is reserved for another task.
               return Optional.absent();
             }
           } else {
             // Slave is not reserved.
-            return assigner.maybeAssign(storeProvider, offer, task, attributeAggregate);
+            return assigner.maybeAssign(storeProvider, offer, resourceRequest);
           }
         }
       };
@@ -189,16 +189,18 @@ public interface TaskScheduler extends EventSubscriber {
           @Override
           public Boolean apply(MutableStoreProvider store) {
             LOG.fine("Attempting to schedule task " + taskId);
-            final IScheduledTask task = Iterables.getOnlyElement(
-                store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
+            final ITaskConfig task = Iterables.getOnlyElement(
+                Iterables.transform(
+                    store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
+                    Tasks.SCHEDULED_TO_INFO),
                 null);
             if (task == null) {
               LOG.warning("Failed to look up task " + taskId + ", it may have been deleted.");
             } else {
-              AttributeAggregate aggregate =
-                  getJobState(store, Tasks.SCHEDULED_TO_JOB_KEY.apply(task));
+              AttributeAggregate aggregate = getJobState(store, task.getJob());
               try {
-                if (!offerQueue.launchFirst(getAssignerFunction(store, aggregate, taskId, task))) {
+                ResourceRequest resourceRequest = new ResourceRequest(task, taskId, aggregate);
+                if (!offerQueue.launchFirst(getAssignerFunction(store, resourceRequest))) {
                   // Task could not be scheduled.
                   maybePreemptFor(taskId, aggregate);
                   attemptsNoMatch.incrementAndGet();

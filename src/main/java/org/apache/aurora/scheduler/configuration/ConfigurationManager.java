@@ -140,7 +140,7 @@ public final class ConfigurationManager {
           new Closure<TaskConfig>() {
             @Override
             public void execute(TaskConfig task) {
-              if (!isDedicated(ITaskConfig.build(task))
+              if (!isDedicated(IConstraint.setFromBuilders(task.getConstraints()))
                   && task.isProduction()
                   && task.isIsService()
                   && !Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT))) {
@@ -202,8 +202,8 @@ public final class ConfigurationManager {
     return taskConstraint.getSetField() == TaskConstraint._Fields.VALUE;
   }
 
-  public static boolean isDedicated(ITaskConfig task) {
-    return Iterables.any(task.getConstraints(), getConstraintByName(DEDICATED_ATTRIBUTE));
+  public static boolean isDedicated(Iterable<IConstraint> taskConstraints) {
+    return Iterables.any(taskConstraints, getConstraintByName(DEDICATED_ATTRIBUTE));
   }
 
   @Nullable

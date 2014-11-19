@@ -51,6 +51,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.mesos.Driver;
 import org.apache.aurora.scheduler.state.MaintenanceController;
 import org.apache.aurora.scheduler.state.StateManager;
@@ -298,8 +299,7 @@ public class TaskSchedulerTest extends EasyMockTest {
     return expect(assigner.maybeAssign(
         EasyMock.<MutableStoreProvider>anyObject(),
         eq(offer),
-        eq(task),
-        eq(jobAggregate)));
+        eq(new ResourceRequest(task.getAssignedTask().getTask(), Tasks.id(task), jobAggregate))));
   }
 
   @Test
@@ -524,17 +524,16 @@ public class TaskSchedulerTest extends EasyMockTest {
     captureB.getValue().run();
   }
 
-  private Capture<IScheduledTask> expectTaskScheduled(IScheduledTask task) {
+  private Capture<ResourceRequest> expectTaskScheduled(IScheduledTask task) {
     TaskInfo mesosTask = makeTaskInfo(task);
-    Capture<IScheduledTask> taskScheduled = createCapture();
+    Capture<ResourceRequest> request = createCapture();
     expect(assigner.maybeAssign(
         EasyMock.<MutableStoreProvider>anyObject(),
         EasyMock.<HostOffer>anyObject(),
-        capture(taskScheduled),
-        EasyMock.eq(emptyJob)))
+        capture(request)))
         .andReturn(Optional.of(mesosTask));
     driver.launchTask(EasyMock.<OfferID>anyObject(), eq(mesosTask));
-    return taskScheduled;
+    return request;
   }
 
   @Test
@@ -566,8 +565,8 @@ public class TaskSchedulerTest extends EasyMockTest {
     Capture<Runnable> timeoutA = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
     Capture<Runnable> timeoutB = expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
 
-    Capture<IScheduledTask> firstScheduled = expectTaskScheduled(jobA0);
-    Capture<IScheduledTask> secondScheduled = expectTaskScheduled(jobB0);
+    Capture<ResourceRequest> firstScheduled = expectTaskScheduled(jobA0);
+    Capture<ResourceRequest> secondScheduled = expectTaskScheduled(jobB0);
 
     // Expect another watch of the task group for job A.
     expectTaskRetryIn(FIRST_SCHEDULE_DELAY_MS);
@@ -585,8 +584,10 @@ public class TaskSchedulerTest extends EasyMockTest {
     timeoutA.getValue().run();
     timeoutB.getValue().run();
     assertEquals(
-        ImmutableSet.of(jobA0, jobB0),
-        ImmutableSet.of(firstScheduled.getValue(), secondScheduled.getValue()));
+        ImmutableSet.of(Tasks.id(jobA0), Tasks.id(jobB0)),
+        ImmutableSet.of(
+            firstScheduled.getValue().getTaskId(),
+            secondScheduled.getValue().getTaskId()));
   }
 
   @Test

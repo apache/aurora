@@ -19,6 +19,7 @@ import java.util.Set;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -102,19 +103,101 @@ public interface SchedulingFilter {
   }
 
   /**
+   * An available resource in the cluster.
+   */
+  class UnusedResource {
+    private final ResourceSlot offer;
+    private final IHostAttributes attributes;
+
+    public UnusedResource(ResourceSlot offer, IHostAttributes attributes) {
+      this.offer = offer;
+      this.attributes = attributes;
+    }
+
+    public ResourceSlot getResourceSlot() {
+      return offer;
+    }
+
+    public IHostAttributes getAttributes() {
+      return attributes;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof UnusedResource)) {
+        return false;
+      }
+
+      UnusedResource other = (UnusedResource) o;
+      return Objects.equals(getResourceSlot(), other.getResourceSlot())
+          && Objects.equals(getAttributes(), other.getAttributes());
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(offer, attributes);
+    }
+  }
+
+  /**
+   * A request for resources in the cluster.
+   */
+  class ResourceRequest {
+    private final ITaskConfig task;
+    private final String taskId;
+    private final AttributeAggregate jobState;
+
+    public ResourceRequest(ITaskConfig task, String taskId, AttributeAggregate jobState) {
+      this.task = task;
+      this.taskId = taskId;
+      this.jobState = jobState;
+    }
+
+    public Iterable<IConstraint> getConstraints() {
+      return task.getConstraints();
+    }
+
+    public ResourceSlot getResourceSlot() {
+      return ResourceSlot.from(task);
+    }
+
+    public AttributeAggregate getJobState() {
+      return jobState;
+    }
+
+    public String getTaskId() {
+      return taskId;
+    }
+
+    public int getNumRequestedPorts() {
+      return task.getRequestedPorts().size();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof ResourceRequest)) {
+        return false;
+      }
+
+      ResourceRequest other = (ResourceRequest) o;
+      return Objects.equals(task, other.task)
+          && Objects.equals(getTaskId(), other.getTaskId())
+          && Objects.equals(getJobState(), other.getJobState());
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(task, taskId, jobState);
+    }
+  }
+
+  /**
    * Applies a task against the filter with the given resources, and on the host.
    *
-   * @param offer Resources offered.
-   * @param task Task.
-   * @param taskId Canonical ID of the task.
-   * @param attributeAggregate Attribute information for tasks in the job containing {@code task}.
+   * @param resource An available resource in the cluster.
+   * @param request A resource request to match against the {@code resource}.
    * @return A set of vetoes indicating reasons the task cannot be scheduled.  If the task may be
    *    scheduled, the set will be empty.
    */
-  Set<Veto> filter(
-      ResourceSlot offer,
-      IHostAttributes attributes,
-      ITaskConfig task,
-      String taskId,
-      AttributeAggregate attributeAggregate);
+  Set<Veto> filter(UnusedResource resource, ResourceRequest request);
 }

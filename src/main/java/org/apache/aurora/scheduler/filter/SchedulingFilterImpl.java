@@ -18,7 +18,6 @@ import java.util.EnumSet;
 import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -31,9 +30,9 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
@@ -46,7 +45,6 @@ import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVe
 /**
  * Implementation of the scheduling filter that ensures resource requirements of tasks are
  * fulfilled, and that tasks are allowed to run on the given machine.
- *
  */
 public class SchedulingFilterImpl implements SchedulingFilter {
 
@@ -56,23 +54,6 @@ public class SchedulingFilterImpl implements SchedulingFilter {
   private static final Optional<Veto> NO_VETO = Optional.absent();
 
   private static final Set<MaintenanceMode> VETO_MODES = EnumSet.of(DRAINING, DRAINED);
-
-  /**
-   * A function that may veto a task.
-   */
-  private interface FilterRule extends Function<ITaskConfig, Iterable<Veto>> { }
-
-  /**
-   * Convenience class for a rule that will only ever have a single veto.
-   */
-  private abstract static class AbstractSingleVetoRule implements FilterRule {
-    @Override
-    public final Iterable<Veto> apply(ITaskConfig task) {
-      return doApply(task).asSet();
-    }
-
-    abstract Optional<Veto> doApply(ITaskConfig task);
-  }
 
   // Scaling ranges to use for comparison of vetos.  This has no real bearing besides trying to
   // determine if a veto along one resource vector is a 'stronger' veto than that of another vector.
@@ -115,39 +96,25 @@ public class SchedulingFilterImpl implements SchedulingFilter {
     }
   }
 
-  private Iterable<FilterRule> rulesFromOffer(final ResourceSlot available) {
-    return ImmutableList.<FilterRule>of(
-        new AbstractSingleVetoRule() {
-          @Override
-          public Optional<Veto> doApply(ITaskConfig task) {
-            return CPU.maybeVeto(
-                available.getNumCpus(),
-                ResourceSlot.from(task).getNumCpus());
-          }
-        },
-        new AbstractSingleVetoRule() {
-          @Override
-          public Optional<Veto> doApply(ITaskConfig task) {
-            return RAM.maybeVeto(
-                available.getRam().as(Data.MB),
-                ResourceSlot.from(task).getRam().as(Data.MB));
-          }
-        },
-        new AbstractSingleVetoRule() {
-          @Override
-          public Optional<Veto> doApply(ITaskConfig task) {
-            return DISK.maybeVeto(available.getDisk().as(Data.MB),
-                ResourceSlot.from(task).getDisk().as(Data.MB));
-          }
-        },
-        new AbstractSingleVetoRule() {
-          @Override
-          public Optional<Veto> doApply(ITaskConfig task) {
-            return PORTS.maybeVeto(available.getNumPorts(),
-                ResourceSlot.from(task).getNumPorts());
-          }
-        }
-    );
+  private static void maybeAddVeto(
+      ImmutableList.Builder<Veto> vetoes,
+      ResourceVector vector,
+      double available,
+      double requested) {
+
+    Optional<Veto> veto = vector.maybeVeto(available, requested);
+    if (veto.isPresent()) {
+      vetoes.add(veto.get());
+    }
+  }
+
+  private static Iterable<Veto> getResourceVetoes(ResourceSlot available, ResourceSlot required) {
+    ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
+    maybeAddVeto(vetoes, CPU, available.getNumCpus(), required.getNumCpus());
+    maybeAddVeto(vetoes, RAM, available.getRam().as(Data.MB), required.getRam().as(Data.MB));
+    maybeAddVeto(vetoes, DISK, available.getDisk().as(Data.MB), required.getDisk().as(Data.MB));
+    maybeAddVeto(vetoes, PORTS, available.getNumPorts(), required.getNumPorts());
+    return vetoes.build();
   }
 
   private static boolean isValueConstraint(IConstraint constraint) {
@@ -165,78 +132,58 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         }
       });
 
-  private FilterRule getConstraintFilter(
-      final AttributeAggregate jobState,
-      final IHostAttributes offerAttributes) {
+  private Iterable<Veto> getConstraintVetoes(
+      Iterable<IConstraint> taskConstraints,
+      AttributeAggregate jobState,
+      Iterable<IAttribute> offerAttributes) {
 
-    return new FilterRule() {
-      @Override
-      public Iterable<Veto> apply(final ITaskConfig task) {
-        if (!task.isSetConstraints()) {
-          return ImmutableList.of();
+    ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
+    for (IConstraint constraint : VALUES_FIRST.sortedCopy(taskConstraints)) {
+      Optional<Veto> veto = ConstraintMatcher.getVeto(jobState, offerAttributes, constraint);
+      if (veto.isPresent()) {
+        vetoes.add(veto.get());
+        if (isValueConstraint(constraint)) {
+          // Break when a value constraint mismatch is found to avoid other
+          // potentially-expensive operations to satisfy other constraints.
+          break;
         }
-
-        ConstraintFilter constraintFilter = new ConstraintFilter(
-            jobState,
-            offerAttributes.getAttributes());
-        ImmutableList.Builder<Veto> vetoes = ImmutableList.builder();
-        for (IConstraint constraint : VALUES_FIRST.sortedCopy(task.getConstraints())) {
-          Optional<Veto> veto = constraintFilter.getVeto(constraint);
-          if (veto.isPresent()) {
-            vetoes.add(veto.get());
-            if (isValueConstraint(constraint)) {
-              // Break when a value constraint mismatch is found to avoid other
-              // potentially-expensive operations to satisfy other constraints.
-              break;
-            }
-          }
-        }
-
-        return vetoes.build();
       }
-    };
+    }
+
+    return vetoes.build();
   }
 
   private Optional<Veto> getMaintenanceVeto(MaintenanceMode mode) {
     return VETO_MODES.contains(mode)
-        ? Optional.of(ConstraintFilter.maintenanceVeto(mode.toString().toLowerCase()))
+        ? Optional.of(ConstraintMatcher.maintenanceVeto(mode.toString().toLowerCase()))
         : NO_VETO;
-  }
-
-  private Set<Veto> getResourceVetoes(ResourceSlot offer, ITaskConfig task) {
-    ImmutableSet.Builder<Veto> builder = ImmutableSet.builder();
-    for (FilterRule rule : rulesFromOffer(offer)) {
-      builder.addAll(rule.apply(task));
-    }
-    return builder.build();
   }
 
   private boolean isDedicated(IHostAttributes attributes) {
     return Iterables.any(
         attributes.getAttributes(),
-        new ConstraintFilter.NameFilter(DEDICATED_ATTRIBUTE));
+        new ConstraintMatcher.NameFilter(DEDICATED_ATTRIBUTE));
   }
 
   @Override
-  public Set<Veto> filter(
-      ResourceSlot offer,
-      IHostAttributes attributes,
-      ITaskConfig task,
-      String taskId,
-      AttributeAggregate attributeAggregate) {
+  public Set<Veto> filter(UnusedResource resource, ResourceRequest request) {
+    if (!ConfigurationManager.isDedicated(request.getConstraints())
+        && isDedicated(resource.getAttributes())) {
 
-    if (!ConfigurationManager.isDedicated(task) && isDedicated(attributes)) {
       return ImmutableSet.of(DEDICATED_HOST_VETO);
     }
 
-    Optional<Veto> maintenanceVeto = getMaintenanceVeto(attributes.getMode());
+    Optional<Veto> maintenanceVeto = getMaintenanceVeto(resource.getAttributes().getMode());
     if (maintenanceVeto.isPresent()) {
       return maintenanceVeto.asSet();
     }
 
     return ImmutableSet.<Veto>builder()
-        .addAll(getConstraintFilter(attributeAggregate, attributes).apply(task))
-        .addAll(getResourceVetoes(offer, task))
+        .addAll(getConstraintVetoes(
+            request.getConstraints(),
+            request.getJobState(),
+            resource.getAttributes().getAttributes()))
+        .addAll(getResourceVetoes(resource.getResourceSlot(), request.getResourceSlot()))
         .build();
   }
 }

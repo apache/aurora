@@ -44,12 +44,13 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.HostOffer;
-import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.AttributeStore;
@@ -58,7 +59,6 @@ import org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.apache.aurora.scheduler.testing.FakeStatsProvider;
@@ -571,18 +571,15 @@ public class PreemptorImplTest extends EasyMockTest {
 
   private IExpectationSetters<Set<Veto>> expectFiltering() {
     return expect(schedulingFilter.filter(
-        EasyMock.<ResourceSlot>anyObject(),
-        EasyMock.<IHostAttributes>anyObject(),
-        EasyMock.<ITaskConfig>anyObject(),
-        EasyMock.<String>anyObject(),
-        EasyMock.eq(emptyJob))).andAnswer(
-        new IAnswer<Set<Veto>>() {
-          @Override
-          public Set<Veto> answer() {
-            return ImmutableSet.of();
-          }
-        }
-    );
+        EasyMock.<UnusedResource>anyObject(),
+        EasyMock.<ResourceRequest>anyObject()))
+        .andAnswer(
+            new IAnswer<Set<Veto>>() {
+            @Override
+            public Set<Veto> answer() {
+              return ImmutableSet.of();
+            }
+          });
   }
 
   private void expectPreempted(ScheduledTask preempted) throws Exception {

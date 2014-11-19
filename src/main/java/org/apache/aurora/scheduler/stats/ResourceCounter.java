@@ -136,7 +136,7 @@ public class ResourceCounter {
     DEDICATED_CONSUMED(new Predicate<ITaskConfig>() {
       @Override
       public boolean apply(ITaskConfig task) {
-        return ConfigurationManager.isDedicated(task);
+        return ConfigurationManager.isDedicated(task.getConstraints());
       }
     }),
     QUOTA_CONSUMED(new Predicate<ITaskConfig>() {
@@ -148,7 +148,7 @@ public class ResourceCounter {
     FREE_POOL_CONSUMED(new Predicate<ITaskConfig>() {
       @Override
       public boolean apply(ITaskConfig task) {
-        return !ConfigurationManager.isDedicated(task) && !task.isProduction();
+        return !ConfigurationManager.isDedicated(task.getConstraints()) && !task.isProduction();
       }
     });
 
