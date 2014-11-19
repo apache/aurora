@@ -63,7 +63,6 @@ python_library(
     'update.py',
   ],
   dependencies = [
-    '3rdparty/python:argparse',
     '3rdparty/python:requests',
     '3rdparty/python:twitter.common.python',
     '3rdparty/python:twitter.common.quantity',

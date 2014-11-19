@@ -30,7 +30,6 @@ python_requirement_library(
 COMMONS_VERSION = '0.3.2'
 MESOS_VERSION = '0.20.1'
 
-make_link('argparse', '1.2.1')
 make_link('bottle', '0.11.6')
 make_link('Flask', '0.9')
 make_link('mako', '0.4.0')
