@@ -36,6 +36,7 @@ import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
 import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
+import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 
 /**
@@ -107,14 +108,14 @@ public class NearestFit implements EventSubscriber {
   private static final Predicate<Veto> IS_CONSTRAINT_MISMATCH = new Predicate<Veto>() {
     @Override
     public boolean apply(Veto veto) {
-      return veto.isConstraintMismatch();
+      return veto.getVetoType() == SchedulingFilter.VetoType.CONSTRAINT_MISMATCH;
     }
   };
 
   /**
    * Records a task veto event.
-   * This will ignore any veto events where any veto returns {@code true} from
-   * {@link Veto#isConstraintMismatch()}.
+   * This will ignore any veto events with a type of
+   * {@link SchedulingFilter.VetoType#CONSTRAINT_MISMATCH}
    *
    * @param vetoEvent Veto event.
    */

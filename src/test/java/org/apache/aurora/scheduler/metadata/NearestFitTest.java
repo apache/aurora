@@ -35,9 +35,9 @@ import static org.junit.Assert.assertEquals;
 
 public class NearestFitTest {
 
-  private static final Veto ALMOST = new Veto("Almost", 1);
-  private static final Veto NOPE = new Veto("Nope", 5);
-  private static final Veto NO_CHANCE = new Veto("No chance", 1000);
+  private static final Veto ALMOST = Veto.insufficientResources("Almost", 1);
+  private static final Veto NOPE = Veto.insufficientResources("Nope", 5);
+  private static final Veto NO_CHANCE = Veto.insufficientResources("No chance", 1000);
   private static final Veto KERNEL = Veto.constraintMismatch("2.6.39");
 
   private static final String TASK = "taskId";

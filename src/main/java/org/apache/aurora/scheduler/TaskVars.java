@@ -29,6 +29,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.FluentIterable;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.eventbus.Subscribe;
@@ -40,6 +41,9 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
+import org.apache.aurora.scheduler.events.PubsubEvent.Vetoed;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
@@ -56,6 +60,35 @@ class TaskVars extends AbstractIdleService implements EventSubscriber {
   private static final Logger LOG = Logger.getLogger(TaskVars.class.getName());
   private static final ImmutableSet<ScheduleStatus> TRACKED_JOB_STATES =
       ImmutableSet.of(ScheduleStatus.LOST, ScheduleStatus.FAILED);
+
+  /**
+   * Tracks {@link Vetoed} events that have strictly static vetoes to determine task/offer
+   * satisfiability. Vetoes are considered static if the cached offer will never be able to satisfy
+   * a given task requirements.
+   */
+  @VisibleForTesting
+  static final String VETO_STATIC_NAME = "scheduling_veto_static";
+
+  /**
+   * Tracks {@link Vetoed} events that have strictly dynamic vetoes to determine task/offer
+   * satisfiability. Vetoes are considered dynamic if the cached offer may still satisfy a given
+   * task requirements if cluster conditions change (e.g. other tasks are killed or rescheduled).
+   */
+  @VisibleForTesting
+  static final String VETO_DYNAMIC_NAME = "scheduling_veto_dynamic";
+
+  /**
+   * Tracks {@link Vetoed} events that have both static and dynamic vetoes.
+   */
+  @VisibleForTesting
+  static final String VETO_MIXED_NAME = "scheduling_veto_mixed";
+
+  private static final Map<VetoType, String> VETO_TYPES_TO_COUNTERS = ImmutableMap.of(
+      VetoType.INSUFFICIENT_RESOURCES, VETO_STATIC_NAME,
+      VetoType.CONSTRAINT_MISMATCH, VETO_STATIC_NAME,
+      VetoType.LIMIT_NOT_SATISFIED, VETO_DYNAMIC_NAME,
+      VetoType.MAINTENANCE, VETO_STATIC_NAME
+  );
 
   private final LoadingCache<String, Counter> counters;
   private final LoadingCache<String, Counter> untrackedCounters;
@@ -212,6 +245,28 @@ class TaskVars extends AbstractIdleService implements EventSubscriber {
     for (IScheduledTask task : event.getTasks()) {
       decrementCount(task.getStatus());
     }
+  }
+
+  @Subscribe
+  public void taskVetoed(Vetoed event) {
+    // This handler has high call frequency and as such needs to be optimized for reduced
+    // heap churn. We are going to use loop flags to avoid additional object creation.
+    String metricName = null;
+    for (Veto veto : event.getVetoes()) {
+      String currentName = VETO_TYPES_TO_COUNTERS.get(veto.getVetoType());
+      if (currentName == null) {
+        throw new IllegalStateException("Unknown veto type in " + event);
+      }
+
+      if (metricName == null) {
+        metricName = currentName;
+      } else if (!currentName.equals(metricName)) {
+        counters.getUnchecked(VETO_MIXED_NAME).increment();
+        return;
+      }
+    }
+
+    counters.getUnchecked(metricName).increment();
   }
 
   private static class Counter implements Supplier<Long> {

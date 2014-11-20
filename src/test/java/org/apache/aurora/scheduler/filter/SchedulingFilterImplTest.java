@@ -56,8 +56,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.configuration.ConfigurationManager.DEDICATED_ATTRIBUTE;
-import static org.apache.aurora.scheduler.filter.ConstraintMatcher.limitVeto;
-import static org.apache.aurora.scheduler.filter.ConstraintMatcher.mismatchVeto;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.DEDICATED_HOST_VETO;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.CPU;
 import static org.apache.aurora.scheduler.filter.SchedulingFilterImpl.ResourceVector.DISK;
@@ -270,9 +268,10 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   public void testHostDrainingForMaintenance() {
     control.replay();
 
-    assertVetoes(makeTask(),
+    assertVetoes(
+        makeTask(),
         hostAttributes(HOST_A, MaintenanceMode.DRAINING, host(HOST_A), rack(RACK_A)),
-        ConstraintMatcher.maintenanceVeto("draining"));
+        Veto.maintenance("draining"));
   }
 
   @Test
@@ -282,7 +281,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertVetoes(
         makeTask(),
         hostAttributes(HOST_A, MaintenanceMode.DRAINED, host(HOST_A), rack(RACK_A)),
-        ConstraintMatcher.maintenanceVeto("drained"));
+        Veto.maintenance("drained"));
   }
 
   @Test
@@ -295,7 +294,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertVetoes(
         makeTask(OWNER_A, JOB_A, constraint1, constraint2),
         hostAttributes(HOST_A, dedicated(HOST_A), host(HOST_A)),
-        mismatchVeto(DEDICATED_ATTRIBUTE));
+        Veto.constraintMismatch(DEDICATED_ATTRIBUTE));
     assertNoVetoes(
         makeTask(OWNER_B, JOB_B, constraint1, constraint2),
         hostAttributes(HOST_B, dedicated("xxx"), host(HOST_A)));
@@ -312,11 +311,11 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertVetoes(
         makeTask(OWNER_A, JOB_A, hostLimit, makeConstraint(DEDICATED_ATTRIBUTE, "xxx")),
         hostAttributes(HOST_A, host(HOST_A)),
-        mismatchVeto(DEDICATED_ATTRIBUTE));
+        Veto.constraintMismatch(DEDICATED_ATTRIBUTE));
     assertVetoes(
         makeTask(OWNER_B, JOB_A, hostLimit, makeConstraint(DEDICATED_ATTRIBUTE, "xxx")),
         hostAttributes(HOST_B, dedicated(OWNER_B.getRole() + "/" + JOB_B), host(HOST_B)),
-        mismatchVeto(DEDICATED_ATTRIBUTE));
+        Veto.constraintMismatch(DEDICATED_ATTRIBUTE));
   }
 
   @Test
@@ -366,24 +365,24 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         hostLimitTask(OWNER_A, JOB_A, 1),
         hostB,
         stateA,
-        limitVeto(HOST_ATTRIBUTE));
+        Veto.unsatisfiedLimit(HOST_ATTRIBUTE));
     assertVetoes(
         hostLimitTask(OWNER_A, JOB_A, 2),
         hostB,
         stateA,
-        limitVeto(HOST_ATTRIBUTE));
+        Veto.unsatisfiedLimit(HOST_ATTRIBUTE));
     assertNoVetoes(hostLimitTask(OWNER_A, JOB_A, 3), hostB, stateA);
 
     assertVetoes(
         rackLimitTask(OWNER_B, JOB_A, 2),
         hostB,
         stateB,
-        limitVeto(RACK_ATTRIBUTE));
+        Veto.unsatisfiedLimit(RACK_ATTRIBUTE));
     assertVetoes(
         rackLimitTask(OWNER_B, JOB_A, 3),
         hostB,
         stateB,
-        limitVeto(RACK_ATTRIBUTE));
+        Veto.unsatisfiedLimit(RACK_ATTRIBUTE));
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 4), hostB, stateB);
 
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 1), hostC, stateB);
@@ -392,7 +391,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
         rackLimitTask(OWNER_A, JOB_A, 1),
         hostC,
         stateA,
-        limitVeto(RACK_ATTRIBUTE));
+        Veto.unsatisfiedLimit(RACK_ATTRIBUTE));
     assertNoVetoes(rackLimitTask(OWNER_B, JOB_A, 2), hostC, stateB);
   }
 
@@ -460,7 +459,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     assertVetoes(
         makeTask(OWNER_A, JOB_A, jvmNegated, zoneNegated),
         hostA,
-        mismatchVeto("jvm"));
+        Veto.constraintMismatch("jvm"));
   }
 
   @Test

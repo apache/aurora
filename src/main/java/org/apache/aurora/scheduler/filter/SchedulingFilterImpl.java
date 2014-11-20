@@ -92,7 +92,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
     @VisibleForTesting
     Veto veto(double excess) {
-      return new Veto("Insufficient " + name, scale(excess, range));
+      return Veto.insufficientResources(name, scale(excess, range));
     }
   }
 
@@ -155,7 +155,7 @@ public class SchedulingFilterImpl implements SchedulingFilter {
 
   private Optional<Veto> getMaintenanceVeto(MaintenanceMode mode) {
     return VETO_MODES.contains(mode)
-        ? Optional.of(ConstraintMatcher.maintenanceVeto(mode.toString().toLowerCase()))
+        ? Optional.of(Veto.maintenance(mode.toString().toLowerCase()))
         : NO_VETO;
   }
 

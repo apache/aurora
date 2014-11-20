@@ -31,6 +31,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
+import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -287,6 +288,7 @@ public interface OfferQueue extends EventSubscriber {
       }
     }
 
+    @Timed("offer_queue_launch_first")
     @Override
     public boolean launchFirst(Function<HostOffer, Optional<TaskInfo>> acceptor)
         throws LaunchException {
@@ -295,28 +297,40 @@ public interface OfferQueue extends EventSubscriber {
       // possibility of a race between the same offers being accepted by different threads.
 
       for (HostOffer offer : hostOffers.getWeaklyConsistentOffers()) {
-        Optional<TaskInfo> assignment = acceptor.apply(offer);
-        if (assignment.isPresent()) {
-          // Guard against an offer being removed after we grabbed it from the iterator.
-          // If that happens, the offer will not exist in hostOffers, and we can immediately
-          // send it back to LOST for quick reschedule.
-          // Removing while iterating counts on the use of a weakly-consistent iterator being used,
-          // which is a feature of ConcurrentSkipListSet.
-          if (hostOffers.remove(offer.getOffer().getId())) {
-            try {
-              driver.launchTask(offer.getOffer().getId(), assignment.get());
-              return true;
-            } catch (IllegalStateException e) {
-              // TODO(William Farner): Catch only the checked exception produced by Driver
-              // once it changes from throwing IllegalStateException when the driver is not yet
-              // registered.
-              throw new LaunchException("Failed to launch task.", e);
-            }
-          } else {
-            offerRaces.incrementAndGet();
-            throw new LaunchException(
-                "Accepted offer no longer exists in offer queue, likely data race.");
+        if (acceptOffer(offer, acceptor)) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    @Timed("offer_queue_accept_offer")
+    protected boolean acceptOffer(
+        HostOffer offer,
+        Function<HostOffer, Optional<TaskInfo>> acceptor) throws LaunchException {
+
+      Optional<TaskInfo> assignment = acceptor.apply(offer);
+      if (assignment.isPresent()) {
+        // Guard against an offer being removed after we grabbed it from the iterator.
+        // If that happens, the offer will not exist in hostOffers, and we can immediately
+        // send it back to LOST for quick reschedule.
+        // Removing while iterating counts on the use of a weakly-consistent iterator being used,
+        // which is a feature of ConcurrentSkipListSet.
+        if (hostOffers.remove(offer.getOffer().getId())) {
+          try {
+            driver.launchTask(offer.getOffer().getId(), assignment.get());
+            return true;
+          } catch (IllegalStateException e) {
+            // TODO(William Farner): Catch only the checked exception produced by Driver
+            // once it changes from throwing IllegalStateException when the driver is not yet
+            // registered.
+            throw new LaunchException("Failed to launch task.", e);
           }
+        } else {
+          offerRaces.incrementAndGet();
+          throw new LaunchException(
+              "Accepted offer no longer exists in offer queue, likely data race.");
         }
       }
 

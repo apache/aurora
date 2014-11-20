@@ -32,8 +32,10 @@ import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.base.Tasks;
+import org.apache.aurora.scheduler.events.PubsubEvent;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEvent.TasksDeleted;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -50,6 +52,9 @@ import static org.apache.aurora.gen.ScheduleStatus.INIT;
 import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
+import static org.apache.aurora.scheduler.TaskVars.VETO_DYNAMIC_NAME;
+import static org.apache.aurora.scheduler.TaskVars.VETO_MIXED_NAME;
+import static org.apache.aurora.scheduler.TaskVars.VETO_STATIC_NAME;
 import static org.apache.aurora.scheduler.TaskVars.jobStatName;
 import static org.apache.aurora.scheduler.TaskVars.rackStatName;
 import static org.easymock.EasyMock.expect;
@@ -112,6 +117,12 @@ public class TaskVarsTest extends EasyMockTest {
     vars.taskChangedState(TaskStateChange.transition(
         IScheduledTask.build(task.newBuilder().setStatus(status)),
         task.getStatus()));
+  }
+
+  private void applyVeto(IScheduledTask task, Veto... vetoes) {
+    vars.taskVetoed(new PubsubEvent.Vetoed(
+        task.getAssignedTask().getTaskId(),
+        ImmutableSet.copyOf(vetoes)));
   }
 
   private void schedulerActivated(IScheduledTask... initialTasks) {
@@ -203,6 +214,49 @@ public class TaskVarsTest extends EasyMockTest {
     vars.tasksDeleted(new TasksDeleted(ImmutableSet.of(
         IScheduledTask.build(taskA.newBuilder().setStatus(FINISHED)))));
     assertAllZero();
+  }
+
+  @Test
+  public void testStaticVetoGroup() {
+    expectStatusCountersInitialized();
+    expectStatExport(VETO_STATIC_NAME);
+
+    replayAndBuild();
+    schedulerActivated();
+
+    applyVeto(
+        makeTask(JOB_A, PENDING),
+        Veto.insufficientResources("ram", 500),
+        Veto.insufficientResources("cpu", 500));
+
+    assertEquals(1, getValue(VETO_STATIC_NAME));
+  }
+
+  @Test
+  public void testDynamicVetoGroup() {
+    expectStatusCountersInitialized();
+    expectStatExport(VETO_DYNAMIC_NAME);
+
+    replayAndBuild();
+    schedulerActivated();
+
+    applyVeto(makeTask(JOB_A, PENDING), Veto.unsatisfiedLimit("constraint"));
+    assertEquals(1, getValue(VETO_DYNAMIC_NAME));
+  }
+
+  @Test
+  public void testMixedVetoGroup() {
+    expectStatusCountersInitialized();
+    expectStatExport(VETO_MIXED_NAME);
+
+    replayAndBuild();
+    schedulerActivated();
+
+    applyVeto(makeTask(JOB_A, PENDING),
+        Veto.unsatisfiedLimit("constraint"),
+        Veto.insufficientResources("ram", 500));
+
+    assertEquals(1, getValue(VETO_MIXED_NAME));
   }
 
   @Test

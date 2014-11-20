@@ -2012,7 +2012,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     Set<PendingReason> expected = ImmutableSet.of(new PendingReason()
         .setTaskId(taskId)
-        .setReason("first,second"));
+        .setReason("Constraint not satisfied: first,Constraint not satisfied: second"));
 
     Response response = assertOkResponse(thrift.getPendingReason(query.get()));
     assertEquals(expected, response.getResult().getGetPendingReasonResult().getReasons());

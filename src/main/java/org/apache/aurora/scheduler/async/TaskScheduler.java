@@ -188,43 +188,7 @@ public interface TaskScheduler extends EventSubscriber {
         return storage.write(new MutateWork.Quiet<Boolean>() {
           @Override
           public Boolean apply(MutableStoreProvider store) {
-            LOG.fine("Attempting to schedule task " + taskId);
-            final ITaskConfig task = Iterables.getOnlyElement(
-                Iterables.transform(
-                    store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
-                    Tasks.SCHEDULED_TO_INFO),
-                null);
-            if (task == null) {
-              LOG.warning("Failed to look up task " + taskId + ", it may have been deleted.");
-            } else {
-              AttributeAggregate aggregate = getJobState(store, task.getJob());
-              try {
-                ResourceRequest resourceRequest = new ResourceRequest(task, taskId, aggregate);
-                if (!offerQueue.launchFirst(getAssignerFunction(store, resourceRequest))) {
-                  // Task could not be scheduled.
-                  maybePreemptFor(taskId, aggregate);
-                  attemptsNoMatch.incrementAndGet();
-                  return false;
-                }
-              } catch (OfferQueue.LaunchException e) {
-                LOG.log(Level.WARNING, "Failed to launch task.", e);
-                attemptsFailed.incrementAndGet();
-
-                // The attempt to schedule the task failed, so we need to backpedal on the
-                // assignment.
-                // It is in the LOST state and a new task will move to PENDING to replace it.
-                // Should the state change fail due to storage issues, that's okay.  The task will
-                // time out in the ASSIGNED state and be moved to LOST.
-                stateManager.changeState(
-                    store,
-                    taskId,
-                    Optional.of(PENDING),
-                    LOST,
-                    LAUNCH_FAILED_MSG);
-              }
-            }
-
-            return true;
+            return scheduleTask(store, taskId);
           }
         });
       } catch (RuntimeException e) {
@@ -234,6 +198,47 @@ public interface TaskScheduler extends EventSubscriber {
         attemptsFailed.incrementAndGet();
         return false;
       }
+    }
+
+    @Timed("task_schedule_attempt_locked")
+    private boolean scheduleTask(MutableStoreProvider store, String taskId) {
+      LOG.fine("Attempting to schedule task " + taskId);
+      final ITaskConfig task = Iterables.getOnlyElement(
+          Iterables.transform(
+              store.getTaskStore().fetchTasks(Query.taskScoped(taskId).byStatus(PENDING)),
+              Tasks.SCHEDULED_TO_INFO),
+          null);
+      if (task == null) {
+        LOG.warning("Failed to look up task " + taskId + ", it may have been deleted.");
+      } else {
+        AttributeAggregate aggregate = getJobState(store, task.getJob());
+        try {
+          ResourceRequest resourceRequest = new ResourceRequest(task, taskId, aggregate);
+          if (!offerQueue.launchFirst(getAssignerFunction(store, resourceRequest))) {
+            // Task could not be scheduled.
+            maybePreemptFor(taskId, aggregate);
+            attemptsNoMatch.incrementAndGet();
+            return false;
+          }
+        } catch (OfferQueue.LaunchException e) {
+          LOG.log(Level.WARNING, "Failed to launch task.", e);
+          attemptsFailed.incrementAndGet();
+
+          // The attempt to schedule the task failed, so we need to backpedal on the
+          // assignment.
+          // It is in the LOST state and a new task will move to PENDING to replace it.
+          // Should the state change fail due to storage issues, that's okay.  The task will
+          // time out in the ASSIGNED state and be moved to LOST.
+          stateManager.changeState(
+              store,
+              taskId,
+              Optional.of(PENDING),
+              LOST,
+              LAUNCH_FAILED_MSG);
+        }
+      }
+
+      return true;
     }
 
     private void maybePreemptFor(String taskId, AttributeAggregate attributeAggregate) {

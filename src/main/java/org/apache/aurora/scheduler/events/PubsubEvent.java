@@ -227,6 +227,14 @@ public interface PubsubEvent {
     public int hashCode() {
       return Objects.hash(taskId, vetoes);
     }
+
+    @Override
+    public String toString() {
+      return com.google.common.base.Objects.toStringHelper(this)
+          .add("taskId", taskId)
+          .add("vetoes", vetoes)
+          .toString();
+    }
   }
 
   class DriverRegistered implements PubsubEvent {

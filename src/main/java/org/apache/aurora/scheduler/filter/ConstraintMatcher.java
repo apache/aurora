@@ -15,7 +15,6 @@ package org.apache.aurora.scheduler.filter;
 
 import java.util.Set;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
@@ -35,21 +34,6 @@ import org.apache.aurora.scheduler.storage.entities.ITaskConstraint;
 final class ConstraintMatcher {
   private ConstraintMatcher() {
     // Utility class.
-  }
-
-  @VisibleForTesting
-  static Veto limitVeto(String limit) {
-    return new Veto("Limit not satisfied: " + limit, Veto.MAX_SCORE);
-  }
-
-  @VisibleForTesting
-  static Veto mismatchVeto(String constraint) {
-    return Veto.constraintMismatch("Constraint not satisfied: " + constraint);
-  }
-
-  @VisibleForTesting
-  static Veto maintenanceVeto(String reason) {
-    return new Veto("Host " + reason + " for maintenance", Veto.MAX_SCORE);
   }
 
   private static final Function<IAttribute, Set<String>> GET_VALUES =
@@ -92,11 +76,11 @@ final class ConstraintMatcher {
             taskConstraint.getValue());
         return matches
             ? Optional.<Veto>absent()
-            : Optional.of(mismatchVeto(constraint.getName()));
+            : Optional.of(Veto.constraintMismatch(constraint.getName()));
 
       case LIMIT:
         if (!attribute.isPresent()) {
-          return Optional.of(mismatchVeto(constraint.getName()));
+          return Optional.of(Veto.constraintMismatch(constraint.getName()));
         }
 
         boolean satisfied = AttributeFilter.matches(
@@ -105,7 +89,7 @@ final class ConstraintMatcher {
             cachedjobState);
         return satisfied
             ? Optional.<Veto>absent()
-            : Optional.of(limitVeto(constraint.getName()));
+            : Optional.of(Veto.unsatisfiedLimit(constraint.getName()));
 
       default:
         throw new SchedulerException("Failed to recognize the constraint type: "

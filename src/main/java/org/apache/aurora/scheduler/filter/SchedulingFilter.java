@@ -16,17 +16,52 @@ package org.apache.aurora.scheduler.filter;
 import java.util.Objects;
 import java.util.Set;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
+import static org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType.CONSTRAINT_MISMATCH;
+import static org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType.INSUFFICIENT_RESOURCES;
+import static org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType.LIMIT_NOT_SATISFIED;
+import static org.apache.aurora.scheduler.filter.SchedulingFilter.VetoType.MAINTENANCE;
+
 /**
  * Determines whether a proposed scheduling assignment should be allowed.
  */
 public interface SchedulingFilter {
+
+  enum VetoType {
+    /**
+     * Not enough resources to satisfy a proposed scheduling assignment.
+     */
+    INSUFFICIENT_RESOURCES("Insufficient: %s"),
+
+    /**
+     * Unable to satisfy proposed scheduler assignment constraints.
+     */
+    CONSTRAINT_MISMATCH("Constraint not satisfied: %s"),
+
+    /**
+     * Constraint limit is not satisfied for a proposed scheduling assignment.
+     */
+    LIMIT_NOT_SATISFIED("Limit not satisfied: %s"),
+
+    /**
+     * Unable to satisfy a proposed scheduler assignment due to cluster maintenance.
+     */
+    MAINTENANCE("Host %s for maintenance");
+
+    private final String reasonFormat;
+
+    VetoType(String reasonFormat) {
+      this.reasonFormat = reasonFormat;
+    }
+
+    String formatReason(String reason) {
+      return String.format(reasonFormat, reason);
+    }
+  }
 
   /**
    * Reason for a proposed scheduling assignment to be filtered out.
@@ -34,33 +69,62 @@ public interface SchedulingFilter {
    * is only intended to be used for relative ranking of vetoes for determining which veto against
    * a scheduling assignment is 'weakest'.
    */
-  class Veto {
+  final class Veto {
     public static final int MAX_SCORE = 1000;
 
+    private final VetoType vetoType;
     private final String reason;
     private final int score;
-    private final boolean valueMismatch;
 
-    private Veto(String reason, int score, boolean valueMismatch) {
-      this.reason = reason;
+    private Veto(VetoType vetoType, String reasonParameter, int score) {
+      this.vetoType = vetoType;
+      this.reason = vetoType.formatReason(reasonParameter);
       this.score = Math.min(MAX_SCORE, score);
-      this.valueMismatch = valueMismatch;
-    }
-
-    @VisibleForTesting
-    public Veto(String reason, int score) {
-      this(reason, score, false);
     }
 
     /**
-     * Creates a special veto that represents a mismatch between the server and task's configuration
+     * Creates a veto that represents a mismatch between the server and task's configuration
      * for an attribute.
      *
-     * @param reason Information about the value mismatch.
+     * @param constraint A constraint name.
      * @return A constraint mismatch veto.
      */
-    public static Veto constraintMismatch(String reason) {
-      return new Veto(reason, MAX_SCORE, true);
+    public static Veto constraintMismatch(String constraint) {
+      return new Veto(CONSTRAINT_MISMATCH, constraint, MAX_SCORE);
+    }
+
+    /**
+     * Creates a veto the represents an unsatisfied constraint limit between the server and task's
+     * configuration for an attribute.
+     *
+     * @param limit A constraint name.
+     * @return A unsatisfied limit veto.
+     */
+    public static Veto unsatisfiedLimit(String limit) {
+      return new Veto(LIMIT_NOT_SATISFIED, limit, MAX_SCORE);
+    }
+
+    /**
+     * Creates a veto that represents an inability of the server to satisfy task's configuration
+     * resource requirements.
+     *
+     * @param resource A resource name.
+     * @param score A veto score.
+     * @return An insufficient resources veto.
+     */
+    public static Veto insufficientResources(String resource, int score) {
+      return new Veto(INSUFFICIENT_RESOURCES, resource, score);
+    }
+
+    /**
+     * Creates a veto that represents a lack of suitable for assignment hosts due to cluster
+     * maintenance.
+     *
+     * @param maintenanceMode A maintenance mode.
+     * @return A maintenance veto.
+     */
+    public static Veto maintenance(String maintenanceMode) {
+      return new Veto(MAINTENANCE, maintenanceMode, MAX_SCORE);
     }
 
     public String getReason() {
@@ -71,8 +135,8 @@ public interface SchedulingFilter {
       return score;
     }
 
-    public boolean isConstraintMismatch() {
-      return valueMismatch;
+    public VetoType getVetoType() {
+      return vetoType;
     }
 
     @Override
@@ -82,22 +146,22 @@ public interface SchedulingFilter {
       }
 
       Veto other = (Veto) o;
-      return Objects.equals(reason, other.reason)
-          && Objects.equals(score, other.score)
-          && Objects.equals(valueMismatch, other.valueMismatch);
+      return Objects.equals(vetoType, other.vetoType)
+          && Objects.equals(reason, other.reason)
+          && Objects.equals(score, other.score);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(reason, score, valueMismatch);
+      return Objects.hash(vetoType, reason, score);
     }
 
     @Override
     public String toString() {
       return com.google.common.base.Objects.toStringHelper(this)
+          .add("vetoType", vetoType)
           .add("reason", reason)
           .add("score", score)
-          .add("valueMismatch", valueMismatch)
           .toString();
     }
   }

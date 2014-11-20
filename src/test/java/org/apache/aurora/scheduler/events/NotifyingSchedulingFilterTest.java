@@ -51,8 +51,8 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
       IHostAttributes.build(new HostAttributes().setHost("host").setMode(MaintenanceMode.NONE)));
   private ResourceRequest request;
 
-  private static final Veto VETO_1 = new Veto("veto1", 1);
-  private static final Veto VETO_2 = new Veto("veto2", 2);
+  private static final Veto VETO_1 = Veto.insufficientResources("ram", 1);
+  private static final Veto VETO_2 = Veto.insufficientResources("ram", 2);
 
   private SchedulingFilter filter;
   private EventSink eventSink;
