@@ -38,7 +38,6 @@ import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -164,12 +163,13 @@ public class LockManagerImplTest extends EasyMockTest {
 
   // Test for regression of AURORA-702.
   @Test
-  @Ignore("Flaky test - see https://issues.apache.org/jira/browse/AURORA-798")
   public void testNoDeadlock() throws Exception {
     final StorageTestUtil storageUtil = new StorageTestUtil(this);
 
-    expect(storageUtil.storeProvider.getLockStore()).andReturn(storageUtil.lockStore).times(2);
-    expect(storageUtil.lockStore.fetchLock(LOCK_KEY)).andReturn(Optional.<ILock>absent()).times(2);
+    expect(storageUtil.storeProvider.getLockStore()).andReturn(storageUtil.lockStore).atLeastOnce();
+    expect(storageUtil.lockStore.fetchLock(LOCK_KEY))
+        .andReturn(Optional.<ILock>absent())
+        .atLeastOnce();
 
     final CountDownLatch reads = new CountDownLatch(2);
     EasyMock.makeThreadSafe(storageUtil.storage, false);
@@ -184,7 +184,7 @@ public class LockManagerImplTest extends EasyMockTest {
             reads.await();
             return result;
           }
-        }).times(2);
+        }).atLeastOnce();
 
     lockManager = new LockManagerImpl(storageUtil.storage, clock, tokenGenerator);
 
