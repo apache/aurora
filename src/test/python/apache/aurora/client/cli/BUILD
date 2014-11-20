@@ -216,7 +216,7 @@ python_tests(
 
 python_tests(
   name='task',
-  sources = [ 'test_task_run.py'],
+  sources = [ 'test_task.py'],
   dependencies = [
     ':util',
     '3rdparty/python:mock',

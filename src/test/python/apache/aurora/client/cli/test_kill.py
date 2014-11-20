@@ -366,7 +366,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
       api = mock_context.get_api('west')
       # set up an empty instance list in the getTasksWithoutConfigs response
       status_response = self.create_simple_success_response()
-      status_response.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[[]]))
+      status_response.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[]))
       mock_context.add_expected_status_query_result(status_response)
       api.kill_job.return_value = self.get_kill_job_response()
       with temporary_file() as fp:

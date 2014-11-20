@@ -23,7 +23,7 @@ from apache.aurora.client.api.command_runner import (
     DistributedCommandRunner,
     InstanceDistributedCommandRunner
 )
-from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, Noun, print_aurora_log, Verb
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK, Noun, print_aurora_log, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
     CommandOption,
@@ -69,6 +69,7 @@ class RunCommand(Verb):
         context.options.ssh_user, instances, print_aurora_log)
     dcr.run(context.options.cmd, parallelism=context.options.num_threads,
         executor_sandbox=context.options.executor_sandbox)
+    return EXIT_OK
 
 
 class SshCommand(Verb):

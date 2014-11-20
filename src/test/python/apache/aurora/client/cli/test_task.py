@@ -16,7 +16,7 @@ import contextlib
 
 from mock import Mock, patch
 
-from apache.aurora.client.cli import EXIT_INVALID_PARAMETER
+from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK
 from apache.aurora.client.cli.client import AuroraCommandLine
 
 from .util import AuroraClientCommandTest
@@ -92,7 +92,7 @@ class TestRunCommand(AuroraClientCommandTest):
             mock_runner_args_patch,
             mock_subprocess):
       cmd = AuroraCommandLine()
-      cmd.execute(cmd_args)
+      assert cmd.execute(cmd_args) == EXIT_OK
       # The status command sends a getTasksStatus query to the scheduler,
       # and then prints the result. The use of shards, above, should change
       # this query - that's the focus of the instances test.

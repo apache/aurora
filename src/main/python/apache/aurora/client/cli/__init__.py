@@ -35,10 +35,11 @@ import getpass
 import logging
 import sys
 import traceback
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 from uuid import uuid1
 from zipfile import BadZipfile
 
+from twitter.common.lang import AbstractClass
 from twitter.common.python.pex import PexInfo
 
 from .command_hooks import GlobalCommandHookRegistry
@@ -198,7 +199,7 @@ class ConfigurationPlugin(object):
     """
 
 
-class AuroraCommand(object):
+class AuroraCommand(AbstractClass):
   def setup_options_parser(self, argparser):
     """Sets up command line options parsing for this command.
     This is a thin veneer over the standard python argparse system.
@@ -212,15 +213,15 @@ class AuroraCommand(object):
       raise TypeError('Command option object must be an instance of CommandOption')
     option.add_to_parser(argparser)
 
-  @property
+  @abstractproperty
   def help(self):
     """Returns the help message for this command"""
 
-  @property
+  @abstractproperty
   def usage(self):
     """Returns a short usage description of the command"""
 
-  @property
+  @abstractproperty
   def name(self):
     """Returns the command name"""
 
@@ -396,6 +397,7 @@ class CommandLine(object):
       return pre_result
     try:
       result = noun.execute(context)
+      assert result is not None, "Noun return value is None!"
       if result == EXIT_OK:
         print_aurora_log(TRANSCRIPT, "Command terminated successfully")
         GlobalCommandHookRegistry.run_post_hooks(context, context.options.noun,
@@ -523,5 +525,6 @@ class Verb(AuroraCommand):
     result += ["", self.help]
     return "\n".join(result)
 
+  @abstractmethod
   def execute(self, context):
     pass
