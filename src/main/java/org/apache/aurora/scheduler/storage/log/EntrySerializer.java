@@ -14,10 +14,14 @@
 package org.apache.aurora.scheduler.storage.log;
 
 import java.nio.ByteBuffer;
+import java.util.Iterator;
 
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
+import com.google.common.collect.AbstractIterator;
+import com.google.common.collect.ImmutableList;
 import com.google.common.hash.HashFunction;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 import com.twitter.common.quantity.Amount;
@@ -39,13 +43,14 @@ import static org.apache.aurora.scheduler.storage.log.LogManager.MaxEntrySize;
  */
 public interface EntrySerializer {
   /**
-   * Serializes a log entry and splits it into chunks no larger than {@code maxEntrySizeBytes}.
+   * Serializes a log entry and splits it into chunks no larger than {@code maxEntrySizeBytes}. The
+   * returned iterable's iterator is not thread-safe.
    *
    * @param logEntry The log entry to serialize.
    * @return Serialized and chunked log entry.
    * @throws CodingException If the entry could not be serialized.
    */
-  byte[][] serialize(LogEntry logEntry) throws CodingException;
+  Iterable<byte[]> serialize(LogEntry logEntry) throws CodingException;
 
   @VisibleForTesting
   class EntrySerializerImpl implements EntrySerializer {
@@ -64,23 +69,51 @@ public interface EntrySerializer {
 
     @Override
     @Timed("log_entry_serialize")
-    public byte[][] serialize(LogEntry logEntry) throws CodingException {
-      byte[] entry = Entries.thriftBinaryEncode(logEntry);
+    public Iterable<byte[]> serialize(LogEntry logEntry) throws CodingException {
+      final byte[] entry = Entries.thriftBinaryEncode(logEntry);
       if (entry.length <= maxEntrySizeBytes) {
-        return new byte[][] {entry};
+        return ImmutableList.of(entry);
       }
 
-      int chunks = (int) Math.ceil(entry.length / (double) maxEntrySizeBytes);
-      byte[][] frames = new byte[chunks + 1][];
+      final int chunks = (int) Math.ceil(entry.length / (double) maxEntrySizeBytes);
 
-      frames[0] = encode(Frame.header(new FrameHeader(chunks, ByteBuffer.wrap(checksum(entry)))));
-      for (int i = 0; i < chunks; i++) {
-        int offset = i * maxEntrySizeBytes;
-        ByteBuffer chunk =
-            ByteBuffer.wrap(entry, offset, Math.min(maxEntrySizeBytes, entry.length - offset));
-        frames[i + 1] = encode(Frame.chunk(new FrameChunk(chunk)));
-      }
-      return frames;
+      final byte[] header = encode(
+          Frame.header(new FrameHeader(chunks, ByteBuffer.wrap(checksum(entry)))));
+
+      return new Iterable<byte[]>() {
+        @Override
+        public Iterator<byte[]> iterator() {
+          return streamFrames(header, chunks, entry);
+        }
+      };
+    }
+
+    Iterator<byte[]> streamFrames(final byte[] header, final int chunks, final byte[] entry) {
+      return new AbstractIterator<byte[]>() {
+        private int i = -1;
+
+        @Override
+        protected byte[] computeNext() {
+          byte[] result;
+          if (i == -1) {
+            result = header;
+          } else if (i < chunks) {
+            int offset = i * maxEntrySizeBytes;
+            ByteBuffer chunk =
+                ByteBuffer.wrap(entry, offset, Math.min(maxEntrySizeBytes, entry.length - offset));
+            try {
+              result = encode(Frame.chunk(new FrameChunk(chunk)));
+            } catch (CodingException e) {
+              throw Throwables.propagate(e);
+            }
+          } else {
+            return endOfData();
+          }
+
+          i++;
+          return result;
+        };
+      };
     }
 
     @Timed("log_entry_checksum")

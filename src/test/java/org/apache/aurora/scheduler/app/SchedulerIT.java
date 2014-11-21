@@ -285,7 +285,7 @@ public class SchedulerIT extends BaseZooKeeperTest {
               @Override
               public byte[] contents() {
                 try {
-                  return entrySerializer.serialize(entry)[0];
+                  return Iterables.getFirst(entrySerializer.serialize(entry), null);
                 } catch (CodingException e) {
                   throw Throwables.propagate(e);
                 }

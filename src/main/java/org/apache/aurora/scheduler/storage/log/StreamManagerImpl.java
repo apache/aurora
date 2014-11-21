@@ -233,7 +233,7 @@ class StreamManagerImpl implements StreamManager {
   @Timed("log_manager_append")
   protected Log.Position appendAndGetPosition(LogEntry logEntry) throws CodingException {
     Log.Position firstPosition = null;
-    byte[][] entries = entrySerializer.serialize(logEntry);
+    Iterable<byte[]> entries = entrySerializer.serialize(logEntry);
     synchronized (writeMutex) { // ensure all sub-entries are written as a unit
       for (byte[] entry : entries) {
         Log.Position position = stream.append(entry);
