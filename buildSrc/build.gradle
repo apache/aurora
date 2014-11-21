@@ -1,0 +1,3 @@
+if (gradle.gradleVersion != GRADLE_VERSION) {
+  throw new GradleException("Building is only supported with gradle version: $GRADLE_VERSION .")
+}

@@ -52,7 +52,7 @@ tasks.withType(JavaCompile).matching { it.name != 'compileGeneratedJava' }.all {
 }
 
 task wrapper(type: Wrapper) {
-  gradleVersion = '2.2'
+  gradleVersion = project(':buildSrc').GRADLE_VERSION
 }
 
 task sourceJar(type: Jar) {
