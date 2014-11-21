@@ -47,6 +47,7 @@ import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.SchedulerModule;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.AsyncModule;
+import org.apache.aurora.scheduler.async.preemptor.PreemptorModule;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
 import org.apache.aurora.scheduler.http.JettyServerModule;
@@ -118,6 +119,7 @@ public class AppModule extends AbstractModule {
     install(new MetadataModule());
     install(new QuotaModule());
     install(new JettyServerModule());
+    install(new PreemptorModule());
     install(new SchedulerDriverModule());
     install(new SchedulerServicesModule());
     install(new SchedulerModule());

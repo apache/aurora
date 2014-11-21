@@ -31,7 +31,6 @@ import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
-import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 import com.twitter.common.args.Arg;
@@ -56,7 +55,6 @@ import org.apache.aurora.scheduler.async.TaskHistoryPruner.HistoryPrunnerSetting
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
-import org.apache.aurora.scheduler.filter.AttributeAggregate;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -64,8 +62,6 @@ import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.util.Objects.requireNonNull;
 
-import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl;
-import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl.PreemptionDelay;
 import static org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl.ReservationDuration;
 
 /**
@@ -152,15 +148,6 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Integer, Time>> MAX_RESCHEDULING_DELAY =
       Arg.create(Amount.of(30, Time.SECONDS));
 
-  @CmdLine(name = "preemption_delay",
-      help = "Time interval after which a pending task becomes eligible to preempt other tasks")
-  private static final Arg<Amount<Long, Time>> PREEMPTION_DELAY =
-      Arg.create(Amount.of(10L, Time.MINUTES));
-
-  @CmdLine(name = "enable_preemptor",
-      help = "Enable the preemptor and preemption")
-  private static final Arg<Boolean> ENABLE_PREEMPTOR = Arg.create(true);
-
   @CmdLine(name = "job_update_history_per_job_threshold",
       help = "Maximum number of completed job updates to retain in a job update history.")
   private static final Arg<Integer> JOB_UPDATE_HISTORY_PER_JOB_THRESHOLD = Arg.create(10);
@@ -181,27 +168,10 @@ public class AsyncModule extends AbstractModule {
   private static final Arg<Amount<Long, Time>> INITIAL_TASK_KILL_RETRY_INTERVAL =
       Arg.create(Amount.of(5L, Time.SECONDS));
 
-  private static final Preemptor NULL_PREEMPTOR = new Preemptor() {
-    @Override
-    public Optional<String> findPreemptionSlotFor(
-        String taskId,
-        AttributeAggregate attributeAggregate) {
-
-      return Optional.absent();
-    }
-  };
-
   @CmdLine(name = "offer_reservation_duration", help = "Time to reserve a slave's offers while "
       + "trying to satisfy a task preempting another.")
   private static final Arg<Amount<Long, Time>> RESERVATION_DURATION =
       Arg.create(Amount.of(3L, Time.MINUTES));
-
-  @Qualifier
-  @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-  private @interface PreemptionBinding { }
-
-  @VisibleForTesting
-  static final Key<Preemptor> PREEMPTOR_KEY = Key.get(Preemptor.class, PreemptionBinding.class);
 
   @CmdLine(name = "executor_gc_interval",
       help = "Max interval on which to run the GC executor on a host to clean up dead tasks.")
@@ -214,17 +184,6 @@ public class AsyncModule extends AbstractModule {
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
   private @interface AsyncExecutor { }
-
-  private final boolean enablePreemptor;
-
-  @VisibleForTesting
-  AsyncModule(boolean enablePreemptor) {
-    this.enablePreemptor = enablePreemptor;
-  }
-
-  public AsyncModule() {
-    this(ENABLE_PREEMPTOR.get());
-  }
 
   @VisibleForTesting
   static final String TIMEOUT_QUEUE_GAUGE = "timeout_queue_size";
@@ -274,22 +233,11 @@ public class AsyncModule extends AbstractModule {
 
         bind(RescheduleCalculator.class).to(RescheduleCalculatorImpl.class).in(Singleton.class);
         expose(RescheduleCalculator.class);
-        if (enablePreemptor) {
-          bind(PREEMPTOR_KEY).to(PreemptorImpl.class);
-          bind(PreemptorImpl.class).in(Singleton.class);
-          LOG.info("Preemptor Enabled.");
-        } else {
-          bind(PREEMPTOR_KEY).toInstance(NULL_PREEMPTOR);
-          LOG.warning("Preemptor Disabled.");
-        }
-        expose(PREEMPTOR_KEY);
-        bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
-            .toInstance(PREEMPTION_DELAY.get());
         bind(TaskGroups.class).in(Singleton.class);
         expose(TaskGroups.class);
       }
     });
-    bindTaskScheduler(binder(), PREEMPTOR_KEY, RESERVATION_DURATION.get());
+    bindTaskScheduler(binder(), RESERVATION_DURATION.get());
     PubsubEventModule.bindSubscriber(binder(), TaskGroups.class);
 
     install(new PrivateModule() {
@@ -390,15 +338,10 @@ public class AsyncModule extends AbstractModule {
    * well with the MultiBinder that backs the PubSub system.
    */
   @VisibleForTesting
-  static void bindTaskScheduler(
-      Binder binder,
-      final Key<Preemptor> preemptorKey,
-      final Amount<Long, Time> reservationDuration) {
-
+  static void bindTaskScheduler(Binder binder, final Amount<Long, Time> reservationDuration) {
     binder.install(new PrivateModule() {
       @Override
       protected void configure() {
-        bind(Preemptor.class).to(preemptorKey);
         bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(ReservationDuration.class)
             .toInstance(reservationDuration);
         bind(TaskScheduler.class).to(TaskSchedulerImpl.class);

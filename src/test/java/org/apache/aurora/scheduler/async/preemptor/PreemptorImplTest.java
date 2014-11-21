@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.async;
+package org.apache.aurora.scheduler.async.preemptor;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -44,6 +44,8 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskEvent;
 import org.apache.aurora.scheduler.HostOffer;
+import org.apache.aurora.scheduler.async.OfferQueue;
+import org.apache.aurora.scheduler.async.preemptor.Preemptor.PreemptorImpl;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
@@ -72,7 +74,6 @@ import static org.apache.aurora.gen.MaintenanceMode.NONE;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
-import static org.apache.aurora.scheduler.async.Preemptor.PreemptorImpl;
 import static org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import static org.apache.mesos.Protos.Offer;
 import static org.apache.mesos.Protos.Resource;
@@ -129,7 +130,8 @@ public class PreemptorImplTest extends EasyMockTest {
         schedulingFilter,
         PREEMPTION_DELAY,
         clock,
-        statsProvider);
+        statsProvider,
+        new LiveClusterState(storageUtil.storage));
 
     preemptor.findPreemptionSlotFor(pendingTask.getAssignedTask().getTaskId(), emptyJob);
   }
@@ -147,7 +149,7 @@ public class PreemptorImplTest extends EasyMockTest {
 
   private void expectGetActiveTasks(ScheduledTask... returnedTasks) {
     storageUtil.expectTaskFetch(
-        PreemptorImpl.CANDIDATE_QUERY,
+        LiveClusterState.CANDIDATE_QUERY,
         IScheduledTask.setFromBuilders(Arrays.asList(returnedTasks)));
   }
 
@@ -525,7 +527,8 @@ public class PreemptorImplTest extends EasyMockTest {
         schedulingFilter,
         PREEMPTION_DELAY,
         clock,
-        statsProvider);
+        statsProvider,
+        new LiveClusterState(storage));
 
     assertEquals(
         Optional.<String>absent(),

@@ -37,6 +37,7 @@ import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.async.TaskScheduler.TaskSchedulerImpl;
+import org.apache.aurora.scheduler.async.preemptor.Preemptor;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.events.EventSink;
@@ -116,8 +117,8 @@ public class TaskSchedulerImplTest extends EasyMockTest {
         new AbstractModule() {
           @Override
           protected void configure() {
-            bind(AsyncModule.PREEMPTOR_KEY).toInstance(preemptor);
-            AsyncModule.bindTaskScheduler(binder(), AsyncModule.PREEMPTOR_KEY, reservationDuration);
+            bind(Preemptor.class).toInstance(preemptor);
+            AsyncModule.bindTaskScheduler(binder(), reservationDuration);
             bind(OfferQueue.class).toInstance(offerQueue);
             bind(StateManager.class).toInstance(stateManager);
             bind(TaskAssigner.class).toInstance(assigner);

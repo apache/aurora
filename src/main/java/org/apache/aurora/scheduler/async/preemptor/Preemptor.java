@@ -11,12 +11,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.scheduler.async;
+package org.apache.aurora.scheduler.async.preemptor;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import java.util.Collections;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -24,9 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Functions;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -37,7 +33,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
-import com.google.common.collect.Sets;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
@@ -47,14 +42,17 @@ import com.twitter.common.util.Clock;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.HostOffer;
 import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.async.OfferQueue;
 import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
+import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
+import org.apache.aurora.scheduler.storage.Storage.Util;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -69,10 +67,6 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.PREEMPTING;
 import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
-import static org.apache.aurora.scheduler.storage.Storage.MutableStoreProvider;
-import static org.apache.aurora.scheduler.storage.Storage.MutateWork;
-import static org.apache.aurora.scheduler.storage.Storage.StoreProvider;
-import static org.apache.aurora.scheduler.storage.Storage.Work;
 
 /**
  * Preempts active tasks in favor of higher priority tasks.
@@ -95,6 +89,8 @@ public interface Preemptor {
    * To avoid excessive churn, the preemptor requires that a task is PENDING for a duration
    * (dictated by {@link #preemptionCandidacyDelay}) before it becomes eligible to preempt other
    * tasks.
+   * <p>
+   * TODO(wfarner): Move this class out of the interface to make it package private.
    */
   class PreemptorImpl implements Preemptor {
 
@@ -105,10 +101,6 @@ public interface Preemptor {
     @Qualifier
     @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
     @interface PreemptionDelay { }
-
-    @VisibleForTesting
-    static final Query.Builder CANDIDATE_QUERY = Query.statusScoped(
-        EnumSet.copyOf(Sets.difference(Tasks.SLAVE_ASSIGNED_STATES, EnumSet.of(PREEMPTING))));
 
     private final AtomicLong tasksPreempted = Stats.exportLong("preemptor_tasks_preempted");
     // Incremented every time the preemptor is invoked and finds tasks pending and preemptable tasks
@@ -131,6 +123,7 @@ public interface Preemptor {
     private final Amount<Long, Time> preemptionCandidacyDelay;
     private final Clock clock;
     private final AtomicLong missingAttributes;
+    private final ClusterState clusterState;
 
     /**
      * Creates a new preemptor.
@@ -144,14 +137,15 @@ public interface Preemptor {
      * @param clock Clock to check current time.
      */
     @Inject
-    PreemptorImpl(
+    public PreemptorImpl(
         Storage storage,
         StateManager stateManager,
         OfferQueue offerQueue,
         SchedulingFilter schedulingFilter,
         @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
         Clock clock,
-        StatsProvider statsProvider) {
+        StatsProvider statsProvider,
+        ClusterState clusterState) {
 
       this.storage = requireNonNull(storage);
       this.stateManager = requireNonNull(stateManager);
@@ -160,25 +154,8 @@ public interface Preemptor {
       this.preemptionCandidacyDelay = requireNonNull(preemptionCandidacyDelay);
       this.clock = requireNonNull(clock);
       missingAttributes = statsProvider.makeCounter("preemptor_missing_attributes");
+      this.clusterState = requireNonNull(clusterState);
     }
-
-    private List<IAssignedTask> fetch(Query.Builder query, Predicate<IScheduledTask> filter) {
-      return Lists.newArrayList(Iterables.transform(Iterables.filter(
-          Storage.Util.consistentFetchTasks(storage, query), filter),
-          SCHEDULED_TO_ASSIGNED));
-    }
-
-    private List<IAssignedTask> fetch(Query.Builder query) {
-      return fetch(query, Predicates.<IScheduledTask>alwaysTrue());
-    }
-
-    private static final Function<IAssignedTask, String> TASK_TO_SLAVE_ID =
-        new Function<IAssignedTask, String>() {
-          @Override
-          public String apply(IAssignedTask input) {
-            return input.getSlaveId();
-          }
-        };
 
     private static final Function<IAssignedTask, ResourceSlot> TASK_TO_RESOURCES =
         new Function<IAssignedTask, ResourceSlot>() {
@@ -222,7 +199,7 @@ public interface Preemptor {
      * The empty set indicates the offers (slack) are enough.
      * A set with elements indicates those tasks and the offers are enough.
      */
-    private Optional<Set<IAssignedTask>> getTasksToPreempt(
+    private Optional<Set<String>> getTasksToPreempt(
         Iterable<IAssignedTask> possibleVictims,
         Iterable<HostOffer> offers,
         IAssignedTask pendingTask,
@@ -249,12 +226,12 @@ public interface Preemptor {
         IHostAttributes attributes = Iterables.getOnlyElement(
             FluentIterable.from(offers).transform(OFFER_TO_ATTRIBUTES).toSet());
 
-        Set<SchedulingFilter.Veto> vetoes = schedulingFilter.filter(
+        Set<Veto> vetoes = schedulingFilter.filter(
             new UnusedResource(slackResources, attributes),
             new ResourceRequest(pendingTask.getTask(), pendingTask.getTaskId(), jobState));
 
         if (vetoes.isEmpty()) {
-          return Optional.<Set<IAssignedTask>>of(ImmutableSet.<IAssignedTask>of());
+          return Optional.<Set<String>>of(ImmutableSet.<String>of());
         }
       }
 
@@ -284,21 +261,23 @@ public interface Preemptor {
           continue;
         }
 
-        Set<SchedulingFilter.Veto> vetoes = schedulingFilter.filter(
+        Set<Veto> vetoes = schedulingFilter.filter(
             new UnusedResource(totalResource, attributes.get()),
             new ResourceRequest(pendingTask.getTask(), pendingTask.getTaskId(), jobState));
 
         if (vetoes.isEmpty()) {
-          return Optional.<Set<IAssignedTask>>of(ImmutableSet.copyOf(toPreemptTasks));
+          Set<String> taskIds =
+              FluentIterable.from(toPreemptTasks).transform(Tasks.ASSIGNED_TO_ID).toSet();
+          return Optional.of(taskIds);
         }
       }
       return Optional.absent();
     }
 
     private Optional<IHostAttributes> getHostAttributes(final String host) {
-      return storage.weaklyConsistentRead(new Work.Quiet<Optional<IHostAttributes>>() {
+      return storage.weaklyConsistentRead(new Storage.Work.Quiet<Optional<IHostAttributes>>() {
         @Override
-        public Optional<IHostAttributes> apply(StoreProvider storeProvider) {
+        public Optional<IHostAttributes> apply(Storage.StoreProvider storeProvider) {
           return storeProvider.getAttributeStore().getHostAttributes(host);
         }
       });
@@ -312,44 +291,28 @@ public interface Preemptor {
           }
         };
 
-    /**
-     * Order by production flag (true, then false), subsorting by task ID.
-     * TODO(wfarner): Re-evaluate - what do we gain from sorting by task ID?
-     */
-    private static final Ordering<IAssignedTask> SCHEDULING_ORDER =
-        Ordering.explicit(true, false)
-            .onResultOf(Functions.compose(
-                Functions.forPredicate(Tasks.IS_PRODUCTION),
-                Tasks.ASSIGNED_TO_INFO))
-            .compound(Ordering.natural().onResultOf(Tasks.ASSIGNED_TO_ID));
-
-    private Multimap<String, IAssignedTask> getSlavesToActiveTasks() {
-      // Only non-pending active tasks may be preempted.
-      List<IAssignedTask> activeTasks = fetch(CANDIDATE_QUERY);
-
-      // Walk through the preemption candidates in reverse scheduling order.
-      Collections.sort(activeTasks, SCHEDULING_ORDER.reverse());
-
-      // Group the tasks by slave id so they can be paired with offers from the same slave.
-      return Multimaps.index(activeTasks, TASK_TO_SLAVE_ID);
+    private Optional<IAssignedTask> fetchIdlePendingTask(String taskId) {
+      Query.Builder query = Query.taskScoped(taskId).byStatus(PENDING);
+      Iterable<IAssignedTask> result = FluentIterable
+          .from(Util.consistentFetchTasks(storage, query))
+          .filter(isIdleTask)
+          .transform(SCHEDULED_TO_ASSIGNED);
+      return Optional.fromNullable(Iterables.getOnlyElement(result, null));
     }
 
     @Override
     public synchronized Optional<String> findPreemptionSlotFor(
-        String taskId,
+        final String taskId,
         AttributeAggregate attributeAggregate) {
 
-      List<IAssignedTask> pendingTasks =
-          fetch(Query.statusScoped(PENDING).byId(taskId), isIdleTask);
+      final Optional<IAssignedTask> pendingTask = fetchIdlePendingTask(taskId);
 
-      // Task is no longer PENDING no need to preempt
-      if (pendingTasks.isEmpty()) {
+      // Task is no longer PENDING no need to preempt.
+      if (!pendingTask.isPresent()) {
         return Optional.absent();
       }
 
-      final IAssignedTask pendingTask = Iterables.getOnlyElement(pendingTasks);
-
-      Multimap<String, IAssignedTask> slavesToActiveTasks = getSlavesToActiveTasks();
+      Multimap<String, IAssignedTask> slavesToActiveTasks = clusterState.getSlavesToActiveTasks();
 
       if (slavesToActiveTasks.isEmpty()) {
         return Optional.absent();
@@ -367,23 +330,23 @@ public interface Preemptor {
           .build();
 
       for (String slaveID : allSlaves) {
-        final Optional<Set<IAssignedTask>> toPreemptTasks = getTasksToPreempt(
+        final Optional<Set<String>> toPreemptTasks = getTasksToPreempt(
             slavesToActiveTasks.get(slaveID),
             slavesToOffers.get(slaveID),
-            pendingTask,
+            pendingTask.get(),
             attributeAggregate);
 
         if (toPreemptTasks.isPresent()) {
-          storage.write(new MutateWork.NoResult.Quiet() {
+          storage.write(new Storage.MutateWork.NoResult.Quiet() {
             @Override
-            protected void execute(MutableStoreProvider storeProvider) {
-              for (IAssignedTask toPreempt : toPreemptTasks.get()) {
+            protected void execute(Storage.MutableStoreProvider storeProvider) {
+              for (String toPreempt : toPreemptTasks.get()) {
                 stateManager.changeState(
                     storeProvider,
-                    toPreempt.getTaskId(),
+                    toPreempt,
                     Optional.<ScheduleStatus>absent(),
                     PREEMPTING,
-                    Optional.of("Preempting in favor of " + pendingTask.getTaskId()));
+                    Optional.of("Preempting in favor of " + taskId));
                 tasksPreempted.incrementAndGet();
               }
             }
@@ -431,4 +394,3 @@ public interface Preemptor {
     }
   }
 }
-
