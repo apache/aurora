@@ -23,11 +23,16 @@ import com.google.common.collect.Multimaps;
 import com.twitter.common.inject.TimedInterceptor.Timed;
 
 import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
+import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.storage.DeduplicatedScheduledTask;
 import org.apache.aurora.gen.storage.DeduplicatedSnapshot;
 import org.apache.aurora.gen.storage.Snapshot;
+
+import static org.apache.aurora.gen.AssignedTask._Fields.TASK;
+import static org.apache.aurora.gen.ScheduledTask._Fields.ASSIGNED_TASK;
+import static org.apache.aurora.gen.storage.Snapshot._Fields.TASKS;
 
 /**
  * Converter between denormalized storage Snapshots and de-duplicated snapshots.
@@ -65,9 +70,38 @@ public interface SnapshotDeduplicator {
         };
 
     private static ScheduledTask deepCopyWithoutTaskConfig(ScheduledTask scheduledTask) {
-      ScheduledTask task = scheduledTask.deepCopy();
-      task.getAssignedTask().unsetTask();
-      return task;
+      ScheduledTask scheduledTaskCopy = new ScheduledTask();
+      for (ScheduledTask._Fields scheduledTaskField : ScheduledTask._Fields.values()) {
+        if (scheduledTaskField == ASSIGNED_TASK) {
+          AssignedTask assignedTask = scheduledTask.getAssignedTask();
+          AssignedTask assignedTaskCopy = new AssignedTask();
+          for (AssignedTask._Fields assignedTaskField : AssignedTask._Fields.values()) {
+            // Copy all fields in AssignedTask except the TASK field.
+            if (assignedTaskField != TASK && assignedTask.isSet(assignedTaskField)) {
+              assignedTaskCopy.setFieldValue(
+                  assignedTaskField, assignedTask.getFieldValue(assignedTaskField));
+            }
+          }
+          scheduledTaskCopy.setAssignedTask(assignedTaskCopy);
+        } else if (scheduledTask.isSet(scheduledTaskField)) {
+          scheduledTaskCopy.setFieldValue(
+              scheduledTaskField, scheduledTask.getFieldValue(scheduledTaskField));
+        }
+      }
+      return scheduledTaskCopy.deepCopy();
+    }
+
+    // NOTE: We intentionally try to minimize the number of copies of the Snapshot#tasks field
+    // we make. The simpler implementation of deepCopy followed by unsetTasks creates a
+    // lot of GC pressure.
+    private static Snapshot deepCopyWithoutTasks(Snapshot snapshot) {
+      Snapshot snapshotCopy = new Snapshot();
+      for (Snapshot._Fields field : Snapshot._Fields.values()) {
+        if (field != TASKS && snapshot.isSet(field)) {
+          snapshotCopy.setFieldValue(field, snapshot.getFieldValue(field));
+        }
+      }
+      return snapshotCopy.deepCopy();
     }
 
     @Override
@@ -76,11 +110,8 @@ public interface SnapshotDeduplicator {
       int numInputTasks = snapshot.getTasksSize();
       LOG.info(String.format("Starting deduplication of a snapshot with %d tasks.", numInputTasks));
 
-      Snapshot partialSnapshot = snapshot.deepCopy();
-      partialSnapshot.unsetTasks();
-
       DeduplicatedSnapshot deduplicatedSnapshot = new DeduplicatedSnapshot()
-          .setPartialSnapshot(partialSnapshot);
+          .setPartialSnapshot(deepCopyWithoutTasks(snapshot));
 
       // Nothing to do if we don't have any input tasks.
       if (!snapshot.isSetTasks()) {
