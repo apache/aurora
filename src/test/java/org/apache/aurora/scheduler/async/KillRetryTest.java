@@ -24,10 +24,7 @@ import com.google.common.testing.TearDown;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.Key;
-import com.twitter.common.application.StartupStage;
 import com.twitter.common.application.modules.LifecycleModule;
-import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatsProvider;
@@ -41,6 +38,7 @@ import org.apache.aurora.scheduler.base.Query;
 import org.apache.aurora.scheduler.events.PubsubEvent.TaskStateChange;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.mesos.Driver;
+import org.apache.aurora.scheduler.state.PubsubTestUtil;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
@@ -98,7 +96,7 @@ public class KillRetryTest extends EasyMockTest {
         }
     );
     eventBus = injector.getInstance(EventBus.class);
-    injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
+    PubsubTestUtil.startPubsub(injector);
   }
 
   private static IScheduledTask makeTask(String id, ScheduleStatus status) {

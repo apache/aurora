@@ -32,7 +32,7 @@ import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
-import org.apache.aurora.scheduler.SchedulerModule;
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.base.AsyncUtil;
 import org.apache.aurora.scheduler.sla.MetricCalculator.MetricCalculatorSettings;
 
@@ -81,7 +81,7 @@ public class SlaModule extends AbstractModule {
         .toInstance(AsyncUtil.singleThreadLoggingScheduledExecutor("SlaStat-%d", LOG));
 
     bind(SlaUpdater.class).in(Singleton.class);
-    SchedulerModule.addSchedulerActiveServiceBinding(binder()).to(SlaUpdater.class);
+    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(SlaUpdater.class);
   }
 
   // TODO(ksweeney): This should use AbstractScheduledService.

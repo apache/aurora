@@ -27,6 +27,7 @@ import javax.ws.rs.HttpMethod;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Injector;
 import com.google.inject.TypeLiteral;
@@ -41,7 +42,6 @@ import com.twitter.common.application.modules.LifecycleModule.LaunchException;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Command;
-import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.base.ExceptionalSupplier;
 import com.twitter.common.base.MoreSuppliers;
 import com.twitter.common.net.http.handlers.AbortHandler;
@@ -56,6 +56,7 @@ import com.twitter.common.net.http.handlers.VarsHandler;
 import com.twitter.common.net.http.handlers.VarsJsonHandler;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.http.api.ApiBeta;
 import org.eclipse.jetty.rewrite.handler.RewriteHandler;
 import org.eclipse.jetty.rewrite.handler.RewriteRegexRule;
@@ -127,11 +128,10 @@ public class JettyServerModule extends AbstractModule {
     LifecycleModule.bindServiceRunner(binder(), HttpServerLauncher.class);
 
     bind(LeaderRedirect.class).in(Singleton.class);
-    LifecycleModule.bindStartupAction(binder(), RedirectMonitor.class);
+    SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RedirectMonitor.class);
   }
 
-  static class RedirectMonitor implements ExceptionalCommand<MonitorException> {
-
+  static class RedirectMonitor extends AbstractIdleService {
     private final LeaderRedirect redirector;
 
     @Inject
@@ -140,8 +140,13 @@ public class JettyServerModule extends AbstractModule {
     }
 
     @Override
-    public void execute() throws MonitorException {
+    public void startUp() throws MonitorException {
       redirector.monitor();
+    }
+
+    @Override
+    protected void shutDown() {
+      // Nothing to do here - we await VM shutdown.
     }
   }
 

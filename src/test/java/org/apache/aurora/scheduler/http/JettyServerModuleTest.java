@@ -45,6 +45,7 @@ import com.twitter.thrift.ServiceInstance;
 
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ServerInfo;
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.OfferQueue;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
@@ -88,6 +89,7 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
         new JettyServerModule(),
         new StatsModule(),
         new LifecycleModule(),
+        new SchedulerServicesModule(),
         new AbstractModule() {
           <T> T bindMock(Class<T> clazz) {
             T mock = createMock(clazz);

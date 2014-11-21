@@ -45,6 +45,7 @@ import com.twitter.thrift.ServiceInstance;
 import org.apache.aurora.GuiceUtils;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.SchedulerModule;
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.AsyncModule;
 import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
@@ -69,7 +70,7 @@ import static org.apache.aurora.gen.apiConstants.THRIFT_API_VERSION;
 /**
  * Binding module for the aurora scheduler application.
  */
-class AppModule extends AbstractModule {
+public class AppModule extends AbstractModule {
   private static final Logger LOG = Logger.getLogger(AppModule.class.getName());
 
   private final String clusterName;
@@ -118,6 +119,7 @@ class AppModule extends AbstractModule {
     install(new QuotaModule());
     install(new JettyServerModule());
     install(new SchedulerDriverModule());
+    install(new SchedulerServicesModule());
     install(new SchedulerModule());
     install(new StateModule());
     install(new SlaModule());

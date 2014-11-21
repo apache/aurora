@@ -13,15 +13,19 @@
  */
 package org.apache.aurora.scheduler.async;
 
+import java.util.Set;
+
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.util.concurrent.Service;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
+import com.google.inject.TypeLiteral;
 import com.twitter.common.application.StartupStage;
 import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.ExceptionalCommand;
@@ -29,6 +33,7 @@ import com.twitter.common.stats.StatsProvider;
 import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.common.util.Clock;
 
+import org.apache.aurora.scheduler.AppStartup;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.mesos.Driver;
@@ -92,7 +97,11 @@ public class AsyncModuleTest extends EasyMockTest {
 
     control.replay();
 
-    injector.getInstance(Key.get(ExceptionalCommand.class, StartupStage.class)).execute();
+    Set<Service> services = injector.getInstance(
+        Key.get(new TypeLiteral<Set<Service>>() { }, AppStartup.class));
+    for (Service service : services) {
+      service.startAsync().awaitRunning();
+    }
 
     injector.getBindings();
 

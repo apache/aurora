@@ -32,6 +32,7 @@ import com.google.common.eventbus.AsyncEventBus;
 import com.google.common.eventbus.DeadEvent;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.AbstractModule;
@@ -46,6 +47,7 @@ import com.twitter.common.args.constraints.Positive;
 import com.twitter.common.base.Command;
 import com.twitter.common.stats.StatsProvider;
 
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.events.NotifyingSchedulingFilter.NotifyDelegate;
 import org.apache.aurora.scheduler.events.PubsubEvent.EventSubscriber;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
@@ -128,7 +130,8 @@ public final class PubsubEventModule extends AbstractModule {
 
     // Ensure at least an empty binding is present.
     getSubscriberBinder(binder());
-    LifecycleModule.bindStartupAction(binder(), RegisterSubscribers.class);
+    // TODO(ksweeney): Would this be better as a scheduler active service?
+    SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RegisterSubscribers.class);
   }
 
   private class DeadEventHandler {
@@ -164,7 +167,7 @@ public final class PubsubEventModule extends AbstractModule {
     }
   }
 
-  static class RegisterSubscribers implements Command {
+  static class RegisterSubscribers extends AbstractIdleService {
     private final EventBus eventBus;
     private final Set<EventSubscriber> subscribers;
 
@@ -175,10 +178,15 @@ public final class PubsubEventModule extends AbstractModule {
     }
 
     @Override
-    public void execute() {
+    protected void startUp() {
       for (EventSubscriber subscriber : subscribers) {
         eventBus.register(subscriber);
       }
+    }
+
+    @Override
+    protected void shutDown() {
+      // Nothing to do - await VM shutdown.
     }
   }
 

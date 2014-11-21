@@ -17,7 +17,6 @@ import java.util.logging.Logger;
 
 import javax.inject.Inject;
 
-import org.apache.aurora.scheduler.stats.AsyncStatsModule.StatUpdater;
 import org.apache.aurora.scheduler.stats.ResourceCounter.GlobalMetric;
 import org.apache.aurora.scheduler.stats.ResourceCounter.Metric;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
@@ -28,7 +27,7 @@ import static java.util.Objects.requireNonNull;
  * Calculates and exports aggregate stats about resources consumed by active tasks.
  */
 class TaskStatCalculator implements Runnable {
-  private static final Logger LOG = Logger.getLogger(StatUpdater.class.getName());
+  private static final Logger LOG = Logger.getLogger(TaskStatCalculator.class.getName());
 
   private final CachedCounters counters;
   private final ResourceCounter resourceCounter;

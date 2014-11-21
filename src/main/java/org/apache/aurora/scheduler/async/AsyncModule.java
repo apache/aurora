@@ -27,18 +27,17 @@ import javax.inject.Singleton;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.Key;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
-import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
 import com.twitter.common.args.constraints.NotNegative;
 import com.twitter.common.args.constraints.Positive;
-import com.twitter.common.base.Command;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.StatsProvider;
@@ -46,7 +45,7 @@ import com.twitter.common.util.BackoffStrategy;
 import com.twitter.common.util.Random;
 import com.twitter.common.util.TruncatedBinaryBackoff;
 
-import org.apache.aurora.scheduler.SchedulerModule;
+import org.apache.aurora.scheduler.SchedulerServicesModule;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.GcExecutorSettings;
 import org.apache.aurora.scheduler.async.GcExecutorLauncher.RandomGcExecutorSettings;
 import org.apache.aurora.scheduler.async.OfferQueue.OfferQueueImpl;
@@ -239,7 +238,7 @@ public class AsyncModule extends AbstractModule {
     final ScheduledThreadPoolExecutor executor =
         AsyncUtil.loggingScheduledExecutor(ASYNC_WORKER_THREADS.get(), "AsyncProcessor-%d", LOG);
     bind(ScheduledThreadPoolExecutor.class).annotatedWith(AsyncExecutor.class).toInstance(executor);
-    LifecycleModule.bindStartupAction(binder(), RegisterGauges.class);
+    SchedulerServicesModule.addAppStartupServiceBinding(binder()).to(RegisterGauges.class);
 
     // AsyncModule itself is not a subclass of PrivateModule because TaskEventModule internally uses
     // a MultiBinder, which cannot span multiple injectors.
@@ -255,7 +254,7 @@ public class AsyncModule extends AbstractModule {
       }
     });
     PubsubEventModule.bindSubscriber(binder(), TaskTimeout.class);
-    SchedulerModule.addSchedulerActiveServiceBinding(binder()).to(TaskTimeout.class);
+    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder()).to(TaskTimeout.class);
 
     install(new PrivateModule() {
       @Override
@@ -366,7 +365,8 @@ public class AsyncModule extends AbstractModule {
         expose(JobUpdateHistoryPruner.class);
       }
     });
-    LifecycleModule.bindStartupAction(binder(), JobUpdateHistoryPruner.class);
+    SchedulerServicesModule.addSchedulerActiveServiceBinding(binder())
+        .to(JobUpdateHistoryPruner.class);
 
     install(new PrivateModule() {
       @Override
@@ -409,7 +409,7 @@ public class AsyncModule extends AbstractModule {
     PubsubEventModule.bindSubscriber(binder, TaskScheduler.class);
   }
 
-  static class RegisterGauges implements Command {
+  static class RegisterGauges extends AbstractIdleService {
     private final StatsProvider statsProvider;
     private final ScheduledThreadPoolExecutor executor;
 
@@ -423,7 +423,7 @@ public class AsyncModule extends AbstractModule {
     }
 
     @Override
-    public void execute() throws RuntimeException {
+    protected void startUp() {
       statsProvider.makeGauge(
           TIMEOUT_QUEUE_GAUGE,
           new Supplier<Integer>() {
@@ -441,6 +441,11 @@ public class AsyncModule extends AbstractModule {
             }
           }
       );
+    }
+
+    @Override
+    protected void shutDown() {
+      // Nothing to do - await VM shutdown.
     }
   }
 }

@@ -21,7 +21,7 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.base.Joiner;
-import com.twitter.common.base.Command;
+import com.google.common.util.concurrent.AbstractIdleService;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.util.Clock;
@@ -35,7 +35,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Prunes per-job update history on a periodic basis.
  */
-class JobUpdateHistoryPruner implements Command {
+class JobUpdateHistoryPruner extends AbstractIdleService {
   private static final Logger LOG = Logger.getLogger(JobUpdateHistoryPruner.class.getName());
 
   private final Clock clock;
@@ -73,7 +73,7 @@ class JobUpdateHistoryPruner implements Command {
   }
 
   @Override
-  public void execute() throws RuntimeException {
+  protected void startUp() {
     executor.scheduleAtFixedRate(
         new Runnable() {
           @Override
@@ -95,5 +95,10 @@ class JobUpdateHistoryPruner implements Command {
         settings.pruneInterval.as(Time.MILLISECONDS),
         settings.pruneInterval.as(Time.MILLISECONDS),
         TimeUnit.MILLISECONDS);
+  }
+
+  @Override
+  protected void shutDown() {
+    // Nothing to do - await VM shutdown.
   }
 }
