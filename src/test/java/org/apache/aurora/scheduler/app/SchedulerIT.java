@@ -49,6 +49,7 @@ import com.twitter.common.application.modules.LifecycleModule;
 import com.twitter.common.base.ExceptionalCommand;
 import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.concurrent.ExecutorServiceShutdown;
@@ -76,13 +77,14 @@ import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.gen.storage.Transaction;
 import org.apache.aurora.gen.storage.storageConstants;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.log.Log;
 import org.apache.aurora.scheduler.log.Log.Entry;
 import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
-import org.apache.aurora.scheduler.mesos.MesosTaskFactory.ExecutorConfig;
+import org.apache.aurora.scheduler.mesos.MesosTaskFactory.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.log.EntrySerializer;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
@@ -104,6 +106,8 @@ import org.junit.Test;
 
 import static com.twitter.common.testing.easymock.EasyMockTest.createCapture;
 
+import static org.apache.aurora.scheduler.ResourceSlot.EXECUTOR_OVERHEAD_CPUS;
+import static org.apache.aurora.scheduler.ResourceSlot.EXECUTOR_OVERHEAD_RAM;
 import static org.apache.mesos.Protos.FrameworkInfo;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createControl;
@@ -194,7 +198,13 @@ public class SchedulerIT extends BaseZooKeeperTest {
         bind(DriverFactory.class).toInstance(driverFactory);
         bind(DriverSettings.class).toInstance(SETTINGS);
         bind(Log.class).toInstance(log);
-        bind(ExecutorConfig.class).toInstance(new ExecutorConfig("/executor/thermos"));
+        Resources executorOverhead = new Resources(
+            EXECUTOR_OVERHEAD_CPUS.get(),
+            EXECUTOR_OVERHEAD_RAM.get(),
+            Amount.of(0L, Data.MB),
+            0);
+        bind(ExecutorSettings.class)
+            .toInstance(new ExecutorSettings("/executor/thermos", executorOverhead));
         install(new BackupModule(backupDir, SnapshotStoreImpl.class));
       }
     };

@@ -35,6 +35,8 @@ import com.twitter.common.args.constraints.NotEmpty;
 import com.twitter.common.args.constraints.NotNull;
 import com.twitter.common.inject.Bindings;
 import com.twitter.common.logging.RootLogConfig;
+import com.twitter.common.quantity.Amount;
+import com.twitter.common.quantity.Data;
 import com.twitter.common.zookeeper.Group;
 import com.twitter.common.zookeeper.SingletonService;
 import com.twitter.common.zookeeper.SingletonService.LeadershipListener;
@@ -46,11 +48,12 @@ import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.SessionValidator;
 import org.apache.aurora.auth.UnsecureAuthModule;
 import org.apache.aurora.scheduler.SchedulerLifecycle;
+import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
 import org.apache.aurora.scheduler.mesos.LibMesosLoadingModule;
-import org.apache.aurora.scheduler.mesos.MesosTaskFactory.ExecutorConfig;
+import org.apache.aurora.scheduler.mesos.MesosTaskFactory.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.db.MigrationModule;
@@ -63,6 +66,9 @@ import org.apache.aurora.scheduler.thrift.ThriftModule;
 import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 
 import static com.twitter.common.logging.RootLogConfig.Configuration;
+
+import static org.apache.aurora.scheduler.ResourceSlot.EXECUTOR_OVERHEAD_CPUS;
+import static org.apache.aurora.scheduler.ResourceSlot.EXECUTOR_OVERHEAD_RAM;
 
 /**
  * Launcher for the aurora scheduler.
@@ -178,7 +184,13 @@ public class SchedulerMain extends AbstractApplication {
         .add(new AbstractModule() {
           @Override
           protected void configure() {
-            bind(ExecutorConfig.class).toInstance(new ExecutorConfig(THERMOS_EXECUTOR_PATH.get()));
+            Resources executorOverhead = new Resources(
+                EXECUTOR_OVERHEAD_CPUS.get(),
+                EXECUTOR_OVERHEAD_RAM.get(),
+                Amount.of(0L, Data.MB),
+                0);
+            bind(ExecutorSettings.class)
+                .toInstance(new ExecutorSettings(THERMOS_EXECUTOR_PATH.get(), executorOverhead));
           }
         })
         .add(getMesosModules())

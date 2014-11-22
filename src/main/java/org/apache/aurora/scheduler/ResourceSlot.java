@@ -38,34 +38,32 @@ public final class ResourceSlot {
   private final Resources resources;
 
   /**
-   * CPU allocated for each executor.
+   * Extra CPU allocated for each executor.
    */
   @VisibleForTesting
   @CmdLine(name = "thermos_executor_cpu",
       help = "The number of CPU cores to allocate for each instance of the executor.")
-  public static final Arg<Double> EXECUTOR_CPUS = Arg.create(0.25);
+  public static final Arg<Double> EXECUTOR_OVERHEAD_CPUS = Arg.create(0.25);
 
   /**
-   * RAM required for the executor.  Executors in the wild have been observed using 48-54MB RSS,
-   * setting to 128MB to be extra vigilant initially.
+   * Extra RAM allocated for the executor.
    */
   @VisibleForTesting
   @CmdLine(name = "thermos_executor_ram",
       help = "The amount of RAM to allocate for each instance of the executor.")
-  public static final Arg<Amount<Integer, Data>> EXECUTOR_RAM =
-  Arg.create(Amount.of(128, Data.MB));
+  public static final Arg<Amount<Long, Data>> EXECUTOR_OVERHEAD_RAM =
+      Arg.create(Amount.of(128L, Data.MB));
 
   private ResourceSlot(Resources r) {
     this.resources = r;
   }
 
   public static ResourceSlot from(ITaskConfig task) {
-    double totalCPU = task.getNumCpus() + EXECUTOR_CPUS.get();
-    Amount<Long, Data> totalRAM =
-        Amount.of(task.getRamMb() + EXECUTOR_RAM.get().as(Data.MB), Data.MB);
-    Amount<Long, Data> disk = Amount.of(task.getDiskMb(), Data.MB);
-    return new ResourceSlot(
-        new Resources(totalCPU, totalRAM, disk, task.getRequestedPorts().size()));
+    return from(
+        task.getNumCpus(),
+        Amount.of(task.getRamMb(), Data.MB),
+        Amount.of(task.getDiskMb(), Data.MB),
+        task.getRequestedPorts().size());
   }
 
   public static ResourceSlot from(Offer offer) {
@@ -89,13 +87,14 @@ public final class ResourceSlot {
   }
 
   @VisibleForTesting
-  public static ResourceSlot from(double cpu,
-                                  Amount<Long, Data> ram,
-                                  Amount<Long, Data> disk,
-                                  int ports) {
-    double totalCPU = cpu + EXECUTOR_CPUS.get();
+  public static ResourceSlot from(
+      double cpu,
+      Amount<Long, Data> ram,
+      Amount<Long, Data> disk,
+      int ports) {
+    double totalCPU = cpu + EXECUTOR_OVERHEAD_CPUS.get();
     Amount<Long, Data> totalRAM =
-        Amount.of(ram.as(Data.MB) + EXECUTOR_RAM.get().as(Data.MB), Data.MB);
+        Amount.of(ram.as(Data.MB) + EXECUTOR_OVERHEAD_RAM.get().as(Data.MB), Data.MB);
 
     return new ResourceSlot(new Resources(totalCPU, totalRAM, disk, ports));
   }

@@ -23,11 +23,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
+import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
-import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.CommandUtil;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.SchedulerException;
@@ -62,15 +62,21 @@ public interface MesosTaskFactory {
    */
   TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException;
 
-  class ExecutorConfig {
+  class ExecutorSettings {
     private final String executorPath;
+    private final Resources executorOverhead;
 
-    public ExecutorConfig(String executorPath) {
+    public ExecutorSettings(String executorPath, Resources executorOverhead) {
       this.executorPath = checkNotBlank(executorPath);
+      this.executorOverhead = requireNonNull(executorOverhead);
     }
 
     String getExecutorPath() {
       return executorPath;
+    }
+
+    Resources getExecutorOverhead() {
+      return executorOverhead;
     }
   }
 
@@ -80,16 +86,39 @@ public interface MesosTaskFactory {
     private static final String EXECUTOR_PREFIX = "thermos-";
 
     /**
+     * Minimum resources required to run Thermos. In the wild Thermos needs about 0.01 CPU and
+     * about 100MB of RAM. The RAM requirement has been rounded up to a power of 2.
+     */
+    @VisibleForTesting
+    static final Resources MIN_THERMOS_RESOURCES = new Resources(
+        0.01,
+        Amount.of(128L, Data.MB),
+        Amount.of(0L, Data.MB),
+        0);
+
+    /**
+     * Minimum resources to allocate for a task. Mesos rejects tasks that have no CPU or no RAM.
+     */
+    @VisibleForTesting
+    static final Resources MIN_TASK_RESOURCES = new Resources(
+        0.01,
+        Amount.of(1L, Data.MB),
+        Amount.of(0L, Data.MB),
+        0);
+
+    /**
      * Name to associate with task executors.
      */
     @VisibleForTesting
     static final String EXECUTOR_NAME = "aurora.task";
 
     private final String executorPath;
+    private final Resources executorOverhead;
 
     @Inject
-    MesosTaskFactoryImpl(ExecutorConfig executorConfig) {
-      this.executorPath = executorConfig.getExecutorPath();
+    MesosTaskFactoryImpl(ExecutorSettings executorSettings) {
+      this.executorPath = executorSettings.getExecutorPath();
+      this.executorOverhead = executorSettings.getExecutorOverhead();
     }
 
     @VisibleForTesting
@@ -97,21 +126,46 @@ public interface MesosTaskFactory {
       return ExecutorID.newBuilder().setValue(EXECUTOR_PREFIX + taskId).build();
     }
 
-    public static String getJobSourceName(IJobKey jobkey) {
+    private static String getJobSourceName(IJobKey jobkey) {
       return String.format("%s.%s.%s", jobkey.getRole(), jobkey.getEnvironment(), jobkey.getName());
     }
 
-    public static String getJobSourceName(ITaskConfig task) {
+    private static String getJobSourceName(ITaskConfig task) {
       return getJobSourceName(task.getJob());
     }
 
-    public static String getInstanceSourceName(ITaskConfig task, int instanceId) {
+    @VisibleForTesting
+    static String getInstanceSourceName(ITaskConfig task, int instanceId) {
       return String.format("%s.%s", getJobSourceName(task), instanceId);
+    }
+
+    /**
+     * Generates a Resource where each resource component is a max out of the two components.
+     *
+     * @param a A resource to compare.
+     * @param b A resource to compare.
+     *
+     * @return Returns a Resources instance where each component is a max of the two components.
+     */
+    @VisibleForTesting
+    static Resources maxElements(Resources a, Resources b) {
+      double maxCPU = Math.max(a.getNumCpus(), b.getNumCpus());
+      Amount<Long, Data> maxRAM = Amount.of(
+          Math.max(a.getRam().as(Data.MB), b.getRam().as(Data.MB)),
+          Data.MB);
+      Amount<Long, Data> maxDisk = Amount.of(
+          Math.max(a.getDisk().as(Data.MB), b.getDisk().as(Data.MB)),
+          Data.MB);
+      int maxPorts = Math.max(a.getNumPorts(), b.getNumPorts());
+
+      return new Resources(maxCPU, maxRAM, maxDisk, maxPorts);
     }
 
     @Override
     public TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException {
       requireNonNull(task);
+      requireNonNull(slaveId);
+
       byte[] taskInBytes;
       try {
         taskInBytes = ThriftBinaryCodec.encode(task.newBuilder());
@@ -120,9 +174,25 @@ public interface MesosTaskFactory {
         throw new SchedulerException("Internal error.", e);
       }
 
+      // The objective of the below code is to allocate a task and executor that is in a container
+      // of task + executor overhead size. Mesos stipulates that we cannot allocate 0 sized tasks or
+      // executors and we should always ensure the ExecutorInfo has enough resources to launch or
+      // run an executor. Therefore the total desired container size (task + executor overhead) is
+      // partitioned to a small portion that is always allocated to the executor and the rest to the
+      // task. If the remaining resources are not enough for the task a small epsilon is allocated
+      // to the task.
+
       ITaskConfig config = task.getTask();
+      Resources taskResources = Resources.from(config);
+      Resources containerResources = Resources.sum(taskResources, executorOverhead);
+
+      taskResources = Resources.subtract(containerResources, MIN_THERMOS_RESOURCES);
+      // It is possible that the final task resources will be negative.
+      // This ensures the task resources are positive.
+      Resources finalTaskResources = maxElements(taskResources, MIN_TASK_RESOURCES);
+
       // TODO(wfarner): Re-evaluate if/why we need to continue handling unset assignedPorts field.
-      List<Resource> resources = Resources.from(config)
+      List<Resource> resources = finalTaskResources
           .toResourceList(task.isSetAssignedPorts()
               ? ImmutableSet.copyOf(task.getAssignedPorts().values())
               : ImmutableSet.<Integer>of());
@@ -144,11 +214,7 @@ public interface MesosTaskFactory {
           .setExecutorId(getExecutorId(task.getTaskId()))
           .setName(EXECUTOR_NAME)
           .setSource(getInstanceSourceName(config, task.getInstanceId()))
-          .addResources(
-              Resources.makeMesosResource(Resources.CPUS, ResourceSlot.EXECUTOR_CPUS.get()))
-          .addResources(Resources.makeMesosResource(
-              Resources.RAM_MB,
-              ResourceSlot.EXECUTOR_RAM.get().as(Data.MB)))
+          .addAllResources(MIN_THERMOS_RESOURCES.toResourceList())
           .build();
       return taskBuilder
           .setExecutor(executor)
