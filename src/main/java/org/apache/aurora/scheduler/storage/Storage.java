@@ -181,6 +181,11 @@ public interface Storage {
    * TODO(wfarner): Update this documentation once all stores are backed by
    * {@link org.apache.aurora.scheduler.storage.db.DbStorage}, as the concurrency behavior will then
    * be dictated by the {@link org.mybatis.guice.transactional.Transactional#isolation()} used.
+   * <p>
+   * TODO(wfarner): This method no longer needs to exist now that there is no global locking for
+   * reads.  We could instead directly inject the individual stores where they are used, as long
+   * as the stores have a layer to replicate what is currently done by
+   * {@link CallOrderEnforcingStorage}.
    *
    * @param work The unit of work to execute.
    * @param <T> The type of result this unit of work produces.

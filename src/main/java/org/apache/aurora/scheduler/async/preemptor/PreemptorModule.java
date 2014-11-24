@@ -26,8 +26,7 @@ import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
-import org.apache.aurora.scheduler.async.preemptor.Preemptor.PreemptorImpl;
-import org.apache.aurora.scheduler.async.preemptor.Preemptor.PreemptorImpl.PreemptionDelay;
+import org.apache.aurora.scheduler.async.preemptor.PreemptorImpl.PreemptionDelay;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 
 public class PreemptorModule extends PrivateModule {
