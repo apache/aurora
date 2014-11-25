@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Wrapper for thrift that attempts to use the system thrift if it's of the expected version,
+# otherwise it bootstraps a new one.
+set -e -u
+
+if [[ $# -lt 1 ]]; then
+  cat <<EOF
+Usage: thriftw EXPECTED_THRIFT_VERSION THRIFT_ARGS...
+
+Run the thrift compiler at EXPECTED_THRIFT_VERSION with THRIFT_ARGS, bootstrapping if necessary.
+EOF
+fi
+expected_version=$1
+shift
+
+HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+
+if which thrift >/dev/null 2>&1; then
+  if [[ $(thrift --version) = "Thrift version $expected_version" ]]; then
+    exec thrift "$@"
+  fi
+fi
+
+thrift="$HERE"/thrift-$expected_version/compiler/cpp/thrift
+if [[ ! -x "$thrift" ]]; then
+  make -C "$HERE"
+fi
+exec "$thrift" "$@"

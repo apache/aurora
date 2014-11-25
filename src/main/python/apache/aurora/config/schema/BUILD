@@ -18,6 +18,6 @@ python_library(
   dependencies = [
     '3rdparty/python:pystachio',
     'src/main/python/apache/thermos/config:schema',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )

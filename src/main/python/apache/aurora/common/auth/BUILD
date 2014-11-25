@@ -18,6 +18,6 @@ python_library(
   dependencies = [
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )

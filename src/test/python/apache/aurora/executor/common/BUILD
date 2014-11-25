@@ -29,7 +29,7 @@ python_library(
   sources = ['fixtures.py'],
   dependencies = [
     'src/main/python/apache/aurora/config/schema',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
 )
 
@@ -65,7 +65,7 @@ python_tests(
     'src/main/python/apache/aurora/common:http_signaler',
     'src/main/python/apache/aurora/executor/common:health_checker',
     'src/main/python/apache/aurora/executor/common:sandbox',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -94,7 +94,7 @@ python_tests(
   dependencies = [
     ':fixtures',
     'src/main/python/apache/aurora/executor/common:task_info',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 

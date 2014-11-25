@@ -28,7 +28,7 @@ python_tests(name = 'host_maintenance',
     'src/main/python/apache/aurora/client:api',
     'src/main/python/apache/aurora/common:cluster',
     'src/main/python/apache/aurora/admin:host_maintenance',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
 )
 

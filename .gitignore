@@ -9,12 +9,15 @@
 /.idea/*
 /.pants.*
 /.vagrant/*
+/api/dist/*
+/atlassian-ide-plugin.xml
 /build/*
 /build-support/*.pex
 /build-support/*.venv
 /build-support/python/*.venv
 /build-support/virtualenv-*
 /buildSrc/build/*
+/buildSrc/dist/*
 /dist/*
 /gradle-app.setting
 /out/*

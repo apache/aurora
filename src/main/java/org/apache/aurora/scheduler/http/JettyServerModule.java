@@ -110,6 +110,17 @@ public class JettyServerModule extends AbstractModule {
       PROPERTY_CONTAINER_REQUEST_FILTERS, GZIPContentEncodingFilter.class.getName(),
       PROPERTY_CONTAINER_RESPONSE_FILTERS, GZIPContentEncodingFilter.class.getName());
 
+  private static final String ENTITIES_HELP_ROOT = Resource
+      .newClassPathResource("org/apache/aurora/scheduler/storage/entities/help")
+      .toString();
+  private static final String API_CLIENT_ROOT = Resource
+      .newClassPathResource("org/apache/aurora/scheduler/gen/client")
+      .toString();
+  private static final String STATIC_ASSETS_ROOT = Resource
+      .newClassPathResource("scheduler/assets/index.html")
+      .toString()
+      .replace("assets/index.html", "");
+
   @Override
   protected void configure() {
     bind(Runnable.class)
@@ -162,7 +173,6 @@ public class JettyServerModule extends AbstractModule {
     private static final Map<String, String> REGEX_REWRITE_RULES =
         ImmutableMap.<String, String>builder()
             .put("/(?:index.html)?", "/assets/index.html")
-            .put("/apibeta/help/(.*)?", "/assets/org/apache/aurora/scheduler/storage/entities/$1")
             .put("/graphview(?:/index.html)?", "/assets/graphview/graphview.html")
             .put("/graphview/(.*)", "/assets/graphview/$1")
             .put("/(?:scheduler|updates)(?:/.*)?", "/assets/scheduler/index.html")
@@ -184,6 +194,16 @@ public class JettyServerModule extends AbstractModule {
       rewrites.setHandler(rootHandler);
 
       return rewrites;
+    }
+
+    @Singleton
+    static class ApiHelpResourceServlet extends DefaultServlet {
+      // Subclass to allow extra instance of DefaultServlet.
+    }
+
+    @Singleton
+    static class ApiClientServlet extends DefaultServlet {
+      // Subclass to allow extra instance of DefaultServlet.
     }
 
     @Override
@@ -249,8 +269,22 @@ public class JettyServerModule extends AbstractModule {
               bind(DefaultServlet.class).in(Singleton.class);
               serve("/assets*")
                   .with(DefaultServlet.class, ImmutableMap.of(
-                      "resourceBase", Resource.newClassPathResource("scheduler").toString(),
+                      "resourceBase", STATIC_ASSETS_ROOT,
                       "dirAllowed", "false"));
+
+              serve("/apihelp/*")
+                  .with(ApiHelpResourceServlet.class, ImmutableMap.<String, String>builder()
+                      .put("resourceBase", ENTITIES_HELP_ROOT)
+                      .put("pathInfoOnly", "true")
+                      .put("dirAllowed", "false")
+                      .build());
+
+              serve("/apiclient/*")
+                  .with(ApiClientServlet.class, ImmutableMap.<String, String>builder()
+                      .put("resourceBase", API_CLIENT_ROOT)
+                      .put("pathInfoOnly", "true")
+                      .put("dirAllowed", "false")
+                      .build());
 
               bind(GuiceContainer.class).in(Singleton.class);
               registerJerseyEndpoint("/apibeta", ApiBeta.class);

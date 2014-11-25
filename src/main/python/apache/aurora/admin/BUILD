@@ -20,7 +20,7 @@ python_library(
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
     'src/main/python/apache/aurora/client:api',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 

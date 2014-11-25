@@ -41,7 +41,7 @@ python_tests(
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/commands:core',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ])
 
 python_tests(
@@ -52,7 +52,7 @@ python_tests(
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/commands:core',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ])
 
 python_tests(
@@ -66,7 +66,7 @@ python_tests(
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/commands:admin',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ])
 
 python_tests(
@@ -79,7 +79,7 @@ python_tests(
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/commands:ssh',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ])
 
 python_tests(
@@ -92,7 +92,7 @@ python_tests(
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/commands:run',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ])
 
 python_tests(
@@ -112,6 +112,6 @@ python_library(
   dependencies = [
     '3rdparty/python:mock',
     'src/main/python/apache/aurora/client/commands:core',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )

@@ -20,7 +20,7 @@ python_library(
   dependencies = [
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.recordio',
-    'src/main/thrift/org/apache/thermos:py-thrift'
+    'api/src/main/thrift/org/apache/thermos:py-thrift'
   ]
 )
 
@@ -39,7 +39,7 @@ python_library(
   sources = ['options.py'],
   dependencies = [
     '3rdparty/python:pystachio',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 

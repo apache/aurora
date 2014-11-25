@@ -42,7 +42,7 @@ python_library(
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.recordio',
     'src/main/python/apache/thermos/common:ckpt',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 

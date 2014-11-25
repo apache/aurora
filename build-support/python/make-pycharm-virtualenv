@@ -22,8 +22,8 @@ PROJECT_NAME=${PWD##*/}
 
 pushd "$BUILDROOT"
   ./pants goal dependencies --dependencies-external src/test/python:all > requirements.txt
-  ./pants setup_py src/main/thrift/org/apache/aurora/gen:py-thrift-packaged
-  ./pants setup_py src/main/thrift/org/apache/thermos:py-thrift
+  ./pants setup_py api/src/main/thrift/org/apache/aurora/gen:py-thrift-packaged
+  ./pants setup_py api/src/main/thrift/org/apache/thermos:py-thrift
   source build-support/pants.venv/bin/activate
     pytest_requirement=$(pip freeze | grep pytest==)
     pytest_cov_requirement=$(pip freeze | grep pytest-cov==)

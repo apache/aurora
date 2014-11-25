@@ -489,12 +489,12 @@ def parse_structs(thrift_defs):
   for s in re.finditer(STRUCT_RE, thrift_defs, flags=re.MULTILINE):
     if s.group('kind') == 'enum':
       struct = EnumType(s.group('name'),
-                        namespaces['java'],
+                        namespaces.get('java', ''),
                         parse_values(s.group('body')),
                         s.group('doc'))
     else:
       struct = StructType(s.group('name'),
-                          namespaces['java'],
+                          namespaces.get('java', ''),
                           s.group('kind'),
                           parse_fields(s.group('body')),
                           s.group('doc'))
@@ -633,6 +633,10 @@ if __name__ == '__main__':
   with open(thrift_file) as f:
     # Load all structs found in the thrift file.
     file_contents = f.read()
+    services = parse_services(file_contents)
+    if not services:
+      log('Skipping doc generation for %s since there are no services.' % thrift_file)
+      sys.exit(0)
     structs = parse_structs(file_contents)
 
     package_dir = os.path.join(code_output_dir, PACKAGE_NAME.replace('.', os.path.sep))
@@ -648,8 +652,7 @@ if __name__ == '__main__':
         code = generate_java(struct)
         code.dump(f)
 
-    services = parse_services(file_contents)
-    resource_dir = os.path.join(resource_output_dir, PACKAGE_NAME.replace('.', os.path.sep))
+    resource_dir = os.path.join(resource_output_dir, PACKAGE_NAME.replace('.', os.path.sep), 'help')
     if not os.path.isdir(resource_dir):
       os.makedirs(resource_dir)
 

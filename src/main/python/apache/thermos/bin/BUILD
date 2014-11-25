@@ -19,7 +19,7 @@ python_binary(
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.recordio',
     'src/main/python/apache/thermos/common',
-    'src/main/thrift/org/apache/thermos:py-thrift'
+    'api/src/main/thrift/org/apache/thermos:py-thrift'
   ]
 )
 
@@ -33,6 +33,6 @@ python_binary(
     'src/main/python/apache/thermos/config:schema',
     'src/main/python/apache/thermos/core',
     'src/main/python/apache/thermos/monitoring',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ],
 )

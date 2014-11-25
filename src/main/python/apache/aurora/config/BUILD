@@ -35,7 +35,7 @@ python_library(
     '3rdparty/python:twitter.common.lang',
     'src/main/python/apache/aurora/common',
     'src/main/python/apache/aurora/config/schema',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
 
 )

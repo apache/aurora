@@ -23,7 +23,7 @@ python_library(
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
     'src/main/python/apache/aurora/common',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -36,7 +36,7 @@ python_library(
     'src/main/python/apache/thermos/config:schema',
     'src/main/python/apache/aurora/common:cluster',
     'src/main/python/apache/aurora/config:schema',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -58,7 +58,7 @@ python_library(
     ':task_util',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -69,7 +69,7 @@ python_library(
     ':instance_watcher',
     ':updater_util',
     '3rdparty/python:twitter.common.log',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -84,7 +84,7 @@ python_library(
     'src/main/python/apache/aurora/common/auth',
     'src/main/python/apache/aurora/common:cluster',
     'src/main/python/apache/aurora/common:transport',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -115,7 +115,7 @@ python_library(
     ':scheduler_mux',
     '3rdparty/python:twitter.common.log',
     'src/main/python/apache/aurora/client:base',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -129,7 +129,7 @@ python_library(
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
     'src/main/python/apache/aurora/common:http_signaler',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -139,7 +139,7 @@ python_library(
   dependencies = [
     ':scheduler_client',
     '3rdparty/python:twitter.common.log',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -151,7 +151,7 @@ python_library(
     '3rdparty/python:twitter.common.log',
     'src/main/python/apache/aurora/client:base',
     'src/main/python/apache/aurora/common',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -166,7 +166,7 @@ python_library(
     ':quota_check',
     '3rdparty/python:twitter.common.log',
     'src/main/python/apache/aurora/client:base',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 

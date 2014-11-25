@@ -82,7 +82,7 @@ python_tests(
   name = 'test_transport',
   sources = ['test_transport.py'],
   dependencies = [
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
     'src/main/python/apache/aurora/common:transport',
     '3rdparty/python:mock',
   ]

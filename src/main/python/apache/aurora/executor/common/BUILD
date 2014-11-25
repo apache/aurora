@@ -96,6 +96,6 @@ python_library(
     '3rdparty/python:twitter.common.log',
     'src/main/python/apache/aurora/config',
     'src/main/python/apache/aurora/config/schema',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )

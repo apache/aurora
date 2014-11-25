@@ -133,8 +133,8 @@ python_library(
     'src/main/python/apache/thermos/monitoring:garbage',
     'src/main/python/apache/aurora/config:schema',
     'src/main/python/apache/aurora/executor/common:sandbox',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 

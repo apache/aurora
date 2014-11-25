@@ -55,9 +55,9 @@ python_tests(name = 'gc_executor',
     'src/main/python/apache/thermos/common:path',
     'src/main/python/apache/thermos/config',
     'src/main/python/apache/thermos/core:runner',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
     'src/main/python/apache/aurora/executor:gc_executor',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
 )
 
@@ -87,7 +87,7 @@ python_tests(name = 'thermos_executor',
     'src/main/python/apache/aurora/executor/common:task_runner',
     'src/main/python/apache/aurora/executor:aurora_executor',
     'src/main/python/apache/aurora/executor:thermos_task_runner',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 

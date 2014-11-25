@@ -19,7 +19,7 @@ python_library(
   sources = ['aurora_job_key.py'],
   dependencies = [
     '3rdparty/python:twitter.common.lang',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -88,7 +88,7 @@ python_library(
     'src/main/python/apache/aurora/common/auth',
 
     # covering dependency on gen.*
-    'src/main/thrift/org/apache/aurora/gen:py-thrift-packaged',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift-packaged',
   ],
   provides = setup_py(
     name = 'apache.aurora.common',

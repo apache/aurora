@@ -40,7 +40,7 @@ python_library(
     'src/main/python/apache/thermos/monitoring:monitor',
     'src/main/python/apache/thermos/monitoring:process',
     'src/main/python/apache/thermos/monitoring:resource',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 

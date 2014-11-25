@@ -168,6 +168,6 @@ public class ApiBeta {
   @GET
   @Produces(MediaType.TEXT_HTML)
   public Response getIndex() {
-    return Response.seeOther(URI.create("/apibeta/help/index.html")).build();
+    return Response.seeOther(URI.create("/apihelp/index.html")).build();
   }
 }

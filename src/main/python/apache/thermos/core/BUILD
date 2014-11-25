@@ -25,7 +25,7 @@ python_library(
     '3rdparty/python:twitter.common.recordio',
     'src/main/python/apache/thermos/common:ckpt',
     'src/main/python/apache/thermos/common:path',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
@@ -37,7 +37,7 @@ python_library(
     '3rdparty/python:twitter.common.recordio',
     'src/main/python/apache/thermos/common:ckpt',
     'src/main/python/apache/thermos/common:path',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
@@ -47,7 +47,7 @@ python_library(
   dependencies = [
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.recordio',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
@@ -60,7 +60,7 @@ python_library(
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
     '3rdparty/python:twitter.common.recordio',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
@@ -80,7 +80,7 @@ python_library(
     'src/main/python/apache/thermos/common:path',
     'src/main/python/apache/thermos/common:planner',
     'src/main/python/apache/thermos/config:schema',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )
 
@@ -93,7 +93,7 @@ python_library(
     # covering libs
     'src/main/python/apache/thermos/common',
     'src/main/python/apache/thermos/config',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ],
   provides = setup_py(
     name = 'apache.thermos.core',

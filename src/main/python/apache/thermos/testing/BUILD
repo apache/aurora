@@ -23,6 +23,6 @@ python_library(
     'src/main/python/apache/thermos/common:path',
     'src/main/python/apache/thermos/config',
     'src/main/python/apache/thermos/core',
-    'src/main/thrift/org/apache/thermos:py-thrift',
+    'api/src/main/thrift/org/apache/thermos:py-thrift',
   ]
 )

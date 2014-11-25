@@ -33,7 +33,7 @@ python_library(
     'src/main/python/apache/aurora/client/api',
     'src/main/python/apache/aurora/client:base',
     'src/main/python/apache/aurora/common:clusters',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
@@ -67,7 +67,7 @@ python_library(
     'src/main/python/apache/aurora/client:factory',
     'src/main/python/apache/aurora/client:options',
     'src/main/python/apache/aurora/common',
-    'src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
 
