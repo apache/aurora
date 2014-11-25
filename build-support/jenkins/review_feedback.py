@@ -171,7 +171,7 @@ def main():
       build_output = 'build_output'
       command = args.command
       # Pipe to a file in case output is large.
-      result = subprocess.call(['bash', '-c', '%s > %s 2>&1' % (command, build_output)])
+      result = subprocess.call(['bash', '-c', '%s 2>&1 | tee %s' % (command, build_output)])
       if result == 0:
         review_text = 'Master (%s) is green with this patch.\n  %s' % (sha, command)
         if _missing_tests(server, latest_diff):
