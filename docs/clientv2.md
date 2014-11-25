@@ -227,7 +227,8 @@ Cron is a scheduler adjunct that periodically runs a job on a
 schedule. The cron commands all manipulate cron schedule entries. The
 schedules are specified as a part of the job configuration.
 
-* `aurora cron schedule jobkey config`: schedule a job to run by cron.
+* `aurora cron schedule jobkey config`: schedule a job to run by cron. If a cron job already exists
+replaces its template with a new one.
 * `aurora cron deschedule jobkey`: removes a jobs entry from the cron schedule.
 * `aurora cron status jobkey`: query for a scheduled job's status.
 

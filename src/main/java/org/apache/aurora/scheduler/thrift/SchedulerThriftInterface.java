@@ -1400,7 +1400,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
 
       if (cronJobManager.hasJob(job)) {
-        return invalidResponse("Cron jobs may only be updated by calling replaceCronTemplate.");
+        return invalidResponse(NO_CRON_UPDATES);
       }
     } catch (AuthFailedException e) {
       return errorResponse(AUTH_FAILED, e);
@@ -1593,6 +1593,9 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
   @VisibleForTesting
   static final String NOOP_JOB_UPDATE_MESSAGE = "Job is unchanged by proposed update.";
+
+  @VisibleForTesting
+  static final String NO_CRON_UPDATES = "Cron jobs may only be updated by calling scheduleCronJob.";
 
   private static Response okEmptyResponse()  {
     return emptyResponse().setResponseCode(OK);

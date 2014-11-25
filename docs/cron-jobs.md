@@ -76,7 +76,8 @@ Most interaction with cron jobs takes place using the `cron` subcommand. See `au
 for up-to-date usage instructions.
 
 ### cron schedule
-Schedules a new cron job on the Aurora cluster for later runs, or updates an existing job.
+Schedules a new cron job on the Aurora cluster for later runs or replaces the existing cron template
+with a new one. Only future runs will be affected, any existing active tasks are left intact.
 
     $ aurora2 cron schedule devcluster/www-data/test/cron_hello_world /vagrant/examples/jobs/cron_hello_world.aurora
 

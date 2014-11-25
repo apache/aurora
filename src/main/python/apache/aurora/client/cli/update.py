@@ -17,7 +17,7 @@ from __future__ import print_function
 import json
 import textwrap
 
-from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_OK, Noun, Verb
+from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_COMMAND_FAILURE, EXIT_OK, Noun, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
     ALL_INSTANCES,
@@ -74,6 +74,11 @@ class StartUpdate(Verb):
     if instances is not None and context.options.strict:
       context.verify_shards_option_validity(job, instances)
     config = context.get_job_config(job, context.options.config_file)
+    if config.raw().has_cron_schedule():
+      raise context.CommandError(
+          EXIT_COMMAND_FAILURE,
+          "Cron jobs may only be updated with \"aurora cron schedule\" command")
+
     api = context.get_api(config.cluster())
     resp = api.start_job_update(config, instances)
     context.check_and_log_response(resp, err_code=EXIT_API_ERROR,

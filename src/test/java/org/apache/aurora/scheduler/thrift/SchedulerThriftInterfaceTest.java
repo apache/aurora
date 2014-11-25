@@ -171,6 +171,7 @@ import static org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryExcept
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASKS_PER_JOB;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASK_ID_LENGTH;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_JOB_UPDATE_MESSAGE;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NO_CRON_UPDATES;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.killedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.noCronScheduleMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.notScheduledCronMessage;
@@ -2700,7 +2701,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
 
     control.replay();
-    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+    assertEquals(invalidResponse(NO_CRON_UPDATES), thrift.startJobUpdate(request, SESSION));
   }
 
   @Test

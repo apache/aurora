@@ -16,6 +16,8 @@
 
 from __future__ import print_function
 
+import textwrap
+
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_PARAMETER,
@@ -41,7 +43,9 @@ class Schedule(Verb):
 
   @property
   def help(self):
-    return "Create a cron schedule for a job."
+    return textwrap.dedent("""\
+       Create a cron schedule for a job or replace the existing cron template with a new one.
+       Only future runs will be affected, any existing active tasks are left intact.""")
 
   def get_options(self):
     return [BIND_OPTION, JSON_READ_OPTION, JOBSPEC_ARGUMENT, CONFIG_ARGUMENT]
@@ -71,7 +75,9 @@ class Deschedule(Verb):
 
   @property
   def help(self):
-    return "Remove the cron schedule for a job."
+    return textwrap.dedent("""\
+        Remove the cron schedule for a job. Any active tasks are not affected.
+        Use \"aurora job kill\" command to terminate active tasks.""")
 
   def get_options(self):
     return [JOBSPEC_ARGUMENT]
