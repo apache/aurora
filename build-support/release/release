@@ -137,7 +137,8 @@ if [[ $publish == 1 ]]; then
   git commit -m "Updating .auroraversion to release version ${current_version_tag}."
   git push origin "${current_version_tag}"
   git tag -s "${current_version_tag}" -m "Apache Aurora ${current_version_tag} release" ${current_version_tag}
-  git push origin "${current_version_tag}"
+  # Need to disambiguate here, since we already have a local branch ref named for the release.
+  git push origin "refs/tags/${current_version_tag}"
 fi
 
 dist_dir=${base_dir}/dist
