@@ -90,7 +90,7 @@ class CronJobManagerImpl implements CronJobManager {
     } catch (SchedulerException e) {
       throw new CronException(e);
     }
-    LOG.info(String.format("Triggered cron job for %s.", JobKeys.canonicalString(jobKey)));
+    LOG.info(formatMessage("Triggered cron job for %s.", jobKey));
   }
 
   private static void checkNoRunOverlap(SanitizedCronJob cronJob) throws CronException {
@@ -140,30 +140,26 @@ class CronJobManagerImpl implements CronJobManager {
 
   private void checkNotExists(IJobKey jobKey, JobStore jobStore) throws CronException {
     if (jobStore.fetchJob(getManagerKey(), jobKey).isPresent()) {
-      throw new CronException(
-          String.format("Job already exists for %s.", JobKeys.canonicalString(jobKey)));
+      throw new CronException(formatMessage("Job already exists for %s.", jobKey));
     }
   }
 
   private void checkCronExists(IJobKey jobKey, JobStore jobStore) throws CronException {
     if (!jobStore.fetchJob(getManagerKey(), jobKey).isPresent()) {
-      throw new CronException(
-          String.format("No cron template found for %s.", JobKeys.canonicalString(jobKey)));
+      throw new CronException(formatMessage("No cron job found for %s.", jobKey));
     }
   }
 
   private void removeJob(IJobKey jobKey, JobStore.Mutable jobStore) {
     jobStore.removeJob(jobKey);
-    LOG.info(
-        String.format("Deleted cron job %s from storage.", JobKeys.canonicalString(jobKey)));
+    LOG.info(formatMessage("Deleted cron job %s from storage.", jobKey));
   }
 
   private void saveJob(SanitizedCronJob cronJob, JobStore.Mutable jobStore) {
     IJobConfiguration config = cronJob.getSanitizedConfig().getJobConfig();
 
     jobStore.saveAcceptedJob(getManagerKey(), config);
-    LOG.info(String.format(
-        "Saved new cron job %s to storage.", JobKeys.canonicalString(config.getKey())));
+    LOG.info(formatMessage("Saved new cron job %s to storage.", config.getKey()));
   }
 
   // TODO(ksweeney): Consider exposing this in the interface and making caller responsible.
@@ -175,8 +171,7 @@ class CronJobManagerImpl implements CronJobManager {
     } catch (SchedulerException e) {
       throw new CronException(e);
     }
-    LOG.info(String.format(
-        "Scheduled job %s with schedule %s.", JobKeys.canonicalString(jobKey), crontabEntry));
+    LOG.info(formatMessage("Scheduled job %s with schedule %s.", jobKey, crontabEntry));
   }
 
   @Override
@@ -221,16 +216,15 @@ class CronJobManagerImpl implements CronJobManager {
   }
 
   private void descheduleJob(IJobKey jobKey) {
-    String path = JobKeys.canonicalString(jobKey);
     try {
       // TODO(ksweeney): Consider interrupting the running job here.
       // There's a race here where an old running job could fail to find the old config. That's
       // fine given that the behavior of AuroraCronJob is to log an error and exit if it's unable
       // to find a job for its key.
       scheduler.deleteJob(Quartz.jobKey(jobKey));
-      LOG.info("Successfully descheduled " + path + ".");
+      LOG.info(formatMessage("Successfully descheduled %s.", jobKey));
     } catch (SchedulerException e) {
-      LOG.log(Level.WARNING, "Error when attempting to deschedule " + path + ": " + e, e);
+      LOG.log(Level.WARNING, formatMessage("Error descheduling %s: %s", jobKey, e), e);
     }
   }
 
@@ -256,5 +250,9 @@ class CronJobManagerImpl implements CronJobManager {
       throw Throwables.propagate(e);
     }
     return scheduledJobs.build();
+  }
+
+  private static String formatMessage(String format, IJobKey jobKey, Object... args) {
+    return String.format(format, JobKeys.canonicalString(jobKey), args);
   }
 }

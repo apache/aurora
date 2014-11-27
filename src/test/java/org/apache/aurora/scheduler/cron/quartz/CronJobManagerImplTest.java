@@ -20,6 +20,7 @@ import java.util.TimeZone;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.twitter.common.testing.easymock.EasyMockTest;
@@ -40,11 +41,13 @@ import org.quartz.CronTrigger;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.impl.matchers.GroupMatcher;
 
 import static org.easymock.EasyMock.anyObject;
 import static org.easymock.EasyMock.expect;
+import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -68,6 +71,17 @@ public class CronJobManagerImplTest extends EasyMockTest {
   public void testStartJobNowExistent() throws Exception {
     populateStorage();
     scheduler.triggerJob(QuartzTestUtil.QUARTZ_JOB_KEY);
+
+    control.replay();
+
+    cronJobManager.startJobNow(QuartzTestUtil.AURORA_JOB_KEY);
+  }
+
+  @Test(expected = CronException.class)
+  public void testStartJobNowFails() throws Exception {
+    populateStorage();
+    scheduler.triggerJob(QuartzTestUtil.QUARTZ_JOB_KEY);
+    expectLastCall().andThrow(new SchedulerException());
 
     control.replay();
 
@@ -128,6 +142,18 @@ public class CronJobManagerImplTest extends EasyMockTest {
   }
 
   @Test(expected = CronException.class)
+  public void testCreateNonexistentJobFails() throws Exception {
+    SanitizedCronJob sanitizedCronJob = QuartzTestUtil.makeSanitizedCronJob();
+
+    expect(scheduler.scheduleJob(anyObject(JobDetail.class), anyObject(Trigger.class)))
+        .andThrow(new SchedulerException());
+
+    control.replay();
+
+    cronJobManager.createJob(sanitizedCronJob);
+  }
+
+  @Test(expected = CronException.class)
   public void testCreateExistingJobFails() throws Exception {
     SanitizedCronJob sanitizedCronJob = QuartzTestUtil.makeSanitizedCronJob();
     populateStorage();
@@ -184,6 +210,16 @@ public class CronJobManagerImplTest extends EasyMockTest {
   }
 
   @Test
+  public void testFailedDeleteJobDoesNotThrow() throws Exception {
+    expect(scheduler.deleteJob(QuartzTestUtil.QUARTZ_JOB_KEY)).andThrow(new SchedulerException());
+
+    control.replay();
+
+    populateStorage();
+    cronJobManager.deleteJob(QuartzTestUtil.AURORA_JOB_KEY);
+  }
+
+  @Test
   public void testGetScheduledJobs() throws Exception {
     CronTrigger cronTrigger = createMock(CronTrigger.class);
     expect(scheduler.getJobKeys(EasyMock.<GroupMatcher<JobKey>>anyObject()))
@@ -197,6 +233,30 @@ public class CronJobManagerImplTest extends EasyMockTest {
 
     Map<IJobKey, CrontabEntry> scheduledJobs = cronJobManager.getScheduledJobs();
     assertEquals(CrontabEntry.parse("* * * * *"), scheduledJobs.get(QuartzTestUtil.AURORA_JOB_KEY));
+  }
+
+  @Test
+  public void testGetScheduledJobsEmpty() throws Exception {
+    expect(scheduler.getJobKeys(EasyMock.<GroupMatcher<JobKey>>anyObject()))
+        .andReturn(ImmutableSet.of(QuartzTestUtil.QUARTZ_JOB_KEY));
+    EasyMock.
+        <List<? extends Trigger>>expect(scheduler.getTriggersOfJob(QuartzTestUtil.QUARTZ_JOB_KEY))
+        .andReturn(ImmutableList.<CronTrigger>of());
+
+    control.replay();
+    assertEquals(ImmutableMap.<IJobKey, CrontabEntry>of(), cronJobManager.getScheduledJobs());
+  }
+
+  @Test(expected = RuntimeException.class)
+  public void testGetScheduledJobsFails() throws Exception {
+    expect(scheduler.getJobKeys(EasyMock.<GroupMatcher<JobKey>>anyObject()))
+        .andReturn(ImmutableSet.of(QuartzTestUtil.QUARTZ_JOB_KEY));
+    EasyMock.
+        <List<? extends Trigger>>expect(scheduler.getTriggersOfJob(QuartzTestUtil.QUARTZ_JOB_KEY))
+        .andThrow(new SchedulerException());
+
+    control.replay();
+    cronJobManager.getScheduledJobs();
   }
 
   private void populateStorage() throws Exception {
