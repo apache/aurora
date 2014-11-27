@@ -82,13 +82,14 @@ class TestQueryCommand(AuroraClientCommandTest):
   @classmethod
   def task_query(cls):
     return TaskQuery(
-        jobKeys=[JobKey(role=None, environment=None, name=None)],
-        instanceIds=set(),
+        role='test_role',
+        jobName='test_job',
+        instanceIds=set([0]),
         statuses=set([ScheduleStatus.RUNNING]))
 
   def test_query(self):
     """Tests successful execution of the query command."""
-    mock_options = self.setup_mock_options(force=True)
+    mock_options = self.setup_mock_options(force=True, shards="0")
     mock_api, mock_scheduler_proxy = self.create_mock_api()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
@@ -97,13 +98,13 @@ class TestQueryCommand(AuroraClientCommandTest):
 
       mock_scheduler_proxy.getTasksStatus.return_value = self.create_response(self.create_task())
 
-      query([self.TEST_CLUSTER], mock_options)
+      query([self.TEST_CLUSTER, 'test_role', 'test_job'], mock_options)
 
       mock_scheduler_proxy.getTasksStatus.assert_called_with(self.task_query())
 
   def test_query_fails(self):
     """Tests failed execution of the query command."""
-    mock_options = self.setup_mock_options()
+    mock_options = self.setup_mock_options(shards="0")
     mock_api, mock_scheduler_proxy = self.create_mock_api()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
@@ -113,11 +114,13 @@ class TestQueryCommand(AuroraClientCommandTest):
       mock_scheduler_proxy.getTasksStatus.return_value = self.create_response(self.create_task())
 
       try:
-        query([self.TEST_CLUSTER], mock_options)
+        query([self.TEST_CLUSTER, 'test_role', 'test_job'], mock_options)
       except SystemExit:
         pass
       else:
         assert 'Expected exception is not raised'
+
+      mock_scheduler_proxy.getTasksStatus.assert_called_with(self.task_query())
 
 
 class TestIncreaseQuotaCommand(AuroraClientCommandTest):

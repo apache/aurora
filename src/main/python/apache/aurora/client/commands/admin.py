@@ -142,7 +142,7 @@ def query(args, options):
     die('--force is required for expensive queries (states outside ACTIVE states')
 
   api = AuroraClientAPI(CLUSTERS[cluster], options.verbosity)
-  query_info = api.query(api.build_query(role, job, instances=instances, statuses=states))
+  query_info = api.query(TaskQuery(role=role, jobName=job, instanceIds=instances, statuses=states))
   if query_info.responseCode != ResponseCode.OK:
     die('Failed to query scheduler: %s' % query_info.messageDEPRECATED)
 
