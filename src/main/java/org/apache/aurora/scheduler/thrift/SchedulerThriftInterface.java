@@ -331,11 +331,11 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     });
   }
 
-  @Override
-  public Response scheduleCronJob(
+  private Response createOrUpdateCronTemplate(
       JobConfiguration mutableJob,
       @Nullable Lock mutableLock,
-      SessionKey session) {
+      SessionKey session,
+      boolean updateOnly) {
 
     IJobConfiguration job = IJobConfiguration.build(mutableJob);
     IJobKey jobKey = JobKeys.assertValid(job.getKey());
@@ -343,11 +343,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
-    } catch (AuthFailedException e) {
-      return errorResponse(AUTH_FAILED, e);
-    }
 
-    try {
       SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
 
       lockManager.validateIfLocked(
@@ -364,7 +360,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       validateTaskLimits(template, count, quotaManager.checkInstanceAddition(template, count));
 
       // TODO(mchucarroll): Merge CronJobManager.createJob/updateJob
-      if (cronJobManager.hasJob(sanitized.getJobConfig().getKey())) {
+      if (updateOnly || cronJobManager.hasJob(sanitized.getJobConfig().getKey())) {
         // The job already has a schedule: so update it.
         cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
       } else {
@@ -372,11 +368,31 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       }
 
       return okEmptyResponse();
+    } catch (AuthFailedException e) {
+      return errorResponse(AUTH_FAILED, e);
     } catch (LockException e) {
       return errorResponse(LOCK_ERROR, e);
     } catch (TaskDescriptionException | TaskValidationException | CronException e) {
       return errorResponse(INVALID_REQUEST, e);
     }
+  }
+
+  @Override
+  public Response scheduleCronJob(
+      JobConfiguration mutableJob,
+      @Nullable Lock mutableLock,
+      SessionKey session) {
+
+   return createOrUpdateCronTemplate(mutableJob, mutableLock, session, false);
+  }
+
+  @Override
+  public Response replaceCronTemplate(
+      JobConfiguration mutableJob,
+      @Nullable Lock mutableLock,
+      SessionKey session) {
+
+    return createOrUpdateCronTemplate(mutableJob, mutableLock, session, true);
   }
 
   @Override
@@ -401,37 +417,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return errorResponse(AUTH_FAILED, e);
     } catch (LockException e) {
       return errorResponse(LOCK_ERROR, e);
-    }
-  }
-
-  @Override
-  public Response replaceCronTemplate(
-      JobConfiguration mutableConfig,
-      @Nullable Lock mutableLock,
-      SessionKey session) {
-
-    requireNonNull(mutableConfig);
-    IJobConfiguration job = IJobConfiguration.build(mutableConfig);
-    IJobKey jobKey = JobKeys.assertValid(job.getKey());
-    requireNonNull(session);
-
-    try {
-      sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
-    } catch (AuthFailedException e) {
-      return errorResponse(AUTH_FAILED, e);
-    }
-
-    try {
-      lockManager.validateIfLocked(
-          ILockKey.build(LockKey.job(jobKey.newBuilder())),
-          Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
-
-      cronJobManager.updateJob(SanitizedCronJob.fromUnsanitized(job));
-      return okEmptyResponse();
-    } catch (LockException e) {
-      return errorResponse(LOCK_ERROR, e);
-    } catch (CronException | TaskDescriptionException e) {
-      return errorResponse(INVALID_REQUEST, e);
     }
   }
 

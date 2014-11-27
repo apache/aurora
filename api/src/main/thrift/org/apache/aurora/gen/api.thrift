@@ -1000,6 +1000,7 @@ service AuroraSchedulerManager extends ReadOnlyScheduler {
   /** Releases the lock acquired earlier in acquireLock call. */
   Response releaseLock(1: Lock lock, 2: LockValidation validation, 3: SessionKey session)
 
+  // TODO(maxim): reevaluate if it's still needed when client updater is gone (AURORA-785).
   /**
    * Replaces the template (configuration) for the existing cron job.
    * The cron job template (configuration) must exist for the call to succeed.

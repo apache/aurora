@@ -1189,6 +1189,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testReplaceCronTemplate() throws Exception {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    SanitizedConfiguration sanitized =
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(ENOUGH_QUOTA);
+
     cronJobManager.updateJob(anyObject(SanitizedCronJob.class));
     control.replay();
 
@@ -1221,6 +1229,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   public void testReplaceCronTemplateDoesNotExist() throws Exception {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    SanitizedConfiguration sanitized =
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(ENOUGH_QUOTA);
+
     cronJobManager.updateJob(anyObject(SanitizedCronJob.class));
     expectLastCall().andThrow(new CronException("Nope"));
 
