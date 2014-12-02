@@ -12,9 +12,11 @@
 # limitations under the License.
 #
 
+import pytest
+
 from apache.aurora.executor.common.task_info import mesos_task_instance_from_assigned_task
 
-from .fixtures import BASE_MTI, HELLO_WORLD, HELLO_WORLD_MTI, MESOS_JOB
+from .fixtures import BASE_MTI, HELLO_WORLD, HELLO_WORLD_MTI, HELLO_WORLD_UNBOUND, MESOS_JOB
 
 from gen.apache.aurora.api.ttypes import AssignedTask, ExecutorConfig, TaskConfig
 
@@ -29,3 +31,14 @@ def test_deserialize_thermos_task():
     executorConfig=ExecutorConfig(name='thermos', data=HELLO_WORLD_MTI.json_dumps()))
   assigned_task = AssignedTask(task=task_config, instanceId=0)
   assert mesos_task_instance_from_assigned_task(assigned_task) == BASE_MTI(task=HELLO_WORLD)
+
+
+def test_deserialize_thermos_task_unbound_refs():
+  task_config = TaskConfig(
+      executorConfig=ExecutorConfig(
+        name='thermos', data=MESOS_JOB(task=HELLO_WORLD_UNBOUND).json_dumps()))
+  assigned_task = AssignedTask(task=task_config, instanceId=0)
+  with pytest.raises(ValueError) as execinfo:
+    mesos_task_instance_from_assigned_task(assigned_task)
+
+  assert execinfo.value.message == "Unexpected unbound refs: {{unbound_cmd}} {{unbound}}"

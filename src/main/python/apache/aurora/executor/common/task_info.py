@@ -69,6 +69,7 @@ def mesos_task_instance_from_assigned_task(assigned_task):
 
   # This is a MesosJob
   mti, refs = task_instance_from_job(MesosJob.json_loads(thermos_task), assigned_task.instanceId)
+  unbound_refs = []
   for ref in refs:
     # If the ref is {{thermos.task_id}} or a subscope of
     # {{thermos.ports}}, it currently gets bound by the Thermos Runner,
@@ -85,7 +86,12 @@ def mesos_task_instance_from_assigned_task(assigned_task):
       continue
     if ref == Ref.from_address('thermos.user'):
       continue
-    raise ValueError('Unexpected unbound refs: %s' % ' '.join(map(str, refs)))
+    else:
+      unbound_refs.append(ref)
+
+  if len(unbound_refs) != 0:
+    raise ValueError('Unexpected unbound refs: %s' % ' '.join(map(str, unbound_refs)))
+
   return mti
 
 

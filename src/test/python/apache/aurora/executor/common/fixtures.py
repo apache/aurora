@@ -41,3 +41,7 @@ MESOS_JOB = MesosJob(
   instances=1,
   role=getpass.getuser(),
 )
+
+HELLO_WORLD_UNBOUND = BASE_TASK(
+    name='{{unbound_cmd}}',
+    processes=[Process(name='hello_world_{{thermos.task_id}}', cmdline='echo hello {{unbound}}')])
