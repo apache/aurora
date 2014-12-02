@@ -43,6 +43,7 @@ import org.apache.aurora.GuiceUtils;
 import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.AuroraSchedulerManager;
+import org.apache.aurora.gen.Response;
 import org.apache.aurora.scheduler.thrift.auth.DecoratedThrift;
 
 /**
@@ -142,7 +143,10 @@ public class AopModule extends AbstractModule {
       Matcher<? super Class<?>> classMatcher,
       MethodInterceptor interceptor) {
 
-    binder.bindInterceptor(classMatcher, Matchers.any(), interceptor);
+    binder.bindInterceptor(
+        classMatcher,
+        Matchers.returns(Matchers.subclassesOf(Response.class)),
+        interceptor);
     binder.requestInjection(interceptor);
   }
 

@@ -35,6 +35,7 @@ import org.junit.Test;
 
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
 
 public class AopModuleTest extends EasyMockTest {
@@ -108,5 +109,13 @@ public class AopModuleTest extends EasyMockTest {
 
     Iface thrift = getIface(toggledMethods);
     assertSame(response, thrift.createJob(job, null, SESSION_KEY));
+  }
+
+  @Test
+  public void assertToStringNotIntercepted() {
+    control.replay();
+
+    Iface thrift = getIface(ImmutableMap.<String, Boolean>of());
+    assertNotNull(thrift.toString());
   }
 }
