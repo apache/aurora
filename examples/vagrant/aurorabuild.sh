@@ -65,7 +65,7 @@ function build_scheduler {
 function build_executor {
   ./pants src/main/python/apache/aurora/executor/bin:gc_executor
   ./pants src/main/python/apache/aurora/executor/bin:thermos_executor
-  ./pants src/main/python/apache/aurora/executor/bin:thermos_runner
+  ./pants src/main/python/apache/thermos/bin:thermos_runner
 
   # Package runner within executor.
   python <<EOF

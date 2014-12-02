@@ -30,14 +30,14 @@ from twitter.common.quantity import Amount, Time
 
 from apache.aurora.config.schema.base import MB, MesosTaskInstance, Process, Resources, Task
 from apache.aurora.executor.common.sandbox import DirectorySandbox
-from apache.aurora.executor.thermos_statuses import (
+from apache.aurora.executor.thermos_task_runner import ThermosTaskRunner
+from apache.thermos.common.statuses import (
     INTERNAL_ERROR,
     INVALID_TASK,
     TERMINAL_TASK,
     UNKNOWN_ERROR,
     UNKNOWN_USER
 )
-from apache.aurora.executor.thermos_task_runner import ThermosTaskRunner
 
 from gen.apache.thermos.ttypes import TaskState
 
@@ -66,7 +66,7 @@ class TestThermosTaskRunnerIntegration(object):
     log.init('executor_logger')
     if not cls.PANTS_BUILT and 'SKIP_PANTS_BUILD' not in os.environ:
       assert subprocess.call(["./pants",
-          "src/main/python/apache/aurora/executor/bin:thermos_runner"]) == 0
+          "src/main/python/apache/thermos/bin:thermos_runner"]) == 0
       cls.PANTS_BUILT = True
 
   @classmethod

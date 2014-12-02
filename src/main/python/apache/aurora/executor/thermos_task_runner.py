@@ -30,6 +30,13 @@ from twitter.common.quantity import Amount, Time
 
 from apache.aurora.common.http_signaler import HttpSignaler
 from apache.thermos.common.path import TaskPath
+from apache.thermos.common.statuses import (
+    INTERNAL_ERROR,
+    INVALID_TASK,
+    TERMINAL_TASK,
+    UNKNOWN_ERROR,
+    UNKNOWN_USER
+)
 from apache.thermos.config.loader import ThermosTaskWrapper
 from apache.thermos.core import runner as core
 from apache.thermos.monitoring.monitor import TaskMonitor
@@ -37,13 +44,6 @@ from apache.thermos.monitoring.monitor import TaskMonitor
 from .common.status_checker import StatusResult
 from .common.task_info import mesos_task_instance_from_assigned_task, resolve_ports
 from .common.task_runner import TaskError, TaskRunner, TaskRunnerProvider
-from .thermos_statuses import (
-    INTERNAL_ERROR,
-    INVALID_TASK,
-    TERMINAL_TASK,
-    UNKNOWN_ERROR,
-    UNKNOWN_USER
-)
 
 from gen.apache.thermos.ttypes import TaskState
 

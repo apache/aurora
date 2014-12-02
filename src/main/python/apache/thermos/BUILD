@@ -28,5 +28,6 @@ python_library(
     descripton = 'The Apache Aurora Thermos runtime.',
   ).with_binaries(
     thermos = 'src/main/python/apache/thermos/bin:thermos',
+    thermos_runner = 'src/main/python/apache/thermos/bin:thermos_runner',
   )
 )

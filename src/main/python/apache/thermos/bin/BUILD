@@ -36,3 +36,24 @@ python_binary(
     'api/src/main/thrift/org/apache/thermos:py-thrift',
   ],
 )
+
+python_library(
+  name = 'thermos_runner_source',
+  sources = ['thermos_runner.py'],
+  dependencies = [
+    'src/main/python/apache/thermos/common:planner',
+    'src/main/python/apache/thermos/common:statuses',
+    'src/main/python/apache/thermos/config:schema',
+    'src/main/python/apache/thermos/core',
+  ],
+)
+
+python_binary(
+  name = 'thermos_runner',
+  entry_point = 'apache.thermos.bin.thermos_runner',
+  dependencies = [
+    '3rdparty/python:twitter.common.app',
+    '3rdparty/python:twitter.common.log',
+    ':thermos_runner_source',
+  ],
+)

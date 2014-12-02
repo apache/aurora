@@ -44,12 +44,18 @@ python_library(
 )
 
 python_library(
+  name = 'statuses',
+  sources = ['statuses.py'],
+)
+
+python_library(
   name = 'common',
   dependencies = [
     ':ckpt',
     ':options',
     ':path',
     ':planner',
+    ':statuses',
   ],
   provides = setup_py(
     name = 'apache.thermos.common',

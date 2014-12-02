@@ -15,11 +15,6 @@
 import os
 
 python_library(
-  name = 'thermos_statuses',
-  sources = ['thermos_statuses.py'],
-)
-
-python_library(
   name = 'thermos_task_runner',
   sources = ['thermos_task_runner.py'],
   dependencies = [
@@ -35,7 +30,6 @@ python_library(
     'src/main/python/apache/aurora/executor/common:status_checker',
     'src/main/python/apache/aurora/executor/common:task_info',
     'src/main/python/apache/aurora/executor/common:task_runner',
-    ':thermos_statuses',
   ]
 )
 
@@ -99,18 +93,6 @@ python_library(
   ]
 )
 
-python_library(
-  name = 'thermos_runner',
-  sources = ['thermos_runner.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.app',
-    '3rdparty/python:twitter.common.log',
-    'src/main/python/apache/thermos/common:planner',
-    'src/main/python/apache/thermos/config:schema',
-    'src/main/python/apache/thermos/core',
-    ':thermos_statuses',
-  ],
-)
 
 python_library(
   name = 'gc_executor',
@@ -155,6 +137,5 @@ python_library(
   ).with_binaries(
     gc_executor = 'src/main/python/apache/aurora/executor/bin:gc_executor',
     thermos_executor = 'src/main/python/apache/aurora/executor/bin:thermos_executor',
-    thermos_runner = 'src/main/python/apache/aurora/executor/bin:thermos_runner',
   )
 )

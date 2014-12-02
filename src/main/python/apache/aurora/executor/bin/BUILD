@@ -49,14 +49,3 @@ python_binary(
     'src/main/python/apache/aurora/executor:gc_executor',
   ]
 )
-
-python_binary(
-  name = 'thermos_runner',
-  source = 'thermos_runner_main.py',
-  entry_point = 'apache.aurora.executor.bin.thermos_runner_main:proxy_main',
-  dependencies = [
-    '3rdparty/python:twitter.common.app',
-    '3rdparty/python:twitter.common.log',
-    'src/main/python/apache/aurora/executor:thermos_runner',
-  ],
-)

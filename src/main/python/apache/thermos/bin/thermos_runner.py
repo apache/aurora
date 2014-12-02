@@ -24,17 +24,16 @@ from twitter.common import app, log
 
 from apache.thermos.common.options import add_port_to
 from apache.thermos.common.planner import TaskPlanner
-from apache.thermos.config.loader import ThermosConfigLoader
-from apache.thermos.core.process import Process
-from apache.thermos.core.runner import TaskRunner
-
-from .thermos_statuses import (
+from apache.thermos.common.statuses import (
     INTERNAL_ERROR,
     INVALID_TASK,
     TERMINAL_TASK,
     UNKNOWN_ERROR,
     UNKNOWN_USER
 )
+from apache.thermos.config.loader import ThermosConfigLoader
+from apache.thermos.core.process import Process
+from apache.thermos.core.runner import TaskRunner
 
 app.add_option(
     "--thermos_json",
@@ -186,3 +185,10 @@ def proxy_main(args, opts):
     for line in traceback.format_exc().splitlines():
       log.error(line)
     sys.exit(UNKNOWN_ERROR)
+
+
+def main(args, opts):
+  return proxy_main(args, opts)
+
+
+app.main()
