@@ -102,6 +102,7 @@ class TRequestsTransport(TTransportBase):
           data=data,
           timeout=self.__timeout,
           auth=self.__auth)
+      response.raise_for_status()
     except request_exceptions.Timeout:
       raise TTransportException(
           type=TTransportException.TIMED_OUT,

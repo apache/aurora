@@ -15,6 +15,7 @@
 import logging
 from threading import Thread
 
+import pytest
 import requests
 from mock import create_autospec, Mock
 from requests import exceptions as request_exceptions
@@ -67,15 +68,35 @@ def test_request_transport_timeout():
   protocol = TJSONProtocol.TJSONProtocol(transport)
   client = ReadOnlyScheduler.Client(protocol)
 
-  try:
+  with pytest.raises(TTransport.TTransportException) as execinfo:
     client.getRoleSummary()
-    assert False, 'getRoleSummary should not succeed'
-  except TTransport.TTransportException as e:
-    assert e.message == 'Timed out talking to http://localhost:12345'
-  except Exception as e:
-    assert False, 'Only expected TTransportException, got %s' % e
+
+  assert execinfo.value.message == 'Timed out talking to http://localhost:12345'
 
   transport.close()
+
+
+def test_raise_for_status_causes_exception():
+  response = create_autospec(spec=requests.Response, instance=True)
+  response.raise_for_status.side_effect = requests.exceptions.HTTPError()
+
+  session = create_autospec(spec=requests.Session, instance=True)
+  session.headers = {}
+  session.post.return_value = response
+
+  transport = TRequestsTransport('http://localhost:12345', session_factory=lambda: session)
+  protocol = TJSONProtocol.TJSONProtocol(transport)
+  client = ReadOnlyScheduler.Client(protocol)
+
+  with pytest.raises(TTransport.TTransportException) as excinfo:
+    client.getRoleSummary()
+
+  assert excinfo.value.type == TTransport.TTransportException.UNKNOWN
+  assert excinfo.value.message.startswith('Unknown error talking to http://localhost:12345')
+
+  transport.close()
+
+  response.raise_for_status.assert_called_once_with()
 
 
 def test_request_any_other_exception():
@@ -86,13 +107,8 @@ def test_request_any_other_exception():
   protocol = TJSONProtocol.TJSONProtocol(transport)
   client = ReadOnlyScheduler.Client(protocol)
 
-  try:
+  with pytest.raises(TTransport.TTransportException):
     client.getRoleSummary()
-    assert False, 'getRoleSummary should not succeed'
-  except TTransport.TTransportException:
-    pass
-  except Exception as e:
-    assert False, 'Only expected TTransportException, got %s' % e
 
   transport.close()
 
