@@ -17,7 +17,7 @@ python_binary(
   source = 'thermos_observer.py',
   entry_point = 'apache.thermos.observer.bin.thermos_observer:proxy_main',
   dependencies = [
-    '3rdparty/python:cherrypy',
+    '3rdparty/python:CherryPy',
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.exceptions',
     '3rdparty/python:twitter.common.http',
