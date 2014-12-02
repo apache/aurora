@@ -15,8 +15,6 @@ package org.apache.aurora.scheduler.async.preemptor;
 
 import com.google.common.collect.Multimap;
 
-import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
-
 /**
  * A facade for the preemptor to gain access to the state of scheduled tasks in the cluster.
  */
@@ -30,5 +28,5 @@ public interface ClusterState {
    *
    * @return Active tasks and their associated slave IDs.
    */
-  Multimap<String, IAssignedTask> getSlavesToActiveTasks();
+  Multimap<String, PreemptionVictim> getSlavesToActiveTasks();
 }

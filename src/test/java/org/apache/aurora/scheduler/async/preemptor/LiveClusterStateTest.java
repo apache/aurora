@@ -17,8 +17,9 @@ import com.google.common.collect.ImmutableMultimap;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.ScheduledTask;
-import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
 import org.junit.Before;
@@ -45,7 +46,7 @@ public class LiveClusterStateTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        ImmutableMultimap.<String, IAssignedTask>of(),
+        ImmutableMultimap.<String, PreemptionVictim>of(),
         clusterState.getSlavesToActiveTasks());
   }
 
@@ -53,7 +54,17 @@ public class LiveClusterStateTest extends EasyMockTest {
     return IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setTaskId(taskId)
-            .setSlaveId(slaveId)));
+            .setSlaveId(slaveId)
+            .setSlaveHost(slaveId + "-host")
+            .setTask(new TaskConfig()
+                .setOwner(new Identity("owner", "role"))
+                .setNumCpus(1)
+                .setRamMb(1)
+                .setDiskMb(1))));
+  }
+
+  private static PreemptionVictim fromTask(IScheduledTask task) {
+    return PreemptionVictim.fromTask(task.getAssignedTask());
   }
 
   @Test
@@ -67,9 +78,9 @@ public class LiveClusterStateTest extends EasyMockTest {
     control.replay();
 
     assertEquals(
-        ImmutableMultimap.<String, IAssignedTask>builder()
-            .putAll("1", a.getAssignedTask(), b.getAssignedTask())
-            .putAll("2", c.getAssignedTask())
+        ImmutableMultimap.<String, PreemptionVictim>builder()
+            .putAll("1", fromTask(a), fromTask(b))
+            .putAll("2", fromTask(c))
             .build(),
         clusterState.getSlavesToActiveTasks());
   }

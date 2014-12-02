@@ -18,10 +18,9 @@ import java.util.EnumSet;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 
 import org.apache.aurora.scheduler.base.Query;
@@ -35,14 +34,6 @@ import static org.apache.aurora.gen.ScheduleStatus.PREEMPTING;
 import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
 
 class LiveClusterState implements ClusterState {
-  @VisibleForTesting
-  static final Function<IAssignedTask, String> TASK_TO_SLAVE_ID =
-      new Function<IAssignedTask, String>() {
-        @Override
-        public String apply(IAssignedTask input) {
-          return input.getSlaveId();
-        }
-      };
 
   @VisibleForTesting
   static final Query.Builder CANDIDATE_QUERY = Query.statusScoped(
@@ -56,13 +47,19 @@ class LiveClusterState implements ClusterState {
   }
 
   @Override
-  public Multimap<String, IAssignedTask> getSlavesToActiveTasks() {
+  public Multimap<String, PreemptionVictim> getSlavesToActiveTasks() {
     // Only non-pending active tasks may be preempted.
     Iterable<IAssignedTask> activeTasks = Iterables.transform(
         Storage.Util.fetchTasks(storage, CANDIDATE_QUERY),
         SCHEDULED_TO_ASSIGNED);
 
     // Group the tasks by slave id so they can be paired with offers from the same slave.
-    return Multimaps.index(activeTasks, TASK_TO_SLAVE_ID);
+    // Choosing to do this iteratively instead of using Multimaps.index/transform to avoid
+    // generating a very large intermediate map.
+    ImmutableMultimap.Builder<String, PreemptionVictim> tasksBySlave = ImmutableMultimap.builder();
+    for (IAssignedTask task : activeTasks) {
+      tasksBySlave.put(task.getSlaveId(), PreemptionVictim.fromTask(task));
+    }
+    return tasksBySlave.build();
   }
 }

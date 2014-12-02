@@ -25,7 +25,6 @@ import javax.inject.Qualifier;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
-import com.google.common.base.Predicates;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -138,14 +137,6 @@ class PreemptorImpl implements Preemptor {
     this.clusterState = requireNonNull(clusterState);
   }
 
-  private static final Function<IAssignedTask, ResourceSlot> TASK_TO_RESOURCES =
-      new Function<IAssignedTask, ResourceSlot>() {
-        @Override
-        public ResourceSlot apply(IAssignedTask task) {
-          return ResourceSlot.from(task.getTask());
-        }
-      };
-
   private static final Function<HostOffer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
       new Function<HostOffer, ResourceSlot>() {
         @Override
@@ -170,10 +161,34 @@ class PreemptorImpl implements Preemptor {
         }
       };
 
+  private static final Function<PreemptionVictim, ResourceSlot> VICTIM_TO_RESOURCES =
+      new Function<PreemptionVictim, ResourceSlot>() {
+        @Override
+        public ResourceSlot apply(PreemptionVictim victim) {
+          return victim.getResources();
+        }
+      };
+
+  private static final Function<PreemptionVictim, String> VICTIM_TO_TASK_ID =
+      new Function<PreemptionVictim, String>() {
+        @Override
+        public String apply(PreemptionVictim victim) {
+          return victim.getTaskId();
+        }
+      };
+
   // TODO(zmanji) Consider using Dominant Resource Fairness for ordering instead of the vector
   // ordering
-  private static final Ordering<IAssignedTask> RESOURCE_ORDER =
-      ResourceSlot.ORDER.onResultOf(TASK_TO_RESOURCES).reverse();
+  private static final Ordering<PreemptionVictim> RESOURCE_ORDER =
+      ResourceSlot.ORDER.onResultOf(VICTIM_TO_RESOURCES).reverse();
+
+  private static final Function<PreemptionVictim, String> VICTIM_TO_HOST =
+      new Function<PreemptionVictim, String>() {
+        @Override
+        public String apply(PreemptionVictim victim) {
+          return victim.getSlaveHost();
+        }
+      };
 
   /**
    * Optional.absent indicates that this slave does not have enough resources to satisfy the task.
@@ -181,7 +196,7 @@ class PreemptorImpl implements Preemptor {
    * A set with elements indicates those tasks and the offers are enough.
    */
   private Optional<Set<String>> getTasksToPreempt(
-      Iterable<IAssignedTask> possibleVictims,
+      Iterable<PreemptionVictim> possibleVictims,
       Iterable<HostOffer> offers,
       IAssignedTask pendingTask,
       AttributeAggregate jobState) {
@@ -189,7 +204,7 @@ class PreemptorImpl implements Preemptor {
     // This enforces the precondition that all of the resources are from the same host. We need to
     // get the host for the schedulingFilter.
     Set<String> hosts = ImmutableSet.<String>builder()
-        .addAll(Iterables.transform(possibleVictims, Tasks.ASSIGNED_TO_SLAVE_HOST))
+        .addAll(Iterables.transform(possibleVictims, VICTIM_TO_HOST))
         .addAll(Iterables.transform(offers, OFFER_TO_HOST)).build();
 
     String host = Iterables.getOnlyElement(hosts);
@@ -216,24 +231,22 @@ class PreemptorImpl implements Preemptor {
       }
     }
 
-    FluentIterable<IAssignedTask> preemptableTasks = FluentIterable.from(possibleVictims)
-        .filter(Predicates.compose(
-            preemptionFilter(pendingTask.getTask()),
-            Tasks.ASSIGNED_TO_INFO));
+    FluentIterable<PreemptionVictim> preemptableTasks = FluentIterable.from(possibleVictims)
+        .filter(preemptionFilter(pendingTask.getTask()));
 
     if (preemptableTasks.isEmpty()) {
       return Optional.absent();
     }
 
-    List<IAssignedTask> toPreemptTasks = Lists.newArrayList();
+    List<PreemptionVictim> toPreemptTasks = Lists.newArrayList();
 
-    Iterable<IAssignedTask> sortedVictims = RESOURCE_ORDER.immutableSortedCopy(preemptableTasks);
+    Iterable<PreemptionVictim> sortedVictims = RESOURCE_ORDER.immutableSortedCopy(preemptableTasks);
 
-    for (IAssignedTask victim : sortedVictims) {
+    for (PreemptionVictim victim : sortedVictims) {
       toPreemptTasks.add(victim);
 
       ResourceSlot totalResource = ResourceSlot.sum(
-          ResourceSlot.sum(Iterables.transform(toPreemptTasks, TASK_TO_RESOURCES)),
+          ResourceSlot.sum(Iterables.transform(toPreemptTasks, VICTIM_TO_RESOURCES)),
           slackResources);
 
       Optional<IHostAttributes> attributes = getHostAttributes(host);
@@ -248,7 +261,7 @@ class PreemptorImpl implements Preemptor {
 
       if (vetoes.isEmpty()) {
         Set<String> taskIds =
-            FluentIterable.from(toPreemptTasks).transform(Tasks.ASSIGNED_TO_ID).toSet();
+            FluentIterable.from(toPreemptTasks).transform(VICTIM_TO_TASK_ID).toSet();
         return Optional.of(taskIds);
       }
     }
@@ -293,7 +306,7 @@ class PreemptorImpl implements Preemptor {
       return Optional.absent();
     }
 
-    Multimap<String, IAssignedTask> slavesToActiveTasks = clusterState.getSlavesToActiveTasks();
+    Multimap<String, PreemptionVictim> slavesToActiveTasks = clusterState.getSlavesToActiveTasks();
 
     if (slavesToActiveTasks.isEmpty()) {
       return Optional.absent();
@@ -351,10 +364,10 @@ class PreemptorImpl implements Preemptor {
    * @return A filter that will compare the priorities and resources required by other tasks
    *     with {@code preemptableTask}.
    */
-  private static Predicate<ITaskConfig> preemptionFilter(final ITaskConfig pendingTask) {
-    return new Predicate<ITaskConfig>() {
+  private static Predicate<PreemptionVictim> preemptionFilter(final ITaskConfig pendingTask) {
+    return new Predicate<PreemptionVictim>() {
       @Override
-      public boolean apply(ITaskConfig possibleVictim) {
+      public boolean apply(PreemptionVictim possibleVictim) {
         boolean pendingIsProduction = pendingTask.isProduction();
         boolean victimIsProduction = possibleVictim.isProduction();
 
@@ -362,7 +375,7 @@ class PreemptorImpl implements Preemptor {
           return true;
         } else if (pendingIsProduction == victimIsProduction) {
           // If production flags are equal, preemption is based on priority within the same role.
-          if (pendingTask.getJob().getRole().equals(possibleVictim.getJob().getRole())) {
+          if (pendingTask.getJob().getRole().equals(possibleVictim.getRole())) {
             return pendingTask.getPriority() > possibleVictim.getPriority();
           } else {
             return false;
