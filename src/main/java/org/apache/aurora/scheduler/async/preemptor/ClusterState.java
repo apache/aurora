@@ -18,7 +18,7 @@ import com.google.common.collect.Multimap;
 /**
  * A facade for the preemptor to gain access to the state of scheduled tasks in the cluster.
  */
-public interface ClusterState {
+interface ClusterState {
 
   /**
    * Gets a snapshot of the active tasks in the cluster, indexed by the slave IDs they are

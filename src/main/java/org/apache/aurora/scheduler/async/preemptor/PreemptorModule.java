@@ -19,6 +19,7 @@ import javax.inject.Singleton;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import com.google.inject.AbstractModule;
 import com.google.inject.PrivateModule;
 import com.google.inject.TypeLiteral;
 import com.twitter.common.args.Arg;
@@ -27,15 +28,21 @@ import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Time;
 
 import org.apache.aurora.scheduler.async.preemptor.PreemptorImpl.PreemptionDelay;
+import org.apache.aurora.scheduler.events.PubsubEventModule;
 import org.apache.aurora.scheduler.filter.AttributeAggregate;
 
-public class PreemptorModule extends PrivateModule {
+public class PreemptorModule extends AbstractModule {
 
   private static final Logger LOG = Logger.getLogger(PreemptorModule.class.getName());
 
   @CmdLine(name = "enable_preemptor",
       help = "Enable the preemptor and preemption")
   private static final Arg<Boolean> ENABLE_PREEMPTOR = Arg.create(true);
+
+  @CmdLine(name = "enable_preemptor_caching",
+      help = "Cache the state consumed by the preemptor to improve scheduling throughput at the "
+          + "cost of higher memory consumption.")
+  private static final Arg<Boolean> ENABLE_PREEMPTOR_CACHING = Arg.create(true);
 
   @CmdLine(name = "preemption_delay",
       help = "Time interval after which a pending task becomes eligible to preempt other tasks")
@@ -55,20 +62,38 @@ public class PreemptorModule extends PrivateModule {
 
   @Override
   protected void configure() {
-    if (enablePreemptor) {
-      bind(Preemptor.class).to(PreemptorImpl.class);
-      bind(PreemptorImpl.class).in(Singleton.class);
-      bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
-          .toInstance(PREEMPTION_DELAY.get());
-      bind(ClusterState.class).to(LiveClusterState.class);
-      bind(LiveClusterState.class).in(Singleton.class);
-      LOG.info("Preemptor Enabled.");
-    } else {
-      bind(Preemptor.class).toInstance(NULL_PREEMPTOR);
-      LOG.warning("Preemptor Disabled.");
-    }
+    install(new PrivateModule() {
+      @Override
+      protected void configure() {
+        if (enablePreemptor) {
+          LOG.info("Preemptor Enabled.");
+          bind(Preemptor.class).to(PreemptorImpl.class);
+          bind(PreemptorImpl.class).in(Singleton.class);
+          bind(new TypeLiteral<Amount<Long, Time>>() { }).annotatedWith(PreemptionDelay.class)
+              .toInstance(PREEMPTION_DELAY.get());
+          if (ENABLE_PREEMPTOR_CACHING.get()) {
+            bind(ClusterState.class).to(CachedClusterState.class);
+            bind(CachedClusterState.class).in(Singleton.class);
+            expose(CachedClusterState.class);
+          } else {
+            bind(ClusterState.class).to(LiveClusterState.class);
+            bind(LiveClusterState.class).in(Singleton.class);
+          }
+        } else {
+          bind(Preemptor.class).toInstance(NULL_PREEMPTOR);
+          LOG.warning("Preemptor Disabled.");
+        }
 
-    expose(Preemptor.class);
+        expose(Preemptor.class);
+      }
+    });
+
+    // We can't do this in the private module due to the known conflict between multibindings
+    // and private modules due to multiple injectors.  We accept the added complexity here to keep
+    // the other bindings private.
+    if (enablePreemptor && ENABLE_PREEMPTOR_CACHING.get()) {
+      PubsubEventModule.bindSubscriber(binder(), CachedClusterState.class);
+    }
   }
 
   private static final Preemptor NULL_PREEMPTOR = new Preemptor() {
