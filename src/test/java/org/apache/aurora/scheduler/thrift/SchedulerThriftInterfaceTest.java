@@ -410,8 +410,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testCreateCronJobEmptyCronSchedule() throws Exception {
-    // TODO(maxim): Deprecate this as part of AURORA-423.
+  public void testRejectCronJobEmptyCronSchedule() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeProdJob().setCronSchedule(""));
     SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
     expectAuth(ROLE, true);
@@ -423,14 +422,11 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(ENOUGH_QUOTA);
 
-    stateManager.insertPendingTasks(
-        storageUtil.mutableStoreProvider,
-        sanitized.getJobConfig().getTaskConfig(),
-        sanitized.getInstanceIds());
-
     control.replay();
 
-    assertOkResponse(thrift.createJob(job.newBuilder(), LOCK.newBuilder(), SESSION));
+    assertEquals(
+        invalidResponse(SanitizedCronJob.NO_CRON_SCHEDULE),
+        thrift.createJob(job.newBuilder(), LOCK.newBuilder(), SESSION));
   }
 
   @Test

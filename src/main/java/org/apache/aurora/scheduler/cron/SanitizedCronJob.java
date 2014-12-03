@@ -15,12 +15,12 @@ package org.apache.aurora.scheduler.cron;
 
 import javax.annotation.Nullable;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 
 import org.apache.aurora.gen.CronCollisionPolicy;
-import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.configuration.SanitizedConfiguration;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
@@ -31,6 +31,9 @@ import static java.util.Objects.requireNonNull;
  * Used by functions that expect field validation before being called.
  */
 public final class SanitizedCronJob {
+  @VisibleForTesting
+  public static final String NO_CRON_SCHEDULE = "Job has an empty cron schedule.";
+
   private final SanitizedConfiguration config;
   private final CrontabEntry crontabEntry;
 
@@ -43,8 +46,7 @@ public final class SanitizedCronJob {
   private SanitizedCronJob(SanitizedConfiguration config) throws CronException {
     final IJobConfiguration job = config.getJobConfig();
     if (!hasCronSchedule(job)) {
-      throw new CronException(String.format(
-          "Not a valid cron job, %s has no cron schedule", JobKeys.canonicalString(job.getKey())));
+      throw new CronException(NO_CRON_SCHEDULE);
     }
 
     Optional<CrontabEntry> entry = CrontabEntry.tryParse(job.getCronSchedule());
