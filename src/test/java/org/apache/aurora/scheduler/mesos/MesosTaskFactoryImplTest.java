@@ -86,19 +86,24 @@ public class MesosTaskFactoryImplTest {
     taskFactory = new MesosTaskFactoryImpl(config);
     TaskInfo task = taskFactory.createFrom(TASK, SLAVE);
     assertEquals(DEFAULT_EXECUTOR, task.getExecutor());
+
     double taskCPU = config.getExecutorOverhead().getNumCpus()
         + TASK.getTask().getNumCpus()
         - MIN_THERMOS_RESOURCES.getNumCpus();
     long taskRamMB = config.getExecutorOverhead().getRam().as(Data.MB)
         + TASK.getTask().getRamMb()
         - MIN_THERMOS_RESOURCES.getRam().as(Data.MB);
+    long taskDiskMB = config.getExecutorOverhead().getDisk().as(Data.MB)
+        + TASK.getTask().getDiskMb()
+        - MIN_THERMOS_RESOURCES.getDisk().as(Data.MB);
 
     assertTrue(taskCPU > 0.0);
     assertTrue(taskRamMB > 0);
+    assertTrue(taskDiskMB > 0);
 
     assertEquals(ImmutableSet.of(
             Resources.makeMesosResource(Resources.CPUS, taskCPU),
-            Resources.makeMesosResource(Resources.DISK_MB, TASK.getTask().getDiskMb()),
+            Resources.makeMesosResource(Resources.DISK_MB, taskDiskMB),
             Resources.makeMesosResource(Resources.RAM_MB, taskRamMB),
             Resources.makeMesosRangeResource(
                 Resources.PORTS,
@@ -121,14 +126,18 @@ public class MesosTaskFactoryImplTest {
     long taskRamMB = config.getExecutorOverhead().getRam().as(Data.MB)
         + TASK.getTask().getRamMb()
         - MIN_THERMOS_RESOURCES.getRam().as(Data.MB);
+    long taskDiskMB = config.getExecutorOverhead().getDisk().as(Data.MB)
+        + TASK.getTask().getDiskMb()
+        - MIN_THERMOS_RESOURCES.getDisk().as(Data.MB);
 
     assertTrue(taskCPU > 0.0);
     assertTrue(taskRamMB > 0);
+    assertTrue(taskDiskMB > 0);
 
     assertEquals(DEFAULT_EXECUTOR, task.getExecutor());
     assertEquals(ImmutableSet.of(
             Resources.makeMesosResource(Resources.CPUS, taskCPU),
-            Resources.makeMesosResource(Resources.DISK_MB, TASK.getTask().getDiskMb()),
+            Resources.makeMesosResource(Resources.DISK_MB, taskDiskMB),
             Resources.makeMesosResource(Resources.RAM_MB, taskRamMB)
         ),
         ImmutableSet.copyOf(task.getResourcesList()));
@@ -147,12 +156,17 @@ public class MesosTaskFactoryImplTest {
         + TASK.getTask().getNumCpus()
         - MIN_THERMOS_RESOURCES.getNumCpus();
 
+    long taskDiskMB = config.getExecutorOverhead().getDisk().as(Data.MB)
+        + TASK.getTask().getDiskMb()
+        - MIN_THERMOS_RESOURCES.getDisk().as(Data.MB);
+
     assertTrue(taskCPU > 0.0);
+    assertTrue(taskDiskMB > 0);
 
     assertEquals(ImmutableSet.of(
       Resources.makeMesosResource(Resources.CPUS, taskCPU),
       Resources.makeMesosResource(Resources.RAM_MB, MIN_TASK_RESOURCES.getRam().as(Data.MB)),
-      Resources.makeMesosResource(Resources.DISK_MB, TASK.getTask().getDiskMb()),
+      Resources.makeMesosResource(Resources.DISK_MB, taskDiskMB),
       Resources.makeMesosRangeResource(
           Resources.PORTS,
           ImmutableSet.copyOf(TASK.getAssignedPorts().values()))

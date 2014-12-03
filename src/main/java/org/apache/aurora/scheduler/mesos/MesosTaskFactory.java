@@ -93,17 +93,18 @@ public interface MesosTaskFactory {
     static final Resources MIN_THERMOS_RESOURCES = new Resources(
         0.01,
         Amount.of(128L, Data.MB),
-        Amount.of(0L, Data.MB),
+        Amount.of(1L, Data.MB),
         0);
 
     /**
-     * Minimum resources to allocate for a task. Mesos rejects tasks that have no CPU or no RAM.
+     * Minimum resources to allocate for a task. Mesos rejects tasks that have no CPU, no RAM, or
+     * no Disk.
      */
     @VisibleForTesting
     static final Resources MIN_TASK_RESOURCES = new Resources(
         0.01,
         Amount.of(1L, Data.MB),
-        Amount.of(0L, Data.MB),
+        Amount.of(1L, Data.MB),
         0);
 
     /**
