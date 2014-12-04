@@ -880,8 +880,6 @@ struct Response {
   1: ResponseCode responseCode
   // TODO(wfarner): Remove the message field in 0.7.0. (AURORA-466)
   2: optional string messageDEPRECATED
-  // TODO(wfarner): Remove version field in 0.7.0. (AURORA-467)
-  4: APIVersion DEPRECATEDversion
   5: ServerInfo serverInfo
   /** Payload from the invoked RPC. */
   3: optional Result result
@@ -923,13 +921,6 @@ service ReadOnlyScheduler {
 
   /** Fetches the quota allocated for a user. */
   Response getQuota(1: string ownerRole)
-
-  // TODO(Suman Karumuri): Delete this API once it is no longer used.
-  /**
-   * Returns the current version of the API implementation
-   * NOTE: This method is deprecated.
-   */
-  Response getVersion()
 
   /**
    * Populates fields in a job configuration as though it were about to be run.

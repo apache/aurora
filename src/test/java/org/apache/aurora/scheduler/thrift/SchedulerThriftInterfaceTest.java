@@ -47,7 +47,6 @@ import org.apache.aurora.auth.CapabilityValidator;
 import org.apache.aurora.auth.CapabilityValidator.AuditCheck;
 import org.apache.aurora.auth.CapabilityValidator.Capability;
 import org.apache.aurora.auth.SessionValidator.AuthFailedException;
-import org.apache.aurora.gen.APIVersion;
 import org.apache.aurora.gen.AddInstancesConfig;
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.AuroraAdmin;
@@ -217,7 +216,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
           .setClusterName("test")
           .setThriftAPIVersion(THRIFT_API_VERSION)
           .setStatsUrlPrefix("fake_url");
-  private static final APIVersion API_VERSION = new APIVersion().setMajor(THRIFT_API_VERSION);
   private static final String CRON_SCHEDULE = "0 * * * *";
 
   private StorageTestUtil storageUtil;
@@ -1789,7 +1787,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private Response response(ResponseCode code, Optional<Result> result, String... messages) {
     Response response = Util.emptyResponse()
         .setResponseCode(code)
-        .setDEPRECATEDversion(API_VERSION)
         .setServerInfo(SERVER_INFO)
         .setResult(result.orNull());
     if (messages.length > 0) {
@@ -1819,7 +1816,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private Response invalidResponse(String message) {
     return Util.emptyResponse()
         .setResponseCode(INVALID_REQUEST)
-        .setDEPRECATEDversion(API_VERSION)
         .setServerInfo(SERVER_INFO)
         .setMessageDEPRECATED(message)
         .setDetails(ImmutableList.of(new ResponseDetail(message)));
@@ -2182,13 +2178,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertResponse(AUTH_FAILED, thrift.snapshot(SESSION));
     assertOkResponse(thrift.snapshot(SESSION));
     assertResponse(ERROR, thrift.snapshot(SESSION));
-  }
-
-  @Test
-  public void testGetVersion() throws Exception {
-    control.replay();
-
-    assertOkResponse(thrift.getVersion());
   }
 
   private static AddInstancesConfig createInstanceConfig(TaskConfig task) {

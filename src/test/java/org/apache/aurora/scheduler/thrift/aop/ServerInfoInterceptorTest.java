@@ -34,7 +34,6 @@ import org.junit.Test;
 import static org.apache.aurora.gen.ResponseCode.OK;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 public class ServerInfoInterceptorTest extends EasyMockTest {
 
@@ -67,18 +66,6 @@ public class ServerInfoInterceptorTest extends EasyMockTest {
       }
     });
     decoratedThrift = injector.getInstance(AuroraAdmin.Iface.class);
-  }
-
-  @Test
-  public void testVersionIsSet() throws Exception {
-    Response response = okResponse(
-        Result.getJobsResult(
-            new GetJobsResult().setConfigs(ImmutableSet.<JobConfiguration>of())));
-
-    expect(realThrift.getJobs(ROLE)).andReturn(response);
-    control.replay();
-
-    assertNotNull(decoratedThrift.getJobs(ROLE).getDEPRECATEDversion());
   }
 
   @Test

@@ -230,11 +230,6 @@ abstract class ForwardingThrift implements AuroraAdmin.Iface {
   }
 
   @Override
-  public Response getVersion() throws TException {
-    return delegate.getVersion();
-  }
-
-  @Override
   public Response acquireLock(LockKey lockKey, SessionKey session) throws TException {
     return delegate.acquireLock(lockKey, session);
   }

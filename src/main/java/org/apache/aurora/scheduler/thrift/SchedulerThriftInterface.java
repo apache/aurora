@@ -177,7 +177,6 @@ import static org.apache.aurora.gen.ResponseCode.INVALID_REQUEST;
 import static org.apache.aurora.gen.ResponseCode.LOCK_ERROR;
 import static org.apache.aurora.gen.ResponseCode.OK;
 import static org.apache.aurora.gen.ResponseCode.WARNING;
-import static org.apache.aurora.gen.apiConstants.CURRENT_API_VERSION;
 import static org.apache.aurora.scheduler.base.Tasks.ACTIVE_STATES;
 import static org.apache.aurora.scheduler.quota.QuotaCheckResult.Result.INSUFFICIENT_QUOTA;
 import static org.apache.aurora.scheduler.thrift.Util.addMessage;
@@ -1138,11 +1137,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
     }
 
     return error;
-  }
-
-  @Override
-  public Response getVersion() {
-    return okResponse(Result.getVersionResult(CURRENT_API_VERSION));
   }
 
   @Override
