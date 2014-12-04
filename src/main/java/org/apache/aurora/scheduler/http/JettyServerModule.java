@@ -245,7 +245,7 @@ public class JettyServerModule extends AbstractModule {
             @Override
             protected void configureServlets() {
               bind(HttpStatsFilter.class).in(Singleton.class);
-              filter("/assets/scheduler*").through(HttpStatsFilter.class);
+              filter("*").through(HttpStatsFilter.class);
               bind(LeaderRedirectFilter.class).in(Singleton.class);
               filterRegex("/assets/scheduler(?:/.*)?").through(LeaderRedirectFilter.class);
 
