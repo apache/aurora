@@ -36,6 +36,7 @@ from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.sla import JobUpTimeLimit
 from apache.aurora.client.base import (
     check_and_log_response,
+    combine_messages,
     die,
     get_grouping_or_die,
     GROUPING_OPTION,
@@ -144,7 +145,7 @@ def query(args, options):
   api = AuroraClientAPI(CLUSTERS[cluster], options.verbosity)
   query_info = api.query(TaskQuery(role=role, jobName=job, instanceIds=instances, statuses=states))
   if query_info.responseCode != ResponseCode.OK:
-    die('Failed to query scheduler: %s' % query_info.messageDEPRECATED)
+    die('Failed to query scheduler: %s' % combine_messages(query_info))
 
   tasks = query_info.result.scheduleStatusResult.tasks
   if tasks is None:

@@ -21,7 +21,7 @@ from fnmatch import fnmatch
 
 from pystachio import Ref
 
-from apache.aurora.client.base import synthesize_url
+from apache.aurora.client.base import combine_messages, synthesize_url
 from apache.aurora.client.cli import (
     Context,
     EXIT_API_ERROR,
@@ -149,7 +149,7 @@ class AuroraCommandContext(Context):
   def check_and_log_response(self, resp, err_code=EXIT_API_ERROR, err_msg=None):
     if resp.responseCode != ResponseCode.OK:
       if err_msg is None:
-        err_msg = resp.messageDEPRECATED
+        err_msg = combine_messages(resp)
       if resp.responseCode == ResponseCode.LOCK_ERROR:
         self.print_err(self.LOCK_ERROR_MSG)
       self.print_err(err_msg)

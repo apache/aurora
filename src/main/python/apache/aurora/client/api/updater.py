@@ -24,7 +24,7 @@ from thrift.TSerialization import serialize
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
 
-from apache.aurora.client.base import format_response
+from apache.aurora.client.base import combine_messages, format_response
 
 from .error_handling_thread import ExecutionError, spawn_worker
 from .instance_watcher import InstanceWatcher
@@ -132,7 +132,7 @@ class Updater(object):
     if resp.responseCode == ResponseCode.OK:
       self._lock = None
     else:
-      log.error('There was an error finalizing the update: %s' % resp.messageDEPRECATED)
+      log.error('There was an error finalizing the update: %s' % combine_messages(resp))
     return resp
 
   def int_handler(self, *args):
@@ -646,12 +646,8 @@ class Updater(object):
     return TaskQuery(jobKeys=[self._job_key], statuses=ACTIVE_STATES, instanceIds=instanceIds)
 
   def _failed_response(self, message):
-    # This is a synthetic Scheduler response that should follow the dual-write approach for error
-    # messages to simplify caller's handling logic until the deprecation (AURORA-466) is complete.
-    return Response(
-        responseCode=ResponseCode.ERROR,
-        details=[ResponseDetail(message=message)],
-        messageDEPRECATED=message)
+    # TODO(wfarner): Avoid synthesizing scheduler responses, consider using an exception instead.
+    return Response(responseCode=ResponseCode.ERROR, details=[ResponseDetail(message=message)])
 
   def update(self, instances=None):
     """Performs the job update, blocking until it completes.

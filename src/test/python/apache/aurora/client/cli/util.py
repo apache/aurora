@@ -119,11 +119,7 @@ class AuroraClientCommandTest(unittest.TestCase):
 
   @classmethod
   def create_blank_response(cls, code, msg):
-    return Response(
-        responseCode=code,
-        details=[ResponseDetail(message=msg)],
-        messageDEPRECATED=msg
-    )
+    return Response(responseCode=code, details=[ResponseDetail(message=msg)])
 
   @classmethod
   def create_simple_success_response(cls):

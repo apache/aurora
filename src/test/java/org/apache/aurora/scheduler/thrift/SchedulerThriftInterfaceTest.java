@@ -26,7 +26,6 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 
 import com.google.common.base.Function;
-import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
@@ -542,7 +541,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   private void assertMessageMatches(Response response, final String string) {
     // TODO(wfarner): This test coverage could be much better.  Circle back to apply more thorough
     // response contents testing throughout.
-    assertEquals(string, response.getMessageDEPRECATED());
     assertTrue(Iterables.any(response.getDetails(), new Predicate<ResponseDetail>() {
       @Override
       public boolean apply(ResponseDetail detail) {
@@ -1790,10 +1788,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setServerInfo(SERVER_INFO)
         .setResult(result.orNull());
     if (messages.length > 0) {
-      response.setMessageDEPRECATED(Joiner.on(", ").join(messages));
-      response
-          .setDetails(FluentIterable.from(Arrays.asList(messages)).transform(MESSAGE_TO_DETAIL)
-              .toList());
+      response.setDetails(FluentIterable.from(Arrays.asList(messages)).transform(MESSAGE_TO_DETAIL)
+          .toList());
     }
 
     return response;
@@ -1809,7 +1805,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   private Response errorResponse(String message) {
     return response(ERROR, Optional.<Result>absent())
-        .setMessageDEPRECATED(message)
         .setDetails(ImmutableList.of(new ResponseDetail().setMessage(message)));
   }
 
@@ -1817,7 +1812,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return Util.emptyResponse()
         .setResponseCode(INVALID_REQUEST)
         .setServerInfo(SERVER_INFO)
-        .setMessageDEPRECATED(message)
         .setDetails(ImmutableList.of(new ResponseDetail(message)));
   }
 

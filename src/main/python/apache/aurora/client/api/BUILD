@@ -22,6 +22,7 @@ python_library(
     ':updater',
     '3rdparty/python:twitter.common.lang',
     '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/aurora/client:base',
     'src/main/python/apache/aurora/common',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
@@ -139,6 +140,7 @@ python_library(
   dependencies = [
     ':scheduler_client',
     '3rdparty/python:twitter.common.log',
+    'src/main/python/apache/aurora/client:base',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )

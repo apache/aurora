@@ -13,7 +13,6 @@
  */
 package org.apache.aurora.scheduler.thrift;
 
-import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.twitter.common.base.MorePreconditions;
 
@@ -80,10 +79,6 @@ public final class Util {
   }
 
   private static Response appendMessage(Response response, String message) {
-    String existingMessage = response.getMessageDEPRECATED();
-    String prefix = Strings.isNullOrEmpty(existingMessage) ? "" : existingMessage + ", ";
-    response.setMessageDEPRECATED(prefix + message);
-
     response.addToDetails(new ResponseDetail(message));
     return response;
   }

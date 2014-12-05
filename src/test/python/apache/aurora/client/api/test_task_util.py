@@ -25,6 +25,7 @@ from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Response,
     ResponseCode,
+    ResponseDetail,
     Result,
     ScheduledTask,
     ScheduleStatusResult,
@@ -59,7 +60,7 @@ class TaskUtilTest(unittest.TestCase):
   def mock_scheduler(cls, response_code=None):
     scheduler = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
     response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, messageDEPRECATED='test')
+    resp = Response(responseCode=response_code, details=[ResponseDetail(message='test')])
     resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=cls.create_tasks()))
     scheduler.getTasksWithoutConfigs.return_value = resp
     return scheduler

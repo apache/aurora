@@ -28,6 +28,7 @@ from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     Response,
     ResponseCode,
+    ResponseDetail,
     Result,
     ScheduledTask,
     ScheduleStatus,
@@ -50,6 +51,14 @@ UPDATER_CONFIG = UpdaterConfig(
 )
 
 
+def make_response(code=ResponseCode.OK, message='test', result=None):
+  return Response(
+    responseCode=code,
+    details=[ResponseDetail(message=message)],
+    result=result,
+    serverInfo=ServerInfo(clusterName='test', thriftAPIVersion=THRIFT_API_VERSION))
+
+
 class TestRestarter(MoxTestBase):
 
   def setUp(self):
@@ -70,14 +79,11 @@ class TestRestarter(MoxTestBase):
         self.mock_instance_watcher)
 
   def mock_restart_instances(self, instances, lock=None):
-    response = Response(responseCode=ResponseCode.OK, messageDEPRECATED='test')
-    response.serverInfo = ServerInfo(thriftAPIVersion=THRIFT_API_VERSION)
-
     self.mock_scheduler.restartShards(
         JOB.to_thrift(),
         instances,
         lock,
-        SESSION_KEY).AndReturn(response)
+        SESSION_KEY).AndReturn(make_response())
     self.mock_instance_watcher.watch(instances).AndReturn([])
 
   def test_restart_one_iteration(self):
@@ -108,11 +114,7 @@ class TestRestarter(MoxTestBase):
           status=ScheduleStatus.RUNNING,
           assignedTask=AssignedTask(task=TaskConfig(), instanceId=i)
       ))
-    response = Response(responseCode=ResponseCode.OK, messageDEPRECATED='test')
-    response.serverInfo = ServerInfo(thriftAPIVersion=THRIFT_API_VERSION)
-    response.result = Result()
-    response.result.scheduleStatusResult = ScheduleStatusResult(tasks=tasks)
-
+    response = make_response(result=Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks)))
     self.mock_scheduler.getTasksWithoutConfigs(IgnoreArg()).AndReturn(response)
 
   def test_restart_all_instances(self):
@@ -124,8 +126,7 @@ class TestRestarter(MoxTestBase):
     self.restarter.restart(None)
 
   def mock_status_no_active_task(self):
-    response = Response(responseCode=ResponseCode.INVALID_REQUEST, messageDEPRECATED='test')
-    response.serverInfo = ServerInfo(thriftAPIVersion=THRIFT_API_VERSION)
+    response = make_response(code=ResponseCode.INVALID_REQUEST)
     self.mock_scheduler.getTasksWithoutConfigs(IgnoreArg()).AndReturn(response)
 
   def test_restart_no_instance_active(self):
@@ -136,8 +137,7 @@ class TestRestarter(MoxTestBase):
     self.restarter.restart(None)
 
   def mock_restart_fails(self):
-    response = Response(responseCode=ResponseCode.ERROR, messageDEPRECATED='test error')
-    response.serverInfo = ServerInfo(thriftAPIVersion=THRIFT_API_VERSION)
+    response = make_response(code=ResponseCode.ERROR, message='test error')
     self.mock_scheduler.restartShards(
         JOB.to_thrift(),
         IgnoreArg(),
@@ -153,14 +153,11 @@ class TestRestarter(MoxTestBase):
     assert self.restarter.restart(None).responseCode == ResponseCode.ERROR
 
   def mock_restart_watch_fails(self, instances):
-    response = Response(responseCode=ResponseCode.OK, messageDEPRECATED='test')
-    response.serverInfo = ServerInfo(thriftAPIVersion=THRIFT_API_VERSION)
-
     self.mock_scheduler.restartShards(
         JOB.to_thrift(),
         instances,
         self.lock,
-        SESSION_KEY).AndReturn(response)
+        SESSION_KEY).AndReturn(make_response())
     self.mock_instance_watcher.watch(instances).AndReturn(instances)
 
   def test_restart_instances_watch_fails(self):

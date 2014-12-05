@@ -17,7 +17,9 @@ from copy import deepcopy
 
 from twitter.common import log
 
-from gen.apache.aurora.api.ttypes import ResourceAggregate, Response, ResponseCode
+from apache.aurora.client.base import combine_messages
+
+from gen.apache.aurora.api.ttypes import ResourceAggregate, Response, ResponseCode, ResponseDetail
 
 
 class CapacityRequest(object):
@@ -75,13 +77,16 @@ class QuotaCheck(object):
 
     Returns: ResponseCode.OK if check is successful.
     """
-    resp_ok = Response(responseCode=ResponseCode.OK, messageDEPRECATED='Quota check successful.')
+    # TODO(wfarner): Avoid synthesizing scheduler responses.
+    resp_ok = Response(
+        responseCode=ResponseCode.OK,
+        details=[ResponseDetail(message='Quota check successful.')])
     if not production:
       return resp_ok
 
     resp = self._scheduler.getQuota(job_key.role)
     if resp.responseCode != ResponseCode.OK:
-      log.error('Failed to get quota from scheduler: %s' % resp.messageDEPRECATED)
+      log.error('Failed to get quota from scheduler: %s' % combine_messages(resp))
       return resp
 
     allocated = CapacityRequest(resp.result.getQuotaResult.quota)
@@ -94,9 +99,10 @@ class QuotaCheck(object):
       print_quota(allocated.quota(), 'Total allocated quota', job_key.role)
       print_quota(consumed.quota(), 'Consumed quota', job_key.role)
       print_quota(requested.quota(), 'Requested', job_key.name)
+      # TODO(wfarner): Avoid synthesizing scheduler responses.
       return Response(
           responseCode=ResponseCode.INVALID_REQUEST,
-          messageDEPRECATED='Failed quota check.')
+          details=[ResponseDetail(message='Failed quota check.')])
 
     return resp_ok
 

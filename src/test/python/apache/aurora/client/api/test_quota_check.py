@@ -27,6 +27,7 @@ from gen.apache.aurora.api.ttypes import (
     ResourceAggregate,
     Response,
     ResponseCode,
+    ResponseDetail,
     Result
 )
 
@@ -43,7 +44,7 @@ class QuotaCheckTest(unittest.TestCase):
   def mock_get_quota(self, allocated, consumed, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
 
-    resp = Response(responseCode=response_code, messageDEPRECATED='test')
+    resp = Response(responseCode=response_code, details=[ResponseDetail(message='test')])
     resp.result = Result(
         getQuotaResult=GetQuotaResult(
           quota=deepcopy(allocated), prodConsumption=deepcopy(consumed)))

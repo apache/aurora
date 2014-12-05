@@ -36,6 +36,7 @@ from apache.aurora.client.api.quota_check import print_quota
 from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.base import (
     check_and_log_response,
+    combine_messages,
     deprecation_warning,
     die,
     handle_open,
@@ -274,11 +275,11 @@ def diff(job_spec, config_file):
   api = make_client(cluster)
   resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
   if resp.responseCode != ResponseCode.OK:
-    die('Request failed, server responded with "%s"' % resp.messageDEPRECATED)
+    die('Request failed, server responded with "%s"' % combine_messages(resp))
   remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
   resp = api.populate_job_config(config)
   if resp.responseCode != ResponseCode.OK:
-    die('Request failed, server responded with "%s"' % resp.messageDEPRECATED)
+    die('Request failed, server responded with "%s"' % combine_messages(resp))
   local_tasks = resp.result.populateJobResult.populatedDEPRECATED
 
   pp = pprint.PrettyPrinter(indent=2)
@@ -572,7 +573,7 @@ def kill_in_batches(api, job_key, instances_arg, batch_size, max_failures):
     for batch in make_batches(instances_to_kill, batch_size):
       resp = api.kill_job(job_key, batch)
       if resp.responseCode is not ResponseCode.OK:
-        log.info("Kill of shards %s failed with error %s" % (batch, resp.messageDEPRECATED))
+        log.info("Kill of shards %s failed with error %s" % (batch, combine_messages(resp)))
         print('ERROR IN KILL_JOB')
         errors += 1
         if errors > max_failures:
@@ -703,11 +704,11 @@ def really_update(job_spec, config_file, options):
     resp = api.query_no_configs(api.build_query(config.role(), config.name(),
         statuses=ACTIVE_STATES, env=config.environment()))
     if resp.responseCode != ResponseCode.OK:
-      die('Could not get job status from server for comparison: %s' % resp.messageDEPRECATED)
+      die('Could not get job status from server for comparison: %s' % combine_messages(resp))
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     resp = api.populate_job_config(config)
     if resp.responseCode != ResponseCode.OK:
-      die('Server could not populate job config for comparison: %s' % resp.messageDEPRECATED)
+      die('Server could not populate job config for comparison: %s' % combine_messages(resp))
     local_task_count = len(resp.result.populateJobResult.populatedDEPRECATED)
     remote_task_count = len(remote_tasks)
     if (local_task_count >= 4 * remote_task_count or local_task_count <= 4 * remote_task_count

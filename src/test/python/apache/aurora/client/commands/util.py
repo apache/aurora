@@ -25,7 +25,7 @@ from apache.aurora.common.clusters import Clusters
 
 from ..api.api_util import SchedulerProxyApiSpec
 
-from gen.apache.aurora.api.ttypes import Response, ResponseCode, Result
+from gen.apache.aurora.api.ttypes import Response, ResponseCode, ResponseDetail, Result
 
 
 class AuroraClientCommandTest(unittest.TestCase):
@@ -34,9 +34,8 @@ class AuroraClientCommandTest(unittest.TestCase):
     # TODO(wfarner): Don't use a mock here.
     response = create_autospec(spec=Response, instance=True)
     response.responseCode = code
-    response.messageDEPRECATED = msg
     response.result = create_autospec(spec=Result, instance=True)
-    response.details = []
+    response.details = [ResponseDetail(message=msg)]
     return response
 
   @classmethod

@@ -16,6 +16,7 @@ from __future__ import print_function
 
 from twitter.common import log
 
+from apache.aurora.client.base import combine_messages
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.auth import make_session_key
 from apache.aurora.common.cluster import Cluster
@@ -237,7 +238,7 @@ class AuroraClientAPI(object):
     log.info("Canceling update on job %s" % job_key)
     resp = Updater.cancel_update(self._scheduler_proxy, job_key)
     if resp.responseCode != ResponseCode.OK:
-      log.error('Error cancelling the update: %s' % resp.messageDEPRECATED)
+      log.error('Error cancelling the update: %s' % combine_messages(resp))
     return resp
 
   def restart(self, job_key, instances, updater_config, health_check_interval_seconds):

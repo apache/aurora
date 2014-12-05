@@ -878,8 +878,6 @@ struct ResponseDetail {
 
 struct Response {
   1: ResponseCode responseCode
-  // TODO(wfarner): Remove the message field in 0.7.0. (AURORA-466)
-  2: optional string messageDEPRECATED
   5: ServerInfo serverInfo
   /** Payload from the invoked RPC. */
   3: optional Result result

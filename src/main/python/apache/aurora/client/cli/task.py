@@ -23,6 +23,7 @@ from apache.aurora.client.api.command_runner import (
     DistributedCommandRunner,
     InstanceDistributedCommandRunner
 )
+from apache.aurora.client.base import combine_messages
 from apache.aurora.client.cli import EXIT_INVALID_PARAMETER, EXIT_OK, Noun, print_aurora_log, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
@@ -104,7 +105,7 @@ class SshCommand(Verb):
     api = context.get_api(cluster)
     resp = api.query(api.build_query(role, name, set([int(instance)]), env=env))
     context.check_and_log_response(resp,
-        err_msg=('Unable to get information about instance: %s' % resp.messageDEPRECATED))
+        err_msg=('Unable to get information about instance: %s' % combine_messages(resp)))
     if (resp.result.scheduleStatusResult.tasks is None or
         len(resp.result.scheduleStatusResult.tasks) == 0):
       raise context.CommandError(EXIT_INVALID_PARAMETER,

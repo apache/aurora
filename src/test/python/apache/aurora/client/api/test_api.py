@@ -31,6 +31,7 @@ from gen.apache.aurora.api.ttypes import (
     JobUpdateStatus,
     Response,
     ResponseCode,
+    ResponseDetail,
     Result,
     TaskConfig
 )
@@ -55,7 +56,7 @@ class TestJobUpdateApis(unittest.TestCase):
   def create_blank_response(cls, code, msg):
     return Response(
       responseCode=code,
-      messageDEPRECATED=msg,
+      details=[ResponseDetail(message=msg)],
       result=create_autospec(spec=Result, spec_set=True, instance=True)
     )
 

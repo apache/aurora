@@ -23,6 +23,7 @@ from pystachio import Environment, Required, String
 from twitter.common import log
 
 from apache.aurora.client.api import AuroraClientAPI
+from apache.aurora.client.base import combine_messages
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.config.schema.base import MesosContext
 from apache.thermos.config.schema import ThermosContext
@@ -158,6 +159,7 @@ class InstanceDistributedCommandRunner(DistributedCommandRunner):
       for task in resp.result.scheduleStatusResult.tasks:
         yield task
     else:
-      self._log(logging.ERROR,
-          "Error: could not retrieve task information for run command: %s" % resp.messageDEPRECATED)
-      raise ValueError("Could not retrieve task information: %s" % resp.messageDEPRECATED)
+      self._log(
+          logging.ERROR,
+          'Error: could not retrieve task information for run command: %s' % combine_messages(resp))
+      raise ValueError('Could not retrieve task information: %s' % combine_messages(resp))

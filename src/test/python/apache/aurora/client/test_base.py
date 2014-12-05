@@ -21,7 +21,7 @@ from gen.apache.aurora.api.ttypes import Response, ResponseCode, ResponseDetail
 class TestBase(unittest.TestCase):
 
   def test_format_response_with_message(self):
-    resp = Response(responseCode=ResponseCode.ERROR, messageDEPRECATED='Error')
+    resp = Response(responseCode=ResponseCode.ERROR, details=[ResponseDetail(message='Error')])
     formatted = base.format_response(resp)
     assert formatted == 'Response from scheduler: ERROR (message: Error)'
 
@@ -29,3 +29,15 @@ class TestBase(unittest.TestCase):
     resp = Response(responseCode=ResponseCode.ERROR, details=[ResponseDetail(message='Error')])
     formatted = base.format_response(resp)
     assert formatted == 'Response from scheduler: ERROR (message: Error)'
+
+  def test_combine_messages(self):
+    resp = Response(responseCode=ResponseCode.ERROR)
+    assert base.combine_messages(resp) == ''
+    resp = Response(responseCode=ResponseCode.ERROR, details=[])
+    assert base.combine_messages(resp) == ''
+    resp = Response(responseCode=ResponseCode.ERROR, details=[ResponseDetail(message='Error')])
+    assert base.combine_messages(resp) == 'Error'
+    resp = Response(
+        responseCode=ResponseCode.ERROR,
+        details=[ResponseDetail(message='Error1'), ResponseDetail(message='Error2')])
+    assert base.combine_messages(resp) == 'Error1, Error2'

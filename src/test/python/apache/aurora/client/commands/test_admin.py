@@ -39,6 +39,7 @@ from gen.apache.aurora.api.ttypes import (
     ResourceAggregate,
     Response,
     ResponseCode,
+    ResponseDetail,
     Result,
     ScheduledTask,
     ScheduleStatus,
@@ -64,11 +65,11 @@ class TestQueryCommand(AuroraClientCommandTest):
     return mock_options
 
   @classmethod
-  def create_response(cls, tasks, response_code=None):
-    response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, messageDEPRECATED='test')
-    resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
-    return resp
+  def create_response(cls, tasks, response_code=ResponseCode.OK):
+    return Response(
+      responseCode=response_code,
+      details=[ResponseDetail(message='test')],
+      result=Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks)))
 
   @classmethod
   def create_task(cls):
@@ -126,12 +127,13 @@ class TestQueryCommand(AuroraClientCommandTest):
 class TestIncreaseQuotaCommand(AuroraClientCommandTest):
 
   @classmethod
-  def create_response(cls, quota, prod, non_prod, response_code=None):
-    response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, messageDEPRECATED='test')
-    resp.result = Result(getQuotaResult=GetQuotaResult(
-        quota=quota, prodConsumption=prod, nonProdConsumption=non_prod))
-    return resp
+  def create_response(cls, quota, prod, non_prod, response_code=ResponseCode.OK):
+    return Response(
+        responseCode=response_code,
+        details=[ResponseDetail(message='test')],
+        result=Result(getQuotaResult=GetQuotaResult(
+            quota=quota, prodConsumption=prod, nonProdConsumption=non_prod))
+    )
 
   def test_increase_quota(self):
     """Tests successful execution of the increase_quota command."""
@@ -164,7 +166,7 @@ class TestSetQuotaCommand(AuroraClientCommandTest):
   @classmethod
   def create_response(cls, quota, prod, non_prod, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, messageDEPRECATED='test')
+    resp = Response(responseCode=response_code, details=[ResponseDetail(message='test')])
     resp.result = Result(getQuotaResult=GetQuotaResult(
       quota=quota, prodConsumption=prod, nonProdConsumption=non_prod))
     return resp
@@ -204,7 +206,7 @@ class TestGetLocksCommand(AuroraClientCommandTest):
   @classmethod
   def create_response(cls, locks, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, messageDEPRECATED='test')
+    resp = Response(responseCode=response_code, details=[ResponseDetail(message='test')])
     resp.result = Result(getLocksResult=GetLocksResult(locks=locks))
     return resp
 

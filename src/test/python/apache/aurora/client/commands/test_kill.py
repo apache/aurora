@@ -28,6 +28,7 @@ from gen.apache.aurora.api.ttypes import (
     JobKey,
     Response,
     ResponseCode,
+    ResponseDetail,
     Result,
     ScheduledTask,
     ScheduleStatus,
@@ -289,7 +290,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
       ))
     return Response(
         responseCode=ResponseCode.OK,
-        messageDEPRECATED='Ok',
+        details=[ResponseDetail(message='Ok')],
         result=Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
     )
 

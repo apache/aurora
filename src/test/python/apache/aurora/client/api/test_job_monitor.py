@@ -25,6 +25,7 @@ from gen.apache.aurora.api.ttypes import (
     JobKey,
     Response,
     ResponseCode,
+    ResponseDetail,
     Result,
     ScheduledTask,
     ScheduleStatus,
@@ -68,7 +69,7 @@ class JobMonitorTest(unittest.TestCase):
 
   def mock_get_tasks(self, tasks, response_code=None):
     response_code = ResponseCode.OK if response_code is None else response_code
-    resp = Response(responseCode=response_code, messageDEPRECATED='test')
+    resp = Response(responseCode=response_code, details=[ResponseDetail(message='test')])
     resp.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
     self._scheduler.getTasksWithoutConfigs.return_value = resp
 

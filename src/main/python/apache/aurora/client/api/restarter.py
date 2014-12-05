@@ -14,6 +14,8 @@
 
 from twitter.common import log
 
+from apache.aurora.client.base import combine_messages
+
 from .instance_watcher import InstanceWatcher
 from .updater_util import FailureThreshold
 
@@ -72,7 +74,7 @@ class Restarter(object):
 
       resp = self._scheduler.restartShards(self._job_key.to_thrift(), batch, self._lock)
       if resp.responseCode != ResponseCode.OK:
-        log.error('Error restarting instances: %s', resp.messageDEPRECATED)
+        log.error('Error restarting instances: %s', combine_messages(resp))
         return resp
 
       failed_instances = self._instance_watcher.watch(batch)

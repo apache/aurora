@@ -40,10 +40,17 @@ def die(msg):
   sys.exit(1)
 
 
+def combine_messages(response):
+  """Combines the message found in the details of a response.
+  :param response: response to extract messages from.
+  :return: Messages from the details in the response, or an empty string if there were no messages.
+  """
+  return ', '.join([d.message for d in (response.details or [])])
+
+
 def format_response(resp):
   return 'Response from scheduler: %s (message: %s)' % (
-    ResponseCode._VALUES_TO_NAMES[resp.responseCode],
-    ", ".join([m.message for m in resp.details]) if resp.details else resp.messageDEPRECATED)
+    ResponseCode._VALUES_TO_NAMES[resp.responseCode], combine_messages(resp))
 
 
 def check_and_log_response(resp):
