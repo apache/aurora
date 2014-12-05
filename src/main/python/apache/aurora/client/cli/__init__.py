@@ -154,7 +154,7 @@ class Context(object):
     print_aurora_log(severity, msg, *args, **kwargs)
 
 
-class ConfigurationPlugin(object):
+class ConfigurationPlugin(AbstractClass):
   """A component that can be plugged in to a command-line to add new configuration options.
 
   For example, if a production environment is protected behind some
@@ -171,15 +171,16 @@ class ConfigurationPlugin(object):
 
   @abstractmethod
   def get_options(self):
-    """Return the set of options processed by this plugin"""
-    return []
+    """Return the set of options processed by this plugin
+    This must return a list of CommandOption objects that represent the arguments for this plugin.
+    """
 
   @abstractmethod
   def before_dispatch(self, raw_args):
     """Run some code before dispatching to the client.
     If a ConfigurationPlugin.Error exception is thrown, aborts the command execution.
+    This must return a list of arguments to pass to the remaining plugins and program.
     """
-    return raw_args
 
   @abstractmethod
   def before_execution(self, context):
