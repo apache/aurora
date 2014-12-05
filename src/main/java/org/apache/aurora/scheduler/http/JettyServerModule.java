@@ -194,11 +194,6 @@ public class JettyServerModule extends AbstractModule {
     }
 
     @Singleton
-    static class ApiHelpResourceServlet extends DefaultServlet {
-      // Subclass to allow extra instance of DefaultServlet.
-    }
-
-    @Singleton
     static class ApiClientServlet extends DefaultServlet {
       // Subclass to allow extra instance of DefaultServlet.
     }
