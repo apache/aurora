@@ -39,6 +39,7 @@ class ThriftEntitiesPlugin implements Plugin<Project>  {
       }
       task('generateThriftEntitiesJava') {
         inputs.files {thriftEntities.inputFiles}
+        inputs.files {thriftEntities.codeGenerator}
         outputs.dir {thriftEntities.genJavaDir}
         doLast {
           thriftEntities.genJavaDir.exists() || thriftEntities.genJavaDir.mkdirs()

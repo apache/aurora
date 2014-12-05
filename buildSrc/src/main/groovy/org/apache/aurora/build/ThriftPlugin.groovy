@@ -60,6 +60,7 @@ class ThriftPlugin implements Plugin<Project> {
             exec {
               commandLine thrift.wrapperPath, thrift.version,
                   '--gen', 'js:jquery',
+                  '--gen', 'html:standalone',
                   '-out', dest.path, file.path
             }
           }

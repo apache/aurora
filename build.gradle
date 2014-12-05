@@ -143,6 +143,9 @@ project(':api') {
   thriftEntities {
     gsonRev = project.gsonRev
     guavaRev = project.guavaRev
+    inputFiles = fileTree("src/main/thrift/org/apache/aurora/gen").matching {
+      include "**/*.thrift"
+    }
   }
 
   idea {

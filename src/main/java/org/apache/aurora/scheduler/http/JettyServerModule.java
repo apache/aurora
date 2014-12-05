@@ -110,9 +110,6 @@ public class JettyServerModule extends AbstractModule {
       PROPERTY_CONTAINER_REQUEST_FILTERS, GZIPContentEncodingFilter.class.getName(),
       PROPERTY_CONTAINER_RESPONSE_FILTERS, GZIPContentEncodingFilter.class.getName());
 
-  private static final String ENTITIES_HELP_ROOT = Resource
-      .newClassPathResource("org/apache/aurora/scheduler/storage/entities/help")
-      .toString();
   private static final String API_CLIENT_ROOT = Resource
       .newClassPathResource("org/apache/aurora/scheduler/gen/client")
       .toString();
@@ -267,19 +264,12 @@ public class JettyServerModule extends AbstractModule {
                   ImmutableMap.of("methods", HttpMethod.GET));
 
               bind(DefaultServlet.class).in(Singleton.class);
-              serve("/assets*")
+              serve("/assets", "/assets/*")
                   .with(DefaultServlet.class, ImmutableMap.of(
                       "resourceBase", STATIC_ASSETS_ROOT,
                       "dirAllowed", "false"));
 
-              serve("/apihelp/*")
-                  .with(ApiHelpResourceServlet.class, ImmutableMap.<String, String>builder()
-                      .put("resourceBase", ENTITIES_HELP_ROOT)
-                      .put("pathInfoOnly", "true")
-                      .put("dirAllowed", "false")
-                      .build());
-
-              serve("/apiclient/*")
+              serve("/apiclient", "/apiclient/*")
                   .with(ApiClientServlet.class, ImmutableMap.<String, String>builder()
                       .put("resourceBase", API_CLIENT_ROOT)
                       .put("pathInfoOnly", "true")
