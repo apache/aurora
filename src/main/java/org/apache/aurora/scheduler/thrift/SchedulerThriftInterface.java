@@ -780,21 +780,15 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
           cronJobKilled = false;
         }
 
-        final boolean tasksKilled = storage.write(new MutateWork.Quiet<Boolean>() {
-          @Override
-          public Boolean apply(MutableStoreProvider storeProvider) {
-            boolean match = false;
-            for (String taskId : Tasks.ids(tasks)) {
-              match |= stateManager.changeState(
-                  storeProvider,
-                  taskId,
-                  Optional.<ScheduleStatus>absent(),
-                  ScheduleStatus.KILLING,
-                  killedByMessage(context.getIdentity()));
-            }
-            return match;
-          }
-        });
+        boolean tasksKilled = false;
+        for (String taskId : Tasks.ids(tasks)) {
+          tasksKilled |= stateManager.changeState(
+              storeProvider,
+              taskId,
+              Optional.<ScheduleStatus>absent(),
+              ScheduleStatus.KILLING,
+              killedByMessage(context.getIdentity()));
+        }
 
         return cronJobKilled || tasksKilled
             ? okEmptyResponse()
