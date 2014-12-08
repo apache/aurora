@@ -227,10 +227,10 @@ class AuroraCommand(AbstractClass):
     """Returns the command name"""
 
 
-class CommandLine(object):
+class CommandLine(AbstractClass):
   """The top-level object implementing a command-line application."""
 
-  @property
+  @abstractproperty
   def name(self):
     """Returns the name of this command-line tool"""
 
@@ -312,6 +312,7 @@ class CommandLine(object):
     result.append("\nRun 'help noun' or 'help noun verb' for help about a specific command")
     return "\n".join(result)
 
+  @abstractmethod
   def register_nouns(self):
     """This method should overridden by applications to register the collection of nouns
     that they can manipulate.
