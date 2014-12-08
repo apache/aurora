@@ -20,14 +20,8 @@ python_binary(
   ],
 )
 
-python_binary(
-  name='aurora2_so',
-  entry_point = 'apache.aurora.client.cli.standalone_client:proxy_main',
-  dependencies = [
-    ':client_lib'
-  ]
-)
 
+# TODO(wfarner): Remove this along with the rest of the v1 client code.
 python_library(
   name = 'bridge',
   sources = ['bridge.py']
@@ -49,6 +43,7 @@ python_library(
   name='cli',
   sources = [
     '__init__.py',
+    'client.py',
     'config.py',
     'context.py',
     'command_hooks.py',
@@ -57,7 +52,6 @@ python_library(
     'logsetup.py',
     'options.py',
     'quota.py',
-    'standalone_client.py',
     'sla.py',
     'task.py',
     'update.py',
