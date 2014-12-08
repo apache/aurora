@@ -49,7 +49,6 @@ python_library(
     'command_hooks.py',
     'cron.py',
     'jobs.py',
-    'logsetup.py',
     'options.py',
     'quota.py',
     'sla.py',
@@ -58,6 +57,7 @@ python_library(
   ],
   dependencies = [
     '3rdparty/python:requests',
+    '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.python',
     '3rdparty/python:twitter.common.quantity',
     'src/main/python/apache/aurora/client/api:command_runner',

@@ -31,19 +31,16 @@ For example:
 from __future__ import print_function
 
 import argparse
-import getpass
 import logging
 import sys
 import traceback
 from abc import abstractmethod, abstractproperty
-from uuid import uuid1
 from zipfile import BadZipfile
 
 from twitter.common.lang import AbstractClass
 from twitter.common.python.pex import PexInfo
 
 from .command_hooks import GlobalCommandHookRegistry
-from .logsetup import TRANSCRIPT
 from .options import CommandOption
 
 # Constants for standard return codes.
@@ -59,31 +56,10 @@ EXIT_TIMEOUT = 9
 EXIT_API_ERROR = 10
 EXIT_UNKNOWN_ERROR = 20
 
-
-# Set up a logging call that adds a unique identifier for this invocation
-# of the client. Log messages sent via this call will contain two additional
-# fields in the log record: "clientid", which contains a UUID for the client
-# invocation, and "user", which contains the username of the user who invoked
-# the client.
-
-LOGGER_NAME = "aurora_client"
-logger = logging.getLogger(LOGGER_NAME)
-CLIENT_ID = uuid1()
-
-
 # A location where you can find a site-specific file containing
 # global hook skip rules. This can be something like a link into a file stored in a git
 # repos.
 GLOBAL_HOOK_SKIP_RULES_URL = None
-
-
-def print_aurora_log(sev, msg, *args, **kwargs):
-  extra = kwargs.get("extra", {})
-  extra["clientid"] = CLIENT_ID
-  extra["user"] = getpass.getuser()
-  extra["logger_name"] = LOGGER_NAME
-  kwargs["extra"] = extra
-  logger.log(sev, msg, *args, **kwargs)
 
 
 def get_client_version():
@@ -108,7 +84,6 @@ class Context(object):
 
   def __init__(self):
     self._options = None
-    self.logging_level = None
 
   @classmethod
   def exit(cls, code, msg):
@@ -143,15 +118,6 @@ class Context(object):
     lines = msg.split("\n")
     for line in lines:
       print("%s%s" % (indent_str, line), file=sys.stderr)
-
-  def print_log(self, severity, msg, *args, **kwargs):
-    """Print a message to a log.
-    Logging with this method is intended for generating output for aurora developers/maintainers.
-    Log output isn't for users - information much more detailed than users want may be logged.
-    Logs generated for clients of a cluster may be gathered in a centralized database by the
-    aurora admins for that cluster.
-    """
-    print_aurora_log(severity, msg, *args, **kwargs)
 
 
 class ConfigurationPlugin(AbstractClass):
@@ -378,7 +344,7 @@ class CommandLine(AbstractClass):
       try:
         plugin.after_execution(context, result)
       except ConfigurationPlugin.Error as e:
-        print_aurora_log(logging.INFO, "Error executing post-execution plugin: %s", e.msg)
+        logging.info("Error executing post-execution plugin: %s", e.msg)
 
   def _execute(self, args):
     """Execute a command.
@@ -393,7 +359,7 @@ class CommandLine(AbstractClass):
     if args[0] == "help":
       return self.help_cmd(args[1:])
     noun, context = self._parse_args(args)
-    print_aurora_log(TRANSCRIPT, "Command=(%s)", args)
+    logging.debug("Command=(%s)", args)
     pre_result = self._run_pre_hooks_and_plugins(context, args)
     if pre_result is not EXIT_OK:
       return pre_result
@@ -401,15 +367,14 @@ class CommandLine(AbstractClass):
       result = noun.execute(context)
       assert result is not None, "Noun return value is None!"
       if result == EXIT_OK:
-        print_aurora_log(TRANSCRIPT, "Command terminated successfully")
+        logging.debug("Command terminated successfully")
         GlobalCommandHookRegistry.run_post_hooks(context, context.options.noun,
             context.options.verb, result)
       else:
-        print_aurora_log(logging.INFO, "Command terminated with error code %s", result)
+        logging.info("Command terminated with error code %s", result)
       self._run_post_plugins(context, result)
       return result
     except Context.CommandError as c:
-      print_aurora_log(logging.INFO, "Error executing command: %s", c.msg)
       self.print_err("Error executing command: %s" % c.msg)
       return c.code
     except Exception:
@@ -421,10 +386,10 @@ class CommandLine(AbstractClass):
     try:
       return self._execute(args)
     except KeyboardInterrupt:
-      print_aurora_log(logging.ERROR, "Command interrupted by user")
+      logging.error("Command interrupted by user")
       return EXIT_INTERRUPTED
     except Exception as e:
-      print_aurora_log(logging.ERROR, "Unknown error: %s" % e)
+      logging.error("Unknown error: %s" % e)
       return EXIT_UNKNOWN_ERROR
 
 

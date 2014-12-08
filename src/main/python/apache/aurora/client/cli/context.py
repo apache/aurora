@@ -29,7 +29,6 @@ from apache.aurora.client.cli import (
     EXIT_INVALID_CONFIGURATION,
     EXIT_INVALID_PARAMETER
 )
-from apache.aurora.client.cli.logsetup import TRANSCRIPT
 from apache.aurora.client.config import get_config
 from apache.aurora.client.factory import make_client
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -91,7 +90,7 @@ class AuroraCommandContext(Context):
       # TODO(mchucarroll): pull request to pystachio, to make it possible to log the loaded
       # file without double-reading.
       with open(config_file, "r") as fp:
-        self.print_log(TRANSCRIPT, "Config: %s" % fp.readlines())
+        logging.debug("Config: %s" % fp.readlines())
       bindings = bindings_to_list(self.options.bindings) if self.options.bindings else None
       result = get_config(
         jobname,
@@ -141,10 +140,8 @@ class AuroraCommandContext(Context):
     if resp.responseCode != ResponseCode.OK:
       for m in resp.details:
         self.print_err("\t%s" % m.message)
-        self.print_log(TRANSCRIPT, "Message from scheduler: %s" % m.message)
-    if resp.details is not None:
-      for m in resp.details:
-        self.print_log(logging.INFO, "Message from scheduler: %s" % m.message)
+    else:
+      logging.info(combine_messages(resp))
 
   def check_and_log_response(self, resp, err_code=EXIT_API_ERROR, err_msg=None):
     if resp.responseCode != ResponseCode.OK:

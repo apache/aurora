@@ -491,8 +491,6 @@ class RestartCommand(Verb):
     if context.options.max_total_failures < 0:
       context.print_err("max_total_failures option must be >0, but you specified %s" %
           context.options.max_total_failures)
-      context.print_log(logging.INFO, "Error: max_total_failures option=%s" %
-          context.options.max_total_failures)
       return EXIT_INVALID_PARAMETER
 
     job = context.options.instance_spec.jobkey
@@ -614,7 +612,7 @@ class StatusCommand(Verb):
     for jk in jobkeys:
       job_tasks = context.get_job_status(jk)
       if job_tasks is None or job_tasks is []:
-        context.print_log(logging.INFO, "No tasks were found for jobkey %s" % jk)
+        logging.info("No tasks were found for jobkey %s" % jk)
         continue
       active_tasks = sorted([t for t in job_tasks if is_active(t)],
                             key=lambda task: task.assignedTask.instanceId)

@@ -16,54 +16,39 @@ from __future__ import print_function
 import logging
 import sys
 
+from twitter.common.log.formatters.plain import PlainFormatter
+
 from apache.aurora.client.cli import CommandLine, ConfigurationPlugin
-from apache.aurora.client.cli.logsetup import setup_default_log_handlers
 from apache.aurora.client.cli.options import CommandOption
 
 
 class AuroraLogConfigurationPlugin(ConfigurationPlugin):
   """Plugin for configuring log level settings for the aurora client."""
 
-  def __init__(self):
-    super(AuroraLogConfigurationPlugin, self).__init__()
-    self.logging_level = None
-
   def get_options(self):
     return [
-        CommandOption("--verbose-logging", "-v", default=False, action="store_true",
-          help=("Show verbose logging, including all logs up to level INFO (equivalent to "
-              "--logging-level=20)")),
-        CommandOption("--logging-level", default=None, type=int, metavar="numeric_level",
-          help="Set logging to a specific numeric level, using the standard python log-levels.")
+      CommandOption("--verbose",
+                    "-v",
+                    default=False,
+                    action="store_true",
+                    help=("Show verbose output"))
     ]
 
   def before_dispatch(self, raw_args):
-    # We need to process the loglevel arguments before dispatch, so that we can
-    # do logging during dispatch. That means that we need to cheat, and manually
-    # check for the logging arguments. (We still register them in get_options,
-    # so that they'll show up in the help message.)
-    loglevel = logging.WARN
+    #TODO(zmanji): Consider raising the default log level to WARN.
+    loglevel = logging.INFO
     for arg in raw_args:
-      if arg == "--verbose-logging" or arg == "-v":
-        if loglevel > logging.INFO:
-          loglevel = logging.INFO
-      if arg.startswith("--logging-level="):
-        arg_bits = arg.split("=")
-        # If the format here is wrong, argparse will generate error, so we just skip
-        # it if it's incorrect.
-        if len(arg_bits) == 2:
-          try:
-            loglevel = int(arg_bits[1])
-          except ValueError:
-            print("Invalid value for log level; must be an integer, but got %s" % arg_bits[1],
-                file=sys.stderr)
-            raise
-    setup_default_log_handlers(loglevel)
-    self.logging_level = loglevel
+      if arg == "--verbose" or arg == "-v":
+        loglevel = logging.DEBUG
+
+    logging.getLogger().setLevel(loglevel)
+    handler = logging.StreamHandler()
+    handler.setFormatter(PlainFormatter())
+    logging.getLogger().addHandler(handler)
     return raw_args
 
   def before_execution(self, context):
-    context.logging_level = self.logging_level
+    pass
 
   def after_execution(self, context, result_code):
     pass

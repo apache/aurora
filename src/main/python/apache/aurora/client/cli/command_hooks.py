@@ -235,8 +235,7 @@ class GlobalCommandHookRegistry(object):
     for desired_skip in desired_skips:
       if not any(rule.allow_hook_skip(desired_skip, user, noun, verb, context.args)
           for name, rule in cls.SKIP_HOOK_RULES.items()):
-        context.print_log(logging.INFO, "Hook %s cannot be skipped by user %s" %
-            (desired_skip, user))
+        logging.info("Hook %s cannot be skipped by user %s" % (desired_skip, user))
         raise context.CommandError(EXIT_PERMISSION_VIOLATION,
             "Hook %s cannot be skipped by user %s" % (desired_skip, user))
     selected_hook_names = set(selected_hook_names) - desired_skips
@@ -258,13 +257,11 @@ class GlobalCommandHookRegistry(object):
       for hook in pre_hooks:
         result = hook.pre_command(noun, verb, context, context.args)
         if result != 0:
-          context.print_log(logging.INFO, "Command hook %s aborted operation with error code %s" %
-              (hook.name, result))
-          context.print_out("Command aborted by command hook %s" % hook.name)
+          context.print_out("Command aborted by command hook %s with error code %s"
+                            % (hook.name, result))
           return result
       return 0
     except CommandHook.Error as c:
-      context.print_log(logging.INFO, "Error executing command hook %s: %s" % (hook.name, c))
       context.print_err("Error executing command hook %s: %s; aborting" % hook.name, c.msg)
       return c.code
 
@@ -277,7 +274,6 @@ class GlobalCommandHookRegistry(object):
         hook.post_command(noun, verb, context, context.args, result)
         return 0
     except CommandHook.Error as c:
-      context.print_log(logging.INFO, "Error executing post-command hook %s: %s" % (hook.name, c))
       context.print_err("Error executing command hook %s: %s; aborting" % hook.name, c.msg)
       return c.code
 

@@ -17,13 +17,13 @@ python_test_suite(
   dependencies = [
     ':api',
     ':bridge',
+    ':client',
     ':command_hooks',
     ':cron',
     ':help',
     ':inspect',
     ':job',
     ':config',
-    ':logging',
     ':plugins',
     ':quota',
     ':sla',
@@ -88,18 +88,6 @@ python_tests(
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
     'src/test/python/apache/aurora/client/commands:util'
-  ]
-)
-
-python_tests(
-  name = 'logging',
-  sources = [ 'test_logging.py' ],
-  dependencies = [
-    ':util',
-    '3rdparty/python:mock',
-    '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
   ]
 )
 
@@ -237,5 +225,13 @@ python_tests(
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
     'src/test/python/apache/aurora/client/commands:util'
+  ]
+)
+
+python_tests(
+  name = 'client',
+  sources = [ 'test_client.py' ],
+  dependencies = [
+    'src/main/python/apache/aurora/client/cli',
   ]
 )
