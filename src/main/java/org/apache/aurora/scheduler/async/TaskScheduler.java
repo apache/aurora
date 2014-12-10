@@ -202,7 +202,7 @@ public interface TaskScheduler extends EventSubscriber {
     }
 
     @Timed("task_schedule_attempt_locked")
-    private boolean scheduleTask(MutableStoreProvider store, String taskId) {
+    protected boolean scheduleTask(MutableStoreProvider store, String taskId) {
       LOG.fine("Attempting to schedule task " + taskId);
       final ITaskConfig task = Iterables.getOnlyElement(
           Iterables.transform(
