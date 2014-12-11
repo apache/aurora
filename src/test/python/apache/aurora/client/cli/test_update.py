@@ -13,7 +13,6 @@
 #
 import contextlib
 import functools
-import unittest
 
 import pytest
 from mock import create_autospec, Mock, patch
@@ -27,7 +26,6 @@ from apache.aurora.client.cli import Context, EXIT_INVALID_CONFIGURATION, EXIT_O
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.jobs import UpdateCommand
 from apache.aurora.client.cli.options import TaskInstanceKey
-from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext, IOMock, mock_verb_options
@@ -50,33 +48,56 @@ from gen.apache.aurora.api.ttypes import (
 )
 
 
-class TestJobUpdateCommand(unittest.TestCase):
+class TestJobUpdateCommand(AuroraClientCommandTest):
+
+  def setUp(self):
+    self._command = UpdateCommand()
+    self._mock_options = mock_verb_options(self._command)
+    self._mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [])
+    self._mock_options.force = True
+    self._fake_context = FakeAuroraCommandContext()
+    self._fake_context.set_options(self._mock_options)
+    self._mock_api = self._fake_context.get_api("test")
+
+  @classmethod
+  def create_mock_config(cls, is_cron=False):
+    mock_config = create_autospec(spec=AuroraConfig, spec_set=True, instance=True)
+    mock_raw_config = Mock()
+    mock_raw_config.has_cron_schedule.return_value = is_cron
+    mock_config.raw = Mock(return_value=mock_raw_config)
+    return mock_config
 
   def test_update_with_lock(self):
-    command = UpdateCommand()
-
-    jobkey = AuroraJobKey("cluster", "role", "env", "job")
-    mock_options = mock_verb_options(command)
-    mock_options.instance_spec = TaskInstanceKey(jobkey, [])
-    mock_options.force = True
-
-    fake_context = FakeAuroraCommandContext()
-    fake_context.set_options(mock_options)
-
-    mock_config = create_autospec(spec=AuroraConfig, spec_set=True, instance=True)
-    fake_context.get_job_config = Mock(return_value=mock_config)
-
-    mock_api = fake_context.get_api("test")
-    mock_api.update_job.return_value = AuroraClientCommandTest.create_blank_response(
-      ResponseCode.LOCK_ERROR, "Error.")
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+    self._mock_api.update_job.return_value = AuroraClientCommandTest.create_blank_response(
+        ResponseCode.LOCK_ERROR, "Error.")
 
     with pytest.raises(Context.CommandError):
-      command.execute(fake_context)
+      self._command.execute(self._fake_context)
 
-    mock_api.update_job.assert_called_once_with(mock_config,
-      mock_options.healthcheck_interval_seconds,
-      mock_options.instance_spec.instance)
-    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
+    self._mock_api.update_job.assert_called_once_with(
+      mock_config,
+      self._mock_options.healthcheck_interval_seconds,
+      self._mock_options.instance_spec.instance)
+    assert self._fake_context.get_err()[0] == self._fake_context.LOCK_ERROR_MSG
+
+  def test_update_print_error_once(self):
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+    error = "Error printed once."
+    self._mock_api.update_job.return_value = AuroraClientCommandTest.create_blank_response(
+        ResponseCode.INVALID_REQUEST,
+        error)
+
+    with pytest.raises(Context.CommandErrorLogged):
+      self._command.execute(self._fake_context)
+
+    self._mock_api.update_job.assert_called_once_with(
+      mock_config,
+      self._mock_options.healthcheck_interval_seconds,
+      self._mock_options.instance_spec.instance)
+    assert self._fake_context.get_err() == ["Update failed due to error:", "\t%s" % error]
 
 
 class TestUpdateCommand(AuroraClientCommandTest):

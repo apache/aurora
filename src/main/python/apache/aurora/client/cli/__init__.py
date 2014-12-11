@@ -82,6 +82,10 @@ class Context(object):
       self.msg = msg
       self.code = code
 
+  class CommandErrorLogged(CommandError):
+    def __init__(self, code, msg):
+      super(Context.CommandErrorLogged, self).__init__(code, msg)  # noqa:T800
+
   def __init__(self):
     self._options = None
 
@@ -374,6 +378,8 @@ class CommandLine(AbstractClass):
         logging.info("Command terminated with error code %s", result)
       self._run_post_plugins(context, result)
       return result
+    except Context.CommandErrorLogged as c:
+      return c.code
     except Context.CommandError as c:
       self.print_err("Error executing command: %s" % c.msg)
       return c.code

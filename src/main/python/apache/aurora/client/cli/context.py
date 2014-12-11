@@ -152,7 +152,7 @@ class AuroraCommandContext(Context):
       self.print_err(err_msg)
     self.log_response(resp)
     if resp.responseCode != ResponseCode.OK:
-      raise self.CommandError(err_code, err_msg)
+      raise self.CommandErrorLogged(err_code, err_msg)
 
   @classmethod
   def parse_partial_jobkey(cls, key):
