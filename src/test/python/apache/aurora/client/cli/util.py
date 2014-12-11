@@ -135,7 +135,6 @@ class AuroraClientCommandTest(unittest.TestCase):
     mock_scheduler = create_autospec(spec=SchedulerThriftApiSpec, instance=True)
     mock_scheduler.url = "http://something_or_other"
     mock_scheduler_client = create_autospec(spec=SchedulerProxyApiSpec, instance=True)
-    #mock_scheduler_client.scheduler.return_value = mock_scheduler
     mock_scheduler_client.url = "http://something_or_other"
     mock_api = create_autospec(spec=HookedAuroraClientAPI, instance=True)
     mock_api.scheduler_proxy = mock_scheduler_client
@@ -296,6 +295,11 @@ jobs = [HELLO_WORLD]
       zk='zookeeper.example.com',
       scheduler_zk_path='/foo/bar',
       auth_mechanism='UNAUTHENTICATED')])
+
+  @classmethod
+  def get_instance_spec(cls, instances_spec):
+    """Create a job instance spec string"""
+    return '%s/%s' % (cls.TEST_JOBSPEC, instances_spec)
 
   @classmethod
   def get_test_config(cls, base, cluster, role, env, job, filler=''):

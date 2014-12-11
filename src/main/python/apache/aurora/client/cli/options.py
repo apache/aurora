@@ -196,7 +196,7 @@ def instance_specifier(spec_str):
   return TaskInstanceKey(jobkey, instances)
 
 
-BATCH_OPTION = CommandOption('--batch-size', type=int, default=5,
+BATCH_OPTION = CommandOption('--batch-size', type=int, default=1,
         help='Number of instances to be operate on in one iteration')
 
 
