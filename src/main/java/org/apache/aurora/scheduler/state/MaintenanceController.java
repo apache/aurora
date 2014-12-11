@@ -41,6 +41,7 @@ import org.apache.aurora.scheduler.storage.Storage.MutateWork;
 import org.apache.aurora.scheduler.storage.Storage.StoreProvider;
 import org.apache.aurora.scheduler.storage.Storage.Work;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
 import static java.util.Objects.requireNonNull;
 
@@ -160,8 +161,13 @@ public interface MaintenanceController {
                 store.getAttributeStore().getHostAttributes(host);
             if (attributes.isPresent() && attributes.get().getMode() == DRAINING) {
               Query.Builder builder = Query.slaveScoped(host).active();
-              if (store.getTaskStore().fetchTasks(builder).isEmpty()) {
+              Set<IScheduledTask> activeTasks = store.getTaskStore().fetchTasks(builder);
+              if (activeTasks.isEmpty()) {
+                LOG.info(String.format("Moving host %s into DRAINED", host));
                 setMaintenanceMode(store, ImmutableSet.of(host), DRAINED);
+              } else {
+                LOG.info(
+                    String.format("Host %s is DRAINING with active tasks: %s", host, activeTasks));
               }
             }
           }
