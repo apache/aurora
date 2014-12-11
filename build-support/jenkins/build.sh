@@ -20,6 +20,13 @@ date
 # Run all Java tests
 ./gradlew -Pq clean build
 
+# Pre-fetch python dependencies. This is to avoid build flakiness introduced by
+# the resolver used in pants.
+export PIP_DEFAULT_TIMEOUT=60
+mkdir -p third_party
+# We omit mesos.native here since we don't actually build or use it in our unit tests.
+pip install -d third_party -r <(grep -v mesos.native 3rdparty/python/requirements.txt)
+
 # Run all Python tests
 # Setting the timeout value to 1 minute ensures package fetches from PyPI do not
 # fail on Apache Jenkins.
