@@ -79,9 +79,7 @@ class TestHostMaintenance(unittest.TestCase):
         Response(
             responseCode=ResponseCode.OK,
             result=Result(maintenanceStatusResult=MaintenanceStatusResult(set([
-                HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.DRAINED),
-                HostStatus(host=TEST_HOSTNAMES[1], mode=MaintenanceMode.DRAINED),
-                HostStatus(host=TEST_HOSTNAMES[2], mode=MaintenanceMode.DRAINED)
+                HostStatus(host=TEST_HOSTNAMES[0], mode=MaintenanceMode.DRAINED)
             ]))))]
 
     fake_maintenance_status_call_args = []
@@ -103,7 +101,7 @@ class TestHostMaintenance(unittest.TestCase):
         (Hosts(set(TEST_HOSTNAMES))),
         (Hosts(set(TEST_HOSTNAMES))),
         (Hosts(set(TEST_HOSTNAMES))),
-        (Hosts(set(TEST_HOSTNAMES)))]
+        (Hosts(set([TEST_HOSTNAMES[0]])))]
 
   @mock.patch("apache.aurora.client.api.AuroraClientAPI.maintenance_status",
               spec=AuroraClientAPI.maintenance_status)

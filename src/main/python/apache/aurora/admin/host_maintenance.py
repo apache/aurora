@@ -51,18 +51,6 @@ class HostMaintenance(object):
     self._client = AuroraClientAPI(cluster, verbosity == 'verbose')
     self._wait_event = wait_event or Event()
 
-  def check_if_drained(self, hostnames):
-    """Checks if host names reached DRAINED status.
-
-    :param hostnames: Host names to check for DRAINED status
-    :type hostnames: list of strings
-    :rtype: set of host names not in DRAINED state
-    """
-    statuses = self.check_status(hostnames)
-    not_ready_hostnames = [h[0] for h in statuses if h[1] != 'DRAINED']
-    log.info('Waiting for hosts to be in DRAINED: %s' % not_ready_hostnames)
-    return set(not_ready_hostnames)
-
   def _drain_hosts(self, drainable_hosts):
     """"Drains tasks from the specified hosts.
 
@@ -79,9 +67,11 @@ class HostMaintenance(object):
     total_wait = self.STATUS_POLL_INTERVAL
     not_drained_hostnames = set(drainable_hostnames)
     while not self._wait_event.is_set() and not_drained_hostnames:
+      log.info('Waiting for hosts to be in DRAINED: %s' % not_drained_hostnames)
       self._wait_event.wait(self.STATUS_POLL_INTERVAL.as_(Time.SECONDS))
 
-      not_drained_hostnames = self.check_if_drained(drainable_hostnames)
+      statuses = self.check_status(list(not_drained_hostnames))
+      not_drained_hostnames = set([h[0] for h in statuses if h[1] != 'DRAINED'])
 
       total_wait += self.STATUS_POLL_INTERVAL
       if not_drained_hostnames and total_wait > self.MAX_STATUS_WAIT:
