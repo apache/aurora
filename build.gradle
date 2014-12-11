@@ -17,6 +17,7 @@ plugins {
   id 'com.eriwen.gradle.js' version '1.12.1'
   id 'com.github.ben-manes.versions' version '0.5'
   id 'com.github.hierynomus.license' version '0.11.0'
+  id 'me.champeau.gradle.jmh' version '0.1.3'
 }
 
 apply plugin: 'application'
@@ -154,6 +155,9 @@ project(':api') {
         sourceDirs += it
         generatedSourceDirs += it
       }
+
+      scopes.COMPILE.plus += [parent.configurations.jmh]
+
       // These directories must exist, else the plugin omits them from the
       // generated project. Since this is executed during the configuration
       // lifecycle phase, dependency tasks have not yet run and created
@@ -317,7 +321,7 @@ codeQualityTasks.each {
 }
 
 checkstyle {
-  sourceSets = [sourceSets.main , sourceSets.test]
+  sourceSets = [sourceSets.main , sourceSets.test, sourceSets.jmh]
 }
 
 tasks.withType(FindBugs) {
@@ -434,6 +438,20 @@ task analyzeReport(type: CoverageReportCheck) {
   legacyClassesWithoutCoverage = file('config/legacy_untested_classes.txt').readLines()
 }
 jacocoTestReport.finalizedBy analyzeReport
+
+def jmhHumanOutputPath = "$buildDir/reports/jmh/human.txt"
+jmh {
+  humanOutputFile = project.file("$jmhHumanOutputPath")
+  resultsFile = project.file("$buildDir/reports/jmh/results.txt")
+
+  // JMH run configuration parameters.
+  iterations = 3
+  fork = 1
+  warmupIterations = 1
+}
+tasks.getByName('jmh').doLast() {
+  println "Benchmark report generated: file://$jmhHumanOutputPath"
+}
 
 run {
   main = 'org.apache.aurora.scheduler.app.local.LocalSchedulerMain'

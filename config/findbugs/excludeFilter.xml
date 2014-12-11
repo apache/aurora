@@ -19,6 +19,8 @@ limitations under the License.
       <Package name="org.apache.aurora.gen.comm" />
       <Package name="org.apache.aurora.gen.storage" />
       <Package name="org.apache.aurora.gen.test" />
+      <Package name="org.apache.aurora.benchmark.generated" />
+      <Package name="org.openjdk.jmh.infra.generated" />
       <!-- Un-namespaced structs used by the executor. -->
       <Class name="ProcessState" />
       <Class name="ProcessStatus" />
@@ -31,6 +33,7 @@ limitations under the License.
       <Bug pattern="CN_IDIOM" />
       <Bug pattern="DLS_DEAD_LOCAL_STORE" />
       <Bug pattern="NM_CLASS_NAMING_CONVENTION" />
+      <Bug pattern="UUF_UNUSED_FIELD" />
     </Or>
   </Match>
 
