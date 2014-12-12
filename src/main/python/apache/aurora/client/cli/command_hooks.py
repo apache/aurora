@@ -21,11 +21,11 @@ import getpass
 import logging
 import os
 import sys
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 from fnmatch import fnmatch
 
 import requests
-from twitter.common.lang import Compatibility
+from twitter.common.lang import AbstractClass, Compatibility
 
 from apache.aurora.client.cli.options import CommandOption
 
@@ -278,7 +278,7 @@ class GlobalCommandHookRegistry(object):
       return c.code
 
 
-class CommandHook(object):
+class CommandHook(AbstractClass):
   """A hook which contains code that should be run before certain commands."""
   class Error(Exception):
     def __init__(self, code, msg):
@@ -286,9 +286,9 @@ class CommandHook(object):
       self.code = code
       self.msg = msg
 
-  @property
+  @abstractproperty
   def name(self):
-    return None
+    "The name of the hook."
 
   @abstractmethod
   def get_nouns(self):

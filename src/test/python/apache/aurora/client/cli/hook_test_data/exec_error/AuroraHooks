@@ -21,6 +21,9 @@ class DynamicHook(CommandHook):
     self.ran_pre = False
     self.ran_post = False
 
+  def name(self):
+    return "dynamic-hook"
+
   def get_nouns(self):
     return ['job']
 
