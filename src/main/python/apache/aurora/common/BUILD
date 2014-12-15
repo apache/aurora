@@ -59,6 +59,14 @@ python_library(
 )
 
 python_library(
+  name = 'pex_version',
+  sources = ['pex_version.py'],
+  dependencies = [
+    '3rdparty/python:twitter.common.python',
+  ]
+)
+
+python_library(
   name = 'shellify',
   sources = ['shellify.py'],
   dependencies = [
@@ -82,6 +90,7 @@ python_library(
     ':cluster',
     ':cluster_option',
     ':clusters',
+    ':pex_version',
     ':http_signaler',
     ':shellify',
     ':transport',

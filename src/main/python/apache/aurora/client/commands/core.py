@@ -25,10 +25,8 @@ import sys
 import time
 from datetime import datetime
 from tempfile import NamedTemporaryFile
-from zipfile import BadZipfile
 
 from twitter.common import app, log
-from twitter.common.python.pex import PexInfo
 
 from apache.aurora.client.api.disambiguator import LiveJobDisambiguator
 from apache.aurora.client.api.job_monitor import JobMonitor
@@ -62,6 +60,7 @@ from apache.aurora.client.options import (
     WAIT_UNTIL_OPTION
 )
 from apache.aurora.common.aurora_job_key import AuroraJobKey
+from apache.aurora.common.pex_version import pex_version, UnknownVersion
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME, CURRENT_API_VERSION
 from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
@@ -154,19 +153,15 @@ _BUILD_INFO_HEADER = "Aurora client build info:"
 _NO_BUILD_INFO_MESSAGE = "Aurora client build info not available"
 
 
-def _version(_argv=sys.argv, _print=print, _from_pex=PexInfo.from_pex):
+def _version(_argv=sys.argv, _print=print, _pex_version=pex_version):
   try:
-    properties = _from_pex(_argv[0]).build_properties
-    # Different versions of pants/pex set different keys in the PEX-INFO file. This approach
-    # attempts to work regardless of the pants/pex version used.
-    build_sha = properties.get('sha', properties.get('revision'))
-    build_date = properties.get('date', properties.get('datetime'))
+    build_sha, build_date = _pex_version(_argv[0])
 
     _print(_BUILD_INFO_HEADER)
     _print("\tsha: %s" % build_sha)
     _print("\tdate: %s" % build_date)
 
-  except (AttributeError, IOError, OSError, BadZipfile):
+  except UnknownVersion:
     _print(_NO_BUILD_INFO_MESSAGE)
   _print(_API_VERSION_MESSAGE)
 

@@ -20,6 +20,7 @@ python_test_suite(
     ':test_clusters',
     ':test_cluster_option',
     ':test_http_signaler',
+    ':test_pex_version',
     ':test_shellify',
     ':test_transport',
   ]
@@ -30,6 +31,15 @@ python_tests(name = 'test_aurora_job_key',
   dependencies = [
     'src/main/python/apache/aurora/common:aurora_job_key'
   ],
+)
+
+python_tests(
+  name = 'test_pex_version',
+  sources = ['test_pex_version.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/common:pex_version',
+  ]
 )
 
 python_tests(

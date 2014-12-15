@@ -35,10 +35,10 @@ import logging
 import sys
 import traceback
 from abc import abstractmethod, abstractproperty
-from zipfile import BadZipfile
 
 from twitter.common.lang import AbstractClass
-from twitter.common.python.pex import PexInfo
+
+from apache.aurora.common.pex_version import pex_version, UnknownVersion
 
 from .command_hooks import GlobalCommandHookRegistry
 from .options import CommandOption
@@ -64,11 +64,8 @@ GLOBAL_HOOK_SKIP_RULES_URL = None
 
 def get_client_version():
   try:
-    pexpath = sys.argv[0]
-    pex_info = PexInfo.from_pex(pexpath)
-    return ("%s@%s" % (pex_info.build_properties.get("sha", "unknown"),
-        pex_info.build_properties.get("date", "unknown")))
-  except (BadZipfile, IOError, OSError):
+    return "%s@%s" % pex_version(sys.argv[0])
+  except UnknownVersion:
     return "VersionUnknown"
 
 
