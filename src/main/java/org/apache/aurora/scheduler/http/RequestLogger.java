@@ -121,7 +121,7 @@ public class RequestLogger extends AbstractLifeCycle implements RequestLog {
   @Override
   public void log(Request request, Response response) {
     int statusCategory = response.getStatus() / 100;
-    Level level = statusCategory == 2 || statusCategory == 3 ? Level.FINE : Level.INFO;
+    Level level = statusCategory == 2 || statusCategory == 3 ? Level.INFO : Level.WARNING;
     if (!sink.isLoggable(level)) {
       return;
     }

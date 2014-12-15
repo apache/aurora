@@ -65,8 +65,8 @@ public class RequestLoggerTest extends EasyMockTest {
     expect(request.getHeader(HttpHeaders.USER_AGENT)).andReturn("junit");
     expect(request.getTimeStamp()).andReturn(clock.nowMillis()).atLeastOnce();
 
-    expect(sink.isLoggable(Level.FINE)).andReturn(true);
-    sink.log(Level.FINE, "snoopy easymock-test [22/Dec/2009:00:00:00 +0000]"
+    expect(sink.isLoggable(Level.INFO)).andReturn(true);
+    sink.log(Level.INFO, "snoopy easymock-test [22/Dec/2009:00:00:00 +0000]"
         + " \"GET / http\" 200 256 \"-\" \"junit\" 110");
 
     control.replay();
@@ -91,8 +91,8 @@ public class RequestLoggerTest extends EasyMockTest {
     expect(request.getHeader(HttpHeaders.USER_AGENT)).andReturn("junit");
     expect(request.getTimeStamp()).andReturn(clock.nowMillis()).atLeastOnce();
 
-    expect(sink.isLoggable(Level.INFO)).andReturn(true);
-    sink.log(Level.INFO, "woodstock easymock-test [22/Dec/2009:00:00:00 +0000]"
+    expect(sink.isLoggable(Level.WARNING)).andReturn(true);
+    sink.log(Level.WARNING, "woodstock easymock-test [22/Dec/2009:00:00:00 +0000]"
         + " \"POST /data http\" 500 128 \"-\" \"junit\" 500");
 
     control.replay();
