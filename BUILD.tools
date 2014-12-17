@@ -1,0 +1,3 @@
+# TODO(wickman) Remove this once https://github.com/pantsbuild/pants/issues/867 is solved.
+jar_library(name = 'nailgun-server',
+            jars = [jar(org = 'com.martiansoftware', name = 'nailgun-server', rev = '0.9.1')])
