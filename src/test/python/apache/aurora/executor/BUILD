@@ -36,8 +36,6 @@ python_test_suite(
 python_test_suite(
   name = 'executor-large',
   dependencies = [
-    # TODO(jfarrell): AURORA-14 for executor_builds
-    #':executor_builds',
     ':gc_executor',
     ':thermos_executor',
   ]
@@ -131,8 +129,4 @@ python_tests(name = 'executor_vars',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/executor:executor_vars',
   ]
-)
-
-python_tests(name = 'executor_builds',
-  sources = ['test_executor_builds.py'],
 )

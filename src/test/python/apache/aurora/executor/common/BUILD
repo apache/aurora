@@ -19,6 +19,7 @@ python_test_suite(
     ':directory_sandbox',
     ':executor_timeout',
     ':health_checker',
+    ':kill_manager',
     ':status_checker',
     ':task_info',
   ]

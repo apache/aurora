@@ -14,6 +14,7 @@
 
 python_test_suite(name = 'all',
   dependencies = [
+    ':base',
     ':binding_helper',
     ':config',
     'src/test/python/apache/aurora/client/api:all',

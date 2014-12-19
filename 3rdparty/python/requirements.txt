@@ -13,8 +13,6 @@ thrift==0.9.1
 twitter.common.app==0.3.2
 twitter.common.collections==0.3.2
 twitter.common.concurrent==0.3.2
-twitter.common.config==0.3.2
-twitter.common.confluence==0.3.2
 twitter.common.contextutil==0.3.2
 twitter.common.decorators==0.3.2
 twitter.common.dirutil==0.3.2
@@ -31,6 +29,5 @@ twitter.common.recordio==0.3.2
 twitter.common.rpc==0.3.2
 twitter.common.string==0.3.2
 twitter.common.testing==0.3.2
-twitter.common.util==0.3.2
 twitter.common.zookeeper==0.3.2
 watchdog==0.7.0
