@@ -38,7 +38,8 @@ def test_api_methods_exist(method_name):
 
 def test_api_methods_params(method_name):
   cluster = create_autospec(spec=Cluster, instance=True)
-  api = HookedAuroraClientAPI(cluster=cluster)  # cant use mock here; need to inspect methods
+  # cant use mock here; need to inspect methods
+  api = HookedAuroraClientAPI(cluster=cluster, user_agent="test-client")
 
   hooked_method = getattr(api, method_name)
   nonhooked_method = getattr(super(HookedAuroraClientAPI, api), method_name)

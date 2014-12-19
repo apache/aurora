@@ -70,7 +70,7 @@ class TestJobUpdateApis(unittest.TestCase):
 
   @classmethod
   def mock_api(cls):
-    api = AuroraClientAPI(Cluster(name="foo"))
+    api = AuroraClientAPI(Cluster(name="foo"), 'test-client')
     mock_proxy = create_autospec(spec=SchedulerThriftApiSpec, spec_set=True, instance=True)
     api._scheduler_proxy = mock_proxy
     return api, mock_proxy
