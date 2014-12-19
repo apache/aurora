@@ -67,12 +67,13 @@ class SchedulerClient(object):
     if cluster.zk:
       return ZookeeperSchedulerClient(cluster, port=cluster.zk_port, **kwargs)
     elif cluster.scheduler_uri:
-      return DirectSchedulerClient(cluster.scheduler_uri)
+      return DirectSchedulerClient(cluster.scheduler_uri, **kwargs)
     else:
       raise ValueError('"cluster" does not specify zk or scheduler_uri')
 
-  def __init__(self, verbose=False):
+  def __init__(self, user_agent, verbose=False):
     self._client = None
+    self._user_agent = user_agent
     self._verbose = verbose
 
   def get_thrift_client(self):
@@ -85,23 +86,22 @@ class SchedulerClient(object):
   def _connect(self):
     return None
 
-  @classmethod
-  def _connect_scheduler(cls, uri, clock=time):
-    transport = TRequestsTransport(uri)
+  def _connect_scheduler(self, uri, clock=time):
+    transport = TRequestsTransport(uri, user_agent=self._user_agent)
     protocol = TJSONProtocol.TJSONProtocol(transport)
     schedulerClient = AuroraAdmin.Client(protocol)
-    for _ in range(cls.THRIFT_RETRIES):
+    for _ in range(self.THRIFT_RETRIES):
       try:
         transport.open()
         return schedulerClient
       except TTransport.TTransportException:
-        clock.sleep(cls.RETRY_TIMEOUT.as_(Time.SECONDS))
+        clock.sleep(self.RETRY_TIMEOUT.as_(Time.SECONDS))
         continue
       except Exception as e:
         # Monkey-patched proxies, like socks, can generate a proxy error here.
         # without adding a dependency, we can't catch those in a more specific way.
-        raise cls.CouldNotConnect('Connection to scheduler failed: %s' % e)
-    raise cls.CouldNotConnect('Could not connect to %s' % uri)
+        raise self.CouldNotConnect('Connection to scheduler failed: %s' % e)
+    raise self.CouldNotConnect('Could not connect to %s' % uri)
 
 
 class ZookeeperSchedulerClient(SchedulerClient):
@@ -117,8 +117,8 @@ class ZookeeperSchedulerClient(SchedulerClient):
     zk = TwitterKazooClient.make(str('%s:%s' % (cluster.zk, port)), verbose=verbose)
     return zk, ServerSet(zk, cluster.scheduler_zk_path, **kw)
 
-  def __init__(self, cluster, port=2181, verbose=False, _deadline=deadline):
-    SchedulerClient.__init__(self, verbose=verbose)
+  def __init__(self, cluster, port=2181, verbose=False, _deadline=deadline, **kwargs):
+    SchedulerClient.__init__(self, verbose=verbose, **kwargs)
     self._cluster = cluster
     self._zkport = port
     self._endpoint = None
@@ -212,7 +212,7 @@ class SchedulerProxy(object):
   class APIVersionError(Error): pass
   class ThriftInternalError(Error): pass
 
-  def __init__(self, cluster, verbose=False, session_key_factory=make_session_key):
+  def __init__(self, cluster, verbose=False, session_key_factory=make_session_key, **kwargs):
     """A callable session_key_factory should be provided for authentication"""
     self.cluster = cluster
     # TODO(Sathya): Make this a part of cluster trait when authentication is pushed to the transport
@@ -222,6 +222,7 @@ class SchedulerProxy(object):
     self.verbose = verbose
     self._lock = threading.RLock()
     self._terminating = threading.Event()
+    self._kwargs = kwargs
 
   def with_scheduler(method):
     """Decorator magic to make sure a connection is made to the scheduler"""
@@ -259,7 +260,7 @@ class SchedulerProxy(object):
         self._scheduler_client
         self._client
     """
-    self._scheduler_client = SchedulerClient.get(self.cluster, verbose=self.verbose)
+    self._scheduler_client = SchedulerClient.get(self.cluster, verbose=self.verbose, **self._kwargs)
     assert self._scheduler_client, "Could not find scheduler (cluster = %s)" % self.cluster.name
     start = time.time()
     while (time.time() - start) < self.CONNECT_MAXIMUM_WAIT.as_(Time.SECONDS):

@@ -125,6 +125,7 @@ class TestDiffCommand(AuroraClientCommandTest):
             options,
             subprocess_patch,
             json_patch):
+
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
@@ -187,6 +188,7 @@ class TestDiffCommand(AuroraClientCommandTest):
             options,
             subprocess_patch,
             json_patch):
+
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()

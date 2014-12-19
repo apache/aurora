@@ -21,7 +21,7 @@ from fnmatch import fnmatch
 
 from pystachio import Ref
 
-from apache.aurora.client.base import combine_messages, synthesize_url
+from apache.aurora.client.base import AURORA_V2_USER_AGENT_NAME, combine_messages, synthesize_url
 from apache.aurora.client.cli import (
     Context,
     EXIT_API_ERROR,
@@ -79,7 +79,7 @@ class AuroraCommandContext(Context):
     session.
     """
     if cluster not in self.apis:
-      api = make_client(cluster)
+      api = make_client(cluster, AURORA_V2_USER_AGENT_NAME)
       self.apis[cluster] = api
     return self.apis[cluster]
 

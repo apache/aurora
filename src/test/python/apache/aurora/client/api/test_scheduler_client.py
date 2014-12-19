@@ -354,7 +354,9 @@ def test_url_when_not_connected_and_cluster_has_no_proxy_url(scheme):
   service_endpoints = [ServiceInstance.unpack(service_json)]
 
   def make_mock_client(proxy_url):
-    client = scheduler_client.ZookeeperSchedulerClient(Cluster(proxy_url=proxy_url),
+    client = scheduler_client.ZookeeperSchedulerClient(
+        Cluster(proxy_url=proxy_url),
+        user_agent='Some-User-Agent',
         _deadline=lambda x, **kws: x())
     client.get_scheduler_serverset = mock.MagicMock(return_value=(mock_zk, service_endpoints))
     client.SERVERSET_TIMEOUT = Amount(0, Time.SECONDS)
@@ -384,12 +386,28 @@ def test_url_when_not_connected_and_cluster_has_no_proxy_url(scheme):
 def test_connect_scheduler(mock_client):
   mock_client.return_value.open.side_effect = [TTransport.TTransportException, True]
   mock_time = mock.create_autospec(spec=time, instance=True)
-  scheduler_client.SchedulerClient._connect_scheduler(
-      'https://scheduler.example.com:1337',
-      mock_time)
-  assert mock_client.return_value.open.call_count == 2
+
+  client = scheduler_client.SchedulerClient('Some-User-Agent', verbose=True)
+  client._connect_scheduler('https://scheduler.example.com:1337', mock_time)
+
+  assert mock_client.return_value.open.has_calls(mock.call(), mock.call())
   mock_time.sleep.assert_called_once_with(
       scheduler_client.SchedulerClient.RETRY_TIMEOUT.as_(Time.SECONDS))
+
+
+@mock.patch('apache.aurora.client.api.scheduler_client.TRequestsTransport', spec=TRequestsTransport)
+def test_connect_scheduler_with_user_agent(mock_transport):
+  mock_transport.return_value.open.side_effect = [TTransport.TTransportException, True]
+  mock_time = mock.create_autospec(spec=time, instance=True)
+
+  user_agent = 'Some-User-Agent'
+
+  client = scheduler_client.SchedulerClient(user_agent, verbose=True)
+
+  uri = 'https://scheduler.example.com:1337'
+  client._connect_scheduler(uri, mock_time)
+
+  mock_transport.assert_called_once_with(uri, user_agent=user_agent)
 
 
 @mock.patch('apache.aurora.client.api.scheduler_client.SchedulerClient',

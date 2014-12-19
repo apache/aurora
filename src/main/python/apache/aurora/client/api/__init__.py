@@ -48,12 +48,21 @@ class AuroraClientAPI(object):
   class ThriftInternalError(Error): pass
   class UpdateConfigError(Error): pass
 
-  def __init__(self, cluster, verbose=False, session_key_factory=make_session_key):
+  def __init__(
+      self,
+      cluster,
+      user_agent,
+      verbose=False,
+      session_key_factory=make_session_key):
+
     if not isinstance(cluster, Cluster):
       raise TypeError('AuroraClientAPI expects instance of Cluster for "cluster", got %s' %
           type(cluster))
     self._scheduler_proxy = SchedulerProxy(
-        cluster, verbose=verbose, session_key_factory=session_key_factory)
+        cluster,
+        verbose=verbose,
+        session_key_factory=session_key_factory,
+        user_agent=user_agent)
     self._cluster = cluster
 
   @property

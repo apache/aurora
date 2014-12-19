@@ -20,6 +20,8 @@ from urlparse import urljoin
 
 from twitter.common import app, log
 
+from apache.aurora.common.pex_version import pex_version, UnknownVersion
+
 from gen.apache.aurora.api.ttypes import ResponseCode
 
 
@@ -239,3 +241,21 @@ Available commands:
 For more help on an individual command:
     %s help <command>
 """ % (usage, app.name())
+
+
+AURORA_V1_USER_AGENT_NAME = 'Aurora v1'
+AURORA_V2_USER_AGENT_NAME = 'Aurora v2'
+AURORA_ADMIN_USER_AGENT_NAME = 'Aurora Admin'
+
+UNKNOWN_CLIENT_VERSION = 'Unknown Version'
+
+
+def user_agent(agent_name='Aurora'):
+  """Generate a user agent containing the specified agent name and the details of the current
+     client version."""
+  try:
+    build_info = '%s-%s' % pex_version(sys.argv[0])
+  except UnknownVersion:
+    build_info = UNKNOWN_CLIENT_VERSION
+
+  return '%s;%s' % (agent_name, build_info)

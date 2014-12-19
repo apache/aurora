@@ -25,16 +25,24 @@ except ImportError:
   from urllib.parse import urlparse
 
 
+DEFAULT_USER_AGENT = 'Python TRequestsTransport v1.0'
+
+
 def default_requests_session_factory():
   session = requests.session()
-  session.headers['User-Agent'] = 'Python TRequestsTransport v1.0'
   return session
 
 
 class TRequestsTransport(TTransportBase):
   """A Thrift HTTP client based upon the requests module."""
 
-  def __init__(self, uri, auth=None, session_factory=default_requests_session_factory):
+  def __init__(
+      self,
+      uri,
+      auth=None,
+      session_factory=default_requests_session_factory,
+      user_agent=DEFAULT_USER_AGENT):
+
     """Construct a TRequestsTransport.
 
     Construct a Thrift transport based upon the requests module.  URI is the
@@ -46,11 +54,14 @@ class TRequestsTransport(TTransportBase):
     :param uri: The endpoint uri
     :type uri: str
     :keyword auth: The requests authentication context.
+    :keyword session_factory: A callable that returns a requests session.
+    :keyword user_agent: The value to use for the User-Agent header.
     """
-    self.__session = None
+    self._session = None
     self.__session_factory = session_factory
     if not callable(session_factory):
       raise TypeError('session_factory should be a callable that produces a requests.Session!')
+    self.__user_agent = user_agent
     self.__wbuf = BytesIO()
     self.__rbuf = BytesIO()
     self.__uri = uri
@@ -65,13 +76,18 @@ class TRequestsTransport(TTransportBase):
     logging.getLogger('requests').setLevel(logging.WARNING)
 
   def isOpen(self):
-    return self.__session is not None
+    return self._session is not None
 
   def open(self):
-    self.__session = self.__session_factory()
+    session = self.__session_factory()
+    requests_default_agent = requests.utils.default_user_agent()
+    if session.headers.get('User-Agent', requests_default_agent) == requests_default_agent:
+      session.headers['User-Agent'] = self.__user_agent
+
+    self._session = session
 
   def close(self):
-    session, self.__session = self.__session, None
+    session, self._session = self._session, None
     session.close()
 
   def setTimeout(self, ms):
@@ -92,12 +108,12 @@ class TRequestsTransport(TTransportBase):
     data = self.__wbuf.getvalue()
     self.__wbuf = BytesIO()
 
-    self.__session.headers['Content-Type'] = 'application/x-thrift'
-    self.__session.headers['Content-Length'] = str(len(data))
-    self.__session.headers['Host'] = self.__urlparse.hostname
+    self._session.headers['Content-Type'] = 'application/x-thrift'
+    self._session.headers['Content-Length'] = str(len(data))
+    self._session.headers['Host'] = self.__urlparse.hostname
 
     try:
-      response = self.__session.post(
+      response = self._session.post(
           self.__uri,
           data=data,
           timeout=self.__timeout,

@@ -32,6 +32,8 @@ python_library(
     'src/main/python/apache/aurora/admin:util',
     'src/main/python/apache/aurora/client/api',
     'src/main/python/apache/aurora/client:base',
+    'src/main/python/apache/aurora/client:config',
+    'src/main/python/apache/aurora/client:factory',
     'src/main/python/apache/aurora/common:clusters',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]

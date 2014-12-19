@@ -33,13 +33,15 @@ from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.quota_check import print_quota
 from apache.aurora.client.api.updater_util import UpdaterConfig
 from apache.aurora.client.base import (
+    AURORA_V1_USER_AGENT_NAME,
     check_and_log_response,
     combine_messages,
     deprecation_warning,
     die,
     handle_open,
     requires,
-    synthesize_url
+    synthesize_url,
+    user_agent
 )
 from apache.aurora.client.config import get_config, GlobalHookRegistry
 from apache.aurora.client.factory import make_client, make_client_factory
@@ -64,6 +66,14 @@ from apache.aurora.common.pex_version import pex_version, UnknownVersion
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME, CURRENT_API_VERSION
 from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
+
+
+def make_v1_client_factory():
+  return make_client_factory(user_agent(AURORA_V1_USER_AGENT_NAME))
+
+
+def make_v1_client(cluster):
+  return make_client(cluster, AURORA_V1_USER_AGENT_NAME)
 
 
 class CoreCommandHook(object):
@@ -196,7 +206,7 @@ def really_create(job_spec, config_file, options):
   except ValueError as v:
     print("Error: %s" % v)
     sys.exit(1)
-  api = make_client(config.cluster())
+  api = make_v1_client(config.cluster())
   resp = api.create_job(config)
   check_and_log_response(resp)
   handle_open(api.scheduler_proxy.scheduler_client().url, config.role(), config.environment(),
@@ -267,7 +277,7 @@ def diff(job_spec, config_file):
     role = config.role()
     env = config.environment()
     name = config.name()
-  api = make_client(cluster)
+  api = make_v1_client(cluster)
   resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
   if resp.responseCode != ResponseCode.OK:
     die('Request failed, server responded with "%s"' % combine_messages(resp))
@@ -336,7 +346,7 @@ def do_open(args, _):
   if not cluster_name:
     die('cluster is required')
 
-  api = make_client(cluster_name)
+  api = make_v1_client(cluster_name)
 
   import webbrowser
   webbrowser.open_new_tab(
@@ -417,7 +427,7 @@ def inspect(job_spec, config_file):
 
 def really_start_cron(args, options):
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
-      args, options, make_client_factory())
+      args, options, make_v1_client_factory())
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
   resp = api.start_cronjob(job_key, config=config)
   check_and_log_response(resp)
@@ -488,7 +498,7 @@ def list_jobs(cluster_and_role):
   if cluster_and_role.count('/') != 1:
     die('list_jobs parameter must be in cluster/role format')
   cluster, role = cluster_and_role.split('/')
-  api = make_client(cluster)
+  api = make_v1_client(cluster)
   resp = api.get_jobs(role)
   check_and_log_response(resp)
   for job in resp.result.getJobsResult.configs:
@@ -518,7 +528,7 @@ def really_kill(args, options):
     print('Shards option is required for kill; use killall to kill all shards', file=sys.stderr)
     exit(1)
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
-      args, options, make_client_factory())
+      args, options, make_v1_client_factory())
   instance_key = str(job_key)
   if options.shards is not None:
     instance_key = "%s/%s" % (instance_key, ",".join(map(str, options.shards)))
@@ -602,7 +612,7 @@ def really_killall(args, options):
   v1_deprecation_warning("killall", new_cmd)
 
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
-  api = make_client(job_key.cluster)
+  api = make_v1_client(job_key.cluster)
   if options.batch_size is not None:
     kill_in_batches(api, job_key, None, options.batch_size, options.max_failures_option)
   else:
@@ -675,7 +685,7 @@ def status(args, options):
               taskString))
 
   api, job_key, _ = LiveJobDisambiguator.disambiguate_args_or_die(
-      args, options, make_client_factory())
+      args, options, make_v1_client_factory())
   v1_deprecation_warning("status", ["job", "status", args[0]])
   resp = api.check_status(job_key)
   check_and_log_response(resp)
@@ -713,7 +723,7 @@ def really_update(job_spec, config_file, options):
 
   maybe_disable_hooks(options)
   config = get_job_config(job_spec, config_file, options)
-  api = make_client(config.cluster())
+  api = make_v1_client(config.cluster())
   if not options.force:
     warn_if_dangerous_change(api, job_spec, config)
   resp = api.update_job(config, options.health_check_interval_seconds, options.shards)
@@ -775,7 +785,7 @@ def really_restart(args, options):
     exit(1)
   maybe_disable_hooks(options)
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
-      args, options, make_client_factory())
+      args, options, make_v1_client_factory())
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
   updater_config = UpdaterConfig(
       options.batch_size,
@@ -848,7 +858,7 @@ def restart(args, options):
 
 def really_cancel_update(args, options):
   api, job_key, config_file = LiveJobDisambiguator.disambiguate_args_or_die(
-      args, options, make_client_factory())
+      args, options, make_v1_client_factory())
   new_cmd = ["job", "cancel-update", str(job_key)]
   v1_deprecation_warning("cancel_update", new_cmd)
   config = get_job_config(job_key.to_path(), config_file, options) if config_file else None
@@ -881,7 +891,7 @@ def get_quota(role):
   """
   options = app.get_options()
   v1_deprecation_warning("get_quota", ["quota", "get", "%s/%s" % (options.cluster, role)])
-  resp = make_client(options.cluster).get_quota(role)
+  resp = make_v1_client(options.cluster).get_quota(role)
   quota_result = resp.result.getQuotaResult
   print_quota(quota_result.quota, 'Total allocated quota', role)
 

@@ -110,7 +110,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     # Next, create gets an API object via make_client. We need to replace that with a mock API.
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
-        patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
+        patch('apache.aurora.client.commands.core.make_v1_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (make_client,
         options):
 
@@ -149,7 +149,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('threading._Event.wait'),
-        patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
+        patch('apache.aurora.client.commands.core.make_v1_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (sleep, make_client,
         options):
       mock_query = self.create_mock_query()
@@ -181,7 +181,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
-        patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
+        patch('apache.aurora.client.commands.core.make_v1_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (make_client,
         options):
       mock_api.create_job.return_value = self.get_failed_createjob_response()
@@ -206,7 +206,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
         patch('threading._Event.wait'),
-        patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
+        patch('apache.aurora.client.commands.core.make_v1_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (sleep, make_client,
         options):
       mock_query = self.create_mock_query()
@@ -234,7 +234,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
-        patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
+        patch('apache.aurora.client.commands.core.make_v1_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (make_client,
         options):
       with temporary_file() as fp:
@@ -258,7 +258,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
     with contextlib.nested(
-        patch('apache.aurora.client.commands.core.make_client', return_value=mock_api),
+        patch('apache.aurora.client.commands.core.make_v1_client', return_value=mock_api),
         patch('twitter.common.app.get_options', return_value=mock_options)) as (make_client,
         options):
       with temporary_file() as fp:

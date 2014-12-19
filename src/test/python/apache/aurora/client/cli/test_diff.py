@@ -77,6 +77,7 @@ class TestDiffCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('subprocess.call', return_value=0),
         patch('json.loads', return_value=Mock())) as (_, _, subprocess_patch, _):
+
       mock_scheduler_proxy.getTasksStatus.return_value = self.create_status_response()
       self.setup_populate_job_config(mock_scheduler_proxy)
       with temporary_file() as fp:
@@ -142,6 +143,7 @@ class TestDiffCommand(AuroraClientCommandTest):
             options,
             subprocess_patch,
             json_patch):
+
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()

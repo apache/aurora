@@ -23,7 +23,7 @@ from thrift.protocol import TJSONProtocol
 from thrift.server import THttpServer
 from thrift.transport import TTransport
 
-from apache.aurora.common.transport import TRequestsTransport
+from apache.aurora.common.transport import DEFAULT_USER_AGENT, TRequestsTransport
 
 from gen.apache.aurora.api import ReadOnlyScheduler
 from gen.apache.aurora.api.ttypes import Response, ResponseCode, ServerInfo
@@ -118,6 +118,19 @@ def test_requests_transports_lowers_logging_level():
 
   TRequestsTransport(
       'http://localhost:12345',
-      session_factory=lambda: create_autospec(spec=requests.Session, instance=True))
+      session_factory=lambda x: create_autospec(spec=requests.Session, instance=True))
 
   assert logging.getLogger('requests').level == logging.WARNING
+
+
+def test_transport_applies_user_agent_from_factory():
+  user_agent = 'Some-User-Agent'
+  transport = TRequestsTransport('http://localhost:12345', user_agent=user_agent)
+  transport.open()
+  assert transport._session.headers['User-Agent'] == user_agent
+
+
+def test_transport_applies_default_user_agent_if_no_factory_provided():
+  transport = TRequestsTransport('http://localhost:12345')
+  transport.open()
+  assert transport._session.headers['User-Agent'] == DEFAULT_USER_AGENT

@@ -29,6 +29,7 @@ python_library(
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.log',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/main/python/apache/aurora/common',
   ]
 )
 
@@ -60,6 +61,7 @@ python_library(
   dependencies = [
     ':base',
     '3rdparty/python:twitter.common.app',
+    'src/main/python/apache/aurora/client/hooks',
     'src/main/python/apache/aurora/client/hooks',
     'src/main/python/apache/aurora/common:cluster',
     'src/main/python/apache/aurora/common:clusters',

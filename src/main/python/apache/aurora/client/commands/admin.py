@@ -32,9 +32,9 @@ from apache.aurora.admin.admin_util import (
     parse_sla_percentage,
     print_results
 )
-from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.sla import JobUpTimeLimit
 from apache.aurora.client.base import (
+    AURORA_ADMIN_USER_AGENT_NAME,
     check_and_log_response,
     combine_messages,
     die,
@@ -42,6 +42,7 @@ from apache.aurora.client.base import (
     GROUPING_OPTION,
     requires
 )
+from apache.aurora.client.factory import make_client
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 from apache.aurora.common.shellify import shellify
@@ -59,6 +60,10 @@ MIN_SLA_INSTANCE_COUNT = optparse.Option(
     default=10,
     help='Min job instance count to consider for SLA purposes. Default 10.'
 )
+
+
+def make_admin_client(cluster):
+  return make_client(cluster, AURORA_ADMIN_USER_AGENT_NAME)
 
 
 @app.command
@@ -142,7 +147,8 @@ def query(args, options):
   if not (states <= ACTIVE_STATES) and not options.force:
     die('--force is required for expensive queries (states outside ACTIVE states')
 
-  api = AuroraClientAPI(CLUSTERS[cluster], options.verbosity)
+  api = make_admin_client(cluster)
+
   query_info = api.query(TaskQuery(role=role, jobName=job, instanceIds=instances, statuses=states))
   if query_info.responseCode != ResponseCode.OK:
     die('Failed to query scheduler: %s' % combine_messages(query_info))
@@ -181,8 +187,7 @@ def set_quota(cluster, role, cpu_str, ram, disk):
   except ValueError as e:
     die(str(e))
 
-  options = app.get_options()
-  resp = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).set_quota(role, cpu, ram_mb, disk_mb)
+  resp = make_admin_client(cluster).set_quota(role, cpu, ram_mb, disk_mb)
   check_and_log_response(resp)
 
 
@@ -197,8 +202,7 @@ def increase_quota(cluster, role, cpu_str, ram_str, disk_str):
   ram = parse_data(ram_str)
   disk = parse_data(disk_str)
 
-  options = app.get_options()
-  client = AuroraClientAPI(CLUSTERS[cluster], options.verbosity == 'verbose')
+  client = make_admin_client(cluster)
   resp = client.get_quota(role)
   quota = resp.result.getQuotaResult.quota
   log.info('Current quota for %s:\n\tCPU\t%s\n\tRAM\t%s MB\n\tDisk\t%s MB' %
@@ -222,8 +226,7 @@ def scheduler_backup_now(cluster):
 
   Immediately initiates a full storage backup.
   """
-  options = app.get_options()
-  check_and_log_response(AuroraClientAPI(CLUSTERS[cluster], options.verbosity).perform_backup())
+  check_and_log_response(make_admin_client(cluster).perform_backup())
 
 
 @app.command
@@ -233,8 +236,7 @@ def scheduler_list_backups(cluster):
 
   Lists backups available for recovery.
   """
-  options = app.get_options()
-  resp = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).list_backups()
+  resp = make_admin_client(cluster).list_backups()
   check_and_log_response(resp)
   backups = resp.result.listBackupsResult.backups
   print('%s available backups:' % len(backups))
@@ -249,9 +251,7 @@ def scheduler_stage_recovery(cluster, backup_id):
 
   Stages a backup for recovery.
   """
-  options = app.get_options()
-  check_and_log_response(
-      AuroraClientAPI(CLUSTERS[cluster], options.verbosity).stage_recovery(backup_id))
+  check_and_log_response(make_admin_client(cluster).stage_recovery(backup_id))
 
 
 @app.command
@@ -261,8 +261,7 @@ def scheduler_print_recovery_tasks(cluster):
 
   Prints all active tasks in a staged recovery.
   """
-  options = app.get_options()
-  resp = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).query_recovery(
+  resp = make_admin_client(cluster).query_recovery(
       TaskQuery(statuses=ACTIVE_STATES))
   check_and_log_response(resp)
   log.info('Role\tJob\tShard\tStatus\tTask ID')
@@ -284,9 +283,7 @@ def scheduler_delete_recovery_tasks(cluster, task_ids):
   Deletes a comma-separated list of task IDs from a staged recovery.
   """
   ids = set(task_ids.split(','))
-  options = app.get_options()
-  check_and_log_response(AuroraClientAPI(CLUSTERS[cluster], options.verbosity)
-      .delete_recovery_tasks(TaskQuery(taskIds=ids)))
+  check_and_log_response(make_admin_client(cluster).delete_recovery_tasks(TaskQuery(taskIds=ids)))
 
 
 @app.command
@@ -296,9 +293,7 @@ def scheduler_commit_recovery(cluster):
 
   Commits a staged recovery.
   """
-  options = app.get_options()
-  check_and_log_response(AuroraClientAPI(CLUSTERS[cluster], options.verbosity)
-      .commit_recovery())
+  check_and_log_response(make_admin_client(cluster).commit_recovery())
 
 
 @app.command
@@ -308,9 +303,7 @@ def scheduler_unload_recovery(cluster):
 
   Unloads a staged recovery.
   """
-  options = app.get_options()
-  check_and_log_response(AuroraClientAPI(CLUSTERS[cluster], options.verbosity)
-      .unload_recovery())
+  check_and_log_response(make_admin_client(cluster).unload_recovery())
 
 
 @app.command
@@ -320,8 +313,7 @@ def scheduler_snapshot(cluster):
 
   Request that the scheduler perform a storage snapshot and block until complete.
   """
-  options = app.get_options()
-  check_and_log_response(AuroraClientAPI(CLUSTERS[cluster], options.verbosity).snapshot())
+  check_and_log_response(make_admin_client(cluster).snapshot())
 
 
 @app.command
@@ -331,8 +323,7 @@ def get_locks(cluster):
 
   Prints all context/operation locks in the scheduler.
   """
-  options = app.get_options()
-  resp = AuroraClientAPI(CLUSTERS[cluster], options.verbosity).get_locks()
+  resp = make_admin_client(cluster).get_locks()
   check_and_log_response(resp)
 
   pp = pprint.PrettyPrinter(indent=2)
@@ -425,9 +416,9 @@ def sla_list_safe_domain(cluster, percentage, duration):
   override_jobs = parse_jobs_file(options.override_filename) if options.override_filename else {}
   get_grouping_or_die(options.grouping)
 
-  vector = AuroraClientAPI(
-      CLUSTERS[cluster],
-      options.verbosity).sla_get_safe_domain_vector(options.min_instance_count, include_hosts)
+  vector = make_admin_client(cluster).sla_get_safe_domain_vector(
+      options.min_instance_count,
+      include_hosts)
   groups = vector.get_safe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS),
       override_jobs, options.grouping)
 
@@ -482,9 +473,7 @@ def sla_probe_hosts(cluster, percentage, duration):
   hosts = parse_hostnames(options.filename, options.hosts)
   get_grouping_or_die(options.grouping)
 
-  vector = AuroraClientAPI(
-      CLUSTERS[cluster],
-      options.verbosity).sla_get_safe_domain_vector(options.min_instance_count, hosts)
+  vector = make_admin_client(cluster).sla_get_safe_domain_vector(options.min_instance_count, hosts)
   groups = vector.probe_hosts(sla_percentage, sla_duration.as_(Time.SECONDS), options.grouping)
 
   output, _ = format_sla_results(groups)
@@ -520,7 +509,5 @@ def get_scheduler(cluster):
 
   Dumps the leading scheduler endpoint URL.
   """
-  options = app.get_options()
-  print("Found leading scheduler at: %s" % AuroraClientAPI(
-      CLUSTERS[cluster],
-      options.verbosity).scheduler_proxy.scheduler_client().raw_url)
+  print("Found leading scheduler at: %s" %
+      make_admin_client(cluster).scheduler_proxy.scheduler_client().raw_url)

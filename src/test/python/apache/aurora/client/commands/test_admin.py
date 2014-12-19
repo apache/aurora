@@ -91,28 +91,32 @@ class TestQueryCommand(AuroraClientCommandTest):
   def test_query(self):
     """Tests successful execution of the query command."""
     mock_options = self.setup_mock_options(force=True, shards="0")
-    mock_api, mock_scheduler_proxy = self.create_mock_api()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.commands.admin.make_admin_client',
+            return_value=create_autospec(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)
+    ) as (_, mock_make_admin_client, _):
 
-      mock_scheduler_proxy.getTasksStatus.return_value = self.create_response(self.create_task())
+      api = mock_make_admin_client.return_value
+      api.query.return_value = self.create_response(self.create_task())
 
       query([self.TEST_CLUSTER, 'test_role', 'test_job'], mock_options)
 
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(self.task_query())
+      api.query.assert_called_with(self.task_query())
 
   def test_query_fails(self):
     """Tests failed execution of the query command."""
     mock_options = self.setup_mock_options(shards="0")
-    mock_api, mock_scheduler_proxy = self.create_mock_api()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)):
+        patch('apache.aurora.client.commands.admin.make_admin_client',
+            return_value=create_autospec(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)
+    ) as (_, mock_make_admin_client, _):
 
-      mock_scheduler_proxy.getTasksStatus.return_value = self.create_response(self.create_task())
+      api = mock_make_admin_client.return_value
+      api.query.return_value = self.create_response(self.create_task())
 
       try:
         query([self.TEST_CLUSTER, 'test_role', 'test_job'], mock_options)
@@ -121,7 +125,7 @@ class TestQueryCommand(AuroraClientCommandTest):
       else:
         assert 'Expected exception is not raised'
 
-      mock_scheduler_proxy.getTasksStatus.assert_called_with(self.task_query())
+      api.query.assert_called_with(self.task_query())
 
 
 class TestIncreaseQuotaCommand(AuroraClientCommandTest):
@@ -140,25 +144,26 @@ class TestIncreaseQuotaCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-            new=create_autospec(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.make_admin_client',
+            return_value=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)
-    ) as (_, api, _):
+    ) as (_, mock_make_admin_client, _):
 
+      api = mock_make_admin_client.return_value
       role = 'test_role'
-      api.return_value.get_quota.return_value = self.create_response(
+      api.get_quota.return_value = self.create_response(
           ResourceAggregate(20.0, 4000, 6000),
           ResourceAggregate(15.0, 2000, 3000),
           ResourceAggregate(6.0, 200, 600),
       )
-      api.return_value.set_quota.return_value = self.create_simple_success_response()
+      api.set_quota.return_value = self.create_simple_success_response()
 
       increase_quota([self.TEST_CLUSTER, role, '4.0', '1MB', '1MB'])
 
-      api.return_value.set_quota.assert_called_with(role, 24.0, 4001, 6001)
-      assert type(api.return_value.set_quota.call_args[0][1]) == type(float())
-      assert type(api.return_value.set_quota.call_args[0][2]) == type(int())
-      assert type(api.return_value.set_quota.call_args[0][3]) == type(int())
+      api.set_quota.assert_called_with(role, 24.0, 4001, 6001)
+      assert type(api.set_quota.call_args[0][1]) == type(float())
+      assert type(api.set_quota.call_args[0][2]) == type(int())
+      assert type(api.set_quota.call_args[0][3]) == type(int())
 
 
 class TestSetQuotaCommand(AuroraClientCommandTest):
@@ -176,20 +181,21 @@ class TestSetQuotaCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-              new=create_autospec(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.make_admin_client',
+              return_value=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)
-    ) as (_, api, _):
+    ) as (_, mock_make_admin_client, _):
 
+      api = mock_make_admin_client.return_value
       role = 'test_role'
-      api.return_value.set_quota.return_value = self.create_simple_success_response()
+      api.set_quota.return_value = self.create_simple_success_response()
 
       set_quota([self.TEST_CLUSTER, role, '4.0', '10MB', '10MB'])
 
-      api.return_value.set_quota.assert_called_with(role, 4.0, 10, 10)
-      assert type(api.return_value.set_quota.call_args[0][1]) == type(float())
-      assert type(api.return_value.set_quota.call_args[0][2]) == type(int())
-      assert type(api.return_value.set_quota.call_args[0][3]) == type(int())
+      api.set_quota.assert_called_with(role, 4.0, 10, 10)
+      assert type(api.set_quota.call_args[0][1]) == type(float())
+      assert type(api.set_quota.call_args[0][2]) == type(int())
+      assert type(api.set_quota.call_args[0][3]) == type(int())
 
 
 class TestGetLocksCommand(AuroraClientCommandTest):
@@ -215,17 +221,18 @@ class TestGetLocksCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-              new=create_autospec(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.make_admin_client',
+              return_value=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.commands.admin.print_results'),
-    ) as (_, api, _, mock_print_results):
+    ) as (_, mock_make_admin_client, _, mock_print_results):
 
-      api.return_value.get_locks.return_value = self.create_response(self.LOCKS)
+      api = mock_make_admin_client.return_value
+      api.get_locks.return_value = self.create_response(self.LOCKS)
 
       get_locks([self.TEST_CLUSTER])
 
-      assert api.return_value.get_locks.call_count == 1
+      assert api.get_locks.call_count == 1
       assert mock_print_results.call_count == 1
       assert "'message': '%s'" % self.MESSAGE in mock_print_results.call_args[0][0][0]
       assert "'user': '%s'" % self.USER in mock_print_results.call_args[0][0][0]
@@ -244,12 +251,13 @@ class TestGetSchedulerCommand(AuroraClientCommandTest):
 
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.admin.AuroraClientAPI',
-              new=create_autospec(spec=AuroraClientAPI)),
+        patch('apache.aurora.client.commands.admin.make_admin_client',
+              return_value=create_autospec(spec=AuroraClientAPI)),
         patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
-    ) as (_, api, _):
+    ) as (_, mock_make_admin_client, _):
 
-      api.return_value.scheduler_proxy = PropertyMock(return_value=mock_proxy)
+      api = mock_make_admin_client.return_value
+      api.scheduler_proxy = PropertyMock(return_value=mock_proxy)
 
       get_scheduler([self.TEST_CLUSTER])
 

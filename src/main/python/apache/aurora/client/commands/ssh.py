@@ -17,7 +17,7 @@ import subprocess
 from twitter.common import app
 
 from apache.aurora.client.api.command_runner import DistributedCommandRunner
-from apache.aurora.client.base import check_and_log_response, die
+from apache.aurora.client.base import AURORA_V1_USER_AGENT_NAME, check_and_log_response, die
 from apache.aurora.client.factory import make_client
 from apache.aurora.client.options import EXECUTOR_SANDBOX_OPTION, SSH_USER_OPTION
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -68,7 +68,7 @@ def ssh(args, options):
     newcmd.append("--command=\"%s\"" % " ".join(args))
   v1_deprecation_warning("ssh", newcmd)
 
-  api = make_client(cluster_name)
+  api = make_client(cluster_name, AURORA_V1_USER_AGENT_NAME)
   resp = api.query(api.build_query(role, name, set([int(shard)]), env=env))
   check_and_log_response(resp)
 

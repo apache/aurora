@@ -23,7 +23,7 @@ from pystachio import Environment, Required, String
 from twitter.common import log
 
 from apache.aurora.client.api import AuroraClientAPI
-from apache.aurora.client.base import combine_messages
+from apache.aurora.client.base import AURORA_V1_USER_AGENT_NAME, combine_messages
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.config.schema.base import MesosContext
 from apache.thermos.config.schema import ThermosContext
@@ -101,7 +101,9 @@ class DistributedCommandRunner(object):
   def __init__(self, cluster, role, env, jobs, ssh_user=None,
       log_fn=log.log):
     self._cluster = cluster
-    self._api = AuroraClientAPI(cluster=cluster)
+    self._api = AuroraClientAPI(
+        cluster=cluster,
+        user_agent=AURORA_V1_USER_AGENT_NAME)
     self._role = role
     self._env = env
     self._jobs = jobs
