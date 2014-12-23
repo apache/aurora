@@ -62,7 +62,6 @@ python_library(
     ':base',
     '3rdparty/python:twitter.common.app',
     'src/main/python/apache/aurora/client/hooks',
-    'src/main/python/apache/aurora/client/hooks',
     'src/main/python/apache/aurora/common:cluster',
     'src/main/python/apache/aurora/common:clusters',
   ]
