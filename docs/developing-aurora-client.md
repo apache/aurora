@@ -1,7 +1,7 @@
 Getting Started
 ===============
 
-Aurora consists of four main pieces: the scheduler (which finds resources in the cluster that can be used to run a job), the executor (which uses the resources assigned by the scheduler to run a job), the command-line client, and the web-ui. For information about working on the scheduler or the webUI, see the file "developing-aurora-scheduler.md" in this directory.
+Aurora consists of four main pieces: the scheduler (which finds resources in the cluster that can be used to run a job), the executor (which uses the resources assigned by the scheduler to run a job), the command-line client, and the web-ui. For information about working on the scheduler or the webUI, see [Developing the Aurora Scheduler](developing-aurora-scheduler.md).
 
 If you want to work on the command-line client, this is the place for you!
 
@@ -19,7 +19,7 @@ are fully self-contained executables: just copy the pex file into your path, and
 
 To run all of the client tests:
 
-    $ ./pasts src/test/python/apache/aurora/client/:all
+    $ ./pants src/test/python/apache/aurora/client/:all
 
 
 Client Configuration
