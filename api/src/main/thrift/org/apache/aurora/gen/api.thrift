@@ -359,10 +359,7 @@ enum ScheduleStatus {
   /** A fault in the task environment has caused the system to believe the task no longer exists.
    * This can happen, for example, when a slave process disappears.
    */
-  LOST             = 7,
-  // TODO(maxim): Remove SANDBOX_DELETED in 0.7.0. (AURORA-832)
-  /** The task sandbox has been deleted by the executor. */
-  SANDBOX_DELETED  = 10
+  LOST             = 7
 }
 
 // States that a task may be in while still considered active.
@@ -396,8 +393,7 @@ const set<ScheduleStatus> LIVE_STATES = [ScheduleStatus.KILLING,
 const set<ScheduleStatus> TERMINAL_STATES = [ScheduleStatus.FAILED,
                                              ScheduleStatus.FINISHED,
                                              ScheduleStatus.KILLED,
-                                             ScheduleStatus.LOST,
-                                             ScheduleStatus.SANDBOX_DELETED]
+                                             ScheduleStatus.LOST]
 
 // Regular expressions for matching valid identifiers for job path components. All expressions
 // below should accept and reject the same set of inputs.

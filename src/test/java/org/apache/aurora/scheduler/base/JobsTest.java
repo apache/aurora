@@ -13,14 +13,11 @@
  */
 package org.apache.aurora.scheduler.base;
 
-import java.util.Arrays;
-import java.util.Set;
+import java.util.EnumSet;
 
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Sets;
 
 import org.apache.aurora.gen.JobStats;
 import org.apache.aurora.gen.ScheduleStatus;
@@ -36,14 +33,9 @@ public class JobsTest {
 
   @Test
   public void testGetJobStats() {
-    // TODO(maxim): Drop when AURORA-832 is fixed.
-    Set<ScheduleStatus> statusValues = Sets.difference(
-        Sets.immutableEnumSet(Arrays.asList(ScheduleStatus.values())),
-        ImmutableSet.of(ScheduleStatus.SANDBOX_DELETED));
-
     ImmutableList<IScheduledTask> tasks =
         FluentIterable
-            .from(statusValues)
+            .from(EnumSet.allOf(ScheduleStatus.class))
             .transform(new Function<ScheduleStatus, IScheduledTask>() {
               @Override
               public IScheduledTask apply(ScheduleStatus status) {

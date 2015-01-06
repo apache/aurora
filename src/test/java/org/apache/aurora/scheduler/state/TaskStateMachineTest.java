@@ -88,10 +88,7 @@ public class TaskStateMachineTest {
 
   @Test
   public void testPostTerminalTransitionDenied() {
-    Set<ScheduleStatus> terminalStates =
-        Sets.difference(Tasks.TERMINAL_STATES, ImmutableSet.of(ScheduleStatus.SANDBOX_DELETED));
-
-    for (ScheduleStatus endState : terminalStates) {
+    for (ScheduleStatus endState : Tasks.TERMINAL_STATES) {
       stateMachine = makeStateMachine(makeTask(false));
       Set<SideEffect.Action> finalActions = Sets.newHashSet(Action.SAVE_STATE);
 
@@ -119,7 +116,7 @@ public class TaskStateMachineTest {
       expectUpdateStateOnTransitionTo(PENDING, ASSIGNED, STARTING, RUNNING);
       legalTransition(TaskState.valueOf(endState.name()), finalActions);
 
-      for (ScheduleStatus badTransition : terminalStates) {
+      for (ScheduleStatus badTransition : Tasks.TERMINAL_STATES) {
         illegalTransition(TaskState.valueOf(badTransition.name()));
       }
     }
@@ -127,10 +124,7 @@ public class TaskStateMachineTest {
 
   @Test
   public void testTerminalToDeleted() {
-    Set<ScheduleStatus> terminalStates =
-        Sets.difference(Tasks.TERMINAL_STATES, ImmutableSet.of(ScheduleStatus.SANDBOX_DELETED));
-
-    for (ScheduleStatus endState : terminalStates) {
+    for (ScheduleStatus endState : Tasks.TERMINAL_STATES) {
       stateMachine = makeStateMachine(makeTask(false));
       Set<SideEffect.Action> finalActions = Sets.newHashSet(Action.SAVE_STATE);
 
