@@ -15,9 +15,9 @@
 import unittest
 from copy import deepcopy
 
-from mock import create_autospec
+from mock import call, create_autospec, patch
 
-from apache.aurora.client.api.quota_check import CapacityRequest, QuotaCheck
+from apache.aurora.client.api.quota_check import CapacityRequest, print_quota, QuotaCheck
 
 from .api_util import SchedulerThriftApiSpec
 
@@ -110,3 +110,20 @@ class QuotaCheckTest(unittest.TestCase):
 
     self.mock_get_quota(allocated, consumed, response_code=ResponseCode.INVALID_REQUEST)
     self.assert_result(True, released, acquired, ResponseCode.INVALID_REQUEST)
+
+  @patch('apache.aurora.client.api.quota_check.print_quota', spec=print_quota)
+  def test_additional_quota_out(self, mock_print_quota):
+    allocated = ResourceAggregate(numCpus=50.0, ramMb=1000, diskMb=3000)
+    consumed = ResourceAggregate(numCpus=45.0, ramMb=900, diskMb=2900)
+    released = CapacityRequest(ResourceAggregate(numCpus=5.0, ramMb=100, diskMb=100))
+    acquired = CapacityRequest(ResourceAggregate(numCpus=11.0, ramMb=220, diskMb=200))
+    additional = ResourceAggregate(numCpus=1.0, ramMb=20, diskMb=0)
+
+    self.mock_get_quota(allocated, consumed)
+    self.assert_result(True, released, acquired, ResponseCode.INVALID_REQUEST)
+    assert mock_print_quota.mock_calls[:4] == [
+        call(allocated, 'Total allocated quota', self._role),
+        call(consumed, 'Consumed quota', self._role),
+        call((acquired - released).quota(), 'Requested', self._name),
+        call(additional, 'Additional quota required', self._role)
+    ]

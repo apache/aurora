@@ -12,6 +12,7 @@
 # limitations under the License.
 #
 
+import math
 import operator
 from copy import deepcopy
 
@@ -56,6 +57,16 @@ class CapacityRequest(object):
   def valid(self):
     return self._quota.numCpus >= 0.0 and self._quota.ramMb >= 0 and self._quota.diskMb >= 0
 
+  def invert_or_reset(self):
+    """Inverts negative resource and resets positive resource as zero."""
+    def invert_or_reset(val):
+      return math.fabs(val) if val < 0 else 0
+
+    return CapacityRequest(ResourceAggregate(
+        numCpus=invert_or_reset(self._quota.numCpus),
+        ramMb=invert_or_reset(self._quota.ramMb),
+        diskMb=invert_or_reset(self._quota.diskMb)))
+
   def quota(self):
     return deepcopy(self._quota)
 
@@ -99,6 +110,8 @@ class QuotaCheck(object):
       print_quota(allocated.quota(), 'Total allocated quota', job_key.role)
       print_quota(consumed.quota(), 'Consumed quota', job_key.role)
       print_quota(requested.quota(), 'Requested', job_key.name)
+      print_quota(effective.invert_or_reset().quota(), 'Additional quota required', job_key.role)
+
       # TODO(wfarner): Avoid synthesizing scheduler responses.
       return Response(
           responseCode=ResponseCode.INVALID_REQUEST,
