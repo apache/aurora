@@ -13,6 +13,7 @@
  */
 package org.apache.aurora.scheduler.http;
 
+import java.util.Locale;
 import java.util.logging.Level;
 
 import com.twitter.common.quantity.Amount;
@@ -25,6 +26,7 @@ import org.eclipse.jetty.http.HttpURI;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.RequestLog;
 import org.eclipse.jetty.server.Response;
+import org.eclipse.jetty.util.DateCache;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -33,6 +35,7 @@ import static org.easymock.EasyMock.expect;
 
 public class RequestLoggerTest extends EasyMockTest {
 
+  private DateCache logDateCache;
   private FakeClock clock;
   private LogSink sink;
   private Request request;
@@ -42,6 +45,8 @@ public class RequestLoggerTest extends EasyMockTest {
 
   @Before
   public void setUp() throws Exception {
+    logDateCache = new DateCache("dd/MMM/yyyy:HH:mm:ss Z", Locale.getDefault());
+    logDateCache.setTimeZoneID("GMT");
     clock = new FakeClock();
     sink = createMock(LogSink.class);
     request = createMock(Request.class);
@@ -66,7 +71,9 @@ public class RequestLoggerTest extends EasyMockTest {
     expect(request.getTimeStamp()).andReturn(clock.nowMillis()).atLeastOnce();
 
     expect(sink.isLoggable(Level.INFO)).andReturn(true);
-    sink.log(Level.INFO, "snoopy easymock-test [22/Dec/2009:00:00:00 +0000]"
+
+    String logDate = logDateCache.format(clock.nowMillis());
+    sink.log(Level.INFO, "snoopy easymock-test [" + logDate + "]"
         + " \"GET / http\" 200 256 \"-\" \"junit\" 110");
 
     control.replay();
@@ -92,7 +99,9 @@ public class RequestLoggerTest extends EasyMockTest {
     expect(request.getTimeStamp()).andReturn(clock.nowMillis()).atLeastOnce();
 
     expect(sink.isLoggable(Level.WARNING)).andReturn(true);
-    sink.log(Level.WARNING, "woodstock easymock-test [22/Dec/2009:00:00:00 +0000]"
+
+    String logDate = logDateCache.format(clock.nowMillis());
+    sink.log(Level.WARNING, "woodstock easymock-test [" + logDate + "]"
         + " \"POST /data http\" 500 128 \"-\" \"junit\" 500");
 
     control.replay();
