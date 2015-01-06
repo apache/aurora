@@ -10,12 +10,12 @@ pants [here](http://pantsbuild.github.io/python-readme.html).
 
 To build the client executable, run the following in a command-shell:
 
-    $ ./pants src/main/python/apache/aurora/client/cli:aurora2
+    $ ./pants src/main/python/apache/aurora/client/cli:aurora
 
-This will produce a python executable _pex_ file in `dist/aurora2.pex`. Pex files
+This will produce a python executable _pex_ file in `dist/aurora.pex`. Pex files
 are fully self-contained executables: just copy the pex file into your path, and you'll be able to run it. For example, for a typical installation:
 
-    $ cp dist/aurora2.pex /usr/local/bin/aurora
+    $ cp dist/aurora.pex /usr/local/bin/aurora
 
 To run all of the client tests:
 
@@ -31,31 +31,13 @@ contents of this file can be found in the
 how the client locates this file can be found in the
 [Client Commands](client-commands.md#cluster-configuration) documentation.
 
-Client Versions
-===============
-
-There are currently two versions of the aurora client, imaginatively known as v1 and v2. All new development is done entirely in v2, but we continue to support and fix bugs in v1, until we get to the point where v2 is feature-complete and tested, and aurora users have had some time at adapt and switch their processes to use v2.
-
-Both versions are built on the same underlying API code.
-
-Client v1 was implemented using twitter.common.app. The command-line processing code for v1 can be found in `src/main/python/apache/aurora/client/commands` and
-`src/main/python/apache/aurora/client/bin`.
-
-Client v2 was implemented using its own noun/verb framework. The client v2 code can be found in `src/main/python/apache/aurora/client/cli`, and the noun/verb framework can be
-found in the `__init__.py` file in that directory.
-
-
 Building and Testing the Client
 ===============================
 
 Building and testing the client code are both done using Pants. The relevant targets to know about are:
 
-   * Build a client v2 executable: `./pants src/main/python/apache/aurora/client/cli:aurora2`
-   * Test client v2 code: `./pants ./pants src/test/python/apache/aurora/client/cli:all`
-   * Build a client v1 executable: `./pants src/main/python/apache/aurora/client/bin:aurora_client`
-   * Test client v1 code: `./pants src/main/python/apache/aurora/client/commands:all`
-   * Test all client code: `./pants src/main/python/apache/aurora/client:all`
-
+   * Build a client executable: `./pants src/main/python/apache/aurora/client/cli:aurora`
+   * Test client code: `./pants ./pants src/test/python/apache/aurora/client/cli:all`
 
 Overview of the Client Architecture
 ===================================
@@ -79,13 +61,11 @@ The client is built on a stacked architecture:
          - monitoring the new version to ensure that the update succeeded.
   3. On top of the API, we have the command-line client itself. The core client, at this level,
     consists of the interface to the command-line which the user will use to interact with aurora.
-    The client v2 code is found in `src/python/apache/aurora/client/cli`. In the `cli` directory,
+    The client code is found in `src/python/apache/aurora/client/cli`. In the `cli` directory,
     the rough structure is as follows:
-       * `__init__.py` contains the noun/verb command-line processing framework used by client v2.
+       * `__init__.py` contains the noun/verb command-line processing framework used by client.
        * `jobs.py` contains the implementation of the core `job` noun, and all of its operations.
-       * `bridge.py` contains the implementation of a component that allows us to ship a
-         combined client that runs both v1 and v2 client commands during the transition period.
-       * `client.py` contains the code that binds the client v2 nouns and verbs into an executable.
+       * `client.py` contains the code that binds the client nouns and verbs into an executable.
 
 Running/Debugging the Client
 ============================

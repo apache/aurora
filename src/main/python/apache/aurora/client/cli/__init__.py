@@ -12,7 +12,7 @@
 # limitations under the License.
 #
 
-'''Command-line tooling infrastructure for aurora client v2.
+'''Command-line tooling infrastructure for aurora client.
 
 This module provides a framework for a noun/verb command-line application.
 In this framework, an application is structured around a collection of basic objects (nouns)

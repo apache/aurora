@@ -33,13 +33,8 @@ function upstart_update {
 }
 
 function build_client {
-  ./pants src/main/python/apache/aurora/client/bin:aurora_client
-  sudo ln -sf $DIST_DIR/aurora_client.pex /usr/local/bin/aurora
-}
-
-function build_client2 {
-  ./pants src/main/python/apache/aurora/client/cli:aurora2
-  sudo ln -sf $DIST_DIR/aurora2.pex /usr/local/bin/aurora2
+  ./pants src/main/python/apache/aurora/client/cli:aurora
+  sudo ln -sf $DIST_DIR/aurora.pex /usr/local/bin/aurora
 }
 
 function build_admin_client {
@@ -92,14 +87,13 @@ function build_observer {
 function build_all {
   build_admin_client
   build_client
-  build_client2
   build_executor
   build_observer
   build_scheduler
 }
 
 function print_components {
-  echo 'Please select from: admin_client, client, client2, executor, observer, scheduler or all.'
+  echo 'Please select from: admin_client, client, executor, observer, scheduler or all.'
 }
 
 if [ "$#" -eq 0 ]

@@ -55,7 +55,7 @@ class AuroraLogConfigurationPlugin(ConfigurationPlugin):
 
 
 class AuroraCommandLine(CommandLine):
-  """The CommandLine implementation for the Aurora client v2 command line."""
+  """The CommandLine implementation for the Aurora client command line."""
 
   def __init__(self):
     super(AuroraCommandLine, self).__init__()

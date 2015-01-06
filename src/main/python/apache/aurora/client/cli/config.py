@@ -13,7 +13,7 @@
 #
 
 """
-An implementation of a clientv2 "config" noun, for commands that
+An implementation of a "config" noun, for commands that
 operate in on configuration files.
 """
 

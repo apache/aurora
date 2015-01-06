@@ -13,13 +13,12 @@
 #
 
 python_binary(
-  name='aurora2',
+  name='aurora',
   entry_point = 'apache.aurora.client.cli.client:proxy_main',
   dependencies = [
     ':client_lib'
   ],
 )
-
 
 # TODO(wfarner): Remove this along with the rest of the v1 client code.
 python_library(

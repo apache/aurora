@@ -24,36 +24,62 @@ set -u -e -x
 
 . src/test/sh/org/apache/aurora/e2e/test_common.sh
 
+
+function check_url_live() {
+  test $(curl -sL -w '%{http_code}' $1 -o /dev/null) == 200
+}
+
 test_http_example() {
   local _cluster=$1 _role=$2 _env=$3 _job=$4 _sched_ip=$5
   local _base_config=$6 _updated_config=$7
   jobkey="$_cluster/$_role/$_env/$_job"
 
-  echo '== Creating job'
-  vagrant ssh -c "aurora create $jobkey $_base_config"
+  # The vagrant/ssh command brings a trailing carriage return and newline, tr strips that.
+  joblist=$(vagrant ssh -c "aurora config list $_base_config" | tr -dc '[[:print:]]')
+  test "$joblist" = "jobs=[$jobkey]"
 
-  # Check that scheduler /vars being exported
+  vagrant ssh -c "aurora job inspect $jobkey $_base_config"
+
+  echo '== Creating job'
+  vagrant ssh -c "aurora job create $jobkey $_base_config"
+
+  echo "== Checking job status"
+  vagrant ssh -c "aurora job list $_cluster/$_role/$_env" | grep "$jobkey"
+  vagrant ssh -c "aurora job status $jobkey"
+  # Check that scheduler UI pages shown
   base_url="http://$_sched_ip:8081"
-  uptime=$(_curl -s "$base_url/vars" | grep jvm_uptime_secs | wc -l)
-  test $uptime -eq 1
+  check_url_live "$base_url/scheduler"
+  check_url_live "$base_url/scheduler/$_role"
+  check_url_live "$base_url/scheduler/$_role/$_env/$_job"
+
+  echo "== Restarting test job"
+
+  vagrant ssh -c "aurora job restart $jobkey"
 
   echo '== Updating test job'
-  vagrant ssh -c "aurora update $jobkey $_updated_config"
+  vagrant ssh -c "aurora job update $jobkey $_updated_config"
 
   echo '== Validating announce'
   validate_serverset "/aurora/$_role/$_env/$_job"
 
-  echo "== Probing job via 'aurora run'"
-  # In order for `aurora run` to work, the VM needs to be forwarded a local ssh identity. To avoid
+  # In order for `aurora task run` to work, the VM needs to be forwarded a local ssh identity. To avoid
   # polluting the global ssh-agent with this identity, we run this test in the context of a local
   # agent. A slightly cleaner solution would be to use a here doc (ssh-agent sh <<EOF ...), but
   # due to a strange confluence of issues, this required some unpalatable hacks. Simply putting
   # the meat of this test in a separate file seems preferable.
-  ssh-agent src/test/sh/org/apache/aurora/e2e/test_run.sh $jobkey $_sched_ip "aurora run"
+  ssh-agent src/test/sh/org/apache/aurora/e2e/test_run.sh $jobkey $_sched_ip
   test $? -eq 0
 
-  vagrant ssh -c "aurora get_quota --cluster=$_cluster $_role"
-  vagrant ssh -c "aurora killall  $jobkey"
+  # Run a kill without specifying instances, and verify that it gets an error, and the job
+  # isn't affected. (TODO(mchucarroll): the failed kill should return non-zero!)
+  vagrant ssh -c "aurora job kill $jobkey" 2>&1 | grep -q "The instances list cannot be omitted in a kill command"
+  check_url_live "$base_url/scheduler/$_role/$_env/$_job"
+
+  vagrant ssh -c "aurora job kill $jobkey/1"
+
+  vagrant ssh -c "aurora job killall  $jobkey"
+
+  vagrant ssh -c "aurora quota get $_cluster/$_role"
 }
 
 test_admin() {

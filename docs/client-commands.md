@@ -128,11 +128,11 @@ the machine executing Aurora commands.
 
 Hooks can be associated with these Aurora Client commands.
 
-  - `cancel_update`
-  - `create`
-  - `kill`
-  - `restart`
-  - `update`
+  - `job cancel-update`
+  - `job create`
+  - `job kill`
+  - `job restart`
+  - `job update`
 
 The process for writing and activating them is complex enough
 that we explain it in a devoted document, [Hooks for Aurora Client API](hooks.md).
@@ -145,28 +145,14 @@ renaming, updating, and restarting a basic Aurora Job.
 
 ### Creating and Running a Job
 
-    aurora create <job key> <configuration file>
+    aurora job create <job key> <configuration file>
 
 Creates and then runs a Job with the specified job key based on a `.aurora` configuration file.
 The configuration file may also contain and activate hook definitions.
 
-`create` can take four named parameters:
-
-- `-E NAME=VALUE` Bind a Thermos mustache variable name to a
-  value. Multiple flags specify multiple values. Defaults to `[]`.
-- ` -o, --open_browser` Open a browser window to the scheduler UI Job
-  page after a job changing operation happens. When `False`, the Job
-  URL prints on the console and the user has to copy/paste it
-  manually. Defaults to `False`. Does not work when running in Vagrant.
-- ` -j, --json` If specified, configuration argument is read as a
-  string in JSON format. Defaults to False.
-- ` --wait_until=STATE` Block the client until all the Tasks have
-  transitioned into the requested state. Possible values are: `PENDING`,
-  `RUNNING`, `FINISHED`. Default: `PENDING`
-
 ### Running a Command On a Running Job
 
-    aurora run <job_key> <cmd>
+    aurora task run CLUSTER/ROLE/ENV/NAME[/INSTANCES] <cmd>
 
 Runs a shell command on all machines currently hosting shards of a
 single Job.
@@ -175,75 +161,42 @@ single Job.
 commands; i.e. anything in the `{{mesos.*}}` and `{{thermos.*}}`
 namespaces.
 
-`run` can take three named parameters:
-
-- `-t NUM_THREADS`, `--threads=NUM_THREADS `The number of threads to
-  use, defaulting to `1`.
-- `--user=SSH_USER` ssh as this user instead of the given role value.
-  Defaults to None.
-- `-e, --executor_sandbox`  Run the command in the executor sandbox
-  instead of the Task sandbox. Defaults to False.
-
 ### Killing a Job
 
-    aurora kill <job key> <configuration file>
+    aurora job killall CLUSTER/ROLE/ENV/NAME
 
 Kills all Tasks associated with the specified Job, blocking until all
-are terminated. Defaults to killing all shards in the Job.
+are terminated. Defaults to killing all instances in the Job.
 
 The `<configuration file>` argument for `kill` is optional. Use it only
 if it contains hook definitions and activations that affect the
 kill command.
 
-`kill` can take two named parameters:
-
-- `-o, --open_browser` Open a browser window to the scheduler UI Job
-  page after a job changing operation happens. When `False`, the Job
-  URL prints on the console and the user has to copy/paste it
-  manually. Defaults to `False`. Does not work when running in Vagrant.
-- `--shards=SHARDS` A list of shard ids to act on. Can either be a
-  comma-separated list (e.g. 0,1,2) or a range (e.g. 0-2) or  any
-  combination of the two (e.g. 0-2,5,7-9). Defaults to acting on all
-  shards.
-
 ### Updating a Job
 
-    aurora update [--shards=ids] <job key> <configuration file>
-    aurora cancel_update <job key> <configuration file>
+    aurora job update CLUSTER/ROLE/ENV/NAME[/INSTANCES] <configuration file>
+    aurora job cancel-update CLUSTER/ROLE/ENV/NAME
 
 Given a running job, does a rolling update to reflect a new
 configuration version. Only updates Tasks in the Job with a changed
-configuration. You can further restrict the operated on Tasks by
-using `--shards` and specifying a comma-separated list of job shard ids.
+configuration. You can further restrict the operated on Tasks by specifying
+specific instances that should be updated.
 
-You may want to run `aurora diff` beforehand to validate which Tasks
+You may want to run `aurora job diff` beforehand to validate which Tasks
 have different configurations.
 
 Updating jobs are locked to be sure the update finishes without
 disruption. If the update abnormally terminates, the lock may stay
 around and cause failure of subsequent update attempts.
- `aurora cancel_update `unlocks the Job specified by
-its `job_key` argument. Be sure you don't issue `cancel_update` when
+ `aurora job cancel-update `unlocks the Job specified by
+its `job_key` argument. Be sure you don't issue `job cancel-update` when
 another user is working with the specified Job.
 
-The `<configuration file>` argument for `cancel_update` is optional. Use
+The `<configuration file>` argument for `job cancel-update` is optional. Use
 it only if it contains hook definitions and activations that affect the
 `cancel_update` command. The `<configuration file>` argument for
 `update` is required, but in addition to a new configuration it can be
-used to define and activate hooks for `update`.
-
-`update` can take four named parameters:
-
-- `--shards=SHARDS` A list of shard ids to update. Can either be a
-  comma-separated list (e.g. 0,1,2) or a range (e.g. 0-2) or  any
-  combination of the two (e.g. 0-2,5,7-9). If not  set, all shards are
-  acted on. Defaults to None.
-- `-E NAME=VALUE` Binds a Thermos mustache variable name to a value.
-  Use multiple flags to specify multiple values. Defaults to `[]`.
-- `-j, --json` If specified, configuration is read in JSON format.
-  Defaults to `False`.
-- `--updater_health_check_interval_seconds=HEALTH_CHECK_INTERVAL_SECONDS`
-  Time interval between subsequent shard status checks. Defaults to `3`.
+used to define and activate hooks for `job update`.
 
 #### Asynchronous job updates (beta)
 
@@ -253,12 +206,12 @@ update progress and job update history in the browser.
 
 There are several sub-commands to manage job updates:
 
-    aurora2 beta-update start <job key> <configuration file
-    aurora2 beta-update status <job key>
-    aurora2 beta-update pause <job key>
-    aurora2 beta-update resume <job key>
-    aurora2 beta-update abort <job key>
-    aurora2 beta-update list <cluster>
+    aurora beta-update start <job key> <configuration file>
+    aurora beta-update status <job key>
+    aurora beta-update pause <job key>
+    aurora beta-update resume <job key>
+    aurora beta-update abort <job key>
+    aurora beta-update list <cluster>
 
 When you `start` a job update, the command will return once it has sent the
 instructions to the scheduler.  At that point, you may view detailed
@@ -287,12 +240,12 @@ to renaming suitable for production services is:
 2.  Check that only these naming components have changed
     with `aurora diff`.
 
-        aurora diff <job_key> <job_configuration>
+        aurora job diff CLUSTER/ROLE/ENV/NAME <job_configuration>
 
 3.  Create the (identical) job at the new key. You may need to request a
     temporary quota increase.
 
-        aurora create <new_job_key> <job_configuration>
+        aurora job create CLUSTER/ROLE/ENV/NEW_NAME <job_configuration>
 
 4.  Migrate all clients over to the new job key. Update all links and
     dashboards. Ensure that both job keys run identical versions of the
@@ -300,7 +253,7 @@ to renaming suitable for production services is:
 5.  After verifying that all clients have successfully moved over, kill
     the old job.
 
-        aurora kill <old_job_key>
+        aurora job killall CLUSTER/ROLE/ENV/NAME
 
 6.  If you received a temporary quota increase, be sure to let the
     powers that be know you no longer need the additional capacity.
@@ -309,52 +262,19 @@ to renaming suitable for production services is:
 
 `restart` restarts all of a job key identified Job's shards:
 
-    aurora restart <job_key> <configuration file>
+    aurora job restart CLUSTER/ROLE/ENV/NAME[/INSTANCES]
 
 Restarts are controlled on the client side, so aborting
-the `restart` command halts the restart operation.
+the `job restart` command halts the restart operation.
 
-`restart` does a rolling restart. You almost always want to do this, but
-not if all shards of a service are misbehaving and are
-completely dysfunctional. To not do a rolling restart, use
-the `-shards` option described below.
-
-**Note**: `restart` only applies its command line arguments and does not
+**Note**: `job restart` only applies its command line arguments and does not
 use or is affected by `update.config`. Restarting
 does ***not*** involve a configuration change. To update the
 configuration, use `update.config`.
 
-The `<configuration file>` argument for restart is optional. Use it only
+The `--config` argument for restart is optional. Use it only
 if it contains hook definitions and activations that affect the
-`restart` command.
-
-In addition to the required job key argument, there are eight
-`restart` specific optional arguments:
-
-- `--updater_health_check_interval_seconds`: Defaults to `3`, the time
-  interval between subsequent shard status checks.
-- `--shards=SHARDS`: Defaults to None, which restarts all shards.
-  Otherwise, only the specified-by-id shards restart. They can be
-  comma-separated `(0, 8, 9)`, a range `(3-5)` or a
-  combination `(0, 3-5, 8, 9-11)`.
-- `--batch_size`: Defaults to `1`, the number of shards to be started
-  in one iteration. So, for example, for value 3, it tries to restart
-  the first three shards specified by `--shards` simultaneously, then
-  the next three, and so on.
-- `--max_per_shard_failures=MAX_PER_SHARD_FAILURES`: Defaults to `0`,
-  the maximum number of restarts per shard during restart. When
-  exceeded, it increments the total failure count.
-- `--max_total_failures=MAX_TOTAL_FAILURES`: Defaults to `0`, the
-  maximum total number of shard failures tolerated during restart.
-- `-o, --open_browser` Open a browser window to the scheduler UI Job
-  page after a job changing operation happens. When `False`, the Job
-  url prints on the console and the user has to copy/paste it
-  manually. Defaults to `False`. Does not work when running in Vagrant.
-- `--restart_threshold`: Defaults to `60`, the maximum number of
-  seconds before a shard must move into the `RUNNING` state before
-  it's considered a failure.
-- `--watch_secs`: Defaults to `45`, the minimum number of seconds a
-  shard must remain in `RUNNING` state before considered a success.
+`job restart` command.
 
 Cron Jobs
 ---------
@@ -367,19 +287,11 @@ if you do.
 Comparing Jobs
 --------------
 
-    aurora diff <job_key> config
+    aurora job diff CLUSTER/ROLE/ENV/NAME <job configuration>
 
 Compares a job configuration against a running job. By default the diff
 is determined using `diff`, though you may choose an alternate
  diff program by specifying the `DIFF_VIEWER` environment variable.
-
-There are two named parameters:
-
-- `-E NAME=VALUE` Bind a Thermos mustache variable name to a
-  value. Multiple flags may be used to specify multiple values.
-  Defaults to `[]`.
-- `-j, --json` Read the configuration argument in JSON format.
-  Defaults to `False`.
 
 Viewing/Examining Jobs
 ----------------------
@@ -389,44 +301,20 @@ how to view and examine Jobs.
 
 ### Listing Jobs
 
-    aurora list_jobs
-    Usage: `aurora list_jobs cluster/role
+    aurora config list <job configuration>
 
 Lists all Jobs registered with the Aurora scheduler in the named cluster for the named role.
 
-It has two named parameters:
-
-- `--pretty`: Displays job information in prettyprinted format.
-  Defaults to `False`.
-- `-c`, `--show-cron`: Shows cron schedule for jobs. Defaults to
-  `False`. Do not use, as it's not yet implemented.
-
 ### Inspecting a Job
 
-    aurora inspect <job_key> config
+    aurora job inspect CLUSTER/ROLE/ENV/NAME <job configuration>
 
 `inspect` verifies that its specified job can be parsed from a
-configuration file, and displays the parsed configuration. It has four
-named parameters:
-
-- `--local`: Inspect the configuration that the  `spawn` command would
-  create, defaulting to `False`.
-- `--raw`: Shows the raw configuration. Defaults to `False`.
-- `-j`, `--json`: If specified, configuration is read in JSON format.
-  Defaults to `False`.
-- `-E NAME=VALUE`: Bind a Thermos Mustache variable name to a value.
-  You can use multiple flags to specify multiple values. Defaults
-  to `[]`
-
-### Versions
-
-    aurora version
-
-Lists client build information and what Aurora API version it supports.
+configuration file, and displays the parsed configuration.
 
 ### Checking Your Quota
 
-    aurora get_quota --cluster=CLUSTER role
+    aurora quota get CLUSTER/ROLE
 
   Prints the production quota allocated to the role's value at the given
 cluster.
@@ -451,7 +339,7 @@ production jobs and user accounts for test or development jobs.
 
 ### Getting Job Status
 
-    aurora status <job_key>
+    aurora job status <job_key>
 
 Returns the status of recent tasks associated with the
 `job_key` specified Job in its supplied cluster. Typically this includes
@@ -464,7 +352,7 @@ Use the Job's web UI scheduler URL or the `aurora status` command to find out on
 machines individual tasks are scheduled. You can open the web UI via the
 `open` command line command if invoked from your machine:
 
-    aurora open [<cluster>[/<role>[/<env>/<job_name>]]]
+    aurora job open [<cluster>[/<role>[/<env>/<job_name>]]]
 
 If only the cluster is specified, it goes directly to that cluster's
 scheduler main page. If the role is specified, it goes to the top-level
@@ -473,25 +361,16 @@ page where you can inspect individual tasks.
 
 ### SSHing to a Specific Task Machine
 
-    aurora ssh <job_key> <shard number>
+    aurora task ssh <job_key> <shard number>
 
 You can have the Aurora client ssh directly to the machine that has been
 assigned a particular Job/shard number. This may be useful for quickly
 diagnosing issues such as performance issues or abnormal behavior on a
 particular machine.
 
-It can take three named parameters:
-
-- `-e`, `--executor_sandbox`:  Run `ssh` in the executor sandbox
-  instead of the  task sandbox. Defaults to `False`.
-- `--user=SSH_USER`: `ssh` as the given user instead of as the role in
-  the `job_key` argument. Defaults to none.
-- `-L PORT:NAME`: Add tunnel from local port `PORT` to the remote
-  named port  `NAME`. Defaults to `[]`.
-
 ### Templating Command Arguments
 
-    aurora run [-e] [-t THREADS] <job_key> -- <<command-line>>
+    aurora task run [-e] [-t THREADS] <job_key> -- <<command-line>>
 
 Given a job specification, run the supplied command on all hosts and
 return the output. You may use the standard Mustache templating rules:
@@ -506,7 +385,7 @@ return the output. You may use the standard Mustache templating rules:
 For example, the following type of pattern can be a powerful diagnostic
 tool:
 
-    aurora run -t5 cluster1/tyg/devel/seizure -- \
+    aurora task run -t5 cluster1/tyg/devel/seizure -- \
       'curl -s -m1 localhost:{{thermos.ports[http]}}/vars | grep uptime'
 
 By default, the command runs in the Task's sandbox. The `-e` option can

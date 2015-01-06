@@ -104,7 +104,7 @@ function await_task_in_state {
   do
     # TODO(wfarner): This check is not that great, since it will detect any task
     # in the job, rather a newly-failed task.
-    result=$(vagrant ssh -c "aurora status $1 2>&1 | grep 'status: $2'" 2>&1)
+    result=$(vagrant ssh -c "aurora job status $1 2>&1 | grep 'status: $2'" 2>&1)
     if [ $? -eq 0 ]
     then
       echo 'PASS'
@@ -128,14 +128,14 @@ cd "$(git rev-parse --show-toplevel)"
 JOB_KEY=devcluster/www-data/devel/hello_world
 
 write_test_files
-aurora_command create "create $JOB_KEY /vagrant/hello_world.aurora"
+aurora_command create "job create $JOB_KEY /vagrant/hello_world.aurora"
 await_task_in_state $JOB_KEY FAILED
 
 # Fix the bug in our test script.
 perl -pi -e 's|xrang\(|xrange\(|g' hello_world.py
-aurora_command update "update $JOB_KEY /vagrant/hello_world.aurora"
+aurora_command update "job update $JOB_KEY /vagrant/hello_world.aurora"
 await_task_in_state $JOB_KEY RUNNING
 
-aurora_command killall "killall $JOB_KEY"
+aurora_command killall "job killall $JOB_KEY"
 
 exit 0

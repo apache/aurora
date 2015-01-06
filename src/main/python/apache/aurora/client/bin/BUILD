@@ -12,14 +12,6 @@
 # limitations under the License.
 #
 
-python_binary(
-  name = 'aurora_client',
-  entry_point = 'apache.aurora.client.bin.aurora_client:proxy_main',
-  dependencies = [
-    ':aurora_client_lib'
-  ]
-)
-
 python_library(
   name = 'aurora_client_lib',
   sources = [ 'aurora_client.py' ],

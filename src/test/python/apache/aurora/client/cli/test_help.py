@@ -22,7 +22,7 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 
 
 class TestHelp(unittest.TestCase):
-  """Tests of the help command for the Aurora v2 client framework"""
+  """Tests of the help command for the Aurora client framework"""
 
   def setUp(self):
     self.cmd = AuroraCommandLine()
