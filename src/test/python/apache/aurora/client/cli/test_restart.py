@@ -78,7 +78,8 @@ class TestRestartCommand(AuroraClientCommandTest):
   def setup_populate_job_config(cls, api):
     populate = cls.create_simple_success_response()
     populate.result = Result(populateJobResult=PopulateJobResult(
-        populatedDEPRECATED={TaskConfig()}
+        populatedDEPRECATED={TaskConfig()},
+        taskConfig=TaskConfig()
     ))
     api.populateJobConfig.return_value = populate
     return populate

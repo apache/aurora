@@ -15,7 +15,14 @@ import unittest
 
 from apache.aurora.client import base
 
-from gen.apache.aurora.api.ttypes import Response, ResponseCode, ResponseDetail
+from gen.apache.aurora.api.ttypes import (
+    PopulateJobResult,
+    Response,
+    ResponseCode,
+    ResponseDetail,
+    Result,
+    TaskConfig
+)
 
 
 class TestBase(unittest.TestCase):
@@ -41,3 +48,15 @@ class TestBase(unittest.TestCase):
         responseCode=ResponseCode.ERROR,
         details=[ResponseDetail(message='Error1'), ResponseDetail(message='Error2')])
     assert base.combine_messages(resp) == 'Error1, Error2'
+
+  def test_get_populated_task_config_set(self):
+    config = TaskConfig()
+    resp = Response(responseCode=ResponseCode.OK, result=Result(populateJobResult=PopulateJobResult(
+        taskConfig=config)))
+    assert config == base.get_populated_task_config(resp)
+
+  def test_get_populated_task_config_deprecated_set(self):
+    config = TaskConfig()
+    resp = Response(responseCode=ResponseCode.OK, result=Result(populateJobResult=PopulateJobResult(
+        populatedDEPRECATED=set([config]))))
+    assert config == base.get_populated_task_config(resp)

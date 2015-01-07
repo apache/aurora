@@ -20,6 +20,7 @@ import os
 import pprint
 import subprocess
 import textwrap
+from copy import deepcopy
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 
@@ -28,6 +29,7 @@ from thrift.TSerialization import serialize
 
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.client.api.updater_util import UpdaterConfig
+from apache.aurora.client.base import get_populated_task_config
 from apache.aurora.client.cli import (
     EXIT_COMMAND_FAILURE,
     EXIT_INVALID_CONFIGURATION,
@@ -207,7 +209,8 @@ class DiffCommand(Verb):
     resp = api.populate_job_config(config)
     context.check_and_log_response(resp, err_code=EXIT_INVALID_CONFIGURATION,
           err_msg="Error loading configuration")
-    local_tasks = resp.result.populateJobResult.populatedDEPRECATED
+    # Deepcopy is important here as tasks will be modified for printing.
+    local_tasks = [deepcopy(get_populated_task_config(resp)) for _ in range(config.instances())]
     diff_program = os.environ.get("DIFF_VIEWER", "diff")
     with NamedTemporaryFile() as local:
       self.dump_tasks(local_tasks, local)
@@ -691,9 +694,6 @@ class UpdateCommand(Verb):
         statuses=ACTIVE_STATES, env=config.environment()))
     context.check_and_log_response(resp, err_msg="Server could not find running job to update")
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
-    resp = api.populate_job_config(config)
-    context.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE,
-        err_msg="Server could not populate job config for comparison:")
     # for determining if an update is dangerous, we estimate the scope of the change
     # by comparing number of instances to be updated, with the number of
     # instances running in the cluster.
@@ -702,7 +702,7 @@ class UpdateCommand(Verb):
     # So updating 20 instances out of 500 isn't a large change: even though 20 < 500/4;
     # but updating 20 instances when there are only 4 running is a large change.
     if context.options.instance_spec.instance == ALL_INSTANCES:
-      local_task_count = len(resp.result.populateJobResult.populatedDEPRECATED)
+      local_task_count = config.instances()
       remote_task_count = len(remote_tasks)
     else:
       local_task_count = len(context.options.instance_spec.instance)

@@ -182,7 +182,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
         diskMb=1,
         job=JobKey(role='bozo', environment='test', name='hello')) for i in range(count)]
     populate.result = Result(populateJobResult=PopulateJobResult(
-        populatedDEPRECATED=set(configs)
+        populatedDEPRECATED=set(configs),
+        taskConfig=configs[0]
     ))
     api.populateJobConfig.return_value = populate
     return populate

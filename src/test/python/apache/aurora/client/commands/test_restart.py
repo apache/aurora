@@ -94,6 +94,7 @@ class TestRestartCommand(AuroraClientCommandTest):
       task_config = create_autospec(spec=TaskConfig, instance=True)
       configs.append(task_config)
     populate.result.populateJobResult.populatedDEPRECATED = set(configs)
+    populate.result.populateJobResult.taskConfig = configs[0]
     return populate
 
   @classmethod

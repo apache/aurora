@@ -104,7 +104,8 @@ class TestDiffCommand(AuroraClientCommandTest):
     api.populateJobConfig.return_value = populate
     tasks = set(task.assignedTask.task for task in cls.create_mock_scheduled_tasks())
     populate.result = Result(populateJobResult=PopulateJobResult(
-      populatedDEPRECATED=tasks
+      populatedDEPRECATED=tasks,
+      taskConfig=list(tasks)[0]
     ))
     return populate
 

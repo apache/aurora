@@ -156,7 +156,8 @@ class TestUpdateCommand(AuroraClientCommandTest):
           job=JobKey(role='mchucarroll', environment='test', name='hello'))
       configs.append(task_config)
     populate.result = Result(populateJobResult=PopulateJobResult(
-        populatedDEPRECATED=set(configs)
+        populatedDEPRECATED=set(configs),
+        taskConfig=configs[0]
     ))
     return populate
 

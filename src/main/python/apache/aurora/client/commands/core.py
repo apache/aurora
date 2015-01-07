@@ -23,6 +23,7 @@ import pprint
 import subprocess
 import sys
 import time
+from copy import deepcopy
 from datetime import datetime
 from tempfile import NamedTemporaryFile
 
@@ -38,6 +39,7 @@ from apache.aurora.client.base import (
     combine_messages,
     deprecation_warning,
     die,
+    get_populated_task_config,
     handle_open,
     requires,
     synthesize_url,
@@ -285,11 +287,11 @@ def diff(job_spec, config_file):
   resp = api.populate_job_config(config)
   if resp.responseCode != ResponseCode.OK:
     die('Request failed, server responded with "%s"' % combine_messages(resp))
-  local_tasks = resp.result.populateJobResult.populatedDEPRECATED
+  local_tasks = [deepcopy(get_populated_task_config(resp)) for _ in range(config.instances())]
 
   pp = pprint.PrettyPrinter(indent=2)
   def pretty_print_task(task):
-  # The raw configuration is not interesting - we only care about what gets parsed.
+    # The raw configuration is not interesting - we only care about what gets parsed.
     task.configuration = None
     task.executorConfig = ExecutorConfig(
         name=AURORA_EXECUTOR_NAME,
@@ -703,7 +705,7 @@ def status(args, options):
 
 
 def really_update(job_spec, config_file, options):
-  def warn_if_dangerous_change(api, job_spec, config):
+  def warn_if_dangerous_change(api, config):
     # Get the current job status, so that we can check if there's anything
     # dangerous about this update.
     resp = api.query_no_configs(api.build_query(config.role(), config.name(),
@@ -711,10 +713,7 @@ def really_update(job_spec, config_file, options):
     if resp.responseCode != ResponseCode.OK:
       die('Could not get job status from server for comparison: %s' % combine_messages(resp))
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
-    resp = api.populate_job_config(config)
-    if resp.responseCode != ResponseCode.OK:
-      die('Server could not populate job config for comparison: %s' % combine_messages(resp))
-    local_task_count = len(resp.result.populateJobResult.populatedDEPRECATED)
+    local_task_count = config.instances()
     remote_task_count = len(remote_tasks)
     if (local_task_count >= 4 * remote_task_count or local_task_count <= 4 * remote_task_count
         or local_task_count == 0):

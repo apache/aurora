@@ -24,7 +24,7 @@ from thrift.TSerialization import serialize
 from twitter.common import log
 from twitter.common.quantity import Amount, Time
 
-from apache.aurora.client.base import combine_messages, format_response
+from apache.aurora.client.base import combine_messages, format_response, get_populated_task_config
 
 from .error_handling_thread import ExecutionError, spawn_worker
 from .instance_watcher import InstanceWatcher
@@ -626,9 +626,7 @@ class Updater(object):
     """
     resp = self._scheduler.populateJobConfig(self._config.job())
     self._check_and_log_response(resp)
-
-    # Safe to take the first element as Scheduler would throw in case zero instances provided.
-    return list(resp.result.populateJobResult.populatedDEPRECATED)[0]
+    return get_populated_task_config(resp)
 
   def _replace_template_if_cron(self):
     """Checks if the provided job config represents a cron job and if so, replaces it.

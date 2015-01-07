@@ -197,8 +197,12 @@ class UpdaterTest(TestCase):
 
   def expect_populate(self, job_config, response_code=ResponseCode.OK):
     resp = make_response(response_code)
-    result = set([deepcopy(job_config.taskConfig)])
-    resp.result = Result(populateJobResult=PopulateJobResult(populatedDEPRECATED=result))
+    config = deepcopy(job_config.taskConfig)
+    result = set([config])
+    resp.result = Result(populateJobResult=PopulateJobResult(
+        populatedDEPRECATED=result,
+        taskConfig=config))
+
     self._scheduler.populateJobConfig(job_config).AndReturn(resp)
 
   def expect_get_tasks(self, tasks, ignore_ids=None, response_code=ResponseCode.OK):
