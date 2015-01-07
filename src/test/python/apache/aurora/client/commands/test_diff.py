@@ -15,7 +15,7 @@
 import contextlib
 import os
 
-from mock import create_autospec, Mock, patch
+from mock import Mock, patch
 from pystachio.config import Config
 from twitter.common.contextutil import temporary_file
 
