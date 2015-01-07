@@ -57,7 +57,7 @@ python_library(
   dependencies = [
     '3rdparty/python:twitter.common.app',
     '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.python',
+    '3rdparty/python:pex',
     'src/main/python/apache/aurora/client/api:command_runner',
     'src/main/python/apache/aurora/client/api:disambiguator',
     'src/main/python/apache/aurora/client/api:job_monitor',

@@ -45,10 +45,10 @@ python_library(
   name = 'executor_vars',
   sources = ['executor_vars.py'],
   dependencies = [
+    '3rdparty/python:pex',
     '3rdparty/python:psutil',
     '3rdparty/python:twitter.common.exceptions',
     '3rdparty/python:twitter.common.metrics',
-    '3rdparty/python:twitter.common.python',
     '3rdparty/python:twitter.common.quantity',
     '3rdparty/python:twitter.common.string',
   ]

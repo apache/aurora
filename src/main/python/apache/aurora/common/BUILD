@@ -62,7 +62,7 @@ python_library(
   name = 'pex_version',
   sources = ['pex_version.py'],
   dependencies = [
-    '3rdparty/python:twitter.common.python',
+    '3rdparty/python:pex',
   ]
 )
 

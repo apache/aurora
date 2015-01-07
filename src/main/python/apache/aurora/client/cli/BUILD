@@ -32,7 +32,7 @@ python_library(
   dependencies = [
     ':cli',
     ':bridge',
-    '3rdparty/python:twitter.common.python',
+    '3rdparty/python:pex',
     'src/main/python/apache/aurora/client/bin:aurora_admin_lib',
     'src/main/python/apache/aurora/client/bin:aurora_client_lib'
   ]
@@ -55,9 +55,9 @@ python_library(
     'update.py',
   ],
   dependencies = [
+    '3rdparty/python:pex',
     '3rdparty/python:requests',
     '3rdparty/python:twitter.common.log',
-    '3rdparty/python:twitter.common.python',
     '3rdparty/python:twitter.common.quantity',
     'src/main/python/apache/aurora/client/api:command_runner',
     'src/main/python/apache/aurora/client/api:disambiguator',

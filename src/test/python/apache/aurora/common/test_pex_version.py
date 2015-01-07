@@ -16,7 +16,7 @@ from zipfile import BadZipfile
 
 import mock
 import pytest
-from twitter.common.python.pex import PexInfo
+from pex.pex import PexInfo
 
 from apache.aurora.common.pex_version import pex_version, UnknownVersion
 

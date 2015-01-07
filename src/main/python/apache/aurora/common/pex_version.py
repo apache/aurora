@@ -14,7 +14,7 @@
 
 from zipfile import BadZipfile
 
-from twitter.common.python.pex import PexInfo
+from pex.pex import PexInfo
 
 
 class UnknownVersion(Exception):
