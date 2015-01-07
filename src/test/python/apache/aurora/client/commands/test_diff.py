@@ -60,11 +60,11 @@ class TestDiffCommand(AuroraClientCommandTest):
   def create_mock_scheduled_tasks(cls):
     jobs = []
     for name in ['foo', 'bar', 'baz']:
-      job = create_autospec(spec=ScheduledTask, instance=True)
+      job = ScheduledTask()
       job.failure_count = 0
-      job.assignedTask = create_autospec(spec=AssignedTask, instance=True)
+      job.assignedTask = AssignedTask()
       job.assignedTask.slaveHost = 'slavehost'
-      job.assignedTask.task = create_autospec(spec=TaskConfig, instance=True)
+      job.assignedTask.task = TaskConfig()
       job.assignedTask.task.maxTaskFailures = 1
       job.assignedTask.task.executorConfig = ExecutorConfig(name='name', data='fake data')
       job.assignedTask.task.metadata = []
@@ -78,11 +78,11 @@ class TestDiffCommand(AuroraClientCommandTest):
       job.assignedTask.instanceId = 4237894
       job.assignedTask.assignedPorts = None
       job.status = ScheduleStatus.RUNNING
-      mockEvent = create_autospec(spec=TaskEvent, instance=True)
-      mockEvent.timestamp = 28234726395
-      mockEvent.status = ScheduleStatus.RUNNING
-      mockEvent.message = "Hi there"
-      job.taskEvents = [mockEvent]
+      event = TaskEvent()
+      event.timestamp = 28234726395
+      event.status = ScheduleStatus.RUNNING
+      event.message = "Hi there"
+      job.taskEvents = [event]
       jobs.append(job)
     return jobs
 
