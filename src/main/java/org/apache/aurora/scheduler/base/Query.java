@@ -15,12 +15,9 @@ package org.apache.aurora.scheduler.base;
 
 import java.util.EnumSet;
 import java.util.Objects;
-import java.util.Set;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
 
 import org.apache.aurora.gen.ScheduleStatus;
@@ -54,20 +51,6 @@ public final class Query {
   public static boolean isJobScoped(Builder taskQuery) {
     TaskQuery q = taskQuery.get();
     return q.isSetRole() && q.isSetEnvironment() && q.isSetJobName() || q.isSetJobKeys();
-  }
-
-  /**
-   * Checks whether a query is strictly scoped to a specific job. A query is strictly job scoped,
-   * iff the only fields that are set in the query are: role, environment and job name.
-   *
-   * @param query Query to test.
-   * @return {@code true} if the query is strictly single job scoped, otherwise {@code false}.
-   */
-  public static boolean isSingleJobScoped(Builder query) {
-    Optional<Set<IJobKey>> jobKey = JobKeys.from(query);
-    return jobKey.isPresent()
-        && jobKey.get().size() == 1
-        && Query.jobScoped(Iterables.getOnlyElement(jobKey.get())).equals(query);
   }
 
   public static Builder arbitrary(TaskQuery query) {

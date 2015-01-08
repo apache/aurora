@@ -169,7 +169,8 @@ import static org.apache.aurora.scheduler.storage.backup.Recovery.RecoveryExcept
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASKS_PER_JOB;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.MAX_TASK_ID_LENGTH;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NOOP_JOB_UPDATE_MESSAGE;
-import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NO_CRON_UPDATES;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.NO_CRON;
+import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.jobAlreadyExistsMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.killedByMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.noCronScheduleMessage;
 import static org.apache.aurora.scheduler.thrift.SchedulerThriftInterface.notScheduledCronMessage;
@@ -387,42 +388,14 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
-  public void testCreateCronJob() throws Exception {
-    IJobConfiguration job = IJobConfiguration.build(makeProdJob().setCronSchedule(CRON_SCHEDULE));
-    SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
-    expectAuth(ROLE, true);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
-    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
-        .andReturn(TASK_ID);
-    expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
-        .andReturn(ENOUGH_QUOTA);
-
-    cronJobManager.createJob(anyObject(SanitizedCronJob.class));
-
-    control.replay();
-
-    assertOkResponse(thrift.createJob(job.newBuilder(), LOCK.newBuilder(), SESSION));
-  }
-
-  @Test
-  public void testRejectCronJobEmptyCronSchedule() throws Exception {
+  public void testCreateJobFailsForCron() throws Exception {
     IJobConfiguration job = IJobConfiguration.build(makeProdJob().setCronSchedule(""));
-    SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
     expectAuth(ROLE, true);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
-    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
-    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
-        .andReturn(TASK_ID);
-    expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
-        .andReturn(ENOUGH_QUOTA);
 
     control.replay();
 
     assertEquals(
-        invalidResponse(SanitizedCronJob.NO_CRON_SCHEDULE),
+        invalidResponse(NO_CRON),
         thrift.createJob(job.newBuilder(), LOCK.newBuilder(), SESSION));
   }
 
@@ -799,21 +772,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY);
     expectAuth(ROOT, true);
     storageUtil.expectTaskFetch(query.active(), buildScheduledTask());
-    expect(cronJobManager.deleteJob(JOB_KEY)).andReturn(false);
     lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     expectTransitionsToKilling();
-
-    control.replay();
-
-    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
-  }
-
-  @Test
-  public void testKillCronJob() throws Exception {
-    Query.Builder query = Query.jobScoped(JOB_KEY);
-    expectAuth(ROOT, true);
-    storageUtil.expectTaskFetch(query.active());
-    expect(cronJobManager.deleteJob(JOB_KEY)).andReturn(true);
 
     control.replay();
 
@@ -900,7 +860,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
     storageUtil.expectTaskFetch(query.active());
     expectAuth(ImmutableSet.of("role"), true);
-    expect(cronJobManager.deleteJob(key)).andReturn(true);
 
     control.replay();
     assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
@@ -1273,10 +1232,31 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
         .andReturn(ENOUGH_QUOTA);
 
-    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false).times(2);
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active());
     cronJobManager.createJob(SanitizedCronJob.from(sanitized));
     control.replay();
     assertResponse(OK, thrift.scheduleCronJob(CRON_JOB, DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testScheduleCronFailsCreationDueToExistingNonCron() throws Exception {
+    expectAuth(ROLE, true);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    SanitizedConfiguration sanitized =
+        SanitizedConfiguration.fromUnsanitized(IJobConfiguration.build(CRON_JOB));
+
+    expect(taskIdGenerator.generate(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(TASK_ID);
+    expect(quotaManager.checkInstanceAddition(sanitized.getJobConfig().getTaskConfig(), 1))
+        .andReturn(ENOUGH_QUOTA);
+
+    expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
+    storageUtil.expectTaskFetch(Query.jobScoped(JOB_KEY).active(), buildScheduledTask());
+    control.replay();
+    assertEquals(
+        invalidResponse(jobAlreadyExistsMessage(JOB_KEY)),
+        thrift.scheduleCronJob(CRON_JOB, DEFAULT_LOCK, SESSION));
   }
 
   @Test
@@ -1309,6 +1289,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testScheduleCronJobFailedTaskConfigValidation() throws Exception {
+    expectAuth(ROLE, true);
+    control.replay();
+    IJobConfiguration job = IJobConfiguration.build(makeJob(null));
+    assertResponse(
+        INVALID_REQUEST,
+        thrift.scheduleCronJob(job.newBuilder(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
   public void testScheduleCronJobFailsLockValidation() throws Exception {
     expectAuth(ROLE, true);
     lockManager.validateIfLocked(LOCK_KEY, Optional.of(LOCK));
@@ -1320,7 +1310,6 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testScheduleCronJobFailsWithNoCronSchedule() throws Exception {
     expectAuth(ROLE, true);
-    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
     control.replay();
 
     assertEquals(
@@ -2696,7 +2685,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
 
     control.replay();
-    assertEquals(invalidResponse(NO_CRON_UPDATES), thrift.startJobUpdate(request, SESSION));
+    assertEquals(invalidResponse(NO_CRON), thrift.startJobUpdate(request, SESSION));
   }
 
   @Test

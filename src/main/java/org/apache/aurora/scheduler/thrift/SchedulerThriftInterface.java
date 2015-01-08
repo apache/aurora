@@ -286,6 +286,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       return errorResponse(INVALID_REQUEST, e);
     }
 
+    if (sanitized.isCron()) {
+      return invalidResponse(NO_CRON);
+    }
+
     return storage.write(new MutateWork.Quiet<Response>() {
       @Override
       public Response apply(MutableStoreProvider storeProvider) {
@@ -296,84 +300,97 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               ILockKey.build(LockKey.job(job.getKey().newBuilder())),
               Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
 
-          if (!storeProvider.getTaskStore().fetchTasks(
-              Query.jobScoped(job.getKey()).active()).isEmpty()
-              || cronJobManager.hasJob(job.getKey())) {
-
-            return invalidResponse("Job already exists: " + JobKeys.canonicalString(job.getKey()));
-          }
+          checkJobExists(storeProvider, job.getKey());
 
           ITaskConfig template = sanitized.getJobConfig().getTaskConfig();
           int count = sanitized.getJobConfig().getInstanceCount();
 
           validateTaskLimits(template, count, quotaManager.checkInstanceAddition(template, count));
 
-          // TODO(mchucarroll): deprecate cron as a part of create/kill job.(AURORA-454)
-          if (sanitized.isCron()) {
-            LOG.warning("Deprecated behavior: scheduling job " + job.getKey()
-                + " with cron via createJob (AURORA_454)");
-            cronJobManager.createJob(SanitizedCronJob.from(sanitized));
-          } else {
-            LOG.info("Launching " + count + " tasks.");
-            stateManager.insertPendingTasks(
-                storeProvider,
-                template,
-                sanitized.getInstanceIds());
-          }
+          LOG.info("Launching " + count + " tasks.");
+          stateManager.insertPendingTasks(
+              storeProvider,
+              template,
+              sanitized.getInstanceIds());
+
           return okEmptyResponse();
         } catch (LockException e) {
           return errorResponse(LOCK_ERROR, e);
-        } catch (CronException | TaskValidationException e) {
+        } catch (JobExistsException | TaskValidationException e) {
           return errorResponse(INVALID_REQUEST, e);
         }
       }
     });
   }
 
+  private static class JobExistsException extends Exception {
+    public JobExistsException(String message) {
+      super(message);
+    }
+  }
+
+  private void checkJobExists(StoreProvider store, IJobKey jobKey) throws JobExistsException {
+    if (!store.getTaskStore().fetchTasks(Query.jobScoped(jobKey).active()).isEmpty()
+        || cronJobManager.hasJob(jobKey)) {
+
+      throw new JobExistsException(jobAlreadyExistsMessage(jobKey));
+    }
+  }
+
   private Response createOrUpdateCronTemplate(
       JobConfiguration mutableJob,
-      @Nullable Lock mutableLock,
+      @Nullable final Lock mutableLock,
       SessionKey session,
-      boolean updateOnly) {
+      final boolean updateOnly) {
 
     IJobConfiguration job = IJobConfiguration.build(mutableJob);
-    IJobKey jobKey = JobKeys.assertValid(job.getKey());
+    final IJobKey jobKey = JobKeys.assertValid(job.getKey());
     requireNonNull(session);
 
+    final SanitizedConfiguration sanitized;
     try {
       sessionValidator.checkAuthenticated(session, ImmutableSet.of(jobKey.getRole()));
-
-      SanitizedConfiguration sanitized = SanitizedConfiguration.fromUnsanitized(job);
-
-      lockManager.validateIfLocked(
-          ILockKey.build(LockKey.job(jobKey.newBuilder())),
-          Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
-
-      if (!sanitized.isCron()) {
-        return invalidResponse(noCronScheduleMessage(jobKey));
-      }
-
-      ITaskConfig template = sanitized.getJobConfig().getTaskConfig();
-      int count = sanitized.getJobConfig().getInstanceCount();
-
-      validateTaskLimits(template, count, quotaManager.checkInstanceAddition(template, count));
-
-      // TODO(mchucarroll): Merge CronJobManager.createJob/updateJob
-      if (updateOnly || cronJobManager.hasJob(sanitized.getJobConfig().getKey())) {
-        // The job already has a schedule: so update it.
-        cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
-      } else {
-        cronJobManager.createJob(SanitizedCronJob.from(sanitized));
-      }
-
-      return okEmptyResponse();
+      sanitized = SanitizedConfiguration.fromUnsanitized(job);
     } catch (AuthFailedException e) {
       return errorResponse(AUTH_FAILED, e);
-    } catch (LockException e) {
-      return errorResponse(LOCK_ERROR, e);
-    } catch (TaskDescriptionException | TaskValidationException | CronException e) {
+    } catch (TaskDescriptionException e) {
       return errorResponse(INVALID_REQUEST, e);
     }
+
+    if (!sanitized.isCron()) {
+      return invalidResponse(noCronScheduleMessage(jobKey));
+    }
+
+    return storage.write(new MutateWork.Quiet<Response>() {
+      @Override
+      public Response apply(MutableStoreProvider storeProvider) {
+        try {
+          lockManager.validateIfLocked(
+              ILockKey.build(LockKey.job(jobKey.newBuilder())),
+              Optional.fromNullable(mutableLock).transform(ILock.FROM_BUILDER));
+
+          ITaskConfig template = sanitized.getJobConfig().getTaskConfig();
+          int count = sanitized.getJobConfig().getInstanceCount();
+
+          validateTaskLimits(template, count, quotaManager.checkInstanceAddition(template, count));
+
+          // TODO(mchucarroll): Merge CronJobManager.createJob/updateJob
+          if (updateOnly || cronJobManager.hasJob(sanitized.getJobConfig().getKey())) {
+            // The job already has a schedule: so update it.
+            cronJobManager.updateJob(SanitizedCronJob.from(sanitized));
+          } else {
+            checkJobExists(storeProvider, jobKey);
+            cronJobManager.createJob(SanitizedCronJob.from(sanitized));
+          }
+
+          return okEmptyResponse();
+        } catch (LockException e) {
+          return errorResponse(LOCK_ERROR, e);
+        } catch (JobExistsException | TaskValidationException | CronException e) {
+          return errorResponse(INVALID_REQUEST, e);
+        }
+      }
+    });
   }
 
   @Override
@@ -736,9 +753,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
       public Response apply(MutableStoreProvider storeProvider) {
         Query.Builder query = Query.arbitrary(mutableQuery);
 
-        // Check single job scoping before adding statuses.
-        boolean isSingleJobScoped = Query.isSingleJobScoped(query);
-
         // Unless statuses were specifically supplied, only attempt to kill active tasks.
         query = query.get().isSetStatuses() ? query : query.byStatus(ACTIVE_STATES);
 
@@ -767,19 +781,6 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
 
         LOG.info("Killing tasks matching " + query);
 
-        final boolean cronJobKilled;
-        if (isSingleJobScoped) {
-          // If this looks like a query for all tasks in a job, instruct the cron
-          // scheduler to delete it.
-          // TODO(mchucarroll): deprecate cron as a part of create/kill job.  (AURORA-454)
-          IJobKey jobKey = Iterables.getOnlyElement(JobKeys.from(query).get());
-          LOG.warning("Deprecated behavior: descheduling job " + jobKey
-              + " with cron via killTasks. (See AURORA-454)");
-          cronJobKilled = cronJobManager.deleteJob(jobKey);
-        } else {
-          cronJobKilled = false;
-        }
-
         boolean tasksKilled = false;
         for (String taskId : Tasks.ids(tasks)) {
           tasksKilled |= stateManager.changeState(
@@ -790,7 +791,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               killedByMessage(context.getIdentity()));
         }
 
-        return cronJobKilled || tasksKilled
+        return tasksKilled
             ? okEmptyResponse()
             : addMessage(emptyResponse(), OK, NO_TASKS_TO_KILL_MESSAGE);
       }
@@ -1373,7 +1374,7 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
               ITaskConfig.build(mutableRequest.getTaskConfig())).newBuilder()));
 
       if (cronJobManager.hasJob(job)) {
-        return invalidResponse(NO_CRON_UPDATES);
+        return invalidResponse(NO_CRON);
       }
     } catch (AuthFailedException e) {
       return errorResponse(AUTH_FAILED, e);
@@ -1562,13 +1563,18 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
   }
 
   @VisibleForTesting
+  static String jobAlreadyExistsMessage(IJobKey jobKey) {
+    return String.format("Job %s already exists", JobKeys.canonicalString(jobKey));
+  }
+
+  @VisibleForTesting
   static final String NO_TASKS_TO_KILL_MESSAGE = "No tasks to kill.";
 
   @VisibleForTesting
   static final String NOOP_JOB_UPDATE_MESSAGE = "Job is unchanged by proposed update.";
 
   @VisibleForTesting
-  static final String NO_CRON_UPDATES = "Cron jobs may only be updated by calling scheduleCronJob.";
+  static final String NO_CRON = "Cron jobs may only be created/updated by calling scheduleCronJob.";
 
   private static Response okEmptyResponse()  {
     return emptyResponse().setResponseCode(OK);
