@@ -4,6 +4,14 @@ First things first, you'll need the source! The Aurora source is available from 
 
     git clone https://git-wip-us.apache.org/repos/asf/incubator-aurora
 
+Read the Style Guides
+---------------------
+Aurora's codebase is primarily Java and Python and conforms to the Twitter Commons styleguides for
+both languages.
+
+- [Java Style Guide](https://github.com/twitter/commons/blob/master/src/java/com/twitter/common/styleguide.md)
+- [Python Style Guide](https://github.com/twitter/commons/blob/master/src/python/twitter/common/styleguide.md)
+
 Find Something to Do
 --------------------
 There are issues in [Jira](https://issues.apache.org/jira/browse/AURORA) with the
