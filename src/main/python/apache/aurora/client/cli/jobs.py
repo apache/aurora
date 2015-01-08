@@ -369,7 +369,7 @@ class KillCommand(AbstractKillCommand):
           "The instances list cannot be omitted in a kill command!; "
           "use killall to kill all instances")
     if context.options.strict:
-      context.verify_shards_option_validity(job, instances_arg)
+      context.verify_instances_option_validity(job, instances_arg)
     api = context.get_api(job.cluster)
     if context.options.no_batching:
       resp = api.kill_job(job, instances_arg)
@@ -497,7 +497,7 @@ class RestartCommand(Verb):
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
     if instances is not None and context.options.strict:
-      context.verify_shards_option_validity(job, instances)
+      context.verify_instances_option_validity(job, instances)
     api = context.get_api(job.cluster)
     config = (context.get_job_config(job, context.options.config)
         if context.options.config else None)
@@ -716,7 +716,7 @@ class UpdateCommand(Verb):
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
     if instances is not None and context.options.strict:
-      context.verify_shards_option_validity(job, instances)
+      context.verify_instances_option_validity(job, instances)
     config = context.get_job_config(job, context.options.config_file)
     api = context.get_api(config.cluster())
     if not context.options.force:

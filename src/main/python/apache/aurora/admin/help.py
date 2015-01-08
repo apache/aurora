@@ -18,11 +18,53 @@ import collections
 import sys
 
 from twitter.common import app
+from twitter.common.log.options import LogOptions
 
 from apache.aurora.client.base import die
 
 
+def add_verbosity_options():
+  def set_quiet(option, _1, _2, parser):
+    setattr(parser.values, option.dest, 'quiet')
+    LogOptions.set_stderr_log_level('NONE')
+
+  def set_verbose(option, _1, _2, parser):
+    setattr(parser.values, option.dest, 'verbose')
+    LogOptions.set_stderr_log_level('DEBUG')
+
+  app.add_option('-v',
+                 dest='verbosity',
+                 default='normal',
+                 action='callback',
+                 callback=set_verbose,
+                 help='Verbose logging. (default: %default)')
+
+  app.add_option('-q',
+                 dest='verbosity',
+                 default='normal',
+                 action='callback',
+                 callback=set_quiet,
+                 help='Quiet logging. (default: %default)')
+
+
+def generate_terse_usage():
+  """Generate minimal application usage from all registered
+     twitter.common.app commands and return as a string."""
+  docs_to_commands = collections.defaultdict(list)
+  for (command, doc) in app.get_commands_and_docstrings():
+    docs_to_commands[doc].append(command)
+  usage = '\n    '.join(sorted(map(make_commands_str, docs_to_commands.values())))
+  return """
+Available commands:
+    %s
+
+For more help on an individual command:
+    %s help <command>
+""" % (usage, app.name())
+
+
 def make_commands_str(commands):
+  """Format a string representation of a number of command aliases."""
   commands.sort()
   if len(commands) == 1:
     return str(commands[0])
@@ -33,6 +75,8 @@ def make_commands_str(commands):
 
 
 def generate_full_usage():
+  """Generate verbose application usage from all registered
+   twitter.common.app commands and return as a string."""
   docs_to_commands = collections.defaultdict(list)
   for (command, doc) in app.get_commands_and_docstrings():
     if doc is not None:

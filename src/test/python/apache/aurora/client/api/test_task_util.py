@@ -19,7 +19,7 @@ from mock import create_autospec
 from apache.aurora.client.api.scheduler_mux import SchedulerMux
 from apache.aurora.client.api.task_util import StatusMuxHelper
 
-from ..api.api_util import SchedulerThriftApiSpec
+from ...api_util import SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,

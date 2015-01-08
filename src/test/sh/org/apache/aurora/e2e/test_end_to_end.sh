@@ -71,13 +71,13 @@ test_http_example() {
   test $? -eq 0
 
   # Run a kill without specifying instances, and verify that it gets an error, and the job
-  # isn't affected. (TODO(mchucarroll): the failed kill should return non-zero!)
+  # isn't affected. (TODO(maxim): the failed kill should return non-zero!)
   vagrant ssh -c "aurora job kill $jobkey" 2>&1 | grep -q "The instances list cannot be omitted in a kill command"
   check_url_live "$base_url/scheduler/$_role/$_env/$_job"
 
   vagrant ssh -c "aurora job kill $jobkey/1"
 
-  vagrant ssh -c "aurora job killall  $jobkey"
+  vagrant ssh -c "aurora job killall $jobkey"
 
   vagrant ssh -c "aurora quota get $_cluster/$_role"
 }
@@ -89,7 +89,7 @@ test_admin() {
 
   echo '== Testing Aurora Admin commands...'
   echo '== Getting leading scheduler'
-  vagrant ssh -c "aurora_admin get_scheduler $_cluster" | grep "$base_url"
+  vagrant ssh -c "aurora_admin get_scheduler $_cluster" | grep ":8081"
 }
 
 RETCODE=1

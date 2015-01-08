@@ -21,7 +21,7 @@ from apache.aurora.common.cluster import Cluster
 from apache.aurora.config import AuroraConfig
 from apache.aurora.config.schema.base import UpdateConfig
 
-from .api_util import SchedulerThriftApiSpec
+from ...api_util import SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     JobConfiguration,

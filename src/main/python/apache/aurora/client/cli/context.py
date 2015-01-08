@@ -212,7 +212,7 @@ class AuroraCommandContext(Context):
     """Returns a list of the currently active instances of a job"""
     return [task.assignedTask.instanceId for task in self.get_job_status(key)]
 
-  def verify_shards_option_validity(self, jobkey, instances):
+  def verify_instances_option_validity(self, jobkey, instances):
     """Given a jobkey, does a getTasksStatus, and then checks that the specified instances
     are valid for the job.
     """

@@ -16,7 +16,6 @@ python_test_suite(
   name = 'all',
   dependencies = [
     ':api',
-    ':bridge',
     ':client',
     ':command_hooks',
     ':cron',
@@ -63,7 +62,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 
@@ -87,15 +85,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
-  ]
-)
-
-python_tests(
-  name = 'bridge',
-  sources = [ 'test_bridge.py' ],
-  dependencies = [
-    'src/main/python/apache/aurora/client/cli:bridge',
   ]
 )
 
@@ -108,7 +97,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 
@@ -122,7 +110,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 
@@ -135,7 +122,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 
@@ -156,7 +142,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 
@@ -171,7 +156,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 
@@ -185,7 +169,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 
@@ -198,7 +181,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 
@@ -211,7 +193,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 
@@ -224,7 +205,6 @@ python_tests(
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',
     'src/main/python/apache/aurora/client/cli:client_lib',
-    'src/test/python/apache/aurora/client/commands:util'
   ]
 )
 

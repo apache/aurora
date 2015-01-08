@@ -14,14 +14,32 @@
 
 python_test_suite(name = 'all',
   dependencies = [
+    ':admin',
     ':host_maintenance',
-    ':admin_util',
+    ':maintenance'
+  ],
+)
+
+python_tests(
+  name='admin',
+  sources = [
+    'test_admin.py',
+    'test_admin_sla.py',
+    'test_admin_util.py',
+  ],
+  dependencies = [
+    ':util',
+    '3rdparty/python:mock',
+    '3rdparty/python:twitter.common.contextutil',
+    'src/main/python/apache/aurora/admin:admin',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
 )
 
 python_tests(name = 'host_maintenance',
   sources = ['test_host_maintenance.py'],
   dependencies = [
+    ':util',
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
@@ -32,13 +50,25 @@ python_tests(name = 'host_maintenance',
   ],
 )
 
-python_tests(name = 'admin_util',
-  sources = ['test_admin_util.py'],
+python_tests(
+  name='maintenance',
+  sources = [
+    'test_maintenance.py',
+  ],
   dependencies = [
+    ':util',
     '3rdparty/python:mock',
-    '3rdparty/python:twitter.common.quantity',
-    '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/admin:util',
+    'src/main/python/apache/aurora/admin:maintenance',
   ],
 )
 
+python_library(
+  name='util',
+  sources = [ 'util.py' ],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/client/hooks:hooks',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/main/python/apache/aurora/client:config',
+  ],
+)

@@ -16,7 +16,7 @@
 
 import contextlib
 
-from mock import create_autospec, patch
+from mock import patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.cli import (
@@ -29,7 +29,6 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
 
-from ..api.api_util import SchedulerProxyApiSpec
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 from gen.apache.aurora.api.ttypes import GetJobsResult, JobConfiguration, JobKey, Result
@@ -155,7 +154,6 @@ class TestCronNoun(AuroraClientCommandTest):
 
   def test_cron_status(self):
     (_, mock_scheduler_proxy) = self.create_mock_api()
-    mock_scheduler_proxy = create_autospec(spec=SchedulerProxyApiSpec)
     with contextlib.nested(
         patch('time.sleep'),
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),

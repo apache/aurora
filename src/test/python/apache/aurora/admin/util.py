@@ -23,7 +23,7 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
 
-from ..api.api_util import SchedulerProxyApiSpec
+from ..api_util import SchedulerProxyApiSpec
 
 from gen.apache.aurora.api.ttypes import Response, ResponseCode, ResponseDetail, Result
 
@@ -43,14 +43,8 @@ class AuroraClientCommandTest(unittest.TestCase):
     return cls.create_blank_response(ResponseCode.OK, 'OK')
 
   @classmethod
-  def create_error_response(cls):
-    return cls.create_blank_response(ResponseCode.ERROR, 'Damn')
-
-  @classmethod
   def create_mock_api(cls):
     """Builds up a mock API object, with a mock SchedulerProxy"""
-    """Builds up a mock API object, with a mock SchedulerProxy.
-    Returns the API and the proxy"""
     mock_scheduler_proxy = create_autospec(
         spec=SchedulerProxyApiSpec,
         spec_set=False,
@@ -61,75 +55,13 @@ class AuroraClientCommandTest(unittest.TestCase):
     mock_api.scheduler_proxy = mock_scheduler_proxy
     return mock_api, mock_scheduler_proxy
 
-  @classmethod
-  def create_mock_api_factory(cls):
-    """Create a collection of mocks for a test that wants to mock out the client API
-    by patching the api factory."""
-    mock_api, mock_scheduler_proxy = cls.create_mock_api()
-    mock_api_factory = lambda x: mock_api
-    return mock_api_factory, mock_scheduler_proxy
-
-  FAKE_TIME = 42131
-
-  @classmethod
-  def fake_time(cls, ignored):
-    """Utility function used for faking time to speed up tests."""
-    cls.FAKE_TIME += 2
-    return cls.FAKE_TIME
-
-  CONFIG_BASE = """
-HELLO_WORLD = Job(
-  name = '%(job)s',
-  role = '%(role)s',
-  cluster = '%(cluster)s',
-  environment = '%(env)s',
-  instances = 20,
-  %(inner)s
-  update_config = UpdateConfig(
-    batch_size = 1,
-    restart_threshold = 60,
-    watch_secs = 45,
-    max_per_shard_failures = 2,
-  ),
-  task = Task(
-    name = 'test',
-    processes = [Process(name = 'hello_world', cmdline = 'echo {{thermos.ports[http]}}')],
-    resources = Resources(cpu = 0.1, ram = 64 * MB, disk = 64 * MB),
-  )
-)
-jobs = [HELLO_WORLD]
-"""
-
-  TEST_ROLE = 'mchucarroll'
-
-  TEST_ENV = 'test'
-
-  TEST_JOB = 'hello'
-
   TEST_CLUSTER = 'west'
-
-  TEST_JOBSPEC = 'west/mchucarroll/test/hello'
 
   TEST_CLUSTERS = Clusters([Cluster(
       name='west',
       zk='zookeeper.example.com',
       scheduler_zk_path='/foo/bar',
       auth_mechanism='UNAUTHENTICATED')])
-
-  @classmethod
-  def get_test_config(cls, cluster, role, env, job, filler=''):
-    """Create a config from the template"""
-    return cls.CONFIG_BASE % {'job': job, 'role': role, 'env': env, 'cluster': cluster,
-        'inner': filler}
-
-  @classmethod
-  def get_valid_config(cls):
-    return cls.get_test_config(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB)
-
-  @classmethod
-  def get_invalid_config(cls, bad_clause):
-    return cls.get_test_config(cls.TEST_CLUSTER, cls.TEST_ROLE, cls.TEST_ENV, cls.TEST_JOB,
-        bad_clause)
 
   @classmethod
   def create_mock_probe_hosts_vector(cls, side_effects):

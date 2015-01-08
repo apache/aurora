@@ -38,7 +38,7 @@ function build_client {
 }
 
 function build_admin_client {
-  ./pants src/main/python/apache/aurora/client/bin:aurora_admin
+  ./pants src/main/python/apache/aurora/admin:aurora_admin
   sudo ln -sf $DIST_DIR/aurora_admin.pex /usr/local/bin/aurora_admin
 }
 

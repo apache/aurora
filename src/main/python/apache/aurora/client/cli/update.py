@@ -73,7 +73,7 @@ class StartUpdate(Verb):
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
     if instances is not None and context.options.strict:
-      context.verify_shards_option_validity(job, instances)
+      context.verify_instances_option_validity(job, instances)
     config = context.get_job_config(job, context.options.config_file)
     if config.raw().has_cron_schedule():
       raise context.CommandError(

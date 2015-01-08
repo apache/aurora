@@ -19,7 +19,7 @@ from mock import call, create_autospec, patch
 
 from apache.aurora.client.api.quota_check import CapacityRequest, print_quota, QuotaCheck
 
-from .api_util import SchedulerThriftApiSpec
+from ...api_util import SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     GetQuotaResult,

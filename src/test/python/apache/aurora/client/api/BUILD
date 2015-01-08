@@ -15,7 +15,6 @@
 python_test_suite(name = 'all',
   dependencies = [
     ':api',
-    ':disambiguator',
     ':instance_watcher',
     ':job_monitor',
     ':mux',
@@ -36,16 +35,6 @@ python_tests(name = 'api',
     'src/main/python/apache/aurora/client/api:api',
     'src/main/python/apache/aurora/client:config',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift'
-  ],
-)
-
-python_tests(
-  name = 'disambiguator',
-  sources = ['test_disambiguator.py'],
-  dependencies = [
-    '3rdparty/python:mox',
-    '3rdparty/python:twitter.common.app',
-    'src/main/python/apache/aurora/client/api:disambiguator',
   ],
 )
 

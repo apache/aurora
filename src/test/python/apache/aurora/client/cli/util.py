@@ -24,7 +24,7 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.cluster import Cluster
 from apache.aurora.common.clusters import Clusters
 
-from ..api.api_util import SchedulerProxyApiSpec, SchedulerThriftApiSpec
+from ...api_util import SchedulerProxyApiSpec, SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,

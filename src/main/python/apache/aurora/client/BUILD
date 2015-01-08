@@ -68,15 +68,6 @@ python_library(
 )
 
 python_library(
-  name = 'options',
-  sources = ['options.py'],
-  dependencies = [
-    'src/main/python/apache/thermos/common:options',
-    'src/main/python/apache/aurora/common:aurora_job_key',
-  ]
-)
-
-python_library(
   name = 'client-packaged',
   dependencies = [
     'src/main/python/apache/aurora/common',

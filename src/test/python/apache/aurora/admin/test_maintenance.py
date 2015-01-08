@@ -18,12 +18,7 @@ from mock import Mock, patch
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.admin.host_maintenance import HostMaintenance
-from apache.aurora.client.commands.maintenance import (
-    host_activate,
-    host_deactivate,
-    host_drain,
-    host_status
-)
+from apache.aurora.admin.maintenance import host_activate, host_deactivate, host_drain, host_status
 
 from .util import AuroraClientCommandTest
 
@@ -94,7 +89,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     mock_scheduler_proxy.startMaintenance.return_value = self.create_start_maintenance_result()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)):
       host_deactivate([self.TEST_CLUSTER])
 
@@ -107,7 +102,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     mock_scheduler_proxy.maintenanceStatus.return_value = self.create_maintenance_status_result()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)):
       host_activate([self.TEST_CLUSTER])
 
@@ -139,8 +134,8 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
               return_value=mock_vector),
-        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.commands.maintenance.parse_script', return_value=mock_callback),
+        patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.admin.maintenance.parse_script', return_value=mock_callback),
         patch('threading._Event.wait'),
         patch('twitter.common.app.get_options', return_value=mock_options)):
       host_drain([self.TEST_CLUSTER])
@@ -175,7 +170,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
               return_value=mock_vector),
-        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('threading._Event.wait'),
         patch('twitter.common.app.get_options', return_value=mock_options)):
       host_drain([self.TEST_CLUSTER])
@@ -204,7 +199,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
           patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
           patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
                 return_value=mock_vector),
-          patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+          patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
           patch('threading._Event.wait'),
           patch('twitter.common.app.get_options', return_value=mock_options)):
         host_drain([self.TEST_CLUSTER])
@@ -235,7 +230,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
           patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
           patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
                 return_value=mock_vector),
-          patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+          patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
           patch('apache.aurora.admin.admin_util.log_admin_message'),
           patch('threading._Event.wait', return_value=mock_wait),
           patch('twitter.common.app.get_options', return_value=mock_options)
@@ -271,7 +266,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
               return_value=create_empty_sla_results()),
-        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('threading._Event.wait'),
         patch('twitter.common.app.get_options', return_value=mock_options)):
 
@@ -299,7 +294,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
         patch('apache.aurora.client.api.sla.Sla.get_domain_uptime_vector',
               return_value=create_multiple_sla_results()),
-        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)):
 
       host_drain([self.TEST_CLUSTER])
@@ -322,7 +317,7 @@ class TestMaintenanceCommands(AuroraClientCommandTest):
     mock_scheduler_proxy.maintenanceStatus.return_value = self.create_maintenance_status_result()
     with contextlib.nested(
         patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.commands.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.admin.maintenance.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('twitter.common.app.get_options', return_value=mock_options)):
       host_status([self.TEST_CLUSTER])
 

@@ -23,15 +23,6 @@ from twitter.common import app, log
 from twitter.common.quantity import Amount, Data, Time
 from twitter.common.quantity.parse_simple import parse_data, parse_time
 
-from apache.aurora.admin.admin_util import (
-    FILENAME_OPTION,
-    format_sla_results,
-    HOSTS_OPTION,
-    parse_hostnames,
-    parse_hostnames_optional,
-    parse_sla_percentage,
-    print_results
-)
 from apache.aurora.client.api.sla import JobUpTimeLimit
 from apache.aurora.client.base import (
     AURORA_ADMIN_USER_AGENT_NAME,
@@ -46,6 +37,16 @@ from apache.aurora.client.factory import make_client
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 from apache.aurora.common.shellify import shellify
+
+from .admin_util import (
+    FILENAME_OPTION,
+    format_sla_results,
+    HOSTS_OPTION,
+    parse_hostnames,
+    parse_hostnames_optional,
+    parse_sla_percentage,
+    print_results
+)
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES, TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import ResponseCode, ScheduleStatus, TaskQuery

@@ -14,7 +14,10 @@
 
 from twitter.common import app, log
 
-from apache.aurora.admin.admin_util import (
+from apache.aurora.client.base import get_grouping_or_die, GROUPING_OPTION, requires
+from apache.aurora.common.clusters import CLUSTERS
+
+from .admin_util import (
     FILENAME_OPTION,
     HOSTS_OPTION,
     OVERRIDE_SLA_DURATION_OPTION,
@@ -26,11 +29,10 @@ from apache.aurora.admin.admin_util import (
     POST_DRAIN_SCRIPT_OPTION,
     UNSAFE_SLA_HOSTS_FILE_OPTION
 )
-from apache.aurora.admin.host_maintenance import HostMaintenance
-from apache.aurora.client.base import get_grouping_or_die, GROUPING_OPTION, requires
-from apache.aurora.common.clusters import CLUSTERS
+from .host_maintenance import HostMaintenance
 
 
+#TODO(maxim): merge with admin.py commands.
 @app.command
 @app.command_option(FILENAME_OPTION)
 @app.command_option(HOSTS_OPTION)

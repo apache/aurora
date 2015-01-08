@@ -18,7 +18,7 @@ from mock import create_autospec
 from apache.aurora.client.api.job_monitor import JobMonitor
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from .api_util import SchedulerThriftApiSpec
+from ...api_util import SchedulerThriftApiSpec
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,

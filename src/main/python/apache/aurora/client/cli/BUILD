@@ -20,21 +20,12 @@ python_binary(
   ],
 )
 
-# TODO(wfarner): Remove this along with the rest of the v1 client code.
-python_library(
-  name = 'bridge',
-  sources = ['bridge.py']
-)
-
 python_library(
   name = 'client_lib',
   sources = [ 'client.py' ],
   dependencies = [
     ':cli',
-    ':bridge',
     '3rdparty/python:pex',
-    'src/main/python/apache/aurora/client/bin:aurora_admin_lib',
-    'src/main/python/apache/aurora/client/bin:aurora_client_lib'
   ]
 )
 
@@ -60,14 +51,12 @@ python_library(
     '3rdparty/python:twitter.common.log',
     '3rdparty/python:twitter.common.quantity',
     'src/main/python/apache/aurora/client/api:command_runner',
-    'src/main/python/apache/aurora/client/api:disambiguator',
     'src/main/python/apache/aurora/client/api:job_monitor',
     'src/main/python/apache/aurora/client/api:updater',
     'src/main/python/apache/aurora/client/hooks',
     'src/main/python/apache/aurora/client:base',
     'src/main/python/apache/aurora/client:config',
     'src/main/python/apache/aurora/client:factory',
-    'src/main/python/apache/aurora/client:options',
     'src/main/python/apache/aurora/common',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],

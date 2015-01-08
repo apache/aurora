@@ -16,15 +16,9 @@ import contextlib
 
 from mock import create_autospec, patch, PropertyMock
 
+from apache.aurora.admin.admin import get_locks, get_scheduler, increase_quota, query, set_quota
 from apache.aurora.client.api import AuroraClientAPI
 from apache.aurora.client.api.scheduler_client import SchedulerClient, SchedulerProxy
-from apache.aurora.client.commands.admin import (
-    get_locks,
-    get_scheduler,
-    increase_quota,
-    query,
-    set_quota
-)
 
 from .util import AuroraClientCommandTest
 
@@ -93,9 +87,9 @@ class TestQueryCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options(force=True, shards="0")
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.admin.make_admin_client',
+        patch('apache.aurora.admin.admin.make_admin_client',
             return_value=create_autospec(spec=AuroraClientAPI)),
-        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)
+        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS)
     ) as (_, mock_make_admin_client, _):
 
       api = mock_make_admin_client.return_value
@@ -110,9 +104,9 @@ class TestQueryCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options(shards="0")
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.admin.make_admin_client',
+        patch('apache.aurora.admin.admin.make_admin_client',
             return_value=create_autospec(spec=AuroraClientAPI)),
-        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)
+        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS)
     ) as (_, mock_make_admin_client, _):
 
       api = mock_make_admin_client.return_value
@@ -144,9 +138,9 @@ class TestIncreaseQuotaCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.admin.make_admin_client',
+        patch('apache.aurora.admin.admin.make_admin_client',
             return_value=create_autospec(spec=AuroraClientAPI)),
-        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)
+        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS)
     ) as (_, mock_make_admin_client, _):
 
       api = mock_make_admin_client.return_value
@@ -181,9 +175,9 @@ class TestSetQuotaCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.admin.make_admin_client',
+        patch('apache.aurora.admin.admin.make_admin_client',
               return_value=create_autospec(spec=AuroraClientAPI)),
-        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS)
+        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS)
     ) as (_, mock_make_admin_client, _):
 
       api = mock_make_admin_client.return_value
@@ -221,10 +215,10 @@ class TestGetLocksCommand(AuroraClientCommandTest):
     mock_options = self.setup_mock_options()
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.admin.make_admin_client',
+        patch('apache.aurora.admin.admin.make_admin_client',
               return_value=create_autospec(spec=AuroraClientAPI)),
-        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.commands.admin.print_results'),
+        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.admin.admin.print_results'),
     ) as (_, mock_make_admin_client, _, mock_print_results):
 
       api = mock_make_admin_client.return_value
@@ -251,9 +245,9 @@ class TestGetSchedulerCommand(AuroraClientCommandTest):
 
     with contextlib.nested(
         patch('twitter.common.app.get_options', return_value=mock_options),
-        patch('apache.aurora.client.commands.admin.make_admin_client',
+        patch('apache.aurora.admin.admin.make_admin_client',
               return_value=create_autospec(spec=AuroraClientAPI)),
-        patch('apache.aurora.client.commands.admin.CLUSTERS', new=self.TEST_CLUSTERS),
+        patch('apache.aurora.admin.admin.CLUSTERS', new=self.TEST_CLUSTERS),
     ) as (_, mock_make_admin_client, _):
 
       api = mock_make_admin_client.return_value

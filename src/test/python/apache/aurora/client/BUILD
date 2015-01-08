@@ -19,7 +19,6 @@ python_test_suite(name = 'all',
     ':config',
     'src/test/python/apache/aurora/client/api:all',
     'src/test/python/apache/aurora/client/cli:all',
-    'src/test/python/apache/aurora/client/commands:all',
     'src/test/python/apache/aurora/client/hooks:all',
   ],
 )

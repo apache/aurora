@@ -42,17 +42,6 @@ python_library(
 )
 
 python_library(
-  name = 'disambiguator',
-  sources = ['disambiguator.py'],
-  dependencies = [
-    ':api',
-    '3rdparty/python:twitter.common.log',
-    'src/main/python/apache/aurora/client:base',
-    'src/main/python/apache/aurora/common',
-  ]
-)
-
-python_library(
   name = 'job_monitor',
   sources = ['job_monitor.py'],
   dependencies = [

@@ -15,7 +15,7 @@
 
 # make-python-sdists: Generate sdists for Aurora Python code for use with pip or upload to PyPI.
 # Usage:
-#   ./build-support/make-python-sdists
+#   ./build-support/release/make-python-sdists
 #
 # Examples:
 #   Install the aurora client in a virtualenv:
@@ -27,6 +27,7 @@
 set -o errexit
 
 TARGETS=(
+  src/main/python/apache/aurora/admin:admin-packaged
   src/main/python/apache/aurora/client:client-packaged
   src/main/python/apache/aurora/common
   src/main/python/apache/aurora/config:config-packaged
