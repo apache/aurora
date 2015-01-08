@@ -104,7 +104,7 @@ class SshCommand(Verb):
 
     api = context.get_api(cluster)
     resp = api.query(api.build_query(role, name, set([int(instance)]), env=env))
-    context.check_and_log_response(resp,
+    context.log_response_and_raise(resp,
         err_msg=('Unable to get information about instance: %s' % combine_messages(resp)))
     if (resp.result.scheduleStatusResult.tasks is None or
         len(resp.result.scheduleStatusResult.tasks) == 0):

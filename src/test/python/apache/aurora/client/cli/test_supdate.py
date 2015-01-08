@@ -13,7 +13,6 @@
 #
 import contextlib
 import textwrap
-import unittest
 
 import pytest
 from mock import create_autospec, Mock, patch
@@ -47,7 +46,7 @@ from gen.apache.aurora.api.ttypes import (
 )
 
 
-class TestStartUpdateCommand(unittest.TestCase):
+class TestStartUpdateCommand(AuroraClientCommandTest):
 
   def setUp(self):
     self._command = StartUpdate()
@@ -80,7 +79,7 @@ class TestStartUpdateCommand(unittest.TestCase):
         mock_config,
         self._mock_options.instance_spec.instance)
 
-    assert self._fake_context.get_err()[0] == self._fake_context.LOCK_ERROR_MSG
+    self.assert_lock_message(self._fake_context)
 
   def test_update_cron_job_fails(self):
     mock_config = self.create_mock_config(is_cron=True)

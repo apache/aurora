@@ -59,7 +59,7 @@ class Schedule(Verb):
           "Non-cron jobs may only be created with \"aurora job create\" command")
 
     resp = api.schedule_cron(config)
-    context.check_and_log_response(resp,
+    context.log_response_and_raise(resp,
         err_msg=("Error scheduling cron job %s:" % context.options.jobspec))
 
     context.print_out("Cron job scheduled, status can be viewed at %s"
@@ -85,7 +85,7 @@ class Deschedule(Verb):
   def execute(self, context):
     api = context.get_api(context.options.jobspec.cluster)
     resp = api.deschedule_cron(context.options.jobspec)
-    context.check_and_log_response(resp,
+    context.log_response_and_raise(resp,
         err_msg=("Error descheduling cron job %s:" % context.options.jobspec))
     context.print_out("Cron descheduling succeeded.")
     return EXIT_OK
@@ -108,7 +108,7 @@ class Start(Verb):
     config = (context.get_job_config(context.options.jobspec, context.options.config)
         if context.options.config else None)
     resp = api.start_cronjob(context.options.jobspec, config=config)
-    context.check_and_log_response(resp,
+    context.log_response_and_raise(resp,
         err_msg=("Error starting cron job %s:" % context.options.jobspec))
     if context.options.open_browser:
       context.open_job_page(api, context.options.job_spec)
@@ -132,7 +132,7 @@ class Show(Verb):
     jobkey = context.options.jobspec
     api = context.get_api(jobkey.cluster)
     resp = api.get_jobs(jobkey.role)
-    context.check_and_log_response(resp, err_code=EXIT_INVALID_PARAMETER,
+    context.log_response_and_raise(resp, err_code=EXIT_INVALID_PARAMETER,
         err_msg=("Error getting cron status for %self from server" % jobkey))
     for job in resp.result.getJobsResult.configs:
       if job.key.environment == jobkey.env and job.key.name == jobkey.name:

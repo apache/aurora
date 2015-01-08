@@ -17,6 +17,7 @@ import unittest
 
 from mock import create_autospec, Mock
 
+from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.hooks.hooked_api import HookedAuroraClientAPI
 from apache.aurora.common.aurora_job_key import AuroraJobKey
@@ -54,6 +55,19 @@ def create_options_mock(options):
   for o in options:
     setattr(mock, o.get_destination(), o.get_default_value())
   return mock
+
+
+class FakeAuroraCommandLine(AuroraCommandLine):
+  def __init__(self):
+    super(FakeAuroraCommandLine, self).__init__()
+    self.__err = []
+
+  def print_err(self, s, indent=0):
+    indent_str = " " * indent
+    self.__err.append("%s%s" % (indent_str, s))
+
+  def get_err(self):
+    return self.__err
 
 
 class FakeAuroraCommandContext(AuroraCommandContext):
@@ -350,6 +364,10 @@ jobs = [HELLO_WORLD]
         cls.TEST_ENV,
         cls.TEST_JOB,
         bad_clause)
+
+  @classmethod
+  def assert_lock_message(cls, context):
+    assert context.get_err()[2] == "\t%s" % context.LOCK_ERROR_MSG
 
 
 class IOMock(object):

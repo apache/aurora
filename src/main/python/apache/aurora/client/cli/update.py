@@ -17,6 +17,7 @@ from __future__ import print_function
 import json
 import textwrap
 
+from apache.aurora.client.base import combine_messages
 from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_COMMAND_FAILURE, EXIT_OK, Noun, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import (
@@ -81,14 +82,14 @@ class StartUpdate(Verb):
 
     api = context.get_api(config.cluster())
     resp = api.start_job_update(config, instances)
-    context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
+    context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
         err_msg="Failed to start update due to error:")
 
     if resp.result:
       url = context.get_update_page(api, job, resp.result.startJobUpdateResult.updateId)
       context.print_out(self.UPDATE_MSG_TEMPLATE % url)
     else:
-      context.print_out_response_details(resp)
+      context.print_out(combine_messages(resp))
     return EXIT_OK
 
 
@@ -110,7 +111,7 @@ class PauseUpdate(Verb):
     jobkey = context.options.jobspec
     api = context.get_api(jobkey.cluster)
     resp = api.pause_job_update(jobkey)
-    context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
+    context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
       err_msg="Failed to pause update due to error:")
     context.print_out("Update has been paused.")
     return EXIT_OK
@@ -134,7 +135,7 @@ class ResumeUpdate(Verb):
     jobkey = context.options.jobspec
     api = context.get_api(jobkey.cluster)
     resp = api.resume_job_update(jobkey)
-    context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
+    context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
       err_msg="Failed to resume update due to error:")
     context.print_out("Update has been resumed.")
     return EXIT_OK
@@ -158,7 +159,7 @@ class AbortUpdate(Verb):
     jobkey = context.options.jobspec
     api = context.get_api(jobkey.cluster)
     resp = api.abort_job_update(jobkey)
-    context.check_and_log_response(resp, err_code=EXIT_API_ERROR,
+    context.log_response_and_raise(resp, err_code=EXIT_API_ERROR,
       err_msg="Failed to abort update due to error:")
     context.print_out("Update has been aborted.")
     return EXIT_OK
@@ -196,7 +197,7 @@ class ListUpdates(Verb):
         job_key=context.options.jobspec,
         user=context.options.user,
         update_statuses=context.options.status)
-    context.check_and_log_response(response)
+    context.log_response_and_raise(response)
     if context.options.write_json:
       result = []
       for summary in response.result.getJobUpdateSummariesResult.updateSummaries:
@@ -238,7 +239,7 @@ class UpdateStatus(Verb):
   def _get_update_id(self, context, jobkey):
     api = context.get_api(context.options.jobspec.cluster)
     response = api.query_job_updates(job_key=context.options.jobspec)
-    context.check_and_log_response(response, "")
+    context.log_response_and_raise(response)
     for summary in response.result.getJobUpdateSummariesResult.updateSummaries:
       if summary.jobKey == jobkey:
         return summary.updateId
@@ -249,7 +250,7 @@ class UpdateStatus(Verb):
     id = self._get_update_id(context, context.options.jobspec)
     api = context.get_api(context.options.jobspec.cluster)
     response = api.get_job_update_details(id)
-    context.check_and_log_response(response)
+    context.log_response_and_raise(response)
     details = response.result.getJobUpdateDetailsResult.details
     if context.options.write_json:
       result = {}

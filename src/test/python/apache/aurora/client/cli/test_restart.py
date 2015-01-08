@@ -13,7 +13,6 @@
 #
 import contextlib
 import functools
-import unittest
 
 import pytest
 from mock import create_autospec, patch
@@ -32,7 +31,7 @@ from .util import AuroraClientCommandTest, FakeAuroraCommandContext, IOMock, moc
 from gen.apache.aurora.api.ttypes import JobKey, PopulateJobResult, ResponseCode, Result, TaskConfig
 
 
-class TestRestartJobCommand(unittest.TestCase):
+class TestRestartJobCommand(AuroraClientCommandTest):
 
   def test_restart_with_lock(self):
     command = RestartCommand()
@@ -61,7 +60,7 @@ class TestRestartJobCommand(unittest.TestCase):
 
     mock_api.restart.assert_called_once_with(jobkey, mock_options.instance_spec.instance,
       updater_config, mock_options.healthcheck_interval_seconds, config=None)
-    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
+    self.assert_lock_message(fake_context)
 
 
 class TestRestartCommand(AuroraClientCommandTest):

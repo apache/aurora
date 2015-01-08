@@ -13,7 +13,6 @@
 #
 
 import contextlib
-import unittest
 
 import pytest
 from mock import create_autospec, Mock, patch
@@ -32,7 +31,12 @@ from apache.aurora.client.cli.jobs import CreateJobCommand
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
 
-from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
+from .util import (
+    AuroraClientCommandTest,
+    FakeAuroraCommandContext,
+    FakeAuroraCommandLine,
+    mock_verb_options
+)
 
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
@@ -51,7 +55,7 @@ class UnknownException(Exception):
   pass
 
 
-class TestCreateJobCommand(unittest.TestCase):
+class TestCreateJobCommand(AuroraClientCommandTest):
 
   def test_create_with_lock(self):
     command = CreateJobCommand()
@@ -78,7 +82,7 @@ class TestCreateJobCommand(unittest.TestCase):
       command.execute(fake_context)
 
     mock_api.create_job.assert_called_once_with(mock_config)
-    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
+    self.assert_lock_message(fake_context)
 
 
 class TestClientCreateCommand(AuroraClientCommandTest):
@@ -315,7 +319,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
             fp.name])
         assert result == EXIT_OK
       assert mock_context.get_out() == [
-          "job create succeeded: job url=http://something_or_other/scheduler/bozo/test/hello"]
+          "Job create succeeded: job url=http://something_or_other/scheduler/bozo/test/hello"]
       assert mock_context.get_err() == []
 
   def test_create_job_startup_fails(self):
@@ -405,24 +409,23 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     Verifies that the creation command sends the right API RPCs, and performs the correct
     tests on the result."""
 
-    mock_context = FakeAuroraCommandContext()
     with contextlib.nested(
-        patch('threading._Event.wait'),
-        patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
+        patch('threading._Event.wait')):
 
       # This is the real test: invoke create as if it had been called by the command line.
       with temporary_file() as fp:
         fp.write(self.get_unbound_test_config())
         fp.flush()
-        cmd = AuroraCommandLine()
+        cmd = FakeAuroraCommandLine()
         result = cmd.execute(['job', 'create', '--wait-until=RUNNING',
             '--bind', 'cluster_binding=west',
            'west/bozo/test/hello',
             fp.name])
         assert result == EXIT_INVALID_CONFIGURATION
-      assert mock_context.get_err() == [
-          "TypeCheck(FAILED): MesosJob[update_config] failed: "
-          "UpdateConfig[batch_size] failed: u'{{TEST_BATCH}}' not an integer"]
+        assert cmd.get_err() == [
+            "Error executing command: Error loading configuration: "
+            "TypeCheck(FAILED): MesosJob[update_config] failed: "
+            "UpdateConfig[batch_size] failed: u'{{TEST_BATCH}}' not an integer"]
 
   def test_create_cron_job_fails(self):
     """Test a cron job is not accepted."""

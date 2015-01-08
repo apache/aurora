@@ -26,7 +26,12 @@ from apache.aurora.client.cli.jobs import KillCommand
 from apache.aurora.client.cli.options import parse_instances, TaskInstanceKey
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
-from .util import AuroraClientCommandTest, FakeAuroraCommandContext, mock_verb_options
+from .util import (
+    AuroraClientCommandTest,
+    FakeAuroraCommandContext,
+    FakeAuroraCommandLine,
+    mock_verb_options
+)
 
 from gen.apache.aurora.api.ttypes import (
     JobKey,
@@ -49,7 +54,7 @@ class TestInstancesParser(unittest.TestCase):
     assert parse_instances("") is None
 
 
-class TestKillCommand(unittest.TestCase):
+class TestKillCommand(AuroraClientCommandTest):
 
   def test_kill_lock_error_nobatch(self):
     """Verify that the no batch code path correctly includes the lock error message."""
@@ -72,7 +77,7 @@ class TestKillCommand(unittest.TestCase):
       command.execute(fake_context)
 
     mock_api.kill_job.assert_called_once_with(jobkey, mock_options.instance_spec.instance)
-    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
+    self.assert_lock_message(fake_context)
 
   def test_kill_lock_error_batches(self):
     """Verify that the batch kill path short circuits and includes the lock error message."""
@@ -99,7 +104,7 @@ class TestKillCommand(unittest.TestCase):
       command.execute(fake_context)
 
     mock_api.kill_job.assert_called_once_with(jobkey, mock_options.instance_spec.instance)
-    assert fake_context.get_err()[0] == fake_context.LOCK_ERROR_MSG
+    self.assert_lock_message(fake_context)
 
 
 class TestClientKillCommand(AuroraClientCommandTest):
@@ -113,9 +118,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
                                      name=cls.TEST_JOB)])
 
   @classmethod
-  def get_monitor_mock(cls):
+  def get_monitor_mock(cls, result=True):
     mock_monitor = Mock(spec=JobMonitor)
-    mock_monitor.wait_until.return_value = True
+    mock_monitor.wait_until.return_value = result
     return mock_monitor
 
   @classmethod
@@ -275,12 +280,14 @@ class TestClientKillCommand(AuroraClientCommandTest):
   def test_kill_job_with_instances_batched_maxerrors(self):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
+    mock_monitor = self.get_monitor_mock(result=False)
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
       mock_context.add_expected_status_query_result(self.create_status_call_result())
-      api.kill_job.return_value = self.create_error_response()
+      api.kill_job.return_value = self.create_simple_success_response()
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -330,7 +337,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'killall', '--no-batching', '--config=%s' % fp.name, self.TEST_JOBSPEC])
 
-      assert mock_context.get_out() == ['job killall succeeded']
+      assert mock_context.get_out() == ['Job killall succeeded']
       assert mock_context.get_err() == []
 
   def test_kill_job_with_instances_batched_output(self):
@@ -351,30 +358,33 @@ class TestClientKillCommand(AuroraClientCommandTest):
         cmd.execute(['job', 'kill', '--config=%s' % fp.name, '--batch-size=5',
                      self.get_instance_spec('0,2,4-6')])
 
-    assert mock_context.get_out() == ['Successfully killed shards [0, 2, 4, 5, 6]',
-        'job kill succeeded']
+    assert mock_context.get_out() == ['Successfully killed instances [0, 2, 4, 5, 6]',
+        'Job kill succeeded']
     assert mock_context.get_err() == []
 
   def test_kill_job_with_instances_batched_maxerrors_output(self):
     """Test kill client-side API logic."""
     mock_context = FakeAuroraCommandContext()
+    mock_monitor = self.get_monitor_mock(result=False)
     with contextlib.nested(
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context),
-        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=self.get_monitor_mock()),
+        patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
       mock_context.add_expected_status_query_result(self.create_status_call_result())
-      api.kill_job.return_value = self.create_error_response()
+      api.kill_job.return_value = self.create_simple_success_response()
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
         fp.flush()
-        cmd = AuroraCommandLine()
+        cmd = FakeAuroraCommandLine()
         cmd.execute(['job', 'kill', '--max-total-failures=1', '--config=%s' % fp.name,
                      '--batch-size=5', self.get_instance_spec('0,2,4-13')])
 
       assert mock_context.get_out() == []
       assert mock_context.get_err() == [
-         'Kill of shards [0, 2, 4, 5, 6] failed with error:', '\tDamn',
-         'Kill of shards [7, 8, 9, 10, 11] failed with error:', '\tDamn',
-         'Exceeded maximum number of errors while killing instances']
+         'Instances [0, 2, 4, 5, 6] were not killed in time',
+         'Instances [7, 8, 9, 10, 11] were not killed in time']
+
+      assert cmd.get_err() == [
+        'Error executing command: Exceeded maximum number of errors while killing instances']

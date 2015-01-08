@@ -80,7 +80,7 @@ class TestJobUpdateCommand(AuroraClientCommandTest):
       mock_config,
       self._mock_options.healthcheck_interval_seconds,
       self._mock_options.instance_spec.instance)
-    assert self._fake_context.get_err()[0] == self._fake_context.LOCK_ERROR_MSG
+    self.assert_lock_message(self._fake_context)
 
   def test_update_print_error_once(self):
     mock_config = self.create_mock_config()

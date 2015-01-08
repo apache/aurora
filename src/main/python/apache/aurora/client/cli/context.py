@@ -62,8 +62,8 @@ def bindings_to_list(bindings):
 class AuroraCommandContext(Context):
 
   LOCK_ERROR_MSG = """Error: job is locked by an incomplete update.
-                      run 'aurora job cancel-update' to release the lock if no update is in progress
-                   """
+                      run 'aurora job cancel-update' to release the lock if no update
+                      is in progress"""
 
   """A context object used by Aurora commands to manage command processing state
   and common operations.
@@ -93,18 +93,16 @@ class AuroraCommandContext(Context):
         logging.debug("Config: %s" % fp.readlines())
       bindings = bindings_to_list(self.options.bindings) if self.options.bindings else None
       result = get_config(
-        jobname,
-        config_file,
-        self.options.read_json,
-        bindings,
-        select_cluster=jobkey.cluster,
-        select_role=jobkey.role,
-        select_env=jobkey.env)
+          jobname,
+          config_file,
+          self.options.read_json,
+          bindings,
+          select_cluster=jobkey.cluster,
+          select_role=jobkey.role,
+          select_env=jobkey.env)
       check_result = result.raw().check()
       if not check_result.ok():
-        self.print_err(str(check_result))
-        raise self.CommandError(EXIT_INVALID_CONFIGURATION,
-            "Error in configuration")
+        raise self.CommandError(EXIT_INVALID_CONFIGURATION, check_result)
       return result
     except Exception as e:
       raise self.CommandError(EXIT_INVALID_CONFIGURATION, 'Error loading configuration: %s' % e)
@@ -131,27 +129,14 @@ class AuroraCommandContext(Context):
     self.open_page(synthesize_url(api.scheduler_proxy.scheduler_client().url,
         role, env, name))
 
-  def print_out_response_details(self, resp):
-    if resp.details is not None:
-      for m in resp.details:
-        self.print_out(m.message)
-
-  def log_response(self, resp):
-    if resp.responseCode != ResponseCode.OK:
-      for m in resp.details:
-        self.print_err("\t%s" % m.message)
-    else:
+  def log_response_and_raise(self, resp, err_code=EXIT_API_ERROR, err_msg="Command failure:"):
+    if resp.responseCode == ResponseCode.OK:
       logging.info(combine_messages(resp))
-
-  def check_and_log_response(self, resp, err_code=EXIT_API_ERROR, err_msg=None):
-    if resp.responseCode != ResponseCode.OK:
-      if err_msg is None:
-        err_msg = combine_messages(resp)
-      if resp.responseCode == ResponseCode.LOCK_ERROR:
-        self.print_err(self.LOCK_ERROR_MSG)
+    else:
       self.print_err(err_msg)
-    self.log_response(resp)
-    if resp.responseCode != ResponseCode.OK:
+      self.print_err("\t%s" % combine_messages(resp))
+      if resp.responseCode == ResponseCode.LOCK_ERROR:
+        self.print_err("\t%s" % self.LOCK_ERROR_MSG)
       raise self.CommandErrorLogged(err_code, err_msg)
 
   @classmethod
@@ -183,7 +168,7 @@ class AuroraCommandContext(Context):
     for cluster in clusters:
       api = self.get_api(cluster)
       resp = api.get_jobs(role)
-      self.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE)
+      self.log_response_and_raise(resp, err_code=EXIT_COMMAND_FAILURE)
       result.extend([AuroraJobKey(cluster, job.key.role, job.key.environment, job.key.name)
           for job in resp.result.getJobsResult.configs])
     return result
@@ -220,7 +205,7 @@ class AuroraCommandContext(Context):
     """Returns a list of task instances running under the job."""
     api = self.get_api(key.cluster)
     resp = api.check_status(key)
-    self.check_and_log_response(resp, err_code=EXIT_INVALID_PARAMETER)
+    self.log_response_and_raise(resp, err_code=EXIT_INVALID_PARAMETER)
     return resp.result.scheduleStatusResult.tasks or None
 
   def get_active_instances(self, key):

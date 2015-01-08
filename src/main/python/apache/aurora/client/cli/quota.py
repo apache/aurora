@@ -17,17 +17,9 @@ from __future__ import print_function
 from thrift.protocol import TJSONProtocol
 from thrift.TSerialization import serialize
 
-from apache.aurora.client.cli import (
-    EXIT_COMMAND_FAILURE,
-    EXIT_INVALID_PARAMETER,
-    EXIT_OK,
-    Noun,
-    Verb
-)
+from apache.aurora.client.cli import EXIT_OK, Noun, Verb
 from apache.aurora.client.cli.context import AuroraCommandContext
 from apache.aurora.client.cli.options import JSON_WRITE_OPTION, ROLE_ARGUMENT
-
-from gen.apache.aurora.api.ttypes import ResponseCode
 
 
 class GetQuotaCmd(Verb):
@@ -76,14 +68,10 @@ class GetQuotaCmd(Verb):
     (cluster, role) = context.options.role
     api = context.get_api(cluster)
     resp = api.get_quota(role)
-    context.log_response(resp)
-    if resp.responseCode == ResponseCode.ERROR:
-      raise context.CommandError(EXIT_INVALID_PARAMETER, 'Role %s not found' % role)
-    elif resp.responseCode == ResponseCode.INVALID_REQUEST:
-      raise context.CommandError(EXIT_COMMAND_FAILURE, 'Error retrieving quota for role %s' % role)
-    elif resp.responseCode == ResponseCode.AUTH_FAILED:
-      raise context.CommandError(EXIT_COMMAND_FAILURE,
-          'Invalid authorization to retrieve quota for role %s' % role)
+    context.log_response_and_raise(
+        resp,
+        err_msg='Error retrieving quota for role %s' % role)
+
     context.print_out(self.render_quota(context.options.write_json, resp))
     return EXIT_OK
 

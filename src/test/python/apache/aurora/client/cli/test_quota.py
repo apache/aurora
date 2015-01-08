@@ -70,6 +70,15 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     assert (expected_response ==
             json.loads(self._get_quota(True, ['quota', 'get', '--write-json', 'west/bozo'])))
 
+  def test_get_quota_failed(self):
+    fake_context = FakeAuroraCommandContext()
+    api = fake_context.get_api('')
+    api.get_quota.return_value = self.create_error_response()
+
+    self._call_get_quota(fake_context, ['quota', 'get', 'west/bozo'])
+
+    assert fake_context.get_err() == ['Error retrieving quota for role bozo', '\tDamn']
+
   def _get_quota(self, include_consumption, command_args):
     mock_context = FakeAuroraCommandContext()
     if include_consumption:
@@ -77,6 +86,9 @@ class TestGetQuotaCommand(AuroraClientCommandTest):
     else:
       self.setup_mock_quota_call_no_consumption(mock_context)
 
+    return self._call_get_quota(mock_context, command_args)
+
+  def _call_get_quota(self, mock_context, command_args):
     with contextlib.nested(
         patch('apache.aurora.client.cli.quota.Quota.create_context', return_value=mock_context),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):

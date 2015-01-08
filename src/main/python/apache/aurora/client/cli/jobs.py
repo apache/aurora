@@ -93,7 +93,7 @@ class CancelUpdateCommand(Verb):
     config = (context.get_job_config(context.options.jobspec, context.options.config_file)
         if context.options.config_file else None)
     resp = api.cancel_update(context.options.jobspec, config=config)
-    context.check_and_log_response(resp)
+    context.log_response_and_raise(resp)
     return EXIT_OK
 
 
@@ -126,7 +126,7 @@ class CreateJobCommand(Verb):
 
     api = context.get_api(config.cluster())
     resp = api.create_job(config)
-    context.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE,
+    context.log_response_and_raise(resp, err_code=EXIT_COMMAND_FAILURE,
                                    err_msg="Job creation failed due to error:")
     if context.options.open_browser:
       context.open_job_page(api, context.options.jobspec)
@@ -142,7 +142,7 @@ class CreateJobCommand(Verb):
       context.print_err("Error occurred while creating job %s" % context.options.jobspec)
       return EXIT_COMMAND_FAILURE
     else:
-      context.print_out("job create succeeded: job url=%s" %
+      context.print_out("Job create succeeded: job url=%s" %
                         context.get_job_page(api, context.options.jobspec))
     return EXIT_OK
 
@@ -199,7 +199,7 @@ class DiffCommand(Verb):
       name = config.name()
     api = context.get_api(cluster)
     resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
-    context.check_and_log_response(resp, err_code=EXIT_INVALID_PARAMETER,
+    context.log_response_and_raise(resp, err_code=EXIT_INVALID_PARAMETER,
         err_msg="Could not find job to diff against")
     if resp.result.scheduleStatusResult.tasks is None:
       context.print_err("No tasks found for job %s" % context.options.jobspec)
@@ -207,7 +207,7 @@ class DiffCommand(Verb):
     else:
       remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     resp = api.populate_job_config(config)
-    context.check_and_log_response(resp, err_code=EXIT_INVALID_CONFIGURATION,
+    context.log_response_and_raise(resp, err_code=EXIT_INVALID_CONFIGURATION,
           err_msg="Error loading configuration")
     # Deepcopy is important here as tasks will be modified for printing.
     local_tasks = [deepcopy(get_populated_task_config(resp)) for _ in range(config.instances())]
@@ -311,7 +311,7 @@ class AbstractKillCommand(Verb):
   def wait_kill_tasks(self, context, scheduler, job_key, instances=None):
     monitor = JobMonitor(scheduler, job_key)
     if not monitor.wait_until(JobMonitor.terminal, instances=instances, with_timeout=True):
-      context.print_err("Tasks were not killed in time.")
+      context.print_err("Instances %s were not killed in time" % instances)
       return EXIT_TIMEOUT
     return EXIT_OK
 
@@ -333,22 +333,19 @@ class AbstractKillCommand(Verb):
       for i in range(min(context.options.batch_size, len(instances_to_kill))):
         batch.append(instances_to_kill.pop())
       resp = api.kill_job(job, batch)
-      if resp.responseCode == ResponseCode.LOCK_ERROR:
-        # Short circuit max errors in this case, and be sure to show the lock error message.
-        context.check_and_log_response(resp)
-      elif (resp.responseCode != ResponseCode.OK
-            or self.wait_kill_tasks(context, api.scheduler_proxy, job, batch) != EXIT_OK):
-        context.print_err("Kill of shards %s failed with error:" % batch)
-        context.log_response(resp)
+      # Short circuit max errors in this case as it's most likely a fatal repeatable error.
+      context.log_response_and_raise(
+        resp,
+        err_msg="Kill of instances %s failed with error:" % batch)
+
+      if self.wait_kill_tasks(context, api.scheduler_proxy, job, batch) != EXIT_OK:
         errors += 1
         if errors > context.options.max_total_failures:
-          context.print_err("Exceeded maximum number of errors while killing instances")
           raise context.CommandError(EXIT_COMMAND_FAILURE,
                "Exceeded maximum number of errors while killing instances")
       else:
-        context.print_out("Successfully killed shards %s" % batch)
+        context.print_out("Successfully killed instances %s" % batch)
     if errors > 0:
-      context.print_err("Warning: Errors occurred during batch kill")
       raise context.CommandError(EXIT_COMMAND_FAILURE, "Errors occurred while killing instances")
 
 
@@ -376,7 +373,7 @@ class KillCommand(AbstractKillCommand):
     api = context.get_api(job.cluster)
     if context.options.no_batching:
       resp = api.kill_job(job, instances_arg)
-      context.check_and_log_response(resp)
+      context.log_response_and_raise(resp)
       wait_result = self.wait_kill_tasks(context, api.scheduler_proxy, job, instances_arg)
       if wait_result is not EXIT_OK:
         return wait_result
@@ -384,7 +381,7 @@ class KillCommand(AbstractKillCommand):
       self.kill_in_batches(context, job, instances_arg)
     if context.options.open_browser:
       context.open_job_page(api, context.options.jobspec)
-    context.print_out("job kill succeeded")
+    context.print_out("Job kill succeeded")
     return EXIT_OK
 
 
@@ -405,7 +402,7 @@ class KillAllJobCommand(AbstractKillCommand):
     api = context.get_api(job.cluster)
     if context.options.no_batching:
       resp = api.kill_job(job, None)
-      context.check_and_log_response(resp)
+      context.log_response_and_raise(resp)
       wait_result = self.wait_kill_tasks(context, api.scheduler_proxy, job)
       if wait_result is not EXIT_OK:
         return wait_result
@@ -413,7 +410,7 @@ class KillAllJobCommand(AbstractKillCommand):
       self.kill_in_batches(context, job, None)
     if context.options.open_browser:
       context.open_job_page(api, job)
-    context.print_out("job killall succeeded")
+    context.print_out("Job killall succeeded")
     return EXIT_OK
 
 
@@ -514,7 +511,7 @@ class RestartCommand(Verb):
     resp = api.restart(job, instances, updater_config,
         context.options.healthcheck_interval_seconds, config=config)
 
-    context.check_and_log_response(resp,
+    context.log_response_and_raise(resp,
                                    err_msg="Error restarting job %s:" % str(job))
     context.print_out("Job %s restarted successfully" % str(job))
     if context.options.open_browser:
@@ -692,7 +689,7 @@ class UpdateCommand(Verb):
     # dangerous about this update.
     resp = api.query_no_configs(api.build_query(config.role(), config.name(),
         statuses=ACTIVE_STATES, env=config.environment()))
-    context.check_and_log_response(resp, err_msg="Server could not find running job to update")
+    context.log_response_and_raise(resp, err_msg="Server could not find running job to update")
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     # for determining if an update is dangerous, we estimate the scope of the change
     # by comparing number of instances to be updated, with the number of
@@ -726,7 +723,7 @@ class UpdateCommand(Verb):
       self.warn_if_dangerous_change(context, api, job, config)
     resp = api.update_job(config, context.options.healthcheck_interval_seconds,
         instances)
-    context.check_and_log_response(resp, err_code=EXIT_COMMAND_FAILURE,
+    context.log_response_and_raise(resp, err_code=EXIT_COMMAND_FAILURE,
         err_msg="Update failed due to error:")
     context.print_out("Update completed successfully")
     return EXIT_OK
