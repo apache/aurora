@@ -19,7 +19,6 @@ python_test_suite(
     ':client',
     ':command_hooks',
     ':cron',
-    ':help',
     ':inspect',
     ':job',
     ':config',
@@ -58,17 +57,6 @@ python_tests(
   sources = [ 'test_supdate.py' ],
   dependencies = [
     ':util',
-    '3rdparty/python:mock',
-    '3rdparty/python:twitter.common.contextutil',
-    'src/main/python/apache/aurora/client/cli',
-    'src/main/python/apache/aurora/client/cli:client_lib',
-  ]
-)
-
-python_tests(
-  name = 'help',
-  sources = [ 'test_help.py' ],
-  dependencies = [
     '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/client/cli',

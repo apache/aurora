@@ -15,12 +15,12 @@
 from argparse import ArgumentTypeError
 from collections import namedtuple
 
-from twitter.common.lang import Compatibility
 from twitter.common.quantity.parse_simple import parse_time
 
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 
 
+# TODO(wfarner): Consider removing, it doesn't appear this wrapper is useful.
 class CommandOption(object):
   """A lightweight encapsulation of an argparse option specification"""
 
@@ -38,66 +38,6 @@ class CommandOption(object):
     self.kwargs = kwargs.copy()
     self.type = self.kwargs.get('type')
     self.help = self.kwargs.get('help', '')
-
-  def is_mandatory(self):
-    return self.kwargs.get('required', not self.name.startswith('--'))
-
-  def get_displayname(self):
-    """Get a display name for a the expected format of a parameter value"""
-    if 'metavar' in self.kwargs:
-      displayname = self.kwargs['metavar']
-    elif self.type is str:
-      displayname = "str"
-    elif isinstance(self.type, Compatibility.string):
-      displayname = self.type
-    elif isinstance(self.type, Compatibility.integer):
-      displayname = "int",
-    elif self.name.startswith('--'):
-      displayname = self.name[2:]
-    else:
-      displayname = self.name
-    return displayname
-
-  def get_destination(self):
-    """Get the attribute name this option will be stored under internally."""
-    if self.kwargs.get('dest'):
-      return self.kwargs['dest']
-    # See the spec here: https://docs.python.org/2/library/argparse.html#dest
-    return self.name.lstrip('--').replace('-', '_')
-
-  def get_default_value(self):
-    """Get the default value if no argument for this option is supplied."""
-    return self.kwargs.get('default')
-
-  def render_usage(self):
-    """Create a usage string for this option"""
-    if not self.name.startswith('--'):
-      return self.get_displayname()
-    if "action" in self.kwargs:
-      if self.kwargs["action"] == "store_true":
-        return "[%s]" % self.name
-      elif self.kwargs["action"] == "store_false":
-        return "[--no-%s]" % self.name[2:]
-    if self.type is None and "choices" in self.kwargs:
-      return "[%s=%s]" % (self.name, self.kwargs["choices"])
-    else:
-      return "[%s=%s]" % (self.name, self.get_displayname())
-
-  def render_help(self):
-    """Render a full help message for this option"""
-    result = ""
-    if "action" in self.kwargs and self.kwargs["action"] == "store_true":
-      result = self.name
-    elif "action" in self.kwargs and self.kwargs["action"] == "store_false":
-      result = "--no-%s" % self.name[2:]
-    elif self.type is None and "choices" in self.kwargs:
-      result = "%s=%s" % (self.name, self.kwargs["choices"])
-    else:
-      if self.name.startswith("--"):
-        result = "%s=%s" % (self.name, self.get_displayname())
-      else:
-        result = "%s" % self.get_displayname()
-    return [result, "\t" + self.help]
 
   def add_to_parser(self, parser):
     """Add this option to an option parser"""

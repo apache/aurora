@@ -43,13 +43,9 @@ class RunCommand(Verb):
 
   @property
   def help(self):
-    return """Usage: aurora task run cluster/role/env/job cmd
-
-  Runs a shell command on machines currently hosting instances of a single job.
-
+    return """runs a shell command on machines currently hosting instances of a single job.
   This feature supports the same command line wildcards that are used to
   populate a job's commands.
-
   This means anything in the {{mesos.*}} and {{thermos.*}} namespaces.
   """
 
@@ -80,9 +76,7 @@ class SshCommand(Verb):
 
   @property
   def help(self):
-    return """usage: aurora task ssh cluster/role/env/job/instance [args...]
-
-  Initiate an SSH session on the machine that a task instance is running on.
+    return """initiates an SSH session on the machine that a task instance is running on.
   """
 
   def get_options(self):

@@ -44,17 +44,16 @@ from gen.apache.aurora.api.ttypes import (
 
 
 def mock_verb_options(verb):
-  return create_options_mock(verb.get_options())
+  # Handle default values opt.kwargs.get('default')
+  def opt_name(opt):
+    return opt.name.lstrip('--').replace('-', '_')
 
-
-def create_options_mock(options):
-  """Inspects a list of CommandOption instances for their attribute and default values and
-     constructs a mock with specification from it."""
-  attributes = [o.get_destination() for o in options]
-  mock = Mock(spec_set=attributes)
-  for o in options:
-    setattr(mock, o.get_destination(), o.get_default_value())
-  return mock
+  options = Mock(spec_set=[opt_name(opt) for opt in verb.get_options()])
+  # Apply default values to options.
+  for opt in verb.get_options():
+    if 'default' in opt.kwargs:
+      setattr(options, opt_name(opt), opt.kwargs.get('default'))
+  return options
 
 
 class FakeAuroraCommandLine(AuroraCommandLine):

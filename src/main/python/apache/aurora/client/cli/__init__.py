@@ -186,10 +186,6 @@ class AuroraCommand(AbstractClass):
     """Returns the help message for this command"""
 
   @abstractproperty
-  def usage(self):
-    """Returns a short usage description of the command"""
-
-  @abstractproperty
   def name(self):
     """Returns the command name"""
 
@@ -229,55 +225,10 @@ class CommandLine(AbstractClass):
   def setup_options_parser(self):
     """ Builds the options parsing for the application."""
     self.parser = argparse.ArgumentParser()
-    subparser = self.parser.add_subparsers(dest="noun")
-    for (name, noun) in self.nouns.items():
+    subparser = self.parser.add_subparsers(dest="noun", title='commands')
+    for name, noun in self.nouns.items():
       noun_parser = subparser.add_parser(name, help=noun.help)
       noun.internal_setup_options_parser(noun_parser)
-
-  def help_cmd(self, args):
-    """Generates a help message for a help request.
-    There are three kinds of help requests: a simple no-parameter request (help) which generates
-    a list of all of the commands; a one-parameter (help noun) request, which generates the help
-    for a particular noun, and a two-parameter request (help noun verb) which generates the help
-    for a particular verb.
-    """
-    if args is None or len(args) == 0:
-      self.print_out(self.composed_help)
-    elif len(args) == 1:
-      if args[0] in self.nouns:
-        self.print_out(self.nouns[args[0]].composed_help)
-        return EXIT_OK
-      else:
-        self.print_err('Unknown noun "%s"' % args[0])
-        self.print_err("Valid nouns are: %s" % [k for k in self.nouns])
-        return EXIT_INVALID_PARAMETER
-    elif len(args) == 2:
-      if args[0] in self.nouns:
-        if args[1] in self.nouns[args[0]].verbs:
-          self.print_out(self.nouns[args[0]].verbs[args[1]].composed_help)
-          return EXIT_OK
-        else:
-          self.print_err('Noun "%s" does not support a verb "%s"' % (args[0], args[1]))
-          verbs = [v for v in self.nouns[args[0]].verbs]
-          self.print_err('Valid verbs for "%s" are: %s' % (args[0], verbs))
-          return EXIT_INVALID_PARAMETER
-      else:
-        self.print_err("Unknown noun %s" % args[0])
-        return EXIT_INVALID_PARAMETER
-    else:
-      self.print_err("Unknown help command: %s" % (" ".join(args)))
-      self.print_err(self.composed_help)
-      return EXIT_INVALID_PARAMETER
-
-  @property
-  def composed_help(self):
-    """Get a fully composed, well-formatted help message"""
-    result = ["Aurora Client version %s" % get_client_version(), "Usage:"]
-    for noun in self.registered_nouns:
-      result += ["==Commands for %ss" % noun]
-      result += ["  %s" % s for s in self.nouns[noun].usage] + [""]
-    result.append("\nRun 'help noun' or 'help noun verb' for help about a specific command")
-    return "\n".join(result)
 
   @abstractmethod
   def register_nouns(self):
@@ -357,8 +308,6 @@ class CommandLine(AbstractClass):
     except ConfigurationPlugin.Error as e:
       print("Error in configuration plugin before dispatch: %s" % e.msg, file=sys.stderr)
       return e.code
-    if args[0] == "help":
-      return self.help_cmd(args[1:])
     noun, context = self._parse_args(args)
     logging.debug("Command=(%s)", args)
     pre_result = self._run_pre_hooks_and_plugins(context, args)
@@ -366,7 +315,7 @@ class CommandLine(AbstractClass):
       return pre_result
     try:
       result = noun.execute(context)
-      assert result is not None, "Noun return value is None!"
+      assert result is not None, "Command return value is None!"
       if result == EXIT_OK:
         logging.debug("Command terminated successfully")
         GlobalCommandHookRegistry.run_post_hooks(context, context.options.noun,
@@ -421,8 +370,8 @@ class Noun(AuroraCommand):
     into a python argparse subparser for this noun.
     """
     self.setup_options_parser(argparser)
-    subparser = argparser.add_subparsers(dest="verb")
-    for (name, verb) in self.verbs.items():
+    subparser = argparser.add_subparsers(dest="verb", title='subcommands')
+    for name, verb in self.verbs.items():
       vparser = subparser.add_parser(name, help=verb.help)
       for opt in verb.get_options():
         opt.add_to_parser(vparser)
@@ -432,10 +381,6 @@ class Noun(AuroraCommand):
       for opt in GlobalCommandHookRegistry.get_options():
         opt.add_to_parser(vparser)
 
-  @property
-  def usage(self):
-    return ["%s %s" % (self.name, self.verbs[verb].usage) for verb in self.verbs]
-
   @classmethod
   def create_context(cls):
     """Commands access state through a context object. The noun specifies what kind
@@ -443,16 +388,9 @@ class Noun(AuroraCommand):
     """
     pass
 
-  @property
-  def composed_help(self):
-    result = ['Usage for noun "%s":' % self.name]
-    result += ["    %s %s" % (self.name, self.verbs[verb].usage) for verb in self.verbs]
-    result += [self.help]
-    return "\n\n".join(result)
-
   def execute(self, context):
     if context.options.verb not in self.verbs:
-      raise self.InvalidVerbException("Noun %s does not have a verb %s" %
+      raise self.InvalidVerbException("Command %s does not have subcommand %s" %
           (self.name, context.options.verb))
     return self.verbs[context.options.verb].execute(context)
 
@@ -464,36 +402,9 @@ class Verb(AuroraCommand):
     """Create a link from a verb to its noun."""
     self.noun = noun
 
-  @property
-  def usage(self):
-    """Get a brief usage-description for the command.
-    A default usage string is automatically generated, but for commands with many options,
-    users may want to specify usage themselves.
-    """
-    result = [self.name]
-    for plugin in self.noun.commandline.plugins:
-      result += ["  " + opt.render_usage() for opt in plugin.get_options()]
-    result += [opt.render_usage() for opt in self.get_options()]
-
-    return " ".join(result)
-
   @abstractmethod
   def get_options(self):
     pass
-
-  @property
-  def composed_help(self):
-    """Generate the composed help message shown when the user requests help about this verb"""
-    result = ['Usage for verb "%s %s":' % (self.noun.name, self.name)]
-    result += ["  " + self.usage]
-    result += ["Options:"]
-    for opt in self.get_options():
-      result += ["  " + s for s in opt.render_help()]
-    for plugin in self.noun.commandline.plugins:
-      for opt in plugin.get_options():
-        result += ["  " + s for s in opt.render_help()]
-    result += ["", self.help]
-    return "\n".join(result)
 
   @abstractmethod
   def execute(self, context):

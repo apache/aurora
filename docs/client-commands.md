@@ -1,12 +1,6 @@
 Aurora Client Commands
 ======================
 
-The most up-to-date reference is in the client itself: use the
-`aurora help` subcommand (for example, `aurora help` or
-`aurora help create`) to find the latest information on parameters and
-functionality. Note that `aurora help open` does not work, due to underlying issues with
-reflection.
-
 - [Introduction](#introduction)
 - [Cluster Configuration](#cluster-configuration)
 - [Job Keys](#job-keys)
@@ -279,10 +273,11 @@ if it contains hook definitions and activations that affect the
 Cron Jobs
 ---------
 
+You can manage cron jobs using the `aurora cron` command.  Please see
+[cron-jobs.md](cron-jobs.md) for more details.
+
 You will see various commands and options relating to cron jobs in
-`aurora -help` and similar. Ignore them, as they're not yet implemented.
-You might be able to use them without causing an error, but nothing happens
-if you do.
+`aurora -h` and similar. Ignore them, as they're not yet implemented.
 
 Comparing Jobs
 --------------

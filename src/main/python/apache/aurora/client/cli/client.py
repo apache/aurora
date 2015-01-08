@@ -89,8 +89,9 @@ class AuroraCommandLine(CommandLine):
 
 def proxy_main():
   client = AuroraCommandLine()
+  # Defaulting to '-h' results in a similar, but more inviting message than 'too few arguments'.
   if len(sys.argv) == 1:
-    sys.argv.append("help")
+    sys.argv.append('-h')
   sys.exit(client.execute(sys.argv[1:]))
 
 if __name__ == '__main__':

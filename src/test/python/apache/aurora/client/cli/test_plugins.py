@@ -15,7 +15,7 @@
 from mock import create_autospec, patch
 from twitter.common.contextutil import temporary_file
 
-from apache.aurora.client.cli import ConfigurationPlugin, EXIT_OK
+from apache.aurora.client.cli import ConfigurationPlugin
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.options import CommandOption
 from apache.aurora.config import AuroraConfig
@@ -142,26 +142,3 @@ class TestPlugins(AuroraClientCommandTest):
       # Check that the plugin did its job.
       assert mock_context.bogosity == "maximum"
       assert mock_context.after
-
-  def mock_print(self, str):
-    for str in str.split('\n'):
-      self.transcript.append(str)
-
-  def mock_print_err(self, str):
-    for str in str.split('\n'):
-      self.err_transcript.append(str)
-
-  def test_plugin_options_in_help(self):
-    cmd = AuroraCommandLine()
-    cmd.register_plugin(BogusPlugin())
-    self.transcript = []
-    self.err_transcript = []
-    with patch('apache.aurora.client.cli.client.AuroraCommandLine.print_out',
-        side_effect=self.mock_print):
-      assert cmd.execute(['help', 'job', 'status']) == EXIT_OK
-      assert len(self.transcript) > 5
-      assert self.transcript[0] == 'Usage for verb "job status":' in self.transcript
-      assert not any('quota' in t for t in self.transcript)
-      assert not any('list' in t for t in self.transcript)
-      assert "Options:" in self.transcript
-      assert any('bogosity' in t for t in self.transcript)
