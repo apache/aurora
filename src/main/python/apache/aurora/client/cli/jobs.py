@@ -248,7 +248,7 @@ class InspectCommand(Verb):
   def execute(self, context):
     config = context.get_job_config(context.options.jobspec, context.options.config_file)
     if context.options.raw:
-      context.print_out(config.job())
+      context.print_out(str(config.job()))
       return EXIT_OK
 
     job = config.raw()

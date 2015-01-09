@@ -36,7 +36,7 @@ import sys
 import traceback
 from abc import abstractmethod, abstractproperty
 
-from twitter.common.lang import AbstractClass
+from twitter.common.lang import AbstractClass, Compatibility
 
 from apache.aurora.common.pex_version import pex_version, UnknownVersion
 
@@ -108,6 +108,8 @@ class Context(object):
     """Prints output to standard out with indent.
     For debugging purposes, it's nice to be able to patch this and capture output.
     """
+    if not isinstance(msg, Compatibility.string):
+      raise TypeError('msg must be a string')
     indent_str = " " * indent
     lines = msg.split("\n")
     for line in lines:

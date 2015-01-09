@@ -14,88 +14,89 @@
 
 import contextlib
 
-from mock import create_autospec, Mock, patch
-from twitter.common.contextutil import temporary_file
+from mock import patch
 
 from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.config import AuroraConfig
+from apache.aurora.config.schema.base import Job
+from apache.thermos.config.schema_base import MB, Process, Resources, Task
 
 from .util import AuroraClientCommandTest
 
-from gen.apache.aurora.api.ttypes import CronCollisionPolicy
-
 
 class TestInspectCommand(AuroraClientCommandTest):
-  def get_mock_config(self):
-    config = create_autospec(spec=AuroraConfig, instance=True)
-    # TODO(wfarner): figure out how to spec this. The raw_config is a Pystachio spec, and that seems
-    # to blow up mock.
-    raw_config = Mock()
-    config.raw.return_value = raw_config
-    raw_config.contact.return_value = "bozo@the.clown"
-    raw_config.name.return_value = "the_job"
-    raw_config.role.return_value = "bozo"
-    raw_config.cluster.return_value = "west"
-    raw_config.instances.return_value = 3
-    raw_config.has_cron_schedule.return_value = True
-    raw_config.cron_schedule.return_value = "* * * * *"
-    raw_config.cron_collision_policy.return_value = CronCollisionPolicy.KILL_EXISTING
-    raw_config.has_constraints.return_value = False
-    raw_config.production.return_value.get.return_value = False
-    mock_task = Mock()
-    raw_config.task.return_value = mock_task
-    mock_task.name.return_value = "task"
-    mock_task.constraints.return_value.get.return_value = {}
-    mock_process = Mock()
-    mock_processes = [mock_process]
-    mock_task.processes.return_value = mock_processes
-    mock_process.name.return_value = "process"
-    mock_process.daemon.return_value.get.return_value = False
-    mock_process.ephemeral.return_value.get.return_value = False
-    mock_process.final.return_value.get.return_value = False
-    mock_process.cmdline.return_value.get.return_value = "ls -la"
-    config.job.return_value.taskConfig.isService = False
+  def get_job_config(self):
+    config = AuroraConfig(job=Job(
+      cluster='west',
+      role='bozo',
+      environment='test',
+      name='the_job',
+      service=False,
+      task=Task(
+        name='task',
+        processes=[Process(cmdline='ls -la', name='process')],
+        resources=Resources(cpu=1.0, ram=1024 * MB, disk=1024 * MB)
+      ),
+      contact='bozo@the.clown',
+      instances=3,
+      cron_schedule='* * * * *'
+    ))
     return config
 
   def test_inspect_job(self):
-    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    mock_transcript = []
+    mock_stdout = []
     def mock_print_out(msg, indent=0):
       indent_str = " " * indent
-      mock_transcript.append("%s%s" % (indent_str, msg))
+      mock_stdout.append("%s%s" % (indent_str, msg))
     with contextlib.nested(
-        patch('threading._Event.wait'),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
         patch('apache.aurora.client.cli.context.AuroraCommandContext.print_out',
             side_effect=mock_print_out),
-        patch('apache.aurora.client.cli.context.get_config', return_value=self.get_mock_config())):
-      with temporary_file() as fp:
-        fp.write(self.get_valid_config())
-        fp.flush()
-        cmd = AuroraCommandLine()
-        result = cmd.execute(['job', 'inspect', 'west/bozo/test/hello', fp.name])
-        # inspect command should run without errors, and return 0.
-        assert result == 0
-        # The command output for the mock should look right.
-        print(mock_transcript)
-        assert mock_transcript == [
-            "Job level information",
-            "  name:       'the_job'",
-            "  role:       'bozo'",
-            "  contact:    'bozo@the.clown'",
-            "  cluster:    'west'",
-            "  instances:  '3'",
-            "  cron:",
-            "    schedule: '* * * * *'",
-            "    policy:   '0'",
-            "  service:    False",
-            "  production: False",
-            "",
-            "Task level information",
-            "  name: 'task'",
-            "",
-            "Process 'process':",
-            "  cmdline:",
-            "    ls -la",
-            ""]
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.get_job_config',
+            return_value=self.get_job_config())):
+      cmd = AuroraCommandLine()
+      assert cmd.execute(['job', 'inspect', 'west/bozo/test/hello', 'config.aurora']) == 0
+      output = '\n'.join(mock_stdout)
+      assert output == '''Job level information
+  name:       'the_job'
+  role:       'bozo'
+  contact:    'bozo@the.clown'
+  cluster:    'west'
+  instances:  '3'
+  cron:
+    schedule: '* * * * *'
+    policy:   'KILL_EXISTING'
+  service:    False
+  production: False
+
+Task level information
+  name: 'task'
+
+Process 'process':
+  cmdline:
+    ls -la
+'''
+
+  def test_inspect_job_raw(self):
+    mock_stdout = []
+    def mock_print_out(msg, indent=0):
+      indent_str = " " * indent
+      mock_stdout.append("%s%s" % (indent_str, msg))
+    job_config = self.get_job_config()
+    with contextlib.nested(
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.print_out',
+            side_effect=mock_print_out),
+        patch('apache.aurora.client.cli.context.AuroraCommandContext.get_job_config',
+            return_value=job_config)):
+      cmd = AuroraCommandLine()
+      assert cmd.execute(['job', 'inspect', '--raw', 'west/bozo/test/hello', 'config.aurora']) == 0
+      output = '\n'.join(mock_stdout)
+      assert output == str(job_config.job())
+
+  # AURORA-990: Prevent regression of client passing invalid arguments to print_out.
+  # Since print_out is the final layer before print(), there's not much else we can do than
+  # ensure the command exits normally.
+  def test_inspect_job_raw_success(self):
+    with patch('apache.aurora.client.cli.context.AuroraCommandContext.get_job_config',
+            return_value=self.get_job_config()):
+      cmd = AuroraCommandLine()
+      assert cmd.execute(['job', 'inspect', '--raw', 'west/bozo/test/hello', 'config.aurora']) == 0
