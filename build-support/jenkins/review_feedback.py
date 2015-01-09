@@ -174,8 +174,13 @@ def main():
       print('Running build command.')
       build_output = 'build_output'
       command = args.command
-      # Pipe to a file in case output is large.
-      result = subprocess.call(['bash', '-c', '%s 2>&1 | tee %s' % (command, build_output)])
+      # Pipe to a file in case output is large, also tee the output to simplify
+      # debugging.  Since we pipe the output, we must set pipefail to ensure
+      # a failing build command fails the bash pipeline.
+      result = subprocess.call([
+          'bash',
+          '-c',
+          'set -o pipefail; %s 2>&1 | tee %s' % (command, build_output)])
       if result == 0:
         review_text = 'Master (%s) is green with this patch.\n  %s' % (sha, command)
         if _missing_tests(server, latest_diff):
