@@ -158,7 +158,11 @@ def main():
     if not _needs_reply(server, request):
       continue
 
-    latest_diff = server.get_resource(request['links']['diffs']['href'])['diffs'][-1]
+    diffs = server.get_resource(request['links']['diffs']['href'])['diffs']
+    if not diffs:
+      continue
+
+    latest_diff = diffs[-1]
     print('Applying diff %d' % latest_diff['id'])
     patch_data = server.get_resource_data(
         latest_diff['links']['self']['href'],
