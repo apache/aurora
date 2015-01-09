@@ -261,5 +261,5 @@ Now that you've finished this Tutorial, you should read or do the following:
   the [Aurora + Thermos Configuration Reference](configuration-reference.md).
 - The [Aurora User Guide](user-guide.md) provides an overview of how Aurora, Mesos, and
   Thermos work "under the hood".
-- Explore the Aurora Client - use the `aurora help` subcommand, and read the
+- Explore the Aurora Client - use `aurora -h`, and read the
   [Aurora Client Commands](client-commands.md) document.

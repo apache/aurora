@@ -350,14 +350,6 @@ You interact with Aurora jobs either via:
   jobs, and finished jobs. Jobs are arranged by role, typically a service account for production
   jobs and user accounts for test or development jobs.
 
-- The Aurora Client's command line interface
+- The Aurora client
 
-  Several Client commands have a `-o` option that automatically opens a window to
-  the specified Job's scheduler UI URL. And, as described above, the `open` command also takes
-  you there.
-
-  For a complete list of Aurora Client commands, use `aurora help` and, for specific
-  command help, `aurora help [command]`. **Note**: `aurora help open`
-  returns `"subcommand open not found"` due to our reflection tricks not
-  working on words that are also builtin Python function names. Or see the
-  [Aurora Client Commands](client-commands.md) document.
+  See [client commands](client-commands.md).

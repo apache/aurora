@@ -72,24 +72,24 @@ set `max_task_failures` to `-1`.
 
 ## Interacting with cron jobs via the Aurora CLI
 
-Most interaction with cron jobs takes place using the `cron` subcommand. See `aurora2 help cron`
+Most interaction with cron jobs takes place using the `cron` subcommand. See `aurora cron -h`
 for up-to-date usage instructions.
 
 ### cron schedule
 Schedules a new cron job on the Aurora cluster for later runs or replaces the existing cron template
 with a new one. Only future runs will be affected, any existing active tasks are left intact.
 
-    $ aurora2 cron schedule devcluster/www-data/test/cron_hello_world /vagrant/examples/jobs/cron_hello_world.aurora
+    $ aurora cron schedule devcluster/www-data/test/cron_hello_world /vagrant/examples/jobs/cron_hello_world.aurora
 
 ### cron deschedule
 Deschedules a cron job, preventing future runs but allowing current runs to complete.
 
-    $ aurora2 cron deschedule devcluster/www-data/test/cron_hello_world
+    $ aurora cron deschedule devcluster/www-data/test/cron_hello_world
 
 ### cron start
 Start a cron job immediately, outside of its normal cron schedule.
 
-    $ aurora2 cron start devcluster/www-data/test/cron_hello_world
+    $ aurora cron start devcluster/www-data/test/cron_hello_world
 
 ### job killall, job restart, job kill
 Cron jobs create instances running on the cluster that you can interact with like normal Aurora

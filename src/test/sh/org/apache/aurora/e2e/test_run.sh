@@ -13,14 +13,14 @@
 # limitations under the License.
 #
 #
-# Test aurora run/aurora2 task run. This script is meant to be run within an ssh-agent to
+# Test aurora run/aurora task run. This script is meant to be run within an ssh-agent to
 # avoid polluting the global ssh-agent w/ the vagrant private key.
 
 set -u -e -x
 
 jobkey=$1
 scheduler_ip=$2
-aurora_command=${3:-"aurora2 task run"}
+aurora_command=${3:-"aurora task run"}
 
 ssh-add $HOME/.vagrant.d/insecure_private_key
 vagrant ssh -c "$aurora_command $jobkey 'pwd'" -- -A -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
