@@ -16,6 +16,9 @@ package org.apache.aurora;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.google.common.collect.ImmutableMultimap;
+import com.google.common.util.concurrent.Service;
+import com.google.common.util.concurrent.Service.State;
 import com.google.common.util.concurrent.ServiceManager;
 
 /**
@@ -37,6 +40,8 @@ public final class GuavaUtils {
     ServiceManagerIface stopAsync();
 
     void awaitStopped(long timeout, TimeUnit unit) throws TimeoutException;
+
+    ImmutableMultimap<State, Service> servicesByState();
   }
 
   /**
@@ -67,6 +72,11 @@ public final class GuavaUtils {
       @Override
       public void awaitStopped(long timeout, TimeUnit unit) throws TimeoutException {
         delegate.awaitStopped(timeout, unit);
+      }
+
+      @Override
+      public ImmutableMultimap<State, Service> servicesByState() {
+        return delegate.servicesByState();
       }
     };
   }

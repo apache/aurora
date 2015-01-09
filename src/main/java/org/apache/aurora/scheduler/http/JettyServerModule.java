@@ -280,6 +280,7 @@ public class JettyServerModule extends AbstractModule {
               registerJerseyEndpoint("/offers", Offers.class);
               registerJerseyEndpoint("/pendingtasks", PendingTasks.class);
               registerJerseyEndpoint("/quotas", Quotas.class);
+              registerJerseyEndpoint("/services", Services.class);
               registerJerseyEndpoint("/slaves", Slaves.class);
               registerJerseyEndpoint("/structdump", StructDump.class);
               registerJerseyEndpoint("/utilization", Utilization.class);
