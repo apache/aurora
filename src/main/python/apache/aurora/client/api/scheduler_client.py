@@ -179,8 +179,8 @@ class ZookeeperSchedulerClient(SchedulerClient):
 
 
 class DirectSchedulerClient(SchedulerClient):
-  def __init__(self, uri, **kwargs):
-    SchedulerClient.__init__(self, verbose=True, **kwargs)
+  def __init__(self, uri, verbose=True, **kwargs):
+    SchedulerClient.__init__(self, verbose=verbose, **kwargs)
     self._uri = uri
 
   def _connect(self):

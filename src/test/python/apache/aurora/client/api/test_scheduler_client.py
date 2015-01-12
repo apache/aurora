@@ -445,8 +445,7 @@ def test_connect_direct_scheduler_with_user_agent(mock_transport):
   user_agent = 'Some-User-Agent'
   uri = 'https://scheduler.example.com:1337'
 
-  client = scheduler_client.DirectSchedulerClient(uri, user_agent=user_agent)
-
+  client = scheduler_client.DirectSchedulerClient(uri, verbose=True, user_agent=user_agent)
   client._connect_scheduler(uri, mock_time)
 
   mock_transport.assert_called_once_with(uri, user_agent=user_agent)
