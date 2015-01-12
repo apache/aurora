@@ -1,5 +1,3 @@
-# Documentation
-
 ## Introduction
 Apache Aurora is a service scheduler that runs on top of Apache Mesos, enabling you to run long-running services that take advantage of Apache Mesos' scalability, fault-tolerance, and resource isolation. This documentation has been organized into sections with three audiences in mind:
  
@@ -16,7 +14,6 @@ This documentation is a work in progress, and we encourage you to ask questions 
  * [Configuration Tutorial](configuration-tutorial.md)
  * [Aurora + Thermos Reference](configuration-reference.md)
  * [Command Line Client](client-commands.md)
- * [Aurora Client v2](clientv2.md)
  * [Cron Jobs](cron-jobs.md)
 
 ## Operators
