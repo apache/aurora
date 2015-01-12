@@ -59,6 +59,7 @@ scheduler itself, you may want to explore developing your own
 
 ### Companies using Aurora
 - [Foursquare](https://foursquare.com)
+- [Gutefrage.net](https://www.gutefrage.net)
 - [Magine TV](https://magine.com)
 - [Oscar Health](https://www.hioscar.com)
 - [Twitter](https://twitter.com)
