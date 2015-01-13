@@ -50,15 +50,9 @@ EXIT_COMMAND_FAILURE = 4
 EXIT_INVALID_COMMAND = 5
 EXIT_INVALID_PARAMETER = 6
 EXIT_NETWORK_ERROR = 7
-EXIT_PERMISSION_VIOLATION = 8
 EXIT_TIMEOUT = 9
 EXIT_API_ERROR = 10
 EXIT_UNKNOWN_ERROR = 20
-
-# A location where you can find a site-specific file containing
-# global hook skip rules. This can be something like a link into a file stored in a git
-# repos.
-GLOBAL_HOOK_SKIP_RULES_URL = None
 
 
 __version__ = pkg_resources.resource_string(__name__, '.auroraversion')
@@ -251,7 +245,7 @@ class CommandLine(AbstractClass):
     return self.nouns.keys()
 
   def _setup(self, args):
-    GlobalCommandHookRegistry.setup(GLOBAL_HOOK_SKIP_RULES_URL)
+    GlobalCommandHookRegistry.setup()
     # Accessing registered_nouns has the side-effect of registering them, but since
     # nouns is unused, we must disable checkstyle.
     nouns = self.registered_nouns  # noqa
