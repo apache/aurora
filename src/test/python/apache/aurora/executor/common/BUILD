@@ -109,3 +109,29 @@ python_tests(
     'src/main/python/apache/aurora/executor/common:executor_timeout',
   ],
 )
+
+python_tests(
+  name = 'resource_manager',
+  sources = [ 'test_resource_manager.py' ],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/config:schema',
+    'src/main/python/apache/aurora/executor/common:resource_manager',
+    'src/main/python/apache/thermos/config',
+    'src/main/python/apache/thermos/monitoring',
+  ]
+)
+
+python_tests(
+  name = 'resource_manager_integration',
+  sources = [ 'test_resource_manager_integration.py' ],
+  dependencies = [
+    '3rdparty/python:mesos.interface',
+    '3rdparty/python:twitter.common.contextutil',
+    '3rdparty/python:twitter.common.dirutil',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/main/python/apache/aurora/config:schema',
+    'src/main/python/apache/aurora/executor/common:sandbox',
+    'src/main/python/apache/aurora/executor/common:resource_manager',
+  ]
+)

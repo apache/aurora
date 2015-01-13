@@ -25,11 +25,13 @@ python_binary(
     'src/main/python/apache/aurora/executor/common:announcer',
     'src/main/python/apache/aurora/executor/common:executor_timeout',
     'src/main/python/apache/aurora/executor/common:health_checker',
+    'src/main/python/apache/aurora/executor/common:resource_manager',
     'src/main/python/apache/aurora/executor/common:sandbox',
     'src/main/python/apache/aurora/executor:executor_detector',
     'src/main/python/apache/aurora/executor:executor_vars',
     'src/main/python/apache/aurora/executor:aurora_executor',
     'src/main/python/apache/aurora/executor:thermos_task_runner',
+    'src/main/python/apache/thermos/common:path',
   ]
 )
 

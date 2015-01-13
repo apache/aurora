@@ -99,3 +99,19 @@ python_library(
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ]
 )
+
+python_library(
+  name = 'resource_manager',
+  sources = ['resource_manager.py'],
+  dependencies = [
+    '3rdparty/python:psutil',
+    '3rdparty/python:twitter.common.dirutil',
+    '3rdparty/python:twitter.common.exceptions',
+    '3rdparty/python:twitter.common.log',
+    '3rdparty/python:twitter.common.quantity',
+    'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
+    'src/main/python/apache/aurora/executor/common:status_checker',
+    'src/main/python/apache/aurora/executor/common:task_info',
+    'src/main/python/apache/thermos/monitoring',
+  ]
+)

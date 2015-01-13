@@ -29,7 +29,9 @@ from apache.aurora.executor.aurora_executor import AuroraExecutor
 from apache.aurora.executor.common.announcer import DefaultAnnouncerCheckerProvider
 from apache.aurora.executor.common.executor_timeout import ExecutorTimeout
 from apache.aurora.executor.common.health_checker import HealthCheckerProvider
+from apache.aurora.executor.common.resource_manager import ResourceManagerProvider
 from apache.aurora.executor.thermos_task_runner import DefaultThermosTaskRunnerProvider
+from apache.thermos.common.path import TaskPath
 
 app.configure(debug=True)
 LogOptions.set_simple(True)
@@ -63,6 +65,14 @@ app.add_option(
          'be of the form $ROOT/$ROLE/$ENVIRONMENT/$JOBNAME.')
 
 
+app.add_option(
+    '--checkpoint-root',
+    dest='checkpoint_root',
+    metavar='PATH',
+    default=TaskPath.DEFAULT_CHECKPOINT_ROOT,
+    help='The checkpoint root where Thermos task checkpoints are stored.')
+
+
 # TODO(wickman) Consider just having the OSS version require pip installed
 # thermos_runner binaries on every machine and instead of embedding the pex
 # as a resource, shell out to one on the PATH.
@@ -86,7 +96,10 @@ def proxy_main():
     )
 
     # status providers:
-    status_providers = [HealthCheckerProvider()]
+    status_providers = [
+        HealthCheckerProvider(),
+        ResourceManagerProvider(checkpoint_root=options.checkpoint_root)
+    ]
 
     if options.announcer_enable:
       if options.announcer_ensemble is None:
