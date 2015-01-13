@@ -7,7 +7,7 @@ mock==1.0.1
 mox==0.5.3
 pex==0.8.2
 psutil==2.1.3
-pystachio==0.7.2
+pystachio==0.7.4
 pyyaml==3.10
 requests==2.3.0
 thrift==0.9.1
