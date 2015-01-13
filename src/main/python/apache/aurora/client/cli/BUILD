@@ -58,6 +58,7 @@ python_library(
     'src/main/python/apache/aurora/client:config',
     'src/main/python/apache/aurora/client:factory',
     'src/main/python/apache/aurora/common',
+    'src/main/resources/apache/aurora/client/cli:auroraversion',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
 )

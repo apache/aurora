@@ -94,7 +94,7 @@ function start_services {
 function prepare_sources {
   cat > /usr/local/bin/update-sources <<EOF
 #!/bin/bash
-rsync -urzvh /vagrant/ /home/vagrant/aurora \
+rsync -urzvhl /vagrant/ /home/vagrant/aurora \
     --filter=':- /vagrant/.gitignore' \
     --exclude=.git \
     --delete

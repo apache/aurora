@@ -36,9 +36,8 @@ import sys
 import traceback
 from abc import abstractmethod, abstractproperty
 
+import pkg_resources
 from twitter.common.lang import AbstractClass, Compatibility
-
-from apache.aurora.common.pex_version import pex_version, UnknownVersion
 
 from .command_hooks import GlobalCommandHookRegistry
 from .options import CommandOption
@@ -62,11 +61,7 @@ EXIT_UNKNOWN_ERROR = 20
 GLOBAL_HOOK_SKIP_RULES_URL = None
 
 
-def get_client_version():
-  try:
-    return "%s@%s" % pex_version(sys.argv[0])
-  except UnknownVersion:
-    return "VersionUnknown"
+__version__ = pkg_resources.resource_string(__name__, '.auroraversion')
 
 
 class Context(object):
@@ -227,6 +222,7 @@ class CommandLine(AbstractClass):
   def setup_options_parser(self):
     """ Builds the options parsing for the application."""
     self.parser = argparse.ArgumentParser()
+    self.parser.add_argument('--version', action='version', version=__version__)
     subparser = self.parser.add_subparsers(dest="noun", title='commands')
     for name, noun in self.nouns.items():
       noun_parser = subparser.add_parser(name, help=noun.help)

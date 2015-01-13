@@ -27,7 +27,8 @@ python_test_suite(
     ':sla',
     ':task',
     ':supdate',
-    ':update'
+    ':update',
+    ':version',
   ]
 )
 
@@ -200,6 +201,15 @@ python_tests(
   name = 'client',
   sources = [ 'test_client.py' ],
   dependencies = [
+    'src/main/python/apache/aurora/client/cli',
+  ]
+)
+
+python_tests(
+  name = 'version',
+  sources = [ 'test_version.py' ],
+  dependencies = [
+    '3rdparty/python:mock',
     'src/main/python/apache/aurora/client/cli',
   ]
 )

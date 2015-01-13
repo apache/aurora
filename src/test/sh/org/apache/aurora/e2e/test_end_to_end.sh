@@ -29,6 +29,10 @@ function check_url_live() {
   test $(curl -sL -w '%{http_code}' $1 -o /dev/null) == 200
 }
 
+test_version() {
+  test $(vagrant ssh -c "aurora --version" | tr -d '\r') = $(cat .auroraversion)
+}
+
 test_http_example() {
   local _cluster=$1 _role=$2 _env=$3 _job=$4 _sched_ip=$5
   local _base_config=$6 _updated_config=$7
@@ -121,6 +125,7 @@ vagrant ssh -c "aurorabuild all"
 
 # wipe the pseudo-deploy dir, and then create it fresh, to guarantee that the
 # test runs clean.
+test_version
 test_http_example "${TEST_ARGS[@]}"
 test_admin "${TEST_ADMIN_ARGS[@]}"
 RETCODE=0
