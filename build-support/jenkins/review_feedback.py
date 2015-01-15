@@ -85,13 +85,23 @@ def _get_latest_user_request(reviews):
 
 def _needs_reply(server, request):
   print('Inspecting review %d: %s' % (request['id'], request['summary']))
-  reviews = server.get_resource(request['links']['reviews']['href'])['reviews']
+  reviews_response = server.get_resource(request['links']['reviews']['href'])
+  reviews = reviews_response['reviews']
+  # The default response limit is 25.  When the responses are limited, a 'next' link will be
+  # included.  When that happens, continue to walk until there are no reviews left.
+  while 'next' in reviews_response['links']:
+    print('Fetching next page of reviews.')
+    reviews_response = server.get_resource(reviews_response['links']['next']['href'])
+    reviews.extend(reviews_response['reviews'])
   feedback_reviews = [r for r in reviews if r['links']['user']['title'] == server.user]
   if feedback_reviews:
     # Determine whether another round of feedback is necessary.
     latest_feedback_time = feedback_reviews[-1]['timestamp']
     latest_request = _get_latest_user_request(reviews)
     latest_diff = _get_latest_diff_time(server, request)
+    print('Latest feedback was given at        %s' % latest_feedback_time)
+    print('Latest build request from a user at %s' % latest_request)
+    print('Latest diff was posted at           %s' % latest_diff)
     return ((latest_request and (latest_request > latest_feedback_time))
             or (latest_diff and (latest_diff > latest_feedback_time)))
   return True
