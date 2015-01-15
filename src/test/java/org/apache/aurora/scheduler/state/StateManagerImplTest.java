@@ -48,6 +48,7 @@ import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.apache.mesos.Protos.SlaveID;
+import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
 import org.easymock.IArgumentMatcher;
@@ -64,6 +65,7 @@ import static org.apache.aurora.gen.ScheduleStatus.LOST;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.apache.aurora.gen.ScheduleStatus.THROTTLED;
+import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.expect;
 import static org.easymock.EasyMock.expectLastCall;
 import static org.junit.Assert.assertEquals;
@@ -474,6 +476,30 @@ public class StateManagerImplTest extends EasyMockTest {
     Iterables.getOnlyElement(Storage.Util.fetchTasks(storage, Query.taskScoped(taskId)));
 
     insertTask(task, 0);
+  }
+
+  @Test
+  public void testAssignTaskPubsub() {
+    // This test ensures the pubsub events emitted by assigning tasks have slave id and host set.
+    ITaskConfig task = makeTask(JIM, MY_JOB);
+    String taskId = "a";
+
+    expect(taskIdGenerator.generate(task, 0)).andReturn(taskId);
+
+    expectStateTransitions(taskId, INIT, PENDING);
+
+    Capture<TaskStateChange> taskStateChangeCapture = createCapture();
+    eventSink.post(capture(taskStateChangeCapture));
+
+    control.replay();
+
+    insertTask(task, 0);
+    assignTask(taskId, HOST_A);
+
+    TaskStateChange change = taskStateChangeCapture.getValue();
+    assertEquals(ASSIGNED, change.getNewState());
+    assertEquals(HOST_A, change.getTask().getAssignedTask().getSlaveHost());
+    assertEquals(HOST_A, change.getTask().getAssignedTask().getSlaveId());
   }
 
   private void expectStateTransitions(

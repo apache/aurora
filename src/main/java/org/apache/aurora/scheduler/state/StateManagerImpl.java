@@ -178,17 +178,8 @@ public class StateManagerImpl implements StateManager {
     requireNonNull(slaveId);
     requireNonNull(assignedPorts);
 
-    boolean success = updateTaskAndExternalState(
-        storeProvider.getUnsafeTaskStore(),
-        Optional.<ScheduleStatus>absent(),
-        taskId,
-        ASSIGNED,
-        Optional.<String>absent());
-
-    Preconditions.checkState(
-        success,
-        "Attempt to assign task " + taskId + " to " + slaveHost + " failed");
     Query.Builder query = Query.taskScoped(taskId);
+
     storeProvider.getUnsafeTaskStore().mutateTasks(query,
         new Function<IScheduledTask, IScheduledTask>() {
           @Override
@@ -202,6 +193,17 @@ public class StateManagerImpl implements StateManager {
             return IScheduledTask.build(builder);
           }
         });
+
+    boolean success = updateTaskAndExternalState(
+        storeProvider.getUnsafeTaskStore(),
+        Optional.<ScheduleStatus>absent(),
+        taskId,
+        ASSIGNED,
+        Optional.<String>absent());
+
+    Preconditions.checkState(
+        success,
+        "Attempt to assign task " + taskId + " to " + slaveHost + " failed");
 
     return Iterables.getOnlyElement(
         Iterables.transform(
