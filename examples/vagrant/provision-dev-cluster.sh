@@ -63,16 +63,7 @@ function install_mesos {
 
 function install_cluster_config {
   mkdir -p /etc/aurora
-  cat > /etc/aurora/clusters.json <<EOF
-[{
-  "name": "devcluster",
-  "zk": "192.168.33.7",
-  "scheduler_zk_path": "/aurora/scheduler",
-  "auth_mechanism": "UNAUTHENTICATED",
-  "slave_run_directory": "latest",
-  "slave_root": "/var/lib/mesos"
-}]
-EOF
+  ln -sf /home/vagrant/aurora/examples/vagrant/clusters.json /etc/aurora/clusters.json
 }
 
 function install_ssh_config {

@@ -55,7 +55,10 @@ EXIT_API_ERROR = 10
 EXIT_UNKNOWN_ERROR = 20
 
 
-__version__ = pkg_resources.resource_string(__name__, '.auroraversion')
+try:
+  __version__ = pkg_resources.resource_string(__name__, '.auroraversion')
+except IOError:
+  __version__ = 'Unknown'
 
 
 class Context(object):
