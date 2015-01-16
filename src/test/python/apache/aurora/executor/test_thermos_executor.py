@@ -269,7 +269,7 @@ class TestThermosExecutor(object):
     LogOptions.set_disk_log_level('DEBUG')
     log.init('executor_logger')
     if not cls.PANTS_BUILT and 'SKIP_PANTS_BUILD' not in os.environ:
-      assert subprocess.call(["./pants",
+      assert subprocess.call(["./pants", "binary",
           "src/main/python/apache/thermos/bin:thermos_runner"]) == 0
       cls.PANTS_BUILT = True
 

@@ -16,7 +16,7 @@
 set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-PANTS_VERSION=0.0.24
+PANTS_VERSION=$(cat $HERE/.pantsversion)
 # Pinned pants requirements - to upgrade pants change this file.
 PANTS_REQUIREMENTS="$HERE/build-support/pants_requirements.txt"
 if ! [ -f "$HERE/build-support/pants.venv/BOOTSTRAPPED" ] || \

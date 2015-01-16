@@ -54,5 +54,5 @@ fi
 source build-support/make-python-sdists.venv/bin/activate
 
 for t in "${TARGETS[@]}"; do
-  ./pants setup_py $t
+  ./pants setup-py $t
 done

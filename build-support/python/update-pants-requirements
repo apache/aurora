@@ -17,7 +17,7 @@ set -ex
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 BUILD_SUPPORT=$(dirname $HERE)
-PANTS_VERSION=0.0.24
+PANTS_VERSION=$(cat $HERE/../../.pantsversion)
 
 PANTS_VENV_PATH="$BUILD_SUPPORT/pants-requirements.venv"
 rm -rf "$PANTS_VENV_PATH"

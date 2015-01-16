@@ -19,8 +19,8 @@ Building and Testing the Client
 Building and testing the client code are both done using Pants. The relevant targets to know about
 are:
 
-   * Build a client executable: `./pants src/main/python/apache/aurora/client/cli:aurora`
-   * Test client code: `./pants ./pants src/test/python/apache/aurora/client/cli:all`
+   * Build a client executable: `./pants binary src/main/python/apache/aurora/client/cli:aurora`
+   * Test client code: `./pants test src/test/python/apache/aurora/client/cli:all`
 
 Running/Debugging the Client
 ============================

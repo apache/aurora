@@ -28,11 +28,9 @@ mkdir -p third_party
 pip install -d third_party -r <(grep -v mesos.native 3rdparty/python/requirements.txt)
 
 # Run all Python tests
-# Setting the timeout value to 1 minute ensures package fetches from PyPI do not
-# fail on Apache Jenkins.
 export JUNIT_XML_BASE="$PWD/dist/test-results"
 mkdir -p "$JUNIT_XML_BASE"
-./pants build --timeout=60 src/test/python:all -vxs
+./pants test.pytest --no-fast src/test/python::
 
 # Run Python style checks
 ./build-support/python/isort-check
