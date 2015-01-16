@@ -13,14 +13,16 @@
 #
 
 import os
-import time
+import threading
 
+import mock
 from mesos.interface import mesos_pb2
 from twitter.common.contextutil import temporary_dir
-from twitter.common.dirutil import safe_open
+from twitter.common.quantity import Amount, Time
 
 from apache.aurora.executor.common.resource_manager import ResourceManagerProvider
 from apache.aurora.executor.common.sandbox import DirectorySandbox
+from apache.thermos.monitoring.disk import DiskCollector
 
 
 # TODO(jcohen): There should really be a single canonical source for creating test jobs/tasks
@@ -66,7 +68,20 @@ def test_resource_manager():
     sandbox = os.path.join(td, 'sandbox')
     root = os.path.join(td, 'thermos')
 
-    rm = ResourceManagerProvider(root).from_assigned_task(
+    completed_event = threading.Event()
+    completed_event.set()
+    completed_mock = mock.PropertyMock(completed_event)
+    mock_disk_collector = mock.create_autospec(DiskCollector, spec_set=True)
+    mock_disk_collector.sample.return_value = None
+    value_mock = mock.PropertyMock(return_value=4197)
+    type(mock_disk_collector).value = value_mock
+    type(mock_disk_collector).completed_event = completed_mock
+
+    rmp = ResourceManagerProvider(
+        root,
+        disk_collector=lambda sandbox: mock_disk_collector,
+        disk_collection_interval=Amount(1, Time.SECONDS))
+    rm = rmp.from_assigned_task(
         make_assigned_task(
             make_job('some-role', 'some-env', 'some-job', 'http', portmap={'http': 80})),
         DirectorySandbox(sandbox))
@@ -75,20 +90,14 @@ def test_resource_manager():
 
     try:
       rm.start()
-
-      with safe_open(os.path.join(sandbox, 'foo.txt'), 'w') as fp:
-        fp.write(4097 * 'x')
-
-      # N.B. The sleep below makes this test inherently vulnerable to flakiness
-      # TODO(jcohen): Investigate using threading.event to avoid the need for a timeout entirely.
-      timeout = 0
-      while rm.status is None and timeout < 5:
-        timeout += 0.1
-        time.sleep(0.1)
-
+      while rm.status is None:
+        rm._kill_event.wait(timeout=1)
       result = rm.status
       assert result is not None
       assert result.reason.startswith('Disk limit exceeded')
       assert result.status == mesos_pb2.TASK_FAILED
+      assert value_mock.call_count == 1
+      assert completed_mock.call_count == 1
+      assert mock_disk_collector.sample.call_count == 1
     finally:
       rm._resource_monitor.kill()

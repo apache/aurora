@@ -118,8 +118,11 @@ class TaskResourceMonitor(ResourceMonitorBase, threading.Thread):
 
   MAX_HISTORY = 10000  # magic number
 
-  def __init__(self, task_monitor, sandbox,
-               process_collector=ProcessTreeCollector, disk_collector=DiskCollector,
+  def __init__(self,
+               task_monitor,
+               sandbox,
+               process_collector=ProcessTreeCollector,
+               disk_collector=DiskCollector,
                process_collection_interval=Amount(20, Time.SECONDS),
                disk_collection_interval=Amount(1, Time.MINUTES),
                history_time=Amount(1, Time.HOURS)):

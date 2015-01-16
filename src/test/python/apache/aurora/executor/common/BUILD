@@ -127,6 +127,7 @@ python_tests(
   sources = [ 'test_resource_manager_integration.py' ],
   dependencies = [
     '3rdparty/python:mesos.interface',
+    '3rdparty/python:mock',
     '3rdparty/python:twitter.common.contextutil',
     '3rdparty/python:twitter.common.dirutil',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
