@@ -14,7 +14,7 @@
  <html>
   <head>
     <title>Aurora $cluster_name$ slaves</title>
-    <link href="/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="/assets/bower_components/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet" />
   </head>
   <body>
     <h2>Cluster utilization</h2>
