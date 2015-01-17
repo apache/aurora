@@ -26,6 +26,7 @@ from apache.aurora.common.clusters import Clusters
 
 from ...api_util import SchedulerProxyApiSpec, SchedulerThriftApiSpec
 
+from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     AssignedTask,
     ExecutorConfig,
@@ -39,7 +40,8 @@ from gen.apache.aurora.api.ttypes import (
     ScheduleStatus,
     ScheduleStatusResult,
     TaskConfig,
-    TaskEvent
+    TaskEvent,
+    TaskQuery
 )
 
 
@@ -74,7 +76,7 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     super(FakeAuroraCommandContext, self).__init__()
     self.status = []
     self.fake_api = self.create_mock_api()
-    self.task_status = []
+    self.task_result = []
     self.showed_urls = []
     self.out = []
     self.err = []
@@ -121,10 +123,20 @@ class FakeAuroraCommandContext(AuroraCommandContext):
     return "YYYY-MM-DD HH:MM:SS"
 
   def add_expected_status_query_result(self, expected_result):
-    self.task_status.append(expected_result)
+    self.add_task_result(expected_result)
+    self.fake_api.check_status.side_effect = self.task_result
+
+  def add_expected_query_result(self, expected_result, job_key=None):
+    self.add_task_result(expected_result)
+    self.fake_api.query_no_configs.side_effect = self.task_result
+    if job_key:
+      self.fake_api.build_query.return_value = TaskQuery(
+          jobKeys=[job_key.to_thrift()], statuses=ACTIVE_STATES)
+
+  def add_task_result(self, expected_result):
+    self.task_result.append(expected_result)
     # each call adds an expected query result, in order.
-    self.fake_api.scheduler_proxy.getTasksWithoutConfigs.side_effect = self.task_status
-    self.fake_api.check_status.side_effect = self.task_status
+    self.fake_api.scheduler_proxy.getTasksWithoutConfigs.side_effect = self.task_result
 
 
 class AuroraClientCommandTest(unittest.TestCase):
@@ -162,69 +174,69 @@ class AuroraClientCommandTest(unittest.TestCase):
     return mock_api_factory, mock_scheduler_client
 
   @classmethod
-  def create_status_call_result(cls, mock_task=None):
-    status_response = cls.create_simple_success_response()
-    schedule_status = create_autospec(spec=ScheduleStatusResult, instance=True)
-    status_response.result = Result(scheduleStatusResult=schedule_status)
-    # This should be a list of ScheduledTask's.
-    schedule_status.tasks = []
-    if mock_task is None:
+  def create_query_call_result(cls, task=None):
+    status_response = cls.create_empty_task_result()
+    if task is None:
       for i in range(20):
-        schedule_status.tasks.append(cls.create_mock_task(i))
+        status_response.result.scheduleStatusResult.tasks.append(cls.create_scheduled_task(i))
     else:
-      schedule_status.tasks.append(mock_task)
+      status_response.result.scheduleStatusResult.tasks.append(task)
     return status_response
 
   @classmethod
-  def create_mock_task(cls, instance_id, status=ScheduleStatus.RUNNING):
-    mock_task = create_autospec(spec=ScheduledTask, instance=True)
-    mock_task.assignedTask = create_autospec(spec=AssignedTask, instance=True)
-    mock_task.assignedTask.instanceId = instance_id
-    mock_task.assignedTask.taskId = "Task%s" % instance_id
-    mock_task.assignedTask.slaveId = "Slave%s" % instance_id
-    mock_task.assignedTask.task = create_autospec(spec=TaskConfig, instance=True)
-    mock_task.slaveHost = "Slave%s" % instance_id
-    mock_task.status = status
-    mock_task_event = create_autospec(spec=TaskEvent, instance=True)
-    mock_task_event.timestamp = 1000
-    mock_task.taskEvents = [mock_task_event]
-    return mock_task
+  def create_empty_task_result(cls):
+    status_response = cls.create_simple_success_response()
+    status_response.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[]))
+    return status_response
+
+  @classmethod
+  def create_scheduled_task(cls, instance_id, status=ScheduleStatus.RUNNING,
+                            task_id=None, initial_time=None):
+    task = ScheduledTask(
+        status=status,
+        assignedTask=AssignedTask(
+            instanceId=instance_id,
+            taskId=task_id or "Task%s" % instance_id,
+            slaveId="Slave%s" % instance_id,
+            slaveHost="Slave%s" % instance_id,
+            task=TaskConfig()),
+        taskEvents=[TaskEvent(timestamp=initial_time or 1000)])
+    return task
 
   @classmethod
   def create_scheduled_tasks(cls):
     tasks = []
     for name in ['foo', 'bar', 'baz']:
-      task = ScheduledTask()
-      task.failure_count = 0
-      task.assignedTask = AssignedTask()
-      task.assignedTask.taskId = 1287391823
-      task.assignedTask.slaveHost = 'slavehost'
-      task.assignedTask.task = TaskConfig()
-      task.assignedTask.task.maxTaskFailures = 1
-      task.assignedTask.task.executorConfig = ExecutorConfig()
-      task.assignedTask.task.executorConfig.data = 'fake data'
-      task.assignedTask.task.metadata = []
-      task.assignedTask.task.job = JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name)
-      task.assignedTask.task.owner = Identity(role=cls.TEST_ROLE)
-      task.assignedTask.task.environment = cls.TEST_ENV
-      task.assignedTask.task.jobName = name
-      task.assignedTask.task.numCpus = 2
-      task.assignedTask.task.ramMb = 2
-      task.assignedTask.task.diskMb = 2
-      task.assignedTask.instanceId = 4237894
-      task.assignedTask.assignedPorts = {}
-      task.status = ScheduleStatus.RUNNING
-      event = TaskEvent()
-      event.timestamp = 28234726395
-      event.status = ScheduleStatus.RUNNING
-      event.message = "Hi there"
-      task.taskEvents = [event]
+      task = ScheduledTask(
+          failureCount=0,
+          assignedTask=AssignedTask(
+              taskId=1287391823,
+              slaveHost='slavehost',
+              task=TaskConfig(
+                  maxTaskFailures=1,
+                  executorConfig=ExecutorConfig(data='fake data'),
+                  metadata=[],
+                  job=JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=name),
+                  owner=Identity(role=cls.TEST_ROLE),
+                  environment=cls.TEST_ENV,
+                  jobName=name,
+                  numCpus=2,
+                  ramMb=2,
+                  diskMb=2),
+              instanceId=4237894,
+              assignedPorts={}),
+          status=ScheduleStatus.RUNNING,
+          taskEvents=[TaskEvent(
+              timestamp=28234726395,
+              status=ScheduleStatus.RUNNING,
+              message="Hi there")])
+
       tasks.append(task)
     return tasks
 
   @classmethod
   def setup_get_tasks_status_calls(cls, scheduler):
-    status_response = cls.create_status_call_result()
+    status_response = cls.create_query_call_result()
     scheduler.getTasksWithoutConfigs.return_value = status_response
 
   @classmethod

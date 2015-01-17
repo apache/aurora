@@ -39,14 +39,11 @@ from .util import (
 )
 
 from gen.apache.aurora.api.ttypes import (
-    AssignedTask,
     JobKey,
     ResponseCode,
     Result,
-    ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
-    TaskEvent,
     TaskQuery
 )
 
@@ -88,28 +85,16 @@ class TestCreateJobCommand(AuroraClientCommandTest):
 class TestClientCreateCommand(AuroraClientCommandTest):
 
   @classmethod
-  def create_mock_task(cls, task_id, instance_id, initial_time, status):
-    mock_task = create_autospec(spec=ScheduledTask, instance=True)
-    mock_task.assignedTask = create_autospec(spec=AssignedTask, instance=True)
-    mock_task.assignedTask.taskId = task_id
-    mock_task.assignedTask.instanceId = instance_id
-    mock_task.status = status
-    mock_task_event = create_autospec(spec=TaskEvent, instance=True)
-    mock_task_event.timestamp = initial_time
-    mock_task.taskEvents = [mock_task_event]
-    return mock_task
-
-  @classmethod
   def create_mock_status_query_result(cls, scheduleStatus):
-    mock_query_result = cls.create_simple_success_response()
-    mock_query_result.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[
-        cls.create_mock_task('hello', 0, 1000, scheduleStatus),
-        cls.create_mock_task('hello', 1, 1004, scheduleStatus)
+    query_result = cls.create_simple_success_response()
+    query_result.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[
+        cls.create_scheduled_task(0, initial_time=1000, status=scheduleStatus),
+        cls.create_scheduled_task(1, initial_time=1004, status=scheduleStatus)
     ]))
-    return mock_query_result
+    return query_result
 
   @classmethod
-  def create_mock_query(cls):
+  def create_query(cls):
     return TaskQuery(
         jobKeys=[JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=cls.TEST_JOB)])
 
@@ -149,7 +134,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
       # After making the client, create sets up a job monitor.
       # The monitor uses TaskQuery to get the tasks. It's called at least twice:once before
       # the job is created, and once after. So we need to set up mocks for the query results.
-      mock_query = self.create_mock_query()
+      mock_query = self.create_query()
       mock_context.add_expected_status_query_result(
         self.create_mock_status_query_result(ScheduleStatus.PENDING))
       mock_context.add_expected_status_query_result(
@@ -177,7 +162,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
         #              combinations did not produce the desired effect. Investigate why (AURORA-510)
         patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
-      mock_query = self.create_mock_query()
+      mock_query = self.create_query()
       mock_context.add_expected_status_query_result(
         self.create_mock_status_query_result(ScheduleStatus.PENDING))
       mock_context.add_expected_status_query_result(
@@ -205,7 +190,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
-      mock_query = self.create_mock_query()
+      mock_query = self.create_query()
       for result in [ScheduleStatus.PENDING, ScheduleStatus.PENDING, ScheduleStatus.RUNNING]:
         mock_context.add_expected_status_query_result(self.create_mock_status_query_result(result))
       api = mock_context.get_api('west')
@@ -381,7 +366,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     with contextlib.nested(
         patch('threading._Event.wait'),
         patch('apache.aurora.client.cli.jobs.Job.create_context', return_value=mock_context)):
-      mock_query = self.create_mock_query()
+      mock_query = self.create_query()
       mock_context.add_expected_status_query_result(
         self.create_mock_status_query_result(ScheduleStatus.PENDING))
       mock_context.add_expected_status_query_result(

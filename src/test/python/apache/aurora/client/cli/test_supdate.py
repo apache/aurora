@@ -88,6 +88,20 @@ class TestStartUpdateCommand(AuroraClientCommandTest):
     with pytest.raises(Context.CommandError):
       self._command.execute(self._fake_context)
 
+  def test_update_no_active_instance_check(self):
+    self._mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [1])
+    self._mock_options.strict = True
+
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+    self._mock_api.start_job_update.return_value = self.create_simple_success_response()
+
+    self._command.execute(self._fake_context)
+
+    self._mock_api.start_job_update.assert_called_once_with(
+      mock_config,
+      self._mock_options.instance_spec.instance)
+
 
 class TestUpdateCommand(AuroraClientCommandTest):
 

@@ -22,13 +22,10 @@ from apache.aurora.config import AuroraConfig
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext
 
 from gen.apache.aurora.api.ttypes import (
-    AssignedTask,
     JobKey,
     Result,
-    ScheduledTask,
     ScheduleStatus,
     ScheduleStatusResult,
-    TaskEvent,
     TaskQuery
 )
 
@@ -66,30 +63,20 @@ class HookForTesting(CommandHook):
 class TestClientCreateCommand(AuroraClientCommandTest):
 
   @classmethod
-  def create_mock_task(cls, task_id, instance_id, initial_time, status):
-    return ScheduledTask(
-        status=status,
-        assignedTask=AssignedTask(
-          taskId=task_id,
-          instanceId=instance_id),
-        taskEvents=[TaskEvent(timestamp=initial_time)]
-    )
-
-  @classmethod
   def create_mock_status_query_result(cls, scheduleStatus):
-    mock_query_result = cls.create_simple_success_response()
+    query_result = cls.create_simple_success_response()
     if scheduleStatus == ScheduleStatus.INIT:
       # status query result for before job is launched.
       tasks = []
     else:
-      mock_task_one = cls.create_mock_task("hello", 0, 1000, scheduleStatus)
-      mock_task_two = cls.create_mock_task("hello", 1, 1004, scheduleStatus)
-      tasks = [mock_task_one, mock_task_two]
-    mock_query_result.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
-    return mock_query_result
+      task_one = cls.create_scheduled_task(0, initial_time=1000, status=scheduleStatus)
+      task_two = cls.create_scheduled_task(1, initial_time=1004, status=scheduleStatus)
+      tasks = [task_one, task_two]
+    query_result.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=tasks))
+    return query_result
 
   @classmethod
-  def create_mock_query(cls):
+  def create_query(cls):
     return TaskQuery(
         jobKeys=[JobKey(role=cls.TEST_ROLE, environment=cls.TEST_ENV, name=cls.TEST_JOB)])
 
@@ -115,7 +102,7 @@ class TestClientCreateCommand(AuroraClientCommandTest):
     GlobalCommandHookRegistry.register_command_hook(command_hook)
     mock_context = FakeAuroraCommandContext()
     with patch("apache.aurora.client.cli.jobs.Job.create_context", return_value=mock_context):
-      mock_query = self.create_mock_query()
+      mock_query = self.create_query()
       mock_context.add_expected_status_query_result(
           self.create_mock_status_query_result(ScheduleStatus.INIT))
       mock_context.add_expected_status_query_result(

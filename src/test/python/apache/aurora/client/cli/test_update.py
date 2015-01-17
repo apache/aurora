@@ -70,7 +70,7 @@ class TestJobUpdateCommand(AuroraClientCommandTest):
   def test_update_with_lock(self):
     mock_config = self.create_mock_config()
     self._fake_context.get_job_config = Mock(return_value=mock_config)
-    self._mock_api.update_job.return_value = AuroraClientCommandTest.create_blank_response(
+    self._mock_api.update_job.return_value = self.create_blank_response(
         ResponseCode.LOCK_ERROR, "Error.")
 
     with pytest.raises(Context.CommandError):
@@ -86,7 +86,7 @@ class TestJobUpdateCommand(AuroraClientCommandTest):
     mock_config = self.create_mock_config()
     self._fake_context.get_job_config = Mock(return_value=mock_config)
     error = "Error printed once."
-    self._mock_api.update_job.return_value = AuroraClientCommandTest.create_blank_response(
+    self._mock_api.update_job.return_value = self.create_blank_response(
         ResponseCode.INVALID_REQUEST,
         error)
 
@@ -98,6 +98,21 @@ class TestJobUpdateCommand(AuroraClientCommandTest):
       self._mock_options.healthcheck_interval_seconds,
       self._mock_options.instance_spec.instance)
     assert self._fake_context.get_err() == ["Update failed due to error:", "\t%s" % error]
+
+  def test_update_no_active_instance_check(self):
+    self._mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [1])
+    self._mock_options.strict = True
+
+    mock_config = self.create_mock_config()
+    self._fake_context.get_job_config = Mock(return_value=mock_config)
+    self._mock_api.update_job.return_value = self.create_simple_success_response()
+
+    self._command.execute(self._fake_context)
+
+    self._mock_api.update_job.assert_called_once_with(
+      mock_config,
+      self._mock_options.healthcheck_interval_seconds,
+      self._mock_options.instance_spec.instance)
 
 
 class TestUpdateCommand(AuroraClientCommandTest):

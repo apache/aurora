@@ -121,7 +121,7 @@ class AuroraClientAPI(object):
     return self.query_no_configs(job_key.to_thrift_query())
 
   @classmethod
-  def build_query(cls, role, job, instances=None, statuses=LIVE_STATES, env=None):
+  def build_query(cls, role, job, env=None, instances=None, statuses=LIVE_STATES):
     return TaskQuery(jobKeys=[JobKey(role=role, environment=env, name=job)],
                      statuses=statuses,
                      instanceIds=instances)

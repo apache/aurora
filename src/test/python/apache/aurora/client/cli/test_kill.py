@@ -33,6 +33,7 @@ from .util import (
     mock_verb_options
 )
 
+from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import (
     JobKey,
     ResponseCode,
@@ -92,9 +93,9 @@ class TestKillCommand(AuroraClientCommandTest):
     fake_context = FakeAuroraCommandContext()
     fake_context.set_options(mock_options)
 
-    fake_context.add_expected_status_query_result(
-      AuroraClientCommandTest.create_status_call_result(
-        AuroraClientCommandTest.create_mock_task(1, ScheduleStatus.KILLED)))
+    fake_context.add_expected_query_result(
+      AuroraClientCommandTest.create_query_call_result(
+        AuroraClientCommandTest.create_scheduled_task(1, ScheduleStatus.RUNNING)))
 
     mock_api = fake_context.get_api('test')
     mock_api.kill_job.return_value = AuroraClientCommandTest.create_blank_response(
@@ -105,6 +106,44 @@ class TestKillCommand(AuroraClientCommandTest):
 
     mock_api.kill_job.assert_called_once_with(jobkey, mock_options.instance_spec.instance)
     self.assert_lock_message(fake_context)
+
+  def test_kill_inactive_instance_spec(self):
+    """Verify the instance spec is validated in a batched kill."""
+    command = KillCommand()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(jobkey, [1])
+    mock_options.no_batching = False
+    mock_options.strict = True
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+
+    fake_context.add_expected_query_result(AuroraClientCommandTest.create_empty_task_result())
+
+    with pytest.raises(Context.CommandError) as e:
+      command.execute(fake_context)
+    assert e.value.message == "Invalid instance parameter: [1]"
+
+  def test_kill_batched_queries_active_instances(self):
+    """Verify that the batch kill operates on active instances only."""
+    command = KillCommand()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(jobkey, [1])
+    mock_options.no_batching = False
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+
+    fake_context.add_expected_query_result(AuroraClientCommandTest.create_empty_task_result())
+
+    command.execute(fake_context)
+    assert fake_context.get_err()[0] == "No tasks to kill found for job cluster/role/env/job"
 
 
 class TestClientKillCommand(AuroraClientCommandTest):
@@ -145,8 +184,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
   @classmethod
   def assert_query(cls, fake_api):
-    calls = [call(cls.TEST_JOBKEY)]
-    assert fake_api.check_status.mock_calls == calls
+    calls = [call(TaskQuery(jobKeys=[cls.TEST_JOBKEY.to_thrift()], statuses=ACTIVE_STATES))]
+    assert fake_api.query_no_configs.mock_calls == calls
 
   def test_killall_job(self):
     """Test killall client-side API logic."""
@@ -181,7 +220,8 @@ class TestClientKillCommand(AuroraClientCommandTest):
 
       api = mock_context.get_api('west')
       api.kill_job.return_value = self.create_simple_success_response()
-      mock_context.add_expected_status_query_result(self.create_status_call_result())
+      mock_context.add_expected_query_result(
+          self.create_query_call_result(), job_key=self.TEST_JOBKEY)
 
       with temporary_file() as fp:
         fp.write(self.get_valid_config())
@@ -264,7 +304,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)) as (_, m, _):
       api = mock_context.get_api('west')
-      mock_context.add_expected_status_query_result(self.create_status_call_result())
+      mock_context.add_expected_query_result(
+          self.create_query_call_result(), job_key=self.TEST_JOBKEY)
+
       api.kill_job.return_value = self.create_simple_success_response()
 
       with temporary_file() as fp:
@@ -286,7 +328,9 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
-      mock_context.add_expected_status_query_result(self.create_status_call_result())
+      mock_context.add_expected_query_result(
+          self.create_query_call_result(), job_key=self.TEST_JOBKEY)
+
       api.kill_job.return_value = self.create_simple_success_response()
 
       with temporary_file() as fp:
@@ -310,7 +354,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
       # set up an empty instance list in the getTasksWithoutConfigs response
       status_response = self.create_simple_success_response()
       status_response.result = Result(scheduleStatusResult=ScheduleStatusResult(tasks=[]))
-      mock_context.add_expected_status_query_result(status_response)
+      mock_context.add_expected_query_result(status_response)
       api.kill_job.return_value = self.create_simple_success_response()
 
       with temporary_file() as fp:
@@ -348,7 +392,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=self.get_monitor_mock()),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
-      mock_context.add_expected_status_query_result(self.create_status_call_result())
+      mock_context.add_expected_query_result(self.create_query_call_result())
       api.kill_job.return_value = self.create_simple_success_response()
 
       with temporary_file() as fp:
@@ -371,7 +415,7 @@ class TestClientKillCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.cli.jobs.JobMonitor', return_value=mock_monitor),
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
       api = mock_context.get_api('west')
-      mock_context.add_expected_status_query_result(self.create_status_call_result())
+      mock_context.add_expected_query_result(self.create_query_call_result())
       api.kill_job.return_value = self.create_simple_success_response()
 
       with temporary_file() as fp:

@@ -198,7 +198,7 @@ class DiffCommand(Verb):
       env = config.environment()
       name = config.name()
     api = context.get_api(cluster)
-    resp = api.query(api.build_query(role, name, statuses=ACTIVE_STATES, env=env))
+    resp = api.query(api.build_query(role, name, env=env, statuses=ACTIVE_STATES))
     context.log_response_and_raise(resp, err_code=EXIT_INVALID_PARAMETER,
         err_msg="Could not find job to diff against")
     if resp.result.scheduleStatusResult.tasks is None:
@@ -318,7 +318,7 @@ class AbstractKillCommand(Verb):
   def kill_in_batches(self, context, job, instances_arg):
     api = context.get_api(job.cluster)
     # query the job, to get the list of active instances.
-    tasks = context.get_job_status(job)
+    tasks = context.get_active_instances(job)
     if tasks is None or len(tasks) == 0:
       context.print_err("No tasks to kill found for job %s" % job)
       return EXIT_INVALID_PARAMETER
@@ -611,7 +611,7 @@ class StatusCommand(Verb):
     result = []
     for jk in jobkeys:
       job_tasks = context.get_job_status(jk)
-      if job_tasks is None or job_tasks is []:
+      if not job_tasks:
         logging.info("No tasks were found for jobkey %s" % jk)
         continue
       active_tasks = sorted([t for t in job_tasks if is_active(t)],
@@ -646,7 +646,7 @@ class StatusCommand(Verb):
 
   def execute(self, context):
     jobs = context.get_jobs_matching_key(context.options.jobspec)
-    if jobs is None or jobs == []:
+    if not jobs:
       return self._print_jobs_not_found()
 
     result = self.get_status_for_jobs(jobs, context)
@@ -688,7 +688,7 @@ class UpdateCommand(Verb):
     # Get the current job status, so that we can check if there's anything
     # dangerous about this update.
     resp = api.query_no_configs(api.build_query(config.role(), config.name(),
-        statuses=ACTIVE_STATES, env=config.environment()))
+        env=config.environment(), statuses=ACTIVE_STATES))
     context.log_response_and_raise(resp, err_msg="Server could not find running job to update")
     remote_tasks = [t.assignedTask.task for t in resp.result.scheduleStatusResult.tasks]
     # for determining if an update is dangerous, we estimate the scope of the change
@@ -715,8 +715,6 @@ class UpdateCommand(Verb):
     job = context.options.instance_spec.jobkey
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
-    if instances is not None and context.options.strict:
-      context.verify_instances_option_validity(job, instances)
     config = context.get_job_config(job, context.options.config_file)
     api = context.get_api(config.cluster())
     if not context.options.force:

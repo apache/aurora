@@ -34,6 +34,7 @@ from apache.aurora.client.factory import make_client
 from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.common.clusters import CLUSTERS
 
+from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import ResponseCode
 
 # Utility type, representing job keys with wildcards.
@@ -202,24 +203,27 @@ class AuroraCommandContext(Context):
       return jobs
 
   def get_job_status(self, key):
-    """Returns a list of task instances running under the job."""
+    """Returns a list of task instances."""
     api = self.get_api(key.cluster)
     resp = api.check_status(key)
     self.log_response_and_raise(resp, err_code=EXIT_INVALID_PARAMETER)
-    return resp.result.scheduleStatusResult.tasks or None
+    return resp.result.scheduleStatusResult.tasks
 
   def get_active_instances(self, key):
     """Returns a list of the currently active instances of a job"""
-    return [task.assignedTask.instanceId for task in self.get_job_status(key)]
+    api = self.get_api(key.cluster)
+    resp = api.query_no_configs(
+        api.build_query(key.role, key.name, env=key.env, statuses=ACTIVE_STATES))
+    self.log_response_and_raise(resp, err_code=EXIT_INVALID_PARAMETER)
+    return resp.result.scheduleStatusResult.tasks
 
   def verify_instances_option_validity(self, jobkey, instances):
-    """Given a jobkey, does a getTasksStatus, and then checks that the specified instances
-    are valid for the job.
-    """
-    active_instances = self.get_active_instances(jobkey)
-    if max(active_instances) < max(instances):
+    """Verifies all provided job instances are currently active."""
+    active = set(task.assignedTask.instanceId for task in self.get_active_instances(jobkey) or [])
+    unrecognized = set(instances) - active
+    if unrecognized:
       raise self.CommandError(EXIT_INVALID_PARAMETER,
-          "Invalid shards parameter: %s only has %s shards" % (jobkey, max(active_instances)))
+          "Invalid instance parameter: %s" % (list(unrecognized)))
 
   def timestamp_to_string(self, timestamp):
     return time.ctime(timestamp)

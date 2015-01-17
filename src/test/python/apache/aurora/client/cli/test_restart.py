@@ -62,6 +62,23 @@ class TestRestartJobCommand(AuroraClientCommandTest):
       updater_config, mock_options.healthcheck_interval_seconds, config=None)
     self.assert_lock_message(fake_context)
 
+  def test_restart_inactive_instance_spec(self):
+    command = RestartCommand()
+
+    jobkey = AuroraJobKey("cluster", "role", "env", "job")
+    mock_options = mock_verb_options(command)
+    mock_options.instance_spec = TaskInstanceKey(jobkey, [1])
+    mock_options.strict = True
+
+    fake_context = FakeAuroraCommandContext()
+    fake_context.set_options(mock_options)
+
+    fake_context.add_expected_query_result(AuroraClientCommandTest.create_empty_task_result())
+
+    with pytest.raises(Context.CommandError) as e:
+      command.execute(fake_context)
+      assert e.message == "Invalid instance parameter: [1]"
+
 
 class TestRestartCommand(AuroraClientCommandTest):
 
