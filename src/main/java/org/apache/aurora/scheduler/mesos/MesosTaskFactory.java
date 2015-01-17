@@ -87,12 +87,12 @@ public interface MesosTaskFactory {
 
     /**
      * Minimum resources required to run Thermos. In the wild Thermos needs about 0.01 CPU and
-     * about 100MB of RAM. The RAM requirement has been rounded up to a power of 2.
+     * about 170MB (peak usage) of RAM. The RAM requirement has been rounded up to a power of 2.
      */
     @VisibleForTesting
     static final Resources MIN_THERMOS_RESOURCES = new Resources(
         0.01,
-        Amount.of(128L, Data.MB),
+        Amount.of(256L, Data.MB),
         Amount.of(1L, Data.MB),
         0);
 

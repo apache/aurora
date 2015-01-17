@@ -57,7 +57,7 @@ public class MesosTaskFactoryImplTest {
   private static final SlaveID SLAVE = SlaveID.newBuilder().setValue("slave-id").build();
   private static final Resources SOME_EXECUTOR_OVERHEAD = new Resources(
       0.01,
-      Amount.of(128L, Data.MB),
+      Amount.of(256L, Data.MB),
       Amount.of(0L, Data.MB),
       0);
 
