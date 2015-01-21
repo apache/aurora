@@ -15,7 +15,7 @@ both languages.
 Find Something to Do
 --------------------
 There are issues in [Jira](https://issues.apache.org/jira/browse/AURORA) with the
-["newbie" tag](https://issues.apache.org/jira/browse/AURORA-189?jql=project%20%3D%20AURORA%20AND%20resolution%20%3D%20Unresolved%20AND%20labels%20%3D%20newbie%20ORDER%20BY%20priority%20DESC)
+["newbie" label](https://issues.apache.org/jira/issues/?jql=project%20%3D%20AURORA%20AND%20labels%20%3D%20newbie%20and%20resolution%3Dunresolved)
 that are good starting places for new Aurora contributors; pick one of these and dive in! Once
 you've got a patch, the next step is to post a review.
 
