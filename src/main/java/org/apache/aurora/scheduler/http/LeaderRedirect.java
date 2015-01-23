@@ -27,12 +27,13 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.Atomics;
-import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.net.pool.DynamicHostSet;
 import com.twitter.common.net.pool.DynamicHostSet.HostChangeMonitor;
 import com.twitter.common.net.pool.DynamicHostSet.MonitorException;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
+
+import org.apache.aurora.scheduler.app.LocalServiceRegistryWithOverrides;
 
 /**
  * Redirect logic for finding the leading scheduler in the event that this process is not the
@@ -47,13 +48,15 @@ public class LeaderRedirect {
 
   private static final Logger LOG = Logger.getLogger(LeaderRedirect.class.getName());
 
-  private final LocalServiceRegistry serviceRegistry;
+  private final LocalServiceRegistryWithOverrides serviceRegistry;
   private final DynamicHostSet<ServiceInstance> schedulers;
 
   private final AtomicReference<ServiceInstance> leader = Atomics.newReference();
 
   @Inject
-  LeaderRedirect(LocalServiceRegistry serviceRegistry, DynamicHostSet<ServiceInstance> schedulers) {
+  LeaderRedirect(
+      LocalServiceRegistryWithOverrides serviceRegistry,
+      DynamicHostSet<ServiceInstance> schedulers) {
     this.serviceRegistry = Objects.requireNonNull(serviceRegistry);
     this.schedulers = Objects.requireNonNull(schedulers);
   }

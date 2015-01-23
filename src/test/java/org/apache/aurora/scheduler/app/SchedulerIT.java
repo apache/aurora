@@ -214,7 +214,13 @@ public class SchedulerIT extends BaseZooKeeperTest {
     final SchedulerMain main = SchedulerMain.class.newInstance();
     injector = Guice.createInjector(
         ImmutableList.<Module>builder()
-            .addAll(main.getModules(CLUSTER_NAME, SERVERSET_PATH, zkClientConfig, STATS_URL_PREFIX))
+            .addAll(
+                main.getModules(
+                    CLUSTER_NAME,
+                    SERVERSET_PATH,
+                    zkClientConfig,
+                    STATS_URL_PREFIX,
+                    Optional.<String>absent()))
             .add(new LifecycleModule())
             .add(new AppLauncherModule())
             .add(new ZooKeeperClientModule(zkClientConfig))

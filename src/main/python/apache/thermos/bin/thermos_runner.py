@@ -94,6 +94,14 @@ app.add_option(
      help="bind a numbered port PORT to name NAME")
 
 
+app.add_option(
+    "--hostname",
+    default=None,
+    dest="hostname",
+    help="The hostname to advertise in ZooKeeper and the thermos observer instead of "
+         "the locally-resolved hostname.")
+
+
 def get_task_from_options(opts):
   tasks = ThermosConfigLoader.load_json(opts.thermos_json)
   if len(tasks.tasks()) == 0:
@@ -157,7 +165,8 @@ def proxy_main(args, opts):
       user=opts.setuid,
       portmap=prebound_ports,
       chroot=opts.chroot,
-      planner_class=CappedTaskPlanner
+      planner_class=CappedTaskPlanner,
+      hostname=opts.hostname,
   )
 
   for sig in (signal.SIGUSR1, signal.SIGUSR2):

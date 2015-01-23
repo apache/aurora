@@ -411,14 +411,14 @@ class TaskRunner(object):
         return None
       return cls(task.tasks()[0].task(), checkpoint_root, checkpoint.header.sandbox,
                  log_dir=checkpoint.header.log_dir, task_id=task_id,
-                 portmap=checkpoint.header.ports)
+                 portmap=checkpoint.header.ports, hostname=checkpoint.header.hostname)
     except Exception as e:
       log.error('Failed to reconstitute checkpoint in TaskRunner.get: %s' % e, exc_info=True)
       return None
 
   def __init__(self, task, checkpoint_root, sandbox, log_dir=None,
                task_id=None, portmap=None, user=None, chroot=False, clock=time,
-               universal_handler=None, planner_class=TaskPlanner):
+               universal_handler=None, planner_class=TaskPlanner, hostname=None):
     """
       required:
         task (config.Task) = the task to run
@@ -463,6 +463,7 @@ class TaskRunner(object):
     self._launch_time = launch_time
     self._log_dir = log_dir or os.path.join(sandbox, '.logs')
     self._pathspec = TaskPath(root=checkpoint_root, task_id=self._task_id, log_dir=self._log_dir)
+    self._hostname = hostname or socket.gethostname()
     try:
       ThermosTaskValidator.assert_valid_task(task)
       ThermosTaskValidator.assert_valid_ports(task, self._portmap)
@@ -626,7 +627,7 @@ class TaskRunner(object):
           launch_time_ms=int(self._launch_time * 1000),
           sandbox=self._sandbox,
           log_dir=self._log_dir,
-          hostname=socket.gethostname(),
+          hostname=self._hostname,
           user=self._user,
           uid=uid,
           ports=self._portmap)

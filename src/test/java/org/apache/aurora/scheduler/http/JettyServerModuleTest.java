@@ -17,6 +17,7 @@ import java.net.InetSocketAddress;
 
 import javax.ws.rs.core.MediaType;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.testing.TearDown;
 import com.google.common.util.concurrent.RateLimiter;
@@ -46,6 +47,7 @@ import com.twitter.thrift.ServiceInstance;
 import org.apache.aurora.gen.AuroraAdmin;
 import org.apache.aurora.gen.ServerInfo;
 import org.apache.aurora.scheduler.SchedulerServicesModule;
+import org.apache.aurora.scheduler.app.LocalServiceRegistryWithOverrides;
 import org.apache.aurora.scheduler.async.OfferQueue;
 import org.apache.aurora.scheduler.async.RescheduleCalculator;
 import org.apache.aurora.scheduler.async.TaskGroups.TaskGroupsSettings;
@@ -109,7 +111,8 @@ public abstract class JettyServerModuleTest extends EasyMockTest {
                     Amount.of(1L, Time.MILLISECONDS),
                     bindMock(BackoffStrategy.class),
                     RateLimiter.create(1000)));
-
+            bind(LocalServiceRegistryWithOverrides.Settings.class).toInstance(
+                new LocalServiceRegistryWithOverrides.Settings(Optional.<String>absent()));
             bind(new TypeLiteral<DynamicHostSet<ServiceInstance>>() { }).toInstance(schedulers);
             thrift = bindMock(AuroraAdmin.Iface.class);
             bindMock(CronJobManager.class);

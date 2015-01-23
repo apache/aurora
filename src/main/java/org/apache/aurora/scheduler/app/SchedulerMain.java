@@ -27,7 +27,6 @@ import com.google.inject.Module;
 import com.twitter.common.application.AbstractApplication;
 import com.twitter.common.application.AppLauncher;
 import com.twitter.common.application.Lifecycle;
-import com.twitter.common.application.modules.LocalServiceRegistry;
 import com.twitter.common.application.modules.StatsModule;
 import com.twitter.common.args.Arg;
 import com.twitter.common.args.CmdLine;
@@ -108,8 +107,12 @@ public class SchedulerMain extends AbstractApplication {
   @CmdLine(name = "viz_job_url_prefix", help = "URL prefix for job container stats.")
   private static final Arg<String> STATS_URL_PREFIX = Arg.create("");
 
+  @CmdLine(name = "hostname",
+      help = "The hostname to advertise in ZooKeeper instead of the locally-resolved hostname.")
+  private static final Arg<String> HOSTNAME_OVERRIDE = Arg.create(null);
+
   @Inject private SingletonService schedulerService;
-  @Inject private LocalServiceRegistry serviceRegistry;
+  @Inject private LocalServiceRegistryWithOverrides serviceRegistry;
   @Inject private SchedulerLifecycle schedulerLifecycle;
   @Inject private Lifecycle appLifecycle;
 
@@ -129,11 +132,17 @@ public class SchedulerMain extends AbstractApplication {
       String clusterName,
       String serverSetPath,
       ClientConfig zkClientConfig,
-      String statsURLPrefix) {
+      String statsURLPrefix,
+      Optional<String> zkLocalDnsNameOverride) {
 
     return ImmutableList.<Module>builder()
         .add(new StatsModule())
-        .add(new AppModule(clusterName, serverSetPath, zkClientConfig, statsURLPrefix))
+        .add(new AppModule(
+            clusterName,
+            serverSetPath,
+            zkClientConfig,
+            statsURLPrefix,
+            zkLocalDnsNameOverride))
         .addAll(getExtraModules())
         .add(getPersistentStorageModule())
         .add(new MemStorageModule(Bindings.annotatedKeyFactory(LogStorage.WriteBehind.class)))
@@ -179,7 +188,8 @@ public class SchedulerMain extends AbstractApplication {
                 CLUSTER_NAME.get(),
                 SERVERSET_PATH.get(),
                 zkClientConfig,
-                STATS_URL_PREFIX.get()))
+                STATS_URL_PREFIX.get(),
+                Optional.fromNullable(HOSTNAME_OVERRIDE.get())))
         .add(new ZooKeeperClientModule(zkClientConfig))
         .add(new AbstractModule() {
           @Override

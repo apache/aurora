@@ -13,7 +13,6 @@
 #
 
 import posixpath
-import socket
 import threading
 import time
 from abc import abstractmethod
@@ -75,10 +74,13 @@ class AnnouncerCheckerProvider(StatusCheckerProvider):
 
     portmap = resolve_ports(mesos_task, assigned_task.assignedPorts)
 
+    # assigned_task.slaveHost is the --hostname argument passed into the mesos slave.
+    # Using this allows overriding the hostname published into ZK when announcing.
+    # If no argument was passed to the mesos-slave, the slave falls back to gethostname().
     endpoint, additional = make_endpoints(
-        socket.gethostname(),
-        portmap,
-        mesos_task.announce().primary_port().get())
+      assigned_task.slaveHost,
+      portmap,
+      mesos_task.announce().primary_port().get())
 
     client = self.make_zk_client()
     path = self.make_zk_path(assigned_task)

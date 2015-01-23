@@ -16,6 +16,7 @@ import errno
 import getpass
 import os
 import signal
+import socket
 import struct
 import subprocess
 import sys
@@ -71,7 +72,8 @@ class ThermosTaskRunner(TaskRunner):
                sandbox,
                checkpoint_root=None,
                artifact_dir=None,
-               clock=time):
+               clock=time,
+               hostname=None):
     """
       runner_pex       location of the thermos_runner pex that this task runner should use
       task_id          task_id assigned by scheduler
@@ -96,6 +98,7 @@ class ThermosTaskRunner(TaskRunner):
     self._role = role
     self._clock = clock
     self._artifact_dir = artifact_dir or safe_mkdtemp()
+    self._hostname = hostname or socket.gethostname()
 
     # wait events
     self._dead = threading.Event()
@@ -244,7 +247,8 @@ class ThermosTaskRunner(TaskRunner):
                   checkpoint_root=self._checkpoint_root,
                   sandbox=self._root,
                   task_id=self._task_id,
-                  thermos_json=self._task_filename)
+                  thermos_json=self._task_filename,
+                  hostname=self._hostname)
 
     if getpass.getuser() == 'root':
       params.update(setuid=self._role)
@@ -388,4 +392,5 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
         sandbox,
         checkpoint_root=self._checkpoint_root,
         artifact_dir=self._artifact_dir,
-        clock=self._clock)
+        clock=self._clock,
+        hostname=assigned_task.slaveHost)

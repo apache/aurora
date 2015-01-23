@@ -208,7 +208,11 @@ def make_assigned_task(thermos_config, assigned_ports=None):
       jobName=thermos_config.name().get(),
       executorConfig=executor_config)
 
-  return AssignedTask(instanceId=12345, task=task_config, assignedPorts=assigned_ports)
+  return AssignedTask(
+      instanceId=12345,
+      task=task_config,
+      assignedPorts=assigned_ports,
+      slaveHost='test-host')
 
 
 def make_job(role, environment, name, primary_port, portmap):

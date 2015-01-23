@@ -22,6 +22,7 @@ import javax.inject.Singleton;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
+import com.google.common.base.Optional;
 import com.google.common.collect.Iterables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
@@ -76,19 +77,22 @@ public class AppModule extends AbstractModule {
 
   private final String clusterName;
   private final String serverSetPath;
-  private final String statsUrlPrefix;
   private final ClientConfig zkClientConfig;
+  private final String statsUrlPrefix;
+  private final Optional<String> zkLocalDnsNameOverride;
 
   AppModule(
       String clusterName,
       String serverSetPath,
       ClientConfig zkClientConfig,
-      String statsUrlPrefix) {
+      String statsUrlPrefix,
+      Optional<String> zkLocalDnsNameOverride) {
 
     this.clusterName = checkNotBlank(clusterName);
     this.serverSetPath = checkNotBlank(serverSetPath);
-    this.statsUrlPrefix = statsUrlPrefix;
     this.zkClientConfig = requireNonNull(zkClientConfig);
+    this.statsUrlPrefix = statsUrlPrefix;
+    this.zkLocalDnsNameOverride = requireNonNull(zkLocalDnsNameOverride);
   }
 
   @Override
@@ -127,6 +131,9 @@ public class AppModule extends AbstractModule {
     install(new SlaModule());
     install(new UpdaterModule());
 
+    bind(LocalServiceRegistryWithOverrides.Settings.class).toInstance(
+        new LocalServiceRegistryWithOverrides.Settings(this.zkLocalDnsNameOverride)
+    );
     bind(StatsProvider.class).toInstance(Stats.STATS_PROVIDER);
   }
 

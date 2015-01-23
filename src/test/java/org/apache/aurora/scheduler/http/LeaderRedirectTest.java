@@ -37,6 +37,7 @@ import com.twitter.common.testing.easymock.EasyMockTest;
 import com.twitter.thrift.Endpoint;
 import com.twitter.thrift.ServiceInstance;
 
+import org.apache.aurora.scheduler.app.LocalServiceRegistryWithOverrides;
 import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -80,7 +81,10 @@ public class LeaderRedirectTest extends EasyMockTest {
     Set<ServiceRunner> services = ImmutableSet.of(fakeRunner);
     LocalServiceRegistry serviceRegistry =
         new LocalServiceRegistry(Providers.of(services), new ShutdownRegistryImpl());
-    leaderRedirector = new LeaderRedirect(serviceRegistry, schedulers);
+    LocalServiceRegistryWithOverrides withOverrides =
+        new LocalServiceRegistryWithOverrides(serviceRegistry,
+            new LocalServiceRegistryWithOverrides.Settings(Optional.<String>absent()));
+    leaderRedirector = new LeaderRedirect(withOverrides, schedulers);
 
     monitorCapture = new Capture<>();
     expect(schedulers.watch(capture(monitorCapture))).andReturn(null);
