@@ -68,18 +68,21 @@ def test_resource_manager():
     sandbox = os.path.join(td, 'sandbox')
     root = os.path.join(td, 'thermos')
 
-    completed_event = threading.Event()
-    completed_event.set()
-    completed_mock = mock.PropertyMock(completed_event)
-    mock_disk_collector = mock.create_autospec(DiskCollector, spec_set=True)
+    mock_disk_collector_class = mock.create_autospec(DiskCollector, spec_set=True)
+    mock_disk_collector = mock_disk_collector_class.return_value
+
     mock_disk_collector.sample.return_value = None
     value_mock = mock.PropertyMock(return_value=4197)
     type(mock_disk_collector).value = value_mock
+
+    completed_event = threading.Event()
+    completed_event.set()
+    completed_mock = mock.PropertyMock(completed_event)
     type(mock_disk_collector).completed_event = completed_mock
 
     rmp = ResourceManagerProvider(
         root,
-        disk_collector=lambda sandbox: mock_disk_collector,
+        disk_collector=mock_disk_collector_class,
         disk_collection_interval=Amount(1, Time.SECONDS))
     rm = rmp.from_assigned_task(
         make_assigned_task(
