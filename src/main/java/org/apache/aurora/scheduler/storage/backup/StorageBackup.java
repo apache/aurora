@@ -13,9 +13,12 @@
  */
 package org.apache.aurora.scheduler.storage.backup;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.text.DateFormat;
@@ -40,10 +43,13 @@ import com.twitter.common.quantity.Time;
 import com.twitter.common.stats.Stats;
 import com.twitter.common.util.Clock;
 
-import org.apache.aurora.codec.ThriftBinaryCodec;
-import org.apache.aurora.codec.ThriftBinaryCodec.CodingException;
 import org.apache.aurora.gen.storage.Snapshot;
 import org.apache.aurora.scheduler.storage.SnapshotStore;
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TIOStreamTransport;
+import org.apache.thrift.transport.TTransport;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;
@@ -153,15 +159,18 @@ public interface StorageBackup {
       String tempBackupName = "temp_" + backupName;
       File tempFile = new File(config.dir, tempBackupName);
       LOG.info("Saving backup to " + tempFile);
-      try {
-        byte[] backup = ThriftBinaryCodec.encodeNonNull(snapshot);
-        Files.write(backup, tempFile);
+      try (
+          OutputStream tempFileStream = new BufferedOutputStream(new FileOutputStream(tempFile))) {
+
+        TTransport transport = new TIOStreamTransport(tempFileStream);
+        TProtocol protocol = new TBinaryProtocol(transport);
+        snapshot.write(protocol);
         Files.move(tempFile, new File(config.dir, backupName));
         successes.incrementAndGet();
       } catch (IOException e) {
         failures.incrementAndGet();
         LOG.log(Level.SEVERE, "Failed to prepare backup " + backupName + ": " + e, e);
-      } catch (CodingException e) {
+      } catch (TException e) {
         LOG.log(Level.SEVERE, "Failed to encode backup " + backupName + ": " + e, e);
         failures.incrementAndGet();
       } finally {
