@@ -29,6 +29,7 @@ Aurora + Thermos Configuration Reference
     - [UpdateConfig Objects](#updateconfig-objects)
     - [HealthCheckConfig Objects](#healthcheckconfig-objects)
     - [Announcer Objects](#announcer-objects)
+    - [Container Objects](#container)
 - [Specifying Scheduling Constraints](#specifying-scheduling-constraints)
 - [Template Namespaces](#template-namespaces)
     - [mesos Namespace](#mesos-namespace)
@@ -299,6 +300,7 @@ resources are allocated.
   ```ram```  | Integer | Bytes of RAM required by the task.
   ```disk``` | Integer | Bytes of disk required by the task.
 
+
 Job Schema
 ==========
 
@@ -322,6 +324,7 @@ Job Schema
   ```priority``` | Integer | Preemption priority to give the task (Default 0). Tasks with higher priorities may preempt tasks at lower priorities.
   ```production``` | Boolean |  Whether or not this is a production task backed by quota (Default: False). Production jobs may preempt any non-production job, and may only be preempted by production jobs in the same role and of higher priority. To run jobs at this level, the job role must have the appropriate quota.
   ```health_check_config``` | ```heath_check_config``` object | Parameters for controlling a task's health checks via HTTP. Only used if a  health port was assigned with a command line wildcard.
+  ```container``` | ```Container``` object | An optional container to run all processes inside of.
 
 ### Services
 
@@ -391,6 +394,24 @@ Static ports should be used cautiously as Aurora does nothing to prevent two
 tasks with the same static port allocations from being co-scheduled.
 External constraints such as slave attributes should be used to enforce such
 guarantees should they be needed.
+
+### Container Object
+
+*Note: The only container type currently supported is "docker".  Docker support is currently EXPERIMENTAL.*
+*Note: In order to correctly execute processes inside a job, the Docker container must have python 2.7 installed.*
+
+Describes the container the job's processes will run inside.
+
+  param          | type           | description
+  -----          | :----:         | -----------
+  ```docker```   | Docker         | A docker container to use.
+
+### Docker Object
+
+  param          | type           | description
+  -----          | :----:         | -----------
+  ```image```    | String         | The name of the docker image to execute.  If the image does not exist locally it will be pulled with ```docker pull```.
+
 
 Specifying Scheduling Constraints
 =================================

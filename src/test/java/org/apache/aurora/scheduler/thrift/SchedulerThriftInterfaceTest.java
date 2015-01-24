@@ -54,6 +54,7 @@ import org.apache.aurora.gen.ConfigRewrite;
 import org.apache.aurora.gen.ConfigSummary;
 import org.apache.aurora.gen.ConfigSummaryResult;
 import org.apache.aurora.gen.Constraint;
+import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.HostStatus;
 import org.apache.aurora.gen.Hosts;
@@ -78,6 +79,7 @@ import org.apache.aurora.gen.LimitConstraint;
 import org.apache.aurora.gen.ListBackupsResult;
 import org.apache.aurora.gen.Lock;
 import org.apache.aurora.gen.LockKey;
+import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.PendingReason;
 import org.apache.aurora.gen.QueryRecoveryResult;
 import org.apache.aurora.gen.Range;
@@ -624,6 +626,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setProduction(true)
         .setOwner(ROLE_IDENTITY)
         .setEnvironment("devel")
+        .setContainer(Container.mesos(new MesosContainer()))
         .setJobName(JOB_NAME);
     JobConfiguration job = makeJob(task);
 
@@ -3017,7 +3020,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
       return expect(userValidator.checkAuthorized(
           eq(SESSION),
           eq(capability),
-          anyObject(AuditCheck.class))).andThrow(new AuthFailedException(AUTH_DENIED_MESSAGE));
+          anyObject(AuditCheck.class))
+      ).andThrow(new AuthFailedException(AUTH_DENIED_MESSAGE));
     } else {
       return expect(userValidator.checkAuthorized(
           eq(SESSION),
@@ -3040,7 +3044,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
         .setProduction(production)
         .setRequestedPorts(ImmutableSet.<String>of())
         .setTaskLinks(ImmutableMap.<String, String>of())
-        .setMaxTaskFailures(1);
+        .setMaxTaskFailures(1)
+        .setContainer(Container.mesos(new MesosContainer()));
   }
 
   private static TaskConfig populatedTask() {

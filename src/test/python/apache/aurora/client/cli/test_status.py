@@ -452,6 +452,9 @@ class TestJobStatus(AuroraClientCommandTest):
                   "task": {
                     "isService": false,
                     "environment": "prod",
+                    "container": {
+                      "mesos": {}
+                    },
                     "requestedPorts": [
                       "http"
                     ],
@@ -505,6 +508,9 @@ class TestJobStatus(AuroraClientCommandTest):
                   "task": {
                     "isService": false,
                     "environment": "prod",
+                    "container": {
+                      "mesos": {}
+                    },
                     "requestedPorts": [
                       "http"
                     ],

@@ -13,12 +13,14 @@
  */
 package org.apache.aurora.scheduler.configuration;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -27,17 +29,22 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.twitter.common.args.Arg;
+import com.twitter.common.args.CmdLine;
 import com.twitter.common.base.Closure;
 import com.twitter.common.base.MorePreconditions;
 
 import org.apache.aurora.gen.Constraint;
+import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.LimitConstraint;
+import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.gen.TaskConfig._Fields;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
+import org.apache.aurora.scheduler.storage.entities.IContainer;
 import org.apache.aurora.scheduler.storage.entities.IIdentity;
 import org.apache.aurora.scheduler.storage.entities.IJobConfiguration;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
@@ -53,6 +60,11 @@ import static org.apache.aurora.gen.apiConstants.GOOD_IDENTIFIER_PATTERN_JVM;
  * TODO(William Farner): Add input validation to all fields (strings not empty, positive ints, etc).
  */
 public final class ConfigurationManager {
+
+  @CmdLine(name = "allowed_container_types",
+      help = "Container types that are allowed to be used by jobs.")
+  private static final Arg<List<Container._Fields>> ALLOWED_CONTAINER_TYPES =
+      Arg.<List<Container._Fields>>create(ImmutableList.of(Container._Fields.MESOS));
 
   public static final String DEDICATED_ATTRIBUTE = "dedicated";
 
@@ -129,6 +141,9 @@ public final class ConfigurationManager {
           new DefaultField(_Fields.TASK_LINKS, Maps.<String, String>newHashMap()),
           new DefaultField(_Fields.REQUESTED_PORTS, Sets.<String>newHashSet()),
           new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()),
+          // TODO(wfarner): Explore replacing these with thrift defaults.
+          new DefaultField(_Fields.CONTAINER,
+              Container.mesos(new MesosContainer())),
           new Closure<TaskConfig>() {
             @Override
             public void execute(TaskConfig task) {
@@ -341,6 +356,25 @@ public final class ConfigurationManager {
         throw new TaskDescriptionException(
             "Only " + dedicatedRole + " may use hosts dedicated for that role.");
       }
+    }
+
+    Optional<Container._Fields> containerType;
+    if (config.isSetContainer()) {
+      IContainer containerConfig = config.getContainer();
+      containerType = Optional.of(containerConfig.getSetField());
+      if (containerConfig.isSetDocker() && !containerConfig.getDocker().isSetImage()) {
+        throw new TaskDescriptionException("A container must specify an image");
+      }
+    } else {
+      // Default to mesos container type if unset.
+      containerType = Optional.of(Container._Fields.MESOS);
+    }
+    if (!containerType.isPresent()) {
+      throw new TaskDescriptionException("A job must have a container type.");
+    }
+    if (!ALLOWED_CONTAINER_TYPES.get().contains(containerType.get())) {
+      throw new TaskDescriptionException(
+          "The container type " + containerType.get().toString() + " is not allowed");
     }
 
     return ITaskConfig.build(applyDefaultsIfUnset(builder));

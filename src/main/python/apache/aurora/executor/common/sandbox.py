@@ -50,9 +50,24 @@ class SandboxInterface(Interface):
 
 
 class SandboxProvider(Interface):
+  def _get_sandbox_user(self, assigned_task):
+    return assigned_task.task.job.role if assigned_task.task.job else assigned_task.task.owner.role
+
   @abstractmethod
   def from_assigned_task(self, assigned_task):
     """Return the appropriate Sandbox implementation from an AssignedTask."""
+
+
+class DefaultSandboxProvider(SandboxProvider):
+  SANDBOX_NAME = 'sandbox'
+
+  def from_assigned_task(self, assigned_task):
+    if assigned_task.task.container.docker:
+      return DockerDirectorySandbox(self.SANDBOX_NAME)
+    else:
+      return DirectorySandbox(
+        os.path.abspath(self.SANDBOX_NAME),
+        self._get_sandbox_user(assigned_task))
 
 
 class DirectorySandbox(SandboxInterface):
@@ -81,23 +96,49 @@ class DirectorySandbox(SandboxInterface):
     except (IOError, OSError) as e:
       raise self.CreationError('Failed to create the sandbox: %s' % e)
 
-    try:
-      pwent = pwd.getpwnam(self._user)
-      grent = grp.getgrgid(pwent.pw_gid)
-    except KeyError:
-      raise self.CreationError(
-          'Could not create sandbox because user does not exist: %s' % self._user)
+    if self._user:
+      try:
+        pwent = pwd.getpwnam(self._user)
+        grent = grp.getgrgid(pwent.pw_gid)
+      except KeyError:
+        raise self.CreationError(
+            'Could not create sandbox because user does not exist: %s' % self._user)
 
-    try:
-      log.debug('DirectorySandbox: chown %s:%s %s' % (self._user, grent.gr_name, self.root))
-      os.chown(self.root, pwent.pw_uid, pwent.pw_gid)
-      log.debug('DirectorySandbox: chmod 700 %s' % self.root)
-      os.chmod(self.root, 0700)
-    except (IOError, OSError) as e:
-      raise self.CreationError('Failed to chown/chmod the sandbox: %s' % e)
+      try:
+        log.debug('DirectorySandbox: chown %s:%s %s' % (self._user, grent.gr_name, self.root))
+        os.chown(self.root, pwent.pw_uid, pwent.pw_gid)
+        log.debug('DirectorySandbox: chmod 700 %s' % self.root)
+        os.chmod(self.root, 0700)
+      except (IOError, OSError) as e:
+        raise self.CreationError('Failed to chown/chmod the sandbox: %s' % e)
 
   def destroy(self):
     try:
       safe_rmtree(self.root)
     except (IOError, OSError) as e:
       raise self.DeletionError('Failed to destroy sandbox: %s' % e)
+
+
+class DockerDirectorySandbox(DirectorySandbox):
+  """ A sandbox implementation that configures the sandbox correctly for docker. """
+
+  def __init__(self, sandbox_name):
+    self._mesos_host_sandbox = os.environ['MESOS_DIRECTORY']
+    self._root = os.path.join(self._mesos_host_sandbox, sandbox_name)
+    super(DockerDirectorySandbox, self).__init__(self._root, user=None)
+
+  def _create_symlinks(self):
+    # This sets up the docker container to have a similar directory structure to the host.
+    # It takes self._mesos_host_sandbox (e.g. "[exec-root]/runs/RUN1/") and:
+    #   - Sets mesos_host_sandbox_root = "[exec-root]/runs/" (one level up from mesos_host_sandbox)
+    #   - Creates mesos_host_sandbox_root (recursively)
+    #   - Symlinks _mesos_host_sandbox -> $MESOS_SANDBOX (typically /mnt/mesos/sandbox)
+    # $MESOS_SANDBOX is provided in the environment by the Mesos docker containerizer.
+
+    mesos_host_sandbox_root = os.path.dirname(self._mesos_host_sandbox)
+    os.makedirs(mesos_host_sandbox_root)
+    os.symlink(os.environ['MESOS_SANDBOX'], self._mesos_host_sandbox)
+
+  def create(self):
+    self._create_symlinks()
+    super(DockerDirectorySandbox, self).create()

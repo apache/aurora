@@ -27,10 +27,12 @@ import com.twitter.common.util.testing.FakeClock;
 
 import org.apache.aurora.gen.AssignedTask;
 import org.apache.aurora.gen.Constraint;
+import org.apache.aurora.gen.Container;
 import org.apache.aurora.gen.ExecutorConfig;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobConfiguration;
 import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.gen.ScheduledTask;
 import org.apache.aurora.gen.TaskConfig;
@@ -99,6 +101,7 @@ public class StorageBackfillTest {
         .setProduction(false)
         .setMaxTaskFailures(1)
         .setExecutorConfig(EXECUTOR_CONFIG)
+        .setContainer(Container.mesos(new MesosContainer()))
         .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1))));
 
     assertEquals(expected, getTask(TASK_ID).getAssignedTask().getTask());

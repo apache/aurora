@@ -487,6 +487,12 @@
             .value()
             .join(', ');
 
+          var container;
+          if (task.container && task.container.docker) {
+            container = {};
+            container.image = task.container.docker.image;
+          }
+
           return {
             numCpus: task.numCpus,
             ramMb: task.ramMb,
@@ -496,7 +502,8 @@
             contact: task.contactEmail || '',
             ports: _.sortBy(task.requestedPorts).join(', '),
             constraints: constraints,
-            metadata: metadata
+            metadata: metadata,
+            container: container
           };
         },
 

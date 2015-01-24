@@ -622,6 +622,7 @@ class TaskRunner(object):
         # reflected in the process state.
         log.error('Unknown user %s.' % self._user)
         uid = None
+
       header = RunnerHeader(
           task_id=self._task_id,
           launch_time_ms=int(self._launch_time * 1000),

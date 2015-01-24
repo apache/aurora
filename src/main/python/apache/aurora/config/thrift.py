@@ -24,12 +24,15 @@ from apache.thermos.config.loader import ThermosTaskValidator
 from gen.apache.aurora.api.constants import AURORA_EXECUTOR_NAME, GOOD_IDENTIFIER_PATTERN_PYTHON
 from gen.apache.aurora.api.ttypes import (
     Constraint,
+    Container,
     CronCollisionPolicy,
+    DockerContainer,
     ExecutorConfig,
     Identity,
     JobConfiguration,
     JobKey,
     LimitConstraint,
+    MesosContainer,
     Metadata,
     TaskConfig,
     TaskConstraint,
@@ -106,15 +109,28 @@ def fully_interpolated(pystachio_object, coerce_fn=lambda i: i):
   return coerce_fn(value.get())
 
 
+def parse_enum(enum_type, value):
+  enum_value = enum_type._NAMES_TO_VALUES.get(value.get().upper())
+  if enum_value is None:
+    raise InvalidConfig('Invalid %s type: %s' % (enum_type, value.get()))
+  return enum_value
+
+
 def select_cron_policy(cron_policy):
-  policy = CronCollisionPolicy._NAMES_TO_VALUES.get(cron_policy.get())
-  if policy is None:
-    raise InvalidConfig('Invalid cron policy: %s' % cron_policy.get())
-  return policy
+  return parse_enum(CronCollisionPolicy, cron_policy)
 
 
 def select_service_bit(job):
   return fully_interpolated(job.service(), bool)
+
+
+def create_container_config(container):
+  if container is Empty:
+    return Container(MesosContainer(), None)
+  elif container.docker() is not Empty:
+    return Container(None, DockerContainer(fully_interpolated(container.docker().image())))
+  else:
+    raise InvalidConfig('If a container is specified it must set one type.')
 
 
 # TODO(wickman): We should revert to using the MesosTaskInstance.
@@ -201,6 +217,7 @@ def convert(job, metadata=frozenset(), ports=frozenset()):
   task.requestedPorts = ports
   task.taskLinks = not_empty_or(job.task_links(), {})
   task.constraints = constraints_to_thrift(not_empty_or(job.constraints(), {}))
+  task.container = create_container_config(job.container())
 
   underlying, refs = job.interpolate()
 

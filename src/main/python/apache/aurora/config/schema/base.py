@@ -65,6 +65,14 @@ class MesosTaskInstance(Struct):
   health_check_config        = Default(HealthCheckConfig, HealthCheckConfig())
 
 
+class Docker(Struct):
+  image = Required(String)
+
+
+class Container(Struct):
+  docker = Docker
+
+
 class MesosJob(Struct):
   name          = Default(String, '{{task.name}}')
   role          = Required(String)
@@ -90,6 +98,7 @@ class MesosJob(Struct):
 
   enable_hooks = Default(Boolean, False)  # enable client API hooks; from env python-list 'hooks'
 
+  container = Container
 
 Job = MesosJob
 Service = Job(service = True)

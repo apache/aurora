@@ -54,4 +54,9 @@
     <td colspan="2">{{group.summary.schedulingDetail.contact}}
     </td>
   </tr>
+  <tr ng-if='group.summary.schedulingDetail.container'>
+    <td class="cellLabel">container</td>
+    <td>image</td>
+    <td>{{group.summary.schedulingDetail.container.image}}</td>
+  </tr>
 </table>

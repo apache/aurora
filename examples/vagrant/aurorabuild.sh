@@ -71,11 +71,6 @@ with contextlib.closing(zipfile.ZipFile('dist/thermos_executor.pex', 'a')) as zf
   zf.write('dist/thermos_runner.pex', 'apache/aurora/executor/resources/thermos_runner.pex')
 EOF
 
-  cat <<EOF > $DIST_DIR/thermos_executor.sh
-#!/usr/bin/env bash
-exec /home/vagrant/aurora/dist/thermos_executor.pex --announcer-enable --announcer-ensemble localhost:2181
-EOF
-  chmod +x $DIST_DIR/thermos_executor.sh
   chmod +x /home/vagrant/aurora/dist/thermos_executor.pex
 }
 

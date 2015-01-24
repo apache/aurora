@@ -12,7 +12,6 @@
 # limitations under the License.
 #
 
-import os
 import threading
 import time
 import traceback
@@ -24,21 +23,12 @@ from twitter.common.metrics import Observable
 from twitter.common.quantity import Amount, Time
 
 from .common.kill_manager import KillManager
-from .common.sandbox import DirectorySandbox, SandboxProvider
+from .common.sandbox import DefaultSandboxProvider
 from .common.status_checker import ChainedStatusChecker
 from .common.task_info import assigned_task_from_mesos_task
 from .common.task_runner import TaskError, TaskRunner, TaskRunnerProvider
 from .executor_base import ExecutorBase
 from .status_manager import StatusManager
-
-
-class DefaultSandboxProvider(SandboxProvider):
-  SANDBOX_NAME = 'sandbox'
-
-  def from_assigned_task(self, assigned_task):
-    return DirectorySandbox(
-        os.path.realpath(self.SANDBOX_NAME),
-        assigned_task.task.job.role if assigned_task.task.job else assigned_task.task.owner.role)
 
 
 class AuroraExecutor(ExecutorBase, Observable):
@@ -51,7 +41,7 @@ class AuroraExecutor(ExecutorBase, Observable):
   def __init__(self,
                runner_provider,
                status_manager_class=StatusManager,
-               sandbox_provider=DefaultSandboxProvider,
+               sandbox_provider=DefaultSandboxProvider(),
                status_providers=(),
                clock=time):
 
@@ -67,7 +57,7 @@ class AuroraExecutor(ExecutorBase, Observable):
     self._status_manager = None
     self._status_manager_class = status_manager_class
     self._sandbox = None
-    self._sandbox_provider = sandbox_provider()
+    self._sandbox_provider = sandbox_provider
     self._kill_manager = KillManager()
     # Events that are exposed for interested entities
     self.runner_aborted = threading.Event()

@@ -83,9 +83,23 @@ public class SchedulerMain extends AbstractApplication {
   @CmdLine(name = "serverset_path", help = "ZooKeeper ServerSet path to register at.")
   private static final Arg<String> SERVERSET_PATH = Arg.create();
 
-  @NotNull
-  @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor launch script.")
+  @CmdLine(name = "thermos_executor_path", help = "Path to the thermos executor entry point.")
   private static final Arg<String> THERMOS_EXECUTOR_PATH = Arg.create();
+
+  @CmdLine(name = "thermos_executor_resources",
+      help = "A comma seperated list of additional resources to copy into the sandbox."
+          + "Note: if thermos_executor_path is not the thermos_executor.pex file itself, "
+          + "this must include it.")
+  private static final Arg<List<String>> THERMOS_EXECUTOR_RESOURCES =
+      Arg.<List<String>>create(ImmutableList.<String>of());
+
+  @CmdLine(name = "thermos_executor_flags",
+      help = "Extra arguments to be passed to the thermos executor")
+  private static final Arg<String> THERMOS_EXECUTOR_FLAGS = Arg.create(null);
+
+  @CmdLine(name = "thermos_observer_root",
+      help = "Path to the thermos observer root (by default /var/run/thermos.)")
+  private static final Arg<String> THERMOS_OBSERVER_ROOT = Arg.create("/var/run/thermos");
 
   @CmdLine(name = "auth_module",
       help = "A Guice module to provide auth bindings. NOTE: The default is unsecure.")
@@ -199,8 +213,14 @@ public class SchedulerMain extends AbstractApplication {
                 EXECUTOR_OVERHEAD_RAM.get(),
                 Amount.of(0L, Data.MB),
                 0);
+
             bind(ExecutorSettings.class)
-                .toInstance(new ExecutorSettings(THERMOS_EXECUTOR_PATH.get(), executorOverhead));
+                .toInstance(new ExecutorSettings(
+                    THERMOS_EXECUTOR_PATH.get(),
+                    THERMOS_EXECUTOR_RESOURCES.get(),
+                    THERMOS_OBSERVER_ROOT.get(),
+                    Optional.fromNullable(THERMOS_EXECUTOR_FLAGS.get()),
+                    executorOverhead));
           }
         })
         .add(getMesosModules())

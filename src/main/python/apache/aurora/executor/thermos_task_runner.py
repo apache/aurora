@@ -242,15 +242,19 @@ class ThermosTaskRunner(TaskRunner):
       log.error('Could not quitquitquit runner: %s' % e)
 
   def _cmdline(self):
+    host_sandbox = None
+    if os.environ.get('MESOS_DIRECTORY'):
+      host_sandbox = os.path.join(os.environ.get('MESOS_DIRECTORY'), 'sandbox')
+
     params = dict(log_dir=LogOptions.log_dir(),
                   log_to_disk='DEBUG',
                   checkpoint_root=self._checkpoint_root,
-                  sandbox=self._root,
+                  sandbox=host_sandbox or self._root,
                   task_id=self._task_id,
                   thermos_json=self._task_filename,
                   hostname=self._hostname)
 
-    if getpass.getuser() == 'root':
+    if getpass.getuser() == 'root' and self._role:
       params.update(setuid=self._role)
 
     cmdline_args = [sys.executable, self._runner_pex]
@@ -271,8 +275,9 @@ class ThermosTaskRunner(TaskRunner):
     cmdline_args = self._cmdline()
     log.info('Forking off runner with cmdline: %s' % ' '.join(cmdline_args))
 
+    cwd = os.environ.get('MESOS_DIRECTORY')
     try:
-      self._popen = subprocess.Popen(cmdline_args)
+      self._popen = subprocess.Popen(cmdline_args, cwd=cwd)
     except OSError as e:
       raise TaskError(e)
 
@@ -369,9 +374,12 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
     self._preemption_wait = preemption_wait
     self._task_runner_class = task_runner_class
 
+  def _get_role(self, assigned_task):
+    return None if assigned_task.task.container.docker else assigned_task.task.job.role
+
   def from_assigned_task(self, assigned_task, sandbox):
     task_id = assigned_task.taskId
-    role = assigned_task.task.job.role if assigned_task.task.job else assigned_task.task.owner.role
+    role = self._get_role(assigned_task)
     try:
       mesos_task = mesos_task_instance_from_assigned_task(assigned_task)
     except ValueError as e:
@@ -394,3 +402,11 @@ class DefaultThermosTaskRunnerProvider(TaskRunnerProvider):
         artifact_dir=self._artifact_dir,
         clock=self._clock,
         hostname=assigned_task.slaveHost)
+
+
+class UserOverrideThermosTaskRunnerProvider(DefaultThermosTaskRunnerProvider):
+  def set_role(self, role):
+    self._role = role
+
+  def _get_role(self, assigned_task):
+    return self._role

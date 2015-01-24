@@ -13,14 +13,19 @@
  */
 package org.apache.aurora.scheduler.mesos;
 
+import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.gen.AssignedTask;
+import org.apache.aurora.gen.Container;
+import org.apache.aurora.gen.DockerContainer;
 import org.apache.aurora.gen.Identity;
 import org.apache.aurora.gen.JobKey;
+import org.apache.aurora.gen.MesosContainer;
 import org.apache.aurora.gen.TaskConfig;
 import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.mesos.MesosTaskFactory.ExecutorSettings;
@@ -31,6 +36,7 @@ import org.apache.mesos.Protos.CommandInfo.URI;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskInfo;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.scheduler.mesos.MesosTaskFactory.MesosTaskFactoryImpl.MIN_TASK_RESOURCES;
@@ -40,20 +46,27 @@ import static org.junit.Assert.assertTrue;
 
 public class MesosTaskFactoryImplTest {
 
-  private static final String EXECUTOR_PATH = "/twitter/fake/executor.sh";
+  private static final String EXECUTOR_PATH = "/twitter/fake/executor.pex";
+  private static final String EXECUTOR_WRAPPER_PATH = "/twitter/fake/executor.sh";
   private static final IAssignedTask TASK = IAssignedTask.build(new AssignedTask()
-      .setInstanceId(2)
-      .setTaskId("task-id")
-      .setAssignedPorts(ImmutableMap.of("http", 80))
-      .setTask(new TaskConfig()
-          .setJob(new JobKey("role", "environment", "job-name"))
-          .setOwner(new Identity("role", "user"))
-          .setEnvironment("environment")
-          .setJobName("job-name")
-          .setDiskMb(10)
-          .setRamMb(100)
-          .setNumCpus(5)
-          .setRequestedPorts(ImmutableSet.of("http"))));
+    .setInstanceId(2)
+    .setTaskId("task-id")
+    .setAssignedPorts(ImmutableMap.of("http", 80))
+    .setTask(new TaskConfig()
+        .setJob(new JobKey("role", "environment", "job-name"))
+        .setOwner(new Identity("role", "user"))
+        .setEnvironment("environment")
+        .setJobName("job-name")
+        .setDiskMb(10)
+        .setRamMb(100)
+        .setNumCpus(5)
+        .setContainer(Container.mesos(new MesosContainer()))
+        .setRequestedPorts(ImmutableSet.of("http"))));
+  private static final IAssignedTask TASK_WITH_DOCKER = IAssignedTask.build(TASK.newBuilder()
+    .setTask(
+        new TaskConfig(TASK.getTask().newBuilder())
+            .setContainer(Container.docker(new DockerContainer("testimage")))));
+
   private static final SlaveID SLAVE = SlaveID.newBuilder().setValue("slave-id").build();
   private static final Resources SOME_EXECUTOR_OVERHEAD = new Resources(
       0.01,
@@ -76,13 +89,32 @@ public class MesosTaskFactoryImplTest {
       .setSource(MesosTaskFactoryImpl.getInstanceSourceName(TASK.getTask(), TASK.getInstanceId()))
       .addAllResources(MIN_THERMOS_RESOURCES.toResourceList())
       .setCommand(CommandInfo.newBuilder()
-          .setValue("./executor.sh")
+          .setValue("./executor.pex")
+          .setShell(true)
           .addUris(URI.newBuilder().setValue(EXECUTOR_PATH).setExecutable(true)))
       .build();
 
+  private static final ExecutorInfo EXECUTOR_WITH_WRAPPER =
+      ExecutorInfo.newBuilder(DEFAULT_EXECUTOR)
+          .setCommand(CommandInfo.newBuilder()
+              .setValue("./executor.sh")
+              .setShell(true)
+              .addUris(URI.newBuilder().setValue(EXECUTOR_PATH).setExecutable(true))
+              .addUris(URI.newBuilder().setValue(EXECUTOR_WRAPPER_PATH).setExecutable(true)))
+          .build();
+
+  @Before
+  public void setUp() {
+    config = new ExecutorSettings(
+        EXECUTOR_PATH,
+        ImmutableList.<String>of(),
+        "/var/run/thermos",
+        Optional.<String>absent(),
+        SOME_EXECUTOR_OVERHEAD);
+  }
+
   @Test
   public void testExecutorInfoUnchanged() {
-    config = new ExecutorSettings(EXECUTOR_PATH, SOME_EXECUTOR_OVERHEAD);
     taskFactory = new MesosTaskFactoryImpl(config);
     TaskInfo task = taskFactory.createFrom(TASK, SLAVE);
     assertEquals(DEFAULT_EXECUTOR, task.getExecutor());
@@ -114,7 +146,6 @@ public class MesosTaskFactoryImplTest {
 
   @Test
   public void testCreateFromPortsUnset() {
-    config = new ExecutorSettings(EXECUTOR_PATH, SOME_EXECUTOR_OVERHEAD);
     taskFactory = new MesosTaskFactoryImpl(config);
     AssignedTask assignedTask = TASK.newBuilder();
     assignedTask.unsetAssignedPorts();
@@ -147,7 +178,12 @@ public class MesosTaskFactoryImplTest {
   public void testExecutorInfoNoOverhead() {
     // Here the ram required for the executor is greater than the sum of task resources
     // + executor overhead. We need to ensure we allocate a non-zero amount of ram in this case.
-    config = new ExecutorSettings(EXECUTOR_PATH, NO_EXECUTOR_OVERHEAD);
+    config = new ExecutorSettings(
+        EXECUTOR_PATH,
+        ImmutableList.<String>of(),
+        "/var/run/thermos",
+        Optional.<String>absent(),
+        NO_EXECUTOR_OVERHEAD);
     taskFactory = new MesosTaskFactoryImpl(config);
     TaskInfo task = taskFactory.createFrom(TASK, SLAVE);
     assertEquals(DEFAULT_EXECUTOR, task.getExecutor());
@@ -186,4 +222,43 @@ public class MesosTaskFactoryImplTest {
     assertEquals(result.getNumPorts(), 1);
   }
 
+  private TaskInfo getDockerTaskInfo() {
+    config = new ExecutorSettings(
+        EXECUTOR_PATH,
+        ImmutableList.<String>of(),
+        "/var/run/thermos",
+        Optional.<String>absent(),
+        SOME_EXECUTOR_OVERHEAD);
+    taskFactory = new MesosTaskFactoryImpl(config);
+    return taskFactory.createFrom(TASK_WITH_DOCKER, SLAVE);
+  }
+
+  @Test
+  public void testDockerContainer() {
+    TaskInfo task = getDockerTaskInfo();
+    assertEquals("testimage", task.getExecutor().getContainer().getDocker().getImage());
+  }
+
+  @Test(expected = NullPointerException.class)
+  public void testInvalidExecutorSettings() {
+    new ExecutorSettings(
+        null,
+        ImmutableList.<String>of(),
+        "",
+        Optional.<String>absent(),
+        SOME_EXECUTOR_OVERHEAD);
+  }
+
+  @Test
+  public void testExecutorAndWrapper() {
+    config = new ExecutorSettings(
+        EXECUTOR_WRAPPER_PATH,
+        ImmutableList.of(EXECUTOR_PATH),
+        "/var/run/thermos",
+        Optional.<String>absent(),
+        SOME_EXECUTOR_OVERHEAD);
+    taskFactory = new MesosTaskFactoryImpl(config);
+    TaskInfo taskInfo = taskFactory.createFrom(TASK, SLAVE);
+    assertEquals(EXECUTOR_WITH_WRAPPER, taskInfo.getExecutor());
+  }
 }

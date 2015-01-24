@@ -15,10 +15,12 @@ package org.apache.aurora.scheduler.base;
 
 import java.util.Map;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.CommandInfo.URI;
+
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -31,21 +33,44 @@ public class CommandUtilTest {
     test("foo.zip", "hdfs://twitter.com/path/foo.zip", ImmutableMap.of("PATH", "/bin:/usr/bin"));
   }
 
+  @Test
+  public void testExecutorOnlyCommand() {
+    CommandInfo cmd = CommandUtil.create("test/executor", ImmutableList.<String>of());
+    assertEquals("./executor", cmd.getValue());
+    assertEquals("test/executor", cmd.getUris(0).getValue());
+  }
+
+  @Test
+  public void testWrapperAndExecutorCommand() {
+    CommandInfo cmd = CommandUtil.create(
+        "test/wrapper",
+        ImmutableList.of("test/executor"));
+    assertEquals("./wrapper", cmd.getValue());
+    assertEquals("test/executor", cmd.getUris(0).getValue());
+    assertEquals("test/wrapper", cmd.getUris(1).getValue());
+  }
+
+  @Test(expected = NullPointerException.class)
+  public void testBadParameters() {
+    CommandUtil.create(null, ImmutableList.<String>of());
+  }
+
   @Test(expected = IllegalArgumentException.class)
   public void testBadUri() {
-    CommandUtil.create("a/b/c/");
+    CommandUtil.create("a/b/c/", ImmutableList.<String>of());
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testEmptyUri() {
-    CommandUtil.create("");
+    CommandUtil.create("", ImmutableList.<String>of());
   }
 
   private void test(String basename, String uri, Map<String, String> env) {
     CommandInfo expectedCommand = CommandInfo.newBuilder()
         .addUris(URI.newBuilder().setValue(uri).setExecutable(true))
         .setValue("./" + basename)
+        .setShell(true)
         .build();
-    assertEquals(expectedCommand, CommandUtil.create(uri));
+    assertEquals(expectedCommand, CommandUtil.create(uri, ImmutableList.<String>of()));
   }
 }

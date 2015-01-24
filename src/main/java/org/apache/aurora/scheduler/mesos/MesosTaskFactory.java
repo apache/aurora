@@ -20,6 +20,7 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
@@ -33,19 +34,22 @@ import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
+
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
+import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.mesos.Protos.CommandInfo;
+import org.apache.mesos.Protos.ContainerInfo;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.Protos.Volume;
 
 import static java.util.Objects.requireNonNull;
-
-import static com.twitter.common.base.MorePreconditions.checkNotBlank;
 
 /**
  * A factory to create mesos task objects.
@@ -63,16 +67,41 @@ public interface MesosTaskFactory {
   TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException;
 
   class ExecutorSettings {
+
     private final String executorPath;
+    private final List<String> executorResources;
+    private final String thermosObserverRoot;
+    private final Optional<String> executorFlags;
     private final Resources executorOverhead;
 
-    public ExecutorSettings(String executorPath, Resources executorOverhead) {
-      this.executorPath = checkNotBlank(executorPath);
+    public ExecutorSettings(
+        String executorPath,
+        List<String> executorResources,
+        String thermosObserverRoot,
+        Optional<String> executorFlags,
+        Resources executorOverhead) {
+
+      this.executorPath = requireNonNull(executorPath);
+      this.executorResources = requireNonNull(executorResources);
+      this.thermosObserverRoot = requireNonNull(thermosObserverRoot);
+      this.executorFlags = requireNonNull(executorFlags);
       this.executorOverhead = requireNonNull(executorOverhead);
     }
 
     String getExecutorPath() {
       return executorPath;
+    }
+
+    List<String> getExecutorResources() {
+      return executorResources;
+    }
+
+    String getThermosObserverRoot() {
+      return thermosObserverRoot;
+    }
+
+    Optional<String> getExecutorFlags() {
+      return executorFlags;
     }
 
     Resources getExecutorOverhead() {
@@ -113,13 +142,11 @@ public interface MesosTaskFactory {
     @VisibleForTesting
     static final String EXECUTOR_NAME = "aurora.task";
 
-    private final String executorPath;
-    private final Resources executorOverhead;
+    private final ExecutorSettings executorSettings;
 
     @Inject
     MesosTaskFactoryImpl(ExecutorSettings executorSettings) {
-      this.executorPath = executorSettings.getExecutorPath();
-      this.executorOverhead = executorSettings.getExecutorOverhead();
+      this.executorSettings = requireNonNull(executorSettings);
     }
 
     @VisibleForTesting
@@ -185,7 +212,8 @@ public interface MesosTaskFactory {
 
       ITaskConfig config = task.getTask();
       Resources taskResources = Resources.from(config);
-      Resources containerResources = Resources.sum(taskResources, executorOverhead);
+      Resources containerResources =
+          Resources.sum(taskResources, executorSettings.getExecutorOverhead());
 
       taskResources = Resources.subtract(containerResources, MIN_THERMOS_RESOURCES);
       // It is possible that the final task resources will be negative.
@@ -198,10 +226,9 @@ public interface MesosTaskFactory {
               ? ImmutableSet.copyOf(task.getAssignedPorts().values())
               : ImmutableSet.<Integer>of());
 
-      if (LOG.isLoggable(Level.FINE)) {
-        LOG.fine("Setting task resources to "
-            + Iterables.transform(resources, Protobufs.SHORT_TOSTRING));
-      }
+      LOG.fine("Setting task resources to "
+          + Iterables.transform(resources, Protobufs.SHORT_TOSTRING));
+
       TaskInfo.Builder taskBuilder =
           TaskInfo.newBuilder()
               .setName(JobKeys.canonicalString(Tasks.ASSIGNED_TO_JOB_KEY.apply(task)))
@@ -210,16 +237,81 @@ public interface MesosTaskFactory {
               .addAllResources(resources)
               .setData(ByteString.copyFrom(taskInBytes));
 
-      ExecutorInfo executor = ExecutorInfo.newBuilder()
-          .setCommand(CommandUtil.create(executorPath))
+      if (config.getContainer().isSetMesos()) {
+        configureTaskForNoContainer(task, config, taskBuilder);
+      } else if (config.getContainer().isSetDocker()) {
+        configureTaskForDockerContainer(task, config, taskBuilder);
+      } else {
+        throw new SchedulerException("Task had no supported container set.");
+      }
+
+      return taskBuilder.build();
+    }
+
+    private void configureTaskForNoContainer(
+        IAssignedTask task,
+        ITaskConfig config,
+        TaskInfo.Builder taskBuilder) {
+
+      CommandInfo commandInfo = CommandUtil.create(
+          executorSettings.getExecutorPath(),
+          executorSettings.getExecutorResources(),
+          "./",
+          executorSettings.getExecutorFlags()).build();
+
+      ExecutorInfo.Builder executorBuilder = configureTaskForExecutor(task, config, commandInfo);
+      taskBuilder.setExecutor(executorBuilder.build());
+    }
+
+    private void configureTaskForDockerContainer(
+        IAssignedTask task,
+        ITaskConfig taskConfig,
+        TaskInfo.Builder taskBuilder) {
+
+      IDockerContainer config = taskConfig.getContainer().getDocker();
+      ContainerInfo.DockerInfo.Builder dockerBuilder = ContainerInfo.DockerInfo.newBuilder()
+          .setImage(config.getImage());
+
+      ContainerInfo.Builder containerBuilder = ContainerInfo.newBuilder()
+          .setType(ContainerInfo.Type.DOCKER)
+          .setDocker(dockerBuilder.build());
+
+      configureContainerVolumes(containerBuilder);
+
+      // TODO(SteveNiemitz): Allow users to specify an executor per container type.
+      CommandInfo.Builder commandInfoBuilder = CommandUtil.create(
+          executorSettings.getExecutorPath(),
+          executorSettings.getExecutorResources(),
+          "$MESOS_SANDBOX/",
+          executorSettings.getExecutorFlags());
+
+      ExecutorInfo.Builder execBuilder =
+          configureTaskForExecutor(task, taskConfig, commandInfoBuilder.build())
+              .setContainer(containerBuilder.build());
+
+      taskBuilder.setExecutor(execBuilder.build());
+    }
+
+    private ExecutorInfo.Builder configureTaskForExecutor(
+        IAssignedTask task,
+        ITaskConfig config,
+        CommandInfo commandInfo) {
+
+      return ExecutorInfo.newBuilder()
+          .setCommand(commandInfo)
           .setExecutorId(getExecutorId(task.getTaskId()))
           .setName(EXECUTOR_NAME)
           .setSource(getInstanceSourceName(config, task.getInstanceId()))
-          .addAllResources(MIN_THERMOS_RESOURCES.toResourceList())
-          .build();
-      return taskBuilder
-          .setExecutor(executor)
-          .build();
+          .addAllResources(MIN_THERMOS_RESOURCES.toResourceList());
+    }
+
+    private void configureContainerVolumes(ContainerInfo.Builder containerBuilder) {
+      containerBuilder.addVolumes(
+          Volume.newBuilder()
+              .setContainerPath(executorSettings.getThermosObserverRoot())
+              .setHostPath(executorSettings.getThermosObserverRoot())
+              .setMode(Volume.Mode.RW)
+              .build());
     }
   }
 }

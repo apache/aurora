@@ -22,12 +22,14 @@ VAGRANTFILE_API_VERSION = "2"
 Vagrant.require_version ">= 1.5.0"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.vm.hostname = "aurora.local"
   config.vm.box = "ubuntu/trusty64"
 
   config.vm.define "devcluster" do |dev|
     dev.vm.network :private_network, ip: "192.168.33.7"
     dev.vm.provider :virtualbox do |vb|
-      vb.customize ["modifyvm", :id, "--memory", "1024"]
+      vb.customize ["modifyvm", :id, "--memory", "2048"]
+      vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
     end
     dev.vm.provision "shell", path: "examples/vagrant/provision-dev-cluster.sh"
   end

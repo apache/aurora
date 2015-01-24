@@ -190,7 +190,7 @@ def make_executor(
   te = FastThermosExecutor(
       runner_provider=runner_provider,
       status_manager_class=status_manager_class,
-      sandbox_provider=DefaultTestSandboxProvider,
+      sandbox_provider=DefaultTestSandboxProvider(),
       status_providers=status_providers,
   )
 
@@ -286,7 +286,7 @@ class TestThermosExecutor(object):
     with temporary_dir() as tempdir:
       te = AuroraExecutor(
           runner_provider=make_provider(tempdir),
-          sandbox_provider=DefaultTestSandboxProvider)
+          sandbox_provider=DefaultTestSandboxProvider())
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
       te.terminated.wait()
       tm = TaskMonitor(TaskPath(root=tempdir), task_id=HELLO_WORLD_TASK_ID)
@@ -308,7 +308,7 @@ class TestThermosExecutor(object):
     with temporary_dir() as tempdir:
       te = AuroraExecutor(
           runner_provider=make_provider(tempdir),
-          sandbox_provider=DefaultTestSandboxProvider)
+          sandbox_provider=DefaultTestSandboxProvider())
       te.launchTask(proxy_driver, make_task(MESOS_JOB(task=HELLO_WORLD), instanceId=0))
       te.runner_started.wait()
       while te._status_manager is None:
@@ -422,7 +422,7 @@ class TestThermosExecutor(object):
       runner_provider = make_provider(td, FailingStartingTaskRunner)
       te = FastThermosExecutor(
           runner_provider=runner_provider,
-          sandbox_provider=DefaultTestSandboxProvider)
+          sandbox_provider=DefaultTestSandboxProvider())
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
       proxy_driver.wait_stopped()
 
@@ -435,7 +435,7 @@ class TestThermosExecutor(object):
     with temporary_dir() as td:
       te = FastThermosExecutor(
           runner_provider=make_provider(td),
-          sandbox_provider=FailingSandboxProvider)
+          sandbox_provider=FailingSandboxProvider())
       te.launchTask(proxy_driver, make_task(HELLO_WORLD_MTI))
       proxy_driver.wait_stopped()
 
@@ -450,7 +450,7 @@ class TestThermosExecutor(object):
     with temporary_dir() as td:
       te = FastThermosExecutor(
           runner_provider=make_provider(td),
-          sandbox_provider=SlowSandboxProvider)
+          sandbox_provider=SlowSandboxProvider())
       te.SANDBOX_INITIALIZATION_TIMEOUT = Amount(1, Time.MILLISECONDS)
       te.launchTask(proxy_driver, task)
       proxy_driver.wait_stopped()
@@ -469,7 +469,7 @@ class TestThermosExecutor(object):
     with temporary_dir() as td:
       te = FastThermosExecutor(
           runner_provider=make_provider(td),
-          sandbox_provider=SlowSandboxProvider)
+          sandbox_provider=SlowSandboxProvider())
       te.launchTask(proxy_driver, task)
       te.sandbox_initialized.wait()
       te.killTask(proxy_driver, mesos_pb2.TaskID(value=task.task_id.value))
@@ -507,7 +507,7 @@ class TestThermosExecutor(object):
 
     te = FastThermosExecutor(
         runner_provider=make_provider(safe_mkdtemp()),
-        sandbox_provider=DefaultTestSandboxProvider)
+        sandbox_provider=DefaultTestSandboxProvider())
     te.launchTask(proxy_driver, task_info)
     proxy_driver.wait_stopped()
 
@@ -522,6 +522,6 @@ def test_waiting_executor():
   with temporary_dir() as checkpoint_root:
     te = AuroraExecutor(
         runner_provider=make_provider(checkpoint_root),
-        sandbox_provider=DefaultTestSandboxProvider)
+        sandbox_provider=DefaultTestSandboxProvider())
     ExecutorTimeout(te.launched, proxy_driver, timeout=Amount(100, Time.MILLISECONDS)).start()
     proxy_driver.wait_stopped()

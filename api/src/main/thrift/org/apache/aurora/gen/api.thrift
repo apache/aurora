@@ -186,6 +186,22 @@ struct ExecutorConfig {
   2: string data
 }
 
+/** Describes a mesos container, this is the default */
+struct MesosContainer {
+}
+
+/** Describes a docker container */
+struct DockerContainer {
+  /** The container image to be run */
+  1: string image
+}
+
+/** Describes a container to be used in a task */
+union Container {
+  1: MesosContainer mesos
+  2: DockerContainer docker
+}
+
 /** Description of the tasks contained within a job. */
 struct TaskConfig {
  /** Job task belongs to. */
@@ -211,7 +227,8 @@ struct TaskConfig {
  20: set<Constraint> constraints
  /** a list of named ports this task requests */
  21: set<string> requestedPorts
-
+ /** the container the task should use to execute */
+ 29: optional Container container = { "mesos": {} }
  /**
   * Custom links to include when displaying this task on the scheduler dashboard. Keys are anchor
   * text, values are URLs. Wildcards are supported for dynamic link crafting based on host, ports,
