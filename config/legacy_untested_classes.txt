@@ -1,3 +1,4 @@
+org/apache/aurora/Protobufs$1
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$1
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureCapabilityValidator$2
 org/apache/aurora/auth/UnsecureAuthModule$UnsecureSessionValidator
