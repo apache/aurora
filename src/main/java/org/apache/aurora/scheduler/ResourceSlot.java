@@ -14,18 +14,21 @@
 package org.apache.aurora.scheduler;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
-import com.twitter.common.args.Arg;
-import com.twitter.common.args.CmdLine;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
+import org.apache.aurora.scheduler.async.preemptor.PreemptionVictim;
 import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
+import org.apache.mesos.Protos;
 
 import static org.apache.mesos.Protos.Offer;
 
@@ -38,32 +41,58 @@ public final class ResourceSlot {
   private final Resources resources;
 
   /**
-   * Extra CPU allocated for each executor.
+   * Minimum resources required to run Thermos. In the wild Thermos needs about 0.01 CPU and
+   * about 170MB (peak usage) of RAM. The RAM requirement has been rounded up to a power of 2.
    */
   @VisibleForTesting
-  @CmdLine(name = "thermos_executor_cpu",
-      help = "The number of CPU cores to allocate for each instance of the executor.")
-  public static final Arg<Double> EXECUTOR_OVERHEAD_CPUS = Arg.create(0.25);
-
-  /**
-   * Extra RAM allocated for the executor.
-   */
-  @VisibleForTesting
-  @CmdLine(name = "thermos_executor_ram",
-      help = "The amount of RAM to allocate for each instance of the executor.")
-  public static final Arg<Amount<Long, Data>> EXECUTOR_OVERHEAD_RAM =
-      Arg.create(Amount.of(128L, Data.MB));
+  public static final Resources MIN_THERMOS_RESOURCES = new Resources(
+      0.01,
+      Amount.of(256L, Data.MB),
+      Amount.of(1L, Data.MB),
+      0);
 
   private ResourceSlot(Resources r) {
     this.resources = r;
   }
 
-  public static ResourceSlot from(ITaskConfig task) {
-    return from(
-        task.getNumCpus(),
-        Amount.of(task.getRamMb(), Data.MB),
-        Amount.of(task.getDiskMb(), Data.MB),
-        task.getRequestedPorts().size());
+  public static ResourceSlot from(ITaskConfig task, ExecutorSettings executorSettings) {
+    return from(Resources.from(task), executorSettings);
+  }
+
+  public static ResourceSlot from(PreemptionVictim victim, ExecutorSettings executorSettings) {
+    return from(victim.getResources(), executorSettings);
+  }
+
+  private static ResourceSlot from(Resources resources, ExecutorSettings executorSettings) {
+    // Apply a flat 'tax' of executor overhead resources to the task.
+    Resources requiredTaskResources = Resources.sum(
+        resources,
+        executorSettings.getExecutorOverhead());
+
+    // Upsize tasks smaller than the minimum resources required to run the executor.
+    return new ResourceSlot(maxElements(requiredTaskResources, MIN_THERMOS_RESOURCES));
+  }
+
+  /**
+   * Generates a Resource where each resource component is a max out of the two components.
+   *
+   * @param a A resource to compare.
+   * @param b A resource to compare.
+   *
+   * @return Returns a Resources instance where each component is a max of the two components.
+   */
+  @VisibleForTesting
+  static Resources maxElements(Resources a, Resources b) {
+    double maxCPU = Math.max(a.getNumCpus(), b.getNumCpus());
+    Amount<Long, Data> maxRAM = Amount.of(
+        Math.max(a.getRam().as(Data.MB), b.getRam().as(Data.MB)),
+        Data.MB);
+    Amount<Long, Data> maxDisk = Amount.of(
+        Math.max(a.getDisk().as(Data.MB), b.getDisk().as(Data.MB)),
+        Data.MB);
+    int maxPorts = Math.max(a.getNumPorts(), b.getNumPorts());
+
+    return new Resources(maxCPU, maxRAM, maxDisk, maxPorts);
   }
 
   public static ResourceSlot from(Offer offer) {
@@ -84,19 +113,6 @@ public final class ResourceSlot {
 
   public int getNumPorts() {
     return resources.getNumPorts();
-  }
-
-  @VisibleForTesting
-  public static ResourceSlot from(
-      double cpu,
-      Amount<Long, Data> ram,
-      Amount<Long, Data> disk,
-      int ports) {
-    double totalCPU = cpu + EXECUTOR_OVERHEAD_CPUS.get();
-    Amount<Long, Data> totalRAM =
-        Amount.of(ram.as(Data.MB) + EXECUTOR_OVERHEAD_RAM.get().as(Data.MB), Data.MB);
-
-    return new ResourceSlot(new Resources(totalCPU, totalRAM, disk, ports));
   }
 
   @Override
@@ -127,6 +143,14 @@ public final class ResourceSlot {
     }));
 
     return new ResourceSlot(r);
+  }
+
+  public static ResourceSlot subtract(ResourceSlot a, Resources b) {
+    return new ResourceSlot(Resources.subtract(a.resources, b));
+  }
+
+  public List<Protos.Resource> toResourceList(Set<Integer> selectedPorts) {
+    return resources.toResourceList(selectedPorts);
   }
 
   public static final Ordering<ResourceSlot> ORDER = new Ordering<ResourceSlot>() {

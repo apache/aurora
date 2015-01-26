@@ -221,8 +221,8 @@ public interface SchedulingFilter {
       return task.getConstraints();
     }
 
-    public ResourceSlot getResourceSlot() {
-      return ResourceSlot.from(task);
+    public ITaskConfig getTask() {
+      return task;
     }
 
     public AttributeAggregate getJobState() {

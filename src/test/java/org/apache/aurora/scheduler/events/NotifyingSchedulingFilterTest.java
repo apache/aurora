@@ -29,6 +29,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -47,7 +48,7 @@ public class NotifyingSchedulingFilterTest extends EasyMockTest {
       .setDiskMb(1024));
   private static final String TASK_ID = "taskId";
   private static final UnusedResource RESOURCE = new UnusedResource(
-      ResourceSlot.from(TASK),
+      ResourceSlot.from(TASK, TaskExecutors.NO_OVERHEAD_EXECUTOR),
       IHostAttributes.build(new HostAttributes().setHost("host").setMode(MaintenanceMode.NONE)));
   private ResourceRequest request;
 

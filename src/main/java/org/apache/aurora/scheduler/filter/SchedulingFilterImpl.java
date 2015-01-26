@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
+import com.google.inject.Inject;
 import com.twitter.common.quantity.Amount;
 import com.twitter.common.quantity.Data;
 
@@ -30,9 +31,12 @@ import org.apache.aurora.gen.MaintenanceMode;
 import org.apache.aurora.gen.TaskConstraint;
 import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.configuration.ConfigurationManager;
+import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.entities.IAttribute;
 import org.apache.aurora.scheduler.storage.entities.IConstraint;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
+
+import static java.util.Objects.requireNonNull;
 
 import static org.apache.aurora.gen.MaintenanceMode.DRAINED;
 import static org.apache.aurora.gen.MaintenanceMode.DRAINING;
@@ -132,6 +136,14 @@ public class SchedulingFilterImpl implements SchedulingFilter {
         }
       });
 
+  private final ExecutorSettings executorSettings;
+
+  @Inject
+  @VisibleForTesting
+  public SchedulingFilterImpl(ExecutorSettings executorSettings) {
+    this.executorSettings = requireNonNull(executorSettings);
+  }
+
   private Iterable<Veto> getConstraintVetoes(
       Iterable<IConstraint> taskConstraints,
       AttributeAggregate jobState,
@@ -183,7 +195,9 @@ public class SchedulingFilterImpl implements SchedulingFilter {
             request.getConstraints(),
             request.getJobState(),
             resource.getAttributes().getAttributes()))
-        .addAll(getResourceVetoes(resource.getResourceSlot(), request.getResourceSlot()))
+        .addAll(getResourceVetoes(
+            resource.getResourceSlot(),
+            ResourceSlot.from(request.getTask(), executorSettings)))
         .build();
   }
 }

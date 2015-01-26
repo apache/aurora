@@ -51,8 +51,8 @@ import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.cron.quartz.CronModule;
 import org.apache.aurora.scheduler.log.mesos.MesosLogStreamModule;
 import org.apache.aurora.scheduler.mesos.CommandLineDriverSettingsModule;
+import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.mesos.LibMesosLoadingModule;
-import org.apache.aurora.scheduler.mesos.MesosTaskFactory.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.db.DbModule;
 import org.apache.aurora.scheduler.storage.db.MigrationModule;
@@ -65,9 +65,6 @@ import org.apache.aurora.scheduler.thrift.ThriftModule;
 import org.apache.aurora.scheduler.thrift.auth.ThriftAuthModule;
 
 import static com.twitter.common.logging.RootLogConfig.Configuration;
-
-import static org.apache.aurora.scheduler.ResourceSlot.EXECUTOR_OVERHEAD_CPUS;
-import static org.apache.aurora.scheduler.ResourceSlot.EXECUTOR_OVERHEAD_RAM;
 
 /**
  * Launcher for the aurora scheduler.
@@ -105,6 +102,21 @@ public class SchedulerMain extends AbstractApplication {
       help = "A Guice module to provide auth bindings. NOTE: The default is unsecure.")
   private static final Arg<? extends Class<? extends Module>> AUTH_MODULE =
       Arg.create(UnsecureAuthModule.class);
+
+  /**
+   * Extra CPU allocated for each executor.
+   */
+  @CmdLine(name = "thermos_executor_cpu",
+      help = "The number of CPU cores to allocate for each instance of the executor.")
+  private static final Arg<Double> EXECUTOR_OVERHEAD_CPUS = Arg.create(0.25);
+
+  /**
+   * Extra RAM allocated for the executor.
+   */
+  @CmdLine(name = "thermos_executor_ram",
+      help = "The amount of RAM to allocate for each instance of the executor.")
+  private static final Arg<Amount<Long, Data>> EXECUTOR_OVERHEAD_RAM =
+      Arg.create(Amount.of(128L, Data.MB));
 
   private static final Iterable<Class<?>> AUTH_MODULE_CLASSES = ImmutableList.<Class<?>>builder()
       .add(SessionValidator.class)

@@ -21,8 +21,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-import com.twitter.common.quantity.Amount;
-import com.twitter.common.quantity.Data;
+import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.AssignedTask;
@@ -42,6 +41,8 @@ import org.apache.aurora.scheduler.configuration.ConfigurationManager;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.Veto;
+import org.apache.aurora.scheduler.mesos.Offers;
+import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
@@ -88,10 +89,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
   private static final long DEFAULT_RAM = 1000;
   private static final long DEFAULT_DISK = 2000;
   private static final ResourceSlot DEFAULT_OFFER = ResourceSlot.from(
-      DEFAULT_CPUS,
-      Amount.of(DEFAULT_RAM, Data.MB),
-      Amount.of(DEFAULT_DISK, Data.MB),
-      0);
+      Offers.createOffer(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK, Pair.of(80, 80)));
 
   private AttributeAggregate emptyJob;
 
@@ -102,7 +100,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
 
   @Before
   public void setUp() {
-    defaultFilter = new SchedulingFilterImpl();
+    defaultFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
     attributeStore = createMock(AttributeStore.Mutable.class);
     emptyJob = new AttributeAggregate(
         Suppliers.ofInstance(ImmutableSet.<IScheduledTask>of()),
@@ -125,10 +123,7 @@ public class SchedulingFilterImplTest extends EasyMockTest {
     control.replay();
 
     ResourceSlot twoPorts = ResourceSlot.from(
-        DEFAULT_CPUS,
-        Amount.of(DEFAULT_RAM, Data.MB),
-        Amount.of(DEFAULT_DISK, Data.MB),
-        2);
+        Offers.createOffer(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK, Pair.of(80, 81)));
 
     ITaskConfig noPortTask = ITaskConfig.build(makeTask(DEFAULT_CPUS, DEFAULT_RAM, DEFAULT_DISK)
         .newBuilder()

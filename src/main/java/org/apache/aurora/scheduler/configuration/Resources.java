@@ -147,6 +147,16 @@ public class Resources {
     return Objects.hash(numCpus, ram, disk, numPorts);
   }
 
+  @Override
+  public String toString() {
+    return com.google.common.base.Objects.toStringHelper(this)
+        .add("numCpus", numCpus)
+        .add("ram", ram)
+        .add("disk", disk)
+        .add("numPorts", numPorts)
+        .toString();
+  }
+
   /**
    * Extracts the resources required from a task.
    *
@@ -193,12 +203,9 @@ public class Resources {
         getNumAvailablePorts(offer.getResourcesList()));
   }
 
-  private static final Resources NO_RESOURCES =
+  @VisibleForTesting
+  public static final Resources NONE =
       new Resources(0, Amount.of(0L, Data.BITS), Amount.of(0L, Data.BITS), 0);
-
-  private static Resources none() {
-    return NO_RESOURCES;
-  }
 
   /**
    * a - b.
@@ -222,7 +229,7 @@ public class Resources {
    * sum(rs).
    */
   public static Resources sum(Iterable<Resources> rs) {
-    Resources sum = none();
+    Resources sum = NONE;
 
     for (Resources r : rs) {
       double numCpus = sum.getNumCpus() + r.getNumCpus();

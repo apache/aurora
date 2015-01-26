@@ -13,57 +13,38 @@
  */
 package org.apache.aurora.scheduler;
 
-import java.util.Set;
-
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.twitter.common.collections.Pair;
 import com.twitter.common.testing.easymock.EasyMockTest;
 
 import org.apache.aurora.gen.HostAttributes;
 import org.apache.aurora.gen.ScheduleStatus;
 import org.apache.aurora.scheduler.async.OfferQueue;
-import org.apache.aurora.scheduler.configuration.Resources;
+import org.apache.aurora.scheduler.mesos.Offers;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage.StorageException;
 import org.apache.aurora.scheduler.storage.entities.IHostAttributes;
 import org.apache.aurora.scheduler.storage.testing.StorageTestUtil;
-import org.apache.mesos.Protos.Attribute;
-import org.apache.mesos.Protos.FrameworkID;
 import org.apache.mesos.Protos.OfferID;
-import org.apache.mesos.Protos.Resource;
-import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
-import org.apache.mesos.Protos.Value.Range;
-import org.apache.mesos.Protos.Value.Ranges;
-import org.apache.mesos.Protos.Value.Scalar;
-import org.apache.mesos.Protos.Value.Text;
-import org.apache.mesos.Protos.Value.Type;
 import org.junit.Before;
 import org.junit.Test;
 
 import static org.apache.aurora.gen.ScheduleStatus.FAILED;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
-import static org.apache.aurora.scheduler.configuration.ConfigurationManager.HOST_CONSTRAINT;
-import static org.apache.mesos.Protos.Offer;
 import static org.easymock.EasyMock.expect;
 import static org.junit.Assert.assertTrue;
 
 public class UserTaskLauncherTest extends EasyMockTest {
 
-  private static final String FRAMEWORK_ID = "FrameworkId";
-
-  private static final SlaveID SLAVE_ID = SlaveID.newBuilder().setValue("SlaveId").build();
-  private static final String SLAVE_HOST_1 = "SlaveHost1";
-
   private static final String TASK_ID_A = "task_id_a";
 
   private static final OfferID OFFER_ID = OfferID.newBuilder().setValue("OfferId").build();
-  private static final HostOffer OFFER = createOffer(SLAVE_ID, SLAVE_HOST_1, 4, 1024, 1024);
+  private static final HostOffer OFFER = new HostOffer(
+      Offers.createOffer(4, 1024, 1024, Pair.of(80, 80)),
+      IHostAttributes.build(new HostAttributes()));
 
   private OfferQueue offerQueue;
   private StateManager stateManager;
@@ -178,43 +159,5 @@ public class UserTaskLauncherTest extends EasyMockTest {
             + "total_unevictable 0 ")
         .build();
     launcher.statusUpdate(status);
-  }
-
-  private static HostOffer createOffer(SlaveID slave, String slaveHost, double cpu,
-      double ramMb, double diskMb) {
-    return createOffer(slave, slaveHost, cpu, ramMb, diskMb,
-        ImmutableSet.<Pair<Integer, Integer>>of());
-  }
-
-  private static HostOffer createOffer(SlaveID slave, String slaveHost, double cpu,
-      double ramMb, double diskMb, Set<Pair<Integer, Integer>> ports) {
-
-    Ranges portRanges = Ranges.newBuilder()
-        .addAllRange(Iterables.transform(ports, new Function<Pair<Integer, Integer>, Range>() {
-          @Override
-          public Range apply(Pair<Integer, Integer> range) {
-            return Range.newBuilder().setBegin(range.getFirst()).setEnd(range.getSecond()).build();
-          }
-        }))
-        .build();
-
-    Offer mesosOffer = Offer.newBuilder()
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.CPUS)
-            .setScalar(Scalar.newBuilder().setValue(cpu)))
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.RAM_MB)
-            .setScalar(Scalar.newBuilder().setValue(ramMb)))
-        .addResources(Resource.newBuilder().setType(Type.SCALAR).setName(Resources.DISK_MB)
-            .setScalar(Scalar.newBuilder().setValue(diskMb)))
-        .addResources(Resource.newBuilder().setType(Type.RANGES).setName(Resources.PORTS)
-            .setRanges(portRanges))
-        .addAttributes(Attribute.newBuilder().setType(Type.TEXT)
-            .setName(HOST_CONSTRAINT)
-            .setText(Text.newBuilder().setValue(slaveHost)))
-        .setSlaveId(slave)
-        .setHostname(slaveHost)
-        .setFrameworkId(FrameworkID.newBuilder().setValue(FRAMEWORK_ID).build())
-        .setId(OFFER_ID)
-        .build();
-    return new HostOffer(mesosOffer, IHostAttributes.build(new HostAttributes()));
   }
 }

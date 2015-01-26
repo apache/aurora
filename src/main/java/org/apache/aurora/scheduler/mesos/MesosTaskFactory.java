@@ -20,7 +20,6 @@ import java.util.logging.Logger;
 import javax.inject.Inject;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
@@ -29,12 +28,12 @@ import com.twitter.common.quantity.Data;
 
 import org.apache.aurora.Protobufs;
 import org.apache.aurora.codec.ThriftBinaryCodec;
+import org.apache.aurora.scheduler.ResourceSlot;
 import org.apache.aurora.scheduler.base.CommandUtil;
 import org.apache.aurora.scheduler.base.JobKeys;
 import org.apache.aurora.scheduler.base.SchedulerException;
 import org.apache.aurora.scheduler.base.Tasks;
 import org.apache.aurora.scheduler.configuration.Resources;
-
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.IDockerContainer;
 import org.apache.aurora.scheduler.storage.entities.IJobKey;
@@ -66,75 +65,10 @@ public interface MesosTaskFactory {
    */
   TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException;
 
-  class ExecutorSettings {
-
-    private final String executorPath;
-    private final List<String> executorResources;
-    private final String thermosObserverRoot;
-    private final Optional<String> executorFlags;
-    private final Resources executorOverhead;
-
-    public ExecutorSettings(
-        String executorPath,
-        List<String> executorResources,
-        String thermosObserverRoot,
-        Optional<String> executorFlags,
-        Resources executorOverhead) {
-
-      this.executorPath = requireNonNull(executorPath);
-      this.executorResources = requireNonNull(executorResources);
-      this.thermosObserverRoot = requireNonNull(thermosObserverRoot);
-      this.executorFlags = requireNonNull(executorFlags);
-      this.executorOverhead = requireNonNull(executorOverhead);
-    }
-
-    String getExecutorPath() {
-      return executorPath;
-    }
-
-    List<String> getExecutorResources() {
-      return executorResources;
-    }
-
-    String getThermosObserverRoot() {
-      return thermosObserverRoot;
-    }
-
-    Optional<String> getExecutorFlags() {
-      return executorFlags;
-    }
-
-    Resources getExecutorOverhead() {
-      return executorOverhead;
-    }
-  }
-
   // TODO(wfarner): Move this class to its own file to reduce visibility to package private.
   class MesosTaskFactoryImpl implements MesosTaskFactory {
     private static final Logger LOG = Logger.getLogger(MesosTaskFactoryImpl.class.getName());
     private static final String EXECUTOR_PREFIX = "thermos-";
-
-    /**
-     * Minimum resources required to run Thermos. In the wild Thermos needs about 0.01 CPU and
-     * about 170MB (peak usage) of RAM. The RAM requirement has been rounded up to a power of 2.
-     */
-    @VisibleForTesting
-    static final Resources MIN_THERMOS_RESOURCES = new Resources(
-        0.01,
-        Amount.of(256L, Data.MB),
-        Amount.of(1L, Data.MB),
-        0);
-
-    /**
-     * Minimum resources to allocate for a task. Mesos rejects tasks that have no CPU, no RAM, or
-     * no Disk.
-     */
-    @VisibleForTesting
-    static final Resources MIN_TASK_RESOURCES = new Resources(
-        0.01,
-        Amount.of(1L, Data.MB),
-        Amount.of(1L, Data.MB),
-        0);
 
     /**
      * Name to associate with task executors.
@@ -168,26 +102,16 @@ public interface MesosTaskFactory {
     }
 
     /**
-     * Generates a Resource where each resource component is a max out of the two components.
-     *
-     * @param a A resource to compare.
-     * @param b A resource to compare.
-     *
-     * @return Returns a Resources instance where each component is a max of the two components.
+     * Resources to 'allocate' to the executor in the ExecutorInfo.  We do this since mesos
+     * disallows an executor with zero resources, but the tasks end up in the same container
+     * anyway.
      */
     @VisibleForTesting
-    static Resources maxElements(Resources a, Resources b) {
-      double maxCPU = Math.max(a.getNumCpus(), b.getNumCpus());
-      Amount<Long, Data> maxRAM = Amount.of(
-          Math.max(a.getRam().as(Data.MB), b.getRam().as(Data.MB)),
-          Data.MB);
-      Amount<Long, Data> maxDisk = Amount.of(
-          Math.max(a.getDisk().as(Data.MB), b.getDisk().as(Data.MB)),
-          Data.MB);
-      int maxPorts = Math.max(a.getNumPorts(), b.getNumPorts());
-
-      return new Resources(maxCPU, maxRAM, maxDisk, maxPorts);
-    }
+    static final Resources RESOURCES_EPSILON = new Resources(
+        0.01,
+        Amount.of(1L, Data.MB),
+        Amount.of(1L, Data.MB),
+        0);
 
     @Override
     public TaskInfo createFrom(IAssignedTask task, SlaveID slaveId) throws SchedulerException {
@@ -202,33 +126,20 @@ public interface MesosTaskFactory {
         throw new SchedulerException("Internal error.", e);
       }
 
-      // The objective of the below code is to allocate a task and executor that is in a container
-      // of task + executor overhead size. Mesos stipulates that we cannot allocate 0 sized tasks or
-      // executors and we should always ensure the ExecutorInfo has enough resources to launch or
-      // run an executor. Therefore the total desired container size (task + executor overhead) is
-      // partitioned to a small portion that is always allocated to the executor and the rest to the
-      // task. If the remaining resources are not enough for the task a small epsilon is allocated
-      // to the task.
-
       ITaskConfig config = task.getTask();
-      Resources taskResources = Resources.from(config);
-      Resources containerResources =
-          Resources.sum(taskResources, executorSettings.getExecutorOverhead());
-
-      taskResources = Resources.subtract(containerResources, MIN_THERMOS_RESOURCES);
-      // It is possible that the final task resources will be negative.
-      // This ensures the task resources are positive.
-      Resources finalTaskResources = maxElements(taskResources, MIN_TASK_RESOURCES);
+      ResourceSlot resourceSlot =
+          ResourceSlot.subtract(ResourceSlot.from(config, executorSettings), RESOURCES_EPSILON);
 
       // TODO(wfarner): Re-evaluate if/why we need to continue handling unset assignedPorts field.
-      List<Resource> resources = finalTaskResources
+      List<Resource> resources = resourceSlot
           .toResourceList(task.isSetAssignedPorts()
               ? ImmutableSet.copyOf(task.getAssignedPorts().values())
               : ImmutableSet.<Integer>of());
 
-      LOG.fine("Setting task resources to "
-          + Iterables.transform(resources, Protobufs.SHORT_TOSTRING));
-
+      if (LOG.isLoggable(Level.FINE)) {
+        LOG.fine("Setting task resources to "
+            + Iterables.transform(resources, Protobufs.SHORT_TOSTRING));
+      }
       TaskInfo.Builder taskBuilder =
           TaskInfo.newBuilder()
               .setName(JobKeys.canonicalString(Tasks.ASSIGNED_TO_JOB_KEY.apply(task)))
@@ -302,7 +213,7 @@ public interface MesosTaskFactory {
           .setExecutorId(getExecutorId(task.getTaskId()))
           .setName(EXECUTOR_NAME)
           .setSource(getInstanceSourceName(config, task.getInstanceId()))
-          .addAllResources(MIN_THERMOS_RESOURCES.toResourceList());
+          .addAllResources(RESOURCES_EPSILON.toResourceList());
     }
 
     private void configureContainerVolumes(ContainerInfo.Builder containerBuilder) {

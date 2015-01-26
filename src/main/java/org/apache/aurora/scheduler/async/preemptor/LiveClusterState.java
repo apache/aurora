@@ -33,6 +33,7 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.aurora.gen.ScheduleStatus.PREEMPTING;
 import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
 
+// TODO(wfarner): Remove this in favor of CachedClusterState.
 class LiveClusterState implements ClusterState {
 
   @VisibleForTesting

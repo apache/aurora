@@ -48,6 +48,7 @@ import org.apache.aurora.scheduler.filter.AttributeAggregate;
 import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
+import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.Storage;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
@@ -104,6 +105,7 @@ class PreemptorImpl implements Preemptor {
   private final Clock clock;
   private final AtomicLong missingAttributes;
   private final ClusterState clusterState;
+  private final ExecutorSettings executorSettings;
 
   /**
    * Creates a new preemptor.
@@ -125,7 +127,8 @@ class PreemptorImpl implements Preemptor {
       @PreemptionDelay Amount<Long, Time> preemptionCandidacyDelay,
       Clock clock,
       StatsProvider statsProvider,
-      ClusterState clusterState) {
+      ClusterState clusterState,
+      ExecutorSettings executorSettings) {
 
     this.storage = requireNonNull(storage);
     this.stateManager = requireNonNull(stateManager);
@@ -135,6 +138,7 @@ class PreemptorImpl implements Preemptor {
     this.clock = requireNonNull(clock);
     missingAttributes = statsProvider.makeCounter("preemptor_missing_attributes");
     this.clusterState = requireNonNull(clusterState);
+    this.executorSettings = requireNonNull(executorSettings);
   }
 
   private static final Function<HostOffer, ResourceSlot> OFFER_TO_RESOURCE_SLOT =
@@ -161,11 +165,11 @@ class PreemptorImpl implements Preemptor {
         }
       };
 
-  private static final Function<PreemptionVictim, ResourceSlot> VICTIM_TO_RESOURCES =
+  private final Function<PreemptionVictim, ResourceSlot> victimToResources =
       new Function<PreemptionVictim, ResourceSlot>() {
         @Override
         public ResourceSlot apply(PreemptionVictim victim) {
-          return victim.getResources();
+          return ResourceSlot.from(victim, executorSettings);
         }
       };
 
@@ -179,8 +183,8 @@ class PreemptorImpl implements Preemptor {
 
   // TODO(zmanji) Consider using Dominant Resource Fairness for ordering instead of the vector
   // ordering
-  private static final Ordering<PreemptionVictim> RESOURCE_ORDER =
-      ResourceSlot.ORDER.onResultOf(VICTIM_TO_RESOURCES).reverse();
+  private final Ordering<PreemptionVictim> resourceOrder =
+      ResourceSlot.ORDER.onResultOf(victimToResources).reverse();
 
   private static final Function<PreemptionVictim, String> VICTIM_TO_HOST =
       new Function<PreemptionVictim, String>() {
@@ -240,13 +244,13 @@ class PreemptorImpl implements Preemptor {
 
     List<PreemptionVictim> toPreemptTasks = Lists.newArrayList();
 
-    Iterable<PreemptionVictim> sortedVictims = RESOURCE_ORDER.immutableSortedCopy(preemptableTasks);
+    Iterable<PreemptionVictim> sortedVictims = resourceOrder.immutableSortedCopy(preemptableTasks);
 
     for (PreemptionVictim victim : sortedVictims) {
       toPreemptTasks.add(victim);
 
       ResourceSlot totalResource = ResourceSlot.sum(
-          ResourceSlot.sum(Iterables.transform(toPreemptTasks, VICTIM_TO_RESOURCES)),
+          ResourceSlot.sum(Iterables.transform(toPreemptTasks, victimToResources)),
           slackResources);
 
       Optional<IHostAttributes> attributes = getHostAttributes(host);

@@ -84,7 +84,7 @@ import org.apache.aurora.scheduler.log.Log.Position;
 import org.apache.aurora.scheduler.log.Log.Stream;
 import org.apache.aurora.scheduler.mesos.DriverFactory;
 import org.apache.aurora.scheduler.mesos.DriverSettings;
-import org.apache.aurora.scheduler.mesos.MesosTaskFactory.ExecutorSettings;
+import org.apache.aurora.scheduler.mesos.ExecutorSettings;
 import org.apache.aurora.scheduler.storage.backup.BackupModule;
 import org.apache.aurora.scheduler.storage.log.EntrySerializer;
 import org.apache.aurora.scheduler.storage.log.LogStorageModule;
@@ -106,8 +106,6 @@ import org.junit.Test;
 
 import static com.twitter.common.testing.easymock.EasyMockTest.createCapture;
 
-import static org.apache.aurora.scheduler.ResourceSlot.EXECUTOR_OVERHEAD_CPUS;
-import static org.apache.aurora.scheduler.ResourceSlot.EXECUTOR_OVERHEAD_RAM;
 import static org.apache.mesos.Protos.FrameworkInfo;
 import static org.easymock.EasyMock.capture;
 import static org.easymock.EasyMock.createControl;
@@ -199,8 +197,8 @@ public class SchedulerIT extends BaseZooKeeperTest {
         bind(DriverSettings.class).toInstance(SETTINGS);
         bind(Log.class).toInstance(log);
         Resources executorOverhead = new Resources(
-            EXECUTOR_OVERHEAD_CPUS.get(),
-            EXECUTOR_OVERHEAD_RAM.get(),
+            0.1,
+            Amount.of(1L, Data.MB),
             Amount.of(0L, Data.MB),
             0);
         bind(ExecutorSettings.class)

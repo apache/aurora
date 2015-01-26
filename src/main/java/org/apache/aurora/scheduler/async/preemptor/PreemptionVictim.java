@@ -15,7 +15,7 @@ package org.apache.aurora.scheduler.async.preemptor;
 
 import java.util.Objects;
 
-import org.apache.aurora.scheduler.ResourceSlot;
+import org.apache.aurora.scheduler.configuration.Resources;
 import org.apache.aurora.scheduler.storage.entities.IAssignedTask;
 import org.apache.aurora.scheduler.storage.entities.ITaskConfig;
 
@@ -27,7 +27,7 @@ public final class PreemptionVictim {
   private final boolean production;
   private final String role;
   private final int priority;
-  private final ResourceSlot resources;
+  private final Resources resources;
   private final String taskId;
 
   private PreemptionVictim(
@@ -35,7 +35,7 @@ public final class PreemptionVictim {
       boolean production,
       String role,
       int priority,
-      ResourceSlot resources,
+      Resources resources,
       String taskId) {
 
     this.slaveHost = slaveHost;
@@ -53,7 +53,7 @@ public final class PreemptionVictim {
         config.isProduction(),
         config.getOwner().getRole(),
         config.getPriority(),
-        ResourceSlot.from(config),
+        Resources.from(task.getTask()),
         task.getTaskId());
   }
 
@@ -73,7 +73,7 @@ public final class PreemptionVictim {
     return priority;
   }
 
-  public ResourceSlot getResources() {
+  public Resources getResources() {
     return resources;
   }
 

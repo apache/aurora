@@ -53,6 +53,7 @@ import org.apache.aurora.scheduler.filter.SchedulingFilter;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.ResourceRequest;
 import org.apache.aurora.scheduler.filter.SchedulingFilter.UnusedResource;
 import org.apache.aurora.scheduler.filter.SchedulingFilterImpl;
+import org.apache.aurora.scheduler.mesos.TaskExecutors;
 import org.apache.aurora.scheduler.state.StateManager;
 import org.apache.aurora.scheduler.storage.AttributeStore;
 import org.apache.aurora.scheduler.storage.Storage;
@@ -130,7 +131,8 @@ public class PreemptorImplTest extends EasyMockTest {
         PREEMPTION_DELAY,
         clock,
         statsProvider,
-        new LiveClusterState(storageUtil.storage));
+        new LiveClusterState(storageUtil.storage),
+        TaskExecutors.NO_OVERHEAD_EXECUTOR);
 
     preemptor.findPreemptionSlotFor(pendingTask.getAssignedTask().getTaskId(), emptyJob);
   }
@@ -317,7 +319,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures a production task can preempt 2 tasks on the same host.
   @Test
   public void testProductionPreemptingManyNonProduction() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(1).setRamMb(512);
 
@@ -349,7 +351,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures we select the minimal number of tasks to preempt
   @Test
   public void testMinimalSetPreempted() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
     ScheduledTask a1 = makeTask(USER_A, JOB_A, TASK_ID_A + "_a1");
     a1.getAssignedTask().getTask().setNumCpus(4).setRamMb(4096);
 
@@ -384,7 +386,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures a production task *never* preempts a production task from another job.
   @Test
   public void testProductionJobNeverPreemptsProductionJob() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
     ScheduledTask p1 = makeProductionTask(USER_A, JOB_A, TASK_ID_A + "_p1");
     p1.getAssignedTask().getTask().setNumCpus(2).setRamMb(1024);
 
@@ -409,7 +411,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures that we can preempt if a task + offer can satisfy a pending task.
   @Test
   public void testPreemptWithOfferAndTask() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
 
     setUpHost(HOST_A, RACK_A);
 
@@ -437,7 +439,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures we can preempt if two tasks and an offer can satisfy a pending task.
   @Test
   public void testPreemptWithOfferAndMultipleTasks() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
 
     setUpHost(HOST_A, RACK_A);
 
@@ -470,7 +472,7 @@ public class PreemptorImplTest extends EasyMockTest {
   // Ensures we don't preempt if a host has enough slack to satisfy a pending task.
   @Test
   public void testPreemptWithLargeOffer() throws Exception {
-    schedulingFilter = new SchedulingFilterImpl();
+    schedulingFilter = new SchedulingFilterImpl(TaskExecutors.NO_OVERHEAD_EXECUTOR);
 
     setUpHost(HOST_A, RACK_A);
 
@@ -527,7 +529,8 @@ public class PreemptorImplTest extends EasyMockTest {
         PREEMPTION_DELAY,
         clock,
         statsProvider,
-        new LiveClusterState(storage));
+        new LiveClusterState(storage),
+        TaskExecutors.NO_OVERHEAD_EXECUTOR);
 
     assertEquals(
         Optional.<String>absent(),

@@ -32,14 +32,14 @@ def wait_until_znodes(count, timeout=30):
   return []
 
 
-# job is created with 4 znodes.
-znodes = wait_until_znodes(4, timeout=10)
+# job is created with 3 znodes.
+znodes = wait_until_znodes(3, timeout=10)
 if not znodes:
   sys.exit(DID_NOT_REGISTER)
 
 client.delete(znodes[0])
 
-znodes = wait_until_znodes(4, timeout=10)
+znodes = wait_until_znodes(3, timeout=10)
 if not znodes:
   sys.exit(DID_NOT_RECOVER_FROM_EXPIRY)
 
