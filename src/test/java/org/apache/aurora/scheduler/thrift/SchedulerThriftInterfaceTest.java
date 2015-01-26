@@ -802,11 +802,57 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testKillByTaskId() throws Exception {
+    // A non-admin user may kill their own tasks when specified by task IDs.
+    Query.Builder query = Query.taskScoped("taskid");
+    expectAuth(ROOT, false);
+    expectAuth(ImmutableSet.of(ROLE), true);
+    // This query happens twice - once for authentication (without consistency) and once again
+    // to perform the state change (within a write transaction).
+    storageUtil.expectTaskFetch(query.active(), buildScheduledTask()).times(2);
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expectTransitionsToKilling();
+
+    control.replay();
+
+    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testKillByStatus() throws Exception {
+    // A non-admin user may not kill arbitrary tasks.
+    Query.Builder query = Query.statusScoped(ScheduleStatus.RUNNING);
+    expectAuth(ROOT, false);
+
+    control.replay();
+
+    assertResponse(AUTH_FAILED, thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
+  public void testKillWithRoleSpecs() throws Exception {
+    // The query performed here is somewhat nonsensical, since we would not have any tasks owned by
+    // multiple roles.  However, that behavior is defined in the storage system.
+    Query.Builder query = Query.arbitrary(new TaskQuery()
+        .setRole("a")
+        .setJobKeys(ImmutableSet.of(JobKeys.from("b", "devel", "job").newBuilder())));
+
+    expectAuth(ROOT, false);
+    expectAuth(ImmutableSet.of("a", "b"), true);
+    storageUtil.expectTaskFetch(query.active(), buildScheduledTask());
+    lockManager.validateIfLocked(LOCK_KEY, Optional.<ILock>absent());
+    expectTransitionsToKilling();
+
+    control.replay();
+
+    assertOkResponse(thrift.killTasks(query.get(), DEFAULT_LOCK, SESSION));
+  }
+
+  @Test
   public void testKillTasksAuthFailure() throws Exception {
     Query.Builder query = Query.unscoped().byJob(JOB_KEY).active();
     expectAuth(ROOT, false);
     expectAuth(ROLE, false);
-    storageUtil.expectTaskFetch(query, buildScheduledTask(JOB_NAME, TASK_ID));
 
     control.replay();
 
@@ -840,7 +886,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   @Test
   public void testKillAuthenticatesQueryRole() throws Exception {
     expectAuth(ROOT, false);
-    expectAuth(ImmutableSet.of("foo", ROLE), true);
+    expectAuth(ImmutableSet.of("foo"), true);
 
     Query.Builder query = Query.roleScoped("foo").active();
 
