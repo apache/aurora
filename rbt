@@ -16,7 +16,7 @@
 set -e
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
-RBTOOLS_VERSION=0.6.2
+RBTOOLS_VERSION=0.7.0
 if ! [ -f "$HERE/build-support/rbt.venv/BOOTSTRAPPED" ] || \
     [ x`cat "$HERE/build-support/rbt.venv/BOOTSTRAPPED"` != x$RBTOOLS_VERSION ]; then
 
