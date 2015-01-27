@@ -29,6 +29,7 @@ set -o nounset
 rc_tag_version=0
 aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=incubator-aurora.git'
 aurora_svn_dist_url='https://dist.apache.org/repos/dist/dev/incubator/aurora'
+aurora_version_file='./src/main/resources/apache/aurora/client/cli/.auroraversion'
 
 function print_help_and_exit {
 cat <<EOF
@@ -174,7 +175,7 @@ git branch $current_version_tag $(git rev-parse HEAD)
 
 echo "Committing updated .auroraversion on master"
 echo $new_snapshot_version > .auroraversion
-git add .auroraversion
+git add ${aurora_version_file}
 git commit -m "Incrementing snapshot version to ${new_snapshot_version}."
 
 # Build the source distribution from the new branch
@@ -182,7 +183,7 @@ echo "Checking out ${current_version_tag} branch and updating .auroraversion"
 git checkout $current_version_tag
 # Increment the version and create a branch
 echo $current_version_tag > .auroraversion
-git add .auroraversion
+git add ${aurora_version_file}
 git commit -m "Updating .auroraversion to ${current_version_tag}."
 
 echo "Building the source distribution"
