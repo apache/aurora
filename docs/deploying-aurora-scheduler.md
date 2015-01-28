@@ -219,7 +219,7 @@ And this job configuration:
     )
 
 The job configuration is indicating that it should only be scheduled on slaves with the attribute
-`dedicated:dba_team/redis`.  Additionally, Aurora will prevent any tasks that do _not_ have that
+`dedicated:db_team/redis`.  Additionally, Aurora will prevent any tasks that do _not_ have that
 constraint from running on those slaves.
 
 
