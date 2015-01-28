@@ -62,6 +62,7 @@ scheduler itself, you may want to explore developing your own
 - [Gutefrage.net](https://www.gutefrage.net)
 - [Magine TV](https://magine.com)
 - [Oscar Health](https://www.hioscar.com)
+- [TellApart](https://www.tellapart.com)
 - [Twitter](https://twitter.com)
 
 Are you using Aurora too?  Let us know, or submit a patch to join the list!
