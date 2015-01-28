@@ -1,3 +1,85 @@
+Aurora 0.7.0
+--------------------------------------------------------------------------------
+## Bug
+    * [AURORA-952] - method interceptor is fatefully intercepting finalize() with null pointer
+    * [AURORA-1050] - test_end_to_end.sh is failing on master
+    * [AURORA-798] - investigate flaky test: LockManagerImplTest/testNoDeadlock
+    * [AURORA-83] - Killing a job attempts to transition non-active tasks
+    * [AURORA-1019] - /utilization has a 404 on bootstrap resource
+    * [AURORA-1002] - Thermos executor does not enforce disk quota.
+    * [AURORA-946] - The replaceCronTemplate RPC does not check quota
+    * [AURORA-988] - aurora client apache.aurora.client.api.ThriftInternalError error due to unexpected kwarg user_agent
+    * [AURORA-996] - Aurora client batch job kill does not filter active tasks
+    * [AURORA-990] - aurora job inspect --raw fails with a stack trace
+    * [AURORA-989] - aurora client v2 dont have "version" command
+    * [AURORA-966] - task_schedule_attempt_locked stats are not exported
+    * [AURORA-965] - Aurora client prints ambiguous trailing error message
+    * [AURORA-980] - rack limit of 1 is meaningless for single-instance job
+    * [AURORA-949] - TRequestsTransport does not raise an exception on 5xx or 4xx responses
+    * [AURORA-976] - The scheduleCronJob RPC allows duplicate job key creation
+    * [AURORA-939] - Executor crashes when it receives an invalid task config
+    * [AURORA-938] - TestVersionCommand::test_version_with_new_pants fails under py.test
+    * [AURORA-921] - Fail fast for cron jobs in "aurora beta-update start"
+    * [AURORA-1018] - Review bot is headed to infinity and beyond
+    * [AURORA-997] - ReviewBot is a filthy liar
+    * [AURORA-923] - Run verb does not return an exit code.
+    * [AURORA-986] - RequestLoggerTest failed for Locale.FRANCE
+    * [AURORA-1016] - NullPointerException in PreemptorImpl
+    * [AURORA-937] - Response.serverInfo is not always populated
+    * [AURORA-956] - The Scheduler can allocate Mesos Tasks with 0 Disk.
+    * [AURORA-936] - Aurora admin query command is broken
+    * [AURORA-992] - /apiclient/ endpoint shows documentation for thermos API
+    * [AURORA-1045] - Scheduler should avoid performing authentication while holding the write lock
+    * [AURORA-1067] - Thermos executor test hangs
+    * [AURORA-968] - Client logs duplicate error messages
+
+## Epic
+    * [AURORA-423] - 0.7.0 deprecations
+    * [AURORA-633] - Support running Docker containers
+    * [AURORA-710] - make aurora v2 client the default client
+
+## Story
+    * [AURORA-933] - python missing license headers
+    * [AURORA-994] - Simplify client help output
+    * [AURORA-930] - GC performance issues with snapshot deduplication on large clusters
+    * [AURORA-998] - aurora client apache.aurora.client.api.ThriftInternalError error due to dup kwarg
+    * [AURORA-121] - Make the preemptor more efficient
+    * [AURORA-776] - Update documentation and scripts to use v2 client.
+    * [AURORA-775] - Remove v1 client build
+    * [AURORA-617] - Switch pants 3rdparty to use python_requirements
+    * [AURORA-782] - Remove command bridging from client
+    * [AURORA-934] - client should set User-Agent
+
+## Task
+    * [AURORA-424] - Empty string cronSchedule should not be accepted by scheduler
+    * [AURORA-919] - Aurora client should provide a --verbose flag and silence DEBUG level log output by default
+    * [AURORA-941] - Enforce gradle version in build.gradle
+    * [AURORA-929] - Remove ReadWriteLockManager
+    * [AURORA-466] - Remove message string in Response struct
+    * [AURORA-691] - Remove populated field in PopulateJobResult struct
+    * [AURORA-928] - Executor overhead cannot be dropped to zero
+    * [AURORA-914] - Instrument task scheduling pipeline
+    * [AURORA-943] - Improve messaging in admin host_drain command
+    * [AURORA-832] - Remove SANDBOX_DELETED state
+    * [AURORA-947] - Use thrift's built-in doc generator
+    * [AURORA-766] - Client should show information for update details when starting an update.
+    * [AURORA-924] - Improve cron error messages
+    * [AURORA-891] - Drop argparse dependency
+    * [AURORA-925] - refactor build.gradle to extract thrift compilation as a separate task class
+    * [AURORA-1021] - Increase MIN_THERMOS_RESOURCES to prevent thermos OOMs.
+    * [AURORA-961] - Set default --batch-size in client v2 to 1
+    * [AURORA-469] - quota check failures should specify how much under quota you are
+    * [AURORA-967] - Explore adding a PMD rule for validating @Timed attribute placement
+    * [AURORA-962] - Allow specifying the hostname the scheduler is running on
+    * [AURORA-935] - Improve logging in MaintenanceController
+    * [AURORA-970] - Include aurora version (from .auroraversion) in the client help output
+    * [AURORA-454] - Remove cron functionality in createJob/killTasks
+    * [AURORA-1013] - Modify thrift schema to support configuring heartbeat updates.
+    * [AURORA-143] - Remove the getVersion RPC
+    * [AURORA-467] - Remove version field in Response struct
+    * [AURORA-982] - Use documentation template when rendering docs on Aurora website
+
+
 Aurora 0.6.0
 --------------------------------------------------------------------------------
 ## Bug
