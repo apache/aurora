@@ -22,6 +22,7 @@ set -o nounset
 aurora_git_web_url='https://git-wip-us.apache.org/repos/asf?p=incubator-aurora.git'
 aurora_svn_dist_url='https://dist.apache.org/repos/dist/release/incubator/aurora'
 aurora_svn_dev_dist_url='https://dist.apache.org/repos/dist/dev/incubator/aurora'
+aurora_version_file='./src/main/resources/apache/aurora/client/cli/.auroraversion'
 
 function print_help_and_exit {
 cat <<EOF
@@ -133,7 +134,7 @@ if [[ $publish == 1 ]]; then
 
   # Increment the version and create a branch
   echo ${current_version_tag} > .auroraversion
-  git add .auroraversion
+  git add ${aurora_version_file}
   git commit -m "Updating .auroraversion to release version ${current_version_tag}."
   git push origin "${current_version_tag}"
   git tag -s "${current_version_tag}" -m "Apache Aurora ${current_version_tag} release" ${current_version_tag}
