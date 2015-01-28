@@ -1,0 +1,53 @@
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+import getpass
+
+run_server = Process(
+  name = 'run_server',
+  cmdline = 'python http_example.py {{thermos.ports[http]}}')
+
+stage_server = Process(
+  name = 'stage_server',
+  cmdline = "cp /tmp/http_example.py ."
+)
+
+test_task = Task(
+  name = 'http_example',
+  resources = Resources(cpu=0.5, ram=34*MB, disk=64*MB),
+  processes = [stage_server, run_server],
+  constraints = order(stage_server, run_server))
+
+update_config = UpdateConfig(watch_secs=10, batch_size=2)
+health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1)
+
+job = Job(
+  name = 'http_example_docker',
+  cluster = 'devcluster',
+  instances = 3,
+  update_config = update_config,
+  health_check_config = health_check_config,
+  task = test_task,
+  role = getpass.getuser(),
+  environment = 'test',
+  contact = '{{role}}@localhost',
+  # Since there is only one slave in devcluster allow all instances to run there.
+  constraints = {
+    'host': 'limit:4',
+  },
+  announce = Announcer(),
+  container = Container(docker=Docker(image = 'http_example')),
+)
+
+jobs = [ job ]

@@ -98,11 +98,14 @@ test_admin() {
 
 RETCODE=1
 # Set up shorthands for test
-export EXAMPLE_DIR=/vagrant/src/test/sh/org/apache/aurora/e2e/http
+export TEST_ROOT=/vagrant/src/test/sh/org/apache/aurora/e2e
+export EXAMPLE_DIR=${TEST_ROOT}/http
+export DOCKER_DIR=${TEST_ROOT}/docker
 TEST_CLUSTER=devcluster
 TEST_ROLE=vagrant
 TEST_ENV=test
 TEST_JOB=http_example
+TEST_DOCKER_JOB=http_example_docker
 TEST_SCHEDULER_IP=192.168.33.7
 TEST_ARGS=(
   $TEST_CLUSTER
@@ -119,6 +122,16 @@ TEST_ADMIN_ARGS=(
   $TEST_SCHEDULER_IP
 )
 
+TEST_DOCKER_ARGS=(
+  $TEST_CLUSTER
+  $TEST_ROLE
+  $TEST_ENV
+  $TEST_DOCKER_JOB
+  $TEST_SCHEDULER_IP
+  $EXAMPLE_DIR/http_example_docker.aurora
+  $EXAMPLE_DIR/http_example_docker_updated.aurora
+)
+
 trap collect_result EXIT
 vagrant up
 vagrant ssh -c "aurorabuild all"
@@ -127,5 +140,11 @@ vagrant ssh -c "aurorabuild all"
 # test runs clean.
 test_version
 test_http_example "${TEST_ARGS[@]}"
+
+# build the test docker image
+vagrant ssh -c "sudo docker build -t http_example ${TEST_ROOT}"
+
+test_http_example "${TEST_DOCKER_ARGS[@]}"
+
 test_admin "${TEST_ADMIN_ARGS[@]}"
 RETCODE=0
