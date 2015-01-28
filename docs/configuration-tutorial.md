@@ -684,29 +684,6 @@ We'd get back:
 
     Hello Tom
 
-We can also use {{}} variables as sectional variables. Let's say we
-have:
-
-    {{#x}} Testing... {{/x}}
-
-If `x` evaluates to `True`, the text between the sectional tags is
-shown. If there is no value for `x` or it evaluates to `False`, the
-between tags text is not shown. So, at a basic level, a sectional
-variable acts as a conditional.
-
-However, if the sectional variable evaluates to a list, array, etc. it
-acts as a `foreach`. For example,
-
-    {{#x}} {{name}} {{/x}}
-
-with
-
-    { "x": [ { "name" : "tic" } { "name" : "tac" } { "name" : "toe" } ] }
-
-evaluates to
-
-    tic tac toe
-
 Every Pystachio object has an associated `.bind` method that can bind
 values to {{}} variables. Bindings are not immediately evaluated.
 Instead, they are evaluated only when the interpolated value of the
