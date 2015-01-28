@@ -387,14 +387,14 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.updater.SchedulerMux', return_value=fake_mux),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('threading._Event.wait')):
-      with patch('apache.aurora.client.cli.context.AuroraCommandContext.warn_and_pause') as pause:
+      with patch('time.sleep') as sleep:
         with temporary_file() as fp:
           fp.write(config)
           fp.flush()
           cmd = AuroraCommandLine()
           result = cmd.execute(['job', 'update', 'west/bozo/test/hello', fp.name])
           assert result == EXIT_OK
-          assert pause.call_count == 1
+          sleep.assert_called_once_with(5)
 
   def test_large_with_instances_warn(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
@@ -416,13 +416,13 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.updater.SchedulerMux', return_value=fake_mux),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('threading._Event.wait')):
-      with patch('apache.aurora.client.cli.context.AuroraCommandContext.warn_and_pause') as pause:
+      with patch('time.sleep') as sleep:
         with temporary_file() as fp:
           fp.write(config)
           fp.flush()
           cmd = AuroraCommandLine()
           cmd.execute(['job', 'update', 'west/bozo/test/hello/1,3,40-160', fp.name])
-          assert pause.call_count == 1
+          sleep.assert_called_once_with(5)
 
   def test_large_with_instances_doesnt_warn(self):
     (mock_api, mock_scheduler_proxy) = self.create_mock_api()
@@ -443,13 +443,13 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('apache.aurora.client.api.updater.SchedulerMux', return_value=fake_mux),
         patch('time.time', side_effect=functools.partial(self.fake_time, self)),
         patch('threading._Event.wait')):
-      with patch('apache.aurora.client.cli.context.AuroraCommandContext.warn_and_pause') as pause:
+      with patch('time.sleep') as sleep:
         with temporary_file() as fp:
           fp.write(config)
           fp.flush()
           cmd = AuroraCommandLine()
           cmd.execute(['job', 'update', 'west/bozo/test/hello/1,3', fp.name])
-          assert pause.call_count == 0
+          assert sleep.call_count == 0
 
   @classmethod
   def assert_correct_addinstance_calls(cls, api):

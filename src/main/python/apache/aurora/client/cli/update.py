@@ -16,6 +16,7 @@ from __future__ import print_function
 
 import json
 import textwrap
+import time
 
 from apache.aurora.client.base import combine_messages
 from apache.aurora.client.cli import EXIT_API_ERROR, EXIT_COMMAND_FAILURE, EXIT_OK, Noun, Verb
@@ -281,9 +282,8 @@ class UpdateStatus(Verb):
       context.print_out("Job: %s, UpdateID: %s" % (context.options.jobspec,
           details.update.summary.updateId))
       context.print_out("Started %s, last updated: %s" %
-          (context.timestamp_to_string(details.update.summary.state.createdTimestampMs),
-          context.timestamp_to_string(
-              details.update.summary.state.lastModifiedTimestampMs)))
+          (time.ctime(details.update.summary.state.createdTimestampMs),
+          time.ctime(details.update.summary.state.lastModifiedTimestampMs)))
       context.print_out("Current status: %s" %
           JobUpdateStatus._VALUES_TO_NAMES[details.update.summary.state.status])
       update_events = details.updateEvents
@@ -292,14 +292,14 @@ class UpdateStatus(Verb):
         for event in update_events:
           context.print_out("Status: %s at %s" % (
               JobUpdateStatus._VALUES_TO_NAMES[event.status],
-              context.timestamp_to_string(event.timestampMs)
+              time.ctime(event.timestampMs)
           ), indent=2)
       instance_events = details.instanceEvents
       if instance_events is not None and len(instance_events) > 0:
         context.print_out("Instance events:")
         for event in instance_events:
           context.print_out("Instance %s at %s: %s" % (
-            event.instanceId, context.timestamp_to_string(event.timestampMs),
+            event.instanceId, time.ctime(event.timestampMs),
             JobUpdateAction._VALUES_TO_NAMES[event.action]
           ), indent=2)
     return EXIT_OK

@@ -20,6 +20,8 @@ import os
 import pprint
 import subprocess
 import textwrap
+import time
+from collections import namedtuple
 from copy import deepcopy
 from datetime import datetime
 from tempfile import NamedTemporaryFile
@@ -64,9 +66,23 @@ from apache.aurora.common.aurora_job_key import AuroraJobKey
 from gen.apache.aurora.api.constants import ACTIVE_STATES, AURORA_EXECUTOR_NAME
 from gen.apache.aurora.api.ttypes import ExecutorConfig, ResponseCode, ScheduleStatus
 
+# Utility type, representing job keys with wildcards.
+PartialJobKey = namedtuple('PartialJobKey', ['cluster', 'role', 'env', 'name'])
+
 
 def arg_type_jobkey(key):
-  return AuroraCommandContext.parse_partial_jobkey(key)
+  """Given a partial jobkey, where parts can be wildcards, parse it.
+  Slots that are wildcards will be replaced by "*".
+  """
+  parts = []
+  for part in key.split('/'):
+    parts.append(part)
+  if len(parts) > 4:
+    raise ValueError('Job key must have no more than 4 segments')
+  while len(parts) < 4:
+    parts.append('*')
+  return PartialJobKey(*parts)
+
 WILDCARD_JOBKEY_OPTION = CommandOption("jobspec", type=arg_type_jobkey,
         metavar="cluster[/role[/env[/name]]]",
         help="A jobkey, optionally containing wildcards")
@@ -709,7 +725,9 @@ class UpdateCommand(Verb):
     if (local_task_count >= 4 * remote_task_count or
         4 * local_task_count <= remote_task_count or
         local_task_count == 0):
-      context.warn_and_pause("Warning: this update is a large change. ")
+      context.print_out("Warning: this update is a large change. ")
+      context.print_out("Press ^c within five seconds to abort.")
+      time.sleep(5)
 
   def execute(self, context):
     job = context.options.instance_spec.jobkey

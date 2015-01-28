@@ -15,8 +15,6 @@
 from __future__ import print_function
 
 import logging
-import time
-from collections import namedtuple
 from fnmatch import fnmatch
 
 from pystachio import Ref
@@ -36,9 +34,6 @@ from apache.aurora.common.clusters import CLUSTERS
 
 from gen.apache.aurora.api.constants import ACTIVE_STATES
 from gen.apache.aurora.api.ttypes import ResponseCode
-
-# Utility type, representing job keys with wildcards.
-PartialJobKey = namedtuple('PartialJobKey', ['cluster', 'role', 'env', 'name'])
 
 
 def bindings_to_list(bindings):
@@ -114,8 +109,7 @@ class AuroraCommandContext(Context):
 
   def open_job_page(self, api, jobkey):
     """Opens the page for a job in the system web browser."""
-    self.open_page(synthesize_url(api.scheduler_proxy.scheduler_client().url, jobkey.role,
-        jobkey.env, jobkey.name))
+    self.open_page(self.get_job_page(api, jobkey))
 
   def get_job_page(self, api, jobkey):
     return synthesize_url(api.scheduler_proxy.scheduler_client().url, jobkey.role,
@@ -139,20 +133,6 @@ class AuroraCommandContext(Context):
       if resp.responseCode == ResponseCode.LOCK_ERROR:
         self.print_err("\t%s" % self.LOCK_ERROR_MSG)
       raise self.CommandErrorLogged(err_code, err_msg)
-
-  @classmethod
-  def parse_partial_jobkey(cls, key):
-    """Given a partial jobkey, where parts can be wildcards, parse it.
-    Slots that are wildcards will be replaced by "*".
-    """
-    parts = []
-    for part in key.split('/'):
-      parts.append(part)
-    if len(parts) > 4:
-      raise cls.CommandError(EXIT_INVALID_PARAMETER, 'Job key must have no more than 4 segments')
-    while len(parts) < 4:
-      parts.append('*')
-    return PartialJobKey(*parts)
 
   @classmethod
   def render_partial_jobkey(cls, jobkey):
@@ -224,11 +204,3 @@ class AuroraCommandContext(Context):
     if unrecognized:
       raise self.CommandError(EXIT_INVALID_PARAMETER,
           "Invalid instance parameter: %s" % (list(unrecognized)))
-
-  def timestamp_to_string(self, timestamp):
-    return time.ctime(timestamp)
-
-  def warn_and_pause(self, warning):
-    self.print_out(warning)
-    self.print_out("Press ^c within five seconds to abort.")
-    time.sleep(5)

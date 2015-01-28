@@ -105,6 +105,12 @@ class TestStartUpdateCommand(AuroraClientCommandTest):
 
 class TestUpdateCommand(AuroraClientCommandTest):
 
+  def setUp(self):
+    patcher = patch("time.ctime")
+    self.addCleanup(patcher.stop)
+    mock_ctime = patcher.start()
+    mock_ctime.return_value = "YYYY-MM-DD HH:MM:SS"
+
   def test_start_update_command_line_succeeds(self):
     mock_context = FakeAuroraCommandContext()
     resp = self.create_simple_success_response()
