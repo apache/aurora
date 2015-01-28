@@ -502,6 +502,7 @@ class TestThermosExecutor(object):
     task_info.data = serialize(
         AssignedTask(
             task=TaskConfig(
+                job=JobKey(role=role, environment='env', name='name'),
                 owner=Identity(role=role, user=role),
                 executorConfig=ExecutorConfig(name=AURORA_EXECUTOR_NAME, data='garbage'))))
 
