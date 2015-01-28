@@ -68,7 +68,9 @@ class CoverageReportCheck extends DefaultTask {
     }.findAll()
 
     if (!coverageErrors.isEmpty()) {
-      throw new GradleException(coverageErrors.join('\n'))
+      // We print here and don't fail the build since this metric has proven to be flaky,
+      // and different JVMs can produce different results.
+      println(coverageErrors.join('\n'))
     }
   }
 
