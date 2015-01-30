@@ -54,7 +54,6 @@ python_tests(
   name = 'test_clusters',
   sources = ['test_clusters.py'],
   dependencies = [
-    '3rdparty/python:pyyaml',
     '3rdparty/python:twitter.common.contextutil',
     'src/main/python/apache/aurora/common:clusters',
   ]

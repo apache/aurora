@@ -14,23 +14,15 @@
 
 from __future__ import print_function
 
-import itertools
 import json
 import os
-from collections import Mapping, namedtuple
+from collections import Mapping
 from contextlib import contextmanager
 
 from pystachio import Required, String
 from twitter.common.collections import maybe_list
 
 from .cluster import Cluster
-
-try:
-  import yaml
-  HAS_YAML = True
-except ImportError:
-  HAS_YAML = False
-
 
 __all__ = (
   'CLUSTERS',
@@ -42,9 +34,6 @@ class NameTrait(Cluster.Trait):
   name = Required(String)  # noqa
 
 
-Parser = namedtuple('Parser', 'loader exception')
-
-
 class Clusters(Mapping):
   class Error(Exception): pass
   class ClusterExists(Error): pass
@@ -52,24 +41,16 @@ class Clusters(Mapping):
   class UnknownFormatError(Error): pass
   class ParseError(Error): pass
 
-  LOADERS = {'.json': Parser(json.load, ValueError)}
-  if HAS_YAML:
-    LOADERS['.yml'] = Parser(yaml.load, yaml.parser.ParserError)
-
   @classmethod
   def from_file(cls, filename):
     return cls(list(cls.iter_clusters(filename)))
 
   @classmethod
   def iter_clusters(cls, filename):
-    _, ext = os.path.splitext(filename)
-    if ext not in cls.LOADERS:
-      raise cls.UnknownFormatError('Unknown clusters file extension: %r' % ext)
     with open(filename) as fp:
-      loader, exc_type = cls.LOADERS[ext]
       try:
-        document = loader(fp)
-      except exc_type as e:
+        document = json.load(fp)
+      except ValueError as e:
         raise cls.ParseError('Unable to parse %s: %s' % (filename, e))
       if isinstance(document, list):
         iterator = document
@@ -137,8 +118,8 @@ CLUSTERS = Clusters(())
 
 def load():
   """(re-)load all clusters from the search path."""
-  for search_path, ext in itertools.product(DEFAULT_SEARCH_PATHS, Clusters.LOADERS):
-    filename = os.path.join(search_path, 'clusters' + ext)
+  for search_path in DEFAULT_SEARCH_PATHS:
+    filename = os.path.join(search_path, 'clusters.json')
     if os.path.exists(filename):
       CLUSTERS.update(Clusters.from_file(filename).values())
 
