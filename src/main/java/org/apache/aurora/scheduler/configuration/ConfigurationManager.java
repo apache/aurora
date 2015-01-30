@@ -66,6 +66,10 @@ public final class ConfigurationManager {
   private static final Arg<List<Container._Fields>> ALLOWED_CONTAINER_TYPES =
       Arg.<List<Container._Fields>>create(ImmutableList.of(Container._Fields.MESOS));
 
+  @CmdLine(name = "enable_legacy_constraints",
+      help = "Set a default host:limit:1 for all and rack:limit:1 constraint for production jobs")
+  private static final Arg<Boolean> ENABLE_LEGACY_CONSTRAINTS = Arg.create(true);
+
   public static final String DEDICATED_ATTRIBUTE = "dedicated";
 
   @VisibleForTesting public static final String HOST_CONSTRAINT = "host";
@@ -133,7 +137,7 @@ public final class ConfigurationManager {
   }
 
   private static final Iterable<Closure<TaskConfig>> DEFAULT_FIELD_POPULATORS =
-      ImmutableList.of(
+      ImmutableList.<Closure<TaskConfig>>of(
           new DefaultField(_Fields.IS_SERVICE, false),
           new DefaultField(_Fields.PRIORITY, 0),
           new DefaultField(_Fields.PRODUCTION, false),
@@ -143,27 +147,7 @@ public final class ConfigurationManager {
           new DefaultField(_Fields.CONSTRAINTS, Sets.<Constraint>newHashSet()),
           // TODO(wfarner): Explore replacing these with thrift defaults.
           new DefaultField(_Fields.CONTAINER,
-              Container.mesos(new MesosContainer())),
-          new Closure<TaskConfig>() {
-            @Override
-            public void execute(TaskConfig task) {
-              if (!Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT))) {
-                task.addToConstraints(hostLimitConstraint(1));
-              }
-            }
-          },
-          new Closure<TaskConfig>() {
-            @Override
-            public void execute(TaskConfig task) {
-              if (!isDedicated(IConstraint.setFromBuilders(task.getConstraints()))
-                  && task.isProduction()
-                  && task.isIsService()
-                  && !Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT))) {
-
-                task.addToConstraints(rackLimitConstraint(1));
-              }
-            }
-          });
+              Container.mesos(new MesosContainer())));
 
   private static final Iterable<RequiredFieldValidator<?>> REQUIRED_FIELDS_VALIDATORS =
       ImmutableList.<RequiredFieldValidator<?>>of(
@@ -405,7 +389,8 @@ public final class ConfigurationManager {
     return new Constraint(RACK_CONSTRAINT, TaskConstraint.limit(new LimitConstraint(limit)));
   }
 
-  private static Predicate<Constraint> hasName(final String name) {
+  @VisibleForTesting
+  static Predicate<Constraint> hasName(final String name) {
     MorePreconditions.checkNotBlank(name);
     return new Predicate<Constraint>() {
       @Override
@@ -416,15 +401,38 @@ public final class ConfigurationManager {
   }
 
   /**
-   * Applies defaults to unset values in a task.
-   *
+   * Wrapper for applyDefaultsIfUnset that passes along the DISABLE_LEGACY_CONSTRAINTS.
    * @param task Task to apply defaults to.
    * @return A reference to the (modified) {@code task}.
    */
   @VisibleForTesting
   public static TaskConfig applyDefaultsIfUnset(TaskConfig task) {
+    return applyDefaultsIfUnset(task, ENABLE_LEGACY_CONSTRAINTS.get());
+  }
+
+  /**
+   * Applies defaults to unset values in a task.
+   * @param task Task to apply defaults to.
+   * @param useLegacyConstraints flag to decide if we should add legacy constraints or not.
+   * @return A reference to the (modified) {@code task}.
+   */
+  @VisibleForTesting
+  static TaskConfig applyDefaultsIfUnset(TaskConfig task, boolean useLegacyConstraints) {
     for (Closure<TaskConfig> populator : DEFAULT_FIELD_POPULATORS) {
       populator.execute(task);
+    }
+
+    // Adding a default Host&Rack constraint is legacy behaviour that can be disabled if needed.
+    if (useLegacyConstraints) {
+      if (!Iterables.any(task.getConstraints(), hasName(HOST_CONSTRAINT))) {
+        task.addToConstraints(hostLimitConstraint(1));
+      }
+      if (!isDedicated(IConstraint.setFromBuilders(task.getConstraints()))
+          && task.isProduction()
+          && task.isIsService()
+          && !Iterables.any(task.getConstraints(), hasName(RACK_CONSTRAINT))) {
+        task.addToConstraints(rackLimitConstraint(1));
+      }
     }
 
     return task;
