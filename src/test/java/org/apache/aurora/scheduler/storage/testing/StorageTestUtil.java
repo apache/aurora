@@ -75,7 +75,7 @@ public class StorageTestUtil {
 
   public <T> IExpectationSetters<T> expectRead() {
     final Capture<Work<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.read(capture(work)))
+    return expect(storage.<T, RuntimeException>read(capture(work)))
         .andAnswer(new IAnswer<T>() {
           @Override
           public T answer() {
@@ -86,7 +86,7 @@ public class StorageTestUtil {
 
   public <T> IExpectationSetters<T> expectWrite() {
     final Capture<MutateWork<T, RuntimeException>> work = EasyMockTest.createCapture();
-    return expect(storage.write(capture(work))).andAnswer(new IAnswer<T>() {
+    return expect(storage.<T, RuntimeException>write(capture(work))).andAnswer(new IAnswer<T>() {
       @Override
       public T answer() {
         return work.getValue().apply(mutableStoreProvider);
