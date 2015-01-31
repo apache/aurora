@@ -78,7 +78,6 @@ public class MesosTaskFactoryImplTest {
       .addAllResources(MesosTaskFactoryImpl.RESOURCES_EPSILON.toResourceList())
       .setCommand(CommandInfo.newBuilder()
           .setValue("./executor.pex")
-          .setShell(true)
           .addUris(URI.newBuilder().setValue(NO_OVERHEAD_EXECUTOR.getExecutorPath())
               .setExecutable(true)))
       .build();
@@ -87,7 +86,6 @@ public class MesosTaskFactoryImplTest {
       ExecutorInfo.newBuilder(DEFAULT_EXECUTOR)
           .setCommand(CommandInfo.newBuilder()
               .setValue("./executor_wrapper.sh")
-              .setShell(true)
               .addUris(URI.newBuilder().setValue(NO_OVERHEAD_EXECUTOR.getExecutorPath())
                   .setExecutable(true))
               .addUris(URI.newBuilder().setValue(EXECUTOR_WRAPPER_PATH).setExecutable(true)))

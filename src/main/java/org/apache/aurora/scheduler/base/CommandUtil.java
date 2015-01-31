@@ -101,8 +101,6 @@ public final class CommandUtil {
     String cmdLine = commandBasePath
         + uriBasename(executorUri)
         + " " + extraArguments.or("");
-    return builder
-        .setValue(cmdLine.trim())
-        .setShell(true);
+    return builder.setValue(cmdLine.trim());
   }
 }
