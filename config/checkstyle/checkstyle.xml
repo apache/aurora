@@ -225,10 +225,7 @@ limitations under the License.
     <module name="NoFinalizer"/>
     <module name="SuperClone"/>
     <module name="SuperFinalize"/>
-    <module name="PackageDeclaration">
-      <property name="ignoreDirectoryName" value="true"/>
-    </module>
-    <module name="JUnitTestCase"/>
+    <module name="PackageDeclaration" />
     <module name="ParameterAssignment"/>
     <module name="DefaultComesLast"/>
     <module name="FallThrough"/>
