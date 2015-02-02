@@ -146,6 +146,14 @@ class JobUpdateControllerImpl implements JobUpdateController {
           throw new IllegalArgumentException("Update instruction is a no-op.");
         }
 
+        List<IJobUpdateSummary> activeJobUpdates =
+            storeProvider.getJobUpdateStore().fetchJobUpdateSummaries(queryByJob(job));
+        if (!activeJobUpdates.isEmpty()) {
+          throw new UpdateStateException("An active update already exists for this job, "
+              + "please terminate it before starting another. "
+              + "Active updates are those in states " + ACTIVE_JOB_UPDATE_STATES);
+        }
+
         LOG.info("Starting update for job " + job);
         ILock lock;
         try {

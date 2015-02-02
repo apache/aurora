@@ -638,6 +638,12 @@ public class JobUpdaterIT extends EasyMockTest {
     assertJobState(JOB, ImmutableMap.of(0, NEW_CONFIG, 1, OLD_CONFIG));
   }
 
+  private void releaseAllLocks() {
+    for (ILock lock : lockManager.getLocks()) {
+      lockManager.releaseLock(lock);
+    }
+  }
+
   @Test
   public void testLostLock() throws Exception {
     expectTaskKilled();
@@ -654,9 +660,7 @@ public class JobUpdaterIT extends EasyMockTest {
 
     // Instance 0 is updated.
     updater.start(update, USER);
-    for (ILock lock : lockManager.getLocks()) {
-      lockManager.releaseLock(lock);
-    }
+    releaseAllLocks();
     clock.advance(RUNNING_TIMEOUT);
     ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
     actions.putAll(0, INSTANCE_UPDATING);
@@ -957,6 +961,69 @@ public class JobUpdaterIT extends EasyMockTest {
     control.replay();
 
     updater.pause(JOB, USER);
+  }
+
+  @Test
+  public void testAbortAfterLostLock() throws Exception {
+    expectTaskKilled();
+
+    control.replay();
+
+    IJobUpdate update = makeJobUpdate(makeInstanceConfig(0, 0, OLD_CONFIG));
+    insertInitialTasks(update);
+
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+
+    updater.start(update, USER);
+    actions.putAll(0, INSTANCE_UPDATING);
+    assertState(ROLLING_FORWARD, actions.build());
+    releaseAllLocks();
+    updater.abort(update.getSummary().getJobKey(), "test");
+    clock.advance(WATCH_TIMEOUT);
+    assertState(ERROR, actions.build());
+  }
+
+  @Test
+  public void testStartUpdateAfterPausedAndLockLost() throws Exception {
+    // Tests for regression of AURORA-1023, in which a user could paint themselves into a corner
+    // by starting an update, pausing it, and forcibly releasing the job lock.  The result in this
+    // behavior should be to prevent further job updates until the user aborts the first one.
+
+    expectTaskKilled();
+
+    control.replay();
+
+    IJobUpdate update = makeJobUpdate(makeInstanceConfig(0, 0, OLD_CONFIG));
+    insertInitialTasks(update);
+
+    changeState(JOB, 0, ASSIGNED, STARTING, RUNNING);
+    clock.advance(WATCH_TIMEOUT);
+
+    ImmutableMultimap.Builder<Integer, JobUpdateAction> actions = ImmutableMultimap.builder();
+
+    updater.start(update, USER);
+    actions.putAll(0, INSTANCE_UPDATING);
+    assertState(ROLLING_FORWARD, actions.build());
+
+    updater.pause(update.getSummary().getJobKey(), "test");
+    assertState(ROLL_FORWARD_PAUSED, actions.build());
+    clock.advance(WATCH_TIMEOUT);
+
+    releaseAllLocks();
+
+    JobUpdate builder = makeJobUpdate(makeInstanceConfig(0, 0, OLD_CONFIG)).newBuilder();
+    builder.getSummary().setUpdateId("another update");
+    IJobUpdate update2 = IJobUpdate.build(builder);
+
+    try {
+      updater.start(update2, USER);
+      fail();
+    } catch (UpdateStateException e) {
+      // Expected.
+    }
   }
 
   private static IJobUpdateSummary makeUpdateSummary() {
