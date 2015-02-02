@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
 import javax.inject.Qualifier;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
@@ -73,15 +74,17 @@ import static org.apache.aurora.scheduler.base.Tasks.SCHEDULED_TO_ASSIGNED;
  * To avoid excessive churn, the preemptor requires that a task is PENDING for a duration
  * (dictated by {@link #preemptionCandidacyDelay}) before it becomes eligible to preempt other
  */
-class PreemptorImpl implements Preemptor {
+@VisibleForTesting
+public class PreemptorImpl implements Preemptor {
 
   /**
    * Binding annotation for the time interval after which a pending task becomes eligible to
    * preempt other tasks.
    */
+  @VisibleForTesting
   @Qualifier
   @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-  @interface PreemptionDelay { }
+  public @interface PreemptionDelay { }
 
   private final AtomicLong tasksPreempted = Stats.exportLong("preemptor_tasks_preempted");
   // Incremented every time the preemptor is invoked and finds tasks pending and preemptable tasks
@@ -119,7 +122,7 @@ class PreemptorImpl implements Preemptor {
    * @param clock Clock to check current time.
    */
   @Inject
-  public PreemptorImpl(
+  PreemptorImpl(
       Storage storage,
       StateManager stateManager,
       OfferQueue offerQueue,

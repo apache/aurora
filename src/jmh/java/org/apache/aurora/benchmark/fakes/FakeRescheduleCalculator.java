@@ -11,14 +11,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.aurora.benchmark;
+package org.apache.aurora.benchmark.fakes;
 
-import org.openjdk.jmh.annotations.Benchmark;
+import org.apache.aurora.scheduler.async.RescheduleCalculator;
+import org.apache.aurora.scheduler.storage.entities.IScheduledTask;
 
-public class SchedulerBenchmark {
+public class FakeRescheduleCalculator implements RescheduleCalculator {
+  @Override
+  public long getStartupScheduleDelayMs(IScheduledTask task) {
+    return 0;
+  }
 
-  @Benchmark
-  public void example() {
-    // TODO(maxim): implement benchmark.
+  @Override
+  public long getFlappingPenaltyMs(IScheduledTask task) {
+    return 0;
   }
 }

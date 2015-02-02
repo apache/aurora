@@ -94,9 +94,10 @@ public interface TaskScheduler extends EventSubscriber {
     /**
      * Binding annotation for the time duration of reservations.
      */
+    @VisibleForTesting
     @Qualifier
     @Target({ FIELD, PARAMETER, METHOD }) @Retention(RUNTIME)
-    @interface ReservationDuration { }
+    public @interface ReservationDuration { }
 
     private static final Logger LOG = Logger.getLogger(TaskSchedulerImpl.class.getName());
 

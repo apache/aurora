@@ -445,9 +445,11 @@ jmh {
   resultsFile = project.file("$buildDir/reports/jmh/results.txt")
 
   // JMH run configuration parameters.
-  iterations = 3
+  iterations = 100
   fork = 1
-  warmupIterations = 1
+  warmupIterations = 10
+  benchmarkMode = 'avgt'
+  timeUnit = 'ns'
 }
 tasks.getByName('jmh').doLast() {
   println "Benchmark report generated: file://$jmhHumanOutputPath"
