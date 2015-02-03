@@ -14,9 +14,7 @@
 package org.apache.aurora.scheduler.storage;
 
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -49,7 +47,6 @@ import org.apache.aurora.scheduler.storage.mem.MemStorage;
 import org.junit.Before;
 import org.junit.Test;
 
-import static org.apache.aurora.gen.ScheduleStatus.KILLED;
 import static org.apache.aurora.gen.ScheduleStatus.PENDING;
 import static org.apache.aurora.gen.ScheduleStatus.RUNNING;
 import static org.junit.Assert.assertEquals;
@@ -105,39 +102,6 @@ public class StorageBackfillTest {
         .setConstraints(ImmutableSet.of(ConfigurationManager.hostLimitConstraint(1))));
 
     assertEquals(expected, getTask(TASK_ID).getAssignedTask().getTask());
-  }
-
-  @Test
-  public void testShardUniquenessCorrection() throws Exception {
-    final AtomicInteger taskId = new AtomicInteger();
-
-    final TaskConfig task = defaultTask();
-    SanitizedConfiguration job = makeJob(JOB_KEY, task, 10);
-    final Set<IScheduledTask> badTasks = ImmutableSet.copyOf(Iterables.transform(
-        job.getInstanceIds(),
-        new Function<Integer, IScheduledTask>() {
-          @Override
-          public IScheduledTask apply(Integer instanceId) {
-            return IScheduledTask.build(new ScheduledTask()
-                .setStatus(RUNNING)
-                .setAssignedTask(new AssignedTask()
-                    .setInstanceId(0)
-                    .setTaskId("task-" + taskId.incrementAndGet())
-                    .setTask(task)));
-          }
-        }));
-
-    storage.write(new Storage.MutateWork.NoResult.Quiet() {
-      @Override
-      protected void execute(Storage.MutableStoreProvider storeProvider) {
-        storeProvider.getUnsafeTaskStore().saveTasks(badTasks);
-      }
-    });
-
-    backfill();
-
-    assertEquals(1, getTasksByStatus(RUNNING).size());
-    assertEquals(9, getTasksByStatus(KILLED).size());
   }
 
   @Test
