@@ -183,3 +183,8 @@ class HookedAuroraClientAPI(NonHookedAuroraClientAPI):
         _partial(super(HookedAuroraClientAPI, self).update_job,
             config, health_check_interval_seconds=health_check_interval_seconds,
             instances=instances))
+
+  def start_job_update(self, config, instances=None):
+    return self._hooked_call(config, None,
+        _partial(super(HookedAuroraClientAPI, self).start_job_update,
+            config, instances=instances))

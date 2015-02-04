@@ -86,11 +86,13 @@ You can associate `pre_`, `post_`, and `err_` hooks with the following methods. 
 
   Aurora Client API Method | Client API Method Argument Signature | Aurora Command Line Command
   -------------------------| ------------------------------------- | ---------------------------
-  ```cancel_update``` | ```self```, ```job_key``` | ```cancel_update```
-  ```create_job``` | ```self```, ```config``` | ```create```, <code>runtask
-  ```restart``` | ```self```, ```job_key```, ```shards```, ```update_config```, ```health_check_interval_seconds``` | ```restart```
-  ```update_job``` | ```self```, ```config```, ```health_check_interval_seconds=3```, ```shards=None``` | ```update```
-  ```kill_job``` | ```self```, ```job_key```, ```shards=None``` |  ```kill```
+  ```cancel_update``` | ```self```, ```job_key``` | ```job cancel-update```
+  ```create_job``` | ```self```, ```config``` | ```job create```, <code>runtask
+  ```restart``` | ```self```, ```job_key```, ```shards```, ```update_config```, ```health_check_interval_seconds``` | ```job restart```
+  ```update_job``` | ```self```, ```config```, ```health_check_interval_seconds=3```, ```shards=None``` | ```job update```
+  ```kill_job``` | ```self```, ```job_key```, ```shards=None``` |  ```job kill```
+  ```start_cronjob``` | ```self```, ```job_key``` | ```cron start```
+  ```start_job_update``` | ```self```, ```config```, ```instances=None``` | ```beta-update start```
 
 Some specific examples:
 
@@ -189,7 +191,7 @@ If this method returns False, the API command call aborts.
 
 ## Generic Hooks
 
-There are five Aurora API Methods which any of the three hook types can attach to. Thus, there are 15 possible hook/method combinations for a single `.aurora` config file. Say that you define `pre_` and `post_` hooks for the `restart` method. That leaves 13 undefined hook/method combinations; `err_restart` and the 3 `pre_`, `post_`, and `err_` hooks for each of the other 4 hookable methods. You can define what happens when any of these otherwise undefined 13 hooks execute via a generic hook, whose signature is:
+There are seven Aurora API Methods which any of the three hook types can attach to. Thus, there are 21 possible hook/method combinations for a single `.aurora` config file. Say that you define `pre_` and `post_` hooks for the `restart` method. That leaves 19 undefined hook/method combinations; `err_restart` and the 3 `pre_`, `post_`, and `err_` hooks for each of the other 6 hookable methods. You can define what happens when any of these otherwise undefined 19 hooks execute via a generic hook, whose signature is:
 
 ```python
 generic_hook(self, hook_config, event, method_name, result_or_err, args*, kw**)
