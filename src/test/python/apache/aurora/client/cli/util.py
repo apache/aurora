@@ -327,10 +327,9 @@ jobs = [HELLO_WORLD]
     return '%s/%s' % (cls.TEST_JOBSPEC, instances_spec)
 
   @classmethod
-  def get_test_config(cls, base, cluster, role, env, job, filler=''):
+  def get_test_config(cls, base, cluster, role, env, job, inner=''):
     """Create a config from the template"""
-    return base % {'job': job, 'role': role, 'env': env, 'cluster': cluster,
-        'inner': filler}
+    return base % {'job': job, 'role': role, 'env': env, 'cluster': cluster, 'inner': inner}
 
   @classmethod
   def get_unbound_test_config(cls, role=None, env=None, job=None):

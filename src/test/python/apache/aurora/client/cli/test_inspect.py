@@ -26,7 +26,7 @@ from .util import AuroraClientCommandTest
 
 class TestInspectCommand(AuroraClientCommandTest):
   def get_job_config(self):
-    config = AuroraConfig(job=Job(
+    return AuroraConfig(job=Job(
       cluster='west',
       role='bozo',
       environment='test',
@@ -41,7 +41,6 @@ class TestInspectCommand(AuroraClientCommandTest):
       instances=3,
       cron_schedule='* * * * *'
     ))
-    return config
 
   def test_inspect_job(self):
     mock_stdout = []

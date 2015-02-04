@@ -734,11 +734,17 @@ class UpdateCommand(Verb):
     instances = (None if context.options.instance_spec.instance == ALL_INSTANCES else
         context.options.instance_spec.instance)
     config = context.get_job_config(job, context.options.config_file)
+
+    if not config.job().taskConfig.isService and not config.job().cronSchedule:
+      raise context.CommandError(
+          EXIT_COMMAND_FAILURE,
+          "Only service and cron jobs may be updated this way, "
+          "please kill and re-create your job instead.")
+
     api = context.get_api(config.cluster())
     if not context.options.force:
       self.warn_if_dangerous_change(context, api, job, config)
-    resp = api.update_job(config, context.options.healthcheck_interval_seconds,
-        instances)
+    resp = api.update_job(config, context.options.healthcheck_interval_seconds, instances)
     context.log_response_and_raise(resp, err_code=EXIT_COMMAND_FAILURE,
         err_msg="Update failed due to error:")
     context.print_out("Update completed successfully")

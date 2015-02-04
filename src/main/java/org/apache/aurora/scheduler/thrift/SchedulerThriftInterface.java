@@ -1361,6 +1361,10 @@ class SchedulerThriftInterface implements AuroraAdmin.Iface {
         .setEnvironment(mutableRequest.getTaskConfig().getEnvironment())
         .setName(mutableRequest.getTaskConfig().getJobName())));
 
+    if (!mutableRequest.getTaskConfig().isIsService()) {
+      return invalidResponse("Updates are not supported for non-service tasks.");
+    }
+
     JobUpdateSettings settings = requireNonNull(mutableRequest.getSettings());
     if (settings.getUpdateGroupSize() <= 0) {
       return invalidResponse("updateGroupSize must be positive.");

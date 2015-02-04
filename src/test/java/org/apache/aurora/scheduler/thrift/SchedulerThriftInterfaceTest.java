@@ -699,11 +699,18 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     assertResponse(INVALID_REQUEST, thrift.createJob(makeJob(task), DEFAULT_LOCK, SESSION));
   }
 
-  private IScheduledTask buildScheduledTask(int instanceId, long ramMb) {
+  private IScheduledTask buildTaskForJobUpdate(int instanceId) {
+    return buildTaskForJobUpdate(instanceId, "data");
+  }
+
+  private IScheduledTask buildTaskForJobUpdate(int instanceId, String executorData) {
     return IScheduledTask.build(new ScheduledTask()
         .setAssignedTask(new AssignedTask()
             .setInstanceId(instanceId)
-            .setTask(populatedTask().setRamMb(ramMb))));
+            .setTask(ConfigurationManager.applyDefaultsIfUnset(populatedTask()
+                .setRamMb(5)
+                .setIsService(true)
+                .setExecutorConfig(new ExecutorConfig().setData(executorData))))));
   }
 
   private IScheduledTask buildScheduledTask() {
@@ -2566,17 +2573,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
 
-    ITaskConfig newTask = buildScheduledTask(0, 8).getAssignedTask().getTask();
-    expect(taskIdGenerator.generate(newTask, 6))
-        .andReturn(TASK_ID);
+    ITaskConfig newTask = buildTaskForJobUpdate(0).getAssignedTask().getTask();
+    expect(taskIdGenerator.generate(newTask, 6)).andReturn(TASK_ID);
 
-    IScheduledTask oldTask1 = buildScheduledTask(0, 5);
-    IScheduledTask oldTask2 = buildScheduledTask(1, 5);
-    IScheduledTask oldTask3 = buildScheduledTask(2, 7);
-    IScheduledTask oldTask4 = buildScheduledTask(3, 7);
-    IScheduledTask oldTask5 = buildScheduledTask(4, 5);
-    IScheduledTask oldTask6 = buildScheduledTask(5, 5);
-    IScheduledTask oldTask7 = buildScheduledTask(6, 5);
+    IScheduledTask oldTask1 = buildTaskForJobUpdate(0, "old");
+    IScheduledTask oldTask2 = buildTaskForJobUpdate(1, "old");
+    IScheduledTask oldTask3 = buildTaskForJobUpdate(2, "old2");
+    IScheduledTask oldTask4 = buildTaskForJobUpdate(3, "old2");
+    IScheduledTask oldTask5 = buildTaskForJobUpdate(4, "old");
+    IScheduledTask oldTask6 = buildTaskForJobUpdate(5, "old");
+    IScheduledTask oldTask7 = buildTaskForJobUpdate(6, "old");
 
     IJobUpdate update = buildJobUpdate(6, newTask, ImmutableMap.of(
         oldTask1.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 1), new Range(4, 6)),
@@ -2612,16 +2618,17 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
 
-    ITaskConfig newTask = buildScheduledTask(0, 5).getAssignedTask().getTask();
-    expect(taskIdGenerator.generate(newTask, 1))
-        .andReturn(TASK_ID);
+    ITaskConfig newTask = buildTaskForJobUpdate(0).getAssignedTask().getTask();
+    expect(taskIdGenerator.generate(newTask, 1)).andReturn(TASK_ID);
 
-    IScheduledTask oldTask1 = buildScheduledTask(0, 5);
-    IScheduledTask oldTask2 = buildScheduledTask(1, 5);
+    IScheduledTask oldTask1 = buildTaskForJobUpdate(0);
+    IScheduledTask oldTask2 = buildTaskForJobUpdate(1);
 
     // Set instance count to 1 to generate empty desired state in diff.
-    IJobUpdate update = buildJobUpdate(1, newTask, ImmutableMap.of(
-        oldTask1.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 1))));
+    IJobUpdate update = buildJobUpdate(
+        1,
+        newTask,
+        ImmutableMap.of(oldTask1.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 1))));
 
     expect(quotaManager.checkJobUpdate(anyObject(IJobUpdate.class))).andReturn(ENOUGH_QUOTA);
 
@@ -2719,8 +2726,15 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   @Test
+  public void testStartUpdateFailsNonServiceTask() throws Exception {
+    control.replay();
+    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(false));
+    assertResponse(INVALID_REQUEST, thrift.startJobUpdate(request, SESSION));
+  }
+
+  @Test
   public void testStartUpdateFailsAuth() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
+    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(true));
     expectAuth(ROLE, false);
 
     control.replay();
@@ -2729,7 +2743,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdateFailsForCronJob() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
+    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(true));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(true);
 
@@ -2739,7 +2753,8 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdateFailsConfigValidation() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setNumCpus(-1));
+    JobUpdateRequest request =
+        buildJobUpdateRequest(populatedTask().setIsService(true).setNumCpus(-1));
     expectAuth(ROLE, true);
 
     control.replay();
@@ -2751,9 +2766,9 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
-    ITaskConfig newTask = buildScheduledTask(0, 5).getAssignedTask().getTask();
+    ITaskConfig newTask = buildTaskForJobUpdate(0).getAssignedTask().getTask();
 
-    IScheduledTask oldTask = buildScheduledTask(0, 5);
+    IScheduledTask oldTask = buildTaskForJobUpdate(0);
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active(), oldTask);
 
     IJobUpdate update = buildJobUpdate(
@@ -2776,10 +2791,10 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
 
-    IScheduledTask oldTask = buildScheduledTask(0, 5);
+    IScheduledTask oldTask = buildTaskForJobUpdate(0);
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active(), oldTask);
 
-    ITaskConfig newTask = buildScheduledTask(0, 8).getAssignedTask().getTask();
+    ITaskConfig newTask = buildTaskForJobUpdate(0).getAssignedTask().getTask();
     JobUpdate builder = buildJobUpdate(
         1,
         newTask,
@@ -2795,7 +2810,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdateFailsInstanceCountCheck() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
+    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(true));
     request.setInstanceCount(4001);
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
@@ -2810,7 +2825,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdateFailsTaskIdLength() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
+    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(true));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
@@ -2826,12 +2841,12 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
 
   @Test
   public void testStartUpdateFailsQuotaCheck() throws Exception {
-    JobUpdateRequest request = buildJobUpdateRequest(populatedTask());
+    JobUpdateRequest request = buildJobUpdateRequest(populatedTask().setIsService(true));
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
 
-    IScheduledTask oldTask = buildScheduledTask(0, 5);
+    IScheduledTask oldTask = buildTaskForJobUpdate(0);
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active(), oldTask);
     expect(taskIdGenerator.generate(ITaskConfig.build(request.getTaskConfig()), 6))
         .andReturn(TASK_ID);
@@ -2852,16 +2867,16 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     expectAuth(ROLE, true);
     expect(cronJobManager.hasJob(JOB_KEY)).andReturn(false);
 
-    IScheduledTask oldTask = buildScheduledTask(0, 5);
-    ITaskConfig newTask = buildScheduledTask(0, 1024).getAssignedTask().getTask();
+    IScheduledTask oldTask = buildTaskForJobUpdate(0, "old");
+    ITaskConfig newTask = buildTaskForJobUpdate(0, "new").getAssignedTask().getTask();
 
-    IJobUpdate update = buildJobUpdate(1, newTask, ImmutableMap.of(
-        oldTask.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 0))
-    ));
+    IJobUpdate update = buildJobUpdate(
+        1,
+        newTask,
+        ImmutableMap.of(oldTask.getAssignedTask().getTask(), ImmutableSet.of(new Range(0, 0))));
 
     expect(uuidGenerator.createNew()).andReturn(UU_ID);
-    expect(taskIdGenerator.generate(ITaskConfig.build(populatedTask()), 1))
-        .andReturn(TASK_ID);
+    expect(taskIdGenerator.generate(newTask, 1)).andReturn(TASK_ID);
     expect(quotaManager.checkJobUpdate(update)).andReturn(ENOUGH_QUOTA);
     storageUtil.expectTaskFetch(Query.unscoped().byJob(JOB_KEY).active(), oldTask);
     jobUpdateController.start(update, USER);
@@ -3095,7 +3110,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
   }
 
   private static TaskConfig populatedTask() {
-    return defaultTask(true).setConstraints(ImmutableSet.of(
+    return defaultTask(true).setConstraints(Sets.newHashSet(
         new Constraint("host", TaskConstraint.limit(new LimitConstraint(1)))));
   }
 
@@ -3120,7 +3135,7 @@ public class SchedulerThriftInterfaceTest extends EasyMockTest {
     return new JobUpdateRequest()
         .setInstanceCount(6)
         .setSettings(buildJobUpdateSettings())
-        .setTaskConfig(config);
+        .setTaskConfig(ConfigurationManager.applyDefaultsIfUnset(config));
   }
 
   private static JobUpdateSettings buildJobUpdateSettings() {

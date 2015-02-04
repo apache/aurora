@@ -15,7 +15,8 @@ import contextlib
 import functools
 
 import pytest
-from mock import create_autospec, Mock, patch
+from mock import call, create_autospec, Mock, patch
+from pystachio import Empty
 from twitter.common.contextutil import temporary_file
 
 from apache.aurora.client.api.health_check import Retriable, StatusHealthCheck
@@ -27,6 +28,8 @@ from apache.aurora.client.cli.client import AuroraCommandLine
 from apache.aurora.client.cli.jobs import UpdateCommand
 from apache.aurora.client.cli.options import TaskInstanceKey
 from apache.aurora.config import AuroraConfig
+from apache.aurora.config.schema.base import Job
+from apache.thermos.config.schema_base import MB, Process, Resources, Task
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext, IOMock, mock_verb_options
 
@@ -60,16 +63,26 @@ class TestJobUpdateCommand(AuroraClientCommandTest):
     self._mock_api = self._fake_context.get_api("test")
 
   @classmethod
-  def create_mock_config(cls, is_cron=False):
-    mock_config = create_autospec(spec=AuroraConfig, spec_set=True, instance=True)
-    mock_raw_config = Mock()
-    mock_raw_config.has_cron_schedule.return_value = is_cron
-    mock_config.raw = Mock(return_value=mock_raw_config)
-    return mock_config
+  def get_job_config(self, is_service=True, is_cron=False):
+    return AuroraConfig(job=Job(
+      cluster='west',
+      role='bozo',
+      environment='test',
+      name='the_job',
+      service=is_service,
+      cron_schedule='* * * * *' if is_cron else Empty,
+      task=Task(
+        name='task',
+        processes=[Process(cmdline='ls -la', name='process')],
+        resources=Resources(cpu=1.0, ram=1024 * MB, disk=1024 * MB)
+      ),
+      contact='bozo@the.clown',
+      instances=3,
+    ))
 
   def test_update_with_lock(self):
-    mock_config = self.create_mock_config()
-    self._fake_context.get_job_config = Mock(return_value=mock_config)
+    config = self.get_job_config()
+    self._fake_context.get_job_config = Mock(return_value=config)
     self._mock_api.update_job.return_value = self.create_blank_response(
         ResponseCode.LOCK_ERROR, "Error.")
 
@@ -77,14 +90,14 @@ class TestJobUpdateCommand(AuroraClientCommandTest):
       self._command.execute(self._fake_context)
 
     self._mock_api.update_job.assert_called_once_with(
-      mock_config,
+      config,
       self._mock_options.healthcheck_interval_seconds,
       self._mock_options.instance_spec.instance)
     self.assert_lock_message(self._fake_context)
 
   def test_update_print_error_once(self):
-    mock_config = self.create_mock_config()
-    self._fake_context.get_job_config = Mock(return_value=mock_config)
+    config = self.get_job_config()
+    self._fake_context.get_job_config = Mock(return_value=config)
     error = "Error printed once."
     self._mock_api.update_job.return_value = self.create_blank_response(
         ResponseCode.INVALID_REQUEST,
@@ -94,7 +107,7 @@ class TestJobUpdateCommand(AuroraClientCommandTest):
       self._command.execute(self._fake_context)
 
     self._mock_api.update_job.assert_called_once_with(
-      mock_config,
+      config,
       self._mock_options.healthcheck_interval_seconds,
       self._mock_options.instance_spec.instance)
     assert self._fake_context.get_err() == ["Update failed due to error:", "\t%s" % error]
@@ -103,16 +116,36 @@ class TestJobUpdateCommand(AuroraClientCommandTest):
     self._mock_options.instance_spec = TaskInstanceKey(self.TEST_JOBKEY, [1])
     self._mock_options.strict = True
 
-    mock_config = self.create_mock_config()
-    self._fake_context.get_job_config = Mock(return_value=mock_config)
+    config = self.get_job_config()
+    self._fake_context.get_job_config = Mock(return_value=config)
     self._mock_api.update_job.return_value = self.create_simple_success_response()
 
     self._command.execute(self._fake_context)
 
-    self._mock_api.update_job.assert_called_once_with(
-      mock_config,
-      self._mock_options.healthcheck_interval_seconds,
-      self._mock_options.instance_spec.instance)
+    assert self._mock_api.update_job.mock_calls == [
+        call(
+            config,
+            self._mock_options.healthcheck_interval_seconds,
+            self._mock_options.instance_spec.instance)]
+
+  def test_update_non_service(self):
+    self._fake_context.get_job_config = Mock(return_value=self.get_job_config(is_service=False))
+
+    # Command failure is the only expectation here, as the request was invalid.
+    with pytest.raises(Context.CommandError):
+      self._command.execute(self._fake_context)
+
+  def test_update_cron(self):
+    config = self.get_job_config(is_cron=True)
+    self._fake_context.get_job_config = Mock(return_value=config)
+    self._mock_api.update_job.return_value = self.create_simple_success_response()
+
+    self._command.execute(self._fake_context)
+    assert self._mock_api.update_job.mock_calls == [
+        call(
+            config,
+            self._mock_options.healthcheck_interval_seconds,
+            self._mock_options.instance_spec.instance)]
 
 
 class TestUpdateCommand(AuroraClientCommandTest):
@@ -133,7 +166,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
       mock_api = mock_context.get_api('west')
       mock_api.update_job.return_value = self.create_simple_success_response()
       with temporary_file() as fp:
-        fp.write(self.get_valid_config())
+        fp.write(self.get_service_config())
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'update', '--force', self.TEST_JOBSPEC, fp.name])
@@ -261,6 +294,16 @@ class TestUpdateCommand(AuroraClientCommandTest):
     mock_job_monitor.wait_until.return_value = True
     return mock_job_monitor
 
+  @classmethod
+  def get_service_config(cls):
+    return cls.get_test_config(
+      cls.CONFIG_BASE,
+      cls.TEST_CLUSTER,
+      cls.TEST_ROLE,
+      cls.TEST_ENV,
+      cls.TEST_JOB,
+      inner='service=True,')
+
   def test_updater_simple(self):
     # Test the client-side updater logic in its simplest case: everything succeeds,
     # and no rolling updates. (Rolling updates are covered by the updater tests.)
@@ -285,7 +328,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('time.sleep', return_value=None),
         patch('threading._Event.wait')):
       with temporary_file() as fp:
-        fp.write(self.get_valid_config())
+        fp.write(self.get_service_config())
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'update', 'west/bozo/test/hello', fp.name])
@@ -324,7 +367,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('time.sleep', return_value=None),
         patch('threading._Event.wait')):
       with temporary_file() as fp:
-        fp.write(self.get_valid_config())
+        fp.write(self.get_service_config())
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'update', 'west/bozo/test/hello/1', fp.name])
@@ -361,7 +404,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
         patch('time.sleep', return_value=None),
         patch('threading._Event.wait')):
       with temporary_file() as fp:
-        fp.write(self.get_valid_config())
+        fp.write(self.get_service_config())
         fp.flush()
         cmd = AuroraCommandLine()
         cmd.execute(['job', 'update', 'west/bozo/test/hello', fp.name])
@@ -375,7 +418,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     mock_job_monitor = self.setup_job_monitor()
     fake_mux = self.FakeSchedulerMux()
     self.setup_mock_scheduler_for_simple_update(mock_api, count=2)
-    config = self.get_valid_config()
+    config = self.get_service_config()
     config = config.replace("instances = 20", "instances = 2")
     with contextlib.nested(
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
@@ -404,7 +447,7 @@ class TestUpdateCommand(AuroraClientCommandTest):
     fake_mux = self.FakeSchedulerMux()
     self.setup_mock_scheduler_for_simple_update(mock_api, count=20)
 
-    config = self.get_valid_config()
+    config = self.get_service_config()
     config = config.replace("instances = 20", "instances = 200")
     with contextlib.nested(
         patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
