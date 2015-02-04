@@ -19,8 +19,10 @@ apt-get update
 apt-get -y install \
     curl \
     git \
+    libapr1-dev \
     libcurl4-openssl-dev \
     libsasl2-dev \
+    libsvn-dev \
     lxc-docker \
     openjdk-7-jdk \
     python-dev \
@@ -33,7 +35,7 @@ update-alternatives --set java /usr/lib/jvm/java-7-openjdk-amd64/jre/bin/java
 # that want to advertise the hostname to the user, or other components.
 hostname 192.168.33.7
 
-MESOS_VERSION=0.20.1
+MESOS_VERSION=0.21.1
 
 function prepare_extras() {
   pushd aurora

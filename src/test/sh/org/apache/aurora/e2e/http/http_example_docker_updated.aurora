@@ -32,7 +32,7 @@ test_task = Task(
 update_config = UpdateConfig(watch_secs=10, batch_size=2)
 health_check_config = HealthCheckConfig(initial_interval_secs=5, interval_secs=1)
 
-job = Job(
+job = Service(
   name = 'http_example_docker',
   cluster = 'devcluster',
   instances = 3,

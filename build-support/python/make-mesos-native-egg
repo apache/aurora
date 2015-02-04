@@ -62,8 +62,10 @@ EOF
 
 UBUNTU_TRUSTY64_DEPENDENCIES=(
   g++-4.8
+  libapr1-dev
   libcurl4-nss-dev
   libsasl2-dev
+  libsvn-dev
   python-dev
   python-virtualenv
   zlib1g-dev
@@ -87,11 +89,13 @@ EOF
 }
 
 CENTOS6_X86_64_DEPENDENCIES=(
+  apr-devel
   cyrus-sasl-devel
   gcc-c++
   libcurl-devel
   patch
   python27-python-devel
+  subversion-devel
   zlib-devel
 )
 build_centos6() {
@@ -118,11 +122,13 @@ EOF
 }
 
 CENTOS7_X86_64_DEPENDENCIES=(
+  apr-devel
   cyrus-sasl-devel
   gcc-c++
   libcurl-devel
   patch
   python-devel
+  subversion-devel
   zlib-devel
 )
 build_centos7() {

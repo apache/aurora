@@ -29,7 +29,7 @@ test_task = Task(
   processes = [stage_server, run_server],
   constraints = order(stage_server, run_server))
 
-job = Job(
+job = Service(
   name = 'http_example',
   cluster = 'devcluster',
   instances = 2,
