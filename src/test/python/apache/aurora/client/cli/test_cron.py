@@ -26,7 +26,6 @@ from apache.aurora.client.cli import (
     EXIT_OK
 )
 from apache.aurora.client.cli.client import AuroraCommandLine
-from apache.aurora.common.aurora_job_key import AuroraJobKey
 from apache.aurora.config import AuroraConfig
 
 from .util import AuroraClientCommandTest, FakeAuroraCommandContext
@@ -38,7 +37,6 @@ class TestCronNoun(AuroraClientCommandTest):
 
   def test_successful_schedule(self):
     mock_context = FakeAuroraCommandContext()
-    key = AuroraJobKey("west", "bozo", "test", "hello")
     with contextlib.nested(
         patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context)):
 
@@ -48,7 +46,7 @@ class TestCronNoun(AuroraClientCommandTest):
         fp.write(self.get_valid_cron_config())
         fp.flush()
         cmd = AuroraCommandLine()
-        cmd.execute(['cron', 'schedule', key.to_path(), fp.name])
+        cmd.execute(['cron', 'schedule', self.TEST_JOBSPEC, fp.name])
 
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
@@ -56,7 +54,7 @@ class TestCronNoun(AuroraClientCommandTest):
       assert isinstance(api.schedule_cron.call_args[0][0], AuroraConfig)
 
       # The last text printed out to the user should contain a url to the job
-      assert mock_context.get_job_page(api, key) in mock_context.out[-1]
+      assert mock_context.get_job_page(api, self.TEST_JOBKEY) in mock_context.out[-1]
 
   def test_schedule_failed(self):
     mock_context = FakeAuroraCommandContext()
@@ -73,6 +71,7 @@ class TestCronNoun(AuroraClientCommandTest):
       # Now check that the right API calls got made.
       # Check that create_job was called exactly once, with an AuroraConfig parameter.
       assert api.schedule_cron.call_count == 1
+      assert isinstance(api.schedule_cron.call_args[0][0], AuroraConfig)
 
   def test_schedule_failed_non_cron(self):
     mock_context = FakeAuroraCommandContext()
@@ -100,47 +99,52 @@ class TestCronNoun(AuroraClientCommandTest):
       assert api.schedule_cron.call_count == 0
 
   def test_schedule_cron_deep_api(self):
-    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    with contextlib.nested(
-        patch('time.sleep'),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_scheduler_proxy.scheduleCronJob.return_value = self.create_simple_success_response()
+    mock_context = FakeAuroraCommandContext()
+    with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
+      api = mock_context.get_api("west")
+      api.schedule_cron.return_value = self.create_simple_success_response()
       with temporary_file() as fp:
         fp.write(self.get_valid_cron_config())
         fp.flush()
         cmd = AuroraCommandLine()
         result = cmd.execute(['cron', 'schedule', 'west/bozo/test/hello', fp.name])
         assert result == EXIT_OK
-        assert mock_scheduler_proxy.scheduleCronJob.call_count == 1
-        job = mock_scheduler_proxy.scheduleCronJob.call_args[0][0]
-        assert job.key == JobKey("bozo", "test", "hello")
+        assert api.schedule_cron.call_count == 1
+        config = api.schedule_cron.call_args[0][0]
+        assert config.role() == "bozo"
+        assert config.environment() == "test"
+        assert config.name() == "hello"
 
   def test_deschedule_cron_deep_api(self):
-    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    with contextlib.nested(
-        patch('time.sleep'),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_scheduler_proxy.descheduleCronJob.return_value = self.create_simple_success_response()
+    mock_context = FakeAuroraCommandContext()
+    with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
+      api = mock_context.get_api("west")
+      api.deschedule_cron.return_value = self.create_simple_success_response()
       cmd = AuroraCommandLine()
-      result = cmd.execute(['cron', 'deschedule', 'west/bozo/test/hello'])
+      result = cmd.execute(['cron', 'deschedule', self.TEST_JOBSPEC])
       assert result == EXIT_OK
-      assert mock_scheduler_proxy.descheduleCronJob.call_count == 1
-      mock_scheduler_proxy.descheduleCronJob.assert_called_with(JobKey(environment='test',
-          role='bozo', name='hello'), None)
+      api.deschedule_cron.assert_called_once_with(self.TEST_JOBKEY)
 
   def test_start_cron(self):
-    (mock_api, mock_scheduler_proxy) = self.create_mock_api()
-    with contextlib.nested(
-        patch('time.sleep'),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS)):
-      mock_scheduler_proxy.startCronJob.return_value = self.create_simple_success_response()
+    mock_context = FakeAuroraCommandContext()
+    with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
+      api = mock_context.get_api("west")
+      api.start_cronjob.return_value = self.create_simple_success_response()
       cmd = AuroraCommandLine()
       result = cmd.execute(['cron', 'start', 'west/bozo/test/hello'])
       assert result == EXIT_OK
-      mock_scheduler_proxy.startCronJob.assert_called_once_with(JobKey("bozo", "test", "hello"))
+      api.start_cronjob.assert_called_once_with(self.TEST_JOBKEY, config=None)
+
+  def test_start_cron_open_browser(self):
+    mock_context = FakeAuroraCommandContext()
+    with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
+      api = mock_context.get_api("west")
+      api.start_cronjob.return_value = self.create_simple_success_response()
+      cmd = AuroraCommandLine()
+      result = cmd.execute(['cron', 'start', self.TEST_JOBSPEC, '--open-browser'])
+      assert result == EXIT_OK
+      api.start_cronjob.assert_called_once_with(self.TEST_JOBKEY, config=None)
+      assert mock_context.showed_urls == ["http://something_or_other/scheduler/bozo/test/hello"]
 
   @classmethod
   def _create_getjobs_response(cls):
@@ -153,29 +157,21 @@ class TestCronNoun(AuroraClientCommandTest):
     return response
 
   def test_cron_status(self):
-    (_, mock_scheduler_proxy) = self.create_mock_api()
-    with contextlib.nested(
-        patch('time.sleep'),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.cli.context.AuroraCommandContext.print_out')) as (
-            _, _, _, mock_print):
-      mock_scheduler_proxy.getJobs.return_value = self._create_getjobs_response()
+    mock_context = FakeAuroraCommandContext()
+    with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
+      api = mock_context.get_api("west")
+      api.get_jobs.return_value = self._create_getjobs_response()
       cmd = AuroraCommandLine()
       result = cmd.execute(['cron', 'show', 'west/bozo/test/hello'])
 
       assert result == EXIT_OK
-      mock_scheduler_proxy.getJobs.assert_called_once_with("bozo")
-      mock_print.assert_called_with("west/bozo/test/hello\t * * * * *")
+      api.get_jobs.assert_called_once_with("bozo")
+      assert mock_context.get_out_str() == "west/bozo/test/hello\t * * * * *"
 
   def test_cron_status_multiple_jobs(self):
-    _, mock_scheduler_proxy = self.create_mock_api()
-    with contextlib.nested(
-        patch('time.sleep'),
-        patch('apache.aurora.client.api.SchedulerProxy', return_value=mock_scheduler_proxy),
-        patch('apache.aurora.client.factory.CLUSTERS', new=self.TEST_CLUSTERS),
-        patch('apache.aurora.client.cli.context.AuroraCommandContext.print_out')) as (
-            _, _, _, mock_print):
+    mock_context = FakeAuroraCommandContext()
+    with patch('apache.aurora.client.cli.cron.CronNoun.create_context', return_value=mock_context):
+      api = mock_context.get_api("west")
       response = self.create_simple_success_response()
       response.result = Result(getJobsResult=GetJobsResult(configs=[
           JobConfiguration(
@@ -185,11 +181,11 @@ class TestCronNoun(AuroraClientCommandTest):
               key=JobKey(role='bozo', environment='test', name='hello2'),
               cronSchedule='* * * * *')
       ]))
-      mock_scheduler_proxy.getJobs.return_value = response
+      api.get_jobs.return_value = response
 
       cmd = AuroraCommandLine()
       result = cmd.execute(['cron', 'show', 'west/bozo/test/hello'])
 
       assert result == EXIT_OK
-      mock_scheduler_proxy.getJobs.assert_called_once_with("bozo")
-      mock_print.assert_called_with("west/bozo/test/hello\t * * * * *")
+      api.get_jobs.assert_called_once_with("bozo")
+      assert mock_context.get_out_str() == "west/bozo/test/hello\t * * * * *"

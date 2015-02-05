@@ -111,7 +111,7 @@ class Start(Verb):
     context.log_response_and_raise(resp,
         err_msg=("Error starting cron job %s:" % context.options.jobspec))
     if context.options.open_browser:
-      context.open_job_page(api, context.options.job_spec)
+      context.open_job_page(api, context.options.jobspec)
     return EXIT_OK
 
 
