@@ -16,6 +16,7 @@ python_test_suite(name = 'all',
   dependencies = [
     ':test_disk',
     ':test_detector',
+    ':test_resource',
   ]
 )
 
@@ -34,3 +35,11 @@ python_tests(name = 'test_detector',
   ]
 )
 
+python_tests(name = 'test_resource',
+  sources = ['test_resource.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/main/python/apache/thermos/common:path',
+    'src/main/python/apache/thermos/monitoring:resource',
+  ]
+)
