@@ -17,11 +17,31 @@ python_test_suite(
   dependencies = [
     ':announcer',
     ':directory_sandbox',
+    ':executor_detector',
     ':executor_timeout',
     ':health_checker',
     ':kill_manager',
+    ':path_detector',
     ':status_checker',
     ':task_info',
+  ]
+)
+
+python_tests(name = 'executor_detector',
+  sources = [ 'test_executor_detector.py' ],
+  dependencies = [
+    '3rdparty/python:twitter.common.contextutil',
+    '3rdparty/python:twitter.common.dirutil',
+    'src/main/python/apache/aurora/executor/common:executor_detector'
+  ]
+)
+
+python_tests(name = 'path_detector',
+  sources = [ 'test_path_detector.py' ],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/main/python/apache/aurora/executor/common:executor_detector',
+    'src/main/python/apache/aurora/executor/common:path_detector',
   ]
 )
 

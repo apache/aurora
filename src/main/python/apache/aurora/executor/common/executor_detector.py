@@ -12,8 +12,8 @@
 # limitations under the License.
 #
 
+import glob
 import os
-from glob import glob
 
 from twitter.common.string import ScanfParser
 
@@ -79,7 +79,7 @@ class ExecutorDetector(object):
   def find(cls, root, slave_id='*', framework_id='*', executor_id='*', run='*'):
     mixins = dict(
         root=root, slave_id=slave_id, framework_id=framework_id, executor_id=executor_id, run=run)
-    return filter(None, map(cls.match, glob(os.path.join(*cls.PATTERN) % mixins)))
+    return filter(None, map(cls.match, glob.glob(os.path.join(*cls.PATTERN) % mixins)))
 
   def __init__(self, root=None):
     self.root = root or self.find_root(os.getcwd())

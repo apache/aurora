@@ -24,7 +24,6 @@ python_test_suite(
   name = 'executor-small',
   dependencies = [
     ':executor_base',
-    ':executor_detector',
     ':executor_vars',
     ':status_manager',
     ':thermos_task_runner',
@@ -57,15 +56,6 @@ python_tests(name = 'gc_executor',
     'src/main/python/apache/aurora/executor:gc_executor',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
   ],
-)
-
-python_tests(name = 'executor_detector',
-  sources = [ 'test_executor_detector.py' ],
-  dependencies = [
-    '3rdparty/python:twitter.common.contextutil',
-    '3rdparty/python:twitter.common.dirutil',
-    'src/main/python/apache/aurora/executor:executor_detector'
-  ]
 )
 
 python_tests(name = 'thermos_executor',

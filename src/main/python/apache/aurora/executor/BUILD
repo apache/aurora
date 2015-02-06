@@ -33,13 +33,6 @@ python_library(
   ]
 )
 
-python_library(
-  name = 'executor_detector',
-  sources = ['executor_detector.py'],
-  dependencies = [
-    '3rdparty/python:twitter.common.string',
-  ]
-)
 
 python_library(
   name = 'executor_vars',
@@ -98,7 +91,6 @@ python_library(
   name = 'gc_executor',
   sources = ['gc_executor.py'],
   dependencies = [
-    ':executor_detector',
     ':executor_base',
     '3rdparty/python:mesos.interface',
     '3rdparty/python:psutil',
@@ -114,6 +106,7 @@ python_library(
     'src/main/python/apache/thermos/monitoring:detector',
     'src/main/python/apache/thermos/monitoring:garbage',
     'src/main/python/apache/aurora/config:schema',
+    'src/main/python/apache/aurora/executor/common:executor_detector',
     'src/main/python/apache/aurora/executor/common:sandbox',
     'api/src/main/thrift/org/apache/aurora/gen:py-thrift',
     'api/src/main/thrift/org/apache/thermos:py-thrift',

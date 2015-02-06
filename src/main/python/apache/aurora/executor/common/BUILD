@@ -13,6 +13,23 @@
 #
 
 python_library(
+  name = 'executor_detector',
+  sources = ['executor_detector.py'],
+  dependencies = [
+    '3rdparty/python:twitter.common.string',
+  ]
+)
+
+python_library(
+  name = 'path_detector',
+  sources = ['path_detector.py'],
+  dependencies = [
+    'src/main/python/apache/thermos/monitoring:detector',
+    ':executor_detector',
+  ]
+)
+
+python_library(
   name = 'status_checker',
   sources = ['status_checker.py'],
   dependencies = [

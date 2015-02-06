@@ -18,6 +18,8 @@ python_library(
   name = 'detector',
   sources = ['detector.py'],
   dependencies = [
+    '3rdparty/python:twitter.common.lang',
+    'src/main/python/apache/thermos/common:constants',
     'src/main/python/apache/thermos/common:path',
   ]
 )

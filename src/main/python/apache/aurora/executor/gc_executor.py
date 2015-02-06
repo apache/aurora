@@ -40,9 +40,9 @@ from apache.thermos.core.inspector import CheckpointInspector
 from apache.thermos.monitoring.detector import TaskDetector
 from apache.thermos.monitoring.garbage import TaskGarbageCollector
 
+from .common.executor_detector import ExecutorDetector
 from .common.sandbox import DirectorySandbox
 from .executor_base import ExecutorBase
-from .executor_detector import ExecutorDetector
 
 from gen.apache.aurora.api.constants import TERMINAL_STATES
 from gen.apache.aurora.api.ttypes import ScheduleStatus

@@ -15,6 +15,7 @@
 python_test_suite(name = 'all',
   dependencies = [
     ':test_disk',
+    ':test_detector',
   ]
 )
 
@@ -22,6 +23,14 @@ python_tests(name = 'test_disk',
   sources = ['test_disk.py'],
   dependencies = [
     'src/main/python/apache/thermos/monitoring:disk',
+  ]
+)
+
+python_tests(name = 'test_detector',
+  sources = ['test_detector.py'],
+  dependencies = [
+    'src/main/python/apache/thermos/common:constants',
+    'src/main/python/apache/thermos/monitoring:detector',
   ]
 )
 
